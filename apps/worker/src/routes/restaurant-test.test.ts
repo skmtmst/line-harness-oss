@@ -51,6 +51,11 @@ function seedRestaurantFixture({
   tenantId?: string;
   name?: string;
 } = {}): void {
+  // 統括ゲート（飲食店機能パック）。このAPI群はゲートの内側を検証する
+  // フィクスチャなので、対象の統括には常にパックを付けておく。
+  // ゲート自体の検証（無し→404）は別のdescribeで明示的に行う。
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`)
+    .run(tenantId);
   testDb.raw.prepare(
     'INSERT INTO rt_organizations (id, account_id, tenant_id, name) VALUES (?, ?, ?, ?)',
   ).run('org-fixture', accountId, tenantId, name);
@@ -151,6 +156,10 @@ beforeEach(() => {
   testDb = createTestD1();
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/175_restaurant_terms_agreement.sql'), 'utf8'));
+  // 統括ゲート（飲食店機能パック）。このAPI群自体を検証するファイルなので
+  // 既定の統括には常にパックを付けておく。ゲート自体の検証（無し→404）は
+  // 別のdescribeで明示的に上書きする。
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = '00000000-0000-4000-8000-000000000001'`).run();
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
     endpoint: 'https://worker.example.test/webhook',
     active: true,
@@ -174,6 +183,16 @@ beforeEach(() => {
 describe('飲食店向けテストAPI', () => {
   it('無効な環境では専用APIを404にする', async () => {
     env.RESTAURANT_TEST_ENABLED = 'false';
+    const response = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect(response.status).toBe(404);
+  });
+
+  it('統括に飲食店機能パックが無いと、環境が有効でも専用APIを404にする', async () => {
+    // beforeEach で既定の統括へ付けたパックを外す。
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = '[]' WHERE id = '00000000-0000-4000-8000-000000000001'`).run();
+    seedRestaurantFixture();
+    // seedRestaurantFixture は毎回パックを付け直すので、fixture後にも外す。
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = '[]' WHERE id = '00000000-0000-4000-8000-000000000001'`).run();
     const response = await request('/api/restaurant-test/snapshot?account_id=account-1');
     expect(response.status).toBe(404);
   });
@@ -290,7 +309,7 @@ describe('飲食店向けテストAPI', () => {
 
   it('最初の規約同意時に認証スタッフの統括組織を1件だけ作る', async () => {
     const tenant = '00000000-0000-4000-8000-000000000099';
-    testDb.raw.prepare('INSERT INTO tenants (id, name) VALUES (?, ?)')
+    testDb.raw.prepare(`INSERT INTO tenants (id, name, feature_packs) VALUES (?, ?, '["restaurant"]')`)
       .run(tenant, '新しい統括');
     authMocks.getStaffByApiKey.mockResolvedValue({
       id: 'new-owner', name: 'New Owner', role: 'owner', access_level: 'full',

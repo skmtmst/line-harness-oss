@@ -120,6 +120,61 @@ describe('契約先の停止', () => {
   });
 });
 
+describe('契約先の機能パック（飲食店機能）', () => {
+  it('統括のオーナーは切り替えられない（403、データは変わらない）', async () => {
+    const res = await app(tenantOwner).request('/api/ops/tenants/tenant-a/feature-packs', {
+      ...json({ featurePacks: ['restaurant'] }), method: 'PATCH',
+    }, environment());
+    expect(res.status).toBe(403);
+    const row = testDb.raw.prepare('SELECT feature_packs FROM tenants WHERE id = ?').get('tenant-a') as { feature_packs: string };
+    expect(row.feature_packs).toBe('[]');
+  });
+
+  it('読み取り専用の運営マスターは切り替えられない', async () => {
+    const res = await app(readOnlyMaster).request('/api/ops/tenants/tenant-a/feature-packs', {
+      ...json({ featurePacks: ['restaurant'] }), method: 'PATCH',
+    }, environment());
+    expect(res.status).toBe(403);
+  });
+
+  it('知らないパック名は400で拒否する', async () => {
+    const res = await app(master).request('/api/ops/tenants/tenant-a/feature-packs', {
+      ...json({ featurePacks: ['unknown-pack'] }), method: 'PATCH',
+    }, environment());
+    expect(res.status).toBe(400);
+  });
+
+  it('存在しない統括は404', async () => {
+    const res = await app(master).request('/api/ops/tenants/no-such-tenant/feature-packs', {
+      ...json({ featurePacks: ['restaurant'] }), method: 'PATCH',
+    }, environment());
+    expect(res.status).toBe(404);
+  });
+
+  it('オンにすると feature_packs が更新され、契約先に見える監査が1件増える', async () => {
+    const res = await app(master).request('/api/ops/tenants/tenant-a/feature-packs', {
+      ...json({ featurePacks: ['restaurant'] }), method: 'PATCH',
+    }, environment());
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { featurePacks: string[] } };
+    expect(body.data.featurePacks).toEqual(['restaurant']);
+    const row = testDb.raw.prepare('SELECT feature_packs FROM tenants WHERE id = ?').get('tenant-a') as { feature_packs: string };
+    expect(JSON.parse(row.feature_packs)).toEqual(['restaurant']);
+    const audit = testDb.raw.prepare(`SELECT COUNT(*) AS c FROM platform_audit_logs WHERE tenant_id = ? AND action = 'tenant.feature_packs.change' AND visible_to_tenant = 1`).get('tenant-a') as { c: number };
+    expect(audit.c).toBe(1);
+  });
+
+  it('オフに戻すと feature_packs が空配列になる', async () => {
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = ? WHERE id = ?`).run('["restaurant"]', 'tenant-a');
+    const res = await app(master).request('/api/ops/tenants/tenant-a/feature-packs', {
+      ...json({ featurePacks: [] }), method: 'PATCH',
+    }, environment());
+    expect(res.status).toBe(200);
+    const row = testDb.raw.prepare('SELECT feature_packs FROM tenants WHERE id = ?').get('tenant-a') as { feature_packs: string };
+    expect(row.feature_packs).toBe('[]');
+  });
+});
+
 describe('代理ログイン', () => {
   it('既定は閲覧のみで始まり、契約先側の履歴には出ない', async () => {
     const res = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());

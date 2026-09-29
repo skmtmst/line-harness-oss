@@ -8608,10 +8608,12 @@ export const api = {
       return fetchApi<ApiResponse<OpsTenantRow[]> & { summary: OpsTenantSummary }>(`/api/ops/tenants${qs ? `?${qs}` : ''}`)
     },
     tenant: (id: string) => fetchApi<ApiResponse<OpsTenantDetail>>(`/api/ops/tenants/${encodeURIComponent(id)}`),
-    createTenant: (name: string) =>
-      fetchApi<ApiResponse<{ id: string; name: string }>>('/api/tenants', { method: 'POST', body: JSON.stringify({ name }) }),
+    createTenant: (name: string, featurePacks?: string[]) =>
+      fetchApi<ApiResponse<{ id: string; name: string }>>('/api/tenants', { method: 'POST', body: JSON.stringify(featurePacks === undefined ? { name } : { name, featurePacks }) }),
     changeTenantStatus: (id: string, input: { status: 'active' | 'suspended' | 'archived'; reason: string; confirmName?: string }) =>
       fetchApi<ApiResponse<{ status: string }>>(`/api/ops/tenants/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify(input) }),
+    setTenantFeaturePacks: (id: string, featurePacks: string[]) =>
+      fetchApi<ApiResponse<{ featurePacks: string[] }>>(`/api/ops/tenants/${encodeURIComponent(id)}/feature-packs`, { method: 'PATCH', body: JSON.stringify({ featurePacks }) }),
     impersonation: {
       current: () => fetchApi<ApiResponse<OpsImpersonation | null>>('/api/ops/impersonation/current'),
       start: (tenantId: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/start', { method: 'POST', body: JSON.stringify({ tenantId }) }),

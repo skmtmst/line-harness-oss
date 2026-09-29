@@ -17,6 +17,7 @@ import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
+import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
   GoogleBusinessError,
   buildAuthorizeUrl,
@@ -465,6 +466,10 @@ async function reviewFor(c: Context<Env>, storeId: string, id: string): Promise<
 
 export const googleAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
   if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
+  // restaurant-test.ts と同じ統括ゲート。パック無しは環境無効と同じ404。
+  if (!(await tenantHasFeaturePack(dbFor(c.env), staffTenantId(c), 'restaurant'))) {
+    return fail(c, 404, 'Not found');
+  }
   const requestedTenant = c.req.query('tenant_id');
   if (requestedTenant && requestedTenant !== staffTenantId(c)) {
     return fail(c, 403, 'この統括を操作する権限がありません');
