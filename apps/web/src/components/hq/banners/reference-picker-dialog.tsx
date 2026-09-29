@@ -1,7 +1,7 @@
 'use client'
 
 import { Check, Upload } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -86,6 +86,12 @@ export default function ReferencePickerDialog({
     }
   }
 
+  /** R606: 検索0件の空状態から、検索語と絞り込みを外す。 */
+  const clearSearchConditions = useCallback(() => {
+    setQuery('')
+    setScope('all')
+  }, [])
+
   const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects])
   const visible = useMemo(() => {
     const list = images ?? []
@@ -146,7 +152,21 @@ export default function ReferencePickerDialog({
         {images === null ? (
           <ListState kind="loading" title="画像を読み込んでいます" />
         ) : visible.length === 0 ? (
-          <ListState kind="empty" title="選べる画像がありません" description="生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。" />
+          <>
+            {/*
+              R606: 全画像0件と検索一致0件を区別する。画像があるのに
+              絞り込んで0件のときは未登録の説明を出さず、条件を外す口を付ける。
+            */}
+            {images.length === 0 ? (
+              <ListState kind="empty" title="選べる画像がありません" description="生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。" />
+            ) : (
+              <ListState
+                kind="empty"
+                emptyPreset="filtered"
+                action={<Button onClick={clearSearchConditions}>条件を外す</Button>}
+              />
+            )}
+          </>
         ) : (
           <div data-design-node="exeSo" role="listbox" aria-label="参照にする画像" className="grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4">
             {visible.map((image) => {
