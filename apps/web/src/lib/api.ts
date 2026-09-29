@@ -6339,6 +6339,12 @@ export const api = {
     createDefinition: (accountId: string, data: SaveTagDefinition) =>
       fetchApi<ApiResponse<TagDefinition>>('/api/tags', {
         method: 'POST',
+        /*
+         * D012: 作る要求ごとの見分け札。二度押し・通信の再送で同じタグが
+         * 2つできないよう、呼び出し側は毎回新しい札を付ける（公開系の
+         * publish・revert と同じ渡し方）。
+         */
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
         body: JSON.stringify({
           lineAccountId: accountId,
           ...data,
