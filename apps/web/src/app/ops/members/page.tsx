@@ -215,7 +215,7 @@ export default function OpsMembersPage() {
         <div className="grid gap-4">
           <NoticeLineAccountCard />
           <div className="rounded-card border border-hairline bg-canvas px-5 py-4 text-label text-ink-secondary">
-            運営メンバーは <code className="rounded bg-canvas-sunken px-1">platform_admins</code> で管理しています。
+            運営メンバーは <code className="rounded-mini bg-canvas-sunken px-1">platform_admins</code> で管理しています。
             LINE でログインする場合は、各メンバーの権限者アカウントに LINE を紐づけてください。
           </div>
         </div>

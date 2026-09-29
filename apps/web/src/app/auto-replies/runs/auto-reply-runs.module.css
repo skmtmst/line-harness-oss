@@ -84,7 +84,7 @@
   height: 30px;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent-soft);
   color: var(--color-ink);
   font-size: var(--text-nano);

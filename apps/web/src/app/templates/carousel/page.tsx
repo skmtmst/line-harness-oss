@@ -602,7 +602,7 @@ function CarouselEditorInner() {
                   disabled={i === 0}
                   aria-label={`パネル ${i + 1} を左へ移動`}
                   title={i === 0 ? 'いちばん左です' : '左へ移動'}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   ←
                 </button>
@@ -611,7 +611,7 @@ function CarouselEditorInner() {
                   disabled={i === panels.length - 1}
                   aria-label={`パネル ${i + 1} を右へ移動`}
                   title={i === panels.length - 1 ? 'いちばん右です' : '右へ移動'}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   →
                 </button>
@@ -625,14 +625,14 @@ function CarouselEditorInner() {
                   }
                   disabled={panels.length >= MAX_COLUMNS}
                   title={panels.length >= MAX_COLUMNS ? `パネルは${MAX_COLUMNS}枚までです` : undefined}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   複製
                 </button>
                 {panels.length > 1 && (
                   <button
                     onClick={() => setPanels((prev) => prev.filter((_, j) => j !== i))}
-                    className="text-danger hover:bg-danger-bg rounded px-2 py-1 text-xs"
+                    className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
                   >
                     削除
                   </button>
@@ -701,7 +701,7 @@ function CarouselEditorInner() {
                   このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）
                 </p>
                 {panel.actions.map((action, ai) => (
-                  <div key={ai} className="border-hairline mb-2 rounded-lg border p-3">
+                  <div key={ai} className="border-hairline mb-2 rounded-control border p-3">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <input
                         type="text"
@@ -745,7 +745,7 @@ function CarouselEditorInner() {
                           onClick={() =>
                             update(i, { actions: panel.actions.filter((_, j) => j !== ai) })
                           }
-                          className="text-danger hover:bg-danger-bg ml-auto rounded px-2 text-xs"
+                          className="text-danger hover:bg-danger-bg ml-auto rounded-mini px-2 text-xs"
                         >
                           外す
                         </button>
@@ -890,7 +890,7 @@ function CarouselEditorInner() {
             <div className="bg-canvas-sunken rounded-card overflow-x-auto p-3">
               <div className="flex gap-2">
                 {panels.map((panel, i) => (
-                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-canvas">
+                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-card bg-canvas">
                     {typeof panel.thumbnailImageUrl === 'string' && /^https?:\/\//.test(panel.thumbnailImageUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={panel.thumbnailImageUrl} alt="" className="h-28 w-full object-cover" />

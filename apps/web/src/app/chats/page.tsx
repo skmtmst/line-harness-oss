@@ -112,11 +112,11 @@ type InboxSavedView = {
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
-    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-micro font-medium">
+    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-mini px-1.5 text-micro font-medium">
       LINE
     </span>
   ) : (
-    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-micro font-medium">
+    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-mini border px-1.5 text-micro font-medium">
       MAIL
     </span>
   )
@@ -195,7 +195,7 @@ function ChatImageMessage({ content }: { content: string }) {
 
   if (!url || failed) {
     return (
-      <span className="flex min-w-40 flex-col items-center justify-center gap-1.5 rounded-md bg-canvas-sunken px-4 py-6 text-center">
+      <span className="flex min-w-40 flex-col items-center justify-center gap-1.5 rounded-mini bg-canvas-sunken px-4 py-6 text-center">
         <span className="text-ink-faint text-xs">画像を読み込めませんでした</span>
         {url ? (
           <button
@@ -215,7 +215,7 @@ function ChatImageMessage({ content }: { content: string }) {
       key={retryKey}
       src={url}
       alt="画像"
-      className="max-w-[200px] rounded"
+      className="max-w-[200px] rounded-mini"
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
@@ -2362,7 +2362,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         既定条件へ戻したことだけを伝える。障害ではないので error とは分ける。
       */}
       {savedViewNotice && (
-        <div role="status" className="mb-4 rounded-lg border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
+        <div role="status" className="mb-4 rounded-control border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
           {savedViewNotice}
         </div>
       )}
@@ -2393,7 +2393,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }}
             aria-pressed={quickFilter === filter.key}
             title={filter.title}
-            className={`inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors ${
+            className={`inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-pill border px-3 text-xs font-semibold transition-colors ${
               quickFilter === filter.key
                 ? 'border-accent-deep bg-accent-soft text-accent-deep'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
@@ -2436,15 +2436,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             保存した検索
           </Button>
           {savedViewsOpen && (
-            <div className="border-hairline absolute top-full right-0 z-40 mt-1.5 max-h-[min(70dvh,32rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border bg-canvas p-4 shadow-xl">
+            <div className="border-hairline absolute top-full right-0 z-40 mt-1.5 max-h-[min(70dvh,32rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-card border bg-canvas p-4 shadow-float">
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
                 {savedViews.length === 0 ? (
-                  <p className="bg-canvas-sunken text-ink-faint rounded-lg px-3 py-3 text-xs">
+                  <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-3 text-xs">
                     まだ保存した検索はありません。
                   </p>
                 ) : savedViews.map((view) => (
-                  <div key={view.id} className="hover:bg-canvas-sunken flex items-center gap-2 rounded-lg px-2 py-1.5">
+                  <div key={view.id} className="hover:bg-canvas-sunken flex items-center gap-2 rounded-control px-2 py-1.5">
                     <button
                       type="button"
                       onClick={() => applySavedView(view)}
@@ -2581,7 +2581,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
       <div
         data-design="Panes"
-        className="border-hairline bg-canvas shadow-card relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-[10px] border"
+        className="border-hairline bg-canvas shadow-card relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-card border"
       >
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
@@ -2611,7 +2611,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               maxLength={SEARCH_QUERY_MAX_LENGTH}
               placeholder="名前・メールアドレス・内容で検索"
               aria-label="名前・メールアドレス・内容で検索"
-              className="w-full rounded-lg border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15"
+              className="w-full rounded-control border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15"
               />
             </div>
             {/*
@@ -2645,7 +2645,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   aria-label={item.label}
                   title={item.label}
                   aria-pressed={channel === item.key}
-                  className={`inline-flex shrink-0 items-center justify-center rounded-md px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-accent-soft text-accent-deep' : 'text-ink hover:bg-shell'}`}
+                  className={`inline-flex shrink-0 items-center justify-center rounded-mini px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-accent-soft text-accent-deep' : 'text-ink hover:bg-shell'}`}
                 >
                   {item.key === 'line' && <ChannelBadge channel="line" />}
                   {item.key === 'email' && <ChannelBadge channel="email" />}
@@ -2671,7 +2671,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               role="radiogroup"
               aria-label="対応状況で絞り込む"
               onKeyDown={handleStatusFilterKeyDown}
-              className="bg-shell flex h-8 flex-nowrap items-stretch rounded-lg p-0.5"
+              className="bg-shell flex h-8 flex-nowrap items-stretch rounded-control p-0.5"
             >
               {statusFilters.map((f, index) => {
                 const selected = statusFilter === f.key
@@ -2688,9 +2688,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     // #639 の素のボタンの最小高さ32pxをここだけ外す。
                     // 切り替え全体の高さ32pxの中に収めるため。
                     style={{ minHeight: 0 }}
-                    className={`min-w-0 flex-1 truncate rounded-md px-1 text-center text-xs whitespace-nowrap transition-colors ${
+                    className={`min-w-0 flex-1 truncate rounded-mini px-1 text-center text-xs whitespace-nowrap transition-colors ${
                       selected
-                        ? 'bg-canvas font-semibold text-ink shadow-sm'
+                        ? 'bg-canvas font-semibold text-ink shadow-card'
                         : 'text-ink-secondary hover:text-ink font-medium'
                     }`}
                   >
@@ -2803,7 +2803,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           {/* メールの行も名前の頭文字（以前は全員「M」で、誰の会話か目で追えなかった）。 */}
                           <Avatar name={item.customerName} size={40} />
                           {item.isUnread && (
-                            <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2" aria-label="未読" />
+                            <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2" aria-label="未読" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -2826,7 +2826,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           <div className="mt-1 flex items-center gap-2">
                             <ChannelBadge channel="email" />
                             <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs">
-                              <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold">
+                              <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold">
                                 {(item.assignedStaffName ?? '未').charAt(0)}
                               </span>
                               <span className="truncate">担当：{item.assignedStaffName ?? '未割り当て'}</span>
@@ -2901,7 +2901,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
                           <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={40} />
                           {chat.isUnread && (
-                            <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2" aria-label="未読" />
+                            <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2" aria-label="未読" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -2940,7 +2940,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           <div className="mt-1 flex items-center gap-2">
                             <ChannelBadge channel="line" />
                             <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs">
-                              <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold">
+                              <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold">
                                 {(operatorName ?? '未').charAt(0)}
                               </span>
                               <span className="truncate">担当：{operatorName ?? '未割り当て'}</span>
@@ -3072,7 +3072,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           ) : !selectedChatId ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
               {/* 空の右側に、何をすればよいかを添える（★V7・better-writing「空の状態は次の一手を」）。 */}
-              <span aria-hidden="true" className="bg-canvas-sunken text-ink-faint mb-1 flex h-12 w-12 items-center justify-center rounded-full">
+              <span aria-hidden="true" className="bg-canvas-sunken text-ink-faint mb-1 flex h-12 w-12 items-center justify-center rounded-pill">
                 <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" /></svg>
               </span>
               <p className="text-ink text-sm font-bold">会話を選ぶと、ここに表示されます</p>
@@ -3220,7 +3220,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       type="button"
                       onClick={() => { void loadOlderMessages() }}
                       disabled={loadingOlderMessages}
-                      className="bg-canvas/90 rounded-pill px-3 py-1 text-xs font-semibold text-action shadow-sm disabled:opacity-50"
+                      className="bg-canvas/90 rounded-pill px-3 py-1 text-xs font-semibold text-action shadow-card disabled:opacity-50"
                     >
                       {loadingOlderMessages ? '読み込み中...' : '前のメッセージ'}
                     </button>
@@ -3265,13 +3265,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         <div key={msg.id}>
                           {showDateSep && (
                             <div className="my-3 flex justify-center">
-                              <span className="bg-ink/20 text-on-accent/85 rounded-full px-2.5 py-0.5 text-[11px]">
+                              <span className="bg-ink/20 text-on-accent/85 rounded-pill px-2.5 py-0.5 text-[11px]">
                                 {formatYmdSlash(msg.createdAt)}
                               </span>
                             </div>
                           )}
                           <div className="my-2 flex items-center justify-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-[11px] font-semibold text-action shadow-sm">
+                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-[11px] font-semibold text-action shadow-card">
                               <Link2 aria-hidden="true" size={13} />
                               シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                             </span>
@@ -3285,7 +3285,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div key={msg.id}>
                         {showDateSep && (
                           <div className="flex justify-center my-3">
-                            <span className="text-[11px] text-on-accent/85 bg-ink/20 px-2.5 py-0.5 rounded-full">
+                            <span className="text-[11px] text-on-accent/85 bg-ink/20 px-2.5 py-0.5 rounded-pill">
                               {formatYmdSlash(msg.createdAt)}
                             </span>
                           </div>
@@ -3296,9 +3296,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           {/* 相手のアイコン（incoming のみ） */}
                           {!isOutgoing && (
                             chatDetail.friendPictureUrl ? (
-                              <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
+                              <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-pill" />
                             ) : (
-                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-avatar-indigo text-xs font-medium text-on-action" aria-hidden="true">
+                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-pill bg-avatar-indigo text-xs font-medium text-on-action" aria-hidden="true">
                                 {chatDetail.friendName.charAt(0)}
                               </div>
                             )
@@ -3309,8 +3309,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             <div
                               className={`max-w-[320px] px-3 py-2 text-sm break-words whitespace-pre-wrap ${
                                 isOutgoing
-                                  ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-on-accent'
-                                  : 'min-w-64 rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-canvas text-ink'
+                                  ? 'rounded-tl-card rounded-tr-mini rounded-bl-card rounded-br-card text-on-accent'
+                                  : 'min-w-64 rounded-tl-mini rounded-tr-card rounded-bl-card rounded-br-card bg-canvas text-ink'
                               }`}
                               style={isOutgoing ? { backgroundColor: 'var(--color-accent-deep)' } : undefined}
                             >
@@ -3318,7 +3318,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               {msg.quoted && (
                                 <div
                                   data-inbox-v6="quoted-message"
-                                  className={`mb-1.5 rounded border-l-2 py-0.5 pl-2 text-xs ${
+                                  className={`mb-1.5 rounded-mini border-l-2 py-0.5 pl-2 text-xs ${
                                     isOutgoing ? 'border-on-accent/40 text-on-accent/80' : 'border-accent text-ink-faint'
                                   }`}
                                 >
@@ -3362,21 +3362,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 <img
                                   src={selectedAccount.pictureUrl}
                                   alt=""
-                                  className="border-canvas h-9 w-9 rounded-full border-2 object-cover"
+                                  className="border-canvas h-9 w-9 rounded-pill border-2 object-cover"
                                 />
                               ) : (
                                 <div
-                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-full border-2 bg-accent-soft text-[12px] font-bold text-accent-deep"
+                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-pill border-2 bg-accent-soft text-[12px] font-bold text-accent-deep"
                                   title={selectedAccount?.displayName ?? selectedAccount?.name ?? '送信アカウント'}
                                 >
                                   {(selectedAccount?.displayName ?? selectedAccount?.name ?? '送').charAt(0)}
                                 </div>
                               )}
                               <div
-                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
+                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold shadow-card"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
-                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-micro font-medium">
+                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-pill text-micro font-medium">
                                   {(msg.sentByStaffName ?? '担').charAt(0)}
                                 </span>
                                 <span className="truncate">{msg.sentByStaffName ?? '担当者'}</span>
@@ -3401,7 +3401,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     if (el) el.scrollTop = el.scrollHeight
                     setUnseenIncoming(0)
                   }}
-                  className="bg-canvas/95 text-action absolute bottom-3 left-1/2 -translate-x-1/2 rounded-pill px-3 py-1.5 text-xs font-semibold shadow-md"
+                  className="bg-canvas/95 text-action absolute bottom-3 left-1/2 -translate-x-1/2 rounded-pill px-3 py-1.5 text-xs font-semibold shadow-card"
                 >
                   新着 {unseenIncoming} 件
                 </button>
@@ -3445,14 +3445,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <button
                       type="button"
                       onClick={() => setShowTemplatePicker(true)}
-                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-action hover:bg-canvas-sunken"
+                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-action hover:bg-canvas-sunken"
                     >
                       ▧ テンプレートを選択
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowComposerOptions((v) => !v)}
-                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-action hover:bg-canvas-sunken"
+                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-action hover:bg-canvas-sunken"
                     >
                       ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </button>
@@ -3571,7 +3571,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 {quotedMessage && (
                   <div
                     data-inbox-v6="quote-preview"
-                    className="mb-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs"
+                    className="mb-2 flex items-center gap-2 rounded-control border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs"
                   >
                     <span className="shrink-0 font-semibold text-ink-faint">引用:</span>
                     <span className="min-w-0 flex-1 truncate text-ink-secondary">
@@ -3596,7 +3596,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 {showSchedulePanel && (
                   <div
                     data-inbox-v6="schedule-panel"
-                    className="mb-2 rounded-lg border border-hairline bg-canvas-sunken p-3"
+                    className="mb-2 rounded-control border border-hairline bg-canvas-sunken p-3"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-ink-secondary flex items-center gap-1 text-sm font-semibold">
@@ -3679,7 +3679,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 {pendingImage && pendingImage.mode === 'line-image' && (
                   <div
                     data-inbox-v6="image-attachment-preview"
-                    className="mb-2 flex items-center gap-2 rounded-lg border border-hairline bg-canvas-sunken px-3 py-2"
+                    className="mb-2 flex items-center gap-2 rounded-control border border-hairline bg-canvas-sunken px-3 py-2"
                   >
                     <button
                       type="button"
@@ -3691,7 +3691,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <img
                         src={pendingImage.previewImageUrl}
                         alt={pendingImageMeta?.name ?? '添付した画像'}
-                        className="h-10 w-10 rounded-md border border-hairline object-cover"
+                        className="h-10 w-10 rounded-mini border border-hairline object-cover"
                       />
                     </button>
                     <span className="min-w-0 flex-1 text-xs">
@@ -3721,7 +3721,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
-                <div className="rounded-[10px] border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
+                <div className="rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
                   {/* 中段 */}
                   {/*
                     INBOX-20: この入力欄に textareaRef を付ける。
@@ -3784,7 +3784,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       disabled={imageUploading}
                       title="画像を選ぶ"
                       aria-label="画像を選ぶ"
-                      className="rounded-md px-2 py-1 text-sm text-ink-faint hover:bg-shell disabled:opacity-50"
+                      className="rounded-mini px-2 py-1 text-sm text-ink-faint hover:bg-shell disabled:opacity-50"
                     >
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 16V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m0 0 4-4a2 2 0 0 1 3 0l5 5M14 10h.01" />
@@ -3819,7 +3819,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <button
                       onClick={handleSendMessage}
                       disabled={sending || messageOverLimit || (!messageContent.trim() && !pendingImage)}
-                      className="shrink-0 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="shrink-0 whitespace-nowrap rounded-control bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {sending ? '送信中...' : '送信'}
                     </button>
@@ -3851,7 +3851,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     {pendingPack ? (
                       <ol className="max-h-56 space-y-2 overflow-y-auto">
                         {pendingPack.map((text, index) => (
-                          <li key={index} className="rounded-lg bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-secondary">
+                          <li key={index} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-secondary">
                             <span className="mr-1 font-semibold text-ink">{index + 1}.</span>
                             <span className="whitespace-pre-wrap break-words">{text.length > 200 ? `${text.slice(0, 200)}…` : text}</span>
                           </li>
@@ -3873,13 +3873,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   onClick={() => setImagePreviewOpen(false)}
                 >
                   <div
-                    className="w-full max-w-2xl rounded-[14px] border border-hairline bg-canvas p-4 shadow-2xl"
+                    className="w-full max-w-2xl rounded-card border border-hairline bg-canvas p-4 shadow-overlay"
                     onClick={(event) => event.stopPropagation()}
                   >
                     <img
                       src={pendingImage.originalContentUrl}
                       alt={pendingImageMeta?.name ?? '添付した画像'}
-                      className="mx-auto max-h-[70vh] w-auto max-w-full rounded-md object-contain"
+                      className="mx-auto max-h-[70vh] w-auto max-w-full rounded-mini object-contain"
                     />
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <p className="text-ink-faint min-w-0 truncate text-xs" title={pendingImageMeta?.name}>
@@ -3889,7 +3889,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <button
                         type="button"
                         onClick={() => setImagePreviewOpen(false)}
-                        className="shrink-0 rounded-lg border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken"
+                        className="shrink-0 rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken"
                       >
                         閉じる
                       </button>
@@ -3941,7 +3941,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               aria-modal={wideInfoPanel ? undefined : true}
               aria-label="顧客情報"
               tabIndex={-1}
-              className="fixed inset-y-0 right-0 z-[70] h-full w-[340px] max-w-full shrink-0 overflow-hidden bg-canvas shadow-2xl focus:outline-none 2xl:relative 2xl:z-auto 2xl:w-[300px] 2xl:shadow-none"
+              className="fixed inset-y-0 right-0 z-[70] h-full w-[340px] max-w-full shrink-0 overflow-hidden bg-canvas shadow-overlay focus:outline-none 2xl:relative 2xl:z-auto 2xl:w-[300px] 2xl:shadow-none"
             >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
@@ -3952,7 +3952,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               type="button"
               onClick={() => setShowFriendInfo(false)}
               aria-label="顧客情報を閉じる"
-              className="absolute top-[17px] right-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken"
+              className="absolute top-[17px] right-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-control border border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken"
             >
               <X aria-hidden="true" className="h-4 w-4" />
             </button>
@@ -3974,7 +3974,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
                     <div className="flex-1 overflow-y-auto divide-y divide-hairline">
                       <section className="flex flex-col items-center px-5 py-5 text-center">
-                        <div className="bg-canvas-sunken border-hairline flex h-14 w-14 items-center justify-center rounded-full border">
+                        <div className="bg-canvas-sunken border-hairline flex h-14 w-14 items-center justify-center rounded-pill border">
                           <span className="text-ink-secondary text-[11px] font-bold">MAIL</span>
                         </div>
                         <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{mail?.customerName ?? '—'}</p>

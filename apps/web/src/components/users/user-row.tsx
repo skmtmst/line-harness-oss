@@ -111,7 +111,7 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
               <span
                 key={a.accountId}
                 title={a.accountName}
-                className="max-w-full truncate rounded-full bg-canvas-sunken px-2 py-0.5 text-xs font-medium text-ink-secondary"
+                className="max-w-full truncate rounded-pill bg-canvas-sunken px-2 py-0.5 text-xs font-medium text-ink-secondary"
               >
                 {a.accountName}
               </span>
@@ -188,7 +188,7 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
                   {row.accounts.map((a) => (
                     <li key={a.friendId} className="flex flex-wrap items-center gap-2 text-ink-secondary">
                       <span
-                        className={`h-2 w-2 rounded-full ${a.isFollowing ? 'bg-accent' : 'bg-ink-disabled'}`}
+                        className={`h-2 w-2 rounded-pill ${a.isFollowing ? 'bg-accent' : 'bg-ink-disabled'}`}
                       />
                       <span className="font-medium">{a.accountName}</span>
                       <span className="text-xs text-ink-faint">

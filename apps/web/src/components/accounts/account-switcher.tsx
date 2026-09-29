@@ -20,7 +20,7 @@ function accountLabel(account: AccountSwitchTarget) {
 }
 
 function AccountMark({ account, compact = false }: { account: AccountSwitchTarget; compact?: boolean }) {
-  const size = compact ? 'h-7 w-7 rounded-lg text-xs' : 'h-9 w-9 rounded-control text-sm'
+  const size = compact ? 'h-7 w-7 rounded-control text-xs' : 'h-9 w-9 rounded-control text-sm'
   if (account.pictureUrl) {
     // eslint-disable-next-line @next/next/no-img-element -- LINE公式アカウントのCDN画像
     return <img src={account.pictureUrl} alt="" className={`${size} shrink-0 object-cover`} />
@@ -44,10 +44,10 @@ export function AccountSwitchDialog({
   const panelRef = useOverlayFocus(true, onClose)
 
   return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-scrim p-4" role="dialog" aria-modal="true" aria-labelledby="account-switch-title" onClick={onClose}>
-    <div ref={panelRef} className="w-full max-w-md rounded-card bg-canvas p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div ref={panelRef} className="w-full max-w-md rounded-card bg-canvas p-5 shadow-overlay" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-start justify-between gap-4">
         <div><p className="text-xs font-semibold text-ink-faint">LINEアカウントを切り替え</p><h2 id="account-switch-title" className="mt-1 text-lg font-bold text-ink">このアカウントへ移動しますか？</h2></div>
-        <button type="button" onClick={onClose} aria-label="閉じる" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl text-ink-faint hover:bg-canvas-sunken">×</button>
+        <button type="button" onClick={onClose} aria-label="閉じる" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-xl text-ink-faint hover:bg-canvas-sunken">×</button>
       </div>
       {current && <div className="mt-5 flex items-center gap-3 rounded-control bg-canvas-sunken px-4 py-3">
         <AccountMark account={current} />
@@ -85,24 +85,24 @@ export default function AccountSwitcher() {
     <div className="relative h-[118px] px-3 py-2.5" data-design-node="J33xq/V2WbXF">
       <p className="mb-2 text-[11px] font-normal text-ink-faint">現在のLINEアカウント</p>
       {loading ? (
-        <div role="status" className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left opacity-60">
+        <div role="status" className="flex h-16 w-full items-center gap-1.5 rounded-card border border-hairline bg-canvas px-2 text-left opacity-60">
           <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">読み込み中…</span><span className="mt-0.5 block truncate text-xs text-ink-faint">LINE情報を確認中</span></span>
         </div>
       ) : error && !selectedAccount ? (
         // 一覧の取得失敗を「店舗が選ばれていません」に見せない（Issue #978）。
-        <div role="alert" className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left">
+        <div role="alert" className="flex h-16 w-full items-center gap-1.5 rounded-card border border-hairline bg-canvas px-2 text-left">
           <span className="min-w-0 flex-1"><span className="block text-sm font-semibold leading-5 text-danger">読み込みに失敗しました</span><span className="mt-0.5 block truncate text-xs text-ink-faint">アカウント一覧を確認できません</span></span>
           <button type="button" onClick={() => { void refreshAccounts() }} disabled={refreshing} className="rounded-pill bg-accent-soft px-1 py-1 text-nano font-semibold text-accent-deep disabled:opacity-60">
             {refreshing ? '確認中' : '再読み込み'}
           </button>
         </div>
       ) : !selectedAccount ? (
-        <Link href="/hq" className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-accent bg-canvas px-2 text-left">
+        <Link href="/hq" className="flex h-16 w-full items-center gap-1.5 rounded-card border border-accent bg-canvas px-2 text-left">
           <span className="min-w-0 flex-1"><span className="block text-sm font-semibold leading-5 text-ink">店舗が選ばれていません</span><span className="mt-0.5 block truncate text-xs text-ink-faint">統括の店舗一覧から選択</span></span>
           <span className="rounded-pill bg-accent-soft px-1 py-1 text-nano font-semibold text-accent-deep">選択</span>
         </Link>
       ) : (
-        <button ref={triggerRef} type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left hover:border-accent">
+        <button ref={triggerRef} type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex h-16 w-full items-center gap-1.5 rounded-card border border-hairline bg-canvas px-2 text-left hover:border-accent">
           <AccountMark account={selectedAccount} compact />
           <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-bold text-ink">{accountLabel(selectedAccount)}</span><span className="mt-0.5 block truncate text-[10px] text-ink-faint">{selectedAccount.plan?.label || selectedAccount.basicId || 'LINE情報を確認中'}</span></span>
           <span className="rounded-pill bg-accent-soft px-1.25 py-0.75 text-nano font-semibold text-accent-deep">表示中</span>
@@ -117,7 +117,7 @@ export default function AccountSwitcher() {
         onClose={() => setOpen(false)}
       >
         <div
-          className="max-h-72 overflow-y-auto rounded-card border border-hairline bg-canvas p-2 shadow-xl"
+          className="max-h-72 overflow-y-auto rounded-card border border-hairline bg-canvas p-2 shadow-float"
           // 最上層では absolute 指定を無効にする（位置は器が決める）。
           style={{ position: 'static', width: '100%' }}
         >

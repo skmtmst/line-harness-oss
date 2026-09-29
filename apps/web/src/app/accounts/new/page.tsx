@@ -352,7 +352,7 @@ export default function NewLineAccountPage() {
                 <ReviewRow label="LIFF ID" value={`${connection.liffId ?? '—'}（自動作成）`} />
                 <ReviewRow label="既存の友だちの取り込み" value={connection.followerImport.capability === 'available' ? `${importState?.imported ?? 0}人` : '未認証のため、友だちは操作があった順に登録されます'} />
               </ReviewGroup>
-              {connection.pictureUrl && <Image src={connection.pictureUrl} alt="LINE公式アカウントのアイコン" width={64} height={64} unoptimized className="h-16 w-16 rounded-full object-cover" />}
+              {connection.pictureUrl && <Image src={connection.pictureUrl} alt="LINE公式アカウントのアイコン" width={64} height={64} unoptimized className="h-16 w-16 rounded-pill object-cover" />}
               {connection.remainingActions.length > 0 && <InfoSection title="残りの手作業"><ul className="space-y-2">{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul></InfoSection>}
             </SetupSection>
           </div>}

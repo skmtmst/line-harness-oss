@@ -137,7 +137,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="apply-to-tag-title"
-        className="bg-canvas rounded-lg shadow-xl w-full max-w-md"
+        className="bg-canvas rounded-control shadow-float w-full max-w-md"
       >
         <div className="p-6">
           <div className="mb-1 flex items-start justify-between gap-3">
@@ -219,14 +219,14 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
               <div className="flex justify-end gap-2">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium border border-hairline rounded-lg hover:bg-surface-pearl transition-colors"
+                  className="px-4 py-2 text-sm font-medium border border-hairline rounded-control hover:bg-surface-pearl transition-colors"
                 >
                   キャンセル
                 </button>
                 <button
                   onClick={apply}
                   disabled={mode.kind === 'tag' && !mode.tagId}
-                  className="px-4 py-2 text-sm font-medium text-on-accent rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
+                  className="px-4 py-2 text-sm font-medium text-on-accent rounded-control disabled:opacity-50 transition-opacity hover:opacity-90"
                   style={{ backgroundColor: 'var(--color-accent)' }}
                 >
                   実行する
@@ -246,7 +246,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'done' && result && (
             <>
-              <div className="bg-accent-soft border border-accent-border text-success text-sm p-4 rounded-lg mb-4">
+              <div className="bg-accent-soft border border-accent-border text-success text-sm p-4 rounded-control mb-4">
                 <div className="font-medium mb-1">✓ 完了しました</div>
                 <div className="text-xs">
                   {result.message ??
@@ -256,7 +256,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
               <div className="flex justify-end">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-on-accent rounded-lg transition-opacity hover:opacity-90"
+                  className="px-4 py-2 text-sm font-medium text-on-accent rounded-control transition-opacity hover:opacity-90"
                   style={{ backgroundColor: 'var(--color-accent)' }}
                 >
                   閉じる
@@ -267,19 +267,19 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'error' && (
             <>
-              <div className="bg-danger-bg border border-status-danger-border text-danger text-sm p-4 rounded-lg mb-4">
+              <div className="bg-danger-bg border border-status-danger-border text-danger text-sm p-4 rounded-control mb-4">
                 {error}
               </div>
               <div className="flex justify-end gap-2">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium border border-hairline rounded-lg hover:bg-surface-pearl transition-colors"
+                  className="px-4 py-2 text-sm font-medium border border-hairline rounded-control hover:bg-surface-pearl transition-colors"
                 >
                   閉じる
                 </button>
                 <button
                   onClick={() => setPhase('config')}
-                  className="px-4 py-2 text-sm font-medium text-on-accent rounded-lg transition-opacity hover:opacity-90"
+                  className="px-4 py-2 text-sm font-medium text-on-accent rounded-control transition-opacity hover:opacity-90"
                   style={{ backgroundColor: 'var(--color-accent)' }}
                 >
                   やり直す

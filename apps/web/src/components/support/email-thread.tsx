@@ -642,7 +642,7 @@ export default function EmailThread({
             <button
               type="button"
               onClick={onOpenCustomerInfo}
-              className="whitespace-nowrap rounded-lg border border-hairline bg-canvas px-2.5 py-1.5 text-xs font-semibold text-action hover:bg-canvas-sunken"
+              className="whitespace-nowrap rounded-control border border-hairline bg-canvas px-2.5 py-1.5 text-xs font-semibold text-action hover:bg-canvas-sunken"
             >
               顧客情報を開く
             </button>
@@ -662,7 +662,7 @@ export default function EmailThread({
               type="button"
               onClick={() => void loadOlder()}
               disabled={olderLoading}
-              className="rounded-full border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-action hover:bg-canvas-sunken disabled:opacity-50"
+              className="rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-action hover:bg-canvas-sunken disabled:opacity-50"
             >
               {olderLoading ? '読み込み中...' : '過去のメッセージを読み込む'}
             </button>
@@ -671,10 +671,10 @@ export default function EmailThread({
         {detail.messages.map((message) => (
           <div key={message.id} className={`flex items-end gap-2 ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${
+              className={`max-w-[86%] rounded-card px-4 py-3 shadow-card sm:max-w-[72%] ${
                 message.direction === 'outgoing'
-                  ? 'rounded-br-md bg-accent-soft text-ink'
-                  : 'rounded-bl-md bg-canvas text-ink'
+                  ? 'rounded-br-mini bg-accent-soft text-ink'
+                  : 'rounded-bl-mini bg-canvas text-ink'
               }`}
             >
               <p className="text-sm leading-6 break-words whitespace-pre-wrap">{message.body_text}</p>
@@ -686,7 +686,7 @@ export default function EmailThread({
             {message.direction === 'outgoing' && (
               <div className="flex w-12 shrink-0 flex-col items-center">
                 <div
-                  className="bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold"
+                  className="bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-pill text-[11px] font-bold"
                   title={message.sent_by_staff_name ?? '担当者情報なし'}
                 >
                   {(message.sent_by_staff_name ?? '担').charAt(0)}
@@ -712,14 +712,14 @@ export default function EmailThread({
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-action hover:bg-canvas-sunken"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-action hover:bg-canvas-sunken"
             >
               ▧ テンプレートを選択
             </button>
             <button
               type="button"
               onClick={() => setShowComposerOptions(v => !v)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-action hover:bg-canvas-sunken"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-action hover:bg-canvas-sunken"
             >
               ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
             </button>
@@ -727,7 +727,7 @@ export default function EmailThread({
               type="button"
               onClick={openMemoEditor}
               aria-expanded={showMemoEditor}
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary hover:bg-canvas-sunken"
+              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary hover:bg-canvas-sunken"
             >
               内部メモ
             </button>
@@ -779,7 +779,7 @@ export default function EmailThread({
           >
             <div
               ref={memoDialogRef}
-              className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[14px] border border-hairline bg-canvas shadow-2xl"
+              className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-card border border-hairline bg-canvas shadow-overlay"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3 border-b border-hairline px-5 py-4">
@@ -806,17 +806,17 @@ export default function EmailThread({
                   rows={7}
                   autoFocus
                   placeholder="メモを追加"
-                  className="mt-2 w-full resize-y rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+                  className="mt-2 w-full resize-y rounded-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
                 />
                 {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
               </div>
               <div className="flex justify-end gap-2 border-t border-hairline px-5 py-4">
-                <button type="button" onClick={closeMemoEditor} className="rounded-lg border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken">キャンセル</button>
+                <button type="button" onClick={closeMemoEditor} className="rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken">キャンセル</button>
                 <button
                   type="button"
                   onClick={() => void saveMemo()}
                   disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}
-                  className="rounded-lg bg-accent-deep px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-control bg-accent-deep px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {memoSaving ? '保存中...' : '保存'}
                 </button>
@@ -839,7 +839,7 @@ export default function EmailThread({
           </p>
         )}
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
-        <div className="rounded-[10px] border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
+        <div className="rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
           <textarea
             value={reply}
             onChange={(e) => setReplyDraft(e.target.value)}
@@ -883,7 +883,7 @@ export default function EmailThread({
             <button
               onClick={() => void sendReply()}
               disabled={!reply.trim() || sending}
-              className="shrink-0 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="shrink-0 whitespace-nowrap rounded-control bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sending ? '送信中...' : 'メールで返信'}
             </button>
