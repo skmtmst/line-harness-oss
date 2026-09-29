@@ -17,4 +17,9 @@ describe('スタッフ招待の確認画面', () => {
   it('未ログインでも共通の認証ガードより手前で表示する', () => {
     expect(appShell).toContain('isPublicAuthPath(pathname)')
   })
+
+  it('D016: 期限切れの日本語案内は出し、内部文（API error）は汎用文へ落とす', () => {
+    expect(source).not.toMatch(/setError\(caught instanceof Error \? caught\.message/)
+    expect(source).toContain('/^API error: /')
+  })
 })

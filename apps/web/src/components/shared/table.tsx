@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } from 'react'
 import shell from './data-table.module.css'
+import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
 import styles from './table.module.css'
 
@@ -241,6 +242,10 @@ const TABLE_STATE_TEXT: Record<TableStateKind, { title: string; description: str
  *
  * 「0件」と「読めなかった」を同じ顔にしない。失敗のときだけ、やり直す
  * ボタンを出す（`onRetry` が無いときは飾りボタンを置かない）。
+ *
+ * `error` に捕まえた失敗を渡すと、403 は権限の案内にして再試行の口を
+ * 出さず（押しても直らないため）、429 は待ち秒数を添える（m23m）。
+ * 画面は `title`・`description` で上書きできる。
  */
 export function TableStateRow({
   colSpan,
@@ -249,6 +254,7 @@ export function TableStateRow({
   description,
   onRetry,
   retryLabel = 'もう一度読み込む',
+  error,
 }: {
   colSpan: number
   kind: TableStateKind
@@ -256,15 +262,17 @@ export function TableStateRow({
   description?: string
   onRetry?: () => void
   retryLabel?: string
+  error?: unknown
 }) {
   const text = TABLE_STATE_TEXT[kind]
+  const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面') : null
   return (
     <tr className={shell.row}>
       <td colSpan={colSpan} className={shell.bodyCell}>
         <div className={styles.stateCell} role={kind === 'error' ? 'alert' : 'status'}>
-          <p className={styles.stateTitle}>{title ?? text.title}</p>
-          <p className={styles.stateDescription}>{description ?? text.description}</p>
-          {kind === 'error' && onRetry ? (
+          <p className={styles.stateTitle}>{title ?? failure?.title ?? text.title}</p>
+          <p className={styles.stateDescription}>{description ?? failure?.description ?? text.description}</p>
+          {kind === 'error' && (failure && !failure.retryable ? undefined : onRetry) ? (
             <button type="button" onClick={onRetry} className={styles.stateRetry}>
               {retryLabel}
             </button>
