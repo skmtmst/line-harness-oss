@@ -50,6 +50,7 @@ const GUARDED = [
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
   'app/tags/searches/edit/page.tsx',
+  'app/templates/carousel/page.tsx',
   'app/templates/questions/new/page.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/page.tsx',

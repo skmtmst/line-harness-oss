@@ -4,8 +4,10 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
@@ -112,6 +114,27 @@ function buildCarouselActions(panels: Panel[]): Record<string, Record<string, un
       })
   })
   return carouselActions
+}
+
+/**
+ * D009: 未保存の見分けに入れる中身。保存の口へ送る項目とそろえる。
+ * `createdId` は人の入力ではないので入れない。
+ */
+interface CarouselDirtyState {
+  name: string
+  panels: Panel[]
+  folderId: string | null
+  tapLimitMode: 'none' | 'once'
+  tapLimitText: string
+}
+
+/**
+ * D009: 保存ずみの正本と今の入力を同じ形の文字にする。1文字でも違えば
+ * 「保存していない変更がある」とする。比べるのは値だけで、順番も含める
+ * （パネルの並び替えも失われる作業のため）。
+ */
+function carouselSnapshot(state: CarouselDirtyState): string {
+  return JSON.stringify(state)
 }
 
 interface CarouselSaveInput {
@@ -253,6 +276,41 @@ function CarouselEditorInner() {
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>('none')
   const [tapLimitText, setTapLimitText] = useState('')
+  /*
+   * D009: 保存ずみの正本。読み込みが終わった直後の1回だけ覚える。
+   * 新規は開いたときの空、編集は読み込んだ中身が正本になる。
+   * 読み込み中は欄が出ないので、その間に打たれることはない。
+   */
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+  const [snapshotTaken, setSnapshotTaken] = useState(false)
+  useEffect(() => {
+    if (loading || snapshotTaken) return
+    setSavedSnapshot(carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
+    setSnapshotTaken(true)
+  }, [loading, snapshotTaken, name, panels, folderId, tapLimitMode, tapLimitText])
+  const dirty = savedSnapshot !== null &&
+    savedSnapshot !== carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText })
+  /*
+   * D009: 未保存のまま画面の外へ出る操作を止める（/webinars/edit と同じ
+   * 共通の番兵・同じ確認の言葉）。一覧への「キャンセル」は素の Link の
+   * まま置き、止める役は番兵が受け持つ。保存して一覧へ戻るときは、
+   * 決まった移動として警告を外してから進む。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({
+    dirty,
+    busy: saving,
+  })
+  const leaveConfirmDialog = (
+    <ConfirmDialog primaryAction="cancel"
+      open={leaveTarget !== null}
+      title="保存していない変更があります"
+      description="このまま移動すると、カルーセルの変更は失われます。保存せずに移動しますか？"
+      confirmLabel="保存せずに移動"
+      cancelLabel="編集を続ける"
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
+  )
   /*
    * N-144: カルーセルの作成・保存APIは owner/admin だけ。staff が
    * シナリオ画面の選択肢から辿って来ても、フォームは出さない。
@@ -409,6 +467,8 @@ function CarouselEditorInner() {
         return
       }
       // 成功したときだけ完了（一覧へ戻る）。失敗では画面を動かさない。
+      // D009: 決まった移動なので警告を外してから進む。
+      disarm()
       router.push('/templates')
     } finally {
       savingRef.current = false
@@ -430,6 +490,7 @@ function CarouselEditorInner() {
           <p className="font-bold text-ink">カルーセルの作成・変更はオーナーと管理者だけができます</p>
           <Link href="/templates" className="text-action hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
         </div>
+        {leaveConfirmDialog}
       </div>
     )
   }
@@ -899,6 +960,10 @@ function CarouselEditorInner() {
             >
               {saving ? '保存中...' : '保存'}
             </button>
+            {/*
+              D009: 未保存のままの「キャンセル」は番兵が止めて確認窓を出す。
+              素の Link のまま置く（止める役は useUnsavedGuard が受け持つ）。
+            */}
             <Link
               href="/templates"
               className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control px-4 py-2 text-sm font-medium"
@@ -906,6 +971,7 @@ function CarouselEditorInner() {
               キャンセル
             </Link>
           </div>
+          {leaveConfirmDialog}
           </div>
         </div>
       )}
