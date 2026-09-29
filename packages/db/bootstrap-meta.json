@@ -484,7 +484,8 @@
     "535_tiktok_pnl.sql",
     "536_support_mark_create_idempotency.sql",
     "536_tenant_restaurant_pack_backfill.sql",
-    "537_friend_field_create_idempotency.sql"
+    "537_friend_field_create_idempotency.sql",
+    "538_rich_menu_group_version.sql"
   ],
-  "migrationCount": 485
+  "migrationCount": 486
 }
