@@ -15,6 +15,7 @@ import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import Toggle from '@/components/shared/toggle'
 
 /** 契約先アカウント（一覧）。★V6 37-3 `X9f5jy`。 */
 
@@ -38,6 +39,7 @@ export default function OpsTenantsPage() {
   const [listFailed, setListFailed] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newRestaurant, setNewRestaurant] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -84,9 +86,10 @@ export default function OpsTenantsPage() {
   const create = async (event: FormEvent) => {
     event.preventDefault()
     if (!newName.trim()) return
-    const res = await opsCall(api.ops.createTenant(newName.trim()))
+    const res = await opsCall(api.ops.createTenant(newName.trim(), newRestaurant ? ['restaurant'] : []))
     if (!res.success) { setError(res.error || '作成できませんでした'); return }
     setNewName('')
+    setNewRestaurant(false)
     setCreating(false)
     router.push(tenantDetailHref(res.data.id))
   }
@@ -134,7 +137,7 @@ export default function OpsTenantsPage() {
       </div>
 
       {creating ? (
-        <form onSubmit={(event) => void create(event)} className="flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
+        <form onSubmit={(event) => void create(event)} className="flex flex-wrap items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
           <div className="flex-1">
             <TextField
               value={newName}
@@ -144,6 +147,14 @@ export default function OpsTenantsPage() {
               aria-label="統括名"
             />
           </div>
+          <label className="flex items-center gap-2 whitespace-nowrap">
+            <Toggle
+              checked={newRestaurant}
+              label={`飲食店機能を${newRestaurant ? 'オフ' : 'オン'}にする`}
+              onChange={setNewRestaurant}
+            />
+            <span className="text-caption text-ink-secondary">飲食店機能</span>
+          </label>
           <Button type="submit" variant="primary">作成する</Button>
           <Button onClick={() => setCreating(false)}>やめる</Button>
         </form>
