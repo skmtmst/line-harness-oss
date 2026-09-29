@@ -166,6 +166,19 @@ const MESSAGE_TYPE_TABS = [
  * 書きかけの中身が移るたびに空へ戻ってしまう（切替は bubble の中身を
  * 作り直す）ので、フォーカスと選択は分ける。
  */
+/**
+ * R580: 保存の検査で止まった不備を直す欄がある段。
+ *
+ * 段の名前は `broadcast-steps.ts` の5段と同じにする。確認の段は入力を
+ * 持たないので、ここには出ない（不備は必ず基本・対象者・メッセージの
+ * どれかにある）。
+ */
+const VALIDATION_STEP_LABEL: Record<'basic' | 'audience' | 'message', string> = {
+  basic: '基本設定',
+  audience: '対象者',
+  message: 'メッセージ',
+}
+
 export function moveMessageTypeTabFocus(
   event: { key: string; currentTarget: HTMLElement; preventDefault: () => void },
   activeElement: Element | null,
@@ -1218,6 +1231,20 @@ export default function BroadcastForm({
     return ''
   }
   /**
+   * R580: いまの入力に対する検査結果が、どの段の不備か。
+   *
+   * `validate()` と同じ順序・同じ関数で判定する。別々に書くと、帯は
+   * 「対象者 済み」なのに保存で断られる、という一番困る形になる
+   * （段の帯と保存の検査を同じ関数に寄せる契約と同じ考え）。
+   * 送信設定の段は入力の不備を持たない（日時は保存の検査対象外）。
+   */
+  const validationStep = (): 'basic' | 'audience' | 'message' | null => {
+    if (!title.trim() || title.trim().length > TITLE_MAX) return 'basic'
+    if (audienceError(targetMode, { scenarioId, tagId, condition })) return 'audience'
+    if (bubblesError(bubbles) || messageButtonsError(messageButtons)) return 'message'
+    return null
+  }
+  /**
    * 配信前チェックへ渡す入力。
    *
    * 人数を数える口と同じ組み立てを1か所にする。この中身の指紋（JSON）を
@@ -1657,6 +1684,40 @@ export default function BroadcastForm({
     : progressSteps
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
   const goToStep = (step: BroadcastStepKey) => onStepChange?.(step)
+  /*
+   * R580: 保存を押した段で理由を示し、直す欄がある段へ移動できるようにする。
+   *
+   * 以前は失敗の文がメッセージの段の中にだけあり、対象者の段で保存を
+   * 押しても理由が見えなかった（非表示の段に隠れていた）。
+   *
+   * 導線は「いまの入力に対する検査結果」と画面の文が一致するときだけ出す。
+   * サーバー側で断られた文・直した後の古い文では、指す段がずれるので出さない。
+   */
+  const liveValidationProblem = validate()
+  const validationMoveStep: 'basic' | 'audience' | 'message' | null =
+    currentStep && error && error === liveValidationProblem ? validationStep() : null
+  /*
+   * 段を移動したあと、直す欄へ焦点を移す。押した位置（下部追従バー）に
+   * 取り残されると、キーボードだけの操作では修正欄へたどり着けない。
+   */
+  const pendingValidationFocus = useRef<BroadcastStepKey | null>(null)
+  const goToValidationStep = (step: 'basic' | 'audience' | 'message') => {
+    if (!onStepChange) {
+      pendingValidationFocus.current = null
+      return
+    }
+    pendingValidationFocus.current = step
+    goToStep(step)
+  }
+  useEffect(() => {
+    if (!pendingValidationFocus.current || pendingValidationFocus.current !== currentStep) return
+    pendingValidationFocus.current = null
+    const section = document.getElementById(`broadcast-step-${currentStep}`)
+    if (typeof section?.scrollIntoView === 'function') {
+      section.scrollIntoView({ block: 'start' })
+    }
+    section?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea')?.focus()
+  }, [currentStep])
 
   const canConfirm = audienceCount !== null && audienceCount > 0
 
@@ -1755,6 +1816,24 @@ export default function BroadcastForm({
       </div>
     )}
     <BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />
+    {/*
+      R580: 保存を押した段で理由を示す。失敗の帯は1画面に1つまでなので、
+      段ごとに分かれているときはここだけに出し、メッセージの段の中の帯は
+      段分けなしの従来フォームのときだけ出す（下の `{!currentStep && ...}`）。
+    */}
+    {currentStep && error ? (
+      <Notice
+        tone="danger"
+        className="mt-3"
+        action={validationMoveStep && validationMoveStep !== currentStep ? (
+          <Button variant="secondary" size="compact" onClick={() => goToValidationStep(validationMoveStep)}>
+            {`${VALIDATION_STEP_LABEL[validationMoveStep]}へ移動`}
+          </Button>
+        ) : undefined}
+      >
+        {error}
+      </Notice>
+    ) : null}
     {editingDraft ? (
       <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
@@ -2241,7 +2320,7 @@ export default function BroadcastForm({
             いまは1通にまとめるか、配信を分けてください。
           </Notice>
         )}
-        {error && <Notice tone="danger" message={error} />}
+        {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={`${shows('schedule') ? '' : 'hidden'} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
           <h3 className="text-lg font-bold text-ink">送信設定</h3>
