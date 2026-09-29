@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import ListState from '@/components/shared/list-state'
 import Progress from '@/components/shared/progress'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Select from '@/components/shared/select'
@@ -136,10 +138,17 @@ export default function HealthPage() {
   const [migrateToId, setMigrateToId] = useState('')
   const [migrating, setMigrating] = useState(false)
   const [retryingHealthIds, setRetryingHealthIds] = useState<Set<string>>(new Set())
+  /*
+   * M018：アカウント一覧の読み込み失敗は、空（未登録）とは別の状態で持つ。
+   * 失敗なのに「登録されていません」と出すと、障害時に登録作業へ誘導してしまう。
+   */
+  const [accountsError, setAccountsError] = useState<unknown>(null)
+  // M019：移行口は owner 専用（サーバの権限表）。画面側でも役割で出し分ける目安。
+  const [role, setRole] = useState<string | null>(null)
 
   const loadAccounts = useCallback(async () => {
     setLoading(true)
-    setError('')
+    setAccountsError(null)
     try {
       const res = await api.health.accounts()
       if (res.success) {
@@ -156,10 +165,10 @@ export default function HealthPage() {
           Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.state]),
         ))
       } else {
-        setError('アカウント情報の取得に失敗しました。もう一度読み込んでください。')
+        setAccountsError(new Error(res.error))
       }
-    } catch {
-      setError('アカウント情報の読み込みに失敗しました。もう一度お試しください。')
+    } catch (caught) {
+      setAccountsError(caught)
     } finally {
       setLoading(false)
     }
@@ -199,6 +208,11 @@ export default function HealthPage() {
   useEffect(() => {
     loadAccounts()
     loadMigrations()
+    try {
+      setRole(window.localStorage.getItem('lh_staff_role') || null)
+    } catch {
+      // ストレージが使えなくても画面は出せる
+    }
   }, [loadAccounts, loadMigrations])
 
   const handleExpand = (accountId: string) => {
@@ -214,12 +228,18 @@ export default function HealthPage() {
       setMigrateFrom(null)
       setMigrateToId('')
       loadMigrations()
-    } catch {
-      setError('移行リクエストに失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (caught) {
+      // M019：一律の汎用文にせず、403 は権限不足として区別する。
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '移行', {
+        forbidden: '友だちの移行はオーナーだけができます。オーナーの方に操作してもらってください。',
+      }))
     } finally {
       setMigrating(false)
     }
   }
+
+  // M019：役割が分かっていて owner でないときは移行の入口を出さない。最終の門はサーバ。
+  const canMigrate = role === null || role === 'owner'
 
   const getAccountName = (id: string): string => {
     const account = accounts.find((a) => a.id === id)
@@ -239,6 +259,14 @@ export default function HealthPage() {
       {loading ? (
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
           読み込み中...
+        </div>
+      ) : accountsError !== null ? (
+        /*
+         * M018：読み込み失敗は「未登録」と出さない。捕まえた失敗を共通部品へ
+         * 渡し、再試行口を出す（403 は権限の案内になり、再試行口は出ない）。
+         */
+        <div className="bg-canvas rounded-card border border-hairline p-8">
+          <ListState kind="error" error={accountsError} onRetry={() => void loadAccounts()} />
         </div>
       ) : accounts.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
@@ -315,15 +343,23 @@ export default function HealthPage() {
                       {/* 確認が止まっていても、最後の結果が危険なら移行の入口は残す。 */}
                       {storedRisk === 'danger' && (
                         <div className="mb-3">
-                          <button
-                            onClick={() => {
-                              setMigrateFrom(account.id)
-                              setMigrateToId('')
-                            }}
-                            className="px-3 py-1.5 rounded-control text-white text-xs font-medium bg-danger hover:brightness-92 transition-colors"
-                          >
-                            友だちを移行する
-                          </button>
+                          {/*
+                            M019：移行口は owner 専用。押せない役割には
+                            ボタンの代わりに理由を出す（最終の門はサーバ）。
+                          */}
+                          {canMigrate ? (
+                            <button
+                              onClick={() => {
+                                setMigrateFrom(account.id)
+                                setMigrateToId('')
+                              }}
+                              className="px-3 py-1.5 rounded-control text-white text-xs font-medium bg-danger hover:brightness-92 transition-colors"
+                            >
+                              友だちを移行する
+                            </button>
+                          ) : (
+                            <p className="text-xs text-ink-secondary">友だちの移行はオーナーだけができます。</p>
+                          )}
                         </div>
                       )}
 

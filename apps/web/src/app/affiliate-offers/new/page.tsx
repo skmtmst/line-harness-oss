@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
@@ -99,6 +101,16 @@ export default function NewAffiliateOfferPage() {
 
   const yen = rewardAmount ? Number(rewardAmount) : 0
   const miles = rewardMiles ? Number(rewardMiles) : 0
+
+  /*
+   * 作成途中の離脱確認。案件名・説明・報酬・タグ・シナリオのどれかに手を
+   * 付けていたら、キャンセルや左メニューで確認窓を出す。作成が終わると
+   * 一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || description || rewardAmount || rewardMiles || tagId || scenarioId || !publishNow
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   return (
     <CreatePage
@@ -353,6 +365,7 @@ export default function NewAffiliateOfferPage() {
           <span className="text-ink-secondary text-sm">作成したらすぐ公開する</span>
         </Checkbox>
       </FormSection>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した案件" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )
 }

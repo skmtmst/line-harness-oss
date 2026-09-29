@@ -12,7 +12,7 @@ import NewWebinarPage from './page'
  *
  * - 何も触っていない戻りはそのまま通す（確認を出さない）
  * - 名前・開催形式・フォルダを触っていたら「保存していない変更があります」
- * - 「保存せずに移動」で一覧へ、「入力を続ける」・Esc で残る
+ * - 「保存せずに移動」で一覧へ、「編集を続ける」・Esc で残る
  */
 
 const fixture = vi.hoisted(() => ({
@@ -139,7 +139,7 @@ describe('ウェビナー作成の未保存離脱確認（R18）', () => {
     expect(fixture.push).toHaveBeenCalledWith('/webinars')
   })
 
-  it('「入力を続ける」とEscでは残り、入力は消えない', async () => {
+  it('「編集を続ける」とEscでは残り、入力は消えない', async () => {
     await render()
     await flush()
     await typeTitle('QAウェビナー')
@@ -147,8 +147,8 @@ describe('ウェビナー作成の未保存離脱確認（R18）', () => {
     await flush()
     expect(document.body.textContent).toContain('保存していない変更があります')
 
-    const stay = [...document.body.querySelectorAll('button')].find((b) => b.textContent === '入力を続ける')
-    if (!stay) throw new Error('「入力を続ける」が見つかりません')
+    const stay = [...document.body.querySelectorAll('button')].find((b) => b.textContent === '編集を続ける')
+    if (!stay) throw new Error('「編集を続ける」が見つかりません')
     await act(async () => { fireEvent.click(stay) })
     await flush()
     expect(dialog()).toBeNull()

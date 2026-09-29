@@ -13,6 +13,8 @@ import {
   type ConversionValueMode,
 } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   CalendarCheck,
   ClipboardCheck,
@@ -339,6 +341,21 @@ export default function NewConversionPointPage() {
       setValueModeNotice(null)
     }
   }
+
+  /*
+   * 作成途中の離脱確認。名前・金額・対象URL・数えない条件・使う場所の
+   * どれかに手を付けていたら、キャンセルや左メニューで確認窓を出す。
+   * 作成が終わると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || value || targetUrl || exclusionMemo || attributionDays ||
+    triggerKind !== 'order' || eventType !== 'ec_order_confirmed' ||
+    valueMode !== 'source' || measureMethod !== 'webhook' ||
+    exclusion !== null || deduplicationMode !== 'once_per_friend' ||
+    reversalPolicy !== 'source_cancelled' || saveAsDraft ||
+    selectedUsageKeys.size > 0
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   return (
     <CreatePage
@@ -707,6 +724,7 @@ export default function NewConversionPointPage() {
           </div>
         </Disclosure>
       </FormSection>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した成果地点" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )
 }
