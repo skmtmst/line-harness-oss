@@ -1561,7 +1561,7 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const { processDueAnalyticsReports } = await import('./services/analytics-reports.js');
         const result = await processDueAnalyticsReports(env, new Date(event.scheduledTime));
-        if (result.processed + result.failed + result.purged > 0) {
+        if (result.processed + result.failed + result.purged + result.reclaimed + result.repaired > 0) {
           console.log(JSON.stringify({ event: 'analytics_report_tick', ...result }));
         }
       },

@@ -491,6 +491,30 @@ async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
 }
 
 async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
+  /*
+   * R423/R426/R428: 公開受信口は受信口IDから所属を確定する。
+   * 画面のコピーURL（queryなし）でも通り、外部指定の account は使わない。
+   * 別 account・不存在の指定で所有先の機能停止をすり抜けられない。
+   * 有効な所有先の受信を無関係な指定で拒否しない。
+   * 本文の account 探索のために JSON を先読みしない
+   * （巨大本文は route の申告サイズ検査で読まずに413へ）。
+   */
+  const receiveMatch = /^\/api\/webhooks\/incoming\/([^/]+)\/receive$/.exec(c.req.path);
+  if (receiveMatch) {
+    let webhookId: string | null = null;
+    try {
+      webhookId = decodeURIComponent(receiveMatch[1]!);
+    } catch {
+      webhookId = null;
+    }
+    if (webhookId) {
+      const owner = await dbFor(c.env).prepare(
+        'SELECT line_account_id AS account_id FROM incoming_webhooks WHERE id = ? AND deleted_at IS NULL',
+      ).bind(webhookId).first<{ account_id: string | null }>();
+      if (owner?.account_id) return { ids: [owner.account_id], accountMismatch: false };
+    }
+    // 未知の受信口は従来の解決へ（route が 404 を返す）。
+  }
   // R348: query と body の両方に所属があるときは両方を見る。query だけを
   // 見ると、query に旧所属・body に新所属を書いて検査をすり抜けられる。
   // 両方が食い違う入力はどちらを信じるか決められないため断る。

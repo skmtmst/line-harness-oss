@@ -201,6 +201,18 @@ export async function getSavedAnalytics(
   db: D1Database,
   lineAccountId: string,
 ): Promise<SavedAnalyticsSummary[]> {
+  // R461: 旧版判定は、期限削除される元 run（analytics_funnel_runs）への
+  // JOIN に頼らない。保存時に固定した定義（versions 表の definition_json）
+  // から使った版を読む。元 run が13か月で消えても判定が解除されない。
+  const funnelCurrent = await db.prepare(
+    `SELECT funnel_id, MAX(version_number) AS current_version
+       FROM analytics_funnel_versions
+      WHERE line_account_id = ?
+      GROUP BY funnel_id`,
+  ).bind(lineAccountId).all<{ funnel_id: string; current_version: number }>();
+  const currentByFunnel = new Map(
+    funnelCurrent.results.map((row) => [row.funnel_id, Number(row.current_version)]),
+  );
   const rows = await db.prepare(
     `SELECT a.*,
             (SELECT COUNT(*) FROM analytics_saved_analysis_snapshots s
@@ -210,6 +222,7 @@ export async function getSavedAnalytics(
             s.data_cutoff_at AS snapshot_data_cutoff_at,
             s.created_at AS snapshot_created_at,
             sv.version_number AS snapshot_analysis_version,
+            sv.definition_json AS snapshot_definition_json,
             fv.version_number AS snapshot_source_version,
             (SELECT MAX(v2.version_number) FROM analytics_funnel_versions v2
               WHERE v2.funnel_id = fr.funnel_id) AS source_current_version
@@ -233,14 +246,35 @@ export async function getSavedAnalytics(
     snapshot_period_from: string | null; snapshot_period_to: string | null;
     snapshot_data_cutoff_at: string | null; snapshot_created_at: string | null;
     snapshot_analysis_version: number | null;
+    snapshot_definition_json: string | null;
     snapshot_source_version: number | null; source_current_version: number | null;
   }>();
   return rows.results.map((row) => {
     const snapshotAnalysisStale = row.snapshot_analysis_version != null
       && row.snapshot_analysis_version < row.current_version_number;
-    const sourceDefinitionStale = row.snapshot_source_version != null
-      && row.source_current_version != null
-      && row.source_current_version > row.snapshot_source_version;
+    // R461: 使った版は保存時の定義から読む。元 run が期限削除で消えても
+    // 版は残る。定義が読めない（壊れている）ときは「最新」と言わず
+    // 古い側に倒して注意を残す。
+    let sourceVersion = row.snapshot_source_version;
+    let sourceCurrent = row.source_current_version;
+    if (row.kind === 'funnel' && row.snapshot_definition_json) {
+      try {
+        const definition = JSON.parse(row.snapshot_definition_json) as {
+          funnelId?: unknown; versionNumber?: unknown;
+        };
+        if (typeof definition.versionNumber === 'number') sourceVersion = definition.versionNumber;
+        if (typeof definition.funnelId === 'string') {
+          const current = currentByFunnel.get(definition.funnelId);
+          if (current !== undefined) sourceCurrent = current;
+        }
+      } catch {
+        sourceVersion = null;
+        sourceCurrent = null;
+      }
+    }
+    const sourceDefinitionStale = row.kind === 'funnel'
+      ? sourceVersion == null || sourceCurrent == null || sourceCurrent > sourceVersion
+      : false;
     return {
       id: row.id,
       name: row.name,
@@ -260,8 +294,8 @@ export async function getSavedAnalytics(
         dataCutoffAt: row.snapshot_data_cutoff_at!,
         createdAt: row.snapshot_created_at!,
         definitionStale: snapshotAnalysisStale || sourceDefinitionStale,
-        sourceVersionNumber: row.snapshot_source_version,
-        sourceCurrentVersionNumber: row.source_current_version,
+        sourceVersionNumber: sourceVersion,
+        sourceCurrentVersionNumber: sourceCurrent,
       } : null,
     };
   });
