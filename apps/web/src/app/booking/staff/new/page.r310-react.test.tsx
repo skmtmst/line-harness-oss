@@ -44,7 +44,8 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {
     status: number
     code: string | undefined
@@ -56,6 +57,7 @@ vi.mock('@/lib/api', () => {
     }
   }
   return {
+    ...actual,
     ApiError,
     api: { staff: { list: async () => ({ success: true, data: [] }) } },
     bookingApi: {

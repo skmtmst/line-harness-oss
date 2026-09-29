@@ -38,7 +38,10 @@ const offersUpdate = vi.hoisted(() => vi.fn())
  * `@/lib/api` は読み込んだ時点で NEXT_PUBLIC_API_URL を要求して落ちる。
  * 画面が実際に呼ぶ口だけを置いた差し替えにして、環境変数に縛られないようにする。
  */
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+  ...actual,
   // CreatePage の後始末が `error instanceof ApiError` を見るので、器だけ揃える。
   ApiError: class ApiError extends Error {},
   api: {
@@ -48,7 +51,8 @@ vi.mock('@/lib/api', () => ({
     tags: { list: vi.fn(async () => ({ success: true, data: [] })) },
     scenarios: { list: vi.fn(async () => ({ success: true, data: [] })) },
   },
-}))
+  }
+})
 
 const pushed = vi.hoisted(() => [] as string[])
 vi.mock('next/navigation', () => ({
