@@ -1120,12 +1120,13 @@ describe('#678 実Reactで描いた画面全体', () => {
     expect(html).toContain('顧客へのお知らせ —')
   })
 
-  it('運用者件数は0件・読み込み中・取得失敗を書き分ける', () => {
+  it('運用者件数は0件・読み込み中・取得失敗・権限なしを書き分ける', () => {
     expect(operatorTabCountLabel('ready', 0)).toBe('0')
     expect(operatorTabCountLabel('ready', 7)).toBe('7')
     expect(operatorTabCountLabel('loading', null)).toBe('—')
     expect(operatorTabCountLabel('error', null)).toBe('取得失敗')
-    expect(operatorTabCountLabel('forbidden', null)).toBe('取得失敗')
+    // M031: 403は取れなかったのではなく権限が無い。「取得失敗」と混ぜない。
+    expect(operatorTabCountLabel('forbidden', null)).toBe('権限なし')
   })
 })
 
@@ -1240,16 +1241,24 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(screen.queryByText('顧客へのお知らせを表示できませんでした')).toBeNull()
   })
 
-  it('運用者だけ403/500になっても、顧客のお知らせは表示を続け、タブの数字だけ「取得失敗」にする', async () => {
+  it('運用者だけ403になっても顧客のお知らせは表示を続け、タブは「権限なし」にする', async () => {
     fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockRejectedValueOnce(new ApiError(403))
 
     const { unmount } = render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy()
+    // M031: 403は「取得失敗」と混ぜない。押しても直らない再試行も出さない。
+    expect(screen.getByText('運用者へのお知らせ 権限なし')).toBeTruthy()
+    expect(screen.queryByText('運用者へのお知らせ 取得失敗')).toBeNull()
+    expect(screen.getByText(/見る権限がありません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'もう一度' })).toBeNull()
     unmount()
+  })
 
+  it('運用者だけ500になっても、顧客のお知らせは表示を続け、タブの数字だけ「取得失敗」にする', async () => {
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockRejectedValueOnce(new Error('internal error'))
     render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy())

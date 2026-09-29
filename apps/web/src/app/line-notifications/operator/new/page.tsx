@@ -13,6 +13,11 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
+import {
+  describeApiFailure,
+  isForbiddenOrRateLimited,
+  loadFailureNotice,
+} from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -83,6 +88,8 @@ function NewOperatorNotificationInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  // M032: 捕まえた宛先の読み込み失敗。読み込み中のままにせず理由と再試行を出す。
+  const [recipientsError, setRecipientsError] = useState<unknown>(null)
   /*
    * 未保存の基準。作成時は宛先の自動選択が終わってから掴む（開いた直後
    * の全選択を「変更あり」と数えないため）。なおし時は読み直しの完了後。
@@ -128,16 +135,22 @@ function NewOperatorNotificationInner() {
     return () => { active = false }
   }, [editId, selectedAccountId])
 
-  useEffect(() => {
-    let active = true
-    if (!selectedAccountId) { setRecipients(null); setRecipientIds([]); return }
+  // M032: 宛先の取り直し。失敗しても読み込み中のままにせず、理由と再試行を出す。
+  // 世代で古い応答を捨てる（アカウント切替後の遅い応答で上書きしない）。
+  const recipientsGeneration = useRef(0)
+  const loadRecipients = () => {
+    const accountId = selectedAccountId
+    if (!accountId) { setRecipients(null); setRecipientIds([]); return }
+    const generation = ++recipientsGeneration.current
+    setRecipientsError(null)
     void api.lineNotifications.operatorRules.previewRecipients({
-      lineAccountId: selectedAccountId,
+      lineAccountId: accountId,
       channels: ['dashboard', 'line'],
     }).then((result) => {
-      if (!active) return
+      if (generation !== recipientsGeneration.current) return
       if (!result.success) throw new Error(result.error)
       setRecipients(result.data)
+      setRecipientsError(null)
       // NOTIFY-04: 再開したお知らせの宛先は保存ずみのもの。全選択で
       // 上書きすると、本人だけにしていた設定が全員へ広がる。
       if (!editId) {
@@ -145,12 +158,18 @@ function NewOperatorNotificationInner() {
         setRecipientIds(autoIds)
         autoIdsRef.current = autoIds
       }
-    }).catch(() => {
-      if (!active) return
+    }).catch((caught) => {
+      if (generation !== recipientsGeneration.current) return
       setRecipients(null)
-      setError('受け取る人を読み込めませんでした。')
+      // M032: 宛先の場所で理由と再試行を出す。下の帯には出さない。
+      // 生の `API error: NNN` は出さない。
+      setRecipientsError(caught)
     })
-    return () => { active = false }
+  }
+
+  useEffect(() => {
+    loadRecipients()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId, editId])
 
   const signature = JSON.stringify([name, eventType, threshold, importance, recipientIds, schedule, dedupeMinutes, onlyAvailable, emailFallback])
@@ -164,14 +183,14 @@ function NewOperatorNotificationInner() {
     // なおし時：読み直しを見る前の初期値は基準にしない。
     if (editId && !sawLoadingRef.current) return
     // 作成時：宛先の自動選択（または読み込み失敗の確定）を待つ。
-    if (!editId && recipients === null && !error) return
+    if (!editId && recipients === null && !error && recipientsError === null) return
     if (!editId && autoIdsRef.current !== null) {
       // 読み込み前に触った分も未保存に数えるよう、初期値＋自動選択で基準を作る。
       setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_OPERATOR_EVENT_TYPE, 'one', 'normal', autoIdsRef.current, 'anytime', '10', false, true]))
       return
     }
     setBaseline(signature)
-  }, [baseline, ruleLoading, editId, recipients, error, signature])
+  }, [baseline, ruleLoading, editId, recipients, error, recipientsError, signature])
 
   /*
    * 作成・なおし途中の離脱確認。基準から1か所でも変わっていたら、
@@ -257,7 +276,10 @@ function NewOperatorNotificationInner() {
       await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
       router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : '公開できませんでした。')
+      // M032: 生の `API error: NNN` を出さず、原因どおりに言い分ける。
+      setError(describeApiFailure(caught, '公開', {
+        forbidden: 'このLINEアカウントのお知らせを公開する権限がありません。',
+      }))
     } finally { setSaving(false) }
   }
 
@@ -272,7 +294,10 @@ function NewOperatorNotificationInner() {
       // 成功は緑の枠で出す。赤い失敗枠には入れない。
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'テスト送信できませんでした。')
+      // M032: 生の `API error: NNN` を出さず、原因どおりに言い分ける。
+      setError(describeApiFailure(caught, 'テスト送信', {
+        forbidden: 'このLINEアカウントのお知らせをテスト送信する権限がありません。',
+      }))
     } finally { setSaving(false) }
   }
 
@@ -311,7 +336,20 @@ function NewOperatorNotificationInner() {
             <p className="mt-1 text-xs text-ink-faint">LINEログイン済みの人にだけ届きます。担当が決まっていないと届きません。</p>
             <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><Select aria-label="送り先" id="operator-recipient-kind" size="full" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><Select aria-label="チーム" id="operator-recipient-team" size="full" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <Checkbox key={recipient.id} checked={selected} onCheckedChange={(checked) => setRecipientIds((current) => checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))}>{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</Checkbox> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
+              {recipients
+                ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <Checkbox key={recipient.id} checked={selected} onCheckedChange={(checked) => setRecipientIds((current) => checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))}>{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</Checkbox> })
+                : recipientsError !== null
+                  ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-ink-secondary" role="alert">
+                        {isForbiddenOrRateLimited(recipientsError)
+                          ? loadFailureNotice(recipientsError, '受け取る人')
+                          : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}
+                      </p>
+                      <Button variant="secondary" size="compact" onClick={() => loadRecipients()}>もう一度読み込む</Button>
+                    </div>
+                    )
+                  : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
             </div>
             {recipients ? <p className="mt-3 text-xs text-ink-secondary">選択 {recipientIds.length}人 ／ LINEで受け取れる {recipients.items.filter((item) => recipientIds.includes(item.id) && item.channels.line).length}人 ／ 管理画面で受け取れる {recipientIds.length}人</p> : null}
           </section>
