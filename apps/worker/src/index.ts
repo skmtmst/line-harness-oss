@@ -155,6 +155,7 @@ import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
+import { tiktokPnl } from './routes/tiktok-pnl.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { restaurantGooglePosts } from './routes/restaurant-google-posts.js';
 import { restaurantGooglePerformance } from './routes/restaurant-google-performance.js';
@@ -571,6 +572,7 @@ app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
 app.route('/', restaurantGooglePerformance);
 app.route('/', googleSheets);
+app.route('/', tiktokPnl);
 app.route('/', tenants);
 app.route('/', hqBanners);
 app.route('/', hqSupport);
@@ -1823,6 +1825,20 @@ async function runSixHourlyHeavyJobs(
         });
         if (result.imported + result.failed > 0) {
           console.log(JSON.stringify({ event: 'ad_cost_import', ...result }));
+        }
+      },
+    },
+    {
+      // TikTok利益計算: EC-CUBEの注文明細を取り込み、利益計算シートへ反映。
+      // 差分（sheet_dirty）だけ書くので6時間ごとの再実行は重くならない。
+      name: 'tiktok pnl sync',
+      run: async () => {
+        const { processTiktokPnlTick } = await import('./services/tiktok-pnl.js');
+        const result = await processTiktokPnlTick(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.createdSheets + result.importedOrders + result.wroteRows + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'tiktok_pnl_tick', ...result }));
         }
       },
     },

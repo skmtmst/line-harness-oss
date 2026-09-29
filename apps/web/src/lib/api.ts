@@ -3152,6 +3152,8 @@ export type MileageRewardVersion = {
   id: string
   versionNumber: number
   status: 'draft' | 'published'
+  /** 保存ごとに増える更新番号。同時編集の検知に送る。 */
+  revision: number
   requiredMiles: number
   /** 数に限りがあるとき。null なら限りなし。**0 と混ぜない。** */
   stockLimit: number | null
@@ -11543,23 +11545,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ accountId }),
       }),
-    /** 下書きを書き換える。読み込んだ版IDで同時編集を検知する。 */
+    /** 下書きを書き換える。読み込んだ版IDと更新番号で同時編集を検知する。 */
     saveRewardDraft: (
       id: string,
       accountId: string,
       expectedVersionId: string,
+      expectedRevision: number,
       draft: MileageRewardDraftInput,
     ) =>
       fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/draft`, {
         method: 'PATCH',
-        body: JSON.stringify({ accountId, expectedVersionId, draft }),
+        body: JSON.stringify({ accountId, expectedVersionId, expectedRevision, draft }),
       }),
-    /** 下書きを公開する。**ここで初めてお客様に見える。** */
-    publishReward: (id: string, accountId: string) =>
+    /** 下書きを公開する。**ここで初めてお客様に見える。**確認した版と更新番号を添えて、途中の保存とすれ違わない。 */
+    publishReward: (id: string, accountId: string, expectedVersionId?: string, expectedRevision?: number) =>
       fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/publish`, {
         method: 'POST',
         headers: { 'X-Confirm-Irreversible': 'mileage-reward-publish' },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ accountId, expectedVersionId, expectedRevision }),
       }),
     /** 下書きで受け渡せるかだけ確かめる。残高・在庫は動かさない。 */
     testReward: (id: string, accountId: string) =>
