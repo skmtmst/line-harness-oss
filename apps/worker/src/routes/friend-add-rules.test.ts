@@ -397,4 +397,62 @@ describe('friend add rules API', () => {
       idempotencyKey: 'friend-rule-publish-0001',
     }));
   });
+
+  describe('M007/M008 存在しない設定の削除・公開', () => {
+    test('M007: 存在しない設定の削除は404（受け皿の409と混ぜない）', async () => {
+      db.getFriendAddRule.mockResolvedValue(null);
+      const response = await app.request('/api/friend-add-rules/gone?account_id=account-1', {
+        method: 'DELETE',
+      }, makeEnv());
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        success: false, error: '見つかりません（一覧を読み直してください）',
+      });
+      expect(db.archiveFriendAddRule).not.toHaveBeenCalled();
+    });
+
+    test('M007: 共通あいさつ（受け皿）の削除は409のまま', async () => {
+      db.getFriendAddRule.mockResolvedValue({ ...rule, is_unknown_route_fallback: 1 });
+      const response = await app.request('/api/friend-add-rules/rule-1?account_id=account-1', {
+        method: 'DELETE',
+      }, makeEnv());
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        success: false, error: '経路が分からなかった人の設定は削除できません',
+      });
+      expect(db.archiveFriendAddRule).not.toHaveBeenCalled();
+    });
+
+    test('M007: ある設定の削除は成功する', async () => {
+      db.archiveFriendAddRule.mockResolvedValue(undefined);
+      const response = await app.request('/api/friend-add-rules/rule-1?account_id=account-1', {
+        method: 'DELETE',
+      }, makeEnv());
+      expect(response.status).toBe(200);
+      expect(db.archiveFriendAddRule).toHaveBeenCalled();
+    });
+
+    test('M008: 存在しない設定の公開は404（500にしない）', async () => {
+      db.getFriendAddRule.mockResolvedValue(null);
+      db.publishFriendAddRule.mockRejectedValue(new Error('FRIEND_ADD_RULE_DRAFT_NOT_FOUND'));
+      const response = await app.request('/api/friend-add-rules/gone/publish?account_id=account-1', {
+        method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0002' },
+      }, makeEnv());
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        success: false, error: '見つかりません（一覧を読み直してください）',
+      });
+    });
+
+    test('M008: 下書きの無い既存設定の公開は409', async () => {
+      db.publishFriendAddRule.mockRejectedValue(new Error('FRIEND_ADD_RULE_DRAFT_NOT_FOUND'));
+      const response = await app.request('/api/friend-add-rules/rule-1/publish?account_id=account-1', {
+        method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0003' },
+      }, makeEnv());
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        success: false, error: '公開できる下書きがありません。最新の状態を読み直してください',
+      });
+    });
+  });
 });

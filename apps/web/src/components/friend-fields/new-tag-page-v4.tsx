@@ -6,6 +6,7 @@ import type { TagGroup } from '@line-crm/shared'
 import { api, type TagDefinition } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Notice from '@/components/shared/notice'
 import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
 
 export default function NewTagPageV4() {
@@ -14,25 +15,62 @@ export default function NewTagPageV4() {
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
   const copyId = params.get('copy') ?? ''
+  /*
+   * D012: 直前に作ったタグの名前。URLに残すので、再読み込みしても
+   * 成功の知らせが消えない。全画面リロードはしない。
+   */
+  const createdName = params.get('created') ?? ''
   const [groups, setGroups] = useState<TagGroup[]>([])
   const [copySource, setCopySource] = useState<TagDefinition | null>(null)
   const [loading, setLoading] = useState(Boolean(copyId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  /*
+   * D011: フォルダ一覧と複製元の失敗は別の理由で出す。一括の
+   * Promise.allで混ぜると、複製していない通常作成でも複製元の失敗に
+   * 見えてしまい、立て直し方が伝わらない。
+   */
+  const [copyError, setCopyError] = useState('')
+  const [foldersFailed, setFoldersFailed] = useState(false)
+  /** フォルダ一覧の取り直し番号。 */
+  const [foldersReloadKey, setFoldersReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    setLoading(Boolean(copyId))
-    void Promise.all([
-      api.tagGroups.list(selectedAccountId),
-      copyId && selectedAccountId ? api.tags.definition(copyId, selectedAccountId) : Promise.resolve(null),
-    ]).then(([folders, definition]) => {
+    if (!selectedAccountId) {
+      setGroups([])
+      setFoldersFailed(false)
+      return
+    }
+    setFoldersFailed(false)
+    void api.tagGroups.list(selectedAccountId).then((folders) => {
       if (cancelled) return
-      if (folders.success) setGroups(folders.data.filter((group) => group.accountId === selectedAccountId))
-      if (definition?.success) setCopySource(definition.data)
+      if (folders.success) {
+        setGroups(folders.data.filter((group) => group.accountId === selectedAccountId))
+      } else {
+        setFoldersFailed(true)
+      }
     }).catch(() => {
-      if (!cancelled) setError('複製元のタグを読み込めませんでした')
+      if (!cancelled) setFoldersFailed(true)
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId, foldersReloadKey])
+
+  useEffect(() => {
+    let cancelled = false
+    setCopySource(null)
+    setCopyError('')
+    if (!copyId || !selectedAccountId) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    void api.tags.definition(copyId, selectedAccountId).then((definition) => {
+      if (cancelled) return
+      if (definition?.success) setCopySource(definition.data)
+      else setCopyError('複製元のタグを読み込めませんでした')
+    }).catch(() => {
+      if (!cancelled) setCopyError('複製元のタグを読み込めませんでした')
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
@@ -60,7 +98,6 @@ export default function NewTagPageV4() {
     }
     setSaving(true)
     setError('')
-    setNotice('')
     try {
       const created = await api.tags.createDefinition(selectedAccountId, {
         name: values.name,
@@ -74,8 +111,10 @@ export default function NewTagPageV4() {
       })
       if (!created.success) throw new Error(created.error)
       if (andAnother) {
-        setNotice('保存しました。続けて新しいタグを作れます。')
-        window.location.assign('/tags/new')
+        const next = new URLSearchParams()
+        if (copyId) next.set('copy', copyId)
+        next.set('created', values.name.trim())
+        router.push(`/tags/new?${next}`)
       } else {
         router.push(`/tags?highlight=${created.data.tag.id}`)
       }
@@ -89,34 +128,40 @@ export default function NewTagPageV4() {
   if (loading) return <p className="p-6 text-sm text-ink-faint">複製元を読み込んでいます…</p>
 
   return (
-    <TagEditorV4
-      key={copyId || 'new'}
-      mode="create"
-      groups={groups}
-      accountId={selectedAccountId}
-      initialLinked={params.get('linked') === '1' || Boolean(copySource?.tag.linkedEnabled)}
-      initialValues={copySource ? {
-        name: `${copySource.tag.name} のコピー`,
-        groupId: copySource.tag.groupId ?? '',
-        isStarred: copySource.tag.isStarred ?? false,
-        linked: Boolean(copySource.tag.linkedEnabled),
-        rewardMiles: copySource.tag.mileageReward ?? 0,
-        referralRewardMiles: copySource.tag.referralMileageReward ?? 0,
-        multiplierBps: copySource.tag.mileageMultiplierBps ?? null,
-        multiplierPriority: copySource.tag.mileageMultiplierPriority ?? 0,
-        applyToExisting: false,
-        reapplyPolicy: copySource.tag.reapplyPolicy ?? 'first_only',
-        actions: (copySource.automation?.actions ?? []).map((action) => linkedActionFromDefinition(
-          action,
-          copySource.tag.linkedActions?.find((saved) => saved.id === action.id),
-        )),
-      } : undefined}
-      referenceDrawerState={params.get('reference') === '1'}
-      saving={saving}
-      error={error}
-      notice={notice}
-      onCancel={() => router.push('/tags')}
-      onSave={(values, andAnother) => save(values, andAnother)}
-    />
+    <div>
+      {createdName ? (
+        <Notice tone="success" className="mb-4" message={`「${createdName}」を作成しました。続けて新しいタグを作れます。`} />
+      ) : null}
+      <TagEditorV4
+        key={`${copyId || 'new'}:${createdName}`}
+        mode="create"
+        groups={groups}
+        accountId={selectedAccountId}
+        initialLinked={params.get('linked') === '1' || Boolean(copySource?.tag.linkedEnabled)}
+        initialValues={copySource ? {
+          name: `${copySource.tag.name} のコピー`,
+          groupId: copySource.tag.groupId ?? '',
+          isStarred: copySource.tag.isStarred ?? false,
+          linked: Boolean(copySource.tag.linkedEnabled),
+          rewardMiles: copySource.tag.mileageReward ?? 0,
+          referralRewardMiles: copySource.tag.referralMileageReward ?? 0,
+          multiplierBps: copySource.tag.mileageMultiplierBps ?? null,
+          multiplierPriority: copySource.tag.mileageMultiplierPriority ?? 0,
+          applyToExisting: false,
+          reapplyPolicy: copySource.tag.reapplyPolicy ?? 'first_only',
+          actions: (copySource.automation?.actions ?? []).map((action) => linkedActionFromDefinition(
+            action,
+            copySource.tag.linkedActions?.find((saved) => saved.id === action.id),
+          )),
+        } : undefined}
+        referenceDrawerState={params.get('reference') === '1'}
+        saving={saving}
+        error={error || copyError}
+        foldersFailed={foldersFailed}
+        onRetryFolders={() => setFoldersReloadKey((key) => key + 1)}
+        onCancel={() => router.push('/tags')}
+        onSave={(values, andAnother) => save(values, andAnother)}
+      />
+    </div>
   )
 }

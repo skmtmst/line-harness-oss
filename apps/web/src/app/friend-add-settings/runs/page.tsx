@@ -10,6 +10,7 @@ import type {
 } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
+import { describeFriendAddFailure } from '../friend-add-failure'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { csvCell } from './csv'
 import { formatJstDateTime, routingAction, routingLabel } from './run-status'
@@ -72,6 +73,8 @@ function FriendAddRunsInner() {
   const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // M009: 403 は共通部品の forbidden で出す。HTTP の状態をそのまま渡す。
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvNote, setCsvNote] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
@@ -92,6 +95,7 @@ function FriendAddRunsInner() {
     }
     setLoading(true)
     setError('')
+    setErrorStatus(null)
     try {
       // 種類・経路の絞り込みはサーバ側へ送る。取得済み20件への表示絞りでは
       // 2ページ目以降が漏れる。
@@ -106,14 +110,18 @@ function FriendAddRunsInner() {
       if (requestId !== requestSequence.current) return
       if (!response.success) {
         setData(null)
-        setError('実行結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+        setError(response.error || '実行結果を表示できませんでした。もう一度お試しください。')
+        setErrorStatus(null)
         return
       }
       setData(response.data)
-    } catch {
+    } catch (caught) {
       if (requestId !== requestSequence.current) return
+      // M009: 403 は権限、404 は選び直し。「通信を確認」は通信断だけ。
+      const failure = describeFriendAddFailure(caught, '実行結果', 'load')
       setData(null)
-      setError('実行結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+      setError(failure.message)
+      setErrorStatus(failure.status)
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
@@ -433,7 +441,7 @@ function FriendAddRunsInner() {
         />
       ) : error ? (
         <ListState
-          kind="error"
+          kind={errorStatus === 403 ? 'forbidden' : 'error'}
           title="実行結果を表示できませんでした"
           description={error}
           action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
