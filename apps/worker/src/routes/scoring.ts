@@ -163,20 +163,25 @@ async function handleMileageRewardDraftUpdate(c: Context<Env>) {
     const body = await c.req.json<{
       accountId?: unknown;
       expectedVersionId?: unknown;
+      expectedRevision?: unknown;
       draft?: MileageRewardDraftInput;
     }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     const expectedVersionId = typeof body.expectedVersionId === 'string'
       ? body.expectedVersionId.trim()
       : '';
+    const expectedRevision = typeof body.expectedRevision === 'number'
+      && Number.isInteger(body.expectedRevision) && body.expectedRevision >= 1
+      ? body.expectedRevision
+      : null;
     if (!await canUseMileageAccount(c, accountId)) {
       return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
     }
-    if (!body.draft || !expectedVersionId) {
+    if (!body.draft || !expectedVersionId || expectedRevision == null) {
       return c.json({ success: false, error: '読み込んだ版と変更内容が必要です' }, 400);
     }
     const reward = await updateMileageRewardDraft(c.env.DB, {
-      id: c.req.param('id') ?? '', lineAccountId: accountId, expectedVersionId,
+      id: c.req.param('id') ?? '', lineAccountId: accountId, expectedVersionId, expectedRevision,
       updatedBy: c.get('staff').id, draft: body.draft,
     });
     auditLog(c, 'mileage.reward.update', { kind: 'mileage_reward', id: reward.id });
@@ -281,13 +286,24 @@ scoring.post(
   requireIrreversibleConfirmation('mileage-reward-publish'),
   async (c) => {
     try {
-      const body = await c.req.json<{ accountId?: unknown }>();
+      const body = await c.req.json<{
+        accountId?: unknown;
+        expectedVersionId?: unknown;
+        expectedRevision?: unknown;
+      }>();
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      const expectedVersionId = typeof body.expectedVersionId === 'string'
+        && body.expectedVersionId.trim() ? body.expectedVersionId.trim() : null;
+      const expectedRevision = typeof body.expectedRevision === 'number'
+        && Number.isInteger(body.expectedRevision) && body.expectedRevision >= 1
+        ? body.expectedRevision
+        : null;
       if (!await canUseMileageAccount(c, accountId)) {
         return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
       }
       const reward = await publishMileageReward(c.env.DB, {
         id: c.req.param('id'), lineAccountId: accountId, publishedBy: c.get('staff').id,
+        expectedVersionId, expectedRevision,
       });
       auditLog(c, 'mileage.reward.publish', { kind: 'mileage_reward', id: reward.id });
       return c.json({ success: true, data: reward });

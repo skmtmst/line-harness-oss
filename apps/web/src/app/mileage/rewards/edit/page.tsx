@@ -215,15 +215,19 @@ function MileageRewardEditorInner() {
     let saved
     if (rewardId) {
       let expectedVersionId = reward?.currentDraftVersionId
-      if (!expectedVersionId) {
+      let expectedRevision = reward?.currentVersion?.revision
+      if (!expectedVersionId || expectedRevision == null) {
         const createdDraft = await api.mileage.createRewardDraft(rewardId, selectedAccountId)
         if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
         expectedVersionId = createdDraft.data.currentDraftVersionId
+        expectedRevision = createdDraft.data.currentVersion?.revision
       }
+      if (expectedRevision == null) throw new Error('failed')
       saved = await api.mileage.saveRewardDraft(
         rewardId,
         selectedAccountId,
         expectedVersionId,
+        expectedRevision,
         draft,
       )
     } else {
@@ -243,7 +247,13 @@ function MileageRewardEditorInner() {
     try {
       const saved = await persistDraft()
       if (thenPublish) {
-        const published = await api.mileage.publishReward(saved.id, selectedAccountId)
+        /* 保存したての版と更新番号を添えて、途中の別保存とすれ違わない。 */
+        const published = await api.mileage.publishReward(
+          saved.id,
+          selectedAccountId,
+          saved.currentDraftVersionId ?? saved.currentVersion?.id,
+          saved.currentVersion?.revision,
+        )
         if (!published.success) throw new Error('failed')
       }
       setPublishOpen(false)
