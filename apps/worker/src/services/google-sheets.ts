@@ -96,14 +96,36 @@ export function parseSpreadsheetId(input: string): string | null {
 
 // ---------- OAuthクライアント ----------
 
+/**
+ * Sheets 専用の OAuth クライアントが無い環境では、同じ Google プロジェクトの
+ * Googleビジネス用クライアントを共用する。OAuthクライアントは「このアプリ」を表す
+ * 資格情報で、実際に何を許可するかは認可のたびに渡すスコープ側で決まるため、
+ * 用途ごとにクライアントを分けなくても要求する権限は変わらない。
+ * 共用する場合でも、Google側にこのコールバックURLの登録は必要。
+ * 専用クライアントを設定した環境ではそちらが優先される。
+ */
 export function sheetsOauthClient(
-  env: Pick<Env['Bindings'], 'GOOGLE_SHEETS_OAUTH_CLIENT_ID' | 'GOOGLE_SHEETS_OAUTH_CLIENT_SECRET'>,
+  env: Pick<
+    Env['Bindings'],
+    | 'GOOGLE_SHEETS_OAUTH_CLIENT_ID'
+    | 'GOOGLE_SHEETS_OAUTH_CLIENT_SECRET'
+    | 'GOOGLE_BUSINESS_OAUTH_CLIENT_ID'
+    | 'GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET'
+  >,
   redirectUri: string,
 ): GoogleOAuthClient | null {
-  const clientId = env.GOOGLE_SHEETS_OAUTH_CLIENT_ID?.trim();
-  const clientSecret = env.GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?.trim();
-  if (!clientId || !clientSecret) return null;
-  return { clientId, clientSecret, redirectUri };
+  // IDとシークレットは必ず同じクライアントの組で使う。
+  // 片方だけ設定された環境で別クライアントの相方と混ざると認可が必ず失敗するため。
+  const pairs: Array<[string | undefined, string | undefined]> = [
+    [env.GOOGLE_SHEETS_OAUTH_CLIENT_ID, env.GOOGLE_SHEETS_OAUTH_CLIENT_SECRET],
+    [env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID, env.GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET],
+  ];
+  for (const [rawId, rawSecret] of pairs) {
+    const clientId = rawId?.trim();
+    const clientSecret = rawSecret?.trim();
+    if (clientId && clientSecret) return { clientId, clientSecret, redirectUri };
+  }
+  return null;
 }
 
 // ---------- データ種別の定義（固定マッピング） ----------
