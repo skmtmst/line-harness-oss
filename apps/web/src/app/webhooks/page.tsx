@@ -271,8 +271,13 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
   // Rotate-secret modal state. Used to recover legacy webhooks deactivated
   // by migration 034, or to rotate a leaked secret in place.
+  /*
+   * d23b R420: 押した時点のLINEアカウントを一緒に持つ。
+   * 本人確認の窓をまたいで切り替えられると、別アカウントの設定へ
+   * 間違った合言葉を書き込んでしまう。
+   */
   const [rotateTarget, setRotateTarget] = useState<
-    | { kind: 'incoming' | 'outgoing'; id: string; name: string; activate: boolean }
+    | { kind: 'incoming' | 'outgoing'; id: string; name: string; activate: boolean; accountId: string }
     | null
   >(null)
   const [rotateSecretValue, setRotateSecretValue] = useState('')
@@ -370,6 +375,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     setSecretCopied(false)
     setRotateTarget(null)
     setRotateSecretValue('')
+    // d23b R420: アカウントを切り替えたら、前のアカウントへ紐付いた
+    // 本人確認の窓も閉じる。通った許可を別アカウントの操作へ回さない。
+    setStepUp(null)
     if (accountChanged) {
       setShowCreate(false)
       setInForm({ name: '', sourceType: '', secret: '' })
@@ -513,13 +521,21 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
       // 切り替えは統括だけの操作。権限不足は通信の失敗と分けて案内する（R32）。
       const forbidden = caught instanceof ApiError && caught.status === 403
+      if (!forbidden) {
+        /*
+          d23b R418: 応答が消えても、口側では止める処理が通っていることがある。
+          「変わっていません」と断言せず、一覧を読み直して実際の状態へ寄せ、
+          結果を確かめる案内だけを残す。
+        */
+        await load().catch(() => {})
+      }
       setToggleFailures((current) => ({
         ...current,
         [key]: {
           kind: 'outgoing', id, name,
           message: forbidden
             ? '統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。'
-            : '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。',
+            : '切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。',
         },
       }))
     } finally {
@@ -645,6 +661,17 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       return setError('LINEアカウントの一覧を読み直してください')
     }
     if (!rotateTarget) return
+    /*
+      d23b R420: 本人確認の窓をまたいだり開けたままにしているあいだに
+      切り替えられたら、開いた時点のアカウントのものではない。書き込みを
+      止めて選び直させる（本人確認の許可は開いたときのアカウントに紐付く）。
+    */
+    if (rotateTarget.accountId !== requestAccountId) {
+      setRotateTarget(null)
+      setRotateSecretValue('')
+      setError('LINEアカウントが切り替わりました。対象を選び直してください。')
+      return
+    }
     if (rotateSecretValue.length < MIN_SECRET_LENGTH) {
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
       return
@@ -1004,7 +1031,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           onToggle={handleToggleIncoming}
           togglingIds={togglingIdsOf('incoming')}
           onRotate={(wh) => {
-            setRotateTarget({ kind: 'incoming', id: wh.id, name: wh.name, activate: !wh.hasSecret })
+            // 開いた時点のアカウントを固定する（d23b R420）。
+            setRotateTarget({ kind: 'incoming', id: wh.id, name: wh.name, activate: !wh.hasSecret, accountId: selectedAccountId ?? '' })
             setRotateSecretValue('')
           }}
           onDelete={(wh) => askDelete('incoming', wh.id, wh.name)}
@@ -1023,11 +1051,13 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           onToggle={handleToggleOutgoing}
           togglingIds={togglingIdsOf('outgoing')}
           onRotate={(wh) => {
+            // 開いた時点のアカウントを固定する（d23b R420）。
             setRotateTarget({
               kind: 'outgoing',
               id: wh.id,
               name: wh.name,
               activate: isHttpsUrl(wh.url) && !wh.hasSecret,
+              accountId: selectedAccountId ?? '',
             })
             setRotateSecretValue('')
           }}
