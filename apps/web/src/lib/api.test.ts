@@ -677,8 +677,8 @@ describe('api.mileage reward draft contract', () => {
     }
 
     await api.mileage.createRewardDraft('reward/1', 'account 1')
-    await api.mileage.saveRewardDraft('reward/1', 'account 1', 'draft-version-1', draft)
-    await api.mileage.publishReward('reward/1', 'account 1')
+    await api.mileage.saveRewardDraft('reward/1', 'account 1', 'draft-version-1', 3, draft)
+    await api.mileage.publishReward('reward/1', 'account 1', 'draft-version-1', 3)
 
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
       'https://worker.example.com/api/mileage/rewards/reward%2F1/draft',
@@ -694,6 +694,7 @@ describe('api.mileage reward draft contract', () => {
       body: JSON.stringify({
         accountId: 'account 1',
         expectedVersionId: 'draft-version-1',
+        expectedRevision: 3,
         draft,
       }),
     })
