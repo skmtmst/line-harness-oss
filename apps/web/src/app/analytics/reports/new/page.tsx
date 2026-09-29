@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -16,10 +16,17 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
+  type AnalyticsReportRun,
   type AnalyticsReportSchedule,
   type AnalyticsReportScheduleOptions,
   type AnalyticsReportSection,
 } from '@/lib/api'
+import {
+  deliveryChannelLabel,
+  deliveryStatusLabel,
+  runErrorLabel,
+  runStateLabel,
+} from '../../report-run-state'
 
 const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail: string; unavailable?: string }> = [
   { id: 'friends', title: '友だちの増減', detail: '増えた・減った・残っている割合' },
@@ -90,6 +97,91 @@ function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254
 }
 
+/*
+ * R454: 1回送信の結果を見る画面。しまうと一覧から消えるため、
+ * 依頼ID（この画面のURL）から失敗理由・宛先別結果へ到達させる。
+ * 全部失敗の確定分だけ、ここから送り直せる。
+ */
+function OneTimeResultView({ accountId, schedule, runs, canManage, onRetryDone }: {
+  accountId: string
+  schedule: AnalyticsReportSchedule
+  runs: AnalyticsReportRun[]
+  canManage: boolean
+  onRetryDone: () => void
+}) {
+  usePageTitle('1回送信の結果')
+  const [retrying, setRetrying] = useState(false)
+  const [retryError, setRetryError] = useState('')
+  const latest = runs[0] ?? null
+  const sentAny = runs.some((run) => run.deliveryResults.some((item) => item.status === 'sent'))
+  const canRetry = canManage && latest !== null && latest.state !== 'running' && !sentAny
+
+  const retry = async () => {
+    if (!canRetry || retrying) return
+    setRetrying(true)
+    setRetryError('')
+    try {
+      const response = await api.analytics.reportSchedules.retry(accountId, schedule.id)
+      if (!response.success) throw new Error(response.error)
+      notifyToast('送り直しを受け付けました。結果はこの画面で確認できます。')
+      onRetryDone()
+    } catch (caught) {
+      setRetryError(caught instanceof Error ? caught.message : '送り直しを受け付けられませんでした')
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  return (
+    <div className="text-ink mx-auto flex max-w-screen-2xl flex-col gap-4 pb-24" data-design-node="URqOA">
+      <PageHeader
+        breadcrumb={[{ label: '分析', href: '/analytics' }, { label: '1回送信の結果' }]}
+        title="1回送信の結果"
+        description=""
+      />
+      <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
+        <h2 className="truncate text-lg font-semibold" title={schedule.name}>{schedule.name}</h2>
+        {!latest && (
+          <p className="text-ink-secondary mt-2 text-sm">まだ送信されていません。送信が終わるとここに結果が出ます。</p>
+        )}
+        {latest && (
+          <div className="mt-3 grid gap-2 text-sm">
+            <p className="text-ink-secondary">結果: <strong className="text-ink">{runStateLabel(latest.state)}</strong></p>
+            {runErrorLabel(latest.errorCode, latest.state) && (
+              <Notice tone="info" message={runErrorLabel(latest.errorCode, latest.state) ?? ''} />
+            )}
+            <ul className="grid list-none gap-2 p-0">
+              {latest.deliveryResults.map((item, index) => (
+                <li key={index} className="border-hairline rounded-control border px-3 py-2 text-xs">
+                  <span className="font-semibold">{deliveryChannelLabel(item.channel)}</span>
+                  {' ／ '}{item.recipient}
+                  {' ／ '}{deliveryStatusLabel(item.status)}
+                  {item.reason && <span className="text-ink-secondary">（{item.reason}）</span>}
+                </li>
+              ))}
+              {latest.deliveryResults.length === 0 && (
+                <li className="text-ink-secondary text-xs">宛先別の結果はまだありません。</li>
+              )}
+            </ul>
+            {sentAny && (
+              <p className="text-ink-secondary text-xs">一部は届いているため、送り直しはできません。</p>
+            )}
+          </div>
+        )}
+        {retryError && <Notice tone="danger" message={retryError} onClose={() => setRetryError('')} className="mt-3" />}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={onRetryDone}>もう一度確認</Button>
+          {canRetry && (
+            <Button disabled={retrying} onClick={() => void retry()}>
+              {retrying ? '送り直しています' : '届いていない分を送り直す'}
+            </Button>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function AnalyticsReportFormPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -116,6 +208,11 @@ function AnalyticsReportFormPage() {
   // 相手へ数字の入ったレポートが送られる。受信者の自動チェックもしない。
   const [staffIds, setStaffIds] = useState<string[]>([])
   const [emails, setEmails] = useState<string[]>([])
+  // R453: 通知方法は独立した選択にする。新規は従来どおり
+  // （管理画面のお知らせあり・メールは宛先ありのみ・LINEなし）。
+  // 編集時は保存済みの通知方法をそのまま読み込む。
+  const [dashboardEnabled, setDashboardEnabled] = useState(true)
+  const [emailEnabled, setEmailEnabled] = useState(false)
   const [lineEnabled, setLineEnabled] = useState(false)
   const [alertsEnabled, setAlertsEnabled] = useState(true)
   // 知らせの決めごとは件の条件ごとに on/off と数値を持つ。固定表示だったものを
@@ -134,6 +231,8 @@ function AnalyticsReportFormPage() {
 
   // 読み直し用の数え直し。入力の状態には触らない(点検#508軽8)。
   const [reloadSeq, setReloadSeq] = useState(0)
+  // R454: 1回送信の履歴（しまった依頼も依頼IDで結果へ到達させる）。
+  const [oneTime, setOneTime] = useState<{ schedule: AnalyticsReportSchedule; runs: AnalyticsReportRun[] } | null>(null)
 
   useEffect(() => {
     let active = true
@@ -144,46 +243,65 @@ function AnalyticsReportFormPage() {
     // PUT してしまう。取り直すたびに編集状態も初期化する。
     setEditing(null)
     setEditMissing(false)
+    setOneTime(null)
     if (!selectedAccountId) {
       setLoading(false)
       return () => { active = false }
     }
-    void api.analytics.reportSchedules.list(selectedAccountId).then((response) => {
+    void api.analytics.reportSchedules.list(selectedAccountId).then(async (response) => {
       if (!active) return
       if (!response.success) {
         setError(response.error || '定期レポートの設定を読み込めませんでした')
-      } else {
-        setOptions(response.data.options)
-        if (editId) {
-          const schedule = response.data.items.find((item) => item.id === editId)
-          if (!schedule) {
-            setEditMissing(true)
-          } else {
-            setEditing(schedule)
-            setName(schedule.name)
-            setSections(schedule.sections)
-            setSavedAnalysisIds(schedule.savedAnalysisIds)
-            setCadence(schedule.cadence)
-            setWeekday(String(schedule.weekday ?? 1))
-            setMonthDay(String(schedule.monthDay ?? 1))
-            setSendTime(schedule.sendTime)
-            setPeriodDays(String(schedule.periodDays))
-            setStaffIds(schedule.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string))
-            setEmails(schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => item.email as string))
-            setLineEnabled(schedule.channels.includes('line'))
-            setAlertsEnabled(schedule.alertRules.length > 0)
-            // 保存済みの決めごとを雛形へ戻す。画面に無い種類は別棚へ避けて、
-            // 保存するときにそのまま付け直す(編集するたびに消えないように)。
-            const drafts = defaultAlertDrafts(false)
-            const extras: AnalyticsReportSchedule['alertRules'] = []
-            for (const rule of schedule.alertRules) {
-              const def = ALERT_RULE_DEFS.find((item) => item.metric === rule.metric && item.operator === rule.operator)
-              if (def) drafts[def.id] = { enabled: true, threshold: String(rule.threshold), minimumSample: String(rule.minimumSample) }
-              else extras.push(rule)
-            }
-            setAlertDrafts(drafts)
-            setExtraAlertRules(extras)
+        setLoading(false)
+        return
+      }
+      setOptions(response.data.options)
+      if (editId) {
+        const schedule = response.data.items.find((item) => item.id === editId)
+        if (schedule && !schedule.isOneTime) {
+          setEditing(schedule)
+          setName(schedule.name)
+          setSections(schedule.sections)
+          setSavedAnalysisIds(schedule.savedAnalysisIds)
+          setCadence(schedule.cadence)
+          setWeekday(String(schedule.weekday ?? 1))
+          setMonthDay(String(schedule.monthDay ?? 1))
+          setSendTime(schedule.sendTime)
+          setPeriodDays(String(schedule.periodDays))
+          setStaffIds(schedule.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string))
+          setEmails(schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => item.email as string))
+          // R453: 保存済みの通知方法をそのまま読み込む。宛先の有無から
+          // 組み直さない（変えない保存で通知方法が変わる原因）。
+          setDashboardEnabled(schedule.channels.includes('dashboard'))
+          setEmailEnabled(schedule.channels.includes('email'))
+          setLineEnabled(schedule.channels.includes('line'))
+          setAlertsEnabled(schedule.alertRules.length > 0)
+          // 保存済みの決めごとを雛形へ戻す。画面に無い種類は別棚へ避けて、
+          // 保存するときにそのまま付け直す(編集するたびに消えないように)。
+          const drafts = defaultAlertDrafts(false)
+          const extras: AnalyticsReportSchedule['alertRules'] = []
+          for (const rule of schedule.alertRules) {
+            const def = ALERT_RULE_DEFS.find((item) => item.metric === rule.metric && item.operator === rule.operator)
+            if (def) drafts[def.id] = { enabled: true, threshold: String(rule.threshold), minimumSample: String(rule.minimumSample) }
+            else extras.push(rule)
           }
+          setAlertDrafts(drafts)
+          setExtraAlertRules(extras)
+          setLoading(false)
+          return
+        }
+        // R454: 一覧に無い・1回送信の依頼は履歴の口で引く。
+        // しまった1回送信もここで結果へ到達させる。
+        try {
+          const detail = await api.analytics.reportSchedules.runs(selectedAccountId, editId)
+          if (!active) return
+          if (detail.success && detail.data.schedule.isOneTime) {
+            setOneTime(detail.data)
+          } else {
+            setEditMissing(true)
+          }
+        } catch {
+          if (active) setEditMissing(true)
         }
       }
       setLoading(false)
@@ -210,6 +328,13 @@ function AnalyticsReportFormPage() {
   })
   const hasInvalidEmail = invalidEmails.some(Boolean)
 
+  // R455: 保存応答が遅れて戻ったとき、別の依頼・別アカウントへ移って
+  // いたらその応答を捨てる。応答のたびに「いま見ている対象」と比べる。
+  const accountRef = useRef(selectedAccountId)
+  accountRef.current = selectedAccountId
+  const editIdRef = useRef(editId)
+  editIdRef.current = editId
+
   const submit = async (sendOnce: boolean) => {
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
     if (!name.trim()) {
@@ -218,6 +343,25 @@ function AnalyticsReportFormPage() {
     }
     if (hasInvalidEmail) {
       setError('メールアドレスの形が正しくない宛先があります。該当の行を直すか消してください。')
+      return
+    }
+    // R453: 通知方法は選んだとおりに送る。1つも選ばれていない・
+    // 受け取れる宛先が無い組み合わせはここで止める（裏側と同じ文）。
+    if (!dashboardEnabled && !emailEnabled && !lineEnabled) {
+      setError('通知方法を1つ以上選んでください')
+      return
+    }
+    const emailRecipients = emails.map((item) => item.trim()).filter(Boolean)
+    const staffById = new Map(options.recipients.map((item) => [item.id, item]))
+    const emailCapable = emailRecipients.length > 0
+      || staffIds.some((id) => staffById.get(id)?.email)
+    if (emailEnabled && !emailCapable) {
+      setError('メールを受け取れる宛先がありません')
+      return
+    }
+    const lineCapable = staffIds.some((id) => staffById.get(id)?.lineLinked)
+    if (lineEnabled && !lineCapable) {
+      setError('LINE連携済みの宛先がありません')
       return
     }
     // 画面の数値を裏側が受け取れる形へ直す。変な数はここで止める
@@ -243,7 +387,11 @@ function AnalyticsReportFormPage() {
     }
     setSaving(true)
     setError('')
-    const emailRecipients = emails.map((item) => item.trim()).filter(Boolean)
+    // R455: この保存が「どの依頼・どのアカウントへ向けたものか」を
+    // 応答時に比べる。移っていたら編集先・文・保存中表示を変えない。
+    const wantAccount = selectedAccountId
+    const wantEditId = editId
+    const sameTarget = () => accountRef.current === wantAccount && editIdRef.current === wantEditId
     const recipients = [
       ...options.recipients.filter((item) => staffIds.includes(item.id)).map((item) => ({
         kind: 'staff' as const, staffId: item.id, label: item.name,
@@ -255,7 +403,13 @@ function AnalyticsReportFormPage() {
       weekday: cadence === 'weekly' ? Number(weekday) : null,
       monthDay: cadence === 'monthly' ? Number(monthDay) : null,
       sendTime, timeZone: options.timeZone, periodDays: Number(periodDays), recipients,
-      channels: ['dashboard', ...(emailRecipients.length ? ['email' as const] : []), ...(lineEnabled ? ['line' as const] : [])] as AnalyticsReportSchedule['channels'],
+      // R453: 選んだ通知方法をそのまま送る。宛先の有無からの組み直しや
+      // dashboard の必須追加はしない（変えない保存で変わる原因）。
+      channels: [
+        ...(dashboardEnabled ? ['dashboard' as const] : []),
+        ...(emailEnabled ? ['email' as const] : []),
+        ...(lineEnabled ? ['line' as const] : []),
+      ] as AnalyticsReportSchedule['channels'],
       alertRules: parsedAlertRules,
     }
     try {
@@ -263,6 +417,7 @@ function AnalyticsReportFormPage() {
         const response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
           ...payload, expectedUpdatedAt: editing.updatedAt,
         })
+        if (!sameTarget()) return
         if (!response.success) throw new Error(response.error)
         setEditing(response.data)
         notifyToast(response.data.status === 'paused'
@@ -272,25 +427,28 @@ function AnalyticsReportFormPage() {
         const response = await api.analytics.reportSchedules.create(selectedAccountId, {
           ...payload, sendOnce,
         })
+        if (!sameTarget()) return
         if (!response.success) throw new Error(response.error)
         /*
           R76。作ったあとも新規のまま残すと、時刻を直してもう一度押したときに
           更新ではなく別の定期配信が増える。作りたての編集画面へ移せば、
-          次の保存は更新（PUT）になる。1回だけ送る場合も一覧へ移して、
-          同じ依頼を二重に押せないようにする。
+          次の保存は更新（PUT）になる。
+          R454: 1回だけ送る場合も、その依頼の結果画面へ移す。
+          一覧からは消えるため、結果の行き先をここで渡す。
         */
         if (sendOnce) {
-          notifyToast('1回だけ送る依頼を受け付けました。送信結果は運用状態に残ります。')
-          router.push('/analytics?tab=saved')
+          notifyToast('1回だけ送る依頼を受け付けました。結果はこの画面で確認できます。')
+          router.push(`/analytics/reports/new?id=${response.data.id}`)
         } else {
           notifyToast(`${nextLabel}から届く定期レポートを作りました。`)
           router.push(`/analytics/reports/new?id=${response.data.id}`)
         }
       }
     } catch (caught) {
+      if (!sameTarget()) return
       setError(caught instanceof Error ? caught.message : editing ? '定期レポートを更新できませんでした' : '定期レポートを作れませんでした')
     } finally {
-      setSaving(false)
+      if (sameTarget()) setSaving(false)
     }
   }
 
@@ -298,6 +456,18 @@ function AnalyticsReportFormPage() {
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="上のバーで、レポートを作るLINE公式アカウントを選んでください。" />
   // 一覧の取得失敗を「見つかりません」へ化けさせない。一時障害はやり直せる画面を先に出す。
   if (error && !options) return <ListState kind="error" title="定期レポートを表示できませんでした" description={error} onRetry={() => setReloadSeq((n) => n + 1)} />
+  // R454: 1回送信の依頼は結果の表示にする（しまうと一覧から消えるため）。
+  if (oneTime && selectedAccountId) {
+    return (
+      <OneTimeResultView
+        accountId={selectedAccountId}
+        schedule={oneTime.schedule}
+        runs={oneTime.runs}
+        canManage={canManage}
+        onRetryDone={() => setReloadSeq((n) => n + 1)}
+      />
+    )
+  }
   if (editMissing || (editing === null && editId)) return <ListState kind="error" title="定期レポートが見つかりませんでした" description="一覧から選び直してください。" />
   if (editing?.isOneTime) return <ListState kind="empty" title="1回だけ送る依頼は変更できません" description="同じ内容が必要なときは、新しく作ってください。" />
   if (!options || options.recipients.length === 0) return (
@@ -392,6 +562,21 @@ function AnalyticsReportFormPage() {
 
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="mb-4 text-lg font-semibold">だれに送りますか</h2>
+            {(() => {
+              // R449: 保存後に受け取れなくなった担当者を編集画面で知らせる。
+              // 候補に出ない人を黙って外さない。
+              if (!editing || !options) return null
+              const invalid = editing.recipients.filter((item) => item.kind === 'staff' && item.staffId
+                && !options.recipients.some((person) => person.id === item.staffId))
+              if (invalid.length === 0) return null
+              return (
+                <Notice
+                  tone="warn"
+                  message={`前に選んでいた${invalid.map((item) => `「${item.label}」`).join('・')}は、いまは受け取れません（利用停止・閲覧範囲外の可能性があります）。このまま保存すると宛先から外れます。`}
+                  className="mb-4"
+                />
+              )
+            })()}
             {/*
              * #975 U064: 長い氏名・役割を細いチップに押し込まない。
              * 390pxでも誰を選んだか分かるよう、1人1行の行リストにする。
@@ -447,9 +632,22 @@ function AnalyticsReportFormPage() {
             <div className="mt-2"><Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>宛先を足す</Button></div>
             {!hasRecipient && <p className="text-ink-secondary mt-3 text-xs">受け取る人を1人以上選んでください。選ぶまで作れません。</p>}
             {hasInvalidEmail && <p className="text-danger mt-3 text-xs">形が正しくない宛先があるため、いまのままでは作れません。</p>}
-            <Checkbox className="border-hairline mt-5 flex w-full border-t pt-4" checked={lineEnabled} onCheckedChange={setLineEnabled} description="ログインユーザーのLINEに、要点だけを短くまとめて送ります。">
-              <strong>LINEでも同じ内容を送る</strong>
-            </Checkbox>
+            {/*
+              R453: 通知方法は3つとも独立した選択にする。担当者の宛先を
+              選んでもメールが外れないし、指定しなかった管理画面の
+              お知らせも勝手に付かない。未変更の保存はそのまま残る。
+            */}
+            <div className="border-hairline mt-5 grid gap-3 border-t pt-4" role="group" aria-label="通知方法">
+              <Checkbox checked={dashboardEnabled} onCheckedChange={setDashboardEnabled} description="運用状態のお知らせに残します。">
+                <strong>管理画面のお知らせにも出す</strong>
+              </Checkbox>
+              <Checkbox checked={emailEnabled} onCheckedChange={setEmailEnabled} description="宛先のメールアドレスへ送ります。担当者のメールもここで送ります。">
+                <strong>メールでも送る</strong>
+              </Checkbox>
+              <Checkbox checked={lineEnabled} onCheckedChange={setLineEnabled} description="ログインユーザーのLINEに、要点だけを短くまとめて送ります。">
+                <strong>LINEでも同じ内容を送る</strong>
+              </Checkbox>
+            </div>
           </section>
 
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
