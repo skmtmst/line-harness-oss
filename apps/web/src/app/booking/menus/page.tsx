@@ -905,10 +905,17 @@ function RuleNumberField({ label, unit, min, max, value, onChange, trackEmpty, h
   const [text, setText] = useState<string | null>(null)
   const trackEmptyRef = useRef(trackEmpty)
   trackEmptyRef.current = trackEmpty
+  // 直前に親から受け取った値。変わったときだけ編集中の文字を捨てる。
+  const lastValueRef = useRef(value)
   // 保存が通ると親の値が変わる。そのときだけ編集中の文字を捨てる。
+  // マウント直後・同じ値の再描画では捨てない。描画の反映が遅れて
+  // 入力のあとに回ってきても、入力中の文字を残す（R311の揺れ対策）。
   useEffect(() => {
-    setText(null)
-    trackEmptyRef.current?.(false)
+    if (lastValueRef.current !== value) {
+      lastValueRef.current = value
+      setText(null)
+      trackEmptyRef.current?.(false)
+    }
   }, [value])
   const shown = text ?? value
   // 古い行には無い項目が undefined で来ることがある。旧表示と同じく空欄で出す。
