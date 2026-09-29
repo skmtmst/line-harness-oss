@@ -46,6 +46,10 @@ crons = ["*/5 * * * *", "1-56/5 * * * *", "0 */6 * * *"]
 [vars]
 DEPLOY_ENV = "production"
 RESTAURANT_TEST_ENABLED = "true"
+# 実店舗のGoogleビジネスプロフィールへ、口コミ返信と投稿を本当に公開する。
+# 利用者が2026-09-29に本番での公開を選んだため有効にした。
+# 無効に戻すと、表示と下書きの保存はそのまま使えて、公開操作だけ403になる。
+GOOGLE_BUSINESS_WRITE_ENABLED = "true"
 WORKER_NAME = "nen-line"
 ADMIN_PAGES_PROJECT = "nen-line-admin-98712679"
 LIFF_PAGES_PROJECT = ""
