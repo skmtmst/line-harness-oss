@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState }
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
@@ -67,11 +67,11 @@ export default function GettingStartedPage() {
 
   return (
     <div className={styles.page}>
+      {/*
+        読込面（loading）では共通部品が onRetry を見ない。
+        失敗面にだけ再試行口が出る。
+      */}
       {status !== 'ready' ? (
-        {/*
-          読込面（loading）では共通部品が onRetry を見ない。
-          失敗面にだけ再試行口が出る。
-        */}
         <ListState
           kind={status === 'error' ? 'error' : 'loading'}
           error={status === 'error' ? loadError : undefined}
