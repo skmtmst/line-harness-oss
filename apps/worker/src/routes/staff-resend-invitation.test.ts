@@ -258,14 +258,20 @@ describe('招待期限7日 (N-432)', () => {
     expect(body.data.inviteExpiresAt).toBe(new Date(Date.now() + SEVEN_DAYS_MS).toISOString());
   });
 
-  it('招待中のメールを作り直すと409で再送へ案内する(新規行を作らない)', async () => {
+  it('招待中のメールの作り直しは上書きする（M957。幽霊行を残さず409で塞がない）', async () => {
     expect((await invite('dupe@example.test')).status).toBe(201);
+    const firstId = (testDb.raw.prepare(
+      'SELECT id FROM staff_members WHERE email = ?',
+    ).get('dupe@example.test') as { id: string }).id;
     const response = await invite('dupe@example.test');
-    expect(response.status).toBe(409);
-    expect(await response.text()).toContain('招待中');
+    expect(response.status).toBe(201);
+    // 古い行は掃除され、同じメールは常に1行。旧トークンは死ぬ。
     expect(testDb.raw.prepare(
       'SELECT COUNT(*) AS count FROM staff_members WHERE email = ?',
     ).get('dupe@example.test')).toEqual({ count: 1 });
+    expect((testDb.raw.prepare(
+      'SELECT id FROM staff_members WHERE email = ?',
+    ).get('dupe@example.test') as { id: string }).id).not.toBe(firstId);
   });
 
   it('利用開始済みメールの作り直しは従来どおり登録済みで断る', async () => {
