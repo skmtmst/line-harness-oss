@@ -235,4 +235,21 @@ describe('processGoogleBusinessDailyMetrics', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].call_clicks).toBe(9);
   });
+
+  it('storeIdを指定すると、その店舗だけを対象にする（検証環境の手動同期用）', async () => {
+    seedStore('store-ebisu', 'account-3', 'EBISU');
+    await seedConnection('conn-2', 'store-ebisu', 'account-3', LOCATION2);
+    const result = await processGoogleBusinessDailyMetrics(env, { now: NOW, fetch: googleFetch(), sleep: noSleep, storeId: 'store-shibuya' });
+    expect(result).toMatchObject({ synced: 1, skipped: 0, failed: 0 });
+    expect(connectionRow('store-shibuya').last_metrics_synced_at).toBe(NOW);
+    expect(connectionRow('store-ebisu').last_metrics_synced_at).toBeNull();
+  });
+
+  it('forceを指定すると、同じJST日でも当日ゲートを無視して取り直す', async () => {
+    await processGoogleBusinessDailyMetrics(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    calls = [];
+    const forced = await processGoogleBusinessDailyMetrics(env, { now: '2026-09-28T21:00:00.000Z', fetch: googleFetch(), sleep: noSleep, force: true });
+    expect(forced).toMatchObject({ synced: 1, skipped: 0 });
+    expect(calls.some((c) => c.url.includes('fetchMultiDailyMetricsTimeSeries'))).toBe(true);
+  });
 });
