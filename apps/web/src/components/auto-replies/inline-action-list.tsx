@@ -178,7 +178,7 @@ export default function InlineActionList({
               <button
                 type="button"
                 onClick={() => remove(action.key)}
-                className="text-red-600 hover:underline"
+                className="text-danger hover:underline"
               >
                 削除
               </button>

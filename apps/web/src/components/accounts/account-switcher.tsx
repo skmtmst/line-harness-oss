@@ -43,7 +43,7 @@ export function AccountSwitchDialog({
   // 閉じたら起点へ戻す・背面はスクロールしない（共通の約束）。
   const panelRef = useOverlayFocus(true, onClose)
 
-  return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="account-switch-title" onClick={onClose}>
+  return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-scrim p-4" role="dialog" aria-modal="true" aria-labelledby="account-switch-title" onClick={onClose}>
     <div ref={panelRef} className="w-full max-w-md rounded-card bg-canvas p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-start justify-between gap-4">
         <div><p className="text-xs font-semibold text-ink-faint">LINEアカウントを切り替え</p><h2 id="account-switch-title" className="mt-1 text-lg font-bold text-ink">このアカウントへ移動しますか？</h2></div>

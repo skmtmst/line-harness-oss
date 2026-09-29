@@ -2547,7 +2547,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         {filterOpen || showTemplatePicker ? (
           <style>{`
             [aria-label="テンプレートを選択"] {
-              background-color: rgb(16 24 40 / 33%) !important;
+              background-color: var(--color-scrim) !important;
             }
             div:has(> section[aria-label="絞り込み"]) > div[aria-hidden="true"] {
               background-color: transparent !important;
@@ -2581,7 +2581,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
       <div
         data-design="Panes"
-        className="border-[#E5E7EB] bg-canvas shadow-card relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-[10px] border"
+        className="border-hairline bg-canvas shadow-card relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-[10px] border"
       >
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
@@ -2603,7 +2603,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
           <div className="border-b border-hairline p-3">
             <div className="relative">
-              <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#98A2B3]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <input
               type="search"
               value={nameQuery}
@@ -3043,7 +3043,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         */}
         <div
           data-inbox-v4="talk-pane"
-          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'border-r border-[#E5E7EB]' : ''} ${selectedChatId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
+          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'border-r border-hairline' : ''} ${selectedChatId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
         >
           {selectedThreadId ? (
             /* メールの往復。LINEのトークと同じ場所に出す。 */
@@ -3091,7 +3091,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 操作が同じ行にいると 390px で宛先の名前が潰れて、
                 誰への返信か読めなかった。640px 以上では従来どおり1行。
               */}
-              <div className="flex min-h-[66px] flex-wrap items-center gap-x-2 gap-y-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3 sm:flex-nowrap">
+              <div className="flex min-h-[66px] flex-wrap items-center gap-x-2 gap-y-2 border-b border-hairline bg-canvas px-4 py-3 sm:flex-nowrap">
                 <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
                   <button
                     onClick={() => setSelectedChatId(null)}
@@ -3190,7 +3190,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     data-inbox-v6="customer-info-toggle"
                     onClick={() => setShowFriendInfo((current) => !current)}
                     aria-expanded={showFriendInfo}
-                    className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-[#E5E7EB] bg-canvas px-2.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                    className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-2.5 text-xs font-semibold text-action hover:bg-canvas-sunken"
                   >
                     {showFriendInfo
                       ? <PanelRightClose aria-hidden="true" size={14} />
@@ -3209,7 +3209,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
               {/* Messages — LINE-style chat bubbles */}
               <div className="relative flex min-h-0 flex-1 flex-col">
-              <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: '#7292BD' }}>
+              <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-line-talk)' }}>
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
                   押すと今見えている最古の1件より古い分を上に足す。
@@ -3366,7 +3366,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 />
                               ) : (
                                 <div
-                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-full border-2 bg-[#EAFBF0] text-[12px] font-bold text-[#057A37]"
+                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-full border-2 bg-accent-soft text-[12px] font-bold text-accent-deep"
                                   title={selectedAccount?.displayName ?? selectedAccount?.name ?? '送信アカウント'}
                                 >
                                   {(selectedAccount?.displayName ?? selectedAccount?.name ?? '送').charAt(0)}
@@ -3419,7 +3419,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
                 よく使うものだけ出し、設定は畳む。
               */}
-              <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-canvas px-4 py-3 relative">
+              <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-hairline bg-canvas px-4 py-3 relative">
                 {/* INBOX-12: 定期更新が連続失敗で止まったときの理由と再試行 */}
                 {chatPollStalled && (
                   <p className="text-danger mb-2 text-xs">
@@ -3445,14 +3445,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <button
                       type="button"
                       onClick={() => setShowTemplatePicker(true)}
-                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-action hover:bg-canvas-sunken"
                     >
                       ▧ テンプレートを選択
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowComposerOptions((v) => !v)}
-                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-action hover:bg-canvas-sunken"
                     >
                       ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </button>
@@ -3469,7 +3469,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       className={`inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
                         showMemoEditor
                           ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
-                          : 'border-[#E5E7EB] bg-canvas text-[#344054] hover:bg-[#F7F8F6]'
+                          : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
                       }`}
                     >
                       <NotebookPen aria-hidden="true" size={14} />
@@ -3721,7 +3721,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
-                <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
+                <div className="rounded-[10px] border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
                   {/* 中段 */}
                   {/*
                     INBOX-20: この入力欄に textareaRef を付ける。
@@ -3784,7 +3784,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       disabled={imageUploading}
                       title="画像を選ぶ"
                       aria-label="画像を選ぶ"
-                      className="rounded-md px-2 py-1 text-sm text-[#667085] hover:bg-[#F2F4F7] disabled:opacity-50"
+                      className="rounded-md px-2 py-1 text-sm text-ink-faint hover:bg-shell disabled:opacity-50"
                     >
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 16V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m0 0 4-4a2 2 0 0 1 3 0l5 5M14 10h.01" />
@@ -3869,11 +3869,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   role="dialog"
                   aria-modal="true"
                   aria-label="添付した画像の確認"
-                  className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/60 p-4"
+                  className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 p-4"
                   onClick={() => setImagePreviewOpen(false)}
                 >
                   <div
-                    className="w-full max-w-2xl rounded-[14px] border border-[#E5E7EB] bg-canvas p-4 shadow-2xl"
+                    className="w-full max-w-2xl rounded-[14px] border border-hairline bg-canvas p-4 shadow-2xl"
                     onClick={(event) => event.stopPropagation()}
                   >
                     <img
@@ -3889,7 +3889,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <button
                         type="button"
                         onClick={() => setImagePreviewOpen(false)}
-                        className="shrink-0 rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+                        className="shrink-0 rounded-lg border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken"
                       >
                         閉じる
                       </button>
@@ -3952,7 +3952,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               type="button"
               onClick={() => setShowFriendInfo(false)}
               aria-label="顧客情報を閉じる"
-              className="absolute top-[17px] right-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-canvas text-[#667085] hover:bg-[#F7F8F6]"
+              className="absolute top-[17px] right-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken"
             >
               <X aria-hidden="true" className="h-4 w-4" />
             </button>
@@ -3967,12 +3967,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 const mail = emailItems.find((e) => e.threadId === selectedThreadId)
                 return (
                   <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
-                    <div className="min-h-[66px] border-b border-[#E5E7EB] px-4 py-3 pr-20">
+                    <div className="min-h-[66px] border-b border-hairline px-4 py-3 pr-20">
                       <p className="text-ink text-sm font-bold">顧客情報</p>
                       <p className="text-ink-faint mt-0.5 truncate text-micro">メールの相手を確認できます</p>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto divide-y divide-[#E5E7EB]">
+                    <div className="flex-1 overflow-y-auto divide-y divide-hairline">
                       <section className="flex flex-col items-center px-5 py-5 text-center">
                         <div className="bg-canvas-sunken border-hairline flex h-14 w-14 items-center justify-center rounded-full border">
                           <span className="text-ink-secondary text-[11px] font-bold">MAIL</span>

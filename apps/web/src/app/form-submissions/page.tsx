@@ -804,7 +804,7 @@ export default function FormSubmissionsPage() {
           />
           </div>
           {reviewMode && (
-            <div className="border-hairline rounded-card border bg-white p-3 text-xs text-ink-secondary">
+            <div className="border-hairline rounded-card border bg-canvas p-3 text-xs text-ink-secondary">
               <p><span className="font-bold text-ink">管理者確認中のフォーム</span> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
               <p className="mt-1">担当の割り当ては後続の対応（#771）で行います。この画面では割り当て操作はできません。</p>
             </div>
@@ -873,7 +873,7 @@ export default function FormSubmissionsPage() {
               />
             </div>
           ) : (
-          <div className="border-hairline rounded-card overflow-hidden border bg-white">
+          <div className="border-hairline rounded-card overflow-hidden border bg-canvas">
             {/*
               ★V7：1440px で右端の「編集」と削除が切れていた（表の最小幅＞実幅）。
               最小幅は1440pxの実幅（約835px）より小さい800pxにし、名前の列を伸び縮みさせる。操作の列は2つのボタンが収まる固定幅。
@@ -1026,11 +1026,11 @@ export default function FormSubmissionsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
             type="button"
-            className="absolute inset-0 bg-black/30"
+            className="absolute inset-0 bg-scrim"
             onClick={() => !savingName && setEditingForm(null)}
             aria-label="名前変更を閉じる"
           />
-          <div ref={renamePanelRef} role="dialog" aria-modal="true" aria-labelledby="rename-form-title" className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+          <div ref={renamePanelRef} role="dialog" aria-modal="true" aria-labelledby="rename-form-title" className="relative w-full max-w-md rounded-xl bg-canvas p-5 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <h3 id="rename-form-title" className="text-base font-semibold text-ink">フォーム名を変更</h3>
               <button
@@ -1043,20 +1043,20 @@ export default function FormSubmissionsPage() {
                 <X aria-hidden="true" className="h-5 w-5" />
               </button>
             </div>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-ink-faint">
               回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。
             </p>
-            <p className="mt-1 text-xs text-gray-400">推奨：サービス名｜目的（対象・導線）</p>
-            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-gray-500">
-              <span className="rounded bg-gray-100 px-2 py-1">質問 {editingForm.fields.length}項目</span>
+            <p className="mt-1 text-xs text-ink-faint">推奨：サービス名｜目的（対象・導線）</p>
+            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-ink-faint">
+              <span className="rounded bg-shell px-2 py-1">質問 {editingForm.fields.length}項目</span>
               {editingForm.usedByAccounts.map((account) => (
-                <span key={account.id} className="rounded bg-gray-100 px-2 py-1">
+                <span key={account.id} className="rounded bg-shell px-2 py-1">
                   {account.name}
                 </span>
               ))}
             </div>
             <label className="mt-4 block">
-              <span className="mb-1.5 block text-xs font-medium text-gray-600">フォーム名</span>
+              <span className="mb-1.5 block text-xs font-medium text-ink-secondary">フォーム名</span>
               <input
                 autoFocus
                 value={editingName}
@@ -1064,16 +1064,16 @@ export default function FormSubmissionsPage() {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') void saveName()
                 }}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-accent"
+                className="w-full rounded-lg border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent"
               />
             </label>
-            {renameError && <p className="mt-2 text-xs text-red-500">{renameError}</p>}
+            {renameError && <p className="mt-2 text-xs text-status-danger">{renameError}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setEditingForm(null)}
                 disabled={savingName}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                className="rounded-lg border border-hairline px-4 py-2 text-sm text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
               >
                 キャンセル
               </button>
@@ -1081,7 +1081,7 @@ export default function FormSubmissionsPage() {
                 type="button"
                 onClick={() => void saveName()}
                 disabled={!editingName.trim() || savingName}
-                className="rounded-lg bg-accent-deep px-4 py-2 text-sm font-medium text-white hover:brightness-92 disabled:opacity-50"
+                className="rounded-lg bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent hover:brightness-92 disabled:opacity-50"
               >
                 {savingName ? '保存中...' : '保存'}
               </button>

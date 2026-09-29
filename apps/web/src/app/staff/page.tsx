@@ -148,7 +148,7 @@ function RowActionButton({ label, onClick, qaOpen }: { label: string; onClick: (
 function Modal({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   // Escapeで閉じる・Tabは窓の中・閉じたら起点へ戻す（共通の約束）。
   const panelRef = useOverlayFocus(true, onClose)
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div ref={panelRef} className={`max-h-[90vh] w-full overflow-y-auto rounded-card bg-canvas p-6 shadow-xl relative ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><button type="button" onClick={onClose} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"><X aria-hidden="true" className="h-5 w-5" /></button>{children}</div></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div ref={panelRef} className={`max-h-[90vh] w-full overflow-y-auto rounded-card bg-canvas p-6 shadow-xl relative ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><button type="button" onClick={onClose} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"><X aria-hidden="true" className="h-5 w-5" /></button>{children}</div></div>
 }
 
 function LoginHistoryNote({ count, loading, failed = false }: { count: number | null; loading: boolean; failed?: boolean }) {
