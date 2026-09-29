@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -125,6 +126,8 @@ export function PerformanceTab({ accountId }: { accountId: string }) {
   const [data, setData] = useState<GooglePerformanceData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -141,6 +144,23 @@ export function PerformanceTab({ accountId }: { accountId: string }) {
 
   useEffect(() => { void load() }, [load])
 
+  /**
+   * いま取り込む。定期処理を待たずに済ませたいとき用。
+   * Googleから読んで自前DBへ書くだけで、Googleへは何も書かない。
+   */
+  const sync = async () => {
+    setSyncing(true)
+    setSyncError('')
+    try {
+      await restaurantGoogleApi.syncPerformance(accountId)
+      await load()
+    } catch (err) {
+      setSyncError(errorMessage(err, 'Googleから数値を取り込めませんでした。'))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   if (loading) return <ListState kind="loading" title="パフォーマンスを読み込んでいます" />
   if (loadError || !data) return <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} />
 
@@ -149,6 +169,7 @@ export function PerformanceTab({ accountId }: { accountId: string }) {
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-lg font-bold">パフォーマンス</h2>
         <div className="flex-1" />
+        <Button onClick={() => void sync()} disabled={syncing}>{syncing ? '取り込み中…' : 'いま取り込む'}</Button>
         <Select
           aria-label="集計期間"
           value={String(data.days)}
@@ -160,8 +181,10 @@ export function PerformanceTab({ accountId }: { accountId: string }) {
 
       <p className="text-ink-secondary text-sm">Google提供の集計値です。最新データには遅れがあります。電話のクリック数は、通話成立数ではありません。</p>
 
+      {syncError ? <NoteBar tone="danger">{syncError}</NoteBar> : null}
+
       {data.lastMetricsSyncedAt === null ? (
-        <NoteBar tone="info">パフォーマンスの自動取得はまだ実行されていません。毎晩の取得のあとに数値が表示されます。</NoteBar>
+        <NoteBar tone="info">パフォーマンスの自動取得はまだ実行されていません。「いま取り込む」を押すか、次回の自動取得を待つと数値が表示されます。</NoteBar>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
