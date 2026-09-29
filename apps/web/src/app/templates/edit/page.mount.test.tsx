@@ -200,6 +200,13 @@ async function fakeApi(input: string, init?: RequestInit): Promise<Response> {
   }
   const templateId = /^\/api\/templates\/([^/]+)$/.exec(path)?.[1]
   if (templateId) {
+    /*
+     * D007: 存在しないIDへ success:true だが本文を含まない応答が返る。
+     * 一覧形 `{items:[]}` のまま詳細として返る場合の再現。
+     */
+    if (templateId === 'tmpl-broken') {
+      return jsonResponse({ success: true, data: { items: [] } })
+    }
     const template = TEMPLATES[templateId]
     if (!template) return jsonResponse({ success: false, error: 'not found' }, 404)
     return jsonResponse({ success: true, data: {
@@ -475,6 +482,16 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
     expect(screenText()).toContain(Testing.TEMPLATE_LOAD_FAILED_MESSAGE)
     expect(isDisabled(saveButton())).toBe(true)
     await act(async () => { click(saveButton()!) })
+    expect(writes).toEqual([])
+  })
+
+  it('D007: 本文の無い詳細応答は落ちず「読み込めませんでした」で止まる', async () => {
+    await mountAt('?id=tmpl-broken')
+
+    expect(screenText()).toContain(Testing.TEMPLATE_LOAD_FAILED_MESSAGE)
+    expect(isDisabled(saveButton())).toBe(true)
+    await act(async () => { click(saveButton()!) })
+    await settle()
     expect(writes).toEqual([])
   })
 })

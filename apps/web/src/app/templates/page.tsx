@@ -14,6 +14,7 @@ import StaffAssetList from './staff-asset-list'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import MobileTableCards from '@/components/shared/mobile-table-cards'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -1218,12 +1219,13 @@ export default function TemplatesPage() {
                   </h3>
                 )}
               </div>
-              <button
-                onClick={() => setDrawerId(null)}
-                className="ml-2 text-ink-faint hover:text-ink-secondary text-2xl leading-none px-1"
-              >
-                ×
-              </button>
+              {/*
+                D010: 素の×テキストでは読み上げが無名ボタンになる。共通の
+                閉じるボタン（Drawer/ConfirmDialog と同じ `aria-label="閉じる"`）を使う。
+              */}
+              <IconButton aria-label="閉じる" title="閉じる" onClick={() => setDrawerId(null)} className="ml-2">
+                <X aria-hidden="true" size={18} />
+              </IconButton>
             </div>
 
             {drawerLoading ? (
