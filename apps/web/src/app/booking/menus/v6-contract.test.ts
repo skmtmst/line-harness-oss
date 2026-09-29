@@ -95,10 +95,19 @@ describe('V6 予約設定', () => {
   it('担当の取得失敗・取得中を「未登録」と誤表示せず作成も止める (DEEP-17)', () => {
     expect(CREATE).toContain('staffLoadState')
     expect(CREATE).toContain('担当を読み込んでいます')
-    expect(CREATE).toContain('担当を読み込めませんでした。開き直してください')
+    // 取得失敗は「未登録」と混ぜない。入力を残したまま、その場で取り直せる。
+    expect(CREATE).toContain('担当を読み込めませんでした。入力はそのまま残っています。')
+    expect(CREATE).toContain('担当をもう一度読み込む')
+    expect(CREATE).toContain('reloadStaff')
+    // 権限不足の失敗に再試行は出さず、権限の案内だけ出す。
+    expect(CREATE).toContain('担当スタッフを見る権限がありません')
+    expect(CREATE).toContain("classifyApiFailure(staffError) !== 'forbidden'")
+    // 空（0人）は失敗と別の言葉で出し、登録へ誘導するのは空のときだけ。
     expect(CREATE).toContain('まだスタッフが登録されていません')
     // 候補が確定するまで保存しない。候補にいないIDは選択数に数えない。
     expect(CREATE).toContain("staffLoadState === 'loading'")
+    expect(CREATE).toContain("staffLoadState === 'error'")
+    expect(CREATE).toContain('担当スタッフを読み込めませんでした。下の「担当をもう一度読み込む」で読み込んでから作成してください')
     expect(CREATE).toContain('assignedIds')
   })
 

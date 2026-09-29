@@ -19,6 +19,8 @@ vi.mock('@/lib/api', () => ({
   api: {
     templates: { list: vi.fn(async () => ({ success: true, data: [] })) },
     folders: { list: vi.fn(async () => ({ success: true, data: [] })) },
+    // R527: この試験は変更できる担当者の筋書き（手順表示の意図を保つ）。
+    staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) },
     autoReplies: {
       create: vi.fn(),
       update: vi.fn(),

@@ -306,6 +306,19 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
     expect(response.status).toBe(200);
   });
 
+  it('R527: 新規作成はstaffに403を返し、何も作らない', async () => {
+    const asStaff = app(testDb.db, staff);
+    const denied = await asStaff.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(settings()),
+    }, asStaff.bindings);
+    expect(denied.status).toBe(403);
+
+    const before = testDb.raw.prepare('SELECT COUNT(*) AS count FROM auto_replies').get();
+    expect(before).toEqual({ count: 2 });
+  });
+
   it('AUTOREPLY-08: 新規作成はOFFをDBまで保持し、再読込・一致評価でも動かない', async () => {
     const target = app(testDb.db);
     const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
