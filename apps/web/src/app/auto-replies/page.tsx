@@ -17,6 +17,7 @@ import EditDialog, { type AutoReplyDraft, type AutoReplyOrderHint } from '@/comp
 import { inEvaluationOrder, movePriorityUpdates } from './auto-reply-order'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { TableStateRow } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
@@ -181,6 +182,8 @@ export default function AutoRepliesPage() {
    * 混ぜない。** 混ぜると、登録したものが消えたように読める。
    */
   const [loadState, setLoadState] = useState<LoadState>('loading')
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
   // 来ないときは null（FolderPanel が「—」と出す）。
@@ -213,6 +216,7 @@ export default function AutoRepliesPage() {
     const requestAccountId = selectedAccountId
     const requestGeneration = ++loadGenerationRef.current
     setLoadState('loading')
+    setLoadError(null)
     setConflictCount(null)
     try {
       const [arRes, tplRes, summaryRes] = await Promise.all([
@@ -257,15 +261,20 @@ export default function AutoRepliesPage() {
       )) return
       // 403 は通信の失敗ではない。読み直しても直らないので、そう書く。
       setLoadedAccountId(requestAccountId)
+      setLoadError(reason)
       setLoadState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
   }, [selectedAccountId])
 
   const loadFolders = useCallback(async () => {
-    const res = await api.folders.list('auto_reply')
-    if (res.success) {
-      setFolders(res.data)
-      setUnfiledCount(res.unfiledCount ?? null)
+    try {
+      const res = await api.folders.list('auto_reply')
+      if (res.success) {
+        setFolders(res.data)
+        setUnfiledCount(res.unfiledCount ?? null)
+      }
+    } catch {
+      // m23m: 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
     }
   }, [])
 
@@ -831,7 +840,10 @@ export default function AutoRepliesPage() {
                     colSpan={6}
                     kind={visibleLoadState}
                     title={LOAD_STATE_WORDS[visibleLoadState].label}
-                    description={LOAD_STATE_WORDS[visibleLoadState].note}
+                    // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+                    // それ以外は画面の文のまま。
+                    description={isForbiddenOrRateLimited(loadError) ? undefined : LOAD_STATE_WORDS[visibleLoadState].note}
+                    error={loadError ?? undefined}
                     onRetry={visibleLoadState === 'error' ? () => void load() : undefined}
                     retryLabel="再読み込み"
                   />

@@ -13,6 +13,7 @@ import Button from '@/components/shared/button'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -93,10 +94,11 @@ function QuestionTemplatePageInner() {
     setFolders([])
     if (!folderAccountId) return
     let cancelled = false
+    // m23m: 置き場が取れなくても質問は作れる。取れない失敗で画面を落とさない。
     void api.folders.list('template', folderAccountId).then((res) => {
       if (cancelled || !res.success) return
       setFolders(res.data)
-    })
+    }).catch(() => {})
     return () => { cancelled = true }
   }, [folderAccountId])
 
@@ -131,8 +133,12 @@ function QuestionTemplatePageInner() {
         }))
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
-      .catch(() => {
-        if (!cancelled) setError('質問テンプレートを読み込めませんでした。')
+      // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+      // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '質問テンプレート') : '質問テンプレートを読み込めませんでした。')
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

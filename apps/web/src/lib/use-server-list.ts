@@ -64,7 +64,9 @@ export function serverListStateView({
   retry,
 }: StateViewInput): ReactElement | null {
   if (loading && itemCount === 0) return createElement(ListState, { kind: 'loading' })
-  if (error) return createElement(ListState, { kind: 'error', onRetry: retry })
+  // m23m: 捕まえた失敗をそのまま渡す。403 は権限の案内・再試行なし、
+  // 429 は待ち案内になる（ListState の `error` が言い分ける）。
+  if (error) return createElement(ListState, { kind: 'error', error, onRetry: retry })
   if (loaded && itemCount === 0) return createElement(ListState, { kind: 'empty' })
   return null
 }

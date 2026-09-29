@@ -11,6 +11,8 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
+import { describeSaveFailure } from '@/lib/api'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
@@ -102,7 +104,14 @@ function MenuStaffMatrixContent() {
       setGrid(next)
       setSavedGrid(next)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+      // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+      if (isForbiddenOrRateLimited(e)) {
+        setError(loadFailureNotice(e, '担当スタッフの割り当て'))
+      } else {
+        const message = e instanceof Error ? e.message : ''
+        setError(message && !/^API error: /.test(message) ? message : '読み込めませんでした。画面を再読み込みして確認してください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -145,8 +154,9 @@ function MenuStaffMatrixContent() {
     } catch (e) {
       // 全件不適用のはずだが、画面の表示とDBの状態が食い違う可能性を
       // 残さないため再読み込みを促す。
+      // m23m: 生の内部文は出さず、共通の保存失敗文にする。
       setError(
-        `${e instanceof Error ? e.message : String(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
+        `${describeSaveFailure(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
       )
     } finally {
       setSaving(false)

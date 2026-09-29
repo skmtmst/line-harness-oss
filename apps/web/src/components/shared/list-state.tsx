@@ -2,6 +2,7 @@ import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock } from 'lucide-react'
 import TargetMissing from './target-missing'
+import { loadFailureCopy } from './api-error-message'
 import styles from './list-state.module.css'
 
 /**
@@ -76,6 +77,7 @@ export default function ListState({
   emptyPreset = 'createable',
   className,
   'data-design': dataDesign,
+  error,
 }: {
   kind: ListStateKind
   /** 設計どおりの文言で足りないとき（「まだタグがありません」など）だけ渡す。 */
@@ -92,6 +94,13 @@ export default function ListState({
   className?: string
   /** 設計の節の印の受け口。共通化で印を落とさないため。 */
   'data-design'?: string
+  /**
+   * 捕まえた読み込み失敗（m23m）。`error` のときだけ見る。
+   * 403 は権限の案内にし、押しても直らない再試行の口は出さない。
+   * 429 は待ち秒数（`Retry-After` があれば使う）を添える。
+   * 画面は `title`・`description` で上書きできる。
+   */
+  error?: unknown
 }) {
   const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
 
@@ -99,13 +108,14 @@ export default function ListState({
   // 見た目が2か所でずれないように、ここで組み立て直さない。
   // className は付けない（見た目は TargetMissing が持つ。余白は親で付ける）。
   if (kind === 'error') {
+    const failure = error === undefined ? null : loadFailureCopy(error, 'この画面')
     return (
       <div data-list-state="error" role="alert" data-design={dataDesign}>
         <TargetMissing
           kind="error"
-          title={title ?? preset.title}
-          description={description ?? preset.description}
-          onRetry={onRetry}
+          title={title ?? failure?.title ?? preset.title}
+          description={description ?? failure?.description ?? preset.description}
+          onRetry={failure && !failure.retryable ? undefined : onRetry}
           retrying={retrying}
         />
         {action}

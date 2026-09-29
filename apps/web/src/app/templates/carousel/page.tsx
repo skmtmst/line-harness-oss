@@ -12,6 +12,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
@@ -319,15 +320,18 @@ function CarouselEditorInner() {
     setFolders([])
     if (!folderAccountId) return
     let cancelled = false
+    // m23m: 置き場が取れなくてもカルーセルは作れる。取れない失敗で画面を落とさない。
     void api.folders.list('template', folderAccountId).then((res) => {
       if (!cancelled && res.success) setFolders(res.data)
-    })
+    }).catch(() => {})
     return () => { cancelled = true }
   }, [folderAccountId])
 
-  const markLoadFailed = () => {
+  // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+  // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+  const markLoadFailed = (caught?: unknown) => {
     setLoadFailed(true)
-    setError('読み込めませんでした。開き直してください。')
+    setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, 'カルーセル') : '読み込めませんでした。開き直してください。')
   }
 
   useEffect(() => {
@@ -384,7 +388,7 @@ function CarouselEditorInner() {
           setError('いまの中身を読み取れませんでした。保存すると上書きされます。')
         }
       })
-      .catch(markLoadFailed)
+      .catch((caught: unknown) => markLoadFailed(caught))
       .finally(() => setLoading(false))
   }, [id])
 
