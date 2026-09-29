@@ -47,7 +47,7 @@ export default function GenreModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-scrim p-4">
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <h2 id={titleId} className="text-lg font-bold text-ink">

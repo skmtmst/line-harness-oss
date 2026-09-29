@@ -34,18 +34,18 @@ export default function OgEditor({
     onChange({ ...value, [k]: v })
 
   return (
-    <div className="space-y-3 border border-gray-200 rounded-lg p-4 bg-gray-50">
-      <div className="text-sm font-medium text-gray-900">
+    <div className="space-y-3 border border-hairline rounded-lg p-4 bg-surface-pearl">
+      <div className="text-sm font-medium text-ink">
         リンクプレビュー（OGP）
       </div>
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-ink-faint">
         LINE / X / Facebook 等にリンクを貼ったときに表示されるカードの内容。
         空欄なら自動で生成されます。
       </div>
 
       {!hideTitle && (
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-medium text-ink-secondary mb-1">
             タイトル
           </label>
           <input
@@ -54,16 +54,16 @@ export default function OgEditor({
             maxLength={TITLE_MAX}
             placeholder={autoTitle ? `自動: ${autoTitle}` : '（自動生成）'}
             onChange={(e) => set('ogTitle', e.target.value || null)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
           />
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-ink-faint mt-1">
             {(value.ogTitle ?? '').length} / {TITLE_MAX}
           </div>
         </div>
       )}
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-medium text-ink-secondary mb-1">
           説明文
         </label>
         <textarea
@@ -74,15 +74,15 @@ export default function OgEditor({
           }
           rows={3}
           onChange={(e) => set('ogDescription', e.target.value || null)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
         />
-        <div className="text-xs text-gray-400 mt-1">
+        <div className="text-xs text-ink-faint mt-1">
           {(value.ogDescription ?? '').length} / {DESC_MAX}
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-medium text-ink-secondary mb-1">
           画像
         </label>
         <ImageUploader
@@ -93,7 +93,7 @@ export default function OgEditor({
           }
         />
         {!value.ogImageUrl && autoImageUrl && (
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-ink-faint mt-1">
             自動: {autoImageUrl}
           </div>
         )}

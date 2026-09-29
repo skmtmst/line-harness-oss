@@ -509,15 +509,15 @@ export default function Sidebar({
   const sidebarContent = (drawer: boolean) => (
     <>
       {drawer ? (
-        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-4 pr-16">
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-hairline px-4 pr-16">
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-xl object-cover" />
           ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-gray-900">{brand.name ?? '然-NEN- LINE管理システム'}</p>
+            <p className="truncate text-sm font-bold text-ink">{brand.name ?? '然-NEN- LINE管理システム'}</p>
             <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
           </div>
         </div>
@@ -660,12 +660,12 @@ export default function Sidebar({
         <button
           ref={menuButtonRef}
           onClick={() => setIsOpen(!isOpen)}
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-shell transition-colors"
           aria-label="メニュー"
           aria-expanded={isOpen}
           aria-controls="mobile-menu"
         >
-          <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-ink-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isOpen
               ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -684,7 +684,7 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-lg object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
         </div>
       </div>
@@ -708,8 +708,8 @@ export default function Sidebar({
         className={`${styles.drawer} ${styles.mobileOnly} ${isOpen ? '' : styles.drawerClosed}`}
       >
         <div className="absolute right-3 top-2.5 z-10">
-          <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100" aria-label="閉じる">
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-shell" aria-label="閉じる">
+            <svg className="w-5 h-5 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

@@ -959,7 +959,7 @@ function VarsPageInner() {
                     <Th align="right" className="bg-canvas-sunken sticky right-0 w-36 px-4 py-3" title="編集・削除">操作</Th>
                   </TableHeadRow>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-divider-soft">
                   {current.map((item) => {
                       const pending = item.nextSchedule
                       return (
