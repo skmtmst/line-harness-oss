@@ -16,6 +16,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
+  ApiError,
   type AnalyticsReportRun,
   type AnalyticsReportSchedule,
   type AnalyticsReportScheduleOptions,
@@ -238,6 +239,7 @@ function AnalyticsReportFormPage() {
     let active = true
     setLoading(true)
     setError('')
+    setConflictId(null)
     setOptions(null)
     // id が外れた/変わったとき前の編集対象が残ると、新規作成のつもりが旧レポートへ
     // PUT してしまう。取り直すたびに編集状態も初期化する。
@@ -334,6 +336,16 @@ function AnalyticsReportFormPage() {
   accountRef.current = selectedAccountId
   const editIdRef = useRef(editId)
   editIdRef.current = editId
+  /*
+   * R526: この作成試行の要求キー。応答消失後の押し直しは同じキーで送り、
+   * サーバは既にある予約を返す。成功するまで持ち回り、成功・作り直しで捨てる。
+   */
+  const createKeyRef = useRef<string | null>(null)
+  /*
+   * R526: 同じキーで内容の違う予約が既にあるときの、その予約の番号。
+   * 2件目を黙って作らず、既にある予約への案内を出す。
+   */
+  const [conflictId, setConflictId] = useState<string | null>(null)
 
   const submit = async (sendOnce: boolean) => {
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
@@ -424,11 +436,32 @@ function AnalyticsReportFormPage() {
           ? '定期レポートを更新しました。止まっている間は届きません。再開すると次の予定から届きます。'
           : `定期レポートを更新しました。次は${nextLabel}に届きます。`)
       } else {
-        const response = await api.analytics.reportSchedules.create(selectedAccountId, {
-          ...payload, sendOnce,
-        })
+        // R526: 作成試行の要求キー。応答消失後の押し直しは同じキーで送り、
+        // 既にある予約へ戻す（2件目を作らない）。
+        if (!createKeyRef.current) createKeyRef.current = crypto.randomUUID()
+        const requestKey = createKeyRef.current
+        let response
+        try {
+          response = await api.analytics.reportSchedules.create(selectedAccountId, {
+            ...payload, sendOnce,
+          }, { idempotencyKey: requestKey })
+        } catch (caught) {
+          // 失敗後に内容を変えて押し直すと、同じキーで内容の違う予約が
+          // 既にある。2件目を黙って作らず、既にある予約への案内を出す。
+          if (caught instanceof ApiError && caught.status === 409) {
+            const existingId = (caught.data as { existingId?: unknown } | undefined)?.existingId
+            if (typeof existingId === 'string' && existingId && sameTarget()) {
+              setConflictId(existingId)
+              setError('')
+              return
+            }
+          }
+          throw caught
+        }
         if (!sameTarget()) return
         if (!response.success) throw new Error(response.error)
+        createKeyRef.current = null
+        setConflictId(null)
         /*
           R76。作ったあとも新規のまま残すと、時刻を直してもう一度押したときに
           更新ではなく別の定期配信が増える。作りたての編集画面へ移せば、
@@ -437,10 +470,14 @@ function AnalyticsReportFormPage() {
           一覧からは消えるため、結果の行き先をここで渡す。
         */
         if (sendOnce) {
-          notifyToast('1回だけ送る依頼を受け付けました。結果はこの画面で確認できます。')
+          notifyToast(response.replayed
+            ? '依頼は既に受け付けられていました。作り直さず、既にある依頼の結果を開きました。'
+            : '1回だけ送る依頼を受け付けました。結果はこの画面で確認できます。')
           router.push(`/analytics/reports/new?id=${response.data.id}`)
         } else {
-          notifyToast(`${nextLabel}から届く定期レポートを作りました。`)
+          notifyToast(response.replayed
+            ? '予約は既に作られていました。作り直さず、既にある予約を開きました。内容を確認してください。'
+            : `${nextLabel}から届く定期レポートを作りました。`)
           router.push(`/analytics/reports/new?id=${response.data.id}`)
         }
       }
@@ -490,6 +527,26 @@ function AnalyticsReportFormPage() {
       />
       {!canManage && <div className="bg-canvas-sunken mb-4 rounded-control px-4 py-3 text-sm">運用担当は内容を確認できます。作成は統括または管理者が行います。</div>}
       {error && <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />}
+      {/*
+        R526: 失敗後に内容を変えて押し直すと、同じ操作の予約が既にある。
+        2件目を黙って作らず、既にある予約への案内を出す。別の新規として
+        作り直すときだけ、要求キーを捨てて新しい試行にする（明示の選択）。
+      */}
+      {conflictId && (
+        <Notice
+          tone="warn"
+          className="mb-4"
+          onClose={() => setConflictId(null)}
+          action={(
+            <>
+              <Button variant="secondary" href={`/analytics/reports/new?id=${encodeURIComponent(conflictId)}`}>既にある予約を確認</Button>
+              <Button variant="secondary" onClick={() => { createKeyRef.current = null; setConflictId(null) }}>内容を変えた新しい予約として作り直す</Button>
+            </>
+          )}
+        >
+          同じ操作で作った予約が既にあります。内容を変えて送り直したため、新しい予約は作りませんでした。
+        </Notice>
+      )}
 
       <div className="grid items-start gap-4 xl:grid-cols-3">
         <div className="grid gap-4 xl:col-span-2">

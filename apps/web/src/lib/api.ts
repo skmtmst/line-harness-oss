@@ -6942,12 +6942,21 @@ export const api = {
         fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; recentOneTime?: RecentOneTimeReport[]; options: AnalyticsReportScheduleOptions }>>(
           `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         ),
+      /*
+       * R526: 応答消失後の再送で二重予約にしない要求キー。同じ試行の
+       * やり直しは同じキー、別の新規作成は別のキーで呼ぶ。サーバは
+       * 同じキー＋同じ内容なら既にある予約を返す（`replayed`）。
+       */
       create: (accountId: string, data: Omit<
         AnalyticsReportSchedule,
         'id' | 'lineAccountId' | 'status' | 'isOneTime' | 'nextRunAt' | 'createdBy' | 'createdAt' | 'updatedAt'
-      > & { sendOnce?: boolean }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+      > & { sendOnce?: boolean }, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<AnalyticsReportSchedule> & { replayed?: boolean }>(
         `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify(data) },
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+          ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
+        },
       ),
       update: (accountId: string, id: string, data: Omit<
         AnalyticsReportSchedule,
