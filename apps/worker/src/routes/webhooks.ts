@@ -62,9 +62,11 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
 import {
+  incomingTestIdempotencyKey,
   retryWebhookInteraction,
   webhookFailureLabel,
   webhookResponseLabel,
+  type IncomingTestOutcome,
 } from '../services/webhook-interactions.js';
 import {
   buildOutgoingWebhookBody,
@@ -805,6 +807,21 @@ webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', '
       actions: safeJson<IncomingWebhookActionRef[]>(webhook.action_refs_json, []),
     });
     // 試しの結果はやり取り台帳へ test 種別で分けて残す。本文は残さない。
+    // d23d R407: 「試しが終わった」と「照合できた」は別の話。試算の結果を
+    // 記録へ残し、一覧で実際の受信の「結びつきました」と見分けが付くようにする。
+    const outcome: IncomingTestOutcome = preview.actions.some((action) => !action.ok)
+      ? 'invalid'
+      : preview.match.status === 'matched'
+        ? 'matched'
+        : preview.match.status === 'ambiguous'
+          ? 'ambiguous'
+          : 'not_found';
+    const outcomeSummary = {
+      matched: '友だちと照合できた',
+      ambiguous: '照合候補が複数あった',
+      not_found: '照合相手がいなかった',
+      invalid: '行動の確認で不備があった',
+    }[outcome];
     const started = Date.now();
     try {
       const interaction = await createWebhookInteraction(c.env.DB, {
@@ -813,12 +830,15 @@ webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', '
         webhookId: webhook.id,
         webhookName: webhook.name,
         eventType: 'incoming_webhook.test',
-        triggerSummary: `${webhook.name}の受け取りを試した`,
+        triggerSummary: `${webhook.name}の受け取りを試した・${outcomeSummary}`,
         requestBodyJson: null,
+        // 試しは再送しないので冪等キーは使われない。結果の種類を印として残す。
+        idempotencyKey: incomingTestIdempotencyKey(outcome),
       });
       await finishWebhookInteraction(c.env.DB, interaction.id, lineAccountId, {
         status: 'succeeded',
-        responseStatus: 200,
+        // 相手へ送信しない試しに「相手の応答番号」は存在しない。
+        responseStatus: null,
         attemptCount: 1,
         durationMs: Date.now() - started,
       });
@@ -1954,7 +1974,20 @@ webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), async
       return stepUpRequiredResponse(c, 'APIトークンの再発行には本人確認が必要です');
     }
     const rotated = await rotateIntegrationApiToken(c.env.DB, id, lineAccountId, c.get('staff')?.id);
-    if (!rotated) return c.json({ success: false, error: 'Not found' }, 404);
+    if (rotated.status === 'not_found') {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (rotated.status === 'conflict') {
+      // 同時再発行に負けた・古い読み取りのまま来た側（R431）。
+      // 新トークンは作っていない。一覧を読み直して今の状態から進める。
+      const current = await listIntegrationApiTokens(c.env.DB, lineAccountId);
+      return c.json({
+        success: false,
+        code: 'TOKEN_ROTATE_CONFLICT',
+        error: 'ほかの操作が先にこのトークンを更新しました。一覧を読み直して、最新の状態からもう一度お試しください',
+        tokens: current.map(serializeApiToken),
+      }, 409);
+    }
     auditLog(c, 'webhook.api_token.rotate', { kind: 'integration_api_token', id: rotated.row.id }, { lineAccountId });
     return c.json({
       success: true,

@@ -41,6 +41,8 @@ export interface GoogleSheetsSyncRun {
   error: string | null;
   startedAt: string;
   finishedAt: string | null;
+  /** この実行が書き出した先（切替前の古い実行と区別するため）。 */
+  spreadsheetId?: string | null;
 }
 
 /** GET connection の `data` の中身。 */

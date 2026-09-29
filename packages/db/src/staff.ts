@@ -247,6 +247,7 @@ export async function updateStaffMember(
   db: D1Database,
   id: string,
   input: UpdateStaffInput,
+  options?: { expectedPolicyVersion?: number; requireRemainingAdmin?: { tenantId: string } },
 ): Promise<StaffMember | null> {
   const now = jstNow();
   const sets: string[] = ['updated_at = ?', 'policy_version = policy_version + 1'];
@@ -282,12 +283,80 @@ export async function updateStaffMember(
   if (input.email_change_expires_at !== undefined) { sets.push('email_change_expires_at = ?'); values.push(input.email_change_expires_at); }
 
   values.push(id);
-  await db
-    .prepare(`UPDATE staff_members SET ${sets.join(', ')} WHERE id = ?`)
+  // R499: 版を指定されたら「読んだときの版のまま」を更新条件にする。
+  // 他者が先に変えていたら1行も当たらず、呼び出し側が409で止める。
+  // R501: 管理者を外す変更は「ほかに有効な管理者が残る」ことも同じ書き込みの
+  // 条件にする。同時に互いを止めても0人にならない（後勝ちではなく競合で止まる）。
+  let where = 'WHERE id = ?';
+  if (options?.expectedPolicyVersion !== undefined) {
+    where += ' AND policy_version = ?';
+    values.push(options.expectedPolicyVersion);
+  }
+  if (options?.requireRemainingAdmin !== undefined) {
+    where += ` AND EXISTS (
+      SELECT 1 FROM staff_members AS remaining
+      WHERE remaining.id <> ?
+        AND COALESCE(remaining.tenant_id, ?) = ?
+        AND remaining.is_active = 1
+        AND remaining.role <> 'staff'
+        AND remaining.access_level <> 'read_only'
+    )`;
+    values.push(id, DEFAULT_TENANT_ID, options.requireRemainingAdmin.tenantId);
+  }
+  const applied = await db
+    .prepare(`UPDATE staff_members SET ${sets.join(', ')} ${where}`)
     .bind(...values)
     .run();
+  if ((applied.meta.changes ?? 0) === 0
+    && (options?.expectedPolicyVersion !== undefined || options?.requireRemainingAdmin !== undefined)) {
+    return null;
+  }
 
   return db.prepare('SELECT * FROM staff_members WHERE id = ?').bind(id).first<StaffMember>();
+}
+
+/**
+ * R498: 権限保存の要求キー台帳。同じ保存の送り直しを版を重ねずに返す。
+ *
+ * 同じキーで内容が違う送り直しは受け付けない（request_hash で照合）。
+ * 行が無いときは null。
+ */
+export interface StaffPermissionReceipt {
+  idempotency_key: string;
+  staff_id: string;
+  request_hash: string;
+  policy_version: number;
+  result: string;
+  created_at: string;
+}
+
+export async function getStaffPermissionReceipt(
+  db: D1Database,
+  staffId: string,
+  idempotencyKey: string,
+): Promise<StaffPermissionReceipt | null> {
+  return db
+    .prepare('SELECT * FROM staff_permission_receipts WHERE idempotency_key = ? AND staff_id = ?')
+    .bind(idempotencyKey, staffId)
+    .first<StaffPermissionReceipt>();
+}
+
+export async function saveStaffPermissionReceipt(
+  db: D1Database,
+  receipt: { idempotencyKey: string; staffId: string; requestHash: string; policyVersion: number; result: string },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO staff_permission_receipts
+         (idempotency_key, staff_id, request_hash, policy_version, result, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (idempotency_key, staff_id) DO NOTHING`,
+    )
+    .bind(
+      receipt.idempotencyKey, receipt.staffId, receipt.requestHash,
+      receipt.policyVersion, receipt.result, jstNow(),
+    )
+    .run();
 }
 
 export async function getStaffAccountScopeIds(db: D1Database, staffId: string): Promise<string[]> {

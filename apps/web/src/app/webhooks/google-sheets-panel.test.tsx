@@ -16,8 +16,16 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const searchParams = { value: '' }
+const accountState: { selectedAccountId: string | null; selectedAccount: { name?: string } | null } = {
+  selectedAccountId: 'acc-1',
+  selectedAccount: null,
+}
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
+  useAccount: () => ({
+    selectedAccountId: accountState.selectedAccountId,
+    selectedAccount: accountState.selectedAccount,
+    loading: false,
+  }),
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
@@ -87,6 +95,8 @@ async function render() {
 beforeEach(() => {
   calls.length = 0
   searchParams.value = ''
+  accountState.selectedAccountId = 'acc-1'
+  accountState.selectedAccount = null
   vi.stubGlobal('fetch', vi.fn(async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : (input as Request).url
     const url = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'http://localhost')
@@ -268,5 +278,155 @@ describe('#838 Google Sheets 連携パネル', () => {
     await settle()
     const disconnectCall = calls.find((c) => c.path === '/api/integrations/google-sheets/disconnect')
     expect(disconnectCall?.body).toEqual({ accountId: 'acc-1', confirmed: true })
+  })
+
+  it('解除はできてもGoogle側の許可取り消しに失敗したら、そのことを伝える（R440）', async () => {
+    handler = async (path, method) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) return connectionBody('connected')
+      if (path.startsWith('/api/integrations/google-sheets/runs')) return { success: true, data: { runs: [] } }
+      if (path === '/api/integrations/google-sheets/disconnect' && method === 'POST') {
+        return { success: true, data: { revoked: false, connection: { status: 'disconnected' } } }
+      }
+      return { success: false, error: 'unhandled' }
+    }
+    await render()
+
+    await act(async () => { button('接続を解除')!.click() })
+    await settle()
+    await act(async () => { dialogButton('接続を解除する')!.click() })
+    await settle()
+
+    expect(text()).toContain('Google側の許可の取り消しに失敗しました')
+    expect(text()).toContain('アクセスを取り消してください')
+  })
+
+  it('同期の記録だけ読み込めなかったとき、連携の表示は残し記録側に再読込を出す（R443）', async () => {
+    let runsFail = true
+    handler = async (path) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) return connectionBody('connected')
+      if (path.startsWith('/api/integrations/google-sheets/runs')) {
+        return runsFail ? { success: false, error: 'internal' } : { success: true, data: { runs: [{
+          id: 'run-1', kind: 'manual', dataType: 'friends', status: 'ok',
+          rowsWritten: 3, error: null, startedAt: '2026-09-26T03:00:00.000Z', finishedAt: '2026-09-26T03:01:00.000Z',
+        }] } }
+      }
+      return { success: false, error: 'unhandled' }
+    }
+    await render()
+
+    // 連携の状態は正常に出る
+    expect(text()).toContain('接続中')
+    expect(text()).toContain('同期の記録を読み込めませんでした')
+    expect(button('記録を読み直す')).toBeTruthy()
+
+    runsFail = false
+    await act(async () => { button('記録を読み直す')!.click() })
+    await settle()
+    expect(text()).not.toContain('同期の記録を読み込めませんでした')
+    expect(text()).toContain('3行')
+  })
+
+  it('30分以上前に始まった実行中の記録は、回収できることを伝え「今すぐ同期」を止めない（R444）', async () => {
+    const staleStart = new Date(Date.now() - 45 * 60 * 1000).toISOString()
+    handler = async (path) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) {
+        return connectionBody('connected', { syncRunning: true })
+      }
+      if (path.startsWith('/api/integrations/google-sheets/runs')) {
+        return { success: true, data: { runs: [{
+          id: 'run-stale', kind: 'manual', dataType: 'friends', status: 'running',
+          rowsWritten: 0, error: null, startedAt: staleStart, finishedAt: null,
+        }] } }
+      }
+      return { success: false, error: 'unhandled' }
+    }
+    await render()
+
+    expect(text()).toContain('途中で止まったまま残っています')
+    const syncButton = button('今すぐ同期')!
+    expect(syncButton).toBeTruthy()
+    expect(syncButton.disabled).toBe(false)
+  })
+
+  it('出力先の保存は通ったが読み直しに失敗したとき、保存できたことと読込失敗を分けて出す（R445）', async () => {
+    let connectionFails = false
+    handler = async (path, method) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) {
+        return connectionFails ? { success: false, error: 'internal' } : connectionBody('connected')
+      }
+      if (path.startsWith('/api/integrations/google-sheets/runs')) return { success: true, data: { runs: [] } }
+      if (path === '/api/integrations/google-sheets/target' && method === 'PUT') {
+        connectionFails = true
+        return { success: true, data: { connection: { status: 'connected' } } }
+      }
+      return { success: false, error: 'unhandled' }
+    }
+    await render()
+
+    await act(async () => { button('出力先を変更')!.click() })
+    await settle()
+    const input = host.querySelector('#sheets-target') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, 'sheet-xyz')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { button('保存')!.click() })
+    await settle()
+
+    expect(text()).toContain('出力先を保存しましたが、最新の状態を読み込めませんでした')
+    // 「保存に失敗した」旨は出さない（同じ値をもう一度保存させない）
+    expect(text()).not.toContain('出力先を保存できませんでした')
+  })
+
+  it('接続開始の応答が返る前に別アカウントへ切り替えたら、前のアカウントの認証へ進まない（R446）', async () => {
+    let resolveStart: ((v: unknown) => void) | null = null
+    handler = async (path, method) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) return connectionBody('disconnected')
+      if (path.startsWith('/api/integrations/google-sheets/runs')) return { success: true, data: { runs: [] } }
+      if (path === '/api/integrations/google-sheets/connect/start' && method === 'POST') {
+        return new Promise((resolve) => { resolveStart = resolve })
+      }
+      return { success: false, error: 'unhandled' }
+    }
+    await render()
+
+    await act(async () => { button('Googleアカウントを接続する')!.click() })
+    // 応答を待つ間に別アカウントへ切り替える
+    accountState.selectedAccountId = 'acc-2'
+    await act(async () => { root.render(<GoogleSheetsPanel />) })
+    await act(async () => {
+      resolveStart!({ success: true, data: { authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth?x=1', mode: 'connect' } })
+    })
+    await settle()
+
+    const assignMock = (globalThis as unknown as { location: { assign: unknown } }).location.assign as ReturnType<typeof vi.fn>
+    expect(assignMock.mock.calls.length).toBe(0)
+    // B側にAの失敗・busyも残らない
+    expect(text()).not.toContain('接続を始められませんでした')
+    expect(button('Googleアカウントを接続する')?.disabled).toBe(false)
+  })
+
+  it('解除の確認窓は対象アカウント名を見せ、アカウント切替で閉じる（R446/R447）', async () => {
+    accountState.selectedAccount = { name: '一号店' }
+    handler = async (path) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) return connectionBody('connected')
+      if (path.startsWith('/api/integrations/google-sheets/runs')) return { success: true, data: { runs: [] } }
+      return { success: false, error: 'unhandled' }
+    }
+    await render()
+
+    await act(async () => { button('接続を解除')!.click() })
+    await settle()
+    expect(dialogText()).toContain('一号店')
+
+    // 窓を開いたまま別アカウントへ切り替える → 確認窓は閉じる
+    accountState.selectedAccountId = 'acc-2'
+    accountState.selectedAccount = { name: '二号店' }
+    await act(async () => { root.render(<GoogleSheetsPanel />) })
+    await settle()
+    expect(dialogText()).not.toContain('接続を解除しますか')
+    // acc-2 の解除は送られていない
+    expect(calls.some((c) => c.path === '/api/integrations/google-sheets/disconnect')).toBe(false)
   })
 })
