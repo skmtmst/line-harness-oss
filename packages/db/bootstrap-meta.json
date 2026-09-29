@@ -485,7 +485,8 @@
     "536_support_mark_create_idempotency.sql",
     "536_tenant_restaurant_pack_backfill.sql",
     "537_friend_field_create_idempotency.sql",
-    "538_staff_invite_email_unique.sql"
+    "538_staff_invite_email_unique.sql",
+    "540_support_mark_rule_create_idempotency.sql"
   ],
-  "migrationCount": 486
+  "migrationCount": 487
 }

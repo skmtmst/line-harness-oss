@@ -6751,9 +6751,14 @@ export const api = {
       markId: string,
       accountId: string,
       data: SaveSupportMarkAutomationRule,
+      idempotencyKey: string,
     ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
       `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
-      { method: 'POST', body: JSON.stringify(data) },
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
     ),
     updateAutomationRule: (
       ruleId: string,
