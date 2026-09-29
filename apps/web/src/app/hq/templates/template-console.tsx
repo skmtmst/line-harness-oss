@@ -37,6 +37,16 @@ const failedStores = (result: DistributionResult) => result.stores.filter(store 
 const formatDate = (value: string) => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('ja-JP') : '—'
 const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
 
+/**
+ * R568: ひな形が指している画像の保存先だけを集める。保存や取り消しの境目で、
+ * 今回送った鍵と突き合わせて、使われなかった分だけ後片付けする。
+ */
+export function uploadedKeysIn(definition: TemplateDefinition): string[] {
+  if ('media' in definition && Array.isArray(definition.media)) return definition.media.map(item => item.r2Key).filter(key => key.trim() !== '')
+  if ('richMenu' in definition) return definition.richMenu.pages.map(page => page.imageR2Key).filter(key => key.trim() !== '')
+  return []
+}
+
 export function resolvedItems(preflight: Preflight, choices: Record<string, DistributionMode>): Resolution[] | null {
   if (!preflight.stores.length || preflight.stores.some(store => !store.items.length)) return null
   const result: Resolution[] = []
@@ -121,6 +131,20 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
   /** R561: 連続作成のたびに正規編集部品を掛け直し、空の新規入力へ戻す番号。 */
   const [formKey, setFormKey] = useState(0)
   const lock = useRef(false)
+  /** R568: この編集で送ったが、まだ保存内容に残っていない画像の保存先。 */
+  const sessionUploads = useRef<string[]>([])
+  /**
+   * R568: 残す鍵以外を後片付けする。所有確認はサーバが行う。
+   * 失敗しても移動や保存を止めない（残った分は次回の保存・取り消しで拾う）。
+   */
+  const reconcileSessionUploads = (keep: readonly string[]) => {
+    const kept = new Set(keep)
+    for (const key of sessionUploads.current) if (!kept.has(key)) void hqTemplatesApi.deleteImage(key).catch(() => undefined)
+    sessionUploads.current = []
+  }
+  const noteSessionUpload = (media: { r2Key: string }) => {
+    if (!sessionUploads.current.includes(media.r2Key)) sessionUploads.current.push(media.r2Key)
+  }
   const createAttempt = useRef<CreationAttempt | null>(null)
   const creationScope = useRef<CreationScope | null>(null)
   const createSettlement = useRef<{ kind: 'saved'; detail: TemplateDetail } | { kind: 'rejected' } | null>(null)
@@ -171,7 +195,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     }
     finally { lock.current = false; if (alive.current) setBusy(false) }
   }
-  const toList = () => { if (createUncertain) return; createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setPendingRun(null); setResult(null); setError(''); setConflict(false); window.history.replaceState(null, '', window.location.pathname + window.location.search) }
+  const toList = () => { if (createUncertain) return; reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : []); createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setPendingRun(null); setResult(null); setError(''); setConflict(false); window.history.replaceState(null, '', window.location.pathname + window.location.search) }
   /** R119: 目録の読み直し。編集中身は残し、候補だけ取り直す。 */
   const reloadCatalog = () => {
     setCatalogFailed(false)
@@ -187,6 +211,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
   }
   const open = (id: string, next: Stage) => void perform(async () => {
+    sessionUploads.current = []
     const loaded = await hqTemplatesApi.get(id)
     if (!alive.current) return
     loadDetailIntoForm(loaded); setSelected([]); setSearch(''); setPreflight(null); setChoices({}); setStage(next)
@@ -247,6 +272,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     if (!alive.current) return
     const isNew = !detail
     loadDetailIntoForm(saved)
+    reconcileSessionUploads(uploadedKeysIn(saved.definition))
     createAttempt.current = null
     setCreateUncertain(false)
     setTemplates(current => [saved.template, ...current.filter(row => row.id !== saved.template.id)])
@@ -340,7 +366,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     {stage !== 'list' && <nav aria-label="配布の進捗"><ol className={styles.steps}>{STEPS.map((step, i) => <li key={step.stage} aria-current={step.stage === stage ? 'step' : undefined}>{i + 1} {step.label}</li>)}</ol></nav>}
     {stage === 'edit' && <p className={styles.breadcrumb}><button type="button" disabled={busy || createUncertain} onClick={toList}>ひな形一覧</button> / {detail ? '編集' : '新規作成'}</p>}
     <header className={styles.header}><div><h1>{title}</h1><p className={styles.muted}>{stage === 'list' ? LIST_DESCRIPTIONS[type] : stage === 'accounts' ? '1アカウントだけ、または複数アカウントを選択して一括配布できます' : stage === 'duplicates' ? '一括設定のあと、必要な項目だけ個別に変更できます' : stage === 'edit' ? `LINEアカウント内と同じ項目で${LABELS[type]}のひな形を作成します` : detail?.template.name}</p></div>
-      {stage === 'list' && <Button aria-label="＋ひな形を作成" variant="primary" disabled={!ready || busy} onClick={() => { createAttempt.current = null; setDetail(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setStage('edit'); setError(''); setConflict(false) }}>{CREATE_LABELS[type]}</Button>}
+      {stage === 'list' && <Button aria-label="＋ひな形を作成" variant="primary" disabled={!ready || busy} onClick={() => { createAttempt.current = null; sessionUploads.current = []; setDetail(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setStage('edit'); setError(''); setConflict(false) }}>{CREATE_LABELS[type]}</Button>}
     </header>
     {error && <div role="alert" className={`${styles.notice} ${styles.error}`}><p>{error}</p>{conflict && detail && <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')}>最新の内容を読み込む</Button>}</div>}
     {message && <p role="status" className={`${styles.notice} ${styles.success}`}>{message}</p>}
@@ -376,6 +402,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
           tenantId={creationScope.current?.tenantId}
           onChange={setDefinition}
           onBusyChange={setUploadBusy}
+          onMediaUploaded={noteSessionUpload}
           onCanonicalCancel={useCanonicalEditors ? toList : undefined}
           onCanonicalSave={useCanonicalEditors ? saveCanonicalDefinition : undefined}
           onRichMenuNameChange={setName}

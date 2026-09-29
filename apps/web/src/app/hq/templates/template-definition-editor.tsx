@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
+import { decodeImageSize } from './image-size'
 import { freshDefinition, withUploadedImage } from '@/lib/hq-template-authoring'
 import RichMenuCreateForm, { freshRichMenuCreateValue, type RichMenuOption } from '@/components/rich-menus/rich-menu-create-form'
 import HqTagDefinitionEditor from '@/components/friend-fields/hq-tag-definition-editor'
@@ -77,21 +78,33 @@ export function referenceCount(type: TemplateType, definition: TemplateDefinitio
   return 0
 }
 
-function ImageUpload({ purpose, disabled, onUploaded, onBusyChange }: { purpose: 'message' | 'rich_menu'; disabled: boolean; onUploaded: (media: MessageTemplateDefinition['media'][number]) => void; onBusyChange?: (busy: boolean) => void }) {
+function ImageUpload({ purpose, disabled, expectedSize, onUploaded, onBusyChange, onReceipt }: { purpose: 'message' | 'rich_menu'; disabled: boolean; expectedSize?: { width: number; height: number } | null; onUploaded: (media: MessageTemplateDefinition['media'][number]) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
   const [error, setError] = useState(''), [uploading, setUploading] = useState(false)
   const alive = useRef(true), locked = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false; onBusyChange?.(false) } }, [onBusyChange])
   const upload = async (file?: File) => {
     if (!file || disabled || locked.current) return
     locked.current = true; setUploading(true); onBusyChange?.(true); setError('')
-    try { const media = await hqTemplatesApi.uploadImage(file, purpose); if (alive.current) onUploaded(media) }
+    try {
+      // R568: 今の大きさで採用できない画像は、R2 へ送る前にここで止める。
+      // 手元で読めないときは送って、採用できる寸法の宣言でサーバに止めてもらう。
+      if (expectedSize) {
+        const decoded = await decodeImageSize(file)
+        if (decoded && (decoded.width !== expectedSize.width || decoded.height !== expectedSize.height)) throw new Error('選択中のサイズに合う画像を指定してください。')
+      }
+      const media = expectedSize && purpose === 'rich_menu'
+        ? await hqTemplatesApi.uploadImage(file, purpose, expectedSize)
+        : await hqTemplatesApi.uploadImage(file, purpose)
+      // R568: 受け取りの記録を先に残す。採用に失敗しても、取り消しの後片付けが拾える。
+      if (alive.current) { onReceipt?.(media); onUploaded(media) }
+    }
     catch (e) { if (alive.current) setError(e instanceof Error ? e.message : '画像を登録できませんでした。') }
     finally { locked.current = false; if (alive.current) { setUploading(false); onBusyChange?.(false) } }
   }
   return <div className={styles.field}><span>画像を登録</span><input aria-label={purpose === 'message' ? 'メッセージ画像を選ぶ' : 'リッチメニュー画像を選ぶ'} type="file" accept="image/png,image/jpeg" disabled={disabled || uploading} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void upload(file) }} /><small className={styles.muted}>{purpose === 'message' ? 'PNG・JPEG、1件8 MiB以下。画像形式では本文に自動設定します。' : 'PNG・JPEG、1 MiB以下。幅2500px、高さ1686pxまたは843px。'}</small>{uploading && <p role="status">画像を登録しています…</p>}{error && <p role="alert">{error}</p>}</div>
 }
 
-function MessageEditor({ value, disabled, onChange, onBusyChange }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void }) {
+function MessageEditor({ value, disabled, onChange, onBusyChange, onReceipt }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
   const current = value.template
   const [targetDate, setTargetDate] = useState('')
   const messageTypeOptions = [
@@ -127,7 +140,7 @@ function MessageEditor({ value, disabled, onChange, onBusyChange }: { value: Mes
             <span>分類</span>
             <input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={event => onChange({ ...value, template: { ...current, category: event.target.value } })} />
           </label>
-          {current.id === 'hq-authored-message' && <ImageUpload purpose="message" disabled={disabled} onBusyChange={onBusyChange} onUploaded={media => onChange(withUploadedImage(value, media))} />}
+          {current.id === 'hq-authored-message' && <ImageUpload purpose="message" disabled={disabled} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={media => onChange(withUploadedImage(value, media))} />}
           {value.media.map(media => <p key={media.id} className={styles.muted}>{media.filename}（{Math.ceil(media.sizeBytes / 1024)} KB）<br /><span className={styles.name}>{media.publicUrl ?? media.r2Key}</span></p>)}
         </>
       )}
@@ -142,13 +155,15 @@ export type RichMenuEditorReferences = {
   trackedLinks?: RichMenuOption[]
 }
 
-function RichMenuEditor({ value, disabled, onChange, onBusyChange, onNameChange, references = {} }: { value: RichMenuDefinition; disabled: boolean; tenantId?: string; onChange: (next: RichMenuDefinition) => void; onBusyChange?: (busy: boolean) => void; onNameChange?: (name: string) => void; references?: RichMenuEditorReferences }) {
+function RichMenuEditor({ value, disabled, onChange, onBusyChange, onNameChange, onReceipt, references = {} }: { value: RichMenuDefinition; disabled: boolean; tenantId?: string; onChange: (next: RichMenuDefinition) => void; onBusyChange?: (busy: boolean) => void; onNameChange?: (name: string) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void; references?: RichMenuEditorReferences }) {
   const [changeError, setChangeError] = useState<string | null>(null)
   let compatibilityError: string | null = null
   let draft = freshRichMenuCreateValue()
   try { draft = hqDefinitionToRichMenuCreateValue(value) }
   catch (error) { compatibilityError = error instanceof Error ? error.message : '内容を安全に読み込めないため停止しました。' }
   const page = value.richMenu.pages[0]
+  // R568: 今の大きさで採用できる寸法。合わない画像は送る前に止める。
+  const expectedSize = value.richMenu.size === 'large' ? { width: 2500, height: 1686 } : { width: 2500, height: 843 }
   return <RichMenuCreateForm
     value={draft}
     disabled={disabled}
@@ -162,17 +177,17 @@ function RichMenuEditor({ value, disabled, onChange, onBusyChange, onNameChange,
       try { const converted = richMenuCreateValueToHqDefinition(next, value); onChange(converted); if (next.name !== value.richMenu.name) onNameChange?.(next.name); setChangeError(null) }
       catch (error) { setChangeError(error instanceof HqRichMenuCompatibilityError ? error.message : '変更を安全に保存できないため停止しました。') }
     }}
-    imageAction={page ? <ImageUpload purpose="rich_menu" disabled={disabled || Boolean(compatibilityError)} onBusyChange={onBusyChange} onUploaded={media => {
+    imageAction={page ? <ImageUpload purpose="rich_menu" disabled={disabled || Boolean(compatibilityError)} expectedSize={expectedSize} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={media => {
       if (media.width !== 2500 || media.height !== (value.richMenu.size === 'large' ? 1686 : 843)) throw new Error('選択中のサイズに合う画像を指定してください。')
       onChange({ ...value, richMenu: { ...value.richMenu, pages: [{ ...page, imageR2Key: media.r2Key }, ...value.richMenu.pages.slice(1)] } })
     }} /> : null}
   />
 }
 
-export default function TemplateDefinitionEditor({ type, value, disabled, editing = false, tenantId, onChange, onBusyChange, richMenuReferences, formReferences, onRichMenuNameChange, onCanonicalSave, onCanonicalCancel }: { type: TemplateType; value: TemplateDefinition; disabled: boolean; editing?: boolean; tenantId?: string; onChange: (next: TemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; richMenuReferences?: RichMenuEditorReferences; formReferences?: FormRefs; onRichMenuNameChange?: (name: string) => void; onCanonicalSave?: (definition: TagDefinition | FormDefinition, andAnother?: boolean) => void | Promise<void>; onCanonicalCancel?: () => void }) {
+export default function TemplateDefinitionEditor({ type, value, disabled, editing = false, tenantId, onChange, onBusyChange, onMediaUploaded, richMenuReferences, formReferences, onRichMenuNameChange, onCanonicalSave, onCanonicalCancel }: { type: TemplateType; value: TemplateDefinition; disabled: boolean; editing?: boolean; tenantId?: string; onChange: (next: TemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onMediaUploaded?: (media: MessageTemplateDefinition['media'][number]) => void; richMenuReferences?: RichMenuEditorReferences; formReferences?: FormRefs; onRichMenuNameChange?: (name: string) => void; onCanonicalSave?: (definition: TagDefinition | FormDefinition, andAnother?: boolean) => void | Promise<void>; onCanonicalCancel?: () => void }) {
   if (type === 'tag' && 'tag' in value) return <HqTagDefinitionEditor definition={value} mode={editing ? 'edit' : 'create'} saving={disabled} onCancel={onCanonicalCancel ?? (() => undefined)} onSave={async (next, andAnother) => { onChange(next); await onCanonicalSave?.(next, andAnother) }} />
-  if (type === 'template' && 'template' in value) return <MessageEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} />
-  if (type === 'rich_menu' && 'richMenu' in value) return <RichMenuEditor value={value} disabled={disabled} tenantId={tenantId} onChange={onChange} onBusyChange={onBusyChange} onNameChange={onRichMenuNameChange} references={richMenuReferences} />
+  if (type === 'template' && 'template' in value) return <MessageEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} onReceipt={onMediaUploaded} />
+  if (type === 'rich_menu' && 'richMenu' in value) return <RichMenuEditor value={value} disabled={disabled} tenantId={tenantId} onChange={onChange} onBusyChange={onBusyChange} onNameChange={onRichMenuNameChange} onReceipt={onMediaUploaded} references={richMenuReferences} />
   if (type === 'form' && 'form' in value) return <HqFormDefinitionEditor definition={value} refs={formReferences} saving={disabled} onCancel={onCanonicalCancel ?? (() => undefined)} onSave={async next => { onChange(next); await onCanonicalSave?.(next) }} />
   return <p role="alert">ひな形の種類と保存内容が一致しません。</p>
 }
