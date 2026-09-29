@@ -29,6 +29,7 @@ import {
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
   chooseRestaurantTable,
   isRestaurantReservationSource,
@@ -114,8 +115,14 @@ restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
 
-  const requestedTenant = tenantId(c);
   const staffTenant = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+  // 統括に飲食店機能パックが付いていない場合、環境が無効な場合と同じ404で
+  // 返す。機能の存在自体を、権限が無い呼び出し元に漏らさないため。
+  if (!(await tenantHasFeaturePack(dbFor(c.env), staffTenant, 'restaurant'))) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+
+  const requestedTenant = tenantId(c);
   if (requestedTenant && requestedTenant !== staffTenant) {
     return c.json({ success: false, error: 'この統括を操作する権限がありません' }, 403);
   }

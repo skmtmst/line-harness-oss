@@ -129,6 +129,7 @@ beforeEach(async () => {
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
   ];
   testDb = createTestD1();
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
   googleCalls = [];
   googlePostsOnGoogle = [];
   createFailStatus = null;

@@ -1,6 +1,7 @@
 export const ADMIN_SESSION_STORAGE_KEY = 'lh_admin_session_fallback'
 export const TWO_FACTOR_CHALLENGE_STORAGE_KEY = 'lh_two_factor_challenge'
 const TWO_FACTOR_NEXT_STORAGE_KEY = 'lh_2fa_next'
+const TWO_FACTOR_METHOD_STORAGE_KEY = 'lh_2fa_method'
 let runtimeAdminSessionToken = ''
 
 function readSessionStorage(key: string): string | null {
@@ -91,6 +92,30 @@ export function takeTwoFactorNextPath(): string {
 export function clearTwoFactorChallenge(): void {
   if (typeof window === 'undefined') return
   removeSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY)
+  removeSessionStorage(TWO_FACTOR_METHOD_STORAGE_KEY)
+}
+
+/** 二段階認証へ進んだときのログイン方法。 */
+export type TwoFactorMethod = 'password' | 'line'
+
+/*
+ * R507: 二段階認証の画面で出すログイン方法。
+ *
+ * 合言葉の受け渡し（#lh_2fa=）と同じ便で `lh_method=password` が来たときだけ
+ * メール経路。LINE経路のサーバー側リダイレクトには付かないので、
+ * 印が無いときはLINE経路とみなす。再読込では保存した値を読む
+ * （合言葉と同じく、その場の便が正本）。
+ */
+export function captureTwoFactorMethod(): TwoFactorMethod {
+  if (typeof window === 'undefined') return 'line'
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  if (params.get('lh_2fa')) {
+    const method: TwoFactorMethod = params.get('lh_method') === 'password' ? 'password' : 'line'
+    try { sessionStorage.setItem(TWO_FACTOR_METHOD_STORAGE_KEY, method) } catch { /* 合言葉と同じ扱い */ }
+    return method
+  }
+  try { return sessionStorage.getItem(TWO_FACTOR_METHOD_STORAGE_KEY) === 'password' ? 'password' : 'line' }
+  catch { return 'line' }
 }
 
 export function getAdminSessionToken(): string {

@@ -3488,6 +3488,36 @@ export type AutomationDraftDetail = {
   triggerConfig: Record<string, unknown>
   conditions: Record<string, unknown>
   actions: AutomationDraftAction[]
+  /**
+   * 監査 R486/R487: 下書きの各「共通アクションを実行」が確認時点で指す
+   * 公開版。版が解決できない処理は versionId が null で、画面は送信へ
+   * 進めない扱いにする。
+   */
+  commonActionRefs: AutomationDraftCommonActionRef[]
+  /** key=版id。確認画面が中身を展開するための版データ（入れ子の先も含む）。 */
+  commonActionVersions: Record<string, AutomationDraftCommonActionVersionDetail>
+}
+
+/** 下書きの処理1件が指す共通アクションの固定版（見つからないときは null）。 */
+export type AutomationDraftCommonActionRef = {
+  stepId: string
+  commonActionId: string
+  name: string | null
+  versionId: string | null
+  versionNumber: number | null
+}
+
+/** 確認画面へ出すための、共通アクションの版の中身。 */
+export type AutomationDraftCommonActionVersionDetail = {
+  commonActionId: string
+  name: string
+  versionNumber: number
+  actions: Array<{
+    id: string
+    type: string
+    params: Record<string, unknown>
+    onFailure: 'stop' | 'continue'
+  }>
 }
 
 /** #942 N-354: 実行記録1件の詳細。処理ごとの結果と試行数を持つ。 */
@@ -8643,10 +8673,12 @@ export const api = {
       return fetchApi<ApiResponse<OpsTenantRow[]> & { summary: OpsTenantSummary }>(`/api/ops/tenants${qs ? `?${qs}` : ''}`)
     },
     tenant: (id: string) => fetchApi<ApiResponse<OpsTenantDetail>>(`/api/ops/tenants/${encodeURIComponent(id)}`),
-    createTenant: (name: string) =>
-      fetchApi<ApiResponse<{ id: string; name: string }>>('/api/tenants', { method: 'POST', body: JSON.stringify({ name }) }),
+    createTenant: (name: string, featurePacks?: string[]) =>
+      fetchApi<ApiResponse<{ id: string; name: string }>>('/api/tenants', { method: 'POST', body: JSON.stringify(featurePacks === undefined ? { name } : { name, featurePacks }) }),
     changeTenantStatus: (id: string, input: { status: 'active' | 'suspended' | 'archived'; reason: string; confirmName?: string }) =>
       fetchApi<ApiResponse<{ status: string }>>(`/api/ops/tenants/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify(input) }),
+    setTenantFeaturePacks: (id: string, featurePacks: string[]) =>
+      fetchApi<ApiResponse<{ featurePacks: string[] }>>(`/api/ops/tenants/${encodeURIComponent(id)}/feature-packs`, { method: 'PATCH', body: JSON.stringify({ featurePacks }) }),
     impersonation: {
       current: () => fetchApi<ApiResponse<OpsImpersonation | null>>('/api/ops/impersonation/current'),
       start: (tenantId: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/start', { method: 'POST', body: JSON.stringify({ tenantId }) }),
@@ -10297,10 +10329,22 @@ export const api = {
       ),
     // R484: `operationKey` は確認画面ごとの要求キー。同じ確認の再試行は
     // 同じ鍵で呼び、Worker は2件目の実行を作らず初回を返す。
-    test: (id: string, accountId: string, friendId: string, versionId?: string, operationKey?: string) =>
+    // R487: `expectedCommonActions` は確認画面で出した共通アクションの版。
+    // 別担当が利用版を切り替えた直後に実行しても、Worker が409で止める。
+    test: (
+      id: string, accountId: string, friendId: string, versionId?: string, operationKey?: string,
+      expectedCommonActions?: Array<{ stepId: string; commonActionId: string; versionId: string }>,
+    ) =>
       fetchApi<ApiResponse<{ runId: string; versionId: string; status: string }>>(
         `/api/automations/${encodeURIComponent(id)}/test?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ versionId, friendId, operationKey }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            versionId, friendId, operationKey,
+            // 共通アクションを呼ばない下書きでは項目自体を送らない。
+            expectedCommonActions: expectedCommonActions?.length ? expectedCommonActions : undefined,
+          }),
+        },
       ),
     templates: (accountId: string) =>
       fetchApi<ApiResponse<AutomationTemplateSummary[]>>(
@@ -10337,7 +10381,7 @@ export const api = {
       triggerConfig: Record<string, unknown>
       conditions?: Record<string, unknown>
       actions: AutomationDraftAction[]
-    }) => fetchApi<ApiResponse<{ updated: true }>>(
+    }) => fetchApi<ApiResponse<{ updated: true; draftVersionId: string }>>(
       `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
       { method: 'PUT', body: JSON.stringify(data) },
     ),

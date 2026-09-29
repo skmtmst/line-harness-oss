@@ -483,7 +483,8 @@
     "534_google_sheets_sync_run_scope.sql",
     "535_tiktok_pnl.sql",
     "536_support_mark_create_idempotency.sql",
+    "536_tenant_restaurant_pack_backfill.sql",
     "537_friend_field_create_idempotency.sql"
   ],
-  "migrationCount": 484
+  "migrationCount": 485
 }

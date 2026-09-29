@@ -148,4 +148,33 @@ describe('GET /api/settings/features availability', () => {
       testDb.raw.close();
     }
   });
+
+  it('統括に飲食店機能パックが無いと、環境が有効でもrestaurant_testはoffになる', async () => {
+    const testDb = fixture();
+    try {
+      // 統括の feature_packs は既定で '[]'（付与なし）。
+      setLegacy(testDb, 'restaurant_test', true);
+      const body = await load(testDb);
+      expect(body.data.features.restaurant_test).toBe(false);
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('統括に飲食店機能パックがあれば、自己設定どおりrestaurant_testが反映される', async () => {
+    const testDb = fixture();
+    try {
+      testDb.raw.prepare(`UPDATE tenants SET feature_packs = ? WHERE id = ?`)
+        .run('["restaurant"]', DEFAULT_TENANT_ID);
+      setLegacy(testDb, 'restaurant_test', true);
+      const onBody = await load(testDb);
+      expect(onBody.data.features.restaurant_test).toBe(true);
+
+      setLegacy(testDb, 'restaurant_test', false);
+      const offBody = await load(testDb);
+      expect(offBody.data.features.restaurant_test).toBe(false);
+    } finally {
+      testDb.raw.close();
+    }
+  });
 });

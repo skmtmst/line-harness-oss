@@ -489,6 +489,10 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
   test('欄を消しても0にならず、空欄のまま保存できない', async () => {
     await renderRules()
     const cutoff = screen.getByRole('spinbutton', { name: '受付の締め切り' }) as HTMLInputElement
+    // 読み込み直後の初期値の反映が落ち着いてから触る。DOMに出た直後は
+    // 描画の反映が遅れていることがあり、そのまま欄を消すと初期化の
+    // 反映と競合して揺れる（R311の安定化。空欄を0にしない意図は変えない）。
+    await waitFor(() => expect(cutoff.value).toBe('1440'))
     fireEvent.change(cutoff, { target: { value: '' } })
 
     // 空欄を維持し、0へ自動で変わらない。
