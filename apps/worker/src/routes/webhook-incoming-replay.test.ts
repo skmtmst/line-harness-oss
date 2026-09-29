@@ -24,10 +24,26 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 const fireEvent = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined));
 vi.mock('../services/event-bus.js', () => ({ fireEvent }));
 const delivery = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<{ ok: boolean; attempts: number; lastStatus: number }>>());
-vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../services/outgoing-webhook-delivery.js')>(),
-  deliverWebhook: delivery,
-}));
+vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/outgoing-webhook-delivery.js')>();
+  return {
+    ...actual,
+    deliverWebhook: delivery,
+    /*
+      d23b R419: event bus の初回配送と sweep はどちらも1回固定経路
+      (deliverOnce)を呼ぶ。event bus 側(送信手段を渡さない)は記録用の
+      モックへ、sweep 側(fetchImpl を渡す)は実物の配送へ流して、
+      同じ冪等キーで実際に署名して送る姿を確かめられるようにする。
+    */
+    deliverOnce: vi.fn(
+      (
+        wh: Parameters<typeof actual.deliverOnce>[0],
+        body: string,
+        opts: Parameters<typeof actual.deliverOnce>[2],
+      ) => (opts?.fetchImpl ? actual.deliverOnce(wh, body, opts) : delivery(wh, body, opts)),
+    ),
+  };
+});
 
 const { app } = await import('../index.js');
 

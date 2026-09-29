@@ -83,6 +83,8 @@ vi.mock('./outgoing-webhook-delivery.js', async () => {
   return {
     ...actual,
     deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 }),
+    // d23b R419: イベント発火の初回配送は1回固定経路(deliverOnce)を呼ぶ。
+    deliverOnce: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 }),
     recordDeliveryOutcome: vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -415,7 +417,9 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
       lineAccountId: 'account-a', webhookId: 'webhook-a', direction: 'outgoing',
       idempotencyKey: 'outgoing_webhook:webhook-a:line_webhook:friend-event-1',
     }));
-    expect(deliveryModule.deliverWebhook).toHaveBeenCalledWith(
+    // d23b: イベント発火の初回配送は送り直し無しの1回固定経路を呼ぶ
+    // （再送は配送台帳の時刻で cron が行う）。
+    expect(deliveryModule.deliverOnce).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'webhook-a' }),
       expect.any(String),
       { idempotencyKey: 'outgoing_webhook:webhook-a:line_webhook:friend-event-1' },

@@ -15,6 +15,7 @@ import {
   getWebhookInteractionById,
   listFailedWebhookInteractionsForRetry,
   countFailedWebhookInteractionsForRetry,
+  countExcludedFailedWebhookInteractions,
   countUnverifiedWebhookInteractions,
   listWebhookInteractions,
   getOutgoingWebhookDeliverySummaries,
@@ -41,6 +42,7 @@ import {
   isOperationCapabilityStopped,
   type IntegrationApiTokenRow,
   type WebhookInteractionRow,
+  type WebhookInteractionListRow,
   type IncomingWebhookIdentityMatch,
   type IncomingWebhookActionRef,
 } from '@line-crm/db';
@@ -57,7 +59,11 @@ import {
   webhookFailureLabel,
   webhookResponseLabel,
 } from '../services/webhook-interactions.js';
-import { buildOutgoingWebhookBody, deliverWebhook } from '../services/outgoing-webhook-delivery.js';
+import {
+  buildOutgoingWebhookBody,
+  deliverOnce,
+  failureReasonForDelivery,
+} from '../services/outgoing-webhook-delivery.js';
 import {
   executeIncomingWebhookActions,
   maskedPayloadShape,
@@ -1137,9 +1143,11 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
       idempotencyKey: eventId,
     });
     const started = Date.now();
-    // 署名用の復号は deliverWebhook が行う。ここは早い段階で 503 を返すための
+    // d23b R419: 試し送信は1回だけ。画面の案内（届いたかを試す1回）と
+    // 自動の送り直しを混ぜないため、送り直しを0回に固定して送る。
+    // 署名用の復号は配送側が行う。ここは早い段階で 503 を返すための
     // 事前確認だけに使い、鍵はそのまま渡す(#650 再審査)。
-    const result = await deliverWebhook(webhook, body, {
+    const result = await deliverOnce(webhook, body, {
       idempotencyKey: eventId,
       credentialKeys: webhookKeysOf(c),
     });
@@ -1148,7 +1156,9 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
       responseStatus: result.lastStatus ?? null,
       attemptCount: result.attempts,
       durationMs: Date.now() - started,
-      failureReason: result.ok ? null : 'processing_failed',
+      // d23b R410/R415: 他経路と同じ理由を残す。届いたか分からない
+      // 失敗を「処理できなかった」と記録しない。
+      failureReason: result.ok ? null : failureReasonForDelivery(result),
     });
     auditLog(c, 'webhook.outgoing.test', { kind: 'outgoing_webhook', id: webhook.id }, { lineAccountId });
     return c.json({ success: true, data: { delivered: result.ok, responseStatus: result.lastStatus ?? null } });
@@ -1193,12 +1203,43 @@ function serializeInteraction(row: WebhookInteractionRow) {
     // 判定用の記号も返す(IDEA-26)。'unknown' は無条件に再送せず、
     // 相手先で確かめてからの1件ずつ復旧として画面が扱う。
     failureReasonCode: row.failure_reason,
-    // つなぎ先が消えたもの・送った内容が残っていないものは送り直せない。
-    canRetry: row.direction === 'outgoing' && row.status === 'failed'
-      && Boolean(row.webhook_id) && row.request_body_json != null,
     startedAt: row.started_at,
     completedAt: row.completed_at,
     retryOfId: row.retry_of_id,
+    ...retryBlockFields(row),
+  };
+}
+
+/**
+ * 送り直せるかの判定と、送り直せない理由（d23b R412/R414）。
+ * 一覧の行(listWebhookInteractions)には送り先と自動配送の現状が
+ * 付いてくる。個別取得の行では分からない分は付けない（隠さず不明のまま）。
+ */
+function retryBlockFields(row: WebhookInteractionRow) {
+  const list = row as Partial<WebhookInteractionListRow>;
+  const hasJoin = 'linked_webhook_active' in row;
+  const outgoingFailed = row.direction === 'outgoing' && row.status === 'failed';
+  // webhook_id が無い記録は連携先が消えたもの。一覧行で送り先が
+  // 見つからない（削除印あり含む）ものも同じ扱い。
+  const webhookDeleted = row.direction === 'outgoing'
+    && (row.webhook_id == null || (hasJoin && list.linked_webhook_active == null));
+  const webhookInactive = hasJoin && row.direction === 'outgoing' && list.linked_webhook_active === 0;
+  const deliveryStatus = hasJoin ? (list.delivery_status ?? null) : null;
+  const autoRetryOpen = deliveryStatus === 'pending' || deliveryStatus === 'sending' || deliveryStatus === 'retry_wait';
+  const autoDelivered = deliveryStatus === 'delivered';
+  const retryBlockReason =
+    webhookDeleted ? 'webhook_deleted'
+    : webhookInactive ? 'webhook_inactive'
+    : autoRetryOpen ? 'auto_retry_scheduled'
+    : autoDelivered ? 'already_delivered'
+    : null;
+  return {
+    // つなぎ先が消えたもの・止まったもの・送った内容が残っていないもの、
+    // 自動の送り直しが動いている・届き済みのものは送り直せない。
+    canRetry: outgoingFailed && Boolean(row.webhook_id) && row.request_body_json != null
+      && !webhookDeleted && !webhookInactive && !autoRetryOpen && !autoDelivered,
+    retryBlockReason,
+    autoRetryNextAt: autoRetryOpen ? (list.delivery_next_retry_at ?? null) : null,
   };
 }
 
@@ -1277,6 +1318,16 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     if (code === 'not_retryable' || code === 'already_retried') {
       return c.json({ success: false, error: code }, 409);
     }
+    /*
+      d23b R412: 同じ通知が自動で届き済み・自動の送り直しが動いている
+      場合は手動のやり直しを重ねず、理由を画面へ返す。
+    */
+    if (code === 'already_delivered') {
+      return c.json({ success: false, error: code }, 409);
+    }
+    if (code === 'auto_retry_scheduled') {
+      return c.json({ success: false, error: code }, 409);
+    }
     if (code === 'webhook_secret_unavailable') {
       return c.json({ success: false, error: 'secret を確認できないため送り直しを止めました' }, 503);
     }
@@ -1298,6 +1349,10 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     if ('error' in access) return access.error;
     // 1件につき最大6回の外部通信になる。1リクエストの外部通信上限を越えないよう5件まで。
     // 結果不明(届いたか分からない)の記録はここには含まれない(IDEA-26)。
+    //
+    // d23b R405: 選ぶ段階で、送り先が消えた・止まった・内容が残っていない
+    // 記録と、自動の送り直しが動いている記録は外す。先頭に固まった対象外の
+    // 記録で、後ろの送れる記録へ届かなくなることはなくなった。
     const failed = await listFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId, 5);
     // N-387: 対象外に残る件数を先に数えて返す。まとめて操作で黙って残さない。
     const totalFailed = await countFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId);
@@ -1305,6 +1360,10 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     // IDEA-26: 結果不明の失敗は無条件に再送しない代わりに、件数を返して
     // 「相手先で確かめてから1件ずつやり直す」ことを画面へ伝える。
     const needsReview = await countUnverifiedWebhookInteractions(c.env.DB, access.lineAccountId);
+    // d23b R408: 対象外に残った件数（消えた・止まった送り先、内容が無い
+    // 記録、自動の送り直しが動いている記録）も返す。画面が「何件が今回の
+    // 対象外だったか」を説明できるようにする。
+    const excluded = await countExcludedFailedWebhookInteractions(c.env.DB, access.lineAccountId);
     let succeeded = 0;
     let failedAgain = 0;
     let skipped = 0;
@@ -1323,7 +1382,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     }
     return c.json({
       success: true,
-      data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining, needsReview },
+      data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining, needsReview, excluded },
     });
   } catch (err) {
     console.error('POST /api/webhooks/interactions/retry-failed error:', err);
