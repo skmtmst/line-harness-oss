@@ -6468,6 +6468,10 @@ export const api = {
       fetchApi<ApiResponse<FriendFieldMigrationRun>>(
         `/api/field-migrations/${runId}?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
+    /**
+     * R515: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。
+     * 同じ作成のやり直しは同じキーを送り、内容を変えたら新しいキーにする。
+     */
     create: (accountId: string, data: {
       name: string
       fieldKey: string
@@ -6481,11 +6485,12 @@ export const api = {
       isPersonal?: boolean
       isStarred?: boolean
       displayOrder?: number
-    }) =>
+    }, idempotencyKey?: string) =>
       fetchApi<ApiResponse<FriendField>>(
         `/api/friend-fields?lineAccountId=${encodeURIComponent(accountId)}`,
         {
         method: 'POST',
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
         body: JSON.stringify(data),
         },
       ),
@@ -6558,6 +6563,10 @@ export const api = {
         `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
         options,
       ),
+    /**
+     * R512: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。
+     * 同じ作成のやり直しは同じキーを送り、内容を変えたら新しいキーにする。
+     */
     create: (accountId: string, data: {
       name: string
       color?: string
@@ -6565,18 +6574,25 @@ export const api = {
       autoOnInbound?: boolean
       displayOrder?: number
       automationRules?: SaveSupportMarkAutomationRule[]
-    }) =>
+    }, idempotencyKey?: string) =>
       fetchApi<ApiResponse<SupportMark>>(
         `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
         {
         method: 'POST',
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
         body: JSON.stringify(data),
         },
       ),
+    /**
+     * R513: 読んだときの版（expectedVersion）を送り、ほかの担当者が
+     * 先に変えていたら409で止める。版が無い呼び出しは従来どおり上書きする。
+     */
     update: (
       id: string,
       accountId: string,
-      data: Partial<Pick<SupportMark, 'name' | 'color' | 'isDefault' | 'autoOnInbound' | 'displayOrder'>>,
+      data: Partial<Pick<SupportMark, 'name' | 'color' | 'isDefault' | 'autoOnInbound' | 'displayOrder'>> & {
+        expectedVersion?: number
+      },
     ) =>
       fetchApi<ApiResponse<SupportMark>>(
         `/api/support-marks/${id}?lineAccountId=${encodeURIComponent(accountId)}`,
