@@ -74,8 +74,22 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   /*
    * R512: 同じ作成のやり直しは同じ要求キーで送る。入力を変えたら
    * 新しいキーにする（同じキーに異なる内容はサーバが409で止める）。
+   * キーは保存の直前に内容と比べて決める。useEffect での作り直しは
+   * 描画の後追いになり、一覧の読み直し直後の再送と行き違いで
+   * キーが替わることがあるため、ここでは使わない。
    */
-  const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
+  const idempotencyKeyRef = useRef<{ signature: string; key: string } | null>(null)
+  const attemptSignature = JSON.stringify([
+    name, color, displayOrder, isDefault,
+    createRule, ruleEvent, ruleActive, ruleProtectionMinutes,
+  ])
+  function attemptKey(): string {
+    const current = idempotencyKeyRef.current
+    if (current && current.signature === attemptSignature) return current.key
+    const key = crypto.randomUUID()
+    idempotencyKeyRef.current = { signature: attemptSignature, key }
+    return key
+  }
   /*
    * R513: ほかの担当者が先に変えていたときの最新の内容。
    * 入力は残したまま、最新の名前・色・並び順と版を見せて選ばせる。
@@ -120,10 +134,6 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
    */
   const canManageByRole = useCanManageSupportMark()
   const roleBlocked = canManageByRole === false
-  // 入力の中身が変わったら、次に押す作成は別の要求として新しいキーにする。
-  useEffect(() => {
-    idempotencyKeyRef.current = crypto.randomUUID()
-  }, [name, color, displayOrder, isDefault, createRule, ruleEvent, ruleActive, ruleProtectionMinutes])
   /*
    * R510: 初回の読み込みだけ入力欄を埋める。再読み込みでは入力内容を
    * 失わない（一覧と重複の注意だけを新しくする）。アカウントや対象が
@@ -209,7 +219,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         : await api.supportMarks.create(selectedAccountId, {
             name: name.trim(), color, displayOrder, isDefault, autoOnInbound: false,
             automationRules: createRule ? [{ name: `${name.trim()}：${eventLabel(ruleEvent)}`, event: ruleEvent, condition: null, priority: 0, manualProtectionMinutes: ruleProtectionMinutes, isActive: ruleActive } satisfies SaveSupportMarkAutomationRule] : [],
-          }, idempotencyKeyRef.current)
+          }, attemptKey())
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
     } catch (reason) {

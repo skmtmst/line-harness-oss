@@ -21,9 +21,10 @@ const mocks = vi.hoisted(() => {
       this.status = status
     }
   }
-  return { runs: vi.fn(), retryRun: vi.fn(), MockApiError }
+  return { runs: vi.fn(), retryRun: vi.fn(), staffMe: vi.fn(), MockApiError }
 })
 const { runs: runsMock, retryRun: retryRunMock, MockApiError } = mocks
+const staffMeMock = mocks.staffMe
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -32,6 +33,9 @@ vi.mock('@/lib/api', () => ({
       retryRun: mocks.retryRun,
       update: vi.fn(),
     },
+    // R530: この試験は変更できる担当者の筋書き。見るだけの出し分けは
+    // runs-viewer-gating で見る。
+    staff: { me: mocks.staffMe },
   },
   ApiError: mocks.MockApiError,
 }))
@@ -125,6 +129,7 @@ afterEach(() => {
 beforeEach(() => {
   runsMock.mockResolvedValue(listResponse())
   retryRunMock.mockResolvedValue({ success: true, data: { status: 'completed' } })
+  staffMeMock.mockResolvedValue({ success: true, data: { role: 'owner' } })
 })
 
 function retryButtons(): HTMLButtonElement[] {
@@ -206,6 +211,21 @@ describe('自動応答・実行結果の再実行（N-081）', () => {
     expect(container.querySelector('[role="status"]')?.textContent)
       .toContain('もう一度実行できませんでした')
     // 失敗時は一覧を読み直さない。
+    expect(runsMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('403 は読み直しではなく権限の説明を出す（R530）', async () => {
+    retryRunMock.mockRejectedValue(new MockApiError(403, 'この操作には管理者権限が必要です'))
+    await renderPage()
+
+    await act(async () => {
+      retryButtons()[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+
+    expect(container.querySelector('[role="status"]')?.textContent)
+      .toContain('再実行する権限がありません')
+    // 権限不足は読み直しても直らないので読み直さない。
     expect(runsMock).toHaveBeenCalledTimes(1)
   })
 })
