@@ -90,4 +90,39 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
     // 静的書き出しなので `[id]` は書き出せない。
     expect(PAGE).toContain("search?.get('id')")
   })
+
+  it('変更の可否は共通の出し分けで決め、手元の保存値で決めない（R522）', () => {
+    // サーバの requireRole('owner', 'admin') と同じ境目を使う。
+    // 直しを戻すと赤くなること: staff.me を読まない・canManage の分岐を外す。
+    // `api.staff.me()` の呼び出し本体は共通の出し分け側にあり、ここでは読む。
+    const HELPER = readFileSync(join(HERE, '..', '..', '..', 'lib', 'staff-role.ts'), 'utf8')
+    expect(PAGE).toContain("from '@/lib/staff-role'")
+    expect(PAGE).toContain('useStaffRole')
+    expect(PAGE).toContain('canManageRole')
+    expect(HELPER).toContain('api.staff.me()')
+    expect(PAGE).not.toContain("localStorage.getItem('lh_staff_role')")
+  })
+
+  it('見るだけには変更の入口を出さず、理由を1つの帯で案内する（R522）', () => {
+    // 入口の描画から1000字以内に canManage の分岐があること。
+    // 注釈文の同名語に当たらないよう、描画だけの形で探す。
+    // 直しを戻すと赤くなること: 分岐を外して入口を無条件表示に戻す。
+    const gated = (entry: string, label: string) => {
+      const at = PAGE.indexOf(entry)
+      expect(at, `${label} が画面にありません`).toBeGreaterThan(-1)
+      expect(
+        PAGE.slice(Math.max(0, at - 1000), at),
+        `${label} が canManage で守られていません`,
+      ).toContain('canManage')
+    }
+    gated("{issuing ? '発行中…' : '引き継ぎコードを出す'}", '引き継ぎコードを出す')
+    gated("{linking ? '確認中…' : 'コードを読む'}", 'コードを読む')
+    gated("{refreshing ? '確認中…' : '事前確認をやり直す'}", '事前確認をやり直す')
+    gated("{savingDecisions ? '保存中…' : '判断を保存する'}", '判断を保存する')
+    gated("{executing ? '実行中…' : '本実行へ進む'}", '本実行へ進む')
+    gated('setCancelOpen(true)}>\n                  引き継ぎを取り消す', '引き継ぎを取り消す')
+    gated('setRollbackOpen(true) }}>\n                切り戻す', '切り戻す')
+    expect(PAGE).toContain('引き継ぎの変更はオーナーと管理者だけができます')
+    expect(PAGE).toContain('bg-info-bg text-ink-secondary')
+  })
 })
