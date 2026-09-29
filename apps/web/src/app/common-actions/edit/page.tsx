@@ -17,7 +17,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import BranchEditors, { newBranchStep, updateBranchStep } from '../branch-editor'
+import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from '../branch-editor'
+import { mergeOrderedActions, stepNumbers } from '../action-order'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -128,9 +129,8 @@ function EditCommonActionInner() {
     }
   }
 
-  const branches = actions.filter((action) => action.type === 'branch')
   const plainActions = actions.filter((action) => action.type !== 'branch')
-  const updateBranch = (branchId: string, patch: { tagId?: string; thenId?: string; elseId?: string }) => {
+  const updateBranch = (branchId: string, patch: BranchPatch) => {
     setActions((current) => current.map((step) => step.id === branchId ? updateBranchStep(step, patch) : step))
   }
 
@@ -230,10 +230,10 @@ function EditCommonActionInner() {
           </section>
           <section>
             <h2 className="text-ink mb-3 font-semibold">順番に動かす処理</h2>
-            <CommonActionEditor value={plainActions} resources={resources} onChange={(next) => setActions([...next, ...branches])} />
+            {/* 監査 R474: 分岐の位置を保ち、通常処理の編集で順序を変えない。番号は実行順。 */}
+            <CommonActionEditor value={plainActions} resources={resources} stepNumbers={stepNumbers(actions)} onChange={(next) => setActions((current) => mergeOrderedActions(current, next))} />
             <BranchEditors
-              branches={branches}
-              offset={plainActions.length}
+              steps={actions}
               resources={resources}
               onUpdate={updateBranch}
               onRemove={(branchId) => setActions((current) => current.filter((step) => step.id !== branchId))}

@@ -16,7 +16,8 @@ import { useCanManageCommonActions } from '@/components/automations/use-common-a
 import { TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import BranchEditors, { newBranchStep, updateBranchStep } from '../branch-editor'
+import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from '../branch-editor'
+import { mergeOrderedActions, stepNumbers } from '../action-order'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -98,15 +99,13 @@ export default function NewCommonActionPage() {
     setActions((current) => [...current, { ...newCommonActionStep('common_action'), params: { commonActionId: id } }])
   }
 
-  const branches = actions.filter((action) => action.type === 'branch')
   const plainActions = actions.filter((action) => action.type !== 'branch')
 
-  const updatePlainActions = (next: CommonActionStep[]) => setActions([...next, ...branches])
+  // 監査 R474: 分岐の位置を保ち、通常処理の編集で順序を変えない。
+  const updatePlainActions = (next: CommonActionStep[]) =>
+    setActions((current) => mergeOrderedActions(current, next))
 
-  const updateBranch = (
-    id: string,
-    patch: { tagId?: string; thenId?: string; elseId?: string },
-  ) => {
+  const updateBranch = (id: string, patch: BranchPatch) => {
     setActions((current) => current.map((step) => step.id === id ? updateBranchStep(step, patch) : step))
   }
 
@@ -155,11 +154,10 @@ export default function NewCommonActionPage() {
             {resourcesLoading ? (
               <div className="border-hairline rounded-card border bg-canvas p-8 text-center text-sm text-ink-faint">選択肢を読み込んでいます</div>
             ) : (
-              <div className="compact-common-action-editor"><CommonActionEditor value={plainActions} resources={resources} onChange={updatePlainActions} /></div>
+              <div className="compact-common-action-editor"><CommonActionEditor value={plainActions} resources={resources} stepNumbers={stepNumbers(actions)} onChange={updatePlainActions} /></div>
             )}
             <BranchEditors
-              branches={branches}
-              offset={plainActions.length}
+              steps={actions}
               resources={resources}
               onUpdate={updateBranch}
               onRemove={(id) => setActions((current) => current.filter((item) => item.id !== id))}

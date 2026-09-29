@@ -50,13 +50,24 @@ describe('V6共通アクションの画面契約', () => {
 
   it('条件分岐はタグ条件と両方の公開版を保存・実行契約へ接続する', () => {
     expect(CREATE + EDIT).toContain('<BranchEditors')
-    expect(BRANCH_EDITOR).toContain('条件のタグ')
+    expect(BRANCH_EDITOR).toContain('条件の組み合わせ')
     expect(BRANCH_EDITOR).toContain('当てはまるとき')
     expect(BRANCH_EDITOR).toContain('当てはまらないとき')
     expect(WORKER).toContain("'branch'")
     expect(WORKER).toContain('branch_too_deep')
     expect(ENGINE).toContain("type: 'branch_marker'")
     expect(ENGINE).toContain('branch_not_selected')
+  })
+
+  it('分岐の編集で非表示の条件・子処理を消さない（監査 R474・R476）', () => {
+    // R474: 通常処理の編集で分岐の位置を保ち、番号は実行順で一致させる。
+    expect(CREATE + EDIT).toContain('mergeOrderedActions')
+    expect(CREATE + EDIT).toContain('stepNumbers')
+    expect(EDITOR).toContain('stepNumbers')
+    // R476: 全条件・両側の全処理を出し、対象だけ更新する。読めない構造は残す。
+    expect(BRANCH_EDITOR).toContain('updateBranchStep')
+    expect(BRANCH_EDITOR).toContain('ここでは変えられません')
+    expect(BRANCH_EDITOR).toContain('すべてに当てはまる')
   })
 
   it('利用版の変更前に差分と進行中への影響を確認する', () => {
