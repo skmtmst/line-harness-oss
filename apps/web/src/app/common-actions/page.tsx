@@ -343,6 +343,10 @@ export default function CommonActionsPage() {
                   </Td>
                   <Td>
                     {item.publishedVersion ? `v${item.publishedVersion}` : '—'}
+                    {/* 監査 R470: 公開版と下書きが両方あるとき、下書きの存在も識別できるようにする。 */}
+                    {item.status === 'published' && item.draftVersion != null ? (
+                      <span className="text-ink-faint ml-1 text-xs" title={`下書きv${item.draftVersion}を編集中`}>下書きあり</span>
+                    ) : null}
                   </Td>
                   <ActionCell>
                     {/* #641: 「中身を見る」＋「その他（…）」の形にそろえる。残りはメニューへ集約。 */}

@@ -373,6 +373,35 @@ describe('V6共通アクション', () => {
     })).rejects.toMatchObject({ code: 'common_action_cycle' });
   });
 
+  it('公開行の処理数は公開版にそろえ下書きは混ぜない（監査 R470）', async () => {
+    const created = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '公開と下書き', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+    });
+    // 公開v1は処理1個、下書きv2は処理2個にする。
+    const draft2 = await createCommonActionDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1',
+    });
+    await updateCommonActionDraft(testDb.db, {
+      id: created.id,
+      lineAccountId: 'account-1',
+      expectedDraftVersionId: draft2.draftVersionId,
+      name: '公開と下書き',
+      actions: [...tagAction('tag-1'), ...tagAction('tag-1').map((step) => ({ ...step, id: 'tag-step-2' }))],
+    });
+
+    const list = await listCommonActions(testDb.db, { lineAccountId: 'account-1' });
+    expect(list.items).toHaveLength(1);
+    // 一覧は「公開中」「v1」と同じ版の処理数1個を出す。下書きの2個を混ぜない。
+    expect(list.items[0]).toMatchObject({
+      status: 'published', publishedVersion: 1, actionCount: 1,
+    });
+    const summary = await getCommonActionsSummary(testDb.db, 'account-1');
+    expect(summary.actions).toBe(1);
+  });
+
   it('一覧で旧版利用ありと未使用を区別する', async () => {
     const used = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '利用中', actions: tagAction('tag-1'),

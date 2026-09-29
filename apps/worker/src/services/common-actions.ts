@@ -586,7 +586,11 @@ export async function listCommonActions(
   const rows = await db.prepare(
     `SELECT ca.id, ca.name, ca.description, ca.status, ca.updated_at,
             dv.version_number AS draft_version, pv.version_number AS published_version,
-            COALESCE(json_array_length(COALESCE(dv.action_config, pv.action_config, '[]')), 0) AS action_count,
+            /* 監査 R470: 公開中行は公開版の処理数と版番号をそろえる。
+               下書き優先で数えると編集中の数が公開内容に見える。 */
+            COALESCE(json_array_length(CASE WHEN ca.status = 'published'
+              THEN COALESCE(pv.action_config, '[]')
+              ELSE COALESCE(dv.action_config, pv.action_config, '[]') END), 0) AS action_count,
             COUNT(DISTINCT b.id) AS binding_count,
             COUNT(DISTINCT CASE
               WHEN ca.current_published_version_id IS NOT NULL
@@ -666,7 +670,9 @@ export async function getCommonActionsSummary(
             SUM(execution_count_this_month) AS executions,
             SUM(failure_count_this_month) AS failures
        FROM (SELECT ca.status AS status,
-                    COALESCE(json_array_length(COALESCE(dv.action_config, pv.action_config, '[]')), 0) AS action_count,
+                    COALESCE(json_array_length(CASE WHEN ca.status = 'published'
+                      THEN COALESCE(pv.action_config, '[]')
+                      ELSE COALESCE(dv.action_config, pv.action_config, '[]') END), 0) AS action_count,
                     COUNT(DISTINCT b.id) AS binding_count,
                     COUNT(DISTINCT CASE
                       WHEN ca.current_published_version_id IS NOT NULL
