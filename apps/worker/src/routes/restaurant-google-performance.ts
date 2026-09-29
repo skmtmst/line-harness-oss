@@ -9,7 +9,9 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { dbFor } from '../services/db-router.js';
-import { fail, googleAccessGuard, storeFor } from './restaurant-google.js';
+import { processGoogleBusinessDailyMetrics } from '../services/google-business-resync.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { fail, googleAccessGuard, nowIso, requireConnectedStore, storeFor } from './restaurant-google.js';
 
 export const restaurantGooglePerformance = new Hono<Env>();
 restaurantGooglePerformance.use('/api/restaurant-test/google/*', googleAccessGuard);
@@ -120,4 +122,19 @@ restaurantGooglePerformance.get('/api/restaurant-test/google/performance', async
     },
     lastMetricsSyncedAt: connection?.last_metrics_synced_at ?? null,
   });
+});
+
+/**
+ * 手動同期。検証環境（cron無し）でパフォーマンス取り込みを試すための入口。
+ * この店舗だけを対象にJST当日ゲートを無視して取り直す（force: true）。
+ * アクセストークン取得・Google呼び出し・失敗時のconnection状態更新は processGoogleBusinessDailyMetrics 側が担う。
+ * 口コミ・投稿・プロフィールのsyncと同じくGoogleから読んで自DBに書くだけ（Googleへの書き込みは無い）ため、担当者にも許可する。
+ */
+restaurantGooglePerformance.post('/api/restaurant-test/google/performance/sync', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const ctx = await requireConnectedStore(c);
+  if (ctx instanceof Response) return ctx;
+  const { store } = ctx;
+
+  const result = await processGoogleBusinessDailyMetrics(c.env, { now: nowIso(), storeId: store.id, force: true });
+  return c.json({ success: true, ...result, syncedAt: nowIso() });
 });
