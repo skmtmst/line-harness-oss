@@ -6707,7 +6707,10 @@ CREATE TABLE tenants (
 
 CREATE TABLE tiktok_pnl_order_lines (
   -- `<TikTok注文ID>:<行番号>`。シートのキー列（A列）にもこの値を使う。
-  line_key TEXT PRIMARY KEY,
+  -- 主キーは line_account_id と組にする。TikTok注文IDはアカウントをまたいで
+  -- 重複し得るため、単独キーにすると先に取り込んだアカウントが行を占有し、
+  -- 別アカウントの同一注文IDが混入・欠落する。
+  line_key TEXT NOT NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   tiktok_order_id TEXT NOT NULL,
   line_index INTEGER NOT NULL,
@@ -6728,7 +6731,8 @@ CREATE TABLE tiktok_pnl_order_lines (
   -- 1 = シートへ未反映（新規または内容が変わった）。書き出し成功で 0 に戻す。
   sheet_dirty INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (line_account_id, line_key)
 );
 
 CREATE TABLE tiktok_pnl_settings (

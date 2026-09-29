@@ -235,7 +235,7 @@ async function upsertOrder(
          unit_price_yen, line_amount_yen, buyer_key, source_updated_at, fetched_at,
          sheet_dirty, created_at, updated_at
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-       ON CONFLICT(line_key) DO UPDATE SET
+       ON CONFLICT(line_account_id, line_key) DO UPDATE SET
          order_date_jst = excluded.order_date_jst,
          paid_at = excluded.paid_at,
          order_status = excluded.order_status,
@@ -582,10 +582,12 @@ async function writeDirtyRows(
     // 書けた分だけ dirty を落とす（途中失敗なら残りは次tickで再送）。
     for (let i = 0; i < batch.length; i += 80) {
       const keys = batch.slice(i, i + 80).map((r) => r.line_key);
+      // line_key はアカウント間で重複し得るため、必ず line_account_id で絞る。
+      // 絞らないと他アカウントの未反映フラグを消し、そのシートへ永久に書けなくなる。
       await db.prepare(
         `UPDATE tiktok_pnl_order_lines SET sheet_dirty = 0, updated_at = datetime('now')
-          WHERE line_key IN (${keys.map(() => '?').join(',')})`,
-      ).bind(...keys).run();
+          WHERE line_account_id = ? AND line_key IN (${keys.map(() => '?').join(',')})`,
+      ).bind(lineAccountId, ...keys).run();
     }
     written += batch.length;
   }
