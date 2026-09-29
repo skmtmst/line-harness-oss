@@ -385,6 +385,26 @@ export async function failOperationHealthRun(
   ).bind(errorMessage.slice(0, 500), completedAt, runId).run();
 }
 
+/**
+ * R571: 結果保存の失敗で failed になった実行枠を、同じ5分枠の押し直しで再実行する。
+ *
+ * failed の行が枠を塞いだままだと、再送は failed 行を重複扱いで返すだけで
+ * 確認処理が走らない。running に戻して呼び出し側が確認・保存をやり直せる
+ * ようにする。completed・running の行には触らない。並列の押し直しで
+ * 先に誰かが開け直したときは false を返し、呼び出し側は重複として返す。
+ */
+export async function reopenFailedOperationHealthRun(
+  db: D1Database,
+  runId: string,
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE operation_health_runs
+        SET status = 'running', overall_status = 'unknown', error_message = NULL, completed_at = NULL
+      WHERE id = ? AND status = 'failed'`,
+  ).bind(runId).run();
+  return Number(result.meta?.changes ?? 0) === 1;
+}
+
 export async function getLatestOperationHealthRun(
   db: D1Database,
   lineAccountId: string,
