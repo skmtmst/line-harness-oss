@@ -925,7 +925,7 @@ CREATE TABLE auth_step_up_grants (
   expires_at  TEXT NOT NULL,
   consumed_at TEXT,
   created_at  TEXT NOT NULL
-);
+, session_token_hash TEXT, issued_policy_version INTEGER);
 
 CREATE TABLE auth_throttles (
   key           TEXT PRIMARY KEY,
@@ -6494,6 +6494,16 @@ CREATE TABLE staff_notification_reads (
   PRIMARY KEY (notification_id, staff_id)
 );
 
+CREATE TABLE staff_permission_receipts (
+  idempotency_key TEXT NOT NULL,
+  staff_id        TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  request_hash    TEXT NOT NULL,
+  policy_version  INTEGER NOT NULL,
+  result          TEXT NOT NULL,
+  created_at      TEXT NOT NULL,
+  PRIMARY KEY (idempotency_key, staff_id)
+);
+
 CREATE TABLE staff_shifts (
   id          TEXT PRIMARY KEY,
   staff_id    TEXT NOT NULL,
@@ -8962,6 +8972,9 @@ CREATE INDEX idx_staff_members_tenant
 
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
+
+CREATE INDEX idx_staff_permission_receipts_staff_v527
+  ON staff_permission_receipts (staff_id, created_at DESC);
 
 CREATE UNIQUE INDEX idx_stop_suppressions_dedup
   ON entry_route_stop_suppressions (line_account_id, line_user_id, ref_code);

@@ -18,6 +18,25 @@ export function isStepUpRequired(error: unknown): boolean {
   return error instanceof ApiError && error.code === 'STEP_UP_REQUIRED'
 }
 
+/*
+ * R503: 入力上限（429）は回数制限と待ち時間の案内にする。
+ * サーバーは待ち秒数を data.retryAfterSeconds と Retry-After で返す。
+ * 無ければ本文（429も表示対象）か汎用文へ落とす。内部情報は出さない。
+ */
+export function stepUpFailureMessage(error: unknown): string {
+  if (error instanceof ApiError && error.status === 429) {
+    const data = error.data as { retryAfterSeconds?: unknown } | null | undefined
+    const seconds = typeof data?.retryAfterSeconds === 'number' && data.retryAfterSeconds > 0
+      ? Math.ceil(data.retryAfterSeconds)
+      : null
+    if (seconds !== null) {
+      const minutes = Math.max(1, Math.ceil(seconds / 60))
+      return `入力回数の上限に達しました。約${minutes}分待ってからやり直してください。正しい内容でも待ち時間中は通りません。`
+    }
+  }
+  return error instanceof Error ? error.message : '確認できませんでした。もう一度お試しください。'
+}
+
 type PendingStepUp = { purpose: StepUpPurpose; action: string; resolve: (token: string | null) => void }
 
 /**
@@ -89,7 +108,7 @@ export default function StepUpPrompt({
       await request.retry(res.data.token)
       onDone()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '確認できませんでした。もう一度お試しください。')
+      setError(stepUpFailureMessage(caught))
     } finally {
       setBusy(false)
     }
@@ -98,9 +117,9 @@ export default function StepUpPrompt({
     <StepUpDialog
       open
       action={request.action}
-      method={method === 'password' ? 'password' : 'totp'}
+      method={method}
       busy={busy}
-      error={method === 'none' ? 'この操作には二段階認証またはパスワードの設定が必要です。設定画面で登録してください。' : error}
+      error={method === 'none' ? undefined : error}
       onSubmit={(value) => void submit(value)}
       onCancel={onClose}
     />

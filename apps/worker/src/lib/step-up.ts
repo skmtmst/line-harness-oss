@@ -49,10 +49,13 @@ export async function consumeStepUpToken(
   const token = c.req.header('X-Step-Up-Token')?.trim();
   if (!staff || !token) return false;
   try {
+    // 確認票は発行したセッションに結び付いている。別セッション・終了済み
+    // セッションからの使い回しはここで止まる（fail closed）。
     return await consumeStepUpGrant(c.env.DB, {
       tokenHash: await sha256Hex(token),
       staffId: staff.id,
       purpose,
+      sessionTokenHash: await adminSessionTokenHashFromRequest(c),
     });
   } catch {
     // grant 台帳が読めないときも止める側に倒す（fail closed）。
