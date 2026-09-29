@@ -301,6 +301,14 @@ interface BillingWebhookEvent {
   data: { object: Record<string, unknown> };
 }
 
+function stripeExpandableId(value: unknown): string | null {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'string') {
+    return (value as { id: string }).id;
+  }
+  return null;
+}
+
 async function findTenantForEvent(c: Context<Env>, object: Record<string, unknown>): Promise<TenantBilling | null> {
   const metadata = (object.metadata ?? {}) as Record<string, string>;
   const byMeta = metadata.tenant_id ?? (typeof object.client_reference_id === 'string' ? object.client_reference_id : null);
@@ -336,9 +344,19 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
 
   try {
     const object = event.data.object;
+    const refundedInvoiceId = event.type === 'charge.refunded'
+      ? stripeExpandableId(object.invoice)
+      : undefined;
     const tenant = await findTenantForEvent(c, object);
     const first = await recordBillingEvent(c.env.DB, { id: event.id, type: event.type, tenantId: tenant?.id ?? null, summary: event.type });
     if (!first) return c.json({ success: true, data: { received: true, duplicate: true } });
+    if (refundedInvoiceId === null) {
+      console.info(JSON.stringify({
+        message: 'billing webhook: charge.refunded 対象外',
+        eventId: event.id,
+        reason: 'Stripe Billing請求書でない',
+      }));
+    }
     if (!tenant) {
       console.warn('billing webhook: tenant not found for event', event.type);
       return c.json({ success: true, data: { received: true, matched: false } });
@@ -412,16 +430,19 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         break;
       }
       case 'charge.refunded': {
-        const invoice = typeof object.invoice === 'string'
-          ? object.invoice
-          : (object.invoice && typeof object.invoice === 'object' && typeof (object.invoice as { id?: unknown }).id === 'string'
-            ? (object.invoice as { id: string }).id
-            : null);
-        if (invoice) {
-          await updateBillingInvoiceRefund(c.env.DB, {
-            invoiceId: invoice,
+        if (refundedInvoiceId) {
+          const updated = await updateBillingInvoiceRefund(c.env.DB, {
+            invoiceId: refundedInvoiceId,
             amountRefunded: typeof object.amount_refunded === 'number' ? object.amount_refunded : 0,
           });
+          if (!updated) {
+            console.warn(JSON.stringify({
+              message: 'billing webhook: charge.refunded 更新対象なし',
+              eventId: event.id,
+              invoiceId: refundedInvoiceId,
+              reason: 'billing_invoice_not_found',
+            }));
+          }
         }
         break;
       }
