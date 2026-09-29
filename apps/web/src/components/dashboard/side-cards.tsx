@@ -339,8 +339,8 @@ export function UpcomingCard({
     >
       {legacyLoading ? (
         <div className="space-y-2">
-          <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
-          <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
+          <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
+          <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
         </div>
       ) : legacyFailed ? (
         <p className="text-ink-faint text-xs leading-relaxed">予定を読み込めませんでした。</p>
@@ -430,7 +430,7 @@ export function DeliveryFailuresCard({ accountId }: { accountId?: string | null 
         </>
       ) : (
         <div className="space-y-2">
-          <div className="bg-canvas-sunken h-7 w-20 animate-pulse rounded" />
+          <div className="bg-canvas-sunken h-7 w-20 animate-pulse rounded-mini" />
         </div>
       )}
     </SideCard>

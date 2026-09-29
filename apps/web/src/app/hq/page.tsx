@@ -153,7 +153,7 @@ export default function HqPage() {
 
       {!loadError && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
+          <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
 

@@ -191,10 +191,10 @@ export default function BookingStaffPage() {
                           <img
                             src={s.profile_image_url}
                             alt={s.display_name}
-                            className="w-9 h-9 rounded-full object-cover"
+                            className="w-9 h-9 rounded-pill object-cover"
                           />
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-shell-gray flex items-center justify-center text-ink-faint text-xs">
+                          <div className="w-9 h-9 rounded-pill bg-shell-gray flex items-center justify-center text-ink-faint text-xs">
                             {s.display_name.slice(0, 1)}
                           </div>
                         )}
@@ -209,7 +209,7 @@ export default function BookingStaffPage() {
                     <Td className="text-ink-secondary">{s.role ?? '-'}</Td>
                     <Td align="center">
                       {s.is_designation_optional ? (
-                        <span className="inline-block px-2 py-0.5 rounded bg-chip-alt-soft text-chip-alt text-xs">指名なし</span>
+                        <span className="inline-block px-2 py-0.5 rounded-mini bg-chip-alt-soft text-chip-alt text-xs">指名なし</span>
                       ) : (
                         <span className="text-xs text-ink-disabled">-</span>
                       )}
@@ -217,9 +217,9 @@ export default function BookingStaffPage() {
                     <Td align="right" className="tabular-nums text-ink-faint">{s.sort_order}</Td>
                     <Td align="center">
                       {s.is_active ? (
-                        <span className="inline-block px-2 py-0.5 rounded bg-success-bg text-success text-xs">ON</span>
+                        <span className="inline-block px-2 py-0.5 rounded-mini bg-success-bg text-success text-xs">ON</span>
                       ) : (
-                        <span className="inline-block px-2 py-0.5 rounded bg-canvas-sunken text-ink-faint text-xs">OFF</span>
+                        <span className="inline-block px-2 py-0.5 rounded-mini bg-canvas-sunken text-ink-faint text-xs">OFF</span>
                       )}
                     </Td>
                     <ActionCell>
@@ -336,7 +336,7 @@ function Modal({
 
   return (
     <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-canvas rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-canvas rounded-card shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
           <h2 id="booking-staff-modal-title" className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -350,7 +350,7 @@ function Modal({
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.name}
-              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="例: yamada-taro"
             />
           </Field>
@@ -360,7 +360,7 @@ function Modal({
               value={form.display_name ?? ''}
               onChange={(e) => set('display_name', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.displayName}
-              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="顧客に表示される名前"
             />
           </Field>
@@ -370,7 +370,7 @@ function Modal({
               value={form.role ?? ''}
               onChange={(e) => set('role', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.role}
-              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="例: トップスタイリスト"
             />
           </Field>
@@ -388,7 +388,7 @@ function Modal({
               value={form.bio ?? ''}
               onChange={(e) => set('bio', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.bio}
-              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-y"
               rows={2}
             />
           </Field>
@@ -400,7 +400,7 @@ function Modal({
               min={BOOKING_STAFF_LIMITS.sortOrderMin}
               max={BOOKING_STAFF_LIMITS.sortOrderMax}
               step={1}
-              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent tabular-nums"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent tabular-nums"
             />
           </Field>
           <Checkbox
@@ -431,7 +431,7 @@ function Modal({
         <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-shell-gray rounded-lg"
+            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-shell-gray rounded-control"
           >
             キャンセル
           </button>

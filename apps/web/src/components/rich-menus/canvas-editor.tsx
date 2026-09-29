@@ -323,7 +323,7 @@ export function CanvasEditor({
           <button
             key={s}
             onClick={() => setScale(s)}
-            className={`px-2 py-0.5 text-xs rounded ${
+            className={`px-2 py-0.5 text-xs rounded-mini ${
               Math.abs(scale - s) < 0.01
                 ? 'bg-ink text-on-accent'
                 : 'bg-shell hover:bg-shell-gray text-ink-secondary'
@@ -457,7 +457,7 @@ export function CanvasEditor({
       {!preview && areas.length > 0 && (
         <div className="space-y-1">
           <h3 className="text-ink-faint text-xs font-semibold">エリア一覧</h3>
-          <ul className="border-hairline divide-hairline divide-y rounded border">
+          <ul className="border-hairline divide-hairline divide-y rounded-mini border">
             {areas.map((area, index) => {
               const selected = area.id === selectedAreaId
               const name = areaDisplayName(area, index)

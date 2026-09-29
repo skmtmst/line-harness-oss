@@ -753,7 +753,7 @@ function AnalyticsReportFormPage() {
         <aside className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
           <section className="border-success bg-success-bg rounded-card border p-5 md:col-span-2 xl:col-span-1">
             <h2 className="mb-3 text-sm font-semibold">{nextLabel} に、こう届きます(見本)</h2>
-            <div className="border-success rounded-card bg-canvas p-4 shadow-sm">
+            <div className="border-success rounded-card bg-canvas p-4 shadow-card">
               <strong className="text-sm">【週次】8/18〜8/24 のまとめ</strong>
               <p className="text-ink-faint mt-1 text-xs">数字はイメージです。</p>
               <div className="mt-3 grid grid-cols-3 gap-2"><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">友だち<b className="text-ink text-base">＋112</b></span><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">成果<b className="text-ink text-base">118件</b></span><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">売上<b className="text-ink text-base">¥312,400</b></span></div>

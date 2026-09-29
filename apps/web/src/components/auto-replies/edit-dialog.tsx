@@ -631,7 +631,7 @@ export default function EditDialog({
       <div className={page ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]' : ''}>
       <div
         ref={dialogRef}
-        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-canvas shadow-xl'}
+        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-control bg-canvas shadow-float'}
         role={page ? undefined : 'dialog'}
         aria-modal={page ? undefined : true}
         aria-labelledby={page ? undefined : 'auto-reply-edit-dialog-title'}
@@ -968,7 +968,7 @@ export default function EditDialog({
             </div>
           </div>
           {/* 返す条件。キーワードが合っても、ここに当てはまらなければ返さない。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink text-sm font-semibold">2. いつ・誰に反応するか</p>
             <p className="text-ink-faint text-xs">
               複数のキーワードは、下の「すべて必須／どれか1つ」でつなぎ方を決めます。
@@ -1422,7 +1422,7 @@ export default function EditDialog({
            * ページ表示に置いていた見本の文章と処理の無い追加ボタンは、実設定と
            * 見分けが付かないので、ダイアログと同じ実編集部品へ結び付ける（U003）。
            */}
-          <div className={page ? 'border-hairline rounded-card space-y-3 border p-4' : 'border-hairline space-y-3 rounded-lg border p-3'}>
+          <div className={page ? 'border-hairline rounded-card space-y-3 border p-4' : 'border-hairline space-y-3 rounded-control border p-3'}>
             <div>
               <p className="text-ink text-sm font-semibold">
                 {page ? '配信後のアクション' : '4. 応答したときに行うこと'}

@@ -100,7 +100,7 @@ function FlexButton({ node }: { node: FlexNode }) {
     display: 'block',
     width: '100%',
     padding: '10px 16px',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-control)',
     fontSize: '14px',
     fontWeight: 600,
     textAlign: 'center',
@@ -208,9 +208,9 @@ function FlexBubble({ bubble, maxWidth }: { bubble: FlexNode; maxWidth?: number 
     <div style={{
       width: w,
       backgroundColor: 'var(--color-canvas)',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-card)',
       overflow: 'hidden',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      boxShadow: 'var(--shadow-card)',
       fontSize: '14px',
       position: 'relative',
     }}>
@@ -299,7 +299,7 @@ function FlexUnavailable({ raw, parsed }: { raw: string; parsed?: unknown }) {
   return (
     <div
       data-flex-preview="unavailable"
-      className="border-hairline bg-canvas text-ink w-full max-w-xs rounded-lg border p-3 text-left text-xs"
+      className="border-hairline bg-canvas text-ink w-full max-w-xs rounded-control border p-3 text-left text-xs"
     >
       <p className="font-semibold">このメッセージはプレビューできません</p>
       <p className="text-ink-secondary mt-1 whitespace-pre-wrap break-words">
@@ -307,7 +307,7 @@ function FlexUnavailable({ raw, parsed }: { raw: string; parsed?: unknown }) {
       </p>
       <details className="mt-2">
         <summary className="text-ink-faint cursor-pointer text-micro">元のデータを表示</summary>
-        <pre className="bg-canvas-sunken text-ink-secondary mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded p-2 text-micro">
+        <pre className="bg-canvas-sunken text-ink-secondary mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-mini p-2 text-micro">
           {raw.length > 4000 ? `${raw.slice(0, 4000)}…` : raw}
         </pre>
       </details>

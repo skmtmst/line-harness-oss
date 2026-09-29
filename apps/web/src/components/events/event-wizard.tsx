@@ -440,7 +440,7 @@ function StepNav({ current }: { current: 1 | 2 | 3 }) {
         return (
           <div key={s.no} className="flex flex-1 items-start gap-2">
             <span
-              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill text-xs font-semibold ${
                 active
                   ? 'bg-accent-deep text-on-accent'
                   : done
@@ -1560,7 +1560,7 @@ function PublishStep({
         <AsideCard title="確定したときに届くメッセージ" note="プレビュー">
           <div className="bg-canvas-sunken rounded-card p-3">
             <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-            <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+            <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
               {preview}
             </p>
           </div>

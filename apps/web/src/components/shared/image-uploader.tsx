@@ -138,7 +138,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
             }
           }}
           placeholder="https://... (外部 CDN / R2 URL)"
-          className="w-full rounded-md border border-hairline px-3 py-2 text-sm"
+          className="w-full rounded-mini border border-hairline px-3 py-2 text-sm"
         />
       ) : previewUrl ? (
         <div
@@ -146,11 +146,11 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
           onDrop={onDrop}
           onPaste={onPaste}
           tabIndex={0}
-          className="rounded-lg border-2 border-dashed border-hairline bg-canvas p-4 transition-colors hover:border-ink-disabled focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+          className="rounded-control border-2 border-dashed border-hairline bg-canvas p-4 transition-colors hover:border-ink-disabled focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
         >
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewUrl} alt="" className="h-24 w-24 rounded object-cover ring-1 ring-hairline" />
+            <img src={previewUrl} alt="" className="h-24 w-24 rounded-mini object-cover ring-1 ring-hairline" />
             <div className="flex-1 space-y-2">
               <button
                 type="button"

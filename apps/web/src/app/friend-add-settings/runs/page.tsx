@@ -486,7 +486,7 @@ function FriendAddRunsInner() {
                   // すべて並べると狭い幅で右端が切れる。
                   <div key={item.id} className="min-w-0 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-medium text-status-success-deep" aria-hidden="true">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-pill bg-status-success-soft text-xs font-medium text-status-success-deep" aria-hidden="true">
                         {displayName.slice(0, 1)}
                       </span>
                       <div className="min-w-0 flex-1">

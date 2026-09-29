@@ -729,7 +729,7 @@ export default function AutomationsPage() {
           />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
           </div>

@@ -152,13 +152,13 @@ export default function ShipmentPanel({
                 <button
                   key={key}
                   onClick={() => setBucket(key)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
                     bucket === key ? 'bg-action text-on-action' : 'bg-canvas-sunken text-ink-secondary'
                   }`}
                 >
                   {label}
                   <span
-                    className={`rounded-full px-1.5 text-[10px] tabular-nums ${
+                    className={`rounded-pill px-1.5 text-[10px] tabular-nums ${
                       bucket === key ? 'bg-canvas/25' : 'bg-canvas text-ink-faint'
                     }`}
                   >

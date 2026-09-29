@@ -27,8 +27,8 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     // 設計 `byqIW`：枠 38x38 / r=10(`rounded-card`) / 背景 canvas。
     expect(source).toContain('rounded-card bg-canvas flex h-[38px] w-[38px]')
     // 中の円は 20x20（h-5 w-5）。以前は 36px の丸を色で塗りつぶしていた。
-    expect(source).toContain('flex h-5 w-5 items-center justify-center rounded-full')
-    expect(source).not.toContain('h-9 w-9 rounded-full')
+    expect(source).toContain('flex h-5 w-5 items-center justify-center rounded-pill')
+    expect(source).not.toContain('h-9 w-9 rounded-pill')
     // 選択中は円の上に16pxのチェック。
     expect(source).toContain('<Check size={16}')
     expect(source).toContain("{ value: '#7C3AED', name: '紫' }")
@@ -43,7 +43,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).toContain('p-[14px]')
     expect(source).toContain('text-nano')
     // 10x10 の円は**選んだ色**、名前は label13/700。
-    expect(source).toContain('h-2.5 w-2.5 shrink-0 rounded-full')
+    expect(source).toContain('h-2.5 w-2.5 shrink-0 rounded-pill')
     expect(source).toContain('style={{ backgroundColor: color }}')
     expect(source).toContain('text-label text-ink font-medium')
   })
