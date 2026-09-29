@@ -107,8 +107,8 @@ const messageTypeOptions: { value: MessageType; label: string }[] = [
 
 const modeBadgeStyle: Record<DeliveryMode, { bg: string; text: string; label: string }> = {
   relative: { bg: 'bg-canvas-sunken', text: 'text-ink-secondary', label: 'Legacy' },
-  elapsed: { bg: 'bg-blue-50', text: 'text-blue-700', label: '経過時間' },
-  absolute_time: { bg: 'bg-amber-50', text: 'text-amber-700', label: '時刻指定' },
+  elapsed: { bg: 'bg-status-info-soft', text: 'text-action', label: '経過時間' },
+  absolute_time: { bg: 'bg-status-warn-soft', text: 'text-warning', label: '時刻指定' },
 }
 
 function formatDelay(minutes: number): string {
@@ -262,7 +262,7 @@ function ImagePreview({ content }: { content: string }) {
     const url = parsed.previewImageUrl || parsed.originalContentUrl
     return (
       <div>
-        <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded mb-2 inline-block">画像</span>
+        <span className="text-xs font-medium text-chip-alt bg-chip-alt-soft px-2 py-0.5 rounded mb-2 inline-block">画像</span>
         {url ? (
           <img src={url} alt="preview" className="border-hairline rounded-card mt-1 max-w-[200px] border" />
         ) : (
@@ -271,7 +271,7 @@ function ImagePreview({ content }: { content: string }) {
       </div>
     )
   } catch {
-    return <p className="text-xs text-red-500">画像 JSON パースエラー</p>
+    return <p className="text-xs text-status-danger">画像 JSON パースエラー</p>
   }
 }
 

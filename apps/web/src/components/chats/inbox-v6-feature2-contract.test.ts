@@ -139,7 +139,7 @@ describe('#455 受信箱の上端と入力欄', () => {
 })
 
 describe('B7CER8 内部メモ', () => {
-  const popover = region(PAGE, 'data-inbox-v6="internal-memo-popover"', '<div className="rounded-[10px] border border-[#D0D5DD]')
+  const popover = region(PAGE, 'data-inbox-v6="internal-memo-popover"', '<div className="rounded-[10px] border border-hairline')
   const toggle = region(PAGE, 'data-inbox-v6="internal-memo-toggle"', '</button>')
 
   it('画面を覆う窓ではなく、送信欄の上に出る紙にする', () => {

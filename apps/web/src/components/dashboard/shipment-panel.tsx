@@ -159,7 +159,7 @@ export default function ShipmentPanel({
                   {label}
                   <span
                     className={`rounded-full px-1.5 text-[10px] tabular-nums ${
-                      bucket === key ? 'bg-white/25' : 'bg-canvas text-ink-faint'
+                      bucket === key ? 'bg-canvas/25' : 'bg-canvas text-ink-faint'
                     }`}
                   >
                     {count}

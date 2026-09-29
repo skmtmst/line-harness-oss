@@ -398,7 +398,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
               <div className="text-xs font-medium text-ink-secondary">{dailyOverview.interval}分間隔 · {dailyRules.length}枠{nonDailyCount > 0 ? ` ＋ 個別${nonDailyCount}枠` : ''}</div>
             </div>
           ) : (
-            <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-700">毎日の配信枠は未設定です</div>
+            <div className="mt-4 rounded-xl bg-status-warn-soft p-4 text-sm text-warning">毎日の配信枠は未設定です</div>
           )}
         </div>
 
@@ -414,7 +414,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                 <span className="text-xs text-ink-faint">開始<TimeField value={bulkStart} onChange={setBulkStart} aria-label="まとめて作る枠の開始" className="mt-1" /></span>
                 <span className="text-xs text-ink-faint">終了<TimeField value={bulkEnd} onChange={setBulkEnd} aria-label="まとめて作る枠の終了" className="mt-1" /></span>
                 <label className="text-xs text-ink-faint">間隔<Select aria-label="間隔" value={String(bulkInterval)} onChange={(value) => setBulkInterval(Number(value))} options={[{ value: '30', label: '30分' }, { value: '60', label: '60分' }, { value: '120', label: '120分' }]} /></label>
-                <button type="button" onClick={applyDailySchedule} className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white hover:brightness-92">毎日の枠を置き換える</button>
+                <button type="button" onClick={applyDailySchedule} className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-92">毎日の枠を置き換える</button>
               </div>
               <p className="mt-2 text-[11px] text-ink-faint">下の保存ボタンを押すまでは本番へ反映されません。</p>
             </div>

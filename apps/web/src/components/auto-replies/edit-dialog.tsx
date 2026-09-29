@@ -616,7 +616,7 @@ export default function EditDialog({
 
   return (
     <div
-      className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'}
+      className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4'}
       data-design-node={page ? step === 'basic' ? 'K7vg2' : step === 'trigger' ? 'nzWIX' : 'ivDoe' : undefined}
       role={page ? undefined : 'presentation'}
       onMouseDown={page ? undefined : (event) => {
@@ -631,7 +631,7 @@ export default function EditDialog({
       <div className={page ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]' : ''}>
       <div
         ref={dialogRef}
-        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl'}
+        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-canvas shadow-xl'}
         role={page ? undefined : 'dialog'}
         aria-modal={page ? undefined : true}
         aria-labelledby={page ? undefined : 'auto-reply-edit-dialog-title'}
@@ -1516,7 +1516,7 @@ export default function EditDialog({
           </section>
             </>
           ) : null}
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-danger">{error}</p>}
         </div>
         {/* ★V7: 窓の中身だけをスクロールさせ、保存の段は窓の下に固定する。 */}
         {!page && <StickyBar className="mx-5 mb-4 shrink-0" actions={stickyActions} />}

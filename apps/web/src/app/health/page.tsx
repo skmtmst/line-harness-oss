@@ -353,7 +353,7 @@ export default function HealthPage() {
                                 setMigrateFrom(account.id)
                                 setMigrateToId('')
                               }}
-                              className="px-3 py-1.5 rounded-control text-white text-xs font-medium bg-danger hover:brightness-92 transition-colors"
+                              className="px-3 py-1.5 rounded-control text-on-accent text-xs font-medium bg-danger hover:brightness-92 transition-colors"
                             >
                               友だちを移行する
                             </button>

@@ -20,7 +20,7 @@
     "shadow": 1
   },
   "app/analytics/page.tsx": {
-    "color": 1,
+    "color": 0,
     "radius": 4,
     "shadow": 0
   },
@@ -130,7 +130,7 @@
     "shadow": 2
   },
   "app/chats/page.tsx": {
-    "color": 36,
+    "color": 0,
     "radius": 48,
     "shadow": 8
   },
@@ -164,11 +164,6 @@
     "radius": 6,
     "shadow": 0
   },
-  "app/duplicates/page.tsx": {
-    "color": 15,
-    "radius": 0,
-    "shadow": 0
-  },
   "app/ec-commerce/ec-commerce-issue-685-server.mjs": {
     "color": 1,
     "radius": 0,
@@ -195,7 +190,7 @@
     "shadow": 1
   },
   "app/friend-add-settings/friend-add-rule-editor.css": {
-    "color": 6,
+    "color": 2,
     "radius": 0,
     "shadow": 2
   },
@@ -212,11 +207,6 @@
   "app/friends/detail/page.tsx": {
     "color": 0,
     "radius": 2,
-    "shadow": 0
-  },
-  "app/friends/page.tsx": {
-    "color": 1,
-    "radius": 0,
     "shadow": 0
   },
   "app/getting-started/getting-started.module.css": {
@@ -395,7 +385,7 @@
     "shadow": 4
   },
   "app/rich-menus/edit/page.tsx": {
-    "color": 1,
+    "color": 0,
     "radius": 24,
     "shadow": 8
   },
@@ -529,11 +519,6 @@
     "radius": 10,
     "shadow": 1
   },
-  "components/app-shell.module.css": {
-    "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
   "components/auth-guard.tsx": {
     "color": 0,
     "radius": 1,
@@ -565,7 +550,7 @@
     "shadow": 3
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "color": 7,
+    "color": 0,
     "radius": 16,
     "shadow": 0
   },
@@ -580,7 +565,7 @@
     "shadow": 1
   },
   "components/chats/inbox-kpis.tsx": {
-    "color": 13,
+    "color": 0,
     "radius": 4,
     "shadow": 0
   },
@@ -595,7 +580,7 @@
     "shadow": 1
   },
   "components/chats/template-picker.tsx": {
-    "color": 47,
+    "color": 0,
     "radius": 13,
     "shadow": 2
   },
@@ -640,7 +625,7 @@
     "shadow": 1
   },
   "components/flex-preview.tsx": {
-    "color": 8,
+    "color": 7,
     "radius": 4,
     "shadow": 1
   },
@@ -650,12 +635,12 @@
     "shadow": 2
   },
   "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "color": 10,
+    "color": 7,
     "radius": 3,
     "shadow": 1
   },
   "components/friend-attributes-v3/friend-attributes-v3-static.module.css": {
-    "color": 61,
+    "color": 3,
     "radius": 11,
     "shadow": 3
   },
@@ -685,7 +670,7 @@
     "shadow": 0
   },
   "components/friend-fields/tag-csv-import-dialog.module.css": {
-    "color": 2,
+    "color": 1,
     "radius": 2,
     "shadow": 1
   },
@@ -695,7 +680,7 @@
     "shadow": 3
   },
   "components/friend-fields/tags-page-v4.tsx": {
-    "color": 10,
+    "color": 3,
     "radius": 4,
     "shadow": 2
   },
@@ -770,7 +755,7 @@
     "shadow": 0
   },
   "components/layout/sidebar.module.css": {
-    "color": 2,
+    "color": 1,
     "radius": 0,
     "shadow": 1
   },
@@ -781,11 +766,6 @@
   },
   "components/ops/impersonation-bar.tsx": {
     "color": 2,
-    "radius": 0,
-    "shadow": 0
-  },
-  "components/ops/knowledge.module.css": {
-    "color": 1,
     "radius": 0,
     "shadow": 0
   },
@@ -810,7 +790,7 @@
     "shadow": 1
   },
   "components/rich-menus/canvas-editor.tsx": {
-    "color": 8,
+    "color": 0,
     "radius": 2,
     "shadow": 0
   },
@@ -985,7 +965,7 @@
     "shadow": 1
   },
   "components/support/email-thread.tsx": {
-    "color": 33,
+    "color": 0,
     "radius": 13,
     "shadow": 2
   },
