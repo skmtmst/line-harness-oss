@@ -353,6 +353,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const [loadFailed, setLoadFailed] = useState(false)
+  /**
+   * R596: 集計だけの失敗は一覧と分けて持つ。集計が読めなくても一覧は
+   * 残し、集計の数値カードだけを「—」と再試行にする。loadFailed と一緒に
+   * 倒すと、一覧まで消えて「登録したものが消えた」に見える。
+   */
+  const [reportFailed, setReportFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   /**
@@ -439,6 +445,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     const seq = ++loadSeq.current
     setLoading(true)
     setLoadFailed(false)
+    setReportFailed(false)
     setDefinitions(null)
     setSummaryReport(null)
     setListTruncated(false)
@@ -482,9 +489,34 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     if (reportResult.status === 'fulfilled' && reportResult.value.success
       && Array.isArray(reportResult.value.data.byDefinition)) {
       setSummaryReport(reportResult.value.data)
+    } else {
+      // R596: 集計だけ読めないときも黙って「—」にしない。数値カードに
+      // 失敗と再試行を出すため、由来を残す。
+      setReportFailed(true)
     }
     setLoading(false)
   }, [accountId, debouncedQuery, sort])
+
+  /**
+   * R596: 集計だけを読み直す。一覧は触らないので、再試行のあいだも
+   * 行は残る。復旧したら数値カードが数値へ戻る。
+   */
+  const reloadReport = useCallback(async () => {
+    const range = definitionRange(30)
+    try {
+      const response = await api.conversions.definitionReport({
+        ...range, lineAccountId: accountId ?? undefined,
+      })
+      if (response.success && Array.isArray(response.data.byDefinition)) {
+        setSummaryReport(response.data)
+        setReportFailed(false)
+      } else {
+        setReportFailed(true)
+      }
+    } catch {
+      setReportFailed(true)
+    }
+  }, [accountId])
 
   useEffect(() => { void load() }, [load])
 
@@ -882,7 +914,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           title="決めてある成果地点"
           value={definitions?.pagination.total ?? null}
           unit="個"
-          detail={definitions ? `動いているもの ${definitions.stateCounts.active}個` : '読み込み中'}
+          /*
+           * R595: 一覧が読めないときは値が「—」になる。3段目まで
+           * 「読み込み中」のままだと直っているように見えるので、由来を書く。
+           */
+          detail={definitions ? `動いているもの ${definitions.stateCounts.active}個` : loadFailed ? '一覧を読み込めませんでした' : '読み込み中'}
           loading={loading}
         />
         <KpiCard
@@ -892,16 +928,30 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           badge={summaryReport?.kpis.countChangeRate == null
             ? undefined
             : `${summaryReport.kpis.countChangeRate > 0 ? '+' : ''}${summaryReport.kpis.countChangeRate}%`}
-          detail={kpi.previousCount === null
-            ? '前の30日の比較は読み込めませんでした'
-            : `前の30日 ${kpi.previousCount.toLocaleString()}件`}
+          /*
+           * R596: 集計だけ読めないときは一覧を残し、このカードだけ
+           * 失敗と再試行にする。再試行は集計だけ読み直すので行は消えない。
+           */
+          detail={reportFailed
+            ? 'この30日の集計を読み込めませんでした'
+            : kpi.previousCount === null
+              ? '前の30日の比較は読み込めませんでした'
+              : `前の30日 ${kpi.previousCount.toLocaleString()}件`}
+          onRetry={reportFailed && !loading ? () => void reloadReport() : undefined}
+          retryLabel="集計を再読み込み"
           loading={loading}
         />
         <KpiCard
           title="金額がついた成果"
           value={summaryReport ? kpi.currentValue : null}
           unit="円"
-          detail={`${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`}
+          /*
+           * R595: 一覧が読めないとき points は空なので、そのまま数えると
+           * 「0個の成果地点」と誤る。未取得は数えない。
+           */
+          detail={definitions
+            ? `${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`
+            : loadFailed ? '金額の内訳を読み込めませんでした' : '読み込み中'}
           loading={loading}
         />
         <KpiCard
@@ -910,7 +960,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           unit="個"
           badge={kpi.unusedCount > 0 ? '確認' : undefined}
           badgeTone={kpi.unusedCount > 0 ? 'neutral' : 'accent'}
-          detail="決めたのに使われていません"
+          detail={loadFailed ? '一覧を読み込めませんでした' : '決めたのに使われていません'}
           loading={loading}
         />
       </KpiCollapse>
@@ -944,14 +994,19 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         }}
         filters={
           <>
+            {/*
+              R595: 一覧が未取得のとき札に 0 を出すと「0件ある」と誤読する。
+              FilterChip は件数が無いとき印を出さない決まりなので、
+              未取得は渡さない（部品側で隠れる）。
+            */}
             {([
-              ['all', 'すべて', definitions?.pagination.total ?? 0],
-              ['active', '動いている', definitions?.stateCounts.active ?? 0],
-              ['draft', '下書き', definitions?.stateCounts.draft ?? 0],
-              ['invalid', '入力不良', definitions?.stateCounts.invalid ?? 0],
-              ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped ?? 0],
-              ['stopped', '止めている', definitions?.stateCounts.stopped ?? 0],
-              ['unused', 'どこからも使われていない', definitions?.stateCounts.unused ?? 0],
+              ['all', 'すべて', definitions?.pagination.total],
+              ['active', '動いている', definitions?.stateCounts.active],
+              ['draft', '下書き', definitions?.stateCounts.draft],
+              ['invalid', '入力不良', definitions?.stateCounts.invalid],
+              ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped],
+              ['stopped', '止めている', definitions?.stateCounts.stopped],
+              ['unused', 'どこからも使われていない', definitions?.stateCounts.unused],
             ] as const).map(([value, label, total]) => (
               <FilterChip
                 key={value}
@@ -1167,13 +1222,20 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-faint text-xs">利用先の名前は詳細で確認できます。追加するときは分析画面でこの成果地点を選びます。</p>
         <div className="flex items-center gap-2 text-xs">
-          <ListRange
-            className="tabular-nums"
-            label="成果地点"
-            total={definitions?.pagination.total ?? shown.length}
-            first={shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
-            last={Math.min(page * PAGE_SIZE, shown.length)}
-          />
+          {/*
+            R595: 一覧が未取得のとき「成果地点 0件」と出すと、失敗なのに
+            空と誤読する。未取得は件数自体を出さない（失敗の案内は上の
+            ListState が担う）。
+          */}
+          {definitions == null ? null : (
+            <ListRange
+              className="tabular-nums"
+              label="成果地点"
+              total={definitions.pagination.total}
+              first={shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
+              last={Math.min(page * PAGE_SIZE, shown.length)}
+            />
+          )}
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       </div>
