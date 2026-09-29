@@ -92,7 +92,7 @@ export default function FolderAddDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
-      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-xl">
+      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-float">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">

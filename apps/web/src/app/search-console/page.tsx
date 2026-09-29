@@ -68,7 +68,7 @@ function MetricCard({
     <div className="rounded-card border-hairline border bg-canvas p-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-ink-secondary whitespace-nowrap text-sm font-medium">{label}</p>
-        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+        <span className="h-2.5 w-2.5 rounded-pill" style={{ backgroundColor: color }} />
       </div>
       <p className="text-ink mt-3 whitespace-nowrap text-3xl font-bold tabular-nums tracking-[-0.02em]">{value}</p>
       <p className={`mt-2 whitespace-nowrap text-xs font-semibold ${delta === null ? 'text-ink-faint' : positive ? 'text-success' : 'text-danger'}`}>
@@ -163,15 +163,15 @@ function SetupCard({ setup, denied = false }: { setup: SearchConsoleSetup | null
   return (
     <div className="rounded-card border-hairline bg-canvas border p-6">
       <div className="flex items-start gap-4">
-        <div className="border-hairline flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-canvas text-xl">G</div>
+        <div className="border-hairline flex h-11 w-11 shrink-0 items-center justify-center rounded-card border bg-canvas text-xl">G</div>
         <div>
           <h2 className="text-ink text-lg font-bold">{denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'}</h2>
           <p className="text-ink-secondary mt-1 text-sm leading-6">
             Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。
           </p>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="border-hairline rounded-xl border bg-canvas p-3"><dt className="text-ink-faint text-xs">対象プロパティ</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? '未設定'}</dd></div>
-            <div className="border-hairline rounded-xl border bg-canvas p-3"><dt className="text-ink-faint text-xs">追加するアカウント</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? '未設定'}</dd></div>
+            <div className="border-hairline rounded-card border bg-canvas p-3"><dt className="text-ink-faint text-xs">対象プロパティ</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? '未設定'}</dd></div>
+            <div className="border-hairline rounded-card border bg-canvas p-3"><dt className="text-ink-faint text-xs">追加するアカウント</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? '未設定'}</dd></div>
           </dl>
         </div>
       </div>
@@ -272,12 +272,12 @@ export default function SearchConsolePage() {
       <div data-design="Head" className="flex flex-wrap items-center justify-end gap-2">
         {data ? <Button onClick={exportCsv}>CSVで書き出す</Button> : null}
         {settingsHref ? <Button href={settingsHref} target="_blank" rel="noreferrer">連携を設定</Button> : null}
-        <div className="border-hairline flex rounded-xl border bg-canvas p-1">
+        <div className="border-hairline flex rounded-card border bg-canvas p-1">
           {ranges.map((range) => (
             <button
               key={range}
               onClick={() => setDays(range)}
-              className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-ink text-canvas' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+              className={`whitespace-nowrap rounded-control px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-ink text-canvas' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
             >
               {range}日
             </button>
@@ -324,7 +324,7 @@ export default function SearchConsolePage() {
                 今の横棒の並びのまま、目盛りの字（text-micro）・等幅数字・1色の棒にそろえる。
                 3項目に3色は付けない（h99Gb の決まり「色は2つまで」）。
               */}
-              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap tabular-nums">{number.format(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full"><div className="bg-action h-full rounded-full" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint text-micro mt-1 text-right tabular-nums">{oneDecimal.format(ratio)}%</p></div> })}</div>
+              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap tabular-nums">{number.format(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-pill"><div className="bg-action h-full rounded-pill" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint text-micro mt-1 text-right tabular-nums">{oneDecimal.format(ratio)}%</p></div> })}</div>
             </section>
           </div>
           <div className="grid gap-5 xl:grid-cols-2">

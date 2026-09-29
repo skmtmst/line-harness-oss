@@ -281,7 +281,7 @@ const severityStyle: Record<OperationSeverity, { label: string; badge: string; p
 
 function StatusPill({ severity }: { severity: OperationSeverity }) {
   const style = severityStyle[severity]
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${style.badge}`}>{style.label}</span>
+  return <span className={`inline-flex items-center rounded-pill px-2.5 py-1 text-xs font-medium ${style.badge}`}>{style.label}</span>
 }
 
 function mostSevere(items: HealthCheckItem[]): OperationSeverity {
@@ -669,7 +669,7 @@ function HealthPanel({
         LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。
       </Notice>
       <div className="rounded-card border-hairline flex flex-wrap items-center gap-3 border bg-canvas px-4 py-3">
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? '6項目のすべてが正常です。' : ''}`}</p>
           <p className="mt-0.5 text-xs text-ink-faint">
@@ -692,7 +692,7 @@ function HealthPanel({
             return (
               <div key={check.id} className={`grid gap-3 px-4 py-4 lg:grid-cols-6 lg:items-center ${check.severity === 'normal' ? 'bg-canvas' : style.panel}`}>
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-medium ${iconClass}`}>{check.icon}</span>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${iconClass}`}>{check.icon}</span>
                   <div className="min-w-0"><p className="text-sm font-semibold text-ink">{check.label}</p><p className="mt-1 text-xs text-ink-faint">{check.description}</p></div>
                 </div>
                 <StatusPill severity={check.severity} />
@@ -1168,16 +1168,16 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
         </aside>
       </div>
 
-      <div className="border-hairline rounded-card sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border bg-canvas px-4 py-3 shadow-lg">
+      <div className="border-hairline rounded-card sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border bg-canvas px-4 py-3 shadow-float">
         <p className="text-xs font-semibold text-ink-faint">4つのうち{selectedTargets.length}つを選択 ／ {accountName} ／ 理由「{reason}」</p>
         <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={mutationLocked || isStopped} className="rounded-control min-h-10 px-4 text-xs font-semibold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><button onClick={openStopConfirm} disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl} className="rounded-control min-h-10 bg-danger px-4 text-xs font-semibold text-on-accent hover:opacity-90 disabled:opacity-50">緊急停止する</button></div>
       </div>
 
       {confirmMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title">
-        <div ref={confirmPanelRef} className="flex w-full flex-col overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}>
-          <div className="flex items-start gap-3 border-b border-hairline px-6 py-6" style={{ minHeight: 112 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger-bg text-xl font-bold text-danger">!</span><div className="min-w-0 flex-1"><h2 id="emergency-confirm-title" className="text-xl font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-sm text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div><button type="button" onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} aria-label="閉じる" className="rounded-mini shrink-0 p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div>
+        <div ref={confirmPanelRef} className="flex w-full flex-col overflow-hidden rounded-card bg-canvas shadow-overlay" style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}>
+          <div className="flex items-start gap-3 border-b border-hairline px-6 py-6" style={{ minHeight: 112 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-danger-bg text-xl font-bold text-danger">!</span><div className="min-w-0 flex-1"><h2 id="emergency-confirm-title" className="text-xl font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-sm text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div><button type="button" onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} aria-label="閉じる" className="rounded-mini shrink-0 p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div>
           <div className="flex-1 space-y-3 overflow-y-auto p-6">{confirmMode === 'stop' ? <>
-            <section className="rounded-control border border-danger bg-danger-bg p-4 text-danger"><p className="text-sm font-semibold">{accountName}</p><div className="mt-3 divide-y divide-danger/15">{selectedTargets.map((key) => <div key={key} className="flex items-center justify-between gap-4 py-2" style={{ minHeight: 58 }}><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas text-danger">■</span><div><p className="text-sm font-semibold">{targetLabels[key].label}</p><p className="mt-0.5 text-xs">{targetLabels[key].note}</p></div></div><strong className="text-right text-sm">{impactText(key)}</strong></div>)}</div><p className="mt-3 text-xs font-medium">停止前にすでにLINEへ渡したものは取り消せません。</p></section>
+            <section className="rounded-control border border-danger bg-danger-bg p-4 text-danger"><p className="text-sm font-semibold">{accountName}</p><div className="mt-3 divide-y divide-danger/15">{selectedTargets.map((key) => <div key={key} className="flex items-center justify-between gap-4 py-2" style={{ minHeight: 58 }}><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-pill bg-canvas text-danger">■</span><div><p className="text-sm font-semibold">{targetLabels[key].label}</p><p className="mt-0.5 text-xs">{targetLabels[key].note}</p></div></div><strong className="text-right text-sm">{impactText(key)}</strong></div>)}</div><p className="mt-3 text-xs font-medium">停止前にすでにLINEへ渡したものは取り消せません。</p></section>
             <section className="rounded-control bg-canvas-sunken px-4 py-3"><p className="text-xs font-medium text-ink">理由</p><p className="mt-1 text-sm text-ink-secondary">{fullReason}</p></section>
             <Notice tone="success"><p className="text-xs font-medium text-success">止まらないもの</p><p className="mt-1 text-xs text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p></Notice>
           </> : <>
@@ -1192,7 +1192,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       </div>}
       {stepUpMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-step-up-title">
-          <div ref={stepUpPanelRef} className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl">
+          <div ref={stepUpPanelRef} className="rounded-card w-full max-w-md bg-canvas p-6 shadow-overlay">
             <div className="flex items-start justify-between gap-3">
               <h2 id="emergency-step-up-title" className="text-lg font-bold text-ink">
                 {stepUpMethod === 'password' ? 'パスワードで本人確認' : '認証アプリで本人確認'}

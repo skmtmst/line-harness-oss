@@ -1016,19 +1016,19 @@ export function AffiliatorsTab({
                               {/* v2 summary cards */}
                               {report && (
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">{CLICK_SUMMARY_LABEL}</p>
                                     <p className="text-2xl font-bold text-ink mt-1">{report.clicks.toLocaleString()}</p>
                                   </div>
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">友だち追加</p>
                                     <p className="text-2xl font-bold text-status-info mt-1">{report.friendAdds.toLocaleString()}</p>
                                   </div>
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">CV 件数（却下除く）</p>
                                     <p className="text-2xl font-bold text-ink mt-1">{report.conversions.toLocaleString()}</p>
                                   </div>
-                                  <div className="bg-success-bg rounded-lg p-4 border border-hairline">
+                                  <div className="bg-success-bg rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">確定報酬</p>
                                     <p className="text-2xl font-bold text-success mt-1">{formatYen(report.confirmedReward)}</p>
                                     <p className="text-[11px] text-ink-secondary mt-1">
@@ -1079,7 +1079,7 @@ export function AffiliatorsTab({
                                     {report.duplicateFlags.map((f) => (
                                       <span
                                         key={f.friendId}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-status-warn-soft border border-status-warn rounded text-xs text-status-warn-deep"
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-status-warn-soft border border-status-warn rounded-mini text-xs text-status-warn-deep"
                                       >
                                         ⚠ {duplicateFriendNameText(f.friendId, journeys)}
                                       </span>
@@ -1162,7 +1162,7 @@ export function AffiliatorsTab({
                                             <td className="py-1 pr-4 text-ink-secondary">{link.label ?? '—'}</td>
                                             <td className="py-1 pr-4">
                                               {link.offer_name ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-status-info-soft text-status-info">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium bg-status-info-soft text-status-info">
                                                   {link.offer_name}
                                                 </span>
                                               ) : <span className="text-ink-faint">—</span>}
@@ -1243,7 +1243,7 @@ export function AffiliatorsTab({
                                       <button
                                         onClick={() => { void loadMoreJourneys(row.id, detailGenRef.current) }}
                                         disabled={journeyLoadingMore}
-                                        className="mt-3 px-4 py-2 text-sm text-action hover:bg-status-info-soft disabled:opacity-50 rounded-md border border-status-info-soft"
+                                        className="mt-3 px-4 py-2 text-sm text-action hover:bg-status-info-soft disabled:opacity-50 rounded-mini border border-status-info-soft"
                                       >
                                         {journeyLoadingMore ? '読み込み中...' : 'さらに読み込む'}
                                       </button>
@@ -1491,7 +1491,7 @@ export function CreateAffiliateModal({
                     onClose={() => setSuggestDismissed(true)}
                   >
                     <div
-                      className="max-h-56 overflow-y-auto rounded-control border border-hairline bg-canvas shadow-lg"
+                      className="max-h-56 overflow-y-auto rounded-control border border-hairline bg-canvas shadow-float"
                       // 最上層では absolute 指定を無効にする（位置は器が決める）。
                       style={{ position: 'static', width: '100%' }}
                     >
@@ -3154,7 +3154,7 @@ function SettlementEditor({
   }
 
   return (
-    <div className="rounded-lg border border-divider-soft bg-canvas p-4">
+    <div className="rounded-control border border-divider-soft bg-canvas p-4">
       <p className="mb-3 text-xs font-semibold uppercase text-ink-faint">支払いの取り決め</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
@@ -3173,7 +3173,7 @@ function SettlementEditor({
               setSaved(false)
             }}
             placeholder="partner@example.com"
-            className="w-full rounded-md border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
           />
         </div>
         <div>
@@ -3195,7 +3195,7 @@ function SettlementEditor({
                 setSaved(false)
               }}
               placeholder="なし"
-              className="w-full rounded-md border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-action"
+              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-action"
             />
             <span className="whitespace-nowrap text-xs text-ink-faint">日</span>
           </div>
@@ -3217,7 +3217,7 @@ function SettlementEditor({
             }}
             placeholder="例: 月末締め翌月末払い"
             maxLength={100}
-            className="w-full rounded-md border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
           />
         </div>
       </div>
@@ -3237,7 +3237,7 @@ function SettlementEditor({
         <button
           onClick={save}
           disabled={saving}
-          className="rounded-md border border-hairline px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-surface-pearl disabled:opacity-40"
+          className="rounded-mini border border-hairline px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-surface-pearl disabled:opacity-40"
         >
           {saving ? '保存中...' : '取り決めを保存'}
         </button>

@@ -100,7 +100,7 @@ function ImpressionsChart({ data }: { data: GooglePerformanceData }) {
         {buckets.map((bucket) => (
           <div key={bucket.startDate} className="flex h-full min-w-0 flex-1 items-end" title={`${shortDate(bucket.startDate)}〜: ${bucket.total ?? '—'}`}>
             <div
-              className="w-full rounded-t"
+              className="w-full rounded-t-mini"
               style={{
                 background: 'var(--color-accent)',
                 height: `${Math.max(((bucket.total ?? 0) / max) * 100, bucket.total ? 2 : 0)}%`,

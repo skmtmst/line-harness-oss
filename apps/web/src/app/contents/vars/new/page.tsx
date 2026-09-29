@@ -495,7 +495,7 @@ function NewCommonVarInner() {
               <>
                 <br />
                 テンプレートには{' '}
-                <code className="bg-canvas-sunken rounded px-1">{`{{var.${varKey}}}`}</code>{' '}
+                <code className="bg-canvas-sunken rounded-mini px-1">{`{{var.${varKey}}}`}</code>{' '}
                 と書きます。
               </>
             )}
@@ -525,7 +525,7 @@ function NewCommonVarInner() {
                 note={
                   <>
                     <span
-                      className="bg-canvas border-hairline text-ink-secondary mr-2 inline-flex h-8 w-11 items-center justify-center rounded border text-xs"
+                      className="bg-canvas border-hairline text-ink-secondary mr-2 inline-flex h-8 w-11 items-center justify-center rounded-mini border text-xs"
                       aria-hidden="true"
                     >
                       {t.mark}

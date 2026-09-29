@@ -4,7 +4,7 @@
 .step,.stepActive,.stepDone { position: relative; display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 10px; color: var(--color-ink-faint); border-bottom: 2px solid var(--color-divider-soft); font-size: 12px; font-weight: 500; }
 .stepActive { color: var(--color-accent-deep); border-color: var(--color-accent); }
 .stepDone { color: var(--color-success); border-color: var(--color-accent); }
-.stepDot { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border-radius: 50%; background: var(--color-step-idle); font-size: 11px; }
+.stepDot { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border-radius: var(--radius-pill); background: var(--color-step-idle); font-size: 11px; }
 .stepActive .stepDot { color: white; background: var(--color-accent-deep); }
 .stepDone .stepDot { color: white; background: var(--color-success); }
 .step small { display: block; font-size: 8px; font-weight: 600; }
@@ -46,7 +46,7 @@
 .field>span:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .field>span:first-child>small { flex: 0 0 auto; color: var(--color-ink-faint); font-size: 10px; font-weight: 400; }
 .field>small { color: var(--color-ink-faint); font-size: 10px; font-weight: 400; }
-.pill { display: inline-flex; align-items: center; width: max-content; padding: 3px 8px; border-radius: 999px; background: var(--color-shell-gray); color: var(--color-ink-secondary); font-size: 9px; font-weight: 500; white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; width: max-content; padding: 3px 8px; border-radius: var(--radius-pill); background: var(--color-shell-gray); color: var(--color-ink-secondary); font-size: 9px; font-weight: 500; white-space: nowrap; }
 .pill_success { background: var(--color-success-bg); color: var(--color-success); }
 .pill_warning { background: var(--color-warning-bg); color: var(--color-warning); }
 .pill_danger { background: var(--color-danger-bg); color: var(--color-danger); }

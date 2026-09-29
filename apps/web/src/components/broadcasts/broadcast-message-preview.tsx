@@ -46,11 +46,11 @@ export default function BroadcastMessagePreview({
             </p>
           )}
           {item.type === 'text' ? (
-            <p className="whitespace-pre-wrap rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-sm leading-6 text-ink shadow-sm">
+            <p className="whitespace-pre-wrap rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-sm leading-6 text-ink shadow-card">
               {item.text || 'テキストを入力すると表示されます'}
             </p>
           ) : item.location ? (
-            <div className="rounded-card bg-canvas p-3 text-sm shadow-sm">
+            <div className="rounded-card bg-canvas p-3 text-sm shadow-card">
               <p className="flex items-center gap-1 font-bold text-ink">
                 <MapPin size={14} aria-hidden />
                 {item.location.title}
@@ -63,7 +63,7 @@ export default function BroadcastMessagePreview({
               </p>
             </div>
           ) : (
-            <p className="rounded-card bg-canvas px-3 py-2 text-sm text-ink shadow-sm">
+            <p className="rounded-card bg-canvas px-3 py-2 text-sm text-ink shadow-card">
               {contentExcerpt(item.type, item.text) || messageTypeLabel(item.type)}
             </p>
           )}

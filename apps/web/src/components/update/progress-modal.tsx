@@ -124,7 +124,7 @@ export function ProgressModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="update-progress-title"
-        className="bg-canvas rounded-lg shadow-xl w-full max-w-md p-6"
+        className="bg-canvas rounded-control shadow-float w-full max-w-md p-6"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <h2 id="update-progress-title" className="text-lg font-semibold">
@@ -139,7 +139,7 @@ export function ProgressModal({
               type="button"
               onClick={onClose}
               aria-label="閉じる"
-              className="rounded p-1 text-ink-faint hover:bg-shell"
+              className="rounded-mini p-1 text-ink-faint hover:bg-shell"
             >
               <X aria-hidden="true" className="h-5 w-5" />
             </button>
@@ -161,7 +161,7 @@ export function ProgressModal({
           ))}
         </ul>
         {final && (
-          <div className="mt-4 p-3 rounded bg-surface-pearl">
+          <div className="mt-4 p-3 rounded-mini bg-surface-pearl">
             {final.status === 'success' && (
               <p className="text-success font-semibold">完了しました</p>
             )}

@@ -216,7 +216,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
         </div>
 
         <div data-design="Side" data-design-node="feeding-side" className="flex flex-col gap-4">
-          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-body font-bold text-ink">計算のしかた</h2>
             <p className="mt-2 text-caption text-ink-secondary">公的な指針（NRC／FEDIAF）の式をそのまま使います。</p>
             <dl className="mt-3 flex flex-col gap-2">
@@ -241,7 +241,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
             </dl>
             <p className="mt-3 text-micro text-ink-faint">避妊去勢が未回答のときは「済み」の係数で少なめに見積もります。体型や体調で前後するため、画面には「参考値」と表示します。</p>
           </section>
-          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-body font-bold text-ink">登録済みのペット</h2>
             <p className="mt-2 text-heading font-semibold tabular-nums text-ink">{data.petCount.toLocaleString('ja-JP')}<span className="ml-1 text-caption font-semibold text-ink-faint">頭</span></p>
             <p className="mt-1 text-micro text-ink-faint">保存すると、この全員の目安（主食・然の鹿肉）が計算し直されます。</p>

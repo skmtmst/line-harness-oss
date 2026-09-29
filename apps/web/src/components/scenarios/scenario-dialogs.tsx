@@ -52,7 +52,7 @@ function Shell({
   const panelRef = useOverlayFocus(true, onClose)
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-lg" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-float" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
         <div className={`border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
           <div className="min-w-0">
             <h2 id={titleId} className="text-ink text-lg font-bold">{title}</h2>
@@ -962,7 +962,7 @@ export function TestSendDialog({
           「戻る」「テスト送信を開始」へ必ず到達できるようにする。
         */}
         <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
-          <div ref={confirmPanelRef} role="dialog" aria-modal="true" aria-labelledby="test-send-confirm-title" className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 id="test-send-confirm-title" className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
+          <div ref={confirmPanelRef} role="dialog" aria-modal="true" aria-labelledby="test-send-confirm-title" className="w-full rounded-panel shadow-float" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 id="test-send-confirm-title" className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
             {sending && <Notice tone="info">送信中です。完了までこの画面のまま待ってください。</Notice>}
             {result && (
               <Notice tone={result.ok ? 'success' : 'danger'}>

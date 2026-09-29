@@ -39,9 +39,9 @@ const BAND_LABELS: Record<ActionScoreBand, string> = {
  * 取れていないものは `—` と書き、0 とも言い分ける。
  */
 function ScoreBand({ band }: { band: ActionScoreBand }) {
-  if (band === 'high') return <span className="whitespace-nowrap rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-deep">{BAND_LABELS[band]}</span>
-  if (band === 'normal') return <span className="whitespace-nowrap rounded-full bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
-  return <span className="whitespace-nowrap rounded-full bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
+  if (band === 'high') return <span className="whitespace-nowrap rounded-pill bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-deep">{BAND_LABELS[band]}</span>
+  if (band === 'normal') return <span className="whitespace-nowrap rounded-pill bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
+  return <span className="whitespace-nowrap rounded-pill bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
 }
 
 function ScoreChange({ value }: { value: number | null | undefined }) {
@@ -301,7 +301,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                   <Tr key={item.friendId}>
                     <Td>
                       <div className="flex min-w-0 items-center gap-2.5">
-                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-medium text-accent-deep">{item.displayName.slice(0, 1)}</div>}
+                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-pill object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-xs font-medium text-accent-deep">{item.displayName.slice(0, 1)}</div>}
                         <span className="truncate text-sm font-semibold text-ink" title={item.displayName}>{item.displayName}</span>
                       </div>
                     </Td>

@@ -272,7 +272,7 @@ export function PublishHistorySection({
 
       {/* 公開版と編集中の版を混ぜないための明示。 */}
       {!loadError && runs !== null ? (
-        <div className="border-hairline bg-canvas-sunken mt-3 rounded border px-3 py-2 text-xs leading-5">
+        <div className="border-hairline bg-canvas-sunken mt-3 rounded-mini border px-3 py-2 text-xs leading-5">
           {published ? (
             <p className="text-ink">
               いま対象に出ている版: 「{published.version.name ?? '（名前なし）'}」
@@ -301,7 +301,7 @@ export function PublishHistorySection({
       ) : (
         <ul className="mt-3 space-y-2">
           {runs.map((run) => (
-            <li key={run.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
+            <li key={run.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded-mini border px-3 py-2 text-xs">
               <span className="text-ink">
                 <StatusBadge tone={STATUS_TONE[run.status]} size="compact" className="mr-2">
                   {STATUS_LABEL[run.status]}

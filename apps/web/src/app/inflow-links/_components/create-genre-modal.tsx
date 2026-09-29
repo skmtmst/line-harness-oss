@@ -48,7 +48,7 @@ export default function GenreModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-scrim p-4">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-card bg-canvas p-6 shadow-overlay">
         <div className="flex items-start justify-between gap-3">
           <h2 id={titleId} className="text-lg font-bold text-ink">
             {genre ? 'ジャンル名を編集' : '新しいジャンル'}
@@ -74,16 +74,16 @@ export default function GenreModal({
           }}
           maxLength={80}
           placeholder="例: A店"
-          className="mt-2 w-full rounded-lg border border-hairline px-3 py-2.5 text-sm focus:border-success focus:outline-none focus:ring-2 focus:ring-success/25"
+          className="mt-2 w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-success focus:outline-none focus:ring-2 focus:ring-success/25"
         />
         <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-ink-secondary">
+          <button onClick={onClose} className="rounded-control px-4 py-2 text-sm text-ink-secondary">
             キャンセル
           </button>
           <button
             onClick={save}
             disabled={!name.trim() || submitting}
-            className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90 disabled:opacity-40"
+            className="rounded-control bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90 disabled:opacity-40"
           >
             {submitting ? '保存中…' : genre ? '変更を保存' : 'ジャンルを作成'}
           </button>

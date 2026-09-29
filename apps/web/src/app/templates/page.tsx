@@ -120,7 +120,7 @@ const typeBadgeColor: Record<string, string> = {
 /** 種別の札。一覧の表とスマホのカードで同じ顔にする。 */
 function TemplateKindBadge({ kind }: { kind: string }) {
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+    <span className={`inline-flex items-center rounded-mini px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
       {messageTypeText(kind)}
     </span>
   )
@@ -848,7 +848,7 @@ export default function TemplatesPage() {
                 key={key}
                 onClick={() => setTypeFilter(key)}
                 /* #702: 選んだ札は濃い緑＋白文字(5.44:1)。明るいLINE緑だと白文字で2.26:1しかない。 */
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-pill transition-colors ${
                   typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
                 }`}
               >
@@ -871,7 +871,7 @@ export default function TemplatesPage() {
       */}
       {error && view !== 'error' && (
         <div
-          className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+          className="p-4 bg-danger-bg border border-danger-bg rounded-control text-danger text-sm"
           role="alert"
         >
           {error}
@@ -887,7 +887,7 @@ export default function TemplatesPage() {
               <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-status-danger">*</span></label>
               <input
                 type="text"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="例: コスト比較 flex"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -897,7 +897,7 @@ export default function TemplatesPage() {
               <label className="block text-xs font-medium text-ink-secondary mb-1">カテゴリ</label>
               <input
                 type="text"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="例: general, 挨拶, 返信"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -939,7 +939,7 @@ export default function TemplatesPage() {
                 />
               ) : (
                 <textarea
-                  className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                  className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                   rows={form.messageType === 'flex' ? 10 : 4}
                   placeholder={form.messageType === 'flex' ? '{"type":"bubble","body":...}' : 'メッセージ内容'}
                   value={form.messageContent}
@@ -1196,7 +1196,7 @@ export default function TemplatesPage() {
             onClick={() => setDrawerId(null)}
           />
           <div
-            className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline overflow-y-auto"
+            className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-float border-l border-hairline overflow-y-auto"
             style={{ zIndex: 80 }}
           >
             <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-canvas z-10">
@@ -1207,7 +1207,7 @@ export default function TemplatesPage() {
                     autoFocus
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 border border-hairline rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="flex-1 border border-hairline rounded-mini px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 ) : (
                   <h3
@@ -1238,10 +1238,10 @@ export default function TemplatesPage() {
             ) : !drawerData ? null : (
               <div className="flex flex-col gap-4 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-mini text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                     {messageTypeText(drawerData.question ? 'question' : drawerData.messageType)}
                   </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-pill text-[10px] font-medium bg-info-bg text-info">
                     {drawerData.category}
                   </span>
                   <span className="text-[10px] text-ink-faint">
@@ -1299,7 +1299,7 @@ export default function TemplatesPage() {
                 {/* Preview */}
                 <div>
                   <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
-                  <div className="border border-hairline rounded-lg p-3 bg-canvas-sunken overflow-x-auto">
+                  <div className="border border-hairline rounded-control p-3 bg-canvas-sunken overflow-x-auto">
                     {drawerData.question ? (
                       <div className="space-y-2">
                         {drawerData.question.intro && <p className="text-sm whitespace-pre-wrap">{drawerData.question.intro}</p>}
@@ -1341,7 +1341,7 @@ export default function TemplatesPage() {
                           if (typeof imageUrl !== 'string' || !/^https?:\/\//.test(imageUrl)) {
                             return <p className="text-ink-faint text-xs">画像のURLを開けませんでした。http(s)から始まるURLを入れてください。</p>
                           }
-                          return <img src={imageUrl} alt="" className="max-w-full rounded" />
+                          return <img src={imageUrl} alt="" className="max-w-full rounded-mini" />
                         } catch {
                           return <pre className="text-xs whitespace-pre-wrap">{drawerData.messageContent}</pre>
                         }
@@ -1366,7 +1366,7 @@ export default function TemplatesPage() {
                   <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
-                    className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                    className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     readOnly={!canMutateTemplates}
@@ -1385,7 +1385,7 @@ export default function TemplatesPage() {
                     </button>
                     <button
                       onClick={() => { setEditContent(null); setEditName(null) }}
-                      className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-md"
+                      className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-mini"
                     >
                       キャンセル
                     </button>
@@ -1462,7 +1462,7 @@ export default function TemplatesPage() {
       )}
       {blockedDelete !== null ? (
         <div className="fixed inset-0 flex items-center justify-center bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="M9cij">
-          <section ref={blockedPanelRef} className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
+          <section ref={blockedPanelRef} className="flex w-full flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
             <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
               <h2 id="blocked-template-title" className="text-lead font-bold text-ink">使用中のテンプレートは削除できません</h2>
               <button
@@ -1478,7 +1478,7 @@ export default function TemplatesPage() {
               </button>
             </header>
             <div className="space-y-4 px-6 py-5">
-              <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
+              <div className="rounded-control border border-danger bg-danger-bg px-4 py-3 text-danger">
             <p className="flex items-start gap-2 text-xs font-medium">
               <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
               このテンプレートは{drawerData ? drawerUsageCount : (blockedDelete?.usageCount ?? 0)}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
