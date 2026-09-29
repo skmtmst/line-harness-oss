@@ -8,6 +8,12 @@ const marks = {
   getSupportMarkById: vi.fn(),
   createSupportMark: vi.fn(),
   createSupportMarkWithAutomationRules: vi.fn(),
+  createSupportMarkIdempotent: vi.fn(),
+  SupportMarkCreateError: class SupportMarkCreateError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+    }
+  },
   updateSupportMark: vi.fn(),
   replaceAndArchiveSupportMark: vi.fn(),
   archiveSupportMarkWithReplacement: vi.fn(),
@@ -190,6 +196,7 @@ beforeEach(() => {
   marks.getSupportMarkById.mockResolvedValue(MARK);
   marks.createSupportMark.mockResolvedValue(MARK);
   marks.createSupportMarkWithAutomationRules.mockResolvedValue(MARK);
+  marks.createSupportMarkIdempotent.mockResolvedValue({ mark: MARK, replayed: false });
   marks.updateSupportMark.mockResolvedValue(MARK);
   marks.getDefaultSupportMark.mockResolvedValue(MARK);
   marks.replaceAndArchiveSupportMark.mockResolvedValue(0);
@@ -316,17 +323,98 @@ describe('対応マーク', () => {
       name: '期限超過で要確認', event: 'response_overdue', condition: null,
       priority: 100, manualProtectionMinutes: 60, isActive: true,
     }];
-    const res = await req('/api/support-marks?lineAccountId=account-1', 'POST', {
-      name: '要確認', color: '#EF4B55', displayOrder: 2, automationRules,
-    });
+    const res = await req(
+      '/api/support-marks?lineAccountId=account-1',
+      'POST',
+      { name: '要確認', color: '#EF4B55', displayOrder: 2, automationRules },
+      'owner',
+      { 'Idempotency-Key': 'create-request-1' },
+    );
     expect(res.status).toBe(201);
-    expect(marks.createSupportMarkWithAutomationRules).toHaveBeenCalledWith(
+    expect(marks.createSupportMarkIdempotent).toHaveBeenCalledWith(
       env.DB,
       { tenantId: 'tenant-1', lineAccountId: 'account-1' },
       expect.objectContaining({ name: '要確認', color: '#EF4B55', displayOrder: 2 }),
       'u-1',
       automationRules,
+      'create-request-1',
     );
+  });
+
+  it('R512: 要求キーなしの作成は実行しない', async () => {
+    const res = await req('/api/support-marks?lineAccountId=account-1', 'POST', {
+      name: '要確認',
+    });
+    expect(res.status).toBe(400);
+    expect(marks.createSupportMarkIdempotent).not.toHaveBeenCalled();
+  });
+
+  it('R512: 同じ要求キーの再送は保存済みを200で返す', async () => {
+    marks.createSupportMarkIdempotent.mockResolvedValue({ mark: MARK, replayed: true });
+    const res = await req(
+      '/api/support-marks?lineAccountId=account-1',
+      'POST',
+      { name: '要確認' },
+      'owner',
+      { 'Idempotency-Key': 'create-request-1' },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { id: 'm-1' } });
+  });
+
+  it('R512: 同じ要求キーに異なる内容は409で止める', async () => {
+    marks.createSupportMarkIdempotent.mockRejectedValue(
+      new marks.SupportMarkCreateError('idempotency_conflict', '同じ要求キーに異なる内容が指定されました'),
+    );
+    const res = await req(
+      '/api/support-marks?lineAccountId=account-1',
+      'POST',
+      { name: '別の名前' },
+      'owner',
+      { 'Idempotency-Key': 'create-request-1' },
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'idempotency_conflict' });
+  });
+
+  it('R513: 読んだ版を送り、合えば保存する', async () => {
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'PATCH', {
+      name: '新しい名前', expectedVersion: 1,
+    });
+    expect(res.status).toBe(200);
+    expect(marks.updateSupportMark).toHaveBeenCalledWith(
+      env.DB,
+      'm-2',
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      expect.objectContaining({ name: '新しい名前', expectedVersion: 1 }),
+    );
+  });
+
+  it('R513: 古い版の保存は409で止めて最新を返す', async () => {
+    marks.updateSupportMark.mockResolvedValue('conflict');
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', name: 'Bの名前', version: 2 });
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'PATCH', {
+      name: 'Aの名前', expectedVersion: 1,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'SUPPORT_MARK_VERSION_CONFLICT',
+      data: { latest: { id: 'm-2', name: 'Bの名前', version: 2 } },
+    });
+    expect(marks.updateSupportMark).toHaveBeenCalledWith(
+      env.DB,
+      'm-2',
+      expect.anything(),
+      expect.objectContaining({ expectedVersion: 1 }),
+    );
+  });
+
+  it('R513: 版の形が違えば400で止める', async () => {
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'PATCH', {
+      name: '新しい名前', expectedVersion: 0,
+    });
+    expect(res.status).toBe(400);
+    expect(marks.updateSupportMark).not.toHaveBeenCalled();
   });
 
   it('スタッフは複合作成できない', async () => {

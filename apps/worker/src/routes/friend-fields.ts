@@ -3,7 +3,8 @@ import {
   getFriendFields,
   getFriendFieldsForScope,
   getFriendFieldByIdForScope,
-  createFriendFieldForScope,
+  createFriendFieldIdempotent,
+  FriendFieldCreateError,
   updateFriendField,
   reorderFriendFields,
   deleteFriendField,
@@ -510,6 +511,15 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
   try {
     const scope = await friendFieldAccess(c);
     if (scope instanceof Response) return scope;
+    /*
+     * R515: 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
+     * 同じキー・同じ内容の再送は保存済みの項目を返し、同じキーに
+     * 異なる内容が来たら作らず409で止める（対応マークと同じ約束）。
+     */
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+    if (!idempotencyKey || idempotencyKey.length > 128) {
+      return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+    }
     const body = await c.req.json<Record<string, unknown>>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -547,7 +557,7 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
     const defaultValue = validateDefaultValue(body.defaultValue, type, options.items);
     if (!defaultValue.ok) return c.json({ success: false, error: defaultValue.error }, 422);
 
-    const field = await createFriendFieldForScope(c.env.DB, scope, {
+    const { field, replayed } = await createFriendFieldIdempotent(c.env.DB, scope, {
       name,
       fieldKey: String(body.fieldKey),
       type,
@@ -560,9 +570,13 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
       isPersonal: body.isPersonal === true,
       isStarred: body.isStarred === true,
       displayOrder: Number(body.displayOrder ?? 0),
-    });
-    return c.json({ success: true, data: serialize(field) }, 201);
+    }, idempotencyKey);
+    // 再送で保存済みを返したときは200、新しく作ったときは201。
+    return c.json({ success: true, data: serialize(field) }, replayed ? 200 : 201);
   } catch (err) {
+    if (err instanceof FriendFieldCreateError) {
+      return c.json({ success: false, code: err.code, error: err.message }, 409);
+    }
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
@@ -694,7 +708,19 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), asyn
 
     const field = await updateFriendField(c.env.DB, id, patch);
     if (!field) {
-      return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの変更が先に保存されました。再読み込みしてください' }, 409);
+      /*
+       * R517: 版が合わない再試行は、最新の内容を付けて409で返す。
+       * 画面は送った内容と比べ、保存済みか他人の変更かを案内する
+       * （対応マークの SUPPORT_MARK_VERSION_CONFLICT と同じ約束）。
+       */
+      const latest = await getFriendFieldByIdForScope(c.env.DB, id, scope);
+      if (!latest) return c.json({ success: false, error: '項目が見つかりません' }, 404);
+      return c.json({
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: 'ほかの変更が先に保存されました。最新の内容を確認してください',
+        data: { latest: serialize(latest) },
+      }, 409);
     }
     return c.json({ success: true, data: serialize(field!) });
   } catch (err) {
