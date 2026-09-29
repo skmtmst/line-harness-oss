@@ -3,6 +3,7 @@ import { encryptCredential, setAccountSetting } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import {
+  acquireSyncRun,
   parseSpreadsheetId,
   processDueGoogleSheetsSyncs,
   syncGoogleSheetsIntegration,
@@ -24,7 +25,7 @@ function makeGoogleFetch(sheet: FakeSheet, opts?: {
 }) {
   const calls: Array<{ url: string; method: string }> = [];
   /** authorizedJson の再試行も抜ける失敗を入れたいとき true にする。 */
-  const flags = { failAppend: false, failBatchUpdate: false };
+  const flags = { failAppend: false, failBatchUpdate: false, appendWritesThenFails: false };
   return {
     calls,
     flags,
@@ -76,6 +77,8 @@ function makeGoogleFetch(sheet: FakeSheet, opts?: {
         const tab = sheet.tabs.get(title) ?? [];
         tab.push(...body.values);
         sheet.tabs.set(title, tab);
+        // 実際には書けたのに応答だけ落ちた、を再現する。
+        if (flags.appendWritesThenFails) return json({ error: { message: 'lost response' } }, 500);
         return json({});
       }
       if (valuesPath) {
@@ -283,6 +286,118 @@ describe('syncGoogleSheetsIntegration', () => {
     ).bind('run-old').first<{ status: string }>();
     expect(stale?.status).toBe('error');
   });
+
+  it('append への書き込みは自動再送しない（R439）', async () => {
+    const integration = await makeIntegration(testDb);
+    const sheet: FakeSheet = { tabs: new Map() };
+    const google = makeGoogleFetch(sheet);
+    google.flags.failAppend = true;
+    const result = await syncOneDataType(envFor(testDb), integration, 'friends', {
+      kind: 'manual', now: NOW, fetch: google.fetch as never, sleep,
+    });
+    expect(result.status).toBe('error');
+    // 再送されると同じ行が二度並び得るので、1回だけ試して失敗で止める
+    expect(google.calls.filter((c) => c.url.includes(':append')).length).toBe(1);
+  });
+
+  it('append が保存後に応答を落としても、次の同期で行が重ならない（R439）', async () => {
+    const integration = await makeIntegration(testDb);
+    const sheet: FakeSheet = { tabs: new Map() };
+    const google = makeGoogleFetch(sheet);
+    const env = envFor(testDb);
+    google.flags.appendWritesThenFails = true;
+    const first = await syncOneDataType(env, integration, 'friends', {
+      kind: 'manual', now: NOW, fetch: google.fetch as never, sleep,
+    });
+    expect(first.status).toBe('error');
+    // シート側には実は書けている
+    expect(sheet.tabs.get('友だち')!.length).toBeGreaterThan(1);
+
+    google.flags.appendWritesThenFails = false;
+    const second = await syncOneDataType(env, integration, 'friends', {
+      kind: 'manual', now: '2026-09-27T07:00:00Z', fetch: google.fetch as never, sleep,
+    });
+    expect(second.status).toBe('ok');
+    const keys = sheet.tabs.get('友だち')!.slice(1).map((row) => row[0]);
+    // 既に書けた行は上書きへ回るので、同じキーの行は1行だけ
+    expect(keys.length).toBe(3);
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it('同時に実行権を取りに来た場合は先に記録した方だけが実行する（R438）', async () => {
+    await makeIntegration(testDb);
+    const first = await acquireSyncRun(testDb.db, 'int-1', 'friends', {
+      kind: 'manual', now: NOW, spreadsheetId: SPREADSHEET_ID,
+    });
+    const second = await acquireSyncRun(testDb.db, 'int-1', 'friends', {
+      kind: 'manual', now: NOW, spreadsheetId: SPREADSHEET_ID,
+    });
+    expect(first).not.toBeNull();
+    expect(second).toBeNull();
+    // 負けた側の「実行中」の記録は履歴に残さない
+    const running = await testDb.db.prepare(
+      `SELECT id, spreadsheet_id FROM google_sheets_sync_runs WHERE status = 'running'`,
+    ).all<{ id: string; spreadsheet_id: string | null }>();
+    expect(running.results.length).toBe(1);
+    // 履歴には書き出し先が残る
+    expect(running.results[0]?.spreadsheet_id).toBe(SPREADSHEET_ID);
+  });
+
+  it('出力先を変えた直後の同期は、新しいシートへ全件書き出す（R437）', async () => {
+    const integration = await makeIntegration(testDb);
+    const env = envFor(testDb);
+    const sheetA: FakeSheet = { tabs: new Map() };
+    await syncGoogleSheetsIntegration(env, integration, {
+      kind: 'manual', now: NOW, fetch: makeGoogleFetch(sheetA).fetch as never, sleep,
+    });
+    expect(sheetA.tabs.get('友だち')!.length).toBe(4);
+
+    // 出力先を切り替える
+    const SHEET_B = 'sheet-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    testDb.raw.prepare('UPDATE google_sheets_integrations SET spreadsheet_id = ? WHERE id = ?')
+      .run(SHEET_B, 'int-1');
+    const moved = (await testDb.db.prepare('SELECT * FROM google_sheets_integrations WHERE id = ?')
+      .bind('int-1').first<GoogleSheetsIntegrationRow>())!;
+
+    const sheetB: FakeSheet = { tabs: new Map() };
+    const results = await syncGoogleSheetsIntegration(env, moved, {
+      kind: 'manual', now: '2026-09-27T07:00:00Z', fetch: makeGoogleFetch(sheetB).fetch as never, sleep,
+    });
+    expect(results.map((r) => r.status)).toEqual(['ok', 'ok']);
+    // 新しいシートには既存データが全部入る（途中の続きから再開しない）
+    expect(sheetB.tabs.get('友だち')!.length).toBe(4);
+    expect(sheetB.tabs.get('回答')!.length).toBe(3);
+    // 再開点は出力先ごとに持つので、Aへ戻したときの続きも残る
+    const cursorJson = (await testDb.db.prepare(
+      'SELECT sync_cursor_json FROM google_sheets_integrations WHERE id = ?',
+    ).bind('int-1').first<{ sync_cursor_json: string }>())!.sync_cursor_json;
+    const parsed = JSON.parse(cursorJson) as { targets?: Record<string, unknown> };
+    expect(parsed.targets?.[SPREADSHEET_ID]).toBeTruthy();
+    expect(parsed.targets?.[SHEET_B]).toBeTruthy();
+  });
+
+  it('共有フォームでも他アカウントの友だちの回答は書き出さない（R441）', async () => {
+    // form-1 を acc-2 にも共有し、acc-2 の友だちの回答を足す
+    testDb.raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active)
+      VALUES ('acc-2', 'ch-2', 'A2', 'tok', 'sec', 1);
+      INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-1', 'acc-2');
+      INSERT INTO friends (id, line_user_id, line_account_id, display_name, is_following, metadata, created_at, updated_at)
+      VALUES ('f-other', 'U999', 'acc-2', '別店の客', 1, '{}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+      INSERT INTO form_submissions (id, form_id, friend_id, data, created_at)
+      VALUES ('sub-other', 'form-1', 'f-other', '{"q1":"他店の回答"}', '2026-09-12T00:00:00Z');
+    `);
+    const integration = await makeIntegration(testDb);
+    const sheet: FakeSheet = { tabs: new Map() };
+    const result = await syncOneDataType(envFor(testDb), integration, 'form_answers', {
+      kind: 'manual', now: NOW, fetch: makeGoogleFetch(sheet).fetch as never, sleep,
+    });
+    expect(result.status).toBe('ok');
+    const answers = sheet.tabs.get('回答')!;
+    expect(answers.length).toBe(3); // header + acc-1 の2件だけ
+    expect(answers.flat().includes('U999')).toBe(false);
+    expect(answers.flat().includes('別店の客')).toBe(false);
+  });
 });
 
 describe('processDueGoogleSheetsSyncs', () => {
@@ -322,5 +437,50 @@ describe('processDueGoogleSheetsSyncs', () => {
     ).run(enc);
     const result = await processDueGoogleSheetsSyncs(envFor(testDb), { now: NOW, fetch: (() => { throw new Error('should not fetch'); }) as never, sleep });
     expect(result.synced + result.failed).toBe(0);
+  });
+
+  it('JSTの日付で同日の定期実行は1回だけ（UTCの日付では見ない）（R442）', async () => {
+    // UTCでは前日だがJSTでは今日の実行記録を置く
+    await makeIntegration(testDb);
+    testDb.raw.prepare(
+      `INSERT INTO google_sheets_sync_runs
+         (id, integration_id, kind, data_type, status, started_at, run_date, spreadsheet_id)
+       VALUES ('run-jst-today', 'int-1', 'scheduled', 'friends', 'ok', '2026-09-26T16:30:00Z', '2026-09-27', ?)`,
+    ).run(SPREADSHEET_ID);
+    const sheet: FakeSheet = { tabs: new Map() };
+    // NOW = 2026-09-27T06:00:00Z → JST 2026-09-27 15:00
+    const result = await processDueGoogleSheetsSyncs(envFor(testDb), {
+      now: NOW, fetch: makeGoogleFetch(sheet).fetch as never, sleep,
+    });
+    expect(result).toEqual({ synced: 0, skipped: 1, failed: 0 });
+  });
+
+  it('出力先を変えた日は、変える前のシートへの定期実行が残っていても新しい先へ走る（R442）', async () => {
+    await makeIntegration(testDb);
+    testDb.raw.prepare(
+      `INSERT INTO google_sheets_sync_runs
+         (id, integration_id, kind, data_type, status, started_at, run_date, spreadsheet_id)
+       VALUES ('run-old-dest', 'int-1', 'scheduled', 'friends', 'ok', '2026-09-27T01:00:00Z', '2026-09-27', 'sheet-old')`,
+    ).run();
+    const sheet: FakeSheet = { tabs: new Map() };
+    const result = await processDueGoogleSheetsSyncs(envFor(testDb), {
+      now: NOW, fetch: makeGoogleFetch(sheet).fetch as never, sleep,
+    });
+    expect(result.synced).toBe(1);
+    expect(sheet.tabs.get('友だち')!.length).toBe(4);
+  });
+
+  it('実行日を持たない古い記録は同日の抑止に使わない（R442）', async () => {
+    await makeIntegration(testDb);
+    testDb.raw.prepare(
+      `INSERT INTO google_sheets_sync_runs
+         (id, integration_id, kind, data_type, status, started_at)
+       VALUES ('run-legacy', 'int-1', 'scheduled', 'friends', 'ok', '2026-09-27T01:00:00Z')`,
+    ).run();
+    const sheet: FakeSheet = { tabs: new Map() };
+    const result = await processDueGoogleSheetsSyncs(envFor(testDb), {
+      now: NOW, fetch: makeGoogleFetch(sheet).fetch as never, sleep,
+    });
+    expect(result.synced).toBe(1);
   });
 });
