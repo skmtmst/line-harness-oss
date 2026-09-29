@@ -90,7 +90,11 @@ function CompleteInner() {
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
-    else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
+    else if (res.csrfToken) {
+      // M045: 保存に失敗しても登録は進める（Cookie のセッションで足りる）。
+      // 投げたままにすると登録中の表示で止まる。
+      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
+    }
     window.location.assign('/hq')
   }
 

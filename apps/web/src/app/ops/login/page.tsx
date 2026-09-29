@@ -80,7 +80,11 @@ export default function OpsLoginPage() {
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
-    else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
+    // M041：保存に投げても（シークレットモードの制限など）固まらない。
+    // Cookie のセッションで足りるので、ここでは進める。
+    else if (res.csrfToken) {
+      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
+    }
 
     // 運営メンバーかどうかをサーバーに確かめてから /ops へ。
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
