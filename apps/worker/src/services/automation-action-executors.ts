@@ -136,6 +136,62 @@ function classifyLineError(error: unknown): AutomationActionError {
   );
 }
 
+/**
+ * R363: メッセージ送信時の失敗分類。受理した可能性がある失敗は
+ * `delivery_unconfirmed`（照合待ち）にして自動返却・再送を止める。
+ *
+ * - 4xx拒否 … 未受理が確定。返却してよい失敗。
+ * - 429 … 処理されていない。再試行してよい失敗。
+ * - 5xx・応答なし（タイムアウト・通信断）・200のJSON読取失敗 …
+ *   受理した可能性がある。照合待ちに残す。
+ *
+ * `retryable` は他経路の再試行の目安として従来どおり true を保つ。
+ * マイル特典の配送はコードで照合待ちにし、返却も再送もしない。
+ */
+function classifyLinePushError(error: unknown): AutomationActionError {
+  if (error instanceof AutomationActionError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  const status = (error as { status?: unknown } | null)?.status;
+  const unconfirmed = (note: string): AutomationActionError => new AutomationActionError(
+    'delivery_unconfirmed',
+    note,
+    true,
+  );
+  if (typeof status === 'number') {
+    if (status === 429) {
+      return new AutomationActionError('line_temporary_failure', message, true);
+    }
+    if (status >= 400 && status < 500) {
+      return new AutomationActionError('line_request_rejected', message, false);
+    }
+    return unconfirmed('LINEの応答が不確定のため、送信結果を確認しています');
+  }
+  // 実SDKは status を付けるが、付けない呼び出しもあるため文面でも見る。
+  if (/LINE API error:\s*(400|401|403|404)\b/.test(message)) {
+    return new AutomationActionError('line_request_rejected', message, false);
+  }
+  if (/LINE API error:\s*(429)\b/.test(message)) {
+    return new AutomationActionError('line_temporary_failure', message, true);
+  }
+  if (/LINE API error:\s*5\d\d\b/.test(message)) {
+    return unconfirmed('LINEの応答が不確定のため、送信結果を確認しています');
+  }
+  if (error instanceof SyntaxError) {
+    // 200を受理した後のJSON読取失敗。送達は不明なので照合待ち。
+    return new AutomationActionError(
+      'delivery_unconfirmed',
+      'LINEの応答が不確定のため、送信結果を確認しています',
+      true,
+    );
+  }
+  // 応答が返らない（タイムアウト・通信断）。受理不明として照合待ち。
+  return new AutomationActionError(
+    'delivery_unconfirmed',
+    'LINEの応答が届かないため、送信結果を確認しています',
+    true,
+  );
+}
+
 async function reserveLineOperation(
   context: AutomationActionContext,
   payload: string,
@@ -380,13 +436,22 @@ async function sendMessageExecutor(
   if (await reserveLineOperation(context, payload) === 'replay') {
     return { output: { replayed: true } };
   }
+  const token = await resolveAccessToken(context, dependencies);
+  const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
+  // R363: 送信呼び出しと送信後の記録は分けて失敗を見る。
+  // 呼び出し前の失敗（resolve・検証・予約）は未送信の失敗、
+  // 呼び出し後の失敗（受理不明・記録失敗）は照合待ちにする。
+  // まとめて分類すると、受理済みの送信を未送信として返却・再送する。
+  let response: unknown;
   try {
-    const token = await resolveAccessToken(context, dependencies);
-    const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
-    const response = await client.pushMessage(friend.line_user_id, [message], context.idempotencyKey);
-    const now = dependencies.now?.() ?? jstNow();
-    const logId = crypto.randomUUID();
-    const source = context.inputEvent.source === 'friend_bulk_run' ? 'friend_bulk_run' : 'automation_v6';
+    response = await client.pushMessage(friend.line_user_id, [message], context.idempotencyKey);
+  } catch (error) {
+    throw classifyLinePushError(error);
+  }
+  const now = dependencies.now?.() ?? jstNow();
+  const logId = crypto.randomUUID();
+  const source = context.inputEvent.source === 'friend_bulk_run' ? 'friend_bulk_run' : 'automation_v6';
+  try {
     await context.db.batch([
       context.db.prepare(
         `INSERT INTO messages_log
@@ -400,10 +465,19 @@ async function sendMessageExecutor(
         now,
       }),
     ]);
-    return { output: { messageLogId: logId, replayed: false } };
-  } catch (error) {
-    throw classifyLineError(error);
+  } catch {
+    /*
+     * LINEは受理した後の記録だけ失敗した。未送信として送り直すと
+     * 二重に届くので、送達不明として投げる。呼び出し側は送らず
+     * 確定もせず、照合待ちに残す（Webhook経路と同じ扱い）。
+     */
+    throw new AutomationActionError(
+      'delivery_unconfirmed',
+      '送信後の記録に失敗しました',
+      true,
+    );
   }
+  return { output: { messageLogId: logId, replayed: false } };
 }
 
 function responseId(response: unknown, fallback: string): string {

@@ -96,6 +96,9 @@ export function friendHistoryItem(item: MileageAdminHistoryItem): MileageDetailH
     ruleName: item.ruleName,
     mode: item.mode,
     executedByStaffName: item.executedByStaffName,
+    lineAccountId: item.lineAccountId ?? null,
+    notificationStatus: item.notificationStatus ?? null,
+    notificationErrorCode: item.notificationErrorCode ?? null,
     balanceAfter: item.balanceAfter,
     occurredAt: item.occurredAt,
   }

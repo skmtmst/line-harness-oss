@@ -90,15 +90,38 @@ describe('届かなかった交換', () => {
     expect(code).toMatch(/formatMileageDate\(item\.updatedAt\)/)
   })
 
-  it('失敗中だけを並べる', () => {
+  it('失敗中と確認中だけを並べる', () => {
     // 成功済み・返金済みを並べると、やり直しの押し間違いの素になる。
-    expect(code).toMatch(/item\.status\s*===\s*'delivery_failed'/)
+    // 送ったか分からない配送中（照合待ち）は一覧から消さない（R364）。
+    expect(code).toMatch(/item\.status\s*===\s*'delivery_failed'\s*\|\|\s*item\.status\s*===\s*'delivering'/)
   })
 
-  it('無いとき・取れないときに欄ごと出さない', () => {
-    // 0件・失敗を「0件」と書くと、届いていない交換が無いことになる。
+  it('無いときだけ欄を出さず、取れないときは理由と再読み込みを出す', () => {
+    // 0件を「0件」と書くと、届いていない交換が無いことになる。
+    // 取れないのに欄ごと消すと、見えていない失敗を対応不要と誤認する（R366）。
     expect(code).toMatch(/setRedemptionsVisible\(false\)/)
-    expect(code).toMatch(/redemptionsVisible && failedRedemptions\.length > 0/)
+    expect(code).toMatch(/failedRedemptions\.length > 0 \|\| redemptionsLoad === 'error'/)
+    expect(code).toMatch(/kind=\{redemptionsLoad\}/)
+    expect(code).toMatch(/onRetry/)
+  })
+
+  it('確認中の行は意味を添えて出す', () => {
+    expect(code).toContain('確認中')
+    expect(code).toMatch(/HelpTip/)
+  })
+
+  it('21件以上あっても残りを出せる', () => {
+    // 最後まで読んでいないのに「すべて」と言わない（R365）。
+    expect(code).toMatch(/<Pagination/)
+    expect(code).toMatch(/つ中.*を表示/)
+    expect(code).not.toMatch(/failedRedemptions\.length\}つをすべて表示/)
+  })
+
+  it('返却完了のやり直しは返却どおりに案内する', () => {
+    // 返却済みなのに「やり直せませんでした」と未返却の説明を残さない（R367）。
+    expect(code).toMatch(/redemption\?\.status/)
+    expect(code).toMatch(/'refunded'/)
+    expect(code).toMatch(/setRedemptionsNotice/)
   })
 
   it('やり直しは失敗中の口へ店と一緒に送る', () => {
@@ -126,7 +149,7 @@ describe('届かなかった交換', () => {
   })
 
   it('やり直しのあとは一覧を読み直す', () => {
-    expect(code).toMatch(/await loadFailedRedemptions\(\)/)
+    expect(code).toMatch(/await loadFailedRedemptions\(redemptionsPageRef\.current\)/)
   })
 
   it('店切替で古い応答が後着しない', () => {
@@ -159,7 +182,7 @@ describe('届かなかった交換', () => {
 
   it('再取得のたびに店の世代を確かめる', () => {
     // 1つ目の再取得待ちにBへ切り替わると、2つ目がBを上書きする。
-    expect(code).toMatch(/await loadFailedRedemptions\(\)[\s\S]*?if \(!accountTracker\.isCurrent\(operation\)\) return[\s\S]*?await load\(\)/)
+    expect(code).toMatch(/await loadFailedRedemptions\(redemptionsPageRef\.current\)[\s\S]*?if \(!accountTracker\.isCurrent\(operation\)\) return[\s\S]*?await load\(\)/)
   })
 })
 

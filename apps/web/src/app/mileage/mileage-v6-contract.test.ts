@@ -142,7 +142,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('手動増減はV6実Node・確認段階・冪等キーを通して追記する', () => {
     expect(FRIEND_DETAIL).toContain('<MileageAdjustmentDialog')
     expect(ADJUSTMENT).toContain('designNode="vz0Ji"')
-    expect(ADJUSTMENT).toContain("useState<'input' | 'confirm' | 'requested'>('input')")
+    expect(ADJUSTMENT).toContain("useState<'input' | 'confirm' | 'requested' | 'completed'>('input')")
     expect(ADJUSTMENT).toContain('変更前')
     expect(ADJUSTMENT).toContain('変更量')
     expect(ADJUSTMENT).toContain('変更後')
