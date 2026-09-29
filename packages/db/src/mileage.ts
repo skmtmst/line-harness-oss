@@ -351,6 +351,43 @@ function adjustmentResult(
   };
 }
 
+function buildAdjustmentFingerprint(input: PostMileageAdjustmentInput): string {
+  const fingerprintInput: Record<string, unknown> = {
+    friendId: input.friendId,
+    amount: input.amount,
+    reason: input.reason,
+    reasonCategory: input.reasonCategory,
+    sourceReferenceId: input.sourceReferenceId ?? null,
+    lineAccountId: input.lineAccountId,
+  };
+  // Keep the original six-field shape when neither V6 option is used, so
+  // idempotent retries of adjustments created before this migration still work.
+  if (input.expiresAt) fingerprintInput.expiresAt = input.expiresAt;
+  if (input.notifyFriend) fingerprintInput.notifyFriend = true;
+  return JSON.stringify(fingerprintInput);
+}
+
+/**
+ * R378: 確定済みの調整を Idempotency-Key で探す。
+ *
+ * 承認境界の引き下げや元の有効期限の経過は「新しい調整への判定」なので、
+ * すでに台帳へ入った同じ要求の再送には適用しない。呼び出し側は
+ * 期限・境界の検査より先にここを試し、見つかったら当時の結果を返す。
+ * 同じキーで別の内容が来た場合は idempotency_conflict を投げる。
+ */
+export async function findCommittedMileageAdjustment(
+  db: D1Database,
+  input: PostMileageAdjustmentInput,
+): Promise<MileageAdjustmentResult | null> {
+  const programId = input.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
+  const existing = await db
+    .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
+    .bind(programId, input.idempotencyKey)
+    .first<MileageLedgerEntry>();
+  if (!existing) return null;
+  return adjustmentResult(existing, buildAdjustmentFingerprint(input), true);
+}
+
 /**
  * Append one manual adjustment without ever mutating the existing ledger.
  *
@@ -370,19 +407,7 @@ export async function postMileageAdjustment(
   const programId = input.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
   await ensureBuiltInProgram(db, programId);
 
-  const fingerprintInput: Record<string, unknown> = {
-    friendId: input.friendId,
-    amount: input.amount,
-    reason: input.reason,
-    reasonCategory: input.reasonCategory,
-    sourceReferenceId: input.sourceReferenceId ?? null,
-    lineAccountId: input.lineAccountId,
-  };
-  // Keep the original six-field shape when neither V6 option is used, so
-  // idempotent retries of adjustments created before this migration still work.
-  if (input.expiresAt) fingerprintInput.expiresAt = input.expiresAt;
-  if (input.notifyFriend) fingerprintInput.notifyFriend = true;
-  const fingerprint = JSON.stringify(fingerprintInput);
+  const fingerprint = buildAdjustmentFingerprint(input);
   const existing = await db
     .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
     .bind(programId, input.idempotencyKey)
@@ -399,6 +424,9 @@ export async function postMileageAdjustment(
     executedByStaffId: input.executedByStaffId,
     executedByStaffName: input.executedByStaffName,
     expiresAt: input.expiresAt ?? null,
+    // R380: 通知記録の作成自体が落ちたとき、あとから「通知だけ」を再送
+    // できるよう、依頼されたかどうかを台帳へ残す。
+    notifyFriend: input.notifyFriend === true,
   });
 
   const write = await db
@@ -531,7 +559,7 @@ export async function getMileageSummaryForFriend(
         WHERE mp.id = ?
         GROUP BY mp.id, mp.name`,
     )
-    .bind(friendId, friendId, now, friendId, friendId, programId)
+    .bind(friendId, now, friendId, friendId, friendId, programId)
     .first<{
       program_name: string;
       available: number;
@@ -556,7 +584,7 @@ export interface MileageHistoryItem {
   entryType: MileageEntryType;
   status: MileageEntryStatus;
   amount: number;
-  reason: string;
+  reason: string | null;
   source: string;
   sourceEventId: string | null;
   sourceReferenceId: string | null;
@@ -564,16 +592,28 @@ export interface MileageHistoryItem {
   mode: 'automatic' | 'manual';
   executedByStaffName: string | null;
   occurredAt: string;
+  /** この記録が属する LINE アカウント（不明なら null）。 */
+  lineAccountId: string | null;
+  /*
+   * true の行は、見ている担当者の権限外アカウントの記録。
+   * 残高は名寄せした本人で共通だが、調整の理由・実行者・元イベントは
+   * アカウントの閲覧権限で区切るため、この行では伏せてある（R387）。
+   */
+  restricted: boolean;
+  /** R380: 手動調整につけた友だち通知の状態。通知なし・権限外の行は null。 */
+  notificationStatus: string | null;
+  notificationErrorCode: string | null;
 }
 
 export async function getMileageHistoryForFriend(
   db: D1Database,
   friendId: string,
-  options: { programId?: string; limit?: number } = {},
+  options: { programId?: string; limit?: number; visibleAccountIds?: string[] } = {},
 ): Promise<MileageHistoryItem[]> {
   const programId = options.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
   await ensureBuiltInProgram(db, programId);
   const limit = Math.min(100, Math.max(1, options.limit ?? 20));
+  const visible = options.visibleAccountIds ? new Set(options.visibleAccountIds) : null;
   const result = await db
     .prepare(
       `WITH identity AS (
@@ -583,10 +623,16 @@ export async function getMileageHistoryForFriend(
               ml.source, ml.source_event_id, mr.name AS rule_name,
               json_extract(ml.metadata, '$.sourceReferenceId') AS source_reference_id,
               json_extract(ml.metadata, '$.executedByStaffName') AS executed_by_staff_name,
+              json_extract(ml.metadata, '$.lineAccountId') AS metadata_account_id,
+              bf.line_account_id AS entry_account_id,
+              man.status AS notification_status,
+              man.error_code AS notification_error_code,
               ml.occurred_at
          FROM mileage_ledger ml
          LEFT JOIN identity ON 1 = 1
          LEFT JOIN mileage_rules mr ON mr.id = ml.mileage_rule_id
+         LEFT JOIN friends bf ON bf.id = ml.beneficiary_friend_id
+         LEFT JOIN mileage_adjustment_notifications man ON man.ledger_entry_id = ml.id
         WHERE ml.program_id = ?
           AND ${FRIEND_WALLET_SCOPE_SQL}
         ORDER BY ml.occurred_at DESC, ml.created_at DESC, ml.id DESC
@@ -604,25 +650,43 @@ export async function getMileageHistoryForFriend(
       source_reference_id: string | null;
       rule_name: string | null;
       executed_by_staff_name: string | null;
+      metadata_account_id: string | null;
+      entry_account_id: string | null;
+      notification_status: string | null;
+      notification_error_code: string | null;
       occurred_at: string;
     }>();
 
-  return result.results.map((row) => ({
-    id: row.id,
-    entryType: row.entry_type,
-    status: row.status,
-    amount: row.amount,
-    reason: row.reason,
-    source: row.source,
-    sourceEventId: row.source_event_id,
-    sourceReferenceId: row.source_reference_id,
-    ruleName: row.rule_name,
-    mode: row.entry_type === 'adjustment' || row.source === 'manual' || row.source === 'admin_adjustment'
-      ? 'manual'
-      : 'automatic',
-    executedByStaffName: row.executed_by_staff_name,
-    occurredAt: row.occurred_at,
-  }));
+  return result.results.map((row) => {
+    const lineAccountId = row.metadata_account_id ?? row.entry_account_id;
+    /*
+     * 所属アカウントが分からない行も伏せる。分からない以上「見てよい」
+     * とは証明できないため、権限の外側と同じ扱いにする（安全側）。
+     */
+    const restricted = visible !== null && (lineAccountId === null || !visible.has(lineAccountId));
+    return {
+      id: row.id,
+      entryType: row.entry_type,
+      status: row.status,
+      amount: row.amount,
+      reason: restricted ? null : row.reason,
+      source: row.source,
+      sourceEventId: restricted ? null : row.source_event_id,
+      sourceReferenceId: restricted ? null : row.source_reference_id,
+      ruleName: restricted ? null : row.rule_name,
+      mode: row.entry_type === 'adjustment' || row.source === 'manual' || row.source === 'admin_adjustment'
+        ? 'manual'
+        : 'automatic',
+      executedByStaffName: restricted ? null : row.executed_by_staff_name,
+      occurredAt: row.occurred_at,
+      lineAccountId,
+      restricted,
+      // R380: 通知の失敗は履歴の行から再送できるように、状態だけを返す。
+      // 権限外アカウントの行では通知の有無も伏せる。
+      notificationStatus: restricted ? null : row.notification_status,
+      notificationErrorCode: restricted ? null : row.notification_error_code,
+    };
+  });
 }
 
 export interface MileageSelfInsights {
@@ -2297,6 +2361,11 @@ export interface MileageAdminHistoryItem {
   mode: 'automatic' | 'manual';
   executedByStaffName: string | null;
   lineAccountName: string;
+  /** この記録が属する LINE アカウント（メタに残っていない古い行は null）。 */
+  lineAccountId: string | null;
+  /** 手動調整につけた友だち通知の状態。通知のない行は null。 */
+  notificationStatus: string | null;
+  notificationErrorCode: string | null;
   balanceAfter: number;
   occurredAt: string;
 }
@@ -2671,10 +2740,14 @@ export async function getMileageAdminHistory(
                 lr.source_event_id, mr.name AS rule_name,
                 json_extract(lr.metadata, '$.sourceReferenceId') AS source_reference_id,
                 json_extract(lr.metadata, '$.executedByStaffName') AS executed_by_staff_name,
+                json_extract(lr.metadata, '$.lineAccountId') AS line_account_id,
+                an.status AS notification_status,
+                an.error_code AS notification_error_code,
                 lr.occurred_at, lr.balance_after
            FROM ledger_rows lr
            INNER JOIN selected_profiles sp ON sp.identity_key = lr.identity_key
            LEFT JOIN mileage_rules mr ON mr.id = lr.mileage_rule_id
+           LEFT JOIN mileage_adjustment_notifications an ON an.ledger_entry_id = lr.id
           WHERE ${whereSql}
           ORDER BY lr.occurred_at DESC, lr.created_at DESC, lr.id DESC
           LIMIT ? OFFSET ?`,
@@ -2694,6 +2767,9 @@ export async function getMileageAdminHistory(
         source_reference_id: string | null;
         rule_name: string | null;
         executed_by_staff_name: string | null;
+        line_account_id: string | null;
+        notification_status: string | null;
+        notification_error_code: string | null;
         occurred_at: string;
         line_account_name: string;
         balance_after: number;
@@ -2729,6 +2805,9 @@ export async function getMileageAdminHistory(
         : 'automatic',
       executedByStaffName: row.executed_by_staff_name,
       lineAccountName: row.line_account_name,
+      lineAccountId: row.line_account_id,
+      notificationStatus: row.notification_status,
+      notificationErrorCode: row.notification_error_code,
       balanceAfter: Number(row.balance_after ?? 0),
       occurredAt: row.occurred_at,
     })),
