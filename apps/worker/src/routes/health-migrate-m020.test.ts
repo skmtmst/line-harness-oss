@@ -89,6 +89,7 @@ describe('M020 存在しない移行元の移行は作らない', () => {
       migrated_count: 0,
       total_count: 0,
       created_at: '2026-09-29T00:00:00.000+09:00',
+      completed_at: null,
     });
     vi.mocked(db.updateAccountMigration).mockResolvedValue(undefined);
     const res = await postMigrate('a1', { toAccountId: 'a2' });
