@@ -3,7 +3,7 @@
 import DateField from '@/components/shared/date-field'
 import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
@@ -184,16 +184,30 @@ function NewCommonVarInner() {
   // 登録しないため）。
   const boundAccountRef = useRef(selectedAccountId)
 
-  useEffect(() => {
-    void api.folders
-      .list('common_var')
-      .then((res) => {
-        if (res.success) setFolders(res.data)
-      })
-      .catch(() => {
-        // フォルダが読めなくても登録はできる（未分類になる）。
-      })
+  /**
+   * R593: フォルダの一覧は独立した取得状態にする。失敗を黙って握りつぶすと
+   * 503でも正常な0件と同じ「未分類だけ」になり、失敗と気づけない。
+   * 失敗を明示して再試行を付け、未分類のまま登録できることを伝える。
+   */
+  const [foldersError, setFoldersError] = useState(false)
+  const loadFolders = useCallback(async () => {
+    try {
+      const res = await api.folders.list('common_var')
+      if (res.success) {
+        setFolders(res.data)
+        setFoldersError(false)
+      } else {
+        setFoldersError(true)
+      }
+    } catch {
+      // フォルダが読めなくても登録はできる（未分類になる）。
+      setFoldersError(true)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadFolders()
+  }, [loadFolders])
 
   useEffect(() => {
     if (selectedAccountId === boundAccountRef.current) return
@@ -220,9 +234,26 @@ function NewCommonVarInner() {
     if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [secretWarningFields])
 
-  // 直したら欄の下の文言は消す。残ると直ったのに怒られているように見える。
-  useEffect(() => { setValueFieldError('') }, [value, type])
-  useEffect(() => { setFallbackFieldError('') }, [fallbackValue, type])
+  /**
+   * R594: 値・代替値の入力エラーは、欄の下と画面下部の両方に出る。
+   * 直したら両方消す。欄の下だけ消すと、直ったのに画面下部で
+   * 怒られているように見える。画面下部の一文は、値の入力エラーと
+   * 同じ文のときだけ一緒に消す（別の失敗文は残す）。
+   */
+  const valueErrorMessageRef = useRef('')
+  const fallbackErrorMessageRef = useRef('')
+  useEffect(() => {
+    setValueFieldError('')
+    const message = valueErrorMessageRef.current
+    valueErrorMessageRef.current = ''
+    if (message) setError((current) => (current === message ? '' : current))
+  }, [value, type])
+  useEffect(() => {
+    setFallbackFieldError('')
+    const message = fallbackErrorMessageRef.current
+    fallbackErrorMessageRef.current = ''
+    if (message) setError((current) => (current === message ? '' : current))
+  }, [fallbackValue, type])
 
   /*
    * 入力中に画面の外へ出る操作を止める（VAR-01 監査）。リッチメニュー・
@@ -271,6 +302,8 @@ function NewCommonVarInner() {
     if (valueError) {
       setError(valueError)
       setValueFieldError(valueError)
+      // R594: 直したら画面下部の一文も一緒に消せるよう、文を覚える。
+      valueErrorMessageRef.current = valueError
       focusField('cv-value')
       return
     }
@@ -288,6 +321,7 @@ function NewCommonVarInner() {
       if (fallbackError) {
         setError(fallbackError)
         setFallbackFieldError(fallbackError)
+        fallbackErrorMessageRef.current = fallbackError
         focusField('cv-fallback-value')
         return
       }
@@ -302,8 +336,13 @@ function NewCommonVarInner() {
     if (secretField) {
       const message = '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください'
       setError(message)
-      if (secretField === 'cv-value') setValueFieldError(message)
-      else setFallbackFieldError(message)
+      if (secretField === 'cv-value') {
+        setValueFieldError(message)
+        valueErrorMessageRef.current = message
+      } else {
+        setFallbackFieldError(message)
+        fallbackErrorMessageRef.current = message
+      }
       focusField(secretField)
       return
     }
@@ -337,8 +376,13 @@ function NewCommonVarInner() {
         setError(res.error)
         // 口で止まった理由も欄のすぐ下に映す（R36）。
         const target = focusTargetForReason(res.error)
-        if (target === 'cv-value') setValueFieldError(res.error)
-        else if (target === 'cv-fallback-value') setFallbackFieldError(res.error)
+        if (target === 'cv-value') {
+          setValueFieldError(res.error)
+          valueErrorMessageRef.current = res.error
+        } else if (target === 'cv-fallback-value') {
+          setFallbackFieldError(res.error)
+          fallbackErrorMessageRef.current = res.error
+        }
         return
       }
       router.push('/contents/vars')
@@ -353,8 +397,13 @@ function NewCommonVarInner() {
         if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
           const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
           if (target) focusField(target)
-          if (target === 'cv-value') setValueFieldError(e.message)
-          else if (target === 'cv-fallback-value') setFallbackFieldError(e.message)
+          if (target === 'cv-value') {
+            setValueFieldError(e.message)
+            valueErrorMessageRef.current = e.message
+          } else if (target === 'cv-fallback-value') {
+            setFallbackFieldError(e.message)
+            fallbackErrorMessageRef.current = e.message
+          }
         }
       }
     } finally {
@@ -431,6 +480,21 @@ function NewCommonVarInner() {
               onChange={(value) => setFolderId(value)}
               options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
             />
+            {/*
+              R593: 一覧が読めなくても「未分類だけ」とは言わない。失敗と
+              再試行を欄の下に出し、未分類のまま登録を続けられることと、
+              その影響（未分類で登録される）を伝える。赤は使わない。
+            */}
+            {foldersError ? (
+              <div className="mt-1 space-y-1" data-folders-state="error">
+                <p className="text-ink-secondary text-xs">
+                  フォルダの一覧を読み込めませんでした。未分類のまま登録できます。
+                </p>
+                <Button type="button" onClick={() => void loadFolders()}>
+                  再読み込み
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
 
