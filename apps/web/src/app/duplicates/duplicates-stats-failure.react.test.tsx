@@ -139,6 +139,26 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
     expect(host.textContent).toContain('1配信あたりの無駄')
   })
 
+  it('集計503×statusCounts省略（旧Worker）：0組と誤案内せず総数と内訳不明を分けて出す', async () => {
+    fixture.stats.mockRejectedValue(new ApiError(503))
+    fixture.list.mockResolvedValue({
+      success: true,
+      // 旧Workerとの互換で statusCounts / lowConfidenceCount を省く。
+      // 一覧の total（18）は確実に分かる。
+      data: { items: [candidate()], total: 18, limit: 50, offset: 0 },
+    })
+    await renderPage()
+
+    // 候補一覧は残り、一覧の総数は見える。
+    expect(host.textContent).toContain('田中太郎')
+    expect(host.textContent).toContain('18組中')
+    // 件数矛盾：未取得のカードを「0組」と誤案内しない。
+    expect(host.textContent).not.toContain('0組')
+    // 総数が確実な重複候補は一覧の total、内訳不明は「—」+理由。
+    expect(host.textContent).toContain('18組')
+    expect(host.textContent).toContain('読み込めませんでした')
+  })
+
   it('集計だけ403：権限の案内にし、再試行は出さず候補は残す', async () => {
     fixture.stats.mockRejectedValue(new ApiError(403))
     fixture.list.mockResolvedValue({ success: true, data: listData([candidate()]) })
