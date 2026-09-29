@@ -222,13 +222,27 @@ export function OutgoingOverview({
    */
   const [testNotice, setTestNotice] = useState<{ tone: 'danger'; message: string } | null>(null)
 
+  // d23b R421: アカウントを切り替えたあと、前のアカウントの結果が
+  // 新しい画面へ出ないよう、開始時点のアカウントと今のアカウントを照合する。
+  const lineAccountIdRef = useRef(lineAccountId)
+  lineAccountIdRef.current = lineAccountId
+
+  // 切り替えたら、前のアカウントの確認窓・結果・進行中表示を閉じる。
+  useEffect(() => {
+    setTestTarget(null)
+    setTestNotice(null)
+    setTestingId(null)
+  }, [lineAccountId])
+
   const runTest = async (item: OutgoingWebhookOverview) => {
-    if (!lineAccountId || testingId !== null) return
+    const requestAccountId = lineAccountId
+    if (!requestAccountId || testingId !== null) return
     setTestTarget(null)
     setTestingId(item.id)
     setTestNotice(null)
     try {
-      const response = await api.webhooks.outgoing.test(item.id, lineAccountId)
+      const response = await api.webhooks.outgoing.test(item.id, requestAccountId)
+      if (lineAccountIdRef.current !== requestAccountId) return
       if (response.success && response.data.delivered) {
         const status = response.data.responseStatus
         notifyToast(`「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`)
@@ -240,6 +254,7 @@ export function OutgoingOverview({
         })
       }
     } catch {
+      if (lineAccountIdRef.current !== requestAccountId) return
       setTestNotice({
         tone: 'danger',
         message: `「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`,
