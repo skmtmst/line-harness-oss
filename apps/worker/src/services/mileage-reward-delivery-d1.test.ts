@@ -12,8 +12,10 @@ import {
   claimRedemptionStep,
   clearRedemptionStepIntent,
   createMileageRewardDraft,
+  getMileageRedemption,
   markRedemptionStepSent,
   publishMileageReward,
+  refundMileageRewardRedemption,
   reserveMileageRewardRedemption,
 } from '@line-crm/db';
 
@@ -99,6 +101,28 @@ async function seedWebhookReward(db: D1Database): Promise<string> {
     draft: {
       name: '外部特典', rewardKind: 'template', requiredMiles: 300,
       commonActionVersionId: 'action-version-1',
+    },
+  });
+  return (await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' })).id;
+}
+
+async function seedRefundWebhookReward(db: D1Database): Promise<string> {
+  const draft = await createMileageRewardDraft(db, {
+    lineAccountId: 'account-1',
+    draft: {
+      name: '返却あり特典', rewardKind: 'template', requiredMiles: 300,
+      commonActionVersionId: 'action-version-1', failurePolicy: 'refund',
+    },
+  });
+  return (await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' })).id;
+}
+
+async function seedRefundTwoStepReward(db: D1Database): Promise<string> {
+  const draft = await createMileageRewardDraft(db, {
+    lineAccountId: 'account-1',
+    draft: {
+      name: '返却あり2段特典', rewardKind: 'template', requiredMiles: 300,
+      commonActionVersionId: 'action-version-2', failurePolicy: 'refund',
     },
   });
   return (await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' })).id;
@@ -806,5 +830,177 @@ describe('交換配送の二重送信防止(実D1)', () => {
     expect(raw.prepare(
       `SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'spend'`,
     ).get()).toEqual({ count: 1 });
+  });
+});
+
+/*
+ * 監査 R361・R362・R344 の実D1試験。予約から配送・返却まで本物の
+ * SQL で通し、残高・内訳・台帳の数が1回ずつ合うことを確かめる。
+ */
+describe('部分受け渡しの返却・返却の重なり・再試行期限(実D1)', () => {
+  /*
+   * R361: 2手順目で失敗しても、渡し終えた1手順目がある交換は
+   * 全額返却しない。未完了の手順だけやり直せる。
+   * （直す前は refunded・残高1000に戻り、タグ1に相当する送信だけ残った）
+   */
+  it('一部の手順を渡した交換は全額返却せず、残りだけやり直せる', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    seedTwoStepAction(raw);
+    const rewardId = await seedRefundTwoStepReward(db);
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
+      idempotencyKey: 'e2e-partial-refund', requestFingerprint: 'fp-partial-refund',
+    });
+
+    // 1手順目は通る。2手順目は最初だけ断る。
+    const counter = countFetchesByHost((host, calls) => (
+      host === 'example.org' && calls === 1
+        ? new Response('ng', { status: 500 })
+        : new Response('{}', { status: 200 })
+    ));
+    const failed = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: counter.fetch,
+    });
+    expect(failed).toMatchObject({ status: 'delivery_failed' });
+    expect(failed.message ?? '').toContain('渡し済み');
+    // 全額は戻さない。失敗のまま残し、やり直せる。
+    expect(raw.prepare(
+      `SELECT status FROM mileage_redemptions WHERE id = ?`,
+    ).get(reserved.redemption.id)).toEqual({ status: 'delivery_failed' });
+    expect(raw.prepare(
+      `SELECT available FROM mileage_wallets
+        WHERE program_id = 'default' AND beneficiary_key = 'user:user-1'`,
+    ).get()).toEqual({ available: 700 });
+    expect(raw.prepare(
+      `SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'reversal'`,
+    ).get()).toEqual({ count: 0 });
+
+    // やり直しは未完了の2手順目だけ送る。1手順目は増えない。
+    const retried = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: counter.fetch,
+    });
+    expect(retried.status).toBe('succeeded');
+    expect(counter.count('example.com')).toBe(1);
+    expect(counter.count('example.org')).toBe(2);
+    expect(raw.prepare(
+      `SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'reversal'`,
+    ).get()).toEqual({ count: 0 });
+  });
+
+  /*
+   * R362: 自動返却と再試行が重なっても、返却の台帳・残高・ロット復元は
+   * 各1回。成功へ移った交換には遅い返却が書き込まれない。
+   */
+  it('返却を重ねても内訳は二重に戻らず、成功済みには返却できない', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    const rewardId = await seedRefundWebhookReward(db);
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
+      idempotencyKey: 'e2e-double-refund', requestFingerprint: 'fp-double-refund',
+    });
+
+    // 受信先が断り続け、自動返却まで進む。
+    const refuse = countFetchesByHost(() => new Response('ng', { status: 500 }));
+    const failed = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: refuse.fetch,
+    });
+    expect(failed).toMatchObject({ status: 'delivery_failed' });
+    expect(raw.prepare(
+      `SELECT status FROM mileage_redemptions WHERE id = ?`,
+    ).get(reserved.redemption.id)).toEqual({ status: 'refunded' });
+    expect(raw.prepare(
+      `SELECT available FROM mileage_wallets
+        WHERE program_id = 'default' AND beneficiary_key = 'user:user-1'`,
+    ).get()).toEqual({ available: 1000 });
+
+    // 遅れた返却をもう一度呼んでも、内訳は増えない。
+    await refundMileageRewardRedemption(db, {
+      redemptionId: reserved.redemption.id, reason: '遅れた返却',
+    });
+    expect(raw.prepare(
+      `SELECT available FROM mileage_wallets
+        WHERE program_id = 'default' AND beneficiary_key = 'user:user-1'`,
+    ).get()).toEqual({ available: 1000 });
+    expect(raw.prepare(
+      `SELECT COUNT(*) AS count FROM mileage_ledger
+        WHERE source = 'mileage_reward_refund' AND source_event_id = ?`,
+    ).get(reserved.redemption.id)).toEqual({ count: 1 });
+
+    // 成功へ移った交換には、遅い返却は書き込めない。
+    const second = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
+      idempotencyKey: 'e2e-late-refund', requestFingerprint: 'fp-late-refund',
+    });
+    const accept = countFetchesByHost(() => new Response('{}', { status: 200 }));
+    const succeeded = await deliverMileageReward(db, second.redemption.id, {
+      fetch: accept.fetch,
+    });
+    expect(succeeded.status).toBe('succeeded');
+    await expect(refundMileageRewardRedemption(db, {
+      redemptionId: second.redemption.id, reason: '遅れた返却',
+    })).rejects.toThrow('すでに特典を渡した交換は返金できません');
+    expect(await getMileageRedemption(db, second.redemption.id)).toMatchObject({ status: 'succeeded' });
+    expect(raw.prepare(
+      `SELECT available FROM mileage_wallets
+        WHERE program_id = 'default' AND beneficiary_key = 'user:user-1'`,
+    ).get()).toEqual({ available: 700 });
+  });
+
+  /*
+   * R344: 最初の送信から24時間を過ぎた手順は、同じキーで送り直さない。
+   * 期限内（23時間59分59秒）のやり直しは送って回復する。
+   */
+  it('24時間を過ぎた手順は送らず、期限内は送って回復する', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    const rewardId = await seedWebhookReward(db);
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
+      idempotencyKey: 'e2e-retry-key-expiry', requestFingerprint: 'fp-retry-key-expiry',
+    });
+
+    // 初回は受信先が断る。送っていないことが決まり、証言は消える。
+    const refuse = countFetchesByHost(() => new Response('ng', { status: 500 }));
+    const first = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: refuse.fetch,
+    });
+    expect(first).toMatchObject({ status: 'delivery_failed' });
+    expect(refuse.total()).toBe(1);
+
+    const backdateHours = (hours: number): string => {
+      const now = Date.now() - hours * 3_600_000;
+      return new Date(now).toISOString();
+    };
+    // 手順の生まれを25時間前にする。期限切れの道を通す。
+    raw.prepare(
+      `UPDATE mileage_redemption_step_deliveries SET created_at = ? WHERE redemption_id = ?`,
+    ).run(backdateHours(25), reserved.redemption.id);
+    const accept = countFetchesByHost(() => new Response('{}', { status: 200 }));
+    const expired = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: accept.fetch,
+    });
+    // 送らない。1回目の1通のまま。
+    expect(accept.total()).toBe(0);
+    expect(expired).toMatchObject({ status: 'delivery_failed' });
+    expect(expired.message ?? '').toContain('24時間');
+
+    // 手順の生まれを23時間59分59秒前に戻す。期限内の道を通す。
+    raw.prepare(
+      `UPDATE mileage_redemption_step_deliveries SET created_at = ? WHERE redemption_id = ?`,
+    ).run(new Date(Date.now() - (24 * 3_600_000 - 1000)).toISOString(), reserved.redemption.id);
+    // 期限切れの確定で delivering へ進んでいるため、失敗中に戻して押す。
+    raw.prepare(
+      `UPDATE mileage_redemptions
+          SET status = 'delivery_failed', updated_at = '2020-01-01T00:00:00.000Z',
+              next_retry_at = '2020-01-01T00:00:00.000Z', failure_code = NULL, failure_message = NULL
+        WHERE id = ?`,
+    ).run(reserved.redemption.id);
+    const recovered = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: accept.fetch,
+    });
+    expect(recovered.status).toBe('succeeded');
+    expect(accept.total()).toBe(1);
   });
 });

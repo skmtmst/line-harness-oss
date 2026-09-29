@@ -199,7 +199,8 @@ export type IncomingWebhookDetail = IncomingWebhook & {
     displayName: string
   }>
   actionExecution: {
-    state: 'connected' | 'not_configured'
+    // R404: 保存済みの未対応種類があるときは needs_attention と理由が返る。
+    state: 'connected' | 'not_configured' | 'needs_attention'
     reason: string | null
   }
   latestSample: {
@@ -3045,7 +3046,8 @@ export type MileageHistoryItem = {
   entryType: 'grant' | 'reversal' | 'spend' | 'expiration' | 'adjustment'
   status: 'pending' | 'available' | 'void'
   amount: number
-  reason: string
+  /** 権限の外側のアカウントの記録では null。見分けには restricted を使う。 */
+  reason: string | null
   source: string
   sourceEventId: string | null
   sourceReferenceId: string | null
@@ -3054,6 +3056,13 @@ export type MileageHistoryItem = {
   executedByStaffName: string | null
   balanceAfter?: number
   occurredAt: string
+  /** この記録が属するLINEアカウント。分からないときは null。 */
+  lineAccountId?: string | null
+  /** true の行は見ている人の権限外アカウントの記録で、理由・実行者・元イベントは伏せてある。 */
+  restricted?: boolean
+  /** 手動調整につけた友だち通知の状態。通知なし・権限外の行は null。 */
+  notificationStatus?: string | null
+  notificationErrorCode?: string | null
 }
 export type MileageSelfInsights = {
   accountCount: number
@@ -3309,6 +3318,9 @@ export type MileageAdminHistoryItem = {
   mode: 'automatic' | 'manual'
   executedByStaffName: string | null
   lineAccountName: string
+  lineAccountId?: string | null
+  notificationStatus?: string | null
+  notificationErrorCode?: string | null
   balanceAfter: number
   occurredAt: string
 }
@@ -3343,7 +3355,10 @@ export type MileageFriendV6 = {
   monthChange: number
   available: number
   pending: number
+  /** 30日以内に期限を迎える分。期限つきロットが無いときは null（0 とは別物）。 */
   expiringMiles30d: number | null
+  /** いちばん近い失効日。期限つきロットがあれば 30 日より先でも入る。 */
+  nextExpiringAt: string | null
   lifetimeEarned: number
   spent: number
   lastChangedAt: string | null
@@ -3360,6 +3375,8 @@ export type MileageFriendsV6Overview = {
     monthChange: number
     rankCounts: Array<{ rewardId: string; rankName: string; requiredMiles: number; friendCount: number }>
     expiringMiles30d: number | null
+    /** 一覧の中でいちばん近い失効日。期限つきロットがなければ null。 */
+    nextExpiringAt: string | null
   }
   items: MileageFriendV6[]
   pagination: { total: number; limit: number; offset: number }
@@ -11719,6 +11736,15 @@ export const api = {
           body: JSON.stringify(data),
         },
       ),
+    /*
+     * R380/R381: 残高は動かさず、調整につけた友だち通知だけを再送する。
+     * 送り済みなら何もしない（サーバ側で二度送らない）。
+     */
+    retryMileageNotification: (entryId: string, data: { accountId: string }) =>
+      fetchApi<ApiResponse<{ notification: MileageAdjustmentResult['notification'] }>>(
+        `/api/mileage/entries/${encodeURIComponent(entryId)}/notification-retry`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
     testEarningRule: (accountId: string, draft: unknown) =>
       fetchApi<ApiResponse<MileageEarningRuleTestResult>>('/api/mileage/earning-rules/test', {
         method: 'POST',
@@ -11868,10 +11894,15 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
-      /* 人が見つからなかった届物の箱(#939 N-367)。 */
-      unmatched: (id: string, lineAccountId: string, status?: 'pending' | 'resolved' | 'dismissed') =>
-        fetchApi<ApiResponse<IncomingWebhookUnmatchedItem[]>>(
-          `/api/webhooks/incoming/${encodeURIComponent(id)}/unmatched?lineAccountId=${encodeURIComponent(lineAccountId)}${status ? `&status=${status}` : ''}`,
+      /* 人が見つからなかった届物の箱(#939 N-367)。R401: 50件超えは limit/offset で辿る。 */
+      unmatched: (
+        id: string,
+        lineAccountId: string,
+        status?: 'pending' | 'resolved' | 'dismissed',
+        paging?: { limit?: number; offset?: number },
+      ) =>
+        fetchApi<ApiResponse<IncomingWebhookUnmatchedItem[]> & { total?: number }>(
+          `/api/webhooks/incoming/${encodeURIComponent(id)}/unmatched?lineAccountId=${encodeURIComponent(lineAccountId)}${status ? `&status=${status}` : ''}${paging?.limit ? `&limit=${paging.limit}` : ''}${paging?.offset ? `&offset=${paging.offset}` : ''}`,
         ),
       resolveUnmatched: (id: string, lineAccountId: string, data: { action: 'dismiss' } | { action: 'link'; friendId: string }) =>
         fetchApi<ApiResponse<{ id: string; status: string }>>(

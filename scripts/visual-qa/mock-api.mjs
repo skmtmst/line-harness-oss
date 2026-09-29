@@ -3411,6 +3411,45 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
+  /*
+   * 要対応の交換の一覧。型どおりの名前（items/pagination）で返す。
+   * 失敗中と送ったか分からない配送中（照合待ち）を混ぜ、21件以上でも
+   * limit/offset で残りを出せる見本にする（R364・R365）。
+   */
+  if (pathname === '/api/mileage/redemptions') {
+    const limit = Math.min(100, Math.max(1, Number(query.get('limit') || 20)))
+    const offset = Math.max(0, Number(query.get('offset') || 0))
+    const items = [
+      {
+        id: 'mock-redemption-1', rewardName: '500円ぶんのクーポン', status: 'delivery_failed',
+        attemptCount: 2, failureCode: 'reward_delivery_failed',
+        failureMessage: '特典を渡せませんでした。時間をおいてもう一度お試しください。',
+        updatedAt: '2026-09-09T01:02:03.000Z',
+      },
+      {
+        id: 'mock-redemption-2', rewardName: '送料無料', status: 'delivering',
+        attemptCount: 1, failureCode: null, failureMessage: null,
+        updatedAt: '2026-09-09T02:03:04.000Z',
+      },
+    ]
+    return {
+      success: true,
+      data: {
+        items: items.slice(offset, offset + limit),
+        pagination: { total: items.length, limit, offset },
+      },
+    }
+  }
+  if (method === 'POST' && /^\/api\/mileage\/redemptions\/[^/]+\/retry-fulfillment$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        status: 'succeeded', rewardName: '500円ぶんのクーポン', customerMessage: '交換できました',
+        rewardCode: null, retryAt: null, failurePolicy: 'retry', message: null,
+        redemption: { id: pathname.split('/')[4], status: 'succeeded' },
+      },
+    }
+  }
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
   if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
   if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
