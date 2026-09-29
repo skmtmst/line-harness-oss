@@ -4,6 +4,12 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import type { Env } from '../index';
 import type { AuthenticatedStaff } from '../middleware/auth';
 import { commonActions } from './common-actions';
+import {
+  createCommonAction,
+  createCommonActionDraft,
+  publishCommonActionDraft,
+  updateCommonActionDraft,
+} from '../services/common-actions.js';
 
 function setupApp(db: D1Database, staff: AuthenticatedStaff) {
   const app = new Hono<Env>();
@@ -233,6 +239,47 @@ describe('V6共通アクションAPI', () => {
     expect(retryBody.data.id).toBe(firstBody.data.id);
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM common_actions`).get())
       .toEqual({ count: 1 });
+  });
+
+  it('確認後の参照先更新がある公開は409で止まる（監査 R479）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const wait5 = [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }];
+    const leaf = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '参照される処理', actions: wait5,
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      draftVersionId: leaf.draftVersionId, expectedDraftRevision: 1,
+    });
+    const caller = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '呼び出す処理',
+      actions: [{ id: 'call', type: 'common_action', params: { commonActionId: leaf.id }, onFailure: 'stop' }],
+    });
+    const leafDraft = await createCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+    });
+    await updateCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      expectedDraftVersionId: leafDraft.draftVersionId, expectedDraftRevision: 1,
+      name: '参照される処理',
+      actions: [{ id: 'wait', type: 'wait', params: { minutes: 60 }, onFailure: 'stop' }],
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      draftVersionId: leafDraft.draftVersionId, expectedDraftRevision: 2,
+    });
+    const response = await adminApp.request(
+      `/api/common-actions/${caller.id}/versions/${caller.draftVersionId}/publish?account_id=account-1`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedDraftRevision: 1 }),
+      },
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false, code: 'reference_updated',
+    });
   });
 
   it('タグ付与の連動ドロワーへ13種類のschemaと範囲内選択肢を返す', async () => {

@@ -373,11 +373,78 @@ export async function validateTagAddedActionResources(
   return actions;
 }
 
+async function resolveLatestPublishedReference(
+  db: D1Database,
+  lineAccountId: string,
+  commonActionId: string,
+  field: string,
+): Promise<{ id: string; version_id: string }> {
+  const referenced = await db.prepare(
+    `SELECT ca.id, ca.current_published_version_id AS version_id
+       FROM common_actions ca
+       JOIN common_action_versions cav
+         ON cav.id = ca.current_published_version_id AND cav.common_action_id = ca.id
+        AND cav.status = 'published'
+      WHERE ca.id = ? AND ca.line_account_id = ? AND ca.status = 'published'`,
+  ).bind(commonActionId, lineAccountId).first<{ id: string; version_id: string }>();
+  if (!referenced) {
+    throw new CommonActionValidationError('common_action_not_published', '呼び出す共通アクションに公開版がありません', `${field}.commonActionId`);
+  }
+  return referenced;
+}
+
+/*
+ * 監査 R479: 確認後に参照先が更新されていたら、別の内容を再確認なしで
+ * 公開しない。保存時に固定した版と現在の公開版を突き合わせる。
+ */
+async function collectReferenceDrifts(
+  db: D1Database,
+  lineAccountId: string,
+  actions: ActionDefinition[],
+): Promise<Array<{ actionId: string; name: string; fromVersion: number; toVersion: number }>> {
+  const drifts: Array<{ actionId: string; name: string; fromVersion: number; toVersion: number }> = [];
+  const visit = async (steps: ActionDefinition[]): Promise<void> => {
+    for (const step of steps) {
+      if (step.type === 'branch') {
+        const params = step.params as { then?: unknown; else?: unknown };
+        if (Array.isArray(params.then)) await visit(params.then as ActionDefinition[]);
+        if (Array.isArray(params.else)) await visit(params.else as ActionDefinition[]);
+        continue;
+      }
+      if (step.type !== 'common_action') continue;
+      const actionId = step.params.commonActionId;
+      const pinnedId = step.params.commonActionVersionId;
+      if (typeof actionId !== 'string' || !actionId
+        || typeof pinnedId !== 'string' || !pinnedId) continue;
+      const row = await db.prepare(
+        `SELECT ca.name AS name,
+                (SELECT version_number FROM common_action_versions WHERE id = ?) AS pinned_version,
+                cav.version_number AS latest_version
+           FROM common_actions ca
+           JOIN common_action_versions cav ON cav.id = ca.current_published_version_id
+          WHERE ca.id = ? AND ca.line_account_id = ?`,
+      ).bind(pinnedId, actionId, lineAccountId).first<{
+        name: string; pinned_version: number | null; latest_version: number | null;
+      }>();
+      if (!row || row.pinned_version === null || row.latest_version === null) continue;
+      if (row.latest_version > row.pinned_version
+        && !drifts.some((drift) => drift.actionId === actionId)) {
+        drifts.push({
+          actionId, name: row.name, fromVersion: row.pinned_version, toVersion: row.latest_version,
+        });
+      }
+    }
+  };
+  await visit(actions);
+  return drifts;
+}
+
 async function pinAndValidateReferences(
   db: D1Database,
   lineAccountId: string,
   ownerId: string,
   actions: ActionDefinition[],
+  options?: { keepPins?: boolean },
 ): Promise<ActionDefinition[]> {
   const pinned: ActionDefinition[] = [];
   for (const [index, action] of actions.entries()) {
@@ -451,19 +518,34 @@ async function pinAndValidateReferences(
       if (commonActionId === ownerId) {
         throw new CommonActionValidationError('common_action_cycle', '共通アクションは自分自身を呼び出せません', `${field}.commonActionId`);
       }
-      const referenced = await db.prepare(
-        `SELECT ca.id, ca.current_published_version_id AS version_id
-           FROM common_actions ca
-           JOIN common_action_versions cav
-             ON cav.id = ca.current_published_version_id AND cav.common_action_id = ca.id
-            AND cav.status = 'published'
-          WHERE ca.id = ? AND ca.line_account_id = ? AND ca.status = 'published'`,
-      ).bind(commonActionId, lineAccountId).first<{ id: string; version_id: string }>();
-      if (!referenced) {
-        throw new CommonActionValidationError('common_action_not_published', '呼び出す共通アクションに公開版がありません', `${field}.commonActionId`);
+      /*
+       * 監査 R479: 公開時は保存時に確認した版を保持し、最新へ自動で置き換えない。
+       * 保存時は最新へ固定する（編集画面の表示と保存値を一致させる）。
+       */
+      const pinnedId = typeof params.commonActionVersionId === 'string' && params.commonActionVersionId.trim()
+        ? params.commonActionVersionId.trim()
+        : null;
+      if (options?.keepPins && pinnedId) {
+        const kept = await db.prepare(
+          `SELECT cav.id AS version_id
+             FROM common_action_versions cav
+             JOIN common_actions ca ON ca.id = cav.common_action_id
+            WHERE cav.id = ? AND cav.common_action_id = ? AND cav.status = 'published'
+              AND ca.line_account_id = ?`,
+        ).bind(pinnedId, commonActionId, lineAccountId).first<{ version_id: string }>();
+        if (kept) {
+          params.commonActionId = commonActionId;
+          params.commonActionVersionId = kept.version_id;
+        } else {
+          const fallback = await resolveLatestPublishedReference(db, lineAccountId, commonActionId, field);
+          params.commonActionId = fallback.id;
+          params.commonActionVersionId = fallback.version_id;
+        }
+      } else {
+        const referenced = await resolveLatestPublishedReference(db, lineAccountId, commonActionId, field);
+        params.commonActionId = referenced.id;
+        params.commonActionVersionId = referenced.version_id;
       }
-      params.commonActionId = referenced.id;
-      params.commonActionVersionId = referenced.version_id;
     } else if (action.type === 'branch') {
       const condition = params.condition as { rules?: Array<{ type?: unknown; value?: unknown }> };
       for (const [ruleIndex, rule] of (condition.rules ?? []).entries()) {
@@ -1020,8 +1102,11 @@ export async function createCommonAction(
   const description = typeof input.description === 'string' && input.description.trim()
     ? input.description.trim()
     : null;
-  const actions = validateActionShape(input.actions);
   const id = crypto.randomUUID();
+  // 監査 R479: 参照先は保存時に公開版へ固定する（表示と保存値を一致させる）。
+  const actions = await pinAndValidateReferences(
+    db, input.lineAccountId, id, validateActionShape(input.actions),
+  );
   const versionId = crypto.randomUUID();
   const now = new Date().toISOString();
   try {
@@ -1101,7 +1186,10 @@ export async function updateCommonActionDraft(
   const description = typeof input.description === 'string' && input.description.trim()
     ? input.description.trim()
     : null;
-  const actions = validateActionShape(input.actions);
+  // 監査 R479: 参照先は保存時に公開版へ固定する（表示と保存値を一致させる）。
+  const actions = await pinAndValidateReferences(
+    db, input.lineAccountId, owner.id, validateActionShape(input.actions),
+  );
   const now = new Date().toISOString();
   const result = await db.batch([
     db.prepare(
@@ -1195,7 +1283,17 @@ export async function publishCommonActionDraft(
     );
   }
   const actions = validateActionShape(JSON.parse(draft.action_config));
-  const pinned = await pinAndValidateReferences(db, input.lineAccountId, owner.id, actions);
+  // 監査 R479: 確認後に参照先が更新されていたら、別の内容を再確認なしで公開しない。
+  const drifts = await collectReferenceDrifts(db, input.lineAccountId, actions);
+  if (drifts.length > 0) {
+    const [first] = drifts;
+    throw new CommonActionValidationError(
+      'reference_updated',
+      `参照先「${first.name}」に新しい版があります（v${first.fromVersion}→v${first.toVersion}）。編集画面で内容を確認して保存し直してください`,
+    );
+  }
+  // 保存時に固定した版を保持し、最新へ自動で置き換えない。
+  const pinned = await pinAndValidateReferences(db, input.lineAccountId, owner.id, actions, { keepPins: true });
   // 監査 R478: 参照を展開した深さ・総数も公開前に検査する。
   await assertPublishableExpansion(db, input.lineAccountId, pinned);
   const now = new Date().toISOString();

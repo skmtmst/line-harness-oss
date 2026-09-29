@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { createTemplate, publishTemplate } from '@line-crm/db';
 import {
-  CommonActionValidationError,
   createCommonAction,
   createCommonActionDraft,
   duplicateCommonAction,
@@ -88,24 +87,20 @@ describe('V6共通アクション', () => {
     ).run(created.draftVersionId)).toThrow(/immutable/);
   });
 
-  it('別アカウントの参照先は公開を拒否する', async () => {
-    const created = await createCommonAction(testDb.db, {
+  it('別アカウントの参照先は保存の時点で拒否する（監査 R479）', async () => {
+    // 監査 R479: 参照先の固定は保存時に行う。別アカウントの選択肢は
+    // 下書きに残さず、保存の時点で止める（公開時の検査は維持する）。
+    await expect(createCommonAction(testDb.db, {
       lineAccountId: 'account-1',
       name: '危険な下書き',
       actions: tagAction('tag-2'),
-    });
-    await expect(publishCommonActionDraft(testDb.db, {
-      id: created.id,
-      lineAccountId: 'account-1',
-      draftVersionId: created.draftVersionId,
-      expectedDraftRevision: 1,
     })).rejects.toMatchObject({
       code: 'resource_not_found',
       field: 'actions.0.params.tagId',
     });
     expect(testDb.raw.prepare(
-      `SELECT status FROM common_action_versions WHERE id = ?`,
-    ).get(created.draftVersionId)).toEqual({ status: 'draft' });
+      `SELECT COUNT(*) AS count FROM common_actions WHERE line_account_id = 'account-1'`,
+    ).get()).toEqual({ count: 0 });
   });
 
   it('未公開・別アカウントのテンプレートは結びつけられない(再審査2・3)', async () => {
@@ -239,23 +234,18 @@ describe('V6共通アクション', () => {
     expect(detail.bindings).toEqual([]);
   });
 
-  it('空の友だち情報項目名を公開せず、待機時間を実行形式へ揃える', async () => {
-    const invalid = await createCommonAction(testDb.db, {
+  it('空の友だち情報項目名を保存せず、待機時間を実行形式へ揃える（監査 R479）', async () => {
+    // 監査 R479: 参照先と入力の検査は保存時に行う。不正な内容は下書きに残さない。
+    await expect(createCommonAction(testDb.db, {
       lineAccountId: 'account-1',
       name: '入力不足',
       actions: [{ id: 'metadata', type: 'set_metadata', params: { values: { '': '値' } }, onFailure: 'stop' }],
-    });
-    await expect(publishCommonActionDraft(testDb.db, {
-      id: invalid.id, lineAccountId: 'account-1', draftVersionId: invalid.draftVersionId, expectedDraftRevision: 1,
     })).rejects.toMatchObject({ code: 'metadata_key_required' });
 
     const waiting = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1',
       name: '5分待つ',
       actions: [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }],
-    });
-    await publishCommonActionDraft(testDb.db, {
-      id: waiting.id, lineAccountId: 'account-1', draftVersionId: waiting.draftVersionId, expectedDraftRevision: 1,
     });
     const detail = await getCommonActionDetail(testDb.db, {
       id: waiting.id, lineAccountId: 'account-1',
@@ -359,7 +349,9 @@ describe('V6共通アクション', () => {
     const draftA2 = await createCommonActionDraft(testDb.db, {
       id: first.id, lineAccountId: 'account-1',
     });
-    await updateCommonActionDraft(testDb.db, {
+    // 監査 R479: 循環は保存の時点で止まる（公開時の検査は維持する）。
+    // Bは公開済みでAを呼び、Aの下書きがBを呼ぶと循環になる。
+    await expect(updateCommonActionDraft(testDb.db, {
       id: first.id,
       lineAccountId: 'account-1',
       expectedDraftVersionId: draftA2.draftVersionId,
@@ -369,13 +361,6 @@ describe('V6共通アクション', () => {
         id: 'call-b', type: 'common_action',
         params: { commonActionId: second.id }, onFailure: 'stop',
       }],
-    });
-
-    await expect(publishCommonActionDraft(testDb.db, {
-      id: first.id, lineAccountId: 'account-1', draftVersionId: draftA2.draftVersionId, expectedDraftRevision: 2,
-    })).rejects.toBeInstanceOf(CommonActionValidationError);
-    await expect(publishCommonActionDraft(testDb.db, {
-      id: first.id, lineAccountId: 'account-1', draftVersionId: draftA2.draftVersionId, expectedDraftRevision: 2,
     })).rejects.toMatchObject({ code: 'common_action_cycle' });
   });
 
@@ -518,11 +503,11 @@ describe('V6共通アクション', () => {
       name: '古い名前',
       actions: [...wait5],
     })).rejects.toMatchObject({ code: 'draft_revision_conflict' });
-    // 先行保存の60分は残り、5分に戻っていない（下書きは公開時に正規化される）。
+    // 先行保存の60分は残り、5分に戻っていない（保存時に実行形式へ揃える）。
     let detail = await getCommonActionDetail(testDb.db, {
       id: created.id, lineAccountId: 'account-1',
     });
-    expect(detail.versions[0].actions[0].params).toEqual({ minutes: 60 });
+    expect(detail.versions[0].actions[0].params).toEqual({ durationMinutes: 60 });
     expect(detail.versions[0].draftRevision).toBe(2);
 
     // R477: 公開の読取後に保存が入った古い読取の公開も409で止まる。
@@ -684,6 +669,88 @@ describe('V6共通アクション', () => {
       id: over.id, lineAccountId: 'account-1',
       draftVersionId: over.draftVersionId, expectedDraftRevision: 1,
     })).rejects.toMatchObject({ code: 'execution_plan_too_large' });
+  });
+
+  it('確認後に参照先が更新されたら再確認なしでは公開しない（監査 R479）', async () => {
+    const refTo = (targetId: string) => [{
+      id: 'call', type: 'common_action', params: { commonActionId: targetId }, onFailure: 'stop',
+    }];
+    // 参照先Lのv1（5分待機）を公開する。
+    const leaf = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '参照される処理',
+      actions: [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }],
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      draftVersionId: leaf.draftVersionId, expectedDraftRevision: 1,
+    });
+    // Cの編集画面でL v1を確認して保存する（v1へ固定される）。
+    const caller = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '呼び出す処理', actions: refTo(leaf.id),
+    });
+    let detail = await getCommonActionDetail(testDb.db, {
+      id: caller.id, lineAccountId: 'account-1',
+    });
+    expect(detail.versions[0].actions[0].params).toMatchObject({
+      commonActionId: leaf.id, commonActionVersionId: leaf.draftVersionId,
+    });
+    // 別操作でLのv2（60分待機）が公開される。
+    const leafDraft = await createCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+    });
+    await updateCommonActionDraft(testDb.db, {
+      id: leaf.id,
+      lineAccountId: 'account-1',
+      expectedDraftVersionId: leafDraft.draftVersionId,
+      expectedDraftRevision: 1,
+      name: '参照される処理',
+      actions: [{ id: 'wait', type: 'wait', params: { minutes: 60 }, onFailure: 'stop' }],
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      draftVersionId: leafDraft.draftVersionId, expectedDraftRevision: 2,
+    });
+    // Cは確認済みv1のままでも、再確認なしの公開は止まる。
+    await expect(publishCommonActionDraft(testDb.db, {
+      id: caller.id, lineAccountId: 'account-1',
+      draftVersionId: caller.draftVersionId, expectedDraftRevision: 1,
+    })).rejects.toMatchObject({ code: 'reference_updated' });
+    await expect(publishCommonActionDraft(testDb.db, {
+      id: caller.id, lineAccountId: 'account-1',
+      draftVersionId: caller.draftVersionId, expectedDraftRevision: 1,
+    })).rejects.toThrow(/新しい版があります.*v1→v2/);
+    // 保存し直すとv2へ固定され、公開できる。
+    await updateCommonActionDraft(testDb.db, {
+      id: caller.id,
+      lineAccountId: 'account-1',
+      expectedDraftVersionId: caller.draftVersionId,
+      expectedDraftRevision: 1,
+      name: '呼び出す処理',
+      actions: refTo(leaf.id),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: caller.id, lineAccountId: 'account-1',
+      draftVersionId: caller.draftVersionId, expectedDraftRevision: 2,
+    });
+    detail = await getCommonActionDetail(testDb.db, {
+      id: caller.id, lineAccountId: 'account-1',
+    });
+    expect(detail.versions[0].actions[0].params).toMatchObject({
+      commonActionVersionId: leafDraft.draftVersionId,
+    });
+  });
+
+  it('未公開の参照先は下書き保存の時点で止まる（監査 R479）', async () => {
+    const unpublished = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '未公開の参照先', actions: tagAction('tag-1'),
+    });
+    await expect(createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '未公開を呼ぶ',
+      actions: [{
+        id: 'call', type: 'common_action',
+        params: { commonActionId: unpublished.id }, onFailure: 'stop',
+      }],
+    })).rejects.toMatchObject({ code: 'common_action_not_published' });
   });
 
   it('一覧で旧版利用ありと未使用を区別する', async () => {

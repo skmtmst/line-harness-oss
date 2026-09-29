@@ -34,8 +34,8 @@ async function requireAccount(c: Context<Env>): Promise<string | Response> {
 }
 
 function validationResponse(c: Context<Env>, error: CommonActionValidationError): Response {
-  // 監査 R473・R477・R467: 改訂・利用版の競合は409で再確認へ導く。
-  const conflict = new Set(['version_conflict', 'draft_exists', 'draft_revision_conflict']);
+  // 監査 R473・R477・R467・R479: 改訂・利用版・参照先の競合は409で再確認へ導く。
+  const conflict = new Set(['version_conflict', 'draft_exists', 'draft_revision_conflict', 'reference_updated']);
   const notFound = new Set([
     'not_found', 'draft_not_found', 'base_version_not_found', 'version_not_found', 'binding_not_found',
   ]);

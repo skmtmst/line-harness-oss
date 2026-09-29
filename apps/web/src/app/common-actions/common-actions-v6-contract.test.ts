@@ -127,6 +127,12 @@ describe('V6共通アクションの画面契約', () => {
     expect(CREATE).toContain('clientRequestKey: requestKey')
   })
 
+  it('確認後の参照先更新は再確認なしで公開しない（監査 R479）', () => {
+    expect(WORKER).toContain('reference_updated')
+    expect(WORKER).toContain('新しい版があります')
+    expect(WORKER).toContain('keepPins')
+  })
+
   it('版操作は店が外れていたら実行しない (#580)', () => {
     expect(VERSIONS).toContain('if (!selectedAccountId) {')
     expect(VERSIONS).toContain('LINEアカウントを選び直してください')
