@@ -40,6 +40,7 @@ import {
   parseDeadlineSelect,
   resolveEventMultiAccountIds,
 } from './event-draft-shared'
+import { formatDay, formatNumber } from '@/lib/format'
 
 /**
  * イベントを作る（設計 V2 8-3-2 / 8-3-3 / 8-3-4）。
@@ -517,9 +518,7 @@ function OverviewStep({
   const descLen = (draft.description ?? '').length
   const previewCapacity = Number(firstSlot.capacity)
   const previewDate = firstSlot.date
-    ? new Intl.DateTimeFormat('ja-JP', {
-        month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
-      }).format(new Date(`${firstSlot.date}T00:00:00+09:00`))
+    ? formatDay(new Date(`${firstSlot.date}T00:00:00+09:00`))
     : '開催日を入力'
   const previewEnd = (() => {
     const [hour, minute] = firstSlot.startTime.split(':').map(Number)
@@ -533,9 +532,7 @@ function OverviewStep({
     if (total < 24 * 60 || !firstSlot.date) return hhmm
     const endDate = new Date(new Date(`${firstSlot.date}T00:00:00+09:00`).getTime() + total * 60_000)
     if (Number.isNaN(endDate.getTime())) return hhmm
-    const endDay = new Intl.DateTimeFormat('ja-JP', {
-      month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
-    }).format(endDate)
+    const endDay = formatDay(endDate)
     return `${endDay} ${hhmm}`
   })()
   return (
@@ -592,7 +589,7 @@ function OverviewStep({
               イベント詳細
             </label>
             <span className={`text-xs ${descLen > 20000 ? 'text-danger' : 'text-ink-faint'}`}>
-              {descLen.toLocaleString()} / 20,000
+              {formatNumber(descLen)} / 20,000
             </span>
           </div>
           <textarea

@@ -33,6 +33,7 @@ import {
 } from './column-form'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import styles from './column.module.css'
+import { formatNumber } from '@/lib/format'
 
 /**
  * NENコラムを書く（設計 `ymXJK` 21-1-E／契約 #618）。
@@ -268,7 +269,7 @@ function NewNenColumnInner() {
                 />
               </FormField>
             ) : null}
-            <p className={styles.note}>この条件では {audienceCount == null ? '—' : audienceCount.toLocaleString('ja-JP')}人に届きます。</p>
+            <p className={styles.note}>この条件では {audienceCount == null ? '—' : formatNumber(audienceCount)}人に届きます。</p>
             <Field label="配信日時（日本時間）" type="datetime-local" value={draft.scheduledAt} error={errorFor('scheduledAt')} onChange={(v) => setDraft((d) => ({ ...d, scheduledAt: v }))} />
             {/* NEN-06: ここで入れた日時は下書きに記録されるだけで、まだ予約されない。
                 実際の配信は一覧でコラムを選んで「この内容で予約する」を押したときだけ始まる。 */}

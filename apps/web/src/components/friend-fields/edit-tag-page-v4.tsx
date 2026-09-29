@@ -12,6 +12,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 一覧の `DeleteTagDialog` (`tags-page-v4.tsx`) と同じ分け方。
@@ -79,7 +80,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
     >
       <div className="overflow-hidden rounded-control border border-hairline">
         <dl className="divide-y divide-hairline text-sm">
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-medium">{(dependencies?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-medium">{formatNumber((dependencies?.friendCount ?? tag.friendCount ?? 0))}人</dd></div>
           <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-medium">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
           <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-medium">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
           <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-medium">停止</dd></div>

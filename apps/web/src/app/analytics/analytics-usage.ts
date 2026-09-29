@@ -5,6 +5,7 @@ import {
   itemIsEnabled,
   visibleFeatureGroups,
 } from '@/lib/feature-settings'
+import { formatNumber } from '@/lib/format'
 
 type FeatureSettings = {
   features: Record<string, boolean>
@@ -45,11 +46,11 @@ export function referenceHealthText(metric: AnalyticsMetric<number>): string {
     return `参照切れ 未取得${reason}`
   }
   if (metric.state === 'partial') {
-    const value = metric.value === null ? '—' : metric.value.toLocaleString('ja-JP')
+    const value = metric.value === null ? '—' : formatNumber(metric.value)
     return `参照切れ ${value}（一部のみ）${reason}`
   }
   if (metric.state === 'insufficient') return `参照切れ 未取得${reason}`
-  return `参照切れ ${(metric.value ?? 0).toLocaleString('ja-JP')}`
+  return `参照切れ ${formatNumber((metric.value ?? 0))}`
 }
 
 export function canTidyUsage(

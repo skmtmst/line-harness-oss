@@ -15,6 +15,7 @@ import Button from '@/components/shared/button'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { formatDateTime } from '@/lib/format'
 
 type PublishRun = RichMenuPublishRun
 
@@ -37,7 +38,7 @@ const STATUS_TONE: Record<PublishRun['status'], StatusBadgeTone> = {
 }
 
 function formatAt(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+  return formatDateTime(iso)
 }
 
 /** その版が誰に出る版か。スナップショットに情報が無い版は「分からない」と濁す。 */

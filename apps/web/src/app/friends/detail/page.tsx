@@ -33,6 +33,7 @@ import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { loadFailureKind } from './load-failure-kind'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 /**
  * 友だち詳細。
@@ -264,7 +265,7 @@ function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimel
       className={`text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs @lg:grid @lg:border-b-0 ${last ? 'last:border-b-0' : ''}`}
       style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}
     >
-      <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
+      <span>{formatDateTime(item.occurredAt)}</span>
       <span>{timelineTypeLabel(item.type)}</span>
       <span className="min-w-0 flex-1 basis-full @lg:basis-auto">
         {statusLabel ? (
@@ -1414,14 +1415,14 @@ function FriendDetailInner() {
                 <span className="text-ink-faint text-xs">
                   利用可能
                   {mileage && mileage.pending > 0
-                    ? ` ・ 確定待ち ${mileage.pending.toLocaleString('ja-JP')}`
+                    ? ` ・ 確定待ち ${formatNumber(mileage.pending)}`
                     : ''}
                 </span>
                 <strong className="text-ink text-base font-bold tabular-nums">
                   {mileageStatus === 'loading'
                     ? '…'
                     : mileage
-                      ? mileage.available.toLocaleString('ja-JP')
+                      ? formatNumber(mileage.available)
                       : '—'}
                   <span className="ml-1 text-xs font-semibold">mile</span>
                 </strong>
@@ -1658,7 +1659,7 @@ function FriendDetailInner() {
                     <dt className="text-ink-faint">追加日</dt>
                     <dd className="text-ink-secondary">
                       {friend?.createdAt
-                        ? new Date(friend.createdAt).toLocaleDateString('ja-JP')
+                        ? formatDay(friend.createdAt)
                         : '—'}
                     </dd>
                   </div>
@@ -1820,7 +1821,7 @@ function FriendDetailInner() {
                         友だち追加の記録は本体の作成日時から出す実データ。
                         活動履歴が0件のときは、この記録だけが履歴になる。
                       */}
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
                       {historyStatus === 'ready' && historyItems.length === 0 ? (
                         <p className="text-ink-faint px-4 pb-4 text-xs">
                           上の「友だち追加の記録」以外の活動履歴はまだありません。
@@ -1941,7 +1942,7 @@ function FriendDetailInner() {
                     {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
                     {!historyNextCursor ? (
                       <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
-                        <span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span>
+                        <span>{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span>
                         <span>友だち追加</span>
                         <span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
                         <span>システム</span>
@@ -2226,7 +2227,7 @@ function FriendDetailInner() {
                         <div className="flex items-baseline justify-between gap-2">
                           <p className="text-ink text-sm font-semibold">{s.formName}</p>
                           <p className="text-ink-faint text-xs">
-                            {new Date(s.createdAt).toLocaleString('ja-JP')}
+                            {formatDateTime(s.createdAt)}
                           </p>
                         </div>
                         <dl className="mt-1.5 space-y-0.5">

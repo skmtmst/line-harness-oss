@@ -38,6 +38,7 @@ import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 interface Template {
   id: string
@@ -126,18 +127,15 @@ function TemplateKindBadge({ kind }: { kind: string }) {
   )
 }
 
-/** 今年は「1月13日」、それ以外は「2025年1月13日」。時刻は title で見せる（★V7：1行に収める）。 */
+/** M月D日（曜）。時刻は title で見せる（★V7：1行に収める）。 */
 function formatDate(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  const thisYear = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric' }).formatToParts(new Date()).find((part) => part.type === 'year')?.value
-  return get('year') === thisYear ? `${get('month')}月${get('day')}日` : `${get('year')}年${get('month')}月${get('day')}日`
+  return formatDay(date)
 }
 
 function formatCount(value: number): string {
-  return new Intl.NumberFormat('ja-JP').format(value)
+  return formatNumber(value)
 }
 
 /** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
@@ -1138,7 +1136,7 @@ export default function TemplatesPage() {
                         <span className="text-ink-faint text-xs">送信数を確認できません</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs whitespace-nowrap text-ink-faint tabular-nums" title={new Date(t.updatedAt).toLocaleString('ja-JP')}>{formatDate(t.updatedAt)}</td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap text-ink-faint tabular-nums" title={formatDateTime(t.updatedAt)}>{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
                       {/* 行のクリック（詳細を開く）へ伝えない。 */}
                       <div

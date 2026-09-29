@@ -29,6 +29,7 @@ import HelpTip from '@/components/shared/help-tip'
 import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
+import { formatDay, formatNumber } from '@/lib/format'
 
 interface UsedByAccount {
   id: string
@@ -134,7 +135,7 @@ function displayUpdatedAt(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })
+  return formatDay(date)
 }
 
 export default function FormSubmissionsPage() {
@@ -945,7 +946,7 @@ export default function FormSubmissionsPage() {
                   <td className="px-3 py-2.5 text-right text-xs tabular-nums">
                     {/* ★V7：回答数そのものを「回答を見る」の入口にし、操作の列を細くして名前を読めるようにする。 */}
                     {reviewMode ? (
-                      <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
+                      <span className="block">{displayCount ? `${formatNumber(displayCount)}件` : '—'}</span>
                     ) : (
                       <Link
                         href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`}
@@ -953,7 +954,7 @@ export default function FormSubmissionsPage() {
                         title="集まった回答を見る"
                         className="text-action block font-medium hover:underline"
                       >
-                        {displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '0件'}
+                        {displayCount ? `${formatNumber(displayCount)}件` : '0件'}
                       </Link>
                     )}
                     {/*
@@ -965,12 +966,12 @@ export default function FormSubmissionsPage() {
                     <span className="text-ink-faint block">
                       {form.monthlySubmitCount == null
                         ? '今月 —'
-                        : `今月 ${form.monthlySubmitCount.toLocaleString('ja-JP')}件`}
+                        : `今月 ${formatNumber(form.monthlySubmitCount)}件`}
                     </span>
                     <span className="text-ink-faint block">
                       {form.monthlyCompletionRate == null
                         ? '完了率 —'
-                        : `完了率 ${form.monthlyCompletionRate.toLocaleString('ja-JP')}%`}
+                        : `完了率 ${formatNumber(form.monthlyCompletionRate)}%`}
                     </span>
                   </td>
                   <td className="cq-hide-below-800 px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
@@ -1119,7 +1120,7 @@ export default function FormSubmissionsPage() {
         description={`削除しても、中のフォームは未分類に残ります。${
           deletingFolderCount === null
             ? 'いまこのフォルダに入っている件数を確認できませんでした。'
-            : `いまこのフォルダに入っているのは${deletingFolderCount.toLocaleString('ja-JP')}件です。`
+            : `いまこのフォルダに入っているのは${formatNumber(deletingFolderCount)}件です。`
         }`}
         confirmLabel="削除する"
         destructive
@@ -1217,9 +1218,9 @@ export default function FormSubmissionsPage() {
           <div className="space-y-3 text-sm">
             <dl className="bg-canvas-sunken grid grid-cols-2 gap-2 rounded-control p-3">
               <div><dt className="text-ink-faint text-xs">公開状態</dt><dd className="text-ink mt-1 font-medium">{deleteImpact.form.isActive ? '公開中' : '受付停止中'}</dd></div>
-              <div><dt className="text-ink-faint text-xs">集まった回答</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.submissionCount.toLocaleString('ja-JP')}件</dd></div>
-              <div><dt className="text-ink-faint text-xs">利用中の場所</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.referenceCount.toLocaleString('ja-JP')}か所</dd></div>
-              <div><dt className="text-ink-faint text-xs">開かれた回数</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.openCount.toLocaleString('ja-JP')}回</dd></div>
+              <div><dt className="text-ink-faint text-xs">集まった回答</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.submissionCount)}件</dd></div>
+              <div><dt className="text-ink-faint text-xs">利用中の場所</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.referenceCount)}か所</dd></div>
+              <div><dt className="text-ink-faint text-xs">開かれた回数</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.openCount)}回</dd></div>
             </dl>
             {deleteImpact.answerUrl && (
               <div>

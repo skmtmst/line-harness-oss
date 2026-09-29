@@ -10,6 +10,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 import Notice from '@/components/shared/notice'
+import { formatTime } from '@/lib/format'
 
 /**
  * 対応が必要な受信（設計 `V2 1-1 ダッシュボード` の `card 対応が必要な受信`）。
@@ -248,7 +249,7 @@ export default function PendingInboxCard({
           action={<button type="button" onClick={() => void load()} className="font-medium underline">もう一度読み込む</button>}
         >
           最新の状態に更新できませんでした。
-          {lastSuccessAt ? `最終更新 ${lastSuccessAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} の内容を表示しています。` : ''}
+          {lastSuccessAt ? `最終更新 ${formatTime(lastSuccessAt)} の内容を表示しています。` : ''}
         </Notice>
       ) : null}
 

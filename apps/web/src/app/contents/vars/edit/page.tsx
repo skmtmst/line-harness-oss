@@ -48,6 +48,7 @@ import {
   type ChangeImpactState,
 } from '../change-impact'
 import ImpactReview from '../impact-review'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 共通情報の編集。
@@ -1026,7 +1027,7 @@ function EditCommonVarInner() {
                       <h2 className="text-ink text-sm font-bold">使われている場所</h2>
                     </div>
                     <span className="text-action text-xs font-medium">
-                      {impactState === 'ready' && impact ? `${impact.total.toLocaleString('ja-JP')}か所` : NOT_AVAILABLE}
+                      {impactState === 'ready' && impact ? `${formatNumber(impact.total)}か所` : NOT_AVAILABLE}
                     </span>
                   </div>
                   {impactState !== 'ready' || !impact ? (
@@ -1063,7 +1064,7 @@ function EditCommonVarInner() {
                           {usageGroups.map((group) => (
                             <li key={group.kind} className="px-4 py-3">
                               <p className="text-ink text-sm font-semibold">
-                                {group.kindLabel} {group.count.toLocaleString('ja-JP')}件
+                                {group.kindLabel} {formatNumber(group.count)}件
                               </p>
                               <p className="text-ink-faint mt-1 truncate text-xs" title={group.names.join(' ／ ')}>
                                 {group.names.join(' ／ ')}
@@ -1088,7 +1089,7 @@ function EditCommonVarInner() {
                           言うと、存在しない操作を探させることになる。 */}
                       {'canSave' in impact && impact.blockingTotal > 0 ? (
                         <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
-                          1件ずつ確かめるときは「{impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る」へ進んでください。
+                          1件ずつ確かめるときは「{formatNumber(impact.blockingTotal)}か所を1件ずつ見る」へ進んでください。
                         </p>
                       ) : null}
                     </>
@@ -1180,7 +1181,7 @@ function EditCommonVarInner() {
                     data-qa-open="uNBlA"
                     onClick={() => setShowImpactReview(true)}
                   >
-                    {impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る
+                    {formatNumber(impact.blockingTotal)}か所を1件ずつ見る
                   </Button>
                 ) : null}
                 <Button

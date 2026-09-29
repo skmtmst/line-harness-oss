@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import HelpTip from './help-tip'
 import { isCountableValue } from './not-connected'
 import styles from './kpi-card.module.css'
+import { formatNumber } from '@/lib/format'
 
 export type KpiCardProps = {
   title: string
@@ -162,7 +163,7 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          {valueText !== undefined ? valueText : isCountableValue(value) ? value.toLocaleString('ja-JP') : '—'}
+          {valueText !== undefined ? valueText : isCountableValue(value) ? formatNumber(value) : '—'}
           {valueText !== undefined ? null : unit}
         </p>
       )}

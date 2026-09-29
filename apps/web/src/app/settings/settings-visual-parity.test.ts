@@ -68,7 +68,7 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('splitFeatureGroups(groups, 3)')
     expect(source).not.toContain("['basic', 'delivery', 'contents']")
     expect(source).toContain('api.analytics.usageOverview(selectedAccountId)')
-    expect(source).toContain('利用中 {inUse.toLocaleString')
+    expect(source).toContain('利用中 {formatNumber(inUse')
     expect(source).toContain('利用数は未取得')
     expect(source).toContain('px-3 py-2')
     expect(source).toContain('<div key={columnIndex} className="min-w-0 space-y-3">')

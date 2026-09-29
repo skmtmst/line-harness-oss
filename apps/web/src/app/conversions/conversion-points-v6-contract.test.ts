@@ -38,8 +38,8 @@ describe('V6 成果地点一覧の契約', () => {
 
   it('V6一覧APIの集計・状態・利用先をそのまま使う', () => {
     expect(PAGE).toContain('api.conversions.definitions({')
-    expect(PAGE).toContain('point.metrics.netCount.toLocaleString')
-    expect(PAGE).toContain('point.metrics.netValue.toLocaleString')
+    expect(PAGE).toContain('formatNumber(point.metrics.netCount')
+    expect(PAGE).toContain('formatNumber(point.metrics.netValue')
     expect(PAGE).toContain('point.usageCount === 0')
     expect(PAGE).toContain('definitions.stateCounts.active')
     expect(PAGE).not.toContain('利用先の取得は未接続')

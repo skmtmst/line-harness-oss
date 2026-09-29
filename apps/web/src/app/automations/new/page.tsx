@@ -48,6 +48,7 @@ import {
 } from './trigger-helpers'
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
+import { formatNumber, formatTime } from '@/lib/format'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -650,7 +651,7 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
 
 /** 保存した時刻の表示（DETAIL-15）。分まであれば「いつ保存したか」は読める。 */
 const formatClock = (time: number): string =>
-  new Date(time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  formatTime(time)
 
 /**
  * 「この内容で送る」と押したときに送る中身を、押す前に固めた控え（N-358）。
@@ -2324,7 +2325,7 @@ export default function NewAutomationPage() {
 
           <section className={styles.sideCard}>
             <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
-            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
+            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${formatNumber(previewCount)}人`}</p>
             <p className={styles.sideMissingNote}>
               {/* AUTOMATION-03: 人数の失敗は保存の失敗ではない。下書きは残っている。 */}
               {previewFailed
@@ -2528,7 +2529,7 @@ export default function NewAutomationPage() {
             <dt className="text-xs font-medium text-ink-faint">だれに</dt>
             <dd className="text-ink">
               {targetSummary}
-              {previewCount !== null ? ` 見込み ${previewCount.toLocaleString('ja-JP')}人` : ''}
+              {previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}
             </dd>
           </div>
           <div>

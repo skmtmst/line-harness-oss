@@ -24,6 +24,7 @@ import { reminderStopSummary } from '@/components/reminders/reminder-labels'
 import styles from './reminder-runs.module.css'
 import { csvCell } from '@/lib/presentation'
 import { ReminderRegistrantsPanel } from './registrants-panel'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -38,20 +39,11 @@ const STATUS_VIEW: Record<ReminderDeliveryRunStatus, { label: string; tone: Stat
 }
 
 /** 呼ぶたびに作ると行数分だけ重いため、外で1回作って使い回す (#489-19)。 */
-const jstFormat = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
 function formatJst(value: string | null): string {
   if (!value) return '—'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return '—'
-  return jstFormat.format(parsed)
+  return formatDateTime(parsed)
 }
 
 function timingLabel(offsetMinutes: number): string {
@@ -205,7 +197,7 @@ function ReminderRunsInner() {
         if (all.length >= EXPORT_LIMIT || offset >= total || response.data.items.length === 0) break
       }
       if (total > EXPORT_LIMIT) {
-        setActionMessage(`件数が多いため、全${total.toLocaleString('ja-JP')}件のうち${EXPORT_LIMIT.toLocaleString('ja-JP')}件まで書き出しました。`)
+        setActionMessage(`件数が多いため、全${formatNumber(total)}件のうち${formatNumber(EXPORT_LIMIT)}件まで書き出しました。`)
       }
       const url = URL.createObjectURL(new Blob([csvFor(all)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
@@ -301,10 +293,10 @@ function ReminderRunsInner() {
       </div>
 
       <div className={styles.summary}>
-        <MetricCard label="送信済み" value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'} />
-        <MetricCard label="送信予定" value={data ? `${data.summary.scheduled.toLocaleString('ja-JP')}通` : '—'} />
-        <MetricCard label="停止" value={data ? `${data.summary.stopped.toLocaleString('ja-JP')}人` : '—'} />
-        <MetricCard label="エラー" value={data ? `${data.summary.errors.toLocaleString('ja-JP')}件` : '—'} />
+        <MetricCard label="送信済み" value={data ? `${formatNumber(data.summary.sent)}通` : '—'} />
+        <MetricCard label="送信予定" value={data ? `${formatNumber(data.summary.scheduled)}通` : '—'} />
+        <MetricCard label="停止" value={data ? `${formatNumber(data.summary.stopped)}人` : '—'} />
+        <MetricCard label="エラー" value={data ? `${formatNumber(data.summary.errors)}件` : '—'} />
       </div>
 
       {actionMessage ? <NoteBar tone={actionMessage.includes('ません') ? 'danger' : 'info'}>{actionMessage}</NoteBar> : null}
@@ -335,8 +327,8 @@ function ReminderRunsInner() {
                         <span className={styles.cellSub}>{step.stepNumber}通目</span>
                       </Td>
                       <Td>{timingLabel(step.offsetMinutes)}</Td>
-                      <Td align="right">{step.sent.toLocaleString('ja-JP')}通</Td>
-                      <Td align="right">{step.errors === 0 ? 'なし' : `${step.errors.toLocaleString('ja-JP')}件`}</Td>
+                      <Td align="right">{formatNumber(step.sent)}通</Td>
+                      <Td align="right">{step.errors === 0 ? 'なし' : `${formatNumber(step.errors)}件`}</Td>
                     </Tr>
                   ))}
                 </tbody>
@@ -423,7 +415,7 @@ function ReminderRunsInner() {
                   <span>
                     {data!.pagination.total === 0 ? 0 : data!.pagination.offset + 1}〜
                     {Math.min(data!.pagination.offset + data!.items.length, data!.pagination.total)}件 / 全
-                    {data!.pagination.total.toLocaleString('ja-JP')}件
+                    {formatNumber(data!.pagination.total)}件
                   </span>
                   <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
                 </div>
@@ -437,7 +429,7 @@ function ReminderRunsInner() {
             <CardHeader title="稼働状況" />
             <dl className={styles.sideBody}>
               <Fact label="状態" value={data ? (isUnpublishedDraft ? '下書き' : data.reminder.isActive ? '稼働中' : '停止中') : '—'} />
-              <Fact label="対象者" value={data ? `${data.summary.targetCount.toLocaleString('ja-JP')}人` : '—'} />
+              <Fact label="対象者" value={data ? `${formatNumber(data.summary.targetCount)}人` : '—'} />
               <Fact label="次回送信" value={data ? formatJst(data.summary.nextScheduledAt) : '—'} />
               <Fact label="停止予定" value={data ? (data.reminder.lifecycleStatus === 'stopped' ? '停止済み' : data.reminder.stopConditions === null ? '未設定' : reminderStopSummary(data.reminder.stopConditions)) : '—'} />
             </dl>

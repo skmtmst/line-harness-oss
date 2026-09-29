@@ -10,6 +10,7 @@ import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '
 import TemplatePicker from '@/components/chats/template-picker'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import { formatDateTime } from '@/lib/format'
 
 /**
  * メールの往復。受信箱（/chats）の中央ペインで使う。
@@ -71,12 +72,7 @@ function mergeMessages(current: EmailMessage[], incoming: EmailMessage[]): Email
 }
 
 function dateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(iso)
 }
 
 export function EmailThreadBackButton({ onBack }: { onBack: () => void }) {

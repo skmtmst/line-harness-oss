@@ -188,7 +188,7 @@ describe('N-448 全任意機能の利用状況バッジ', () => {
     expect(broadcasts && rowText(broadcasts)).toContain('90日で 7配信')
     // 90日の利用は無いが過去の最終利用はある。
     const inflow = rows.find((row) => rowText(row).includes('流入と計測'))
-    expect(inflow && rowText(inflow)).toContain('最終利用 2026/03/05')
+    expect(inflow && rowText(inflow)).toContain('最終利用 3月5日（木）')
     // 計測できない機能は 0 にせず未計測＋理由。
     const analytics = rows.find((row) => rowText(row).includes('分析'))
     expect(analytics && rowText(analytics)).toContain('未計測')

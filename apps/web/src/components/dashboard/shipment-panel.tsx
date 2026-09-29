@@ -8,6 +8,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 出荷予定。
@@ -216,7 +217,7 @@ export default function ShipmentPanel({
                           入ったら繋ぐ。docs/v025-open-questions.md に残す。
                         */}
                         <Td align="right" className="text-ink-faint tabular-nums">
-                          {row.quantity > 0 ? row.quantity.toLocaleString('ja-JP') : '—'}
+                          {row.quantity > 0 ? formatNumber(row.quantity) : '—'}
                         </Td>
                         <Td className="whitespace-nowrap">
                           <StatusBadge tone={statusTone[tone]} size="compact">{label}</StatusBadge>

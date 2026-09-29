@@ -37,6 +37,7 @@ import {
   deadlineSelectValue,
   parseDeadlineSelect,
 } from './event-draft-shared'
+import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
 
 type Tab = 'overview' | 'slots' | 'publish'
 
@@ -69,10 +70,7 @@ export function formatJpDateTime(iso: string): string {
     ここが端末の時間帯に依存すると、同じ開催回が一覧と編集で
     時差分ずれて見える。保存値(UTC)は変えず、表示だけ日本時間に固定する。
   */
-  return d.toLocaleString('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(d)
 }
 
 /**
@@ -84,8 +82,8 @@ export function formatJpDateTime(iso: string): string {
 export function formatJpSlotRange(startsAt: string, endsAt: string): string {
   const start = formatJpDateTime(startsAt)
   const end = formatJpDateTime(endsAt)
-  const sameDay = start.slice(0, 10) === end.slice(0, 10)
-  return `${start} 〜 ${sameDay ? end.slice(-5) : end}`
+  const sameDay = formatDay(startsAt) === formatDay(endsAt)
+  return `${start} 〜 ${sameDay ? formatTime(endsAt) : end}`
 }
 
 /**
@@ -580,7 +578,7 @@ function OverviewTab({
         <label className="flex justify-between items-center text-sm font-medium text-ink-secondary mb-1.5">
           <span>イベント詳細</span>
           <span className={`text-xs ${descLen > 20000 ? 'text-danger' : 'text-ink-faint'}`}>
-            {descLen.toLocaleString()} / 20,000
+            {formatNumber(descLen)} / 20,000
           </span>
         </label>
         <textarea

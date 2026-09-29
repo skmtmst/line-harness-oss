@@ -1,5 +1,6 @@
 import { ApiError } from '@/lib/api'
 import type { GoogleHoursPeriod, GoogleWeekday } from '@/lib/restaurant-google-api'
+import { formatDay, formatTime } from '@/lib/format'
 
 /** Googleビジネス画面で共通に使う表示用の小さな道具（第1段・第2段で共有）。 */
 
@@ -12,16 +13,16 @@ export function formatDateTime(value: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return '—'
   const now = new Date()
   const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
-  const time = new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit' }).format(date)
+  const time = formatTime(date)
   if (sameDay) return `今日 ${time}`
-  return `${new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date)} ${time}`
+  return `${formatDay(date)} ${time}`
 }
 
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }).format(date)
+  return formatDay(date)
 }
 
 export function errorMessage(error: unknown, fallback: string): string {

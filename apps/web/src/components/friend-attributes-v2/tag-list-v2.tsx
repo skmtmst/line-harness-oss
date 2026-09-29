@@ -12,6 +12,7 @@ import Progress from '@/components/shared/progress'
 import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatDay, formatNumber } from '@/lib/format'
 
 const UNGROUPED = '__ungrouped__'
 const SHADOW = 'shadow-card'
@@ -68,7 +69,7 @@ function metaFor(tag: Tag): Meta {
   if ((tag.mileageReward ?? 0) > 0) chips.push(`本人+${tag.mileageReward}`)
   if ((tag.referralMileageReward ?? 0) > 0) chips.push(`紹介+${tag.referralMileageReward}`)
   if (tag.mileageMultiplierBps) chips.push(`${tag.mileageMultiplierBps / 10000}倍`)
-  return { source: chips.length ? '連動設定' : '手動', usage: '—', date: new Date(tag.createdAt).toLocaleDateString('ja-JP'), chips }
+  return { source: chips.length ? '連動設定' : '手動', usage: '—', date: formatDay(tag.createdAt), chips }
 }
 
 /** ダブルクォートを含む一般的なCSVの1行を読む。1列目=タグ名、2列目=フォルダ名。 */
@@ -207,7 +208,7 @@ export default function FriendAttributesV2TagList({ fixture }: { fixture?: Frien
   return <div data-design-node="xn98K" className="min-w-0 text-ink [font-family:'SF_Pro_Text',-apple-system,BlinkMacSystemFont,'Helvetica_Neue',Arial,sans-serif]">
     <header data-design="Head" className="flex min-h-[58px] items-start justify-between gap-5"><div><h1 className="text-[30px] font-bold leading-tight tracking-[-0.02em]">友だち属性</h1><p className="mt-1 text-[13px] text-ink-secondary">タグ・情報欄・対応マーク・保存条件を、用途まで見ながら管理します。</p></div><div className="mt-[11px] flex shrink-0 gap-2"><button type="button" onClick={() => setManualOpen(true)} className="h-9 w-[92px] rounded-control border border-hairline bg-canvas text-[13px]">マニュアル</button><button type="button" onClick={() => { setCsvOpen(true); setCsvRows([]); setCsvFileName(''); setCsvDone(0); setCsvError('') }} className="h-9 w-[116px] rounded-control border border-hairline bg-canvas text-[13px]">CSVで一括登録</button></div></header>
     <nav data-design="Tabs" className="mt-4 flex h-7 items-center gap-2" aria-label="友だち属性の種類"><span className="inline-flex h-7 items-center rounded-pill bg-accent-soft px-2 text-[13px] font-semibold text-accent-deep">タグ</span>{[['fields','友だち情報欄'],['marks','対応マーク'],['searches','保存した検索']].map(([tab,label]) => <Link key={tab} href={`/tags?tab=${tab}`} className="inline-flex h-7 items-center rounded-pill bg-canvas-sunken px-2 text-[13px] text-ink-secondary">{label}</Link>)}</nav>
-    <section data-design="KPIs" className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{kpis.map(([title,value,unit,detail]) => <article key={title} className={`h-[108px] rounded-card border border-hairline bg-canvas px-[14px] py-4 ${SHADOW}`}><p className="text-[12px] font-medium text-ink-secondary">{title}</p><p className="mt-1 flex items-baseline gap-1"><span className="text-[26px] font-bold tabular-nums">{value.toLocaleString('ja-JP')}</span><span className="text-[12px] text-ink-secondary">{unit}</span></p><p className="mt-1 text-[11px] text-ink-faint">{detail}</p></article>)}</section>
+    <section data-design="KPIs" className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{kpis.map(([title,value,unit,detail]) => <article key={title} className={`h-[108px] rounded-card border border-hairline bg-canvas px-[14px] py-4 ${SHADOW}`}><p className="text-[12px] font-medium text-ink-secondary">{title}</p><p className="mt-1 flex items-baseline gap-1"><span className="text-[26px] font-bold tabular-nums">{formatNumber(value)}</span><span className="text-[12px] text-ink-secondary">{unit}</span></p><p className="mt-1 text-[11px] text-ink-faint">{detail}</p></article>)}</section>
     <div data-design="Actions" className="mt-4 flex gap-2"><Link href="/tags/folders/new" className="inline-flex h-9 w-[118px] items-center justify-center rounded-control border border-hairline bg-canvas text-[13px]">フォルダを追加</Link><Link href="/tags/new" className="inline-flex h-9 w-[106px] items-center justify-center rounded-control bg-accent-deep text-[13px] font-semibold text-on-accent">＋ タグを追加</Link></div>
     {error && <Notice tone="danger" className="mt-3">{error}</Notice>}
     <div className="mt-4 grid min-w-0 gap-[13px] xl:grid-cols-[270px_minmax(0,1fr)]">

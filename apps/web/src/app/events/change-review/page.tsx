@@ -27,6 +27,7 @@ import {
   type EventDetail,
   type EventSlot,
 } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
 
 const JST_OFFSET_MS = 9 * 3600_000
 
@@ -47,14 +48,7 @@ function localInputToIso(local: string): string | null {
 
 function formatJp(iso: string | null): string {
   if (!iso || !Number.isFinite(Date.parse(iso))) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function previewErrorMessage(code: string): string {

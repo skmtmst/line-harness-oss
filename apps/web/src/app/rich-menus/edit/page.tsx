@@ -38,6 +38,7 @@ import { PublishHistorySection } from './publish-history'
 import { PublishProgressSection } from './publish-progress-section'
 import { PrepublishCheckSection } from './prepublish-check-section'
 import { TestApplySection } from './test-apply-section'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
  * 保存されている条件を読む。
@@ -1788,7 +1789,7 @@ function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | un
   if (!metric || metric.state === 'unavailable' || metric.value === null) {
     return <span title={metric?.reason ?? '未取得'}>— <small className="text-ink-faint text-xs">（未取得）</small></span>
   }
-  return <>{metric.value.toLocaleString('ja-JP')}人</>
+  return <>{formatNumber(metric.value)}人</>
 }
 
 function TargetingStep({
@@ -1919,7 +1920,7 @@ function TargetingStep({
           ) : null}
           {conditionEmpty ? (
             <Notice tone="warn" className="mt-4">条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。</Notice>
-          ) : preview?.overlap.value ? <Notice tone="warn" className="mt-4">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</Notice> : null}
+          ) : preview?.overlap.value ? <Notice tone="warn" className="mt-4">このうち {formatNumber(preview.overlap.value)}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</Notice> : null}
           {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
           <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
         </section>
@@ -2129,7 +2130,7 @@ function PublishStep({
               )}
               <li className={imageReady ? 'text-success' : 'text-warning'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
               <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-warning'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
-              {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
+              {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {formatNumber(preview.overlap.value)}人 が重なっています</li> : null}
             </ul>
           </div>
         </section>
@@ -2171,8 +2172,8 @@ function PublishStep({
             {schedules.map((item) => (
               <li key={item.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded-mini border px-3 py-2 text-xs">
                 <span className="text-ink">
-                  {new Date(item.startsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })} 開始
-                  {item.mode === 'period' && item.endsAt ? ` 〜 ${new Date(item.endsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {formatDateTime(item.startsAt)} 開始
+                  {item.mode === 'period' && item.endsAt ? ` 〜 ${formatDateTime(item.endsAt)}` : ''}
                   {' ・ '}
                   {item.status === 'scheduled' ? '予約中'
                     : item.status === 'publishing' ? '公開処理中'
@@ -2182,7 +2183,7 @@ function PublishStep({
                     : item.status === 'cancelled' ? '取消済み'
                     : item.status === 'failed' ? '失敗・要対応' : item.status}
                   {item.status === 'failed' && item.lastErrorCode ? `（${item.lastErrorCode.slice(0, 40)}）` : ''}
-                  {item.nextRetryAt ? ` ・ 次回 ${new Date(item.nextRetryAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {item.nextRetryAt ? ` ・ 次回 ${formatDateTime(item.nextRetryAt)}` : ''}
                   {item.mode === 'period' ? (item.restoreGroupId ? ` ・ 戻し先 ${restoreMenus.find((menu) => menu.id === item.restoreGroupId)?.name ?? item.restoreGroupId}` : item.restoreDefaultState === 'captured' ? ' ・ 戻し先確定済み（切替前の表示へ戻す）' : item.restoreDefaultState === 'no_default' ? ' ・ 戻し先なし（終了時に表示を外す）' : ' ・ 戻し先は実行開始時に確定') : ''}
                 </span>
                 {item.status === 'scheduled' ? (

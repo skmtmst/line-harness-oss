@@ -15,6 +15,7 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import Notice from '@/components/shared/notice'
 import ListRange from '@/components/ui/list-range'
 import { useAutomationRunPermissions } from '@/components/automations/use-can-manage'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
@@ -89,9 +90,7 @@ const STEP_STATUS_LABEL: Record<AutomationRunDetail['steps'][number]['status'], 
 function formatOccurredAt(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時不明'
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function formatDuration(value: number | null): string {
@@ -391,7 +390,7 @@ export default function AutomationRunsPage() {
         if (result.truncated && result.totalCount !== null) {
           const rest = result.totalCount - (result.returnedCount ?? 0)
           setRetryNotice(
-            `5,000件までしか出ませんでした（対象${result.totalCount.toLocaleString('ja-JP')}件・残り${rest.toLocaleString('ja-JP')}件）。期間や絞り込みで分けて出してください。`,
+            `5,000件までしか出ませんでした（対象${formatNumber(result.totalCount)}件・残り${formatNumber(rest)}件）。期間や絞り込みで分けて出してください。`,
           )
         }
       })
@@ -442,7 +441,7 @@ export default function AutomationRunsPage() {
           <div className="text-right">
             <Button disabled={csvBusy} onClick={downloadRunsCsv}>{csvBusy ? '書き出しています…' : 'CSVで書き出す'}</Button>
             {data && data.pagination.total > 5000 ? (
-              <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みは{data.pagination.total.toLocaleString('ja-JP')}件あり、5,000件までしか出ません。期間や絞り込みで分けて出してください。</p>
+              <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みは{formatNumber(data.pagination.total)}件あり、5,000件までしか出ません。期間や絞り込みで分けて出してください。</p>
             ) : (
               <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます（5,000件まで）</p>
             )}
@@ -453,10 +452,10 @@ export default function AutomationRunsPage() {
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="この30日に動いた" value={data ? `${data.summary.executed.toLocaleString('ja-JP')}回` : '—'} note={data ? '実行結果を集計' : '未取得'} />
-        <Metric label="失敗した" value={data ? `${data.summary.failed.toLocaleString('ja-JP')}回` : '—'} note="処理結果を確認してください" />
-        <Metric label="いちばん動いた" value={data?.summary.mostRunName ?? '—'} note={data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined ? `${data.summary.mostRunCount.toLocaleString('ja-JP')}回` : '未取得'} />
-        <Metric label="条件に外れて動かなかった" value={data ? `${data.summary.skipped.toLocaleString('ja-JP')}回` : '—'} note="条件が厳しすぎないか見てください" />
+        <Metric label="この30日に動いた" value={data ? `${formatNumber(data.summary.executed)}回` : '—'} note={data ? '実行結果を集計' : '未取得'} />
+        <Metric label="失敗した" value={data ? `${formatNumber(data.summary.failed)}回` : '—'} note="処理結果を確認してください" />
+        <Metric label="いちばん動いた" value={data?.summary.mostRunName ?? '—'} note={data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined ? `${formatNumber(data.summary.mostRunCount)}回` : '未取得'} />
+        <Metric label="条件に外れて動かなかった" value={data ? `${formatNumber(data.summary.skipped)}回` : '—'} note="条件が厳しすぎないか見てください" />
       </KpiCollapse>
 
       <Notice tone="info" message="オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。" className="mb-4" />
@@ -475,10 +474,10 @@ export default function AutomationRunsPage() {
 
       <div className="flex flex-wrap gap-2" aria-label="結果で絞り込む">
         {([
-          ['all', 'すべて', data?.summary.total.toLocaleString('ja-JP') ?? '—'],
-          ['executed', '動いた', data?.summary.executed.toLocaleString('ja-JP') ?? '—'],
-          ['skipped', '条件に外れた', data?.summary.skipped.toLocaleString('ja-JP') ?? '—'],
-          ['problems', '失敗', data?.summary.failed.toLocaleString('ja-JP') ?? '—'],
+          ['all', 'すべて', formatNumber(data?.summary.total) ?? '—'],
+          ['executed', '動いた', formatNumber(data?.summary.executed) ?? '—'],
+          ['skipped', '条件に外れた', formatNumber(data?.summary.skipped) ?? '—'],
+          ['problems', '失敗', formatNumber(data?.summary.failed) ?? '—'],
         ] as const).map(([value, label, total]) => (
           <FilterChip key={value} selected={resultFilter === value} onChange={() => changeResultFilter(value)} count={total}>{label}</FilterChip>
         ))}
