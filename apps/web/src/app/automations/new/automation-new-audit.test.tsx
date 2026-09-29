@@ -262,7 +262,101 @@ describe('R490・R491: 公開の再試行と店切替', () => {
     expect(mockCreate).toHaveBeenCalledTimes(1)
     expect(routerPush).toHaveBeenCalledWith('/automations?highlight=draft-9')
   })
+})
 
+describe('R486・R487・R489: 共通アクションの版と公開の照合', () => {
+  /** 共通アクションを1件呼ぶ下書き。確認時の固定版は cv-1（第3版）。 */
+  const draftWithCommonAction = {
+    ...draftDetail,
+    actions: [{ id: 'step-1', type: 'common_action', params: { commonActionId: 'ca-1' }, onFailure: 'stop' }],
+    commonActionRefs: [{
+      stepId: 'step-1', commonActionId: 'ca-1',
+      name: 'お迎え一式', versionId: 'cv-1', versionNumber: 3,
+    }],
+    commonActionVersions: {
+      'cv-1': {
+        commonActionId: 'ca-1', name: 'お迎え一式', versionNumber: 3,
+        actions: [
+          { id: 's1', type: 'send_message', params: { content: 'お待ちしております' }, onFailure: 'stop' },
+        ],
+      },
+      'cv-2': {
+        commonActionId: 'ca-1', name: 'お迎え一式', versionNumber: 4,
+        actions: [
+          { id: 's1', type: 'send_message', params: { content: '別の文面です' }, onFailure: 'stop' },
+        ],
+      },
+    },
+  }
+
+  it('R486: 確認には共通アクションの固定版と実際の本文を出す', async () => {
+    mockGet.mockResolvedValue(ok(draftWithCommonAction))
+    const el = await mountPage()
+    await openTestConfirmation(el)
+    expect(el.textContent).toContain('共通アクション「お迎え一式」第3版：メッセージ「お待ちしております」')
+  })
+
+  it('R487: 確認した版の一式を実行要求へ添える', async () => {
+    mockGet.mockResolvedValue(ok(draftWithCommonAction))
+    const el = await mountPage()
+    await openTestConfirmation(el)
+    await clickButton(el, 'この内容で送る')
+    expect(mockTest).toHaveBeenCalledWith(
+      'draft-9', 'account-1', 'friend-1', 'v2', expect.any(String),
+      [{ stepId: 'step-1', commonActionId: 'ca-1', versionId: 'cv-1' }],
+    )
+  })
+
+  it('R487: 確認後に利用版が切り替わっていたら送らない', async () => {
+    mockGet.mockResolvedValue(ok(draftWithCommonAction))
+    const el = await mountPage()
+    await openTestConfirmation(el)
+    // 送信直前の読み直しで、別担当が束を cv-2 へ切り替えている。
+    // 版の札と中身の指紋は同じまま（束の切り替えは下書きを変えない）。
+    mockGet.mockResolvedValue(ok({
+      ...draftWithCommonAction,
+      commonActionRefs: [{
+        stepId: 'step-1', commonActionId: 'ca-1',
+        name: 'お迎え一式', versionId: 'cv-2', versionNumber: 4,
+      }],
+    }))
+    await clickButton(el, 'この内容で送る')
+    expect(mockTest).not.toHaveBeenCalled()
+    expect(el.textContent).toContain('もう一度、送る内容を確認してください')
+    expect(el.textContent).not.toContain('送る前に確認してください')
+  })
+
+  it('R486: 共通アクションの版を確認できなければ確認画面を開かない', async () => {
+    mockGet.mockResolvedValue(ok({
+      ...draftWithCommonAction,
+      commonActionRefs: [{
+        stepId: 'step-1', commonActionId: 'ca-1',
+        name: 'お迎え一式', versionId: null, versionNumber: null,
+      }],
+    }))
+    const el = await mountPage()
+    await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, '試すルール')
+    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
+    await clickButton(el, '下書きに保存')
+    await typeText(el.querySelector('input[aria-label="1人テストの友だちID"]') as HTMLInputElement, 'friend-1')
+    await clickButton(el, '1人で試す')
+    expect(el.textContent).not.toContain('送る前に確認してください')
+    expect(el.textContent).toContain('共通アクションの内容を確認できませんでした')
+  })
+
+  it('R489: 保存と読み直しの間に別の人が保存していたら、確認せず公開しない', async () => {
+    // PUTは自分の版（v2）を返すが、直後のGETは別担当の版（v3）を返す。
+    mockGet.mockResolvedValue(ok({ ...draftDetail, draftVersionId: 'v3-other' }))
+    const el = await mountPage()
+    await activateRule(el)
+    expect(mockPublish).not.toHaveBeenCalled()
+    expect(el.textContent).toContain('ほかの人が同じ下書きを保存しました')
+    // 自分の入力は消えず、相手の保存も消えない（双方保持）。
+    expect((el.querySelector('input[id="au-name"]') as HTMLInputElement).value).toBe('動かすルール')
+  })
+})
+
+describe('R491: 公開待ちの店切替', () => {
   it('R491: 公開待ちの店切替→戻りは公開済み案内。同じ内容の作り直しはしない', async () => {
     let releasePublish!: (value: unknown) => void
     mockPublish.mockReturnValueOnce(new Promise((resolve) => { releasePublish = resolve as (value: unknown) => void }))
