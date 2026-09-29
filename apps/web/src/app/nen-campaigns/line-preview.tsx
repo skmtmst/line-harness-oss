@@ -35,7 +35,7 @@ export function LineTalk({ children }: { children: React.ReactNode }) {
 }
 
 export function LineTextBubble({ text }: { text: string }) {
-  return <p className="max-w-xs self-start whitespace-pre-wrap rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-caption leading-6 text-ink shadow-card">{text}</p>
+  return <p className="max-w-xs self-start whitespace-pre-wrap rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-caption leading-6 text-ink shadow-card">{text}</p>
 }
 
 /** 画像＋分類＋見出し＋抜粋＋ボタンのカード（Flex の bubble を模した見本）。 */

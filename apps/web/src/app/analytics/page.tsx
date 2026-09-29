@@ -1728,7 +1728,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                           setFunnelAudience(null)
                           setPicked(i)
                         }}
-                        className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded text-left"
+                        className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded-mini text-left"
                         aria-label={`${step.label}の段`}
                         aria-describedby={`funnel-step-${step.stepOrder}-value`}
                       >
@@ -1844,7 +1844,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
             {inactiveFunnels.map((funnel) => (
               <li
                 key={funnel.id}
-                className="border-hairline flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
+                className="border-hairline flex flex-wrap items-center gap-2 rounded-control border px-3 py-2"
               >
                 <span className="text-ink text-sm font-medium">{funnel.name}</span>
                 <Chip tone={funnel.status === 'stopped' ? 'warn' : 'neutral'}>
@@ -2107,7 +2107,7 @@ function FunnelForm({
       <div className="space-y-3">
         <p className="text-ink-secondary text-sm font-medium">段（上から順に見ます）</p>
         {steps.map((step, i) => (
-          <div key={i} className="border-hairline flex flex-wrap items-end gap-2 rounded-lg border p-3">
+          <div key={i} className="border-hairline flex flex-wrap items-end gap-2 rounded-control border p-3">
             <span className="text-ink-faint pb-2 text-sm tabular-nums">{i + 1}.</span>
             <div className="min-w-[10rem] flex-1">
               <label className="text-ink-faint mb-1 block text-xs">段の名前</label>
@@ -2158,7 +2158,7 @@ function FunnelForm({
             {steps.length > 2 && (
               <button
                 onClick={() => setSteps((prev) => prev.filter((_, j) => j !== i))}
-                className="text-danger hover:bg-danger-bg rounded px-2 py-1.5 text-xs"
+                className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1.5 text-xs"
               >
                 外す
               </button>
@@ -2497,7 +2497,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
         {Array.from({ length: 24 }, (_, hour) => {
           const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
           // 高さだけの棒は読み上げに届かない。1本ごとに時間と回数を名前にする。
-          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t bg-accent" style={{ height: `${Math.max(2, clicks / maxHourly * 96)}px` }} />{hour % 3 === 0 && <span className="whitespace-nowrap text-[10px] text-ink-faint">{hour}時</span>}</div>
+          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t-mini bg-accent" style={{ height: `${Math.max(2, clicks / maxHourly * 96)}px` }} />{hour % 3 === 0 && <span className="whitespace-nowrap text-[10px] text-ink-faint">{hour}時</span>}</div>
         })}
       </div>
     </section>

@@ -780,7 +780,7 @@ function MileagePageInner() {
       </div>
       {/*
         #668: ここは人数の内訳で、絞り込みの口ではない。ピルの形
-        （rounded-full + 枠）だと押せるチップに見えるので、押せない
+        （rounded-pill + 枠）だと押せるチップに見えるので、押せない
         事実は字だけの行として出す。「残高が多い順」も選べないので
         「並び順：」の前置きで固定値だと分かる形にする。
       */}
@@ -1128,7 +1128,7 @@ function MileagePageInner() {
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-semibold text-ink">差し戻す理由</span>
           <textarea
-            className="min-h-20 rounded border border-hairline px-3 py-2 text-sm"
+            className="min-h-20 rounded-mini border border-hairline px-3 py-2 text-sm"
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
             placeholder="例：調整の根拠となる資料を確認できませんでした"

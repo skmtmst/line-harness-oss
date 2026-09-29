@@ -501,13 +501,13 @@ const TABS = [
 
 function Toggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
   return <button type="button" role="switch" aria-checked={setting.isEnabled} aria-label={`${setting.label}のお知らせを出す・止める`} disabled={busy} onClick={onToggle}
-    className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors disabled:opacity-50 ${setting.isEnabled ? 'bg-accent' : 'bg-hairline'}`}>
-    <span className={`h-5 w-5 rounded-full bg-canvas shadow-sm transition-transform ${setting.isEnabled ? 'translate-x-5' : ''}`} />
+    className={`inline-flex h-7 w-12 shrink-0 items-center rounded-pill p-1 transition-colors disabled:opacity-50 ${setting.isEnabled ? 'bg-accent' : 'bg-hairline'}`}>
+    <span className={`h-5 w-5 rounded-pill bg-canvas shadow-card transition-transform ${setting.isEnabled ? 'translate-x-5' : ''}`} />
   </button>
 }
 
 function CardPreview({ setting }: { setting: EcNotificationSetting }) {
-  return <div className="border-nen-border bg-nen-ivory overflow-hidden rounded-[24px] border shadow-lg">
+  return <div className="border-nen-border bg-nen-ivory overflow-hidden rounded-card border shadow-float">
     {setting.imageUrl && <img src={setting.imageUrl} alt="" className="aspect-[20/9] w-full object-cover" />}
     <div className="p-5">
       <div className="border-nen-gold-soft flex items-center gap-2 border-b pb-3">
@@ -524,7 +524,7 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
         </div>)}
       </div>
       {setting.outroText && <p className="text-nen-muted mt-4 whitespace-pre-wrap text-xs leading-5">{setting.outroText}</p>}
-      {setting.buttonLabel && <div className="bg-nen-green text-on-accent mt-5 rounded-xl px-4 py-3 text-center text-sm font-semibold">{setting.buttonLabel}</div>}
+      {setting.buttonLabel && <div className="bg-nen-green text-on-accent mt-5 rounded-card px-4 py-3 text-center text-sm font-semibold">{setting.buttonLabel}</div>}
     </div>
   </div>
 }
@@ -634,7 +634,7 @@ function CustomerNotificationEditor({
       * 375px級では並びを折り返さないと横にはみ出す。入れ物を `min-w-0` にし、
       * 操作列を `flex-wrap` で複数行に落とす。左右の余白も狭幅では詰める。
       */}
-    <div data-design="editor-footer" className="fixed bottom-0 left-0 right-0 z-20 min-w-0 border-t border-hairline bg-canvas px-4 py-3 shadow-lg sm:px-6">
+    <div data-design="editor-footer" className="fixed bottom-0 left-0 right-0 z-20 min-w-0 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-6">
       <div className="ml-auto flex min-w-0 flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
         <p className="min-w-0 text-xs text-ink-faint">{definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '出しています。保存すると、次のお知らせから新しい文面が使われます。'}</p>
         <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>

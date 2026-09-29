@@ -184,7 +184,7 @@ function FolderEditor() {
         onMouseDown={closeFromBackdrop}
       >
         <section
-          className="rounded-card border-hairline bg-canvas flex max-h-full w-full max-w-[620px] flex-col overflow-hidden border shadow-2xl"
+          className="rounded-card border-hairline bg-canvas flex max-h-full w-full max-w-[620px] flex-col overflow-hidden border shadow-overlay"
           role="dialog"
           aria-modal="true"
           aria-labelledby="folder-editor-title"
@@ -194,7 +194,7 @@ function FolderEditor() {
               {editId ? 'フォルダを編集' : 'フォルダを追加'}
             </h2>
             <p className="text-ink-secondary mt-1 text-xs">{editId ? '名前と色を変えられます。削除しても中の項目は未分類に残ります。' : 'タグや友だち情報欄を、運用目的ごとに整理します。'}</p>
-            <button type="button" aria-label="閉じる" disabled={saving} onClick={close} className="text-ink-faint hover:text-ink absolute right-4 top-4 rounded p-1 disabled:opacity-40">
+            <button type="button" aria-label="閉じる" disabled={saving} onClick={close} className="text-ink-faint hover:text-ink absolute right-4 top-4 rounded-mini p-1 disabled:opacity-40">
               <X size={18} aria-hidden="true" />
             </button>
           </header>
@@ -252,7 +252,7 @@ function FolderEditor() {
                         selected ? 'ring-accent ring-2' : 'ring-hairline ring-1'
                       }`}
                     >
-                      <span className="relative flex h-5 w-5 items-center justify-center rounded-full" style={{ backgroundColor: item.value }}>
+                      <span className="relative flex h-5 w-5 items-center justify-center rounded-pill" style={{ backgroundColor: item.value }}>
                         {selected && <Check size={16} strokeWidth={3} className="text-on-accent" aria-hidden="true" />}
                       </span>
                     </button>
@@ -268,7 +268,7 @@ function FolderEditor() {
             <div className="rounded-card border-hairline bg-canvas-sunken mt-4 flex flex-col gap-[7px] border p-[14px]">
               <p className="text-nano text-ink-faint font-semibold">一覧での表示</p>
               <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
+                <span className="h-2.5 w-2.5 shrink-0 rounded-pill" style={{ backgroundColor: color }} aria-hidden="true" />
                 <span className="text-label text-ink font-medium">{name.trim() || 'フォルダ名'}</span>
               </div>
             </div>

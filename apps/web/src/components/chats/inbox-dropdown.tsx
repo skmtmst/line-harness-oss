@@ -82,7 +82,7 @@ function Check() {
 }
 
 /* 位置（absolute・z・mt）は器（MenuPortal）が決める。ここは箱の見た目だけ。 */
-const panelClass = 'border-hairline rounded-control bg-canvas min-w-full overflow-hidden border shadow-lg'
+const panelClass = 'border-hairline rounded-control bg-canvas min-w-full overflow-hidden border shadow-float'
 const rowClass = 'flex w-full items-center gap-2 px-3 py-2 text-left text-xs'
 
 // ─────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ function OperatorMark({ option }: { option: OperatorOption }) {
   return (
     <span
       aria-hidden="true"
-      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium"
+      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-pill border text-xs font-medium"
     >
       {mark}
     </span>
@@ -306,7 +306,7 @@ export function StatusDropdown({
         onClick={() => setOpen((now) => !now)}
         className={`border-hairline rounded-control bg-canvas flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
-        <span className={`h-2 w-2 rounded-full ${current.dot}`} aria-hidden="true" />
+        <span className={`h-2 w-2 rounded-pill ${current.dot}`} aria-hidden="true" />
         <span className="font-semibold">{current.label}</span>
         <span className="text-ink-faint"><Chevron open={open} /></span>
       </button>
@@ -332,7 +332,7 @@ export function StatusDropdown({
                 onClick={() => { onChange(status); setOpen(false) }}
                 className={`${rowClass} whitespace-nowrap ${selected ? 'bg-canvas-sunken' : 'hover:bg-canvas-sunken'}`}
               >
-                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-pill ${style.dot}`} aria-hidden="true" />
                 <span className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${style.pill}`}>{style.label}</span>
                 <span className={`text-accent-deep ml-auto ${selected ? '' : 'invisible'}`}><Check /></span>
               </button>

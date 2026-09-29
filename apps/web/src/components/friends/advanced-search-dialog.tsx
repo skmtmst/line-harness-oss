@@ -456,7 +456,7 @@ export default function AdvancedSearchDialog({
          * 組み換え（項目・比較方法・値の縦3段化）は、画面の幅ではなく
          * このパネルの幅で切り替える（#984 U011再）。
          */
-        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-2xl"
+        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
@@ -684,7 +684,7 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-panel border border-hairline bg-canvas p-3">
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-action px-2 py-0.5 text-xs font-medium text-on-action">OR</span>
+              <span className="rounded-pill bg-action px-2 py-0.5 text-xs font-medium text-on-action">OR</span>
               <span className="text-sm font-bold text-ink">いずれか1つ以上満たす条件</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
@@ -913,7 +913,7 @@ function OrAxisPicker({
             onAdd(condition)
             setDraft('')
           }}
-          className="shrink-0 rounded-full border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
+          className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
         >
           ＋ 追加
         </button>

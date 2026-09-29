@@ -191,7 +191,7 @@ export default function AccountEditModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={modalTitleId}
-        className="my-2 w-full max-w-2xl overflow-hidden rounded-lg bg-canvas shadow-xl sm:my-4"
+        className="my-2 w-full max-w-2xl overflow-hidden rounded-control bg-canvas shadow-float sm:my-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-canvas px-4 py-4 sm:px-6">
@@ -212,7 +212,7 @@ export default function AccountEditModal({
             <input
               value={state.name}
               onChange={(e) => update({ name: e.target.value })}
-              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
               required
             />
           </div>
@@ -233,7 +233,7 @@ export default function AccountEditModal({
           />
 
           {/* 上限とアイコン。鍵ではないので、この画面に置いても閲覧権限で困らない。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink-secondary text-sm font-semibold">友だち数とアイコン</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
@@ -298,7 +298,7 @@ export default function AccountEditModal({
           />
 
           {error && (
-            <div className="p-3 bg-danger-bg border border-status-danger-border rounded text-danger text-xs">
+            <div className="p-3 bg-danger-bg border border-status-danger-border rounded-mini text-danger text-xs">
               {error}
             </div>
           )}
@@ -307,14 +307,14 @@ export default function AccountEditModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-hairline hover:bg-surface-pearl"
+              className="px-4 py-2 rounded-control text-sm font-medium border border-hairline hover:bg-surface-pearl"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-lg text-on-accent text-sm font-medium disabled:opacity-50"
+              className="px-4 py-2 rounded-control text-on-accent text-sm font-medium disabled:opacity-50"
               style={{ backgroundColor: 'var(--color-accent)' }}
             >
               {saving ? '保存中...' : '保存'}

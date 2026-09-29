@@ -175,7 +175,7 @@ export default function FormDesignSettings({
       aria-modal="true"
       aria-label="デザイン設定"
     >
-      <section data-design-node="ava2n" className="w-full overflow-hidden rounded-panel shadow-lg" style={{ marginBlock: 94, maxWidth: 820, background: 'var(--color-canvas)' }}>
+      <section data-design-node="ava2n" className="w-full overflow-hidden rounded-panel shadow-float" style={{ marginBlock: 94, maxWidth: 820, background: 'var(--color-canvas)' }}>
         <header className="border-hairline flex items-start justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-ink text-lg font-bold">デザイン設定</h2>
@@ -222,7 +222,7 @@ export default function FormDesignSettings({
                     clearColorInput(role.key)
                     patch(role.key, event.target.value)
                   }}
-                  className="h-10 w-10 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                  className="h-10 w-10 shrink-0 cursor-pointer rounded-mini border-0 bg-transparent p-0"
                   aria-label={`${role.label}の色`}
                 />
                 <span className="min-w-0 flex-1">

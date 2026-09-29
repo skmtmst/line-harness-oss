@@ -493,14 +493,14 @@ export default function AutomationRunsPage() {
           <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>いつ・だれに</span><span>オートメーション</span><span>結果</span><span>したこと</span><span>かかった時間</span><span aria-hidden />
           </div>
           {data.items.map((run) => (
             <div key={run.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
               <div className="min-w-0"><p className="truncate font-semibold text-ink">{formatOccurredAt(run.occurredAt)} ／ {run.subject ?? '友だち名なし'}</p><p className="truncate text-xs text-ink-faint">{run.accountLabel ?? 'アカウント名なし'}</p></div>
-              <div className="min-w-0"><p className="truncate text-ink" title={run.automationName}>{run.automationName}<span className="ml-1 text-xs font-normal text-ink-faint">v{run.versionNumber}</span>{run.isTest ? <span className="ml-1 rounded-full border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト</span> : null}</p><p className="truncate text-xs text-ink-faint" title={run.triggerLabel}>{run.triggerLabel}</p></div>
+              <div className="min-w-0"><p className="truncate text-ink" title={run.automationName}>{run.automationName}<span className="ml-1 text-xs font-normal text-ink-faint">v{run.versionNumber}</span>{run.isTest ? <span className="ml-1 rounded-pill border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト</span> : null}</p><p className="truncate text-xs text-ink-faint" title={run.triggerLabel}>{run.triggerLabel}</p></div>
               <span className={run.status === 'permanent_failed' || run.status === 'partial' || run.status === 'retry_wait' ? 'font-semibold text-danger' : run.status === 'succeeded' ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{STATUS_LABEL[run.status]}</span>
               <p className="truncate text-ink-secondary" title={run.detail ?? '何もしていません'}>{run.detail ?? '何もしていません'}</p>
               <span className="tabular-nums text-ink-secondary">{formatDuration(run.durationMs)}</span>
@@ -537,7 +537,7 @@ export default function AutomationRunsPage() {
       )}
 
       {selectedRun ? (
-        <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-label="実行記録の中身">
+        <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-info">実行記録の中身</p>
@@ -545,7 +545,7 @@ export default function AutomationRunsPage() {
                 {selectedRun.automationName}
                 <span className="ml-2 text-sm font-normal text-ink-faint">版 v{(selectedDetail ?? selectedRun).versionNumber}</span>
                 {(selectedDetail ?? selectedRun).isTest ? (
-                  <span className="ml-2 rounded-full border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト実行</span>
+                  <span className="ml-2 rounded-pill border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト実行</span>
                 ) : null}
                 {/* #1043: 実行した版といまの公開版を区別する。 */}
                 {selectedDetail ? (
@@ -650,7 +650,7 @@ function RunDetail({ label, value }: { label: string; value: string }) {
 
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
+    <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
       <p className="text-xs font-semibold text-ink-faint">{label}</p>
       <p className="mt-1 truncate text-xl font-bold text-ink" title={value}>{value}</p>
       <p className="mt-1 truncate text-xs text-ink-faint" title={note}>{note}</p>

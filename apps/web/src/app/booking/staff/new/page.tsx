@@ -200,7 +200,7 @@ export default function NewBookingStaffPage() {
           <AsideCard title="予約画面での見え方" note="お客様のLINEでの表示です。">
             <div className="border-hairline rounded-card border p-3">
               <div className="flex items-center gap-2">
-                <span className="bg-canvas-sunken h-9 w-9 shrink-0 rounded-full" />
+                <span className="bg-canvas-sunken h-9 w-9 shrink-0 rounded-pill" />
                 <div className="min-w-0">
                   <p className="text-ink truncate text-sm font-medium">{shownName}</p>
                   {role && <p className="text-ink-faint truncate text-xs">{role}</p>}
@@ -323,7 +323,7 @@ export default function NewBookingStaffPage() {
                 <Checkbox
                   checked={offered.has(m.id)}
                   onCheckedChange={() => toggle(m.id)}
-                  className="border-hairline hover:bg-canvas-sunken w-full rounded-md border p-2.5"
+                  className="border-hairline hover:bg-canvas-sunken w-full rounded-mini border p-2.5"
                 ><span className="flex w-full items-center gap-2"><span className="text-ink text-sm">{m.name}</span>
                   <span className="text-ink-faint ml-auto text-xs tabular-nums">
                     {m.duration_minutes}分 / {menuPriceLabel(m)}
@@ -336,7 +336,7 @@ export default function NewBookingStaffPage() {
       </FormSection>
 
       <FormSection step={3} label="受付と表示">
-        <div className="border-hairline rounded-md border p-3">
+        <div className="border-hairline rounded-mini border p-3">
           <p className="text-ink text-sm">店舗の営業時間に合わせる</p>
           <p className="text-ink-faint mt-0.5 text-xs">
             個別に設定したい場合は、登録後に受付時間の画面で調整できます。

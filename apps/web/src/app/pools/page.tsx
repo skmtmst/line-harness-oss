@@ -460,7 +460,7 @@ function CreatePoolModal({
             variant="primary"
             onClick={() => { void onSubmit() }}
             disabled={submitting || !slug || !name || !activeAccountId}
-            className="text-sm px-3 py-1.5 rounded bg-action text-on-accent hover:brightness-90 disabled:opacity-50"
+            className="text-sm px-3 py-1.5 rounded-mini bg-action text-on-accent hover:brightness-90 disabled:opacity-50"
           >
             {submitting ? '作成中…' : '作成'}
           </Button>
