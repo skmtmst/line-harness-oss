@@ -12,6 +12,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { shortDateTime } from '@/lib/hq-banners'
+import { billingFailureMessage } from './failure-message'
 import {
   INVOICE_STATUS_LABELS,
   billingBanner,
@@ -55,6 +56,8 @@ function BillingInner() {
    * `null` は読み込み前の初期値なので、失敗は別の旗で見る。
    */
   const [invoiceFailed, setInvoiceFailed] = useState(false)
+  // M023：履歴の 502（決済サービス不通）も決済サービスの案内にするための目安。
+  const [invoiceError, setInvoiceError] = useState<unknown>(null)
   const [role, setRole] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -63,8 +66,16 @@ function BillingInner() {
   const load = useCallback(async () => {
     setStatus('loading')
     setInvoiceFailed(false)
+    setInvoiceError(null)
     try {
-      const [summaryRes, invoiceRes] = await Promise.all([api.hqBilling.summary(), api.hqBilling.invoices().catch(() => null)])
+      const [summaryRes, invoiceRes] = await Promise.all([
+        api.hqBilling.summary(),
+        // M023：履歴の失敗理由を残す（502 は決済サービスの案内にする）。
+        api.hqBilling.invoices().catch((caught: unknown) => {
+          setInvoiceError(caught)
+          return null
+        }),
+      ])
       if (!summaryRes.success) throw new Error(summaryRes.error)
       setSummary(summaryRes.data)
       // R118: 履歴の失敗は空配列にしない。概要は出して履歴欄だけ失敗表示にする。
@@ -100,7 +111,8 @@ function BillingInner() {
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '申込画面へ進めませんでした。もう一度お試しください。')
+      // M023/M024：原文のまま出さず、共通の案内へ渡す（502 は決済サービスの案内）。
+      setError(billingFailureMessage(caught, '申込画面の表示', 'プランの申込はオーナーだけができます。オーナーの方に操作してもらってください。'))
       setBusy(null)
     }
   }
@@ -113,10 +125,14 @@ function BillingInner() {
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '支払い方法の管理画面へ進めませんでした。')
+      // M023/M024：原文のまま出さず、共通の案内へ渡す（502 は決済サービスの案内）。
+      setError(billingFailureMessage(caught, '支払い方法の管理画面の表示', '支払い方法の管理はオーナーか管理者だけができます。オーナーか管理者の方に操作してもらってください。'))
       setBusy(null)
     }
   }
+
+  // M023：履歴の 502 は決済サービスの案内にする（それ以外は共通の失敗面のまま）。
+  const invoiceUnreachable = invoiceError instanceof ApiError && invoiceError.status === 502
 
   if (status === 'loading') return <ListState kind="loading" title="契約状況を読み込んでいます" />
   // 担当者は見られない（権限表: 課金プランは担当者 不可。閲覧のみは閲覧できる）。
@@ -241,7 +257,13 @@ function BillingInner() {
         <div className="border-t border-hairline" />
         {invoiceFailed ? (
           <div className="px-4 py-5">
-            <ListState kind="error" title="支払い履歴を読み込めませんでした" onRetry={() => void load()} />
+            <ListState
+              kind="error"
+              title={invoiceUnreachable ? '決済サービスにつながりませんでした' : '支払い履歴を読み込めませんでした'}
+              description={invoiceUnreachable ? '少し待って、もう一度読み込んでください。' : undefined}
+              error={invoiceError ?? undefined}
+              onRetry={() => void load()}
+            />
           </div>
         ) : invoices === null || invoices.length === 0 ? (
           <p className="px-4 py-5 text-caption text-ink-faint">まだ支払いはありません。プランを選ぶと、ここに請求と支払いの記録が並びます。</p>

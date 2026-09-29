@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { ArrowRight, Building2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -13,6 +13,8 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   DEFAULT_OPERATOR_EVENT_TYPE,
@@ -81,6 +83,13 @@ function NewOperatorNotificationInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /*
+   * 未保存の基準。作成時は宛先の自動選択が終わってから掴む（開いた直後
+   * の全選択を「変更あり」と数えないため）。なおし時は読み直しの完了後。
+   */
+  const [baseline, setBaseline] = useState<string | null>(null)
+  const autoIdsRef = useRef<string[] | null>(null)
+  const sawLoadingRef = useRef(false)
 
   // 保存ずみのお知らせを全項目そのまま復元する。一部だけ戻すと、
   // 開いて保存した時点で戻らなかった項目が初期値へ上書きされる。
@@ -131,7 +140,11 @@ function NewOperatorNotificationInner() {
       setRecipients(result.data)
       // NOTIFY-04: 再開したお知らせの宛先は保存ずみのもの。全選択で
       // 上書きすると、本人だけにしていた設定が全員へ広がる。
-      if (!editId) setRecipientIds(result.data.items.map((item) => item.id))
+      if (!editId) {
+        const autoIds = result.data.items.map((item) => item.id)
+        setRecipientIds(autoIds)
+        autoIdsRef.current = autoIds
+      }
     }).catch(() => {
       if (!active) return
       setRecipients(null)
@@ -139,6 +152,36 @@ function NewOperatorNotificationInner() {
     })
     return () => { active = false }
   }, [selectedAccountId, editId])
+
+  const signature = JSON.stringify([name, eventType, threshold, importance, recipientIds, schedule, dedupeMinutes, onlyAvailable, emailFallback])
+
+  useEffect(() => {
+    if (baseline !== null) return
+    if (ruleLoading) {
+      sawLoadingRef.current = true
+      return
+    }
+    // なおし時：読み直しを見る前の初期値は基準にしない。
+    if (editId && !sawLoadingRef.current) return
+    // 作成時：宛先の自動選択（または読み込み失敗の確定）を待つ。
+    if (!editId && recipients === null && !error) return
+    if (!editId && autoIdsRef.current !== null) {
+      // 読み込み前に触った分も未保存に数えるよう、初期値＋自動選択で基準を作る。
+      setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_OPERATOR_EVENT_TYPE, 'one', 'normal', autoIdsRef.current, 'anytime', '10', false, true]))
+      return
+    }
+    setBaseline(signature)
+  }, [baseline, ruleLoading, editId, recipients, error, signature])
+
+  /*
+   * 作成・なおし途中の離脱確認。基準から1か所でも変わっていたら、
+   * やめる・左メニューで確認窓を出す。公開・保存が終わると一覧へ
+   * router.push するので、成功後に警告は出ない。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: baseline !== null && signature !== baseline,
+    busy: saving,
+  })
 
   const saveDraft = async (): Promise<string | null> => {
     // 読み込み中に保存すると、未復元の項目が初期値で上書きされる。
@@ -337,6 +380,7 @@ function NewOperatorNotificationInner() {
         </>}
       />
       {/* U063: 選び欄は欄いっぱいに広げる（部品の size="full" を使う）。 */}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

@@ -224,7 +224,7 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
 
     fireEvent.click(screen.getByText('リッチメニュー'))
     await flush()
-    expect(screen.queryByText('入力中の内容があります')).toBeNull()
+    expect(screen.queryByText('保存していない変更があります')).toBeNull()
     expect(routerPush).not.toHaveBeenCalled()
   })
 
@@ -237,13 +237,13 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
     await flush()
 
     // 確認窓が出て遷移は止まる
-    expect(screen.getByText('入力中の内容があります')).toBeTruthy()
+    expect(screen.getByText('保存していない変更があります')).toBeTruthy()
     expect(routerPush).not.toHaveBeenCalled()
 
-    // 「入力を続ける」で閉じる
-    fireEvent.click(screen.getByText('入力を続ける'))
+    // 「編集を続ける」で閉じる
+    fireEvent.click(screen.getByText('編集を続ける'))
     await flush()
-    expect(screen.queryByText('入力中の内容があります')).toBeNull()
+    expect(screen.queryByText('保存していない変更があります')).toBeNull()
     // 入力は残る
     expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('季節メニュー')
   })

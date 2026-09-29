@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import PageHeader from '@/components/shared/page-header'
@@ -1082,13 +1083,9 @@ export default function SettingsPage() {
         onConfirm={resetToDefaults}
       />
 
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="保存せずに移動すると、この画面で変更した機能の表示・並び順は失われます。"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        destructive
+        subject="この画面で変更した機能の表示・並び順"
         busy={saving}
         onCancel={() => {
           if (!saving) cancelLeave()

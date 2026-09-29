@@ -11,6 +11,7 @@ import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
@@ -789,12 +790,9 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
           ) : null}
         </aside>
       </div>
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない下書きがあります"
         description="このまま移動すると、返信文の変更は失われます。下書き保存をしてから移動するか、保存せずに移動してください。"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
