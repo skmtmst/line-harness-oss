@@ -1,3 +1,5 @@
+import { matchesCondition, type SegmentCondition } from './segment-conditions.js';
+
 export type MileageRewardKind =
   | 'coupon'
   | 'tag'
@@ -24,6 +26,8 @@ export interface MileageRewardVersion {
   id: string;
   versionNumber: number;
   status: 'draft' | 'published';
+  /** 保存ごとに増える更新番号。同時編集の検知に使う。 */
+  revision: number;
   requiredMiles: number;
   stockLimit: number | null;
   perFriendLimit: number | null;
@@ -96,6 +100,9 @@ export interface MileageRewardRedemption {
   rewardVersionId: string;
   spendLedgerEntryId: string | null;
   rewardCodeId: string | null;
+  /** 交換が決まったときの名前・種類。未公開の名前変更が過去の交換へ混ざらない。 */
+  rewardNameSnapshot: string | null;
+  rewardKindSnapshot: MileageRewardKind | null;
   idempotencyKey: string;
   requestFingerprint: string;
   status: MileageRedemptionStatus;
@@ -137,6 +144,7 @@ type RewardRow = {
   version_id: string | null;
   version_number: number | null;
   version_status: 'draft' | 'published' | null;
+  revision: number | null;
   required_miles: number | null;
   stock_limit: number | null;
   per_friend_limit: number | null;
@@ -164,6 +172,8 @@ type RedemptionRow = {
   reward_version_id: string;
   spend_ledger_entry_id: string | null;
   reward_code_id: string | null;
+  reward_name_snapshot: string | null;
+  reward_kind_snapshot: MileageRewardKind | null;
   idempotency_key: string;
   request_fingerprint: string;
   status: MileageRedemptionStatus;
@@ -244,10 +254,16 @@ function nonNegativeInteger(value: unknown, label: string): number | null {
 
 function optionalDate(value: unknown, label: string): string | null {
   if (value == null || value === '') return null;
-  if (typeof value !== 'string' || Number.isNaN(new Date(value).getTime())) {
+  if (typeof value !== 'string') {
     throw new MileageRewardError('invalid_date', `${label}を確認してください`);
   }
-  return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new MileageRewardError('invalid_date', `${label}を確認してください`);
+  }
+  // R369: 時差付きのまま保存すると文字列比較で期間を誤判定する。
+  // 保存時にUTCへ正規化し、比較は同じ基準の時刻値で行う。
+  return parsed.toISOString();
 }
 
 function validateRewardTargetConditions(value: unknown): MileageRewardTargetCondition | null {
@@ -340,6 +356,7 @@ function mapVersion(row: RewardRow): MileageRewardVersion | null {
     id: row.version_id,
     versionNumber: row.version_number,
     status: row.version_status,
+    revision: row.revision ?? 1,
     requiredMiles: row.required_miles,
     stockLimit: row.stock_limit,
     perFriendLimit: row.per_friend_limit,
@@ -382,6 +399,7 @@ function rewardSelect(versionExpression: string): string {
          r.reward_kind, r.status, r.sort_order, r.current_draft_version_id,
          r.current_published_version_id, r.created_at, r.updated_at,
          v.id AS version_id, v.version_number, v.status AS version_status,
+         v.revision,
          v.required_miles, v.stock_limit, v.per_friend_limit, v.starts_at, v.ends_at,
          v.benefit_expires_days, v.common_action_version_id, v.failure_policy,
          v.target_conditions, v.customer_message, v.published_at,
@@ -593,34 +611,66 @@ export async function updateMileageRewardDraft(
     id: string;
     lineAccountId: string;
     expectedVersionId: string;
+    expectedRevision?: number | null;
     updatedBy?: string | null;
     draft: MileageRewardDraftInput;
   },
 ): Promise<MileageRewardSummary> {
   const draft = validateMileageRewardDraft(input.draft);
   await requirePublishedActionVersion(db, input.lineAccountId, draft.commonActionVersionId);
+  // R375: 書く前に所属と版IDを照合する。版のUPDATEだけ所属を見ない形にしない。
+  // R374: 読み込んだ更新番号と一致する保存だけ通す。
+  const current = await db.prepare(
+    `SELECT r.current_draft_version_id AS draft_version_id, v.revision AS revision
+       FROM mileage_rewards r
+       LEFT JOIN mileage_reward_versions v ON v.id = r.current_draft_version_id
+      WHERE r.id = ? AND r.line_account_id = ?`,
+  ).bind(input.id, input.lineAccountId).first<{ draft_version_id: string | null; revision: number | null }>();
+  if (!current || current.draft_version_id !== input.expectedVersionId) {
+    if (!current) throw new MileageRewardError('not_found', '使い道が見つかりません', 404);
+    throw new MileageRewardError('version_conflict', 'ほかの人が先に変更しました。読み直してください', 409);
+  }
+  if (input.expectedRevision != null && current.revision !== input.expectedRevision) {
+    throw new MileageRewardError('version_conflict', 'ほかの人が先に変更しました。読み直してください', 409);
+  }
   const now = new Date().toISOString();
+  // 両方のUPDATEに同じ所属・版・更新番号の条件を付け、片方だけ
+  // 書き換わる部分更新を残さない。通るたびに更新番号を1つ増やす。
+  const revisionGuard = input.expectedRevision != null ? ' AND v.revision = ?' : '';
+  const revisionBinds: unknown[] = input.expectedRevision != null ? [input.expectedRevision] : [];
   const results = await db.batch([
     db.prepare(
       `UPDATE mileage_rewards
           SET name = ?, description = ?, image_url = ?, reward_kind = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
+        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
+          AND EXISTS (
+            SELECT 1 FROM mileage_reward_versions v
+             WHERE v.id = ? AND v.reward_id = mileage_rewards.id AND v.status = 'draft'
+             ${revisionGuard}
+          )`,
     ).bind(
       draft.name, draft.description, draft.imageUrl, draft.rewardKind, now,
       input.id, input.lineAccountId, input.expectedVersionId,
+      input.expectedVersionId, ...revisionBinds,
     ),
     db.prepare(
       `UPDATE mileage_reward_versions
           SET required_miles = ?, stock_limit = ?, per_friend_limit = ?, starts_at = ?,
               ends_at = ?, benefit_expires_days = ?, common_action_version_id = ?,
-              target_conditions = ?, failure_policy = ?, customer_message = ?, created_by = ?
-        WHERE id = ? AND reward_id = ? AND status = 'draft'`,
+              target_conditions = ?, failure_policy = ?, customer_message = ?, created_by = ?,
+              revision = revision + 1
+        WHERE id = ? AND reward_id = ? AND status = 'draft'
+          ${input.expectedRevision != null ? ' AND revision = ?' : ''}
+          AND EXISTS (
+            SELECT 1 FROM mileage_rewards r
+             WHERE r.id = mileage_reward_versions.reward_id AND r.line_account_id = ?
+          )`,
     ).bind(
       draft.requiredMiles, draft.stockLimit, draft.perFriendLimit, draft.startsAt,
       draft.endsAt, draft.benefitExpiresDays, draft.commonActionVersionId,
       draft.targetConditions ? JSON.stringify(draft.targetConditions) : null,
       draft.failurePolicy, draft.customerMessage, input.updatedBy ?? null,
-      input.expectedVersionId, input.id,
+      input.expectedVersionId, input.id, ...revisionBinds, input.lineAccountId,
     ),
   ]);
   if ((results[0]?.meta?.changes ?? 0) !== 1 || (results[1]?.meta?.changes ?? 0) !== 1) {
@@ -644,35 +694,62 @@ export async function createMileageRewardDraftFromPublished(
   if (!published) throw new MileageRewardError('published_version_missing', '公開中の版を読み込めませんでした', 409);
   const versionId = crypto.randomUUID();
   const now = new Date().toISOString();
-  await db.batch([
-    db.prepare(
-      `INSERT INTO mileage_reward_versions
-         (id, reward_id, version_number, status, required_miles, stock_limit,
-          per_friend_limit, starts_at, ends_at, benefit_expires_days,
-          common_action_version_id, target_conditions, failure_policy, customer_message, created_by, created_at)
-       SELECT ?, reward_id, version_number + 1, 'draft', required_miles, stock_limit,
-              per_friend_limit, starts_at, ends_at, benefit_expires_days,
-              common_action_version_id, target_conditions, failure_policy, customer_message, ?, ?
-         FROM mileage_reward_versions WHERE id = ? AND status = 'published'`,
-    ).bind(versionId, input.createdBy ?? null, now, reward.currentPublishedVersionId),
-    db.prepare(
-      `UPDATE mileage_rewards SET current_draft_version_id = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id IS NULL`,
-    ).bind(versionId, now, input.id, input.lineAccountId),
-  ]);
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO mileage_reward_versions
+           (id, reward_id, version_number, status, required_miles, stock_limit,
+            per_friend_limit, starts_at, ends_at, benefit_expires_days,
+            common_action_version_id, target_conditions, failure_policy, customer_message, created_by, created_at)
+         SELECT ?, reward_id, version_number + 1, 'draft', required_miles, stock_limit,
+                per_friend_limit, starts_at, ends_at, benefit_expires_days,
+                common_action_version_id, target_conditions, failure_policy, customer_message, ?, ?
+           FROM mileage_reward_versions WHERE id = ? AND status = 'published'`,
+      ).bind(versionId, input.createdBy ?? null, now, reward.currentPublishedVersionId),
+      db.prepare(
+        `UPDATE mileage_rewards SET current_draft_version_id = ?, updated_at = ?
+          WHERE id = ? AND line_account_id = ? AND current_draft_version_id IS NULL`,
+      ).bind(versionId, now, input.id, input.lineAccountId),
+    ]);
+  } catch (error) {
+    // R377: 同時に作った片方は版番号の一意制約に当たる。共同編集の正常な
+    // 競合なので、一般的なサーバーエラーにせず読み直しを案内する。
+    if (error instanceof Error && /unique|UNIQUE/i.test(error.message)) {
+      throw new MileageRewardError('draft_exists', 'ほかの担当者が下書きを作成済みです。読み直してください', 409);
+    }
+    throw error;
+  }
   const created = await getMileageReward(db, input);
   if (!created) throw new MileageRewardError('not_found', '使い道が見つかりません', 404);
+  if (created.currentDraftVersionId !== versionId) {
+    // 競合に勝った相手の下書きが付いた。作り直さず読み直しを案内する。
+    throw new MileageRewardError('draft_exists', 'ほかの担当者が下書きを作成済みです。読み直してください', 409);
+  }
   return created;
 }
 
 export async function publishMileageReward(
   db: D1Database,
-  input: { id: string; lineAccountId: string; publishedBy?: string | null },
+  input: {
+    id: string;
+    lineAccountId: string;
+    publishedBy?: string | null;
+    expectedVersionId?: string | null;
+    expectedRevision?: number | null;
+  },
 ): Promise<MileageRewardSummary> {
   const reward = await getMileageReward(db, input);
   const draft = reward?.currentVersion?.status === 'draft' ? reward.currentVersion : null;
   if (!reward || !draft || !reward.currentDraftVersionId) {
     throw new MileageRewardError('draft_missing', '公開する下書きがありません', 409);
+  }
+  // R376: 公開者が確認した版と更新番号を要求に含め、検証から確定まで
+  // 同じ内容を保証する。途中で保存されたら公開を止めて確認し直す。
+  if (input.expectedVersionId != null && input.expectedVersionId !== draft.id) {
+    throw new MileageRewardError('version_conflict', '公開前に内容が変わりました。読み直してください', 409);
+  }
+  if (input.expectedRevision != null && draft.revision !== input.expectedRevision) {
+    throw new MileageRewardError('version_conflict', '公開前に内容が変わりました。読み直してください', 409);
   }
   await requirePublishedActionVersion(db, input.lineAccountId, draft.commonActionVersionId);
   if (reward.rewardKind === 'coupon') {
@@ -685,18 +762,25 @@ export async function publishMileageReward(
     }
   }
   const now = new Date().toISOString();
+  const revisionGuard = input.expectedRevision != null ? ' AND revision = ?' : '';
+  const revisionBinds: unknown[] = input.expectedRevision != null ? [input.expectedRevision] : [];
   const results = await db.batch([
     db.prepare(
       `UPDATE mileage_reward_versions
           SET status = 'published', published_at = ?, created_by = COALESCE(?, created_by)
-        WHERE id = ? AND reward_id = ? AND status = 'draft'`,
-    ).bind(now, input.publishedBy ?? null, draft.id, reward.id),
+        WHERE id = ? AND reward_id = ? AND status = 'draft'${revisionGuard}`,
+    ).bind(now, input.publishedBy ?? null, draft.id, reward.id, ...revisionBinds),
     db.prepare(
       `UPDATE mileage_rewards
           SET status = 'published', current_published_version_id = current_draft_version_id,
               current_draft_version_id = NULL, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
-    ).bind(now, reward.id, input.lineAccountId, draft.id),
+        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
+          AND EXISTS (
+            SELECT 1 FROM mileage_reward_versions v
+             WHERE v.id = ? AND v.reward_id = mileage_rewards.id
+             ${revisionGuard.replaceAll('revision', 'v.revision')}
+          )`,
+    ).bind(now, reward.id, input.lineAccountId, draft.id, draft.id, ...revisionBinds),
   ]);
   if ((results[0]?.meta?.changes ?? 0) !== 1 || (results[1]?.meta?.changes ?? 0) !== 1) {
     throw new MileageRewardError('version_conflict', '公開前に内容が変わりました。読み直してください', 409);
@@ -755,7 +839,25 @@ export async function importMileageRewardCodes(
   if (!unique.length || unique.length > 10_000) {
     throw new MileageRewardError('invalid_codes', '交換コードは1〜10,000件で登録してください');
   }
-  const results = await db.batch(unique.map((code) => db.prepare(
+  // R372: 重複判定を版の外へ持ち、同じ店舗内の配布履歴まで照合する。
+  // 配布済み（issued/reserved）はもちろん、未使用の旧版コードも再登録では
+  // 増やさない。単発在庫が二重に確保され、別の人へ同じコードを配らない。
+  const existing = new Set<string>();
+  for (let offset = 0; offset < unique.length; offset += 500) {
+    const chunk = unique.slice(offset, offset + 500);
+    const rows = await db.prepare(
+      `SELECT c.code_fingerprint AS fingerprint
+         FROM mileage_reward_codes c
+         JOIN mileage_reward_versions v ON v.id = c.reward_version_id
+         JOIN mileage_rewards r ON r.id = v.reward_id
+        WHERE r.line_account_id = ? AND c.code_fingerprint IN (${chunk.map(() => '?').join(', ')})`,
+    ).bind(input.lineAccountId, ...chunk.map((code) => code.fingerprint))
+      .all<{ fingerprint: string }>();
+    for (const row of rows.results) existing.add(row.fingerprint);
+  }
+  const fresh = unique.filter((code) => !existing.has(code.fingerprint));
+  if (!fresh.length) return { inserted: 0 };
+  const results = await db.batch(fresh.map((code) => db.prepare(
     `INSERT OR IGNORE INTO mileage_reward_codes
        (id, reward_version_id, code_ciphertext, code_fingerprint, status, created_at)
      VALUES (?, ?, ?, ?, 'available', ?)`,
@@ -775,6 +877,8 @@ function mapRedemption(row: RedemptionRow): MileageRewardRedemption {
     rewardVersionId: row.reward_version_id,
     spendLedgerEntryId: row.spend_ledger_entry_id,
     rewardCodeId: row.reward_code_id,
+    rewardNameSnapshot: row.reward_name_snapshot,
+    rewardKindSnapshot: row.reward_kind_snapshot,
     idempotencyKey: row.idempotency_key,
     requestFingerprint: row.request_fingerprint,
     status: row.status,
@@ -900,19 +1004,43 @@ export async function reserveMileageRewardRedemption(
     return { kind: 'existing', redemption: mapRedemption(existing) };
   }
 
-  const reward = await getMileageReward(db, { id: input.rewardId, lineAccountId: input.lineAccountId });
+  // R371: 交換は公開版を直接読む。下書きの有無に左右されない。
+  const publishedRow = await db.prepare(
+    `${rewardSelect('r.current_published_version_id')}
+      WHERE r.id = ? AND r.line_account_id = ? AND r.status = 'published'`,
+  ).bind(input.rewardId, input.lineAccountId).first<RewardRow>();
+  const reward = publishedRow ? mapReward(publishedRow) : null;
   const version = reward?.currentVersion?.status === 'published' ? reward.currentVersion : null;
-  if (!reward || reward.status !== 'published' || !version) {
+  if (!reward || !version) {
     throw new MileageRewardError('reward_not_available', 'この使い道は現在交換できません', 409);
   }
-  const now = new Date().toISOString();
-  if ((version.startsAt && version.startsAt > now) || (version.endsAt && version.endsAt <= now)) {
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
+  // R369: 保存値はUTCへ正規化済み。比較も時刻値で行い、表記ゆれに左右されない。
+  const startsMs = version.startsAt ? new Date(version.startsAt).getTime() : Number.NaN;
+  const endsMs = version.endsAt ? new Date(version.endsAt).getTime() : Number.NaN;
+  if ((Number.isFinite(startsMs) && startsMs > nowMs) || (Number.isFinite(endsMs) && endsMs <= nowMs)) {
     throw new MileageRewardError('reward_outside_period', 'この使い道は交換期間外です', 409);
   }
   const friend = await db.prepare(
     `SELECT id, user_id FROM friends WHERE id = ? AND line_account_id = ?`,
   ).bind(input.friendId, input.lineAccountId).first<{ id: string; user_id: string | null }>();
   if (!friend) throw new MileageRewardError('friend_not_found', '友だち情報を確認できませんでした', 404);
+  // R368: 保存した交換対象条件を消費前に評価する。条件に合わない友だちへ
+  // 特典を渡さない。管理・LIFFの両経路はこの関数を通るため、ここで守る。
+  if (version.targetConditions
+    && ((version.targetConditions.rules?.length ?? 0) > 0
+      || (version.targetConditions.groups?.length ?? 0) > 0)) {
+    let eligible: boolean;
+    try {
+      eligible = await matchesCondition(db, friend.id, version.targetConditions as SegmentCondition);
+    } catch {
+      throw new MileageRewardError('target_conditions_invalid', '交換対象の条件を確認してください', 409);
+    }
+    if (!eligible) {
+      throw new MileageRewardError('reward_not_eligible', 'この使い道の交換対象ではありません', 403);
+    }
+  }
   const beneficiaryKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
   /*
    * R388: 確定文と事後確認も事前確認と同じキー集合で数える。確認だけ広げると
@@ -950,15 +1078,10 @@ export async function reserveMileageRewardRedemption(
       throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
     }
   }
-  const code = reward.rewardKind === 'coupon'
-    ? await db.prepare(
-      `SELECT id FROM mileage_reward_codes
-        WHERE reward_version_id = ? AND status = 'available' ORDER BY created_at, id LIMIT 1`,
-    ).bind(version.id).first<{ id: string }>()
-    : null;
-  if (reward.rewardKind === 'coupon' && !code) {
-    throw new MileageRewardError('out_of_stock', '交換コードの在庫がありません', 409);
-  }
+  const triedCodeIds = new Set<string>();
+  let code: { id: string } | null = null;
+  const redemptionId = crypto.randomUUID();
+  const spendLedgerId = crypto.randomUUID();
   if (version.stockLimit != null) {
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
@@ -1003,96 +1126,115 @@ export async function reserveMileageRewardRedemption(
     throw new MileageRewardError('mileage_lots_unavailable', '交換できるマイルの内訳を確認できませんでした', 409);
   }
 
-  const redemptionId = crypto.randomUUID();
-  const spendLedgerId = crypto.randomUUID();
-  const statements: D1PreparedStatement[] = [
-    db.prepare(
-      `INSERT INTO mileage_redemptions
-         (id, line_account_id, program_id, beneficiary_key, beneficiary_user_id,
-          beneficiary_friend_id, reward_id, reward_version_id, spend_ledger_entry_id,
-          reward_code_id, idempotency_key, request_fingerprint, status, created_at, updated_at)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?
-         FROM mileage_wallets w
-        WHERE w.program_id = ? AND w.beneficiary_key = ?
-          AND w.version = ? AND w.available >= ?
-          AND NOT EXISTS (
-            SELECT 1 FROM mileage_redemptions existing
-             WHERE existing.program_id = ? AND existing.idempotency_key = ?
-          )
-          AND (? IS NULL OR EXISTS (
-            SELECT 1 FROM mileage_reward_codes inventory
-             WHERE inventory.id = ? AND inventory.status = 'available'
-          ))
-          AND (? IS NULL OR (
-            SELECT COUNT(*) FROM mileage_redemptions stock
-             WHERE stock.reward_version_id = ? AND stock.status != 'refunded'
-          ) < ?)
-          AND (? IS NULL OR (
-            SELECT COUNT(*) FROM mileage_redemptions person_limit
-             WHERE person_limit.reward_id = ?
-               AND person_limit.beneficiary_key IN (${limitPlaceholders})
-               AND person_limit.status != 'refunded'
-          ) < ?)`,
-    ).bind(
-      redemptionId, reward.lineAccountId, reward.programId, beneficiaryKey,
-      friend.user_id, friend.id, reward.id, version.id,
-      null, code?.id ?? null, input.idempotencyKey, input.requestFingerprint,
-      now, now, reward.programId, beneficiaryKey, wallet.version, version.requiredMiles,
-      reward.programId, input.idempotencyKey,
-      code?.id ?? null, code?.id ?? null,
-      version.stockLimit, version.id, version.stockLimit,
-      version.perFriendLimit, reward.id, ...limitKeys, version.perFriendLimit,
-    ),
-    db.prepare(
-      `INSERT INTO mileage_ledger
-         (id, program_id, beneficiary_user_id, beneficiary_friend_id,
-          entry_type, amount, status, source, source_event_id, reason,
-          idempotency_key, occurred_at, created_at, metadata)
-       SELECT ?, program_id, beneficiary_user_id, beneficiary_friend_id,
-              'spend', ?, 'available', 'mileage_reward', id, ?, ?, ?, ?, ?
-         FROM mileage_redemptions WHERE id = ?`,
-    ).bind(
-      spendLedgerId, -version.requiredMiles, `「${reward.name}」と交換`,
-      `mileage-redemption:${redemptionId}`, now, now,
-      JSON.stringify({ rewardId: reward.id, rewardVersionId: version.id }), redemptionId,
-    ),
-    db.prepare(
-      `UPDATE mileage_redemptions SET spend_ledger_entry_id = ?, updated_at = ?
-        WHERE id = ? AND spend_ledger_entry_id IS NULL`,
-    ).bind(spendLedgerId, now, redemptionId),
-  ];
-  for (const allocation of allocations) {
-    const allocationId = crypto.randomUUID();
-    statements.push(
+  // R370: 特定コードの取得競合を在庫全体の枯渇と混ぜない。
+  // 選んだコードを横取りされたら、別の利用可能コードを取り直す。
+  // R388: 確定文の上限判定も事前確認と同じ本人キー集合で数える。
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (reward.rewardKind === 'coupon') {
+      const tried = [...triedCodeIds];
+      code = await db.prepare(
+        `SELECT id FROM mileage_reward_codes
+          WHERE reward_version_id = ? AND status = 'available'
+          ${tried.length > 0 ? `AND id NOT IN (${tried.map(() => '?').join(', ')})` : ''}
+          ORDER BY created_at, id LIMIT 1`,
+      ).bind(version.id, ...tried).first<{ id: string }>();
+      if (!code) {
+        throw new MileageRewardError('out_of_stock', '交換コードの在庫がありません', 409);
+      }
+    } else {
+      code = null;
+    }
+    const statements: D1PreparedStatement[] = [
       db.prepare(
-        `UPDATE mileage_grant_lots
-            SET remaining_amount = remaining_amount - ?,
-                status = CASE WHEN remaining_amount - ? = 0 THEN 'exhausted' ELSE status END
-          WHERE ledger_entry_id = ? AND remaining_amount >= ?
-            AND EXISTS (SELECT 1 FROM mileage_redemptions WHERE id = ?)`,
-      ).bind(allocation.amount, allocation.amount, allocation.lotId, allocation.amount, redemptionId),
-      db.prepare(
-        `INSERT INTO mileage_spend_allocations
-           (id, redemption_id, spend_ledger_id, grant_lot_id, amount, created_at)
-         SELECT ?, ?, ?, ?, ?, ?
-          WHERE EXISTS (SELECT 1 FROM mileage_redemptions WHERE id = ?)`,
+        `INSERT INTO mileage_redemptions
+           (id, line_account_id, program_id, beneficiary_key, beneficiary_user_id,
+            beneficiary_friend_id, reward_id, reward_version_id, spend_ledger_entry_id,
+            reward_code_id, reward_name_snapshot, reward_kind_snapshot,
+            idempotency_key, request_fingerprint, status, created_at, updated_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?
+           FROM mileage_wallets w
+          WHERE w.program_id = ? AND w.beneficiary_key = ?
+            AND w.version = ? AND w.available >= ?
+            AND NOT EXISTS (
+              SELECT 1 FROM mileage_redemptions existing
+               WHERE existing.program_id = ? AND existing.idempotency_key = ?
+            )
+            AND (? IS NULL OR EXISTS (
+              SELECT 1 FROM mileage_reward_codes inventory
+               WHERE inventory.id = ? AND inventory.status = 'available'
+            ))
+            AND (? IS NULL OR (
+              SELECT COUNT(*) FROM mileage_redemptions stock
+               WHERE stock.reward_version_id = ? AND stock.status != 'refunded'
+            ) < ?)
+            AND (? IS NULL OR (
+              SELECT COUNT(*) FROM mileage_redemptions person_limit
+               WHERE person_limit.reward_id = ?
+                 AND person_limit.beneficiary_key IN (${limitPlaceholders})
+                 AND person_limit.status != 'refunded'
+            ) < ?)`,
       ).bind(
-        allocationId, redemptionId, spendLedgerId, allocation.lotId,
-        allocation.amount, now, redemptionId,
+        redemptionId, reward.lineAccountId, reward.programId, beneficiaryKey,
+        friend.user_id, friend.id, reward.id, version.id,
+        // R373: 交換が決まったときの名前・種類をこの行に凍結する。
+        null, code?.id ?? null, reward.name, reward.rewardKind,
+        input.idempotencyKey, input.requestFingerprint,
+        now, now, reward.programId, beneficiaryKey, wallet.version, version.requiredMiles,
+        reward.programId, input.idempotencyKey,
+        code?.id ?? null, code?.id ?? null,
+        version.stockLimit, version.id, version.stockLimit,
+        version.perFriendLimit, reward.id, ...limitKeys, version.perFriendLimit,
       ),
-    );
-  }
-  if (code) {
-    statements.push(db.prepare(
-      `UPDATE mileage_reward_codes
-          SET status = 'reserved', redemption_id = ?, reserved_at = ?
-        WHERE id = ? AND status = 'available'
-          AND EXISTS (SELECT 1 FROM mileage_redemptions WHERE id = ?)`,
-    ).bind(redemptionId, now, code.id, redemptionId));
-  }
-  await db.batch(statements);
-  const created = await getMileageRedemption(db, redemptionId);
-  if (!created) {
+      db.prepare(
+        `INSERT INTO mileage_ledger
+           (id, program_id, beneficiary_user_id, beneficiary_friend_id,
+            entry_type, amount, status, source, source_event_id, reason,
+            idempotency_key, occurred_at, created_at, metadata)
+         SELECT ?, program_id, beneficiary_user_id, beneficiary_friend_id,
+                'spend', ?, 'available', 'mileage_reward', id, ?, ?, ?, ?, ?
+           FROM mileage_redemptions WHERE id = ?`,
+      ).bind(
+        spendLedgerId, -version.requiredMiles, `「${reward.name}」と交換`,
+        `mileage-redemption:${redemptionId}`, now, now,
+        JSON.stringify({ rewardId: reward.id, rewardVersionId: version.id }), redemptionId,
+      ),
+      db.prepare(
+        `UPDATE mileage_redemptions SET spend_ledger_entry_id = ?, updated_at = ?
+          WHERE id = ? AND spend_ledger_entry_id IS NULL`,
+      ).bind(spendLedgerId, now, redemptionId),
+    ];
+    for (const allocation of allocations) {
+      const allocationId = crypto.randomUUID();
+      statements.push(
+        db.prepare(
+          `UPDATE mileage_grant_lots
+              SET remaining_amount = remaining_amount - ?,
+                  status = CASE WHEN remaining_amount - ? = 0 THEN 'exhausted' ELSE status END
+            WHERE ledger_entry_id = ? AND remaining_amount >= ?
+              AND EXISTS (SELECT 1 FROM mileage_redemptions WHERE id = ?)`,
+        ).bind(allocation.amount, allocation.amount, allocation.lotId, allocation.amount, redemptionId),
+        db.prepare(
+          `INSERT INTO mileage_spend_allocations
+             (id, redemption_id, spend_ledger_id, grant_lot_id, amount, created_at)
+           SELECT ?, ?, ?, ?, ?, ?
+            WHERE EXISTS (SELECT 1 FROM mileage_redemptions WHERE id = ?)`,
+        ).bind(
+          allocationId, redemptionId, spendLedgerId, allocation.lotId,
+          allocation.amount, now, redemptionId,
+        ),
+      );
+    }
+    if (code) {
+      statements.push(db.prepare(
+        `UPDATE mileage_reward_codes
+            SET status = 'reserved', redemption_id = ?, reserved_at = ?
+          WHERE id = ? AND status = 'available'
+            AND EXISTS (SELECT 1 FROM mileage_redemptions WHERE id = ?)`,
+      ).bind(redemptionId, now, code.id, redemptionId));
+    }
+    await db.batch(statements);
+    const created = await getMileageRedemption(db, redemptionId);
+    if (created) return { kind: 'created', redemption: created };
     const racedExisting = await db.prepare(
       `SELECT * FROM mileage_redemptions WHERE program_id = ? AND idempotency_key = ?`,
     ).bind(reward.programId, input.idempotencyKey).first<RedemptionRow>();
@@ -1103,13 +1245,13 @@ export async function reserveMileageRewardRedemption(
       return { kind: 'existing', redemption: mapRedemption(racedExisting) };
     }
     if (code) {
+      triedCodeIds.add(code.id);
       const inventory = await db.prepare(
         `SELECT status FROM mileage_reward_codes WHERE id = ?`,
       ).bind(code.id).first<{ status: string }>();
-      if (inventory?.status !== 'available') {
-        throw new MileageRewardError('out_of_stock', '交換コードの在庫がありません', 409);
-      }
+      if (inventory?.status !== 'available') continue;
     }
+
     if (version.stockLimit != null) {
       const currentStock = await db.prepare(
         `SELECT COUNT(*) AS count FROM mileage_redemptions
@@ -1136,7 +1278,41 @@ export async function reserveMileageRewardRedemption(
     }
     throw new MileageRewardError('wallet_changed', 'マイル残高が変わりました。読み直してください', 409);
   }
-  return { kind: 'created', redemption: created };
+  // ここへ来るのは、コード以外の理由で確定できなかったとき。
+  // 失敗側の残高は変えず、理由を区別して返す。
+  if (code) {
+    const inventory = await db.prepare(
+      `SELECT status FROM mileage_reward_codes WHERE id = ?`,
+    ).bind(code.id).first<{ status: string }>();
+    if (inventory?.status !== 'available') {
+      throw new MileageRewardError('out_of_stock', '交換コードの在庫がありません', 409);
+    }
+  }
+  if (version.stockLimit != null) {
+    const currentStock = await db.prepare(
+      `SELECT COUNT(*) AS count FROM mileage_redemptions
+        WHERE reward_version_id = ? AND status != 'refunded'`,
+    ).bind(version.id).first<{ count: number }>();
+    if ((currentStock?.count ?? 0) >= version.stockLimit) {
+      throw new MileageRewardError('out_of_stock', 'この使い道は在庫切れです', 409);
+    }
+  }
+  if (version.perFriendLimit != null) {
+    const currentCount = await db.prepare(
+      `SELECT COUNT(*) AS count FROM mileage_redemptions
+        WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
+    ).bind(reward.id, ...limitKeys).first<{ count: number }>();
+    if ((currentCount?.count ?? 0) >= version.perFriendLimit) {
+      throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
+    }
+  }
+  const currentWallet = await db.prepare(
+    `SELECT available FROM mileage_wallets WHERE program_id = ? AND beneficiary_key = ?`,
+  ).bind(reward.programId, beneficiaryKey).first<{ available: number }>();
+  if (!currentWallet || currentWallet.available < version.requiredMiles) {
+    throw new MileageRewardError('insufficient_miles', '交換に必要なマイルが足りません', 409);
+  }
+  throw new MileageRewardError('wallet_changed', 'マイル残高が変わりました。読み直してください', 409);
 }
 
 export async function recordMileageRedemptionAttempt(
@@ -1616,8 +1792,10 @@ export async function getMileageRewardDeliveryPlan(
   if (!row) throw new MileageRewardError('not_found', '交換履歴が見つかりません', 404);
   return {
     redemption: mapRedemption(row),
-    rewardName: row.reward_name,
-    rewardKind: row.reward_kind,
+    // R373: 交換が決まったときの名前・種類を優先する。未公開の名前変更や
+    // 種類変更が、処理中・成功済みの交換へ混ざらない。凍結前の古い行は親行を読む。
+    rewardName: row.reward_name_snapshot ?? row.reward_name,
+    rewardKind: row.reward_kind_snapshot ?? row.reward_kind,
     customerMessage: row.customer_message,
     commonActionVersionId: row.common_action_version_id,
     actionConfig: row.action_config,

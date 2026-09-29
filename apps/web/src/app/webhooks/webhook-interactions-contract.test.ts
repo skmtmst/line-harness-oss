@@ -110,4 +110,12 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<h1')
   })
+
+  // d23d R407: 受け取りの「試し」は実際の受信ではない。
+  // 「届いた記録」「受け取ったとき」の案内を試しには出さない。
+  it('受け取りの試しの記録は実処理と別の案内にする(R407)', () => {
+    expect(PAGE).toContain("item.eventType === 'incoming_webhook.test'")
+    expect(PAGE).toContain('の受け取りを試したとき')
+    expect(PAGE).toContain('受け取りの試しの記録です。実際の受け取りと処理の実行はしていないため')
+  })
 })

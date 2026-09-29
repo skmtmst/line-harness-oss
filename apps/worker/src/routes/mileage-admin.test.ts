@@ -157,7 +157,7 @@ describe('mileage admin API', () => {
     const draft = await call('/api/mileage/rewards/reward-1/draft', {
       method: 'PATCH',
       body: JSON.stringify({
-        accountId: 'account-1', expectedVersionId: 'version-1',
+        accountId: 'account-1', expectedVersionId: 'version-1', expectedRevision: 2,
         draft: {
           name: '交換品', rewardKind: 'coupon', requiredMiles: 300,
           targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }] },
@@ -166,7 +166,7 @@ describe('mileage admin API', () => {
     });
     expect(draft.status).toBe(200);
     expect(dbMocks.updateMileageRewardDraft).toHaveBeenCalledWith(env.DB, expect.objectContaining({
-      id: 'reward-1', lineAccountId: 'account-1', expectedVersionId: 'version-1',
+      id: 'reward-1', lineAccountId: 'account-1', expectedVersionId: 'version-1', expectedRevision: 2,
       draft: expect.objectContaining({
         targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }] },
       }),
@@ -198,6 +198,7 @@ describe('mileage admin API', () => {
     expect(response.status).toBe(200);
     expect(dbMocks.publishMileageReward).toHaveBeenCalledWith(env.DB, {
       id: 'reward-1', lineAccountId: 'account-1', publishedBy: 'env-owner',
+      expectedVersionId: null, expectedRevision: null,
     });
   });
 

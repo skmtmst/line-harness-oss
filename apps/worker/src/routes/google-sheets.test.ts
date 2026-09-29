@@ -35,6 +35,8 @@ const { googleSheets } = await import('./google-sheets.js');
 /** SQLの内容で振り分ける簡易D1。INSERTのbind値は記録する。 */
 const statements: Array<{ sql: string; args: unknown[] }> = [];
 const firstQueue: Array<unknown> = [];
+/** run() の changes を個別に仕込むためのキュー（未設定は1）。 */
+const runChangesQueue: Array<number> = [];
 function firstFor(sql: string) {
   return firstQueue.shift() ?? null;
 }
@@ -44,7 +46,8 @@ const prepare = vi.fn((sql: string) => ({
     all: async () => ({ results: [] }),
     run: async () => {
       statements.push({ sql, args });
-      return { meta: { changes: 1 } };
+      const changes = sql.includes('SET used_at') ? (runChangesQueue.shift() ?? 1) : 1;
+      return { meta: { changes } };
     },
   }),
   first: async () => firstFor(sql),
@@ -83,6 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   statements.length = 0;
   firstQueue.length = 0;
+  runChangesQueue.length = 0;
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({ ids: ['acc-1'], accounts: [] });
 });
 
@@ -104,6 +108,15 @@ describe('connect/start', () => {
     expect(insert).toBeTruthy();
     // code_verifier は暗号化して持つ（平文でDBへ置かない）
     expect(String(insert!.args[4])).toMatch(/^v1\./);
+    // R448: 新しい接続操作の開始時に、このアカウントの古いstateは消す
+    // （開始済みの古いcallbackが後から連携を上書きしないように）。
+    const clearOld = statements.find(
+      (s) => s.sql.includes('DELETE FROM google_sheets_oauth_states') && s.args[0] === 'acc-1',
+    );
+    expect(clearOld).toBeTruthy();
+    const clearIndex = statements.indexOf(clearOld!);
+    const insertIndex = statements.indexOf(insert!);
+    expect(clearIndex).toBeLessThan(insertIndex);
   });
 
   it('全アカウント担当でないadminは403', async () => {
@@ -201,6 +214,7 @@ describe('oauth/callback', () => {
     });
     firstQueue.push({ id: 'acc-1' });
     firstQueue.push(null); // integrationFor（既存なし）
+    firstQueue.push({ state: 's1' }); // 保存直前のstate生存確認
     googleBusiness.exchangeAuthorizationCode.mockResolvedValue({
       accessToken: 'at-1', refreshToken: 'rt-plain-secret', expiresAtMs: Date.now() + 3600_000,
     });
@@ -248,6 +262,47 @@ describe('oauth/callback', () => {
     expect(response.headers.get('location')).toContain('sheets=error%3Ano_refresh_token');
     expect(statements.some((s) => s.sql.includes('INSERT INTO google_sheets_integrations'))).toBe(false);
   });
+
+  it('保存直前にstateが消えていたら連携を作り直さずerror:state_cancelledで戻す', async () => {
+    // R448: 解除・新しい接続開始でstate行が消えたあとに遅れて届いたcallback。
+    // 連携行を作り直してはいけない。
+    const verifierEnc = await encryptCredential('verifier-1', ENCRYPTION_KEY);
+    firstQueue.push({
+      state: 's1', line_account_id: 'acc-1', staff_id: 'owner-1', mode: 'connect',
+      code_verifier_enc: verifierEnc, expires_at: '2999-01-01T00:00:00Z', used_at: null,
+    });
+    firstQueue.push({ id: 'acc-1' });
+    firstQueue.push(null); // integrationFor
+    firstQueue.push(null); // 保存直前のstate生存確認 → 消えている
+    googleBusiness.exchangeAuthorizationCode.mockResolvedValue({
+      accessToken: 'at-1', refreshToken: 'rt-1', expiresAtMs: Date.now() + 3600_000,
+    });
+    googleBusiness.fetchAccountEmail.mockResolvedValue('owner@example.com');
+    const response = await appFor().fetch(
+      new Request('https://worker.example.com/api/integrations/google-sheets/oauth/callback?state=s1&code=authcode'),
+      env,
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toContain('sheets=error%3Astate_cancelled');
+    expect(statements.some((s) => s.sql.includes('INSERT INTO google_sheets_integrations'))).toBe(false);
+  });
+
+  it('同じstateを二度消費しようとしても片方だけ通る', async () => {
+    // R448: 消費UPDATEの changes が0 → もう片方が先に使った → invalid_state。
+    const verifierEnc = await encryptCredential('verifier-1', ENCRYPTION_KEY);
+    firstQueue.push({
+      state: 's1', line_account_id: 'acc-1', staff_id: 'owner-1', mode: 'connect',
+      code_verifier_enc: verifierEnc, expires_at: '2999-01-01T00:00:00Z', used_at: null,
+    });
+    runChangesQueue.push(0); // 条件付きUPDATEが当たらない = 先に消費済み
+    const response = await appFor().fetch(
+      new Request('https://worker.example.com/api/integrations/google-sheets/oauth/callback?state=s1&code=authcode'),
+      env,
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toContain('sheets=error%3Ainvalid_state');
+    expect(googleBusiness.exchangeAuthorizationCode).not.toHaveBeenCalled();
+  });
 });
 
 describe('disconnect', () => {
@@ -273,6 +328,11 @@ describe('disconnect', () => {
     expect(body.data.revoked).toBe(true);
     expect(googleBusiness.revokeToken).toHaveBeenCalledWith({ token: 'rt-1', fetch: expect.anything() });
     expect(statements.some((s) => s.sql.includes('DELETE FROM google_sheets_integrations'))).toBe(true);
+    // R448: 解除時にこのアカウントの接続操作（state）も全部消す。
+    // 解除より前に始まっていた遅いcallbackが連携を復活させないように。
+    expect(
+      statements.some((s) => s.sql.includes('DELETE FROM google_sheets_oauth_states') && s.args[0] === 'acc-1'),
+    ).toBe(true);
     expect(auditLogMod.auditLog).toHaveBeenCalledWith(
       expect.anything(), 'google.sheets.disconnect', expect.anything(), expect.anything(),
     );

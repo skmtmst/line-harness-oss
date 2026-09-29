@@ -3113,7 +3113,7 @@ CREATE TABLE google_sheets_sync_runs (
   started_at TEXT NOT NULL,
   finished_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, run_date TEXT, spreadsheet_id TEXT);
 
 CREATE TABLE hq_support_messages (
   id               TEXT PRIMARY KEY,
@@ -4087,7 +4087,7 @@ CREATE TABLE mileage_redemptions (
   delivered_at             TEXT,
   refunded_at              TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at               TEXT NOT NULL DEFAULT (datetime('now')), reward_name_snapshot TEXT, reward_kind_snapshot TEXT,
   UNIQUE (program_id, idempotency_key)
 );
 
@@ -4123,7 +4123,7 @@ CREATE TABLE mileage_reward_versions (
   customer_message         TEXT NOT NULL DEFAULT '',
   created_by               TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  published_at             TEXT, target_conditions TEXT,
+  published_at             TEXT, target_conditions TEXT, revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE (reward_id, version_number)
 );
 
