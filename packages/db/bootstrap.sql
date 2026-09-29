@@ -2845,6 +2845,17 @@ CREATE TABLE friend_export_jobs (
   failure_reason TEXT
 );
 
+CREATE TABLE friend_field_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  field_id          TEXT NOT NULL REFERENCES friend_fields(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
 CREATE TABLE friend_field_reminder_scan_states (
   reminder_id TEXT PRIMARY KEY REFERENCES reminders(id) ON DELETE CASCADE,
   cursor      TEXT,
@@ -6593,6 +6604,17 @@ CREATE TABLE support_mark_archive_requests (
   UNIQUE(line_account_id, idempotency_key)
 );
 
+CREATE TABLE support_mark_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  mark_id           TEXT NOT NULL REFERENCES support_marks(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
 CREATE TABLE support_mark_scopes (
   mark_id         TEXT PRIMARY KEY REFERENCES support_marks(id),
   tenant_id       TEXT NOT NULL REFERENCES tenants(id),
@@ -8056,6 +8078,9 @@ CREATE INDEX idx_friend_daily_snapshots_date
 CREATE INDEX idx_friend_export_jobs_account
   ON friend_export_jobs(line_account_id, created_at DESC);
 
+CREATE INDEX idx_friend_field_create_requests_field
+  ON friend_field_create_requests(line_account_id, field_id, created_at DESC);
+
 CREATE INDEX idx_friend_field_scopes_account
   ON friend_field_scopes(tenant_id, line_account_id);
 
@@ -9003,6 +9028,9 @@ CREATE INDEX idx_support_email_threads_status_last
 
 CREATE INDEX idx_support_mark_archive_requests_mark
   ON support_mark_archive_requests(line_account_id, mark_id, created_at DESC);
+
+CREATE INDEX idx_support_mark_create_requests_mark
+  ON support_mark_create_requests(line_account_id, mark_id, created_at DESC);
 
 CREATE INDEX idx_support_mark_scopes_account
   ON support_mark_scopes(tenant_id, line_account_id);

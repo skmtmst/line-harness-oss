@@ -1,10 +1,10 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -15,6 +15,7 @@ import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import Select from '@/components/shared/select'
+import ListState from '@/components/shared/list-state'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
@@ -60,21 +61,63 @@ function NewFriendFieldForm() {
   const [folders, setFolders] = useState<Folder[]>([])
   /*
    * IDEA-04: 同名・同じ差し込み名の項目がすでにあるとき、保存する前に
-   * 知らせる。取れなかったときは注意を出さないだけ（保存は止めない）。
+   * 知らせる。
+   * R514: 既存項目が取れていないのに空一覧として扱わない。失敗は見せて
+   * その場で再試行し、重複を確認できるまで保存を止める。
    */
   const [existing, setExisting] = useState<FriendField[]>([])
+  const [existingState, setExistingState] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** フォルダが取れない間は未分類だけに見える。隠さず、選び直せるようにする。 */
+  const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [reloading, setReloading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * R515: 同じ作成のやり直しは同じ要求キーで送る。入力を変えたら
+   * 新しいキーにする（同じキーに異なる内容はサーバが409で止める）。
+   */
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
 
-  useEffect(() => { void api.folders.list('friend_field').then((res) => { if (res.success) setFolders(res.data) }) }, [])
-  useEffect(() => {
-    if (!selectedAccountId) return
-    let cancelled = false
-    void api.friendFields.list(selectedAccountId)
-      .then((res) => { if (!cancelled && res.success) setExisting(res.data) })
-      .catch(() => { /* 注意が出せないだけ。読み直しはしない */ })
-    return () => { cancelled = true }
+  const loadFolders = useCallback(async () => {
+    setReloading(true)
+    try {
+      const res = await api.folders.list('friend_field')
+      if (!res.success) throw new Error(res.error)
+      setFolders(res.data)
+      setFoldersState('ready')
+    } catch {
+      setFoldersState('error')
+    } finally {
+      setReloading(false)
+    }
+  }, [])
+
+  const loadExisting = useCallback(async () => {
+    const account = selectedAccountId
+    if (!account) {
+      setExistingState('error')
+      return
+    }
+    setReloading(true)
+    try {
+      const res = await api.friendFields.list(account)
+      if (!res.success) throw new Error(res.error)
+      setExisting(res.data)
+      setExistingState('ready')
+    } catch {
+      // R514: 失敗を隠して空一覧にしない。入力は残し、再試行を出す。
+      setExistingState('error')
+    } finally {
+      setReloading(false)
+    }
   }, [selectedAccountId])
+
+  useEffect(() => { void loadFolders() }, [loadFolders])
+  useEffect(() => { void loadExisting() }, [loadExisting])
+  // 入力の中身が変わったら、次に押す作成は別の要求として新しいキーにする。
+  useEffect(() => {
+    idempotencyKeyRef.current = crypto.randomUUID()
+  }, [name, fieldKey, type, folderId, options, defaultValue, defaultOptions, isPersonal, isStarred, ecIsMaster, ecFieldPath])
 
   /*
    * 入力がひとつでも入ったら未保存（作成系の他画面と同じ考え方）。
@@ -99,9 +142,12 @@ function NewFriendFieldForm() {
     return existing.filter((item) => item.fieldKey === key).map((item) => item.name)
   }, [existing, fieldKey])
 
+  // R514: 既存項目を読めていない間の保存は送らない（重複を確認できないため）。
+  const listBlocked = existingState !== 'ready'
   const save = async () => {
     if (saving) return
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
+    if (listBlocked) return
     if (!name.trim()) return setError('項目名を入力してください')
     if (!fieldKey.trim()) return setError('差し込み名を入力してください')
     if (NEEDS_OPTIONS.has(type) && optionList.length === 0) return setError('選択肢を1つ以上入力してください')
@@ -133,11 +179,12 @@ function NewFriendFieldForm() {
               : defaultValue.trim() || null,
         isPersonal, isStarred,
         ecIsMaster, ecFieldPath: ecIsMaster ? ecFieldPath.trim() : null,
-      })
+        // R515: 同じ作成のやり直しは同じ要求キーで送り、二重に作らない。
+      }, idempotencyKeyRef.current)
       if (!res.success) throw new Error(res.error)
       router.push(back ?? `/tags?tab=fields&highlight=${res.data.id}`)
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : '項目を作成できませんでした')
+      setError(describeSaveFailure(reason))
     } finally { setSaving(false) }
   }
 
@@ -152,6 +199,18 @@ function NewFriendFieldForm() {
         <Link href={back ?? '/tags?tab=fields'} className="text-status-info shrink-0 text-label font-semibold hover:underline">友だち情報欄へ</Link>
       </div>
 
+      {/* R514: 既存項目の取得失敗は隠さず、その場で再試行する。入力は残す。 */}
+      {existingState === 'error' ? (
+        <div className="mb-4">
+          <ListState
+            kind="error"
+            title="既存の項目を読み込めませんでした"
+            description="重複を確認できないため、読み直すまで保存できません。入力内容はそのままです。"
+            onRetry={() => void loadExisting()}
+            retrying={reloading}
+          />
+        </div>
+      ) : null}
       {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -212,6 +271,14 @@ function NewFriendFieldForm() {
             ) : null}
             <Field label="フォルダ" htmlFor="ff-folder" note="フォルダは友だち詳細のタブになります。">
               <Select id="ff-folder" value={folderId} onChange={(value) => setFolderId(value)} aria-label="友だち情報欄のフォルダ" size="full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              {foldersState === 'error' ? (
+                <p className="mt-1.5 text-xs leading-5 text-ink-secondary">
+                  フォルダを読み込めませんでした。今は未分類にしか入れられません。
+                  <button type="button" onClick={() => void loadFolders()} disabled={reloading} className="ml-1 font-semibold text-status-info hover:underline disabled:opacity-40">
+                    {reloading ? '読み込んでいます' : 'もう一度読み込む'}
+                  </button>
+                </p>
+              ) : null}
             </Field>
             {/* IDEA-04: 「情報欄」を選んだ理由と、印だけならタグ・対応状態なら対応マークという違いを、作る場所で確認できるようにする。 */}
             <AttributeKindGuide current="field" />
@@ -257,7 +324,8 @@ function NewFriendFieldForm() {
       </div>
 
       {/* #976 U084/U085: 追従バーの操作は共通Button。左キャンセル→右確定の並びはStickyBarが持つ。 */}
-      <StickyBar status={saving ? '項目を保存しています' : '未保存'} actions={<><Button href={back ?? '/tags?tab=fields'}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '作成中…' : '項目を作成'}</Button></>} />
+      {/* R514: 重複を確認できるまで保存は押させず、理由を状態文に出す。 */}
+      <StickyBar status={saving ? '項目を保存しています' : listBlocked ? '既存の項目を読み直すと保存できます' : '未保存'} actions={<><Button href={back ?? '/tags?tab=fields'}>キャンセル</Button><Button type="button" variant="primary" disabled={saving || listBlocked} onClick={() => void save()}>{saving ? '作成中…' : '項目を作成'}</Button></>} />
       <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力中の内容があります"

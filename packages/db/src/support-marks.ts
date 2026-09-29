@@ -347,6 +347,111 @@ export interface NewSupportMarkAutomationRule {
   isActive: boolean;
 }
 
+export class SupportMarkCreateError extends Error {
+  constructor(public readonly code: 'idempotency_conflict', message: string) {
+    super(message);
+    this.name = 'SupportMarkCreateError';
+  }
+}
+
+/**
+ * R512: 同じ要求キーの再送で二重に作らないための指紋。
+ *
+ * 名前・色・並び順・初期値・受信時自動付与・自動変更ルールが
+ * 1文字でも違えば別の要求とみなし、作らず止める。
+ */
+function supportMarkCreateFingerprint(
+  input: {
+    name: string;
+    color?: string;
+    isDefault?: boolean;
+    autoOnInbound?: boolean;
+    displayOrder?: number;
+  },
+  automationRules: NewSupportMarkAutomationRule[],
+): string {
+  return JSON.stringify({
+    name: input.name,
+    color: input.color ?? '#94A3B8',
+    isDefault: input.isDefault === true,
+    autoOnInbound: input.autoOnInbound === true,
+    displayOrder: input.displayOrder ?? 0,
+    automationRules,
+  });
+}
+
+export interface SupportMarkCreateResult {
+  mark: SupportMark;
+  /** 同じ要求キーの再送で、保存済みのマークを返した。 */
+  replayed: boolean;
+}
+
+/**
+ * R512: 要求キー付きで対応マークを作る。
+ *
+ * 応答だけ失った再試行は、同じキー・同じ内容なら保存済みのマークを
+ * 返す（作り直さない）。同じキーに異なる内容が来たら作らず止める。
+ * 要求キーの行は本体と同じD1バッチで確定するため、同時に同じキーが
+ * 送られても1件だけ残る（負けた側のバッチは巻き戻る）。
+ */
+export async function createSupportMarkIdempotent(
+  db: D1Database,
+  scope: SupportMarkScope,
+  input: {
+    name: string;
+    color?: string;
+    isDefault?: boolean;
+    autoOnInbound?: boolean;
+    displayOrder?: number;
+  },
+  actorId: string | null,
+  automationRules: NewSupportMarkAutomationRule[],
+  idempotencyKey: string,
+): Promise<SupportMarkCreateResult> {
+  const fingerprint = supportMarkCreateFingerprint(input, automationRules);
+  const findRequest = () => db.prepare(
+    `SELECT mark_id, request_fingerprint
+       FROM support_mark_create_requests
+      WHERE line_account_id = ? AND idempotency_key = ?`,
+  ).bind(scope.lineAccountId, idempotencyKey).first<{
+    mark_id: string;
+    request_fingerprint: string;
+  }>();
+  const previous = await findRequest();
+  if (previous) {
+    if (previous.request_fingerprint !== fingerprint) {
+      throw new SupportMarkCreateError(
+        'idempotency_conflict',
+        '同じ要求キーに異なる内容が指定されました。一覧を確認してください',
+      );
+    }
+    const mark = await getSupportMarkById(db, previous.mark_id, scope);
+    if (mark) return { mark, replayed: true };
+    // 保存済みのはずのマークが無い（保管済み等）。古い予約を消して作り直す。
+    await db.prepare(
+      `DELETE FROM support_mark_create_requests
+        WHERE line_account_id = ? AND idempotency_key = ?`,
+    ).bind(scope.lineAccountId, idempotencyKey).run();
+  }
+  const markId = crypto.randomUUID();
+  try {
+    const mark = await createSupportMarkWithAutomationRules(
+      db, scope, input, actorId, automationRules, markId,
+      { key: idempotencyKey, fingerprint },
+    );
+    return { mark, replayed: false };
+  } catch (err) {
+    // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
+    // 勝者がいなければ元の失敗をそのまま返す（握りつぶさない）。
+    const raced = await findRequest().catch(() => null);
+    if (raced?.request_fingerprint === fingerprint) {
+      const mark = await getSupportMarkById(db, raced.mark_id, scope).catch(() => null);
+      if (mark) return { mark, replayed: true };
+    }
+    throw err;
+  }
+}
+
 /** マーク本体と自動変更ルールを同じD1バッチで確定する。 */
 export async function createSupportMarkWithAutomationRules(
   db: D1Database,
@@ -360,8 +465,10 @@ export async function createSupportMarkWithAutomationRules(
   },
   actorId: string | null,
   automationRules: NewSupportMarkAutomationRule[],
+  markId: string = crypto.randomUUID(),
+  idempotency?: { key: string; fingerprint: string },
 ): Promise<SupportMark> {
-  const id = crypto.randomUUID();
+  const id = markId;
   const now = jstNow();
   const statements: D1PreparedStatement[] = [];
   if (input.isDefault) {
@@ -453,10 +560,33 @@ export async function createSupportMarkWithAutomationRules(
     actorId,
     JSON.stringify({ lineAccountId: scope.lineAccountId, automationRuleCount: automationRules.length }),
   ));
+  if (idempotency) {
+    // R512: 要求キーの行も同じバッチで確定する。本体より後に積むため、
+    // 外部キーのある環境でも制約に当たらない。同じキーの同時実行は
+    // UNIQUE 制約で負けた側だけ巻き戻り、二重に残らない。
+    statements.push(db.prepare(
+      `INSERT INTO support_mark_create_requests
+         (id, line_account_id, idempotency_key, request_fingerprint,
+          mark_id, response_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      scope.lineAccountId,
+      idempotency.key,
+      idempotency.fingerprint,
+      id,
+      JSON.stringify({ markId: id }),
+      now,
+    ));
+  }
   await db.batch(statements);
   return (await getSupportMarkById(db, id, scope))!;
 }
 
+/**
+ * R513: 読んだときの版（expectedVersion）と違えば、ほかの担当者が
+ * 先に変えている。黙って上書きせず 'conflict' を返す。
+ */
 export async function updateSupportMark(
   db: D1Database,
   id: string,
@@ -468,10 +598,15 @@ export async function updateSupportMark(
     autoOnInbound?: boolean;
     displayOrder?: number;
     actorId?: string | null;
+    expectedVersion?: number;
   },
-): Promise<SupportMark | null> {
+): Promise<SupportMark | null | 'conflict'> {
   const existing = await getSupportMarkById(db, id, scope);
   if (!existing) return null;
+  if (input.expectedVersion !== undefined
+    && Number(existing.version ?? 1) !== input.expectedVersion) {
+    return 'conflict';
+  }
 
   // 移行前の共通マークは選択中アカウントへ複製し、そのアカウントの
   // 友だちだけを付け替える。他アカウントの表示や設定は変えない。
