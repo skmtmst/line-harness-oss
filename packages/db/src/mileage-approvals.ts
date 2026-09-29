@@ -1,7 +1,7 @@
 import { postMileageAdjustment } from './mileage.js';
 import type { MileageLedgerEntry, MileageRuleRow } from './mileage.js';
 import { matchesCondition, parseCondition } from './segment-conditions.js';
-import { jstNow } from './utils.js';
+import { dbTableExists, jstNow } from './utils.js';
 import { MileageV6Error, type MileageEarningRuleDraft } from './mileage-admin-v6.js';
 
 /**
@@ -110,6 +110,24 @@ export async function confirmPendingMileageEntry(
  *   残高を下回る取消は受け付けない。
  * - void: 再送とみなして既存の逆向き行を返す。
  */
+/**
+ * m25d R359: 取り消した付与の未使用分を交換対象から外す。
+ * 交換の内訳はロットから選ぶため、台帳の取消だけでは取消済みロットが
+ * 使われてしまう。使い切った分は交換側の予約が残り、未使用分だけを
+ * 無効化する（紹介成果の却下と同じ考え方）。条件付きなので冪等。
+ */
+async function voidGrantLotForEntry(db: D1Database, entryId: string): Promise<void> {
+  if (!(await dbTableExists(db, 'mileage_grant_lots'))) return;
+  await db
+    .prepare(
+      `UPDATE mileage_grant_lots
+          SET remaining_amount = 0, status = 'void'
+        WHERE ledger_entry_id = ? AND status = 'available'`,
+    )
+    .bind(entryId)
+    .run();
+}
+
 export async function voidMileageLedgerEntry(
   db: D1Database,
   input: {
@@ -134,6 +152,9 @@ export async function voidMileageLedgerEntry(
     .bind(idempotencyKey)
     .first<{ id: string }>();
   if (existingReversal) {
+    // m25d R359: 再送時も内訳を無効化し直す（冪等で二重の影響なし）。
+    // 初回が落ちた後に残った使用可能ロットをここで閉じる。
+    await voidGrantLotForEntry(db, entry.id);
     return { entry, reversalEntryId: existingReversal.id, replayed: true };
   }
 
@@ -254,13 +275,18 @@ export async function voidMileageLedgerEntry(
         .prepare(`SELECT id FROM mileage_ledger WHERE idempotency_key = ?`)
         .bind(idempotencyKey)
         .first<{ id: string }>();
-      if (raced) return { entry, reversalEntryId: raced.id, replayed: true };
+      if (raced) {
+        await voidGrantLotForEntry(db, entry.id);
+        return { entry, reversalEntryId: raced.id, replayed: true };
+      }
       throw new MileageV6Error(
         'insufficient_balance',
         '利用可能な残高が足りないため取消できません',
         409,
       );
     }
+    // m25d R359: 台帳の取消と同時に内訳も使用不可にする（同じ処理で整合）。
+    await voidGrantLotForEntry(db, entry.id);
     return { entry, reversalEntryId: reversalId, replayed: false };
   }
 

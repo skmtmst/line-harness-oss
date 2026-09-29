@@ -397,6 +397,15 @@ export async function findCommittedMileageAdjustment(
  * `(program_id, idempotency_key)` constraint makes retries return the original
  * before/after values instead of applying the delta again.
  */
+/**
+ * m25d R359: 手動減算で使う内訳の選び方。交換の予約と同じ「使える」基準で、
+ * 期限の近いロットから順に消費する。台帳の INSERT と同じ batch へ積むため、
+ * 台帳が書かれなかった同時操作の負け分は EXISTS の条件でロットへ触らない。
+ */
+function adjustmentLotSpendOrderSql(): string {
+  return `CASE WHEN expires_at IS NULL THEN 1 ELSE 0 END, expires_at, available_at, ledger_entry_id`;
+}
+
 export async function postMileageAdjustment(
   db: D1Database,
   input: PostMileageAdjustmentInput,
@@ -414,6 +423,12 @@ export async function postMileageAdjustment(
     .first<MileageLedgerEntry>();
   if (existing) return adjustmentResult(existing, fingerprint, true);
 
+  const friend = await db
+    .prepare(`SELECT id, user_id FROM friends WHERE id = ? AND line_account_id = ?`)
+    .bind(input.friendId, input.lineAccountId)
+    .first<{ id: string; user_id: string | null }>();
+  if (!friend) throw new MileageAdjustmentError('friend_not_found');
+
   const id = crypto.randomUUID();
   const now = input.occurredAt ?? jstNow();
   const baseMetadata = JSON.stringify({
@@ -429,8 +444,35 @@ export async function postMileageAdjustment(
     notifyFriend: input.notifyFriend === true,
   });
 
-  const write = await db
-    .prepare(
+  // m25d R359: 減算は台帳だけでなく付与内訳も同じ処理で減らす。
+  // 増額は 275 の trigger がロットを作るが、減額は台帳だけでは
+  // ロットが残り「残高100・使用可能ロット200」の不整合になる。
+  // 期限切れは使えない分なので消費対象から外す（交換の予約と同じ）。
+  // ロット不足（期限切れ・過去の不整合）はある分だけ消費し、
+  // 台帳の残高検査は従来どおり台帳が決める。
+  const lotSpends: Array<{ lotId: string; amount: number }> = [];
+  if (input.amount < 0 && (await dbTableExists(db, 'mileage_grant_lots'))) {
+    const beneficiaryKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
+    const lots = await db
+      .prepare(
+        `SELECT ledger_entry_id, remaining_amount FROM mileage_grant_lots
+          WHERE program_id = ? AND beneficiary_key = ? AND status = 'available'
+            AND remaining_amount > 0 AND (expires_at IS NULL OR expires_at > ?)
+          ORDER BY ${adjustmentLotSpendOrderSql()}`,
+      )
+      .bind(programId, beneficiaryKey, now)
+      .all<{ ledger_entry_id: string; remaining_amount: number }>();
+    let remaining = -input.amount;
+    for (const lot of lots.results) {
+      if (remaining <= 0) break;
+      const take = Math.min(remaining, lot.remaining_amount);
+      lotSpends.push({ lotId: lot.ledger_entry_id, amount: take });
+      remaining -= take;
+    }
+  }
+
+  const statements: D1PreparedStatement[] = [
+    db.prepare(
       `WITH identity AS (
          SELECT id, user_id FROM friends WHERE id = ? AND line_account_id = ?
        ), wallet AS (
@@ -453,8 +495,7 @@ export async function postMileageAdjustment(
               ?, ?
          FROM identity CROSS JOIN wallet
         WHERE ? > 0 OR wallet.available + ? >= 0`,
-    )
-    .bind(
+    ).bind(
       input.friendId,
       input.lineAccountId,
       programId,
@@ -470,20 +511,30 @@ export async function postMileageAdjustment(
       now,
       input.amount,
       input.amount,
-    )
-    .run();
+    ),
+  ];
+  for (const spend of lotSpends) {
+    statements.push(
+      db.prepare(
+        `UPDATE mileage_grant_lots
+            SET remaining_amount = remaining_amount - ?,
+                status = CASE WHEN remaining_amount - ? = 0 THEN 'exhausted' ELSE status END
+          WHERE ledger_entry_id = ? AND remaining_amount >= ?
+            AND EXISTS (SELECT 1 FROM mileage_ledger WHERE id = ?)`,
+      ).bind(spend.amount, spend.amount, spend.lotId, spend.amount, id),
+    );
+  }
+  const batchResults = (await db.batch(statements)) as Array<{
+    meta?: { changes?: unknown };
+  }>;
+  const ledgerChanges = Number(batchResults[0]?.meta?.changes ?? 0);
 
   const inserted = await db
     .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
     .bind(programId, input.idempotencyKey)
     .first<MileageLedgerEntry>();
-  if (inserted) return adjustmentResult(inserted, fingerprint, (write.meta?.changes ?? 0) === 0);
+  if (inserted) return adjustmentResult(inserted, fingerprint, ledgerChanges === 0);
 
-  const friend = await db
-    .prepare(`SELECT id FROM friends WHERE id = ? AND line_account_id = ?`)
-    .bind(input.friendId, input.lineAccountId)
-    .first<{ id: string }>();
-  if (!friend) throw new MileageAdjustmentError('friend_not_found');
   throw new MileageAdjustmentError('insufficient_balance');
 }
 
