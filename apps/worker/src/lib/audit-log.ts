@@ -141,6 +141,8 @@ export type AuditAction =
   | 'google.sheets.disconnect'
   | 'google.sheets.target.update'
   | 'google.sheets.sync'
+  // TikTok利益計算シートの手動同期。
+  | 'tiktok_pnl.manual_sync'
   | 'restaurant.google.store.bootstrap'
   | 'restaurant.google.connect.start'
   | 'restaurant.google.connect'

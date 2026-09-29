@@ -3146,6 +3146,36 @@ const spec = {
         },
       },
     },
+    '/api/integrations/tiktok-pnl/status': {
+      get: {
+        tags: ['External integrations'],
+        summary: 'TikTok利益計算シートの状態（シートURL・最終同期・未反映行数・エラー）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'TikTok PnL sheet status' },
+          '400': { description: 'account_id required' },
+          '403': { description: 'owner/admin required' },
+        },
+      },
+    },
+    '/api/integrations/tiktok-pnl/sync': {
+      post: {
+        tags: ['External integrations'],
+        summary: 'TikTok利益計算シートへ今すぐ同期（EC取り込み＋差分行の書き出し）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Sync result' },
+          '400': { description: 'account_id required' },
+          '403': { description: 'owner/admin required' },
+          '409': { description: 'Google Sheets連携が未接続' },
+          '502': { description: 'Sync failed' },
+        },
+      },
+    },
     '/api/ec-commerce/orders/{id}': {
       get: {
         tags: ['NEN delivery'],
