@@ -930,10 +930,17 @@ export async function listMileageRedemptions(
   const status = input.status ?? 'needs_attention';
   // R364: 既定は「要対応」（届かなかった交換＋送ったか分からない交換）。
   // `delivering` のままの照合待ちを既定の一覧から消さない。
+  // R362: 返却確定後に書き込みが中断した交換（台帳なしの refunded）も
+  // 要対応に入れる。入れないと残高が戻らないまま誰にも見えない。
   const statusClause = status === 'all'
     ? ''
     : status === 'needs_attention'
-      ? `AND r.status IN ('delivery_failed', 'delivering')`
+      ? `AND (r.status IN ('delivery_failed', 'delivering')
+        OR (r.status = 'refunded' AND NOT EXISTS (
+          SELECT 1 FROM mileage_ledger l
+           WHERE l.program_id = r.program_id
+             AND l.idempotency_key = 'mileage-redemption-refund:' || r.id
+        )))`
       : 'AND r.status = ?';
   const binds: unknown[] = [input.lineAccountId];
   if (status !== 'all' && status !== 'needs_attention') binds.push(status);
@@ -1327,7 +1334,20 @@ export async function recordMileageRedemptionAttempt(
 ): Promise<MileageRewardRedemption> {
   const current = await getMileageRedemption(db, input.redemptionId);
   if (!current) throw new MileageRewardError('not_found', '交換履歴が見つかりません', 404);
-  if (current.status === 'succeeded' || current.status === 'refunded') return current;
+  if (current.status === 'succeeded') return current;
+  if (current.status === 'refunded') {
+    /*
+     * R362: 返却確定後に台帳・ロットの書き込みが中断した行は、
+     * ここでも欠けた分を足してから返す。失敗したら回復（再試行・cron）
+     * に任せ、記録の呼び出し自体は壊さない。
+     */
+    try {
+      await completeRefundWrites(db, current, '中断した返却の再開');
+    } catch {
+      /* 回復は再試行・cronに任せる */
+    }
+    return (await getMileageRedemption(db, current.id))!;
+  }
   const now = new Date().toISOString();
   const attempt = current.attemptCount + 1;
   const status: MileageRedemptionStatus = input.status === 'succeeded' ? 'succeeded' : 'delivery_failed';
@@ -1409,15 +1429,89 @@ export async function refundMileageRewardRedemption(
 }
 
 /**
+ * 返却の書き込みが欠けていないか確かめる合図。
+ * 返却台帳の冪等キーは交換ごとに1つ。台帳が無ければ書き込みは
+ * 未実行（中断は確定前）。台帳があれば残高は戻っている
+ * （残高は台帳 INSERT の trigger で連動する）。
+ */
+function refundReversalIdempotencyKey(redemptionId: string): string {
+  return `mileage-redemption-refund:${redemptionId}`;
+}
+
+/**
  * 勝者だけが呼ぶ、台帳・ロット・コード解放の書き込み。
- * 台帳の冪等キーで二重書き込みを防ぐ。ロット復元は台帳が
- * 初めて書かれたときだけ行う（再開時は戻さない）。
+ *
+ * R362: 台帳 INSERT とロット復元・コード解放を1つの batch で書く。
+ * batch は原子（一部だけ残らない）なので、中断後に残るのは
+ * 「台帳なし」（未実行）だけになる。INSERT は厳しい書き込み
+ * （OR IGNORE なし）にする。同時に走った相手の batch は一意制約で
+ * 全体が巻き戻り、残高・内訳の二重書き込みにならない。
+ * 負けた走者は台帳を確かめ直し、あれば完了として扱う。
  */
 async function completeRefundWrites(
   db: D1Database,
   current: MileageRewardRedemption,
   reason: string,
 ): Promise<void> {
+  const { reward, allocations } = await loadRefundSources(db, current);
+  const now = new Date().toISOString();
+  const existing = await selectRefundReversal(db, current);
+  if (!existing) {
+    try {
+      await db.batch([
+        db.prepare(
+          `INSERT INTO mileage_ledger
+             (id, program_id, beneficiary_user_id, beneficiary_friend_id,
+              entry_type, amount, status, source, source_event_id, reason,
+              idempotency_key, occurred_at, created_at, metadata)
+           VALUES (?, ?, ?, ?, 'reversal', ?, 'available', 'mileage_reward_refund', ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(), current.programId,
+          current.beneficiaryUserId, current.beneficiaryFriendId,
+          reward.required_miles, current.id, requiredText(reason, '戻す理由', 500),
+          refundReversalIdempotencyKey(current.id), now, now,
+          JSON.stringify({ redemptionId: current.id, spendLedgerId: current.spendLedgerEntryId }),
+        ),
+        ...allocations.map((allocation) => db.prepare(
+          // m22u R359: 返却は有効なロットだけへ戻す。成果の取消で無効化した
+          // ロット(void)へは戻さない（取り消した付与が交換で復活しないように）。
+          `UPDATE mileage_grant_lots
+              SET remaining_amount = remaining_amount + ?,
+                  status = 'available'
+            WHERE ledger_entry_id = ? AND beneficiary_key = ?
+              AND status IN ('available', 'exhausted')`,
+        ).bind(allocation.amount, allocation.grant_lot_id, current.beneficiaryKey)),
+        ...(current.rewardCodeId
+          ? [db.prepare(
+            `UPDATE mileage_reward_codes
+                SET status = 'available', redemption_id = NULL, reserved_at = NULL
+              WHERE id = ? AND redemption_id = ? AND status = 'reserved'`,
+          ).bind(current.rewardCodeId, current.id)]
+          : []),
+      ]);
+      return;
+    } catch (error) {
+      // 同時再開の負け（一意制約）か、本当の書き込み失敗かを見分ける。
+      // 台帳があれば相手が書き終えた（batch 原子なのでロット・コードも済み）。
+      if (await selectRefundReversal(db, current)) {
+        await verifyRefundWrites(db, current, allocations);
+        return;
+      }
+      throw error;
+    }
+  }
+  // 台帳がある再開時は、ロットを戻さない（二重に戻さない）。
+  // ただし旧処理で残った「台帳あり・コード未解放」だけは直す。
+  await verifyRefundWrites(db, current, allocations);
+}
+
+async function loadRefundSources(
+  db: D1Database,
+  current: MileageRewardRedemption,
+): Promise<{
+  reward: { required_miles: number };
+  allocations: Array<{ grant_lot_id: string; amount: number }>;
+}> {
   const reward = await db.prepare(
     `SELECT v.required_miles FROM mileage_reward_versions v WHERE v.id = ?`,
   ).bind(current.rewardVersionId).first<{ required_miles: number }>();
@@ -1433,40 +1527,135 @@ async function completeRefundWrites(
   if (allocatedTotal !== reward.required_miles) {
     throw new MileageRewardError('refund_source_missing', '戻すマイルの内訳を確認できませんでした', 409);
   }
+  return { reward, allocations: allocations.results };
+}
+
+async function selectRefundReversal(
+  db: D1Database,
+  current: MileageRewardRedemption,
+): Promise<{ id: string } | null> {
+  return db.prepare(
+    `SELECT id FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`,
+  ).bind(current.programId, refundReversalIdempotencyKey(current.id))
+    .first<{ id: string }>();
+}
+
+/**
+ * R362: 旧処理で残り得る「台帳あり・コード未解放」の照合。
+ * batch は原子なので、コードが未解放ならロット復元も未実行。
+ * updated_at の条件付き更新で勝者を1人に絞り、勝者だけが
+ * ロット復元＋コード解放の batch を書く。コード解放の条件付き
+ * 更新は何度でも安全なので、照合自体は何度呼んでも壊さない。
+ */
+async function verifyRefundWrites(
+  db: D1Database,
+  current: MileageRewardRedemption,
+  allocations: Array<{ grant_lot_id: string; amount: number }>,
+): Promise<void> {
+  if (!current.rewardCodeId) return;
+  const code = await db.prepare(
+    `SELECT status FROM mileage_reward_codes WHERE id = ? AND redemption_id = ?`,
+  ).bind(current.rewardCodeId, current.id).first<{ status: string }>();
+  if (!code || code.status !== 'reserved') return;
   const now = new Date().toISOString();
-  const ledgerId = crypto.randomUUID();
-  const inserted = await db.prepare(
-    `INSERT OR IGNORE INTO mileage_ledger
-       (id, program_id, beneficiary_user_id, beneficiary_friend_id,
-        entry_type, amount, status, source, source_event_id, reason,
-        idempotency_key, occurred_at, created_at, metadata)
-     VALUES (?, ?, ?, ?, 'reversal', ?, 'available', 'mileage_reward_refund', ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    ledgerId, current.programId, current.beneficiaryUserId, current.beneficiaryFriendId,
-    reward.required_miles, current.id, requiredText(reason, '戻す理由', 500),
-    `mileage-redemption-refund:${current.id}`, now, now,
-    JSON.stringify({ redemptionId: current.id, spendLedgerId: current.spendLedgerEntryId }),
-  ).run();
-  // 台帳が既にある再開時は、ロットを戻さない（二重に戻さない）。
-  if ((inserted.meta?.changes ?? 0) !== 1) return;
+  const fenced = await db.prepare(
+    `UPDATE mileage_redemptions SET updated_at = ?
+      WHERE id = ? AND status = 'refunded' AND updated_at = ?`,
+  ).bind(now, current.id, current.updatedAt).run();
+  if ((fenced.meta?.changes ?? 0) !== 1) return;
   await db.batch([
-    ...allocations.results.map((allocation) => db.prepare(
-      // m22u R359: 返却は有効なロットだけへ戻す。成果の取消で無効化した
-      // ロット(void)へは戻さない（取り消した付与が交換で復活しないように）。
+    ...allocations.map((allocation) => db.prepare(
       `UPDATE mileage_grant_lots
           SET remaining_amount = remaining_amount + ?,
               status = 'available'
         WHERE ledger_entry_id = ? AND beneficiary_key = ?
           AND status IN ('available', 'exhausted')`,
     ).bind(allocation.amount, allocation.grant_lot_id, current.beneficiaryKey)),
-    ...(current.rewardCodeId
-      ? [db.prepare(
-        `UPDATE mileage_reward_codes
-            SET status = 'available', redemption_id = NULL, reserved_at = NULL
-          WHERE id = ? AND redemption_id = ? AND status = 'reserved'`,
-      ).bind(current.rewardCodeId, current.id)]
-      : []),
+    db.prepare(
+      `UPDATE mileage_reward_codes
+          SET status = 'available', redemption_id = NULL, reserved_at = NULL
+        WHERE id = ? AND redemption_id = ? AND status = 'reserved'`,
+    ).bind(current.rewardCodeId, current.id),
   ]);
+}
+
+/**
+ * R362: 返却の書き込みが最後まで終わっているか。
+ * 台帳が無ければ残高も内訳も未復旧。台帳があってもコードが
+ * 未解放なら旧処理の残り（ロット未復旧）。どちらも無ければ完了。
+ */
+export async function isMileageRefundComplete(
+  db: D1Database,
+  redemptionId: string,
+): Promise<boolean> {
+  const current = await getMileageRedemption(db, redemptionId);
+  if (!current || current.status !== 'refunded') return false;
+  if (!await selectRefundReversal(db, current)) return false;
+  if (!current.rewardCodeId) return true;
+  const code = await db.prepare(
+    `SELECT status FROM mileage_reward_codes WHERE id = ? AND redemption_id = ?`,
+  ).bind(current.rewardCodeId, current.id).first<{ status: string }>();
+  return !code || code.status !== 'reserved';
+}
+
+/**
+ * R362: 返却確定後に書き込みが中断した交換（台帳なしの refunded）。
+ * 再試行は409、cronも要対応一覧も拾わない取り残し。回復処理と
+ * 要対応一覧がこの口で見つけて再開する。
+ */
+export async function findIncompleteMileageRefunds(
+  db: D1Database,
+  input: { lineAccountId?: string; limit?: number } = {},
+): Promise<MileageRewardRedemption[]> {
+  const limit = Math.min(100, Math.max(1, Math.floor(input.limit ?? 50)));
+  const binds: unknown[] = [];
+  const accountClause = input.lineAccountId
+    ? 'AND r.line_account_id = ?'
+    : '';
+  if (input.lineAccountId) binds.push(input.lineAccountId);
+  const rows = await db.prepare(
+    `SELECT r.* FROM mileage_redemptions r
+      WHERE r.status = 'refunded'
+        AND NOT EXISTS (
+          SELECT 1 FROM mileage_ledger l
+           WHERE l.program_id = r.program_id
+             AND l.idempotency_key = 'mileage-redemption-refund:' || r.id
+        )
+        ${accountClause}
+      ORDER BY r.updated_at, r.created_at LIMIT ?`,
+  ).bind(...binds, limit).all<RedemptionRow>();
+  return rows.results.map(mapRedemption);
+}
+
+/**
+ * R362: 中断した返却を残高・台帳・状態が一致するまで再開する。
+ * 冪等なので何度でも呼べる。同時に走っても台帳・ロット復元は各1回。
+ * 成功へ移っていた行は返却せず済みとして数える（二重返却なし）。
+ */
+export async function recoverIncompleteMileageRefunds(
+  db: D1Database,
+  input: { lineAccountId?: string; limit?: number; reason?: string } = {},
+): Promise<{ recovered: number; failed: number }> {
+  const targets = await findIncompleteMileageRefunds(db, input);
+  let recovered = 0;
+  let failed = 0;
+  for (const target of targets) {
+    try {
+      await refundMileageRewardRedemption(db, {
+        redemptionId: target.id,
+        reason: input.reason ?? '中断した返却の再開',
+      });
+      recovered += 1;
+    } catch (error) {
+      // 直前に成功へ移っていたら、返却の必要はない（遅い返却は書かない）。
+      if (error instanceof MileageRewardError && error.code === 'already_delivered') {
+        recovered += 1;
+        continue;
+      }
+      failed += 1;
+    }
+  }
+  return { recovered, failed };
 }
 
 export type MileageRedemptionStepStatus = 'started' | 'sent';
