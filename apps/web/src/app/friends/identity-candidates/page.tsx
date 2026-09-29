@@ -55,6 +55,7 @@ export default function FriendIdentityCandidatesPage() {
         failure={review.failure}
         emptyTitle="確認する候補はありません"
         emptyDescription="同じ人の疑いが見つかると、ここに並びます。"
+        onRetry={review.reload}
       />
 
       {review.state === 'ready' && detail ? (

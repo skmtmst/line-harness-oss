@@ -8,6 +8,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -466,13 +467,9 @@ export default function FileScanSettingsPage() {
         </ConfirmDialog>
       ) : null}
 
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="保存せずに移動すると、外の検査の設定の変更は失われます。"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        destructive
+        subject="外の検査の設定の変更"
         busy={configBusy}
         onCancel={() => {
           if (!configBusy) cancelLeave()

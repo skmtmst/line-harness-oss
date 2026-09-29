@@ -12,7 +12,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
@@ -329,15 +329,7 @@ function NewFriendFieldForm() {
       {/* #976 U084/U085: 追従バーの操作は共通Button。左キャンセル→右確定の並びはStickyBarが持つ。 */}
       {/* R514: 重複を確認できるまで保存は押させず、理由を状態文に出す。 */}
       <StickyBar status={saving ? '項目を保存しています' : listBlocked ? '既存の項目を読み直すと保存できます' : '未保存'} actions={<><Button href={back ?? '/tags?tab=fields'}>キャンセル</Button><Button type="button" variant="primary" disabled={saving || listBlocked} onClick={() => void save()}>{saving ? '作成中…' : '項目を作成'}</Button></>} />
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="入力中の内容があります"
-        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="入力を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

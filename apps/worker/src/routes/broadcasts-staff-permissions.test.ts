@@ -168,6 +168,7 @@ describe('一斉配信の staff 個別権限キー', () => {
 
   it('作成の鍵を持つ staff は下書きを消せる（鍵なし staff は403）', async () => {
     mocks.getBroadcastById.mockResolvedValue(row({ status: 'draft' }));
+    mocks.deleteBroadcast.mockResolvedValue(true);
 
     const allowed = await app(staffWith('/broadcasts', 'broadcast.definition.edit'))
       .request('/api/broadcasts/broadcast-1', { method: 'DELETE' });
@@ -181,6 +182,24 @@ describe('一斉配信の staff 個別権限キー', () => {
     expect(mocks.deleteBroadcast).not.toHaveBeenCalled();
   });
 
+  it('D026: 送信中・送信済みは鍵があっても409で消さない', async () => {
+    mocks.deleteBroadcast.mockResolvedValue(false);
+
+    mocks.getBroadcastById.mockResolvedValue(row({ status: 'sending' }));
+    const sending = await app(staffWith('/broadcasts', 'broadcast.definition.edit'))
+      .request('/api/broadcasts/broadcast-1', { method: 'DELETE' });
+    expect(sending.status).toBe(409);
+    expect(await sending.json()).toMatchObject({ success: false });
+
+    mocks.getBroadcastById.mockResolvedValue(row({ status: 'sent' }));
+    const sent = await app(staffWith('/broadcasts', 'broadcast.definition.edit'))
+      .request('/api/broadcasts/broadcast-1', { method: 'DELETE' });
+    expect(sent.status).toBe(409);
+    expect(await sent.json()).toMatchObject({ success: false });
+
+    expect(mocks.deleteBroadcast).not.toHaveBeenCalled();
+  });
+
   it('owner は鍵なしで従来どおり通る', async () => {
     mocks.getBroadcastById.mockResolvedValue(row({ status: 'sending', stopped_at: '2026-09-25T01:00:00+09:00' }));
     const stopped = await app(owner)
@@ -188,6 +207,7 @@ describe('一斉配信の staff 個別権限キー', () => {
     expect(stopped.status).toBe(200);
 
     mocks.getBroadcastById.mockResolvedValue(row({ status: 'draft' }));
+    mocks.deleteBroadcast.mockResolvedValue(true);
     const deleted = await app(owner)
       .request('/api/broadcasts/broadcast-1', { method: 'DELETE' });
     expect(deleted.status).toBe(200);
