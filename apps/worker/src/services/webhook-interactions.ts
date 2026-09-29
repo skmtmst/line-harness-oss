@@ -43,9 +43,46 @@ export function webhookFailureLabel(reason: WebhookInteractionFailureReason | nu
 export function webhookResponseLabel(row: WebhookInteractionRow): string {
   if (row.status === 'failed') return webhookFailureLabel(row.failure_reason) ?? '処理できませんでした';
   if (row.status === 'pending') return '処理中です';
+  /*
+   * d23d R407: 受け取りの「試し」は照合も実行もしていない。
+   * 実処理と同じ「結びつきました」を出すと、照合相手がいない試しまで
+   * 成功に見えてしまう。記録時に idempotency_key へ残した試算結果を読む。
+   */
+  if (row.event_type === 'incoming_webhook.test') return incomingTestResultLabel(row.idempotency_key);
   if (row.direction === 'incoming') return '結びつきました';
   if (row.response_status != null) return `${row.response_status} OK`;
   return '届きました';
+}
+
+/**
+ * 受け取りの試しの結果の種類(d23d R407)。
+ * 'invalid' は照合の成否に関わらず、行動の組み立て確認で不備があった試し。
+ */
+export type IncomingTestOutcome = 'matched' | 'ambiguous' | 'not_found' | 'invalid';
+
+/**
+ * 試し記録の idempotency_key の先頭につける印。
+ * 試しは再送しない・相手への送信も無いので冪等キーとしては使われない。
+ * 末尾にuuidを添えて一意には保つ。
+ */
+export const INCOMING_TEST_KEY_PREFIX = 'incoming-test:';
+
+export function incomingTestIdempotencyKey(outcome: IncomingTestOutcome): string {
+  return `${INCOMING_TEST_KEY_PREFIX}${outcome}:${crypto.randomUUID()}`;
+}
+
+function incomingTestResultLabel(idempotencyKey: string): string {
+  const outcome = idempotencyKey.startsWith(INCOMING_TEST_KEY_PREFIX)
+    ? idempotencyKey.slice(INCOMING_TEST_KEY_PREFIX.length).split(':')[0]
+    : null;
+  switch (outcome) {
+    case 'matched': return '照合できました（試し）';
+    case 'ambiguous': return '照合候補が複数（試し）';
+    case 'not_found': return '照合相手なし（試し）';
+    case 'invalid': return '行動の確認で不備（試し）';
+    // この印が無い古い試し記録は結果の内訳を残していない。
+    default: return '受け取りの試し（実行していません）';
+  }
 }
 
 /**
