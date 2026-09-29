@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -18,6 +18,8 @@ import { useAccount } from '@/contexts/account-context'
  */
 function EditWebhookPageInner() {
   const { selectedAccountId } = useAccount()
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
 
@@ -129,16 +131,19 @@ function EditWebhookPageInner() {
         if (!selectedAccountId) return 'LINEアカウントを選択してください'
         if (!name.trim()) return '名前を入力してください'
         if (!/^https:\/\//.test(url.trim())) return 'URLは https:// で始めてください'
+        // d23b R416: 口側と登録画面は0〜7を受け付ける。編集画面だけ狭いと、
+        // 7で登録したものが他の項目の変更ごと弾かれてしまう。
         const retries = Number(maxRetries)
-        if (!Number.isInteger(retries) || retries < 0 || retries > 5) {
-          return '送り直しは0から5の整数にしてください'
+        if (!Number.isInteger(retries) || retries < 0 || retries > 7) {
+          return '送り直しは0から7の整数にしてください'
         }
         return null
       }}
       onSave={async () => {
-        if (!selectedAccountId) throw new Error('LINEアカウントを選択してください')
+        const requestAccountId = selectedAccountId
+        if (!requestAccountId) throw new Error('LINEアカウントを選択してください')
         try {
-          const res = await api.webhooks.outgoing.update(id, selectedAccountId, {
+          const res = await api.webhooks.outgoing.update(id, requestAccountId, {
             name: name.trim(),
             url: url.trim(),
             eventTypes: eventTypes
@@ -154,6 +159,14 @@ function EditWebhookPageInner() {
             throw new Error('送り先の変更は統括だけができます。必要なときは統括に頼んでください。')
           }
           throw caught
+        }
+        /*
+          d23b R422: 保存が返る前にアカウントが切り替わっていたら、切り替え
+          先の画面を一覧へ飛ばさない。保存そのものは済んでいるので、完了と
+          場所を確かめる案内だけ残す（例外にすると画面遷移を止められる）。
+        */
+        if (selectedAccountIdRef.current !== requestAccountId) {
+          throw new Error('LINEアカウントが切り替わりました。保存は済んでいます。一覧から内容を確かめてください。')
         }
       }}
     >
@@ -196,14 +209,14 @@ function EditWebhookPageInner() {
           <Field
             label="失敗したときの送り直し"
             htmlFor="wh-edit-retries"
-            note="相手が 5xx を返したときや、つながらなかったときに送り直します。上限は5回です。"
+            note="相手が 5xx を返したときや、つながらなかったときに送り直します。1分・5分・30分…と間隔を空け、上限は7回です。相手が 4xx を返した場合は送り直しません。"
           >
             <div className="flex items-center gap-1.5">
               <input
                 id="wh-edit-retries"
                 type="number"
                 min={0}
-                max={5}
+                max={7}
                 value={maxRetries}
                 onChange={(event) => setMaxRetries(event.target.value)}
                 className={`${inputClass} w-24 tabular-nums`}

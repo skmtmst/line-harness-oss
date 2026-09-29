@@ -472,7 +472,8 @@
     "512_restaurant_google_metrics.sql",
     "513_conversion_approval_freeze.sql",
     "520_incoming_webhook_receipt_plan.sql",
-    "521_incoming_webhook_receipt_body_hash.sql"
+    "521_incoming_webhook_receipt_body_hash.sql",
+    "532_webhook_interaction_secret_unavailable.sql"
   ],
-  "migrationCount": 473
+  "migrationCount": 474
 }
