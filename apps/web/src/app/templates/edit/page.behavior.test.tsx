@@ -495,6 +495,32 @@ describe('目標日までの日数の見本', () => {
     expect(preview.content).not.toContain('-')
     expect(preview.unresolved).toEqual([])
   })
+
+  it('D007: 本文が無くても見本づくりは落ちず、空を返す', () => {
+    for (const content of [undefined, null] as unknown[]) {
+      expect(() =>
+        T.buildTemplatePreview(content as string, { friendFields: [], commonVars: [] }),
+      ).not.toThrow()
+      expect(
+        T.buildTemplatePreview(content as string, { friendFields: [], commonVars: [] }),
+      ).toEqual({ content: '', unresolved: [] })
+      expect(T.extractMessageUrls(content as string)).toEqual([])
+    }
+  })
+
+  it('D007: 形の違う詳細応答は中身として受け取らない', () => {
+    // 一覧形・空・本文なしは ready にしない。
+    expect(T.isTemplateDetailData({ items: [] })).toBe(false)
+    expect(T.isTemplateDetailData(null)).toBe(false)
+    expect(T.isTemplateDetailData(undefined)).toBe(false)
+    expect(T.isTemplateDetailData({ name: '案内', messageType: 'text' })).toBe(false)
+    expect(T.isTemplateDetailData({ name: '案内', messageType: 'text', messageContent: 42 })).toBe(false)
+    // 利用先が物でないものも受け取らない。
+    expect(T.isTemplateDetailData({ name: '案内', messageType: 'text', messageContent: '本文', usedBy: '壊れた値' })).toBe(false)
+    // 型どおりは受け取る。利用先が無くてもよい。
+    expect(T.isTemplateDetailData({ name: '案内', messageType: 'text', messageContent: '本文' })).toBe(true)
+    expect(T.isTemplateDetailData({ name: '案内', messageType: 'text', messageContent: '本文', usedBy: null })).toBe(true)
+  })
 })
 
 /* ------------------------------------------------------- 見本の置き換え */
