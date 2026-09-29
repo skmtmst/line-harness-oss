@@ -16,7 +16,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { ApiError, api } from '@/lib/api'
+import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
@@ -134,12 +134,22 @@ function MigrateFriendField() {
     選択をすべて捨てる。前のアカウントの実行状況が残ると、いまの
     アカウントで起きていない移行が「完了」と見える。
   */
+  /*
+   * R519: 同じ移行先の作り直しは同じ要求キーで送る。入力を変えたら
+   * 新しいキーにする（同じキーに異なる内容はサーバが409で止める）。
+   */
+  const createKeyRef = useRef<string>(crypto.randomUUID())
+  useEffect(() => {
+    createKeyRef.current = crypto.randomUUID()
+  }, [targetName, targetKey, targetType])
+
   useEffect(() => {
     gateRef.current.invalidate()
     setPreview(null)
     setIdempotencyKey(null)
     setRun(null)
     setCreatedTarget(null)
+    createKeyRef.current = crypto.randomUUID()
     /*
       TECH-07: 飛んでいる確認・実行を捨てたら、ボタンの「確認中…
       実行中…」も捨てる。世代を止めてもフラグが残ると、
@@ -165,6 +175,52 @@ function MigrateFriendField() {
     setRun(null)
   }
 
+  /*
+   * R519: 移行先を作るか、作り済みを取り直す。
+   *
+   * 応答だけ失った再試行は同じ要求キーで送るため、サーバは保存済みを
+   * 返す。要求キーが変わった後の差し込み名の重複では、作成済みを
+   * 取り直して比べる。同一内容ならその移行先で事前確認を続け、
+   * 異なる内容なら衝突として説明する。
+   */
+  const createTargetOrRecover = async (account: string, token: number): Promise<FriendField | null> => {
+    if (!source) return null
+    const params = {
+      name: targetName.trim() || `${source.name}（新）`,
+      fieldKey: targetKey.trim() || `${source.fieldKey}_new`.slice(0, 32),
+      type: targetType,
+    }
+    try {
+      const created = await api.friendFields.create(account, params, createKeyRef.current)
+      if (!created.success) throw new Error(created.error)
+      if (!gateRef.current.current(token) || accountRef.current !== account) return null
+      setCreatedTarget(created.data)
+      setFields((current) => (current.some((item) => item.id === created.data.id) ? current : [...current, created.data]))
+      return created.data
+    } catch (reason) {
+      try {
+        const res = await api.friendFields.list(account)
+        if (res.success) {
+          const existing = res.data.find((item) => item.fieldKey === params.fieldKey) ?? null
+          if (existing && existing.name === params.name && existing.type === params.type) {
+            if (!gateRef.current.current(token) || accountRef.current !== account) return null
+            setCreatedTarget(existing)
+            setFields((current) => (current.some((item) => item.id === existing.id) ? current : [...current, existing]))
+            return existing
+          }
+        }
+      } catch { /* 取り直せないときは下の説明へ */ }
+      if (!gateRef.current.current(token) || accountRef.current !== account) return null
+      const status = (reason as { status?: number } | null)?.status
+      if (status === 409) {
+        setError(`同じ差し込み名「${params.fieldKey}」の別の項目があります。一覧を確認してください`)
+      } else {
+        setError(describeSaveFailure(reason))
+      }
+      return null
+    }
+  }
+
   const runPreview = async () => {
     if (!source || !selectedAccountId || checking) return
     setChecking(true); setError(''); setPreview(null); setRun(null)
@@ -174,16 +230,8 @@ function MigrateFriendField() {
       let targetField = target
       // 新規モードでは、実行できる確認（期限付き証票）に項目の実体が要るので先に作る。
       if (!targetField && targetMode === 'new') {
-        const created = await api.friendFields.create(account, {
-          name: targetName.trim() || `${source.name}（新）`,
-          fieldKey: targetKey.trim() || `${source.fieldKey}_new`.slice(0, 32),
-          type: targetType,
-        }, crypto.randomUUID())
-        if (!created.success) throw new Error(created.error)
-        targetField = created.data
-        if (!gateRef.current.current(token) || accountRef.current !== account) return
-        setCreatedTarget(created.data)
-        setFields((current) => [...current, created.data])
+        targetField = await createTargetOrRecover(account, token)
+        if (!targetField) return
       }
       if (!targetField) {
         setError('移行先の項目を選んでください')
