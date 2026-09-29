@@ -866,6 +866,8 @@ const ALLOWLIST = new Set<string>([
   'GET /api/analytics/ref-summary',
   'GET /api/analytics/ref/{refCode}',
   'GET /api/analytics/report-schedules',
+  'GET /api/analytics/report-schedules/{id}/runs',
+  'POST /api/analytics/report-schedules/{id}/retry',
   'GET /api/analytics/routes',
   'GET /api/analytics/saved',
   'GET /api/analytics/saved/{id}/snapshots',

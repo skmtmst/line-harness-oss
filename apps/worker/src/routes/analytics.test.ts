@@ -34,7 +34,11 @@ const mocks = {
   getSavedAnalytics: vi.fn(),
   getSavedAnalyticsSnapshots: vi.fn(),
   getAnalyticsReportSchedules: vi.fn(),
+  getRecentOneTimeAnalyticsReportRuns: vi.fn(async () => []),
   getAnalyticsReportSchedule: vi.fn(),
+  getAnalyticsReportScheduleIncludingArchived: vi.fn(),
+  getAnalyticsReportRuns: vi.fn(),
+  requeueOneTimeAnalyticsReportSchedule: vi.fn(),
   createAnalyticsReportSchedule: vi.fn(),
   updateAnalyticsReportSchedule: vi.fn(),
   setAnalyticsReportScheduleStatus: vi.fn(),
@@ -212,6 +216,9 @@ beforeEach(() => {
     lineAccountId: input.lineAccountId, createdAt: input.now, updatedAt: input.now,
   }));
   mocks.getAnalyticsReportSchedule.mockResolvedValue(null);
+  mocks.getAnalyticsReportScheduleIncludingArchived.mockResolvedValue(null);
+  mocks.getAnalyticsReportRuns.mockResolvedValue([]);
+  mocks.requeueOneTimeAnalyticsReportSchedule.mockResolvedValue('requeued');
   mocks.updateAnalyticsReportSchedule.mockResolvedValue('updated');
   mocks.setAnalyticsReportScheduleStatus.mockResolvedValue('updated');
   mocks.getStaffMembers.mockResolvedValue([
@@ -1123,5 +1130,70 @@ describe('V6 定期レポートAPI', () => {
     });
     expect(idempotent.status).toBe(200);
     expect(mocks.setAnalyticsReportScheduleStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('R454 1回送信の履歴と送り直し', () => {
+  const archivedOneTime = {
+    id: 'once-1', lineAccountId: 'account-a', name: '1回送信', sections: ['friends'],
+    savedAnalysisIds: [], cadence: 'weekly', weekday: 1, monthDay: null,
+    sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+    recipients: [{ kind: 'email', email: 'a@example.com', label: 'a@example.com' }],
+    channels: ['email'], alertRules: [], status: 'archived', isOneTime: true,
+    nextRunAt: '2026-09-07T00:00:00.000Z', createdBy: 'u-1',
+    createdAt: '2026-09-06T00:00:00.000Z', updatedAt: '2026-09-07T01:00:00.000Z',
+  };
+  const failedRun = {
+    id: 'run-1', scheduleId: 'once-1', lineAccountId: 'account-a',
+    scheduledFor: '2026-09-07T00:00:00.000Z', state: 'failed',
+    deliveryResults: [{ channel: 'email', recipient: 'a@example.com', status: 'failed', reason: 'x' }],
+    errorCode: 'synthetic_mail_failed',
+  };
+
+  it('しまった1回送信の履歴を依頼IDで返す', async () => {
+    mocks.getAnalyticsReportScheduleIncludingArchived.mockImplementation(async (_db, id) => (
+      id === 'once-1' ? archivedOneTime : null
+    ));
+    mocks.getAnalyticsReportRuns.mockResolvedValue([failedRun]);
+    const res = await req(`/api/analytics/report-schedules/once-1/runs?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true, data: { schedule: { id: 'once-1' }, runs: [{ id: 'run-1' }] },
+    });
+    expect((await req(`/api/analytics/report-schedules/ghost/runs?${ACCOUNT}`)).status).toBe(404);
+    expect((await req(`/api/analytics/report-schedules/once-1/runs?account_id=account-b`)).status).toBe(404);
+  });
+
+  it('全部失敗の1回送信だけ送り直せる', async () => {
+    mocks.getAnalyticsReportScheduleIncludingArchived.mockResolvedValue(archivedOneTime);
+    mocks.getAnalyticsReportRuns.mockResolvedValue([failedRun]);
+    mocks.getAnalyticsReportSchedule.mockResolvedValue({ ...archivedOneTime, status: 'active' });
+    const res = await req(`/api/analytics/report-schedules/once-1/retry?${ACCOUNT}`, 'POST', {});
+    expect(res.status).toBe(200);
+    expect(mocks.requeueOneTimeAnalyticsReportSchedule).toHaveBeenCalled();
+    // 運用担当は送り直せない
+    expect((await reqAsStaff(`/api/analytics/report-schedules/once-1/retry?${ACCOUNT}`, 'POST', {})).status).toBe(403);
+  });
+
+  it('一部でも届いたものは送り直さない', async () => {
+    mocks.getAnalyticsReportScheduleIncludingArchived.mockResolvedValue(archivedOneTime);
+    mocks.getAnalyticsReportRuns.mockResolvedValue([{
+      ...failedRun,
+      deliveryResults: [
+        { channel: 'dashboard', status: 'sent' },
+        { channel: 'email', recipient: 'a@example.com', status: 'failed', reason: 'x' },
+      ],
+    }]);
+    const res = await req(`/api/analytics/report-schedules/once-1/retry?${ACCOUNT}`, 'POST', {});
+    expect(res.status).toBe(422);
+    expect(mocks.requeueOneTimeAnalyticsReportSchedule).not.toHaveBeenCalled();
+  });
+
+  it('定期レポートや実行中は送り直さない', async () => {
+    mocks.getAnalyticsReportScheduleIncludingArchived.mockResolvedValue({ ...archivedOneTime, isOneTime: false });
+    expect((await req(`/api/analytics/report-schedules/once-1/retry?${ACCOUNT}`, 'POST', {})).status).toBe(404);
+    mocks.getAnalyticsReportScheduleIncludingArchived.mockResolvedValue(archivedOneTime);
+    mocks.getAnalyticsReportRuns.mockResolvedValue([{ ...failedRun, state: 'running' }]);
+    expect((await req(`/api/analytics/report-schedules/once-1/retry?${ACCOUNT}`, 'POST', {})).status).toBe(422);
   });
 });
