@@ -316,6 +316,24 @@ export async function updateStaffMember(
 }
 
 /**
+ * R509: 仮秘密の条件付き確保。まだ無いときだけ置く。
+ *
+ * 同じ合言葉への同時取得で両方が新しい秘密を作っても、保存は1つだけ。
+ * 置けた側が true。負けた側は置かれた値を読み直して同じQRを返す。
+ */
+export async function claimTotpPendingSecret(
+  db: D1Database,
+  staffId: string,
+  pendingSecretEnc: string,
+): Promise<boolean> {
+  const applied = await db
+    .prepare('UPDATE staff_members SET totp_pending_secret_enc = ?, updated_at = ?, policy_version = policy_version + 1 WHERE id = ? AND totp_pending_secret_enc IS NULL')
+    .bind(pendingSecretEnc, jstNow(), staffId)
+    .run();
+  return (applied.meta.changes ?? 0) > 0;
+}
+
+/**
  * R498: 権限保存の要求キー台帳。同じ保存の送り直しを版を重ねずに返す。
  *
  * 同じキーで内容が違う送り直しは受け付けない（request_hash で照合）。

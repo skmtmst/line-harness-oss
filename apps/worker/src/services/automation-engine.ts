@@ -235,7 +235,7 @@ async function getStep(db: D1Database, runId: string, stepKey: string): Promise<
   ).bind(runId, stepKey).first<StepRow>();
 }
 
-async function resolveCommonActionVersion(
+export async function resolveCommonActionVersion(
   db: D1Database,
   input: { lineAccountId: string; automationId: string; action: ActionDefinition },
 ): Promise<string | null> {

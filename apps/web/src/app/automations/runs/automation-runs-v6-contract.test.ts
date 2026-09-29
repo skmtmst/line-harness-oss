@@ -78,6 +78,8 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
     expect(PAGE).toContain('downloadApiFile(api.automations.runsCsvUrl')
     expect(PAGE).toContain('api.automations.cancelRun')
     expect(PAGE).toContain('この実行を取りやめる')
+    // R492: 取りやめの確認には操作対象の店名を出す。
+    expect(PAGE).toContain('の実行を取りやめますか？記録は残りますが、実行は戻せません。')
     expect(PAGE).toContain('実行を取りやめました。記録は残っています。')
   })
 
