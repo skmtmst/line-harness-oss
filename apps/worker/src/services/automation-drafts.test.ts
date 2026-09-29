@@ -132,6 +132,112 @@ describe('オートメーションの見本と下書き', () => {
       .toEqual({ status: 'draft' });
   });
 
+  it('共通アクションを呼ぶ下書きは、確認用に固定版と中身（入れ子の先も）を返す', async () => {
+    /*
+     * 監査 R486/R487: 確認画面は「この共通アクションのこの版が動く」を
+     * 中身付きで出し、実行側は同じ一式で照合する。getAutomationDraft が
+     * 束から版を解決し、版の中身（入れ子の固定先まで）を返すことを固定。
+     */
+    testDb.raw.prepare(
+      `INSERT INTO common_actions (id, line_account_id, name, status, current_published_version_id)
+       VALUES ('ca-1', 'account-1', '会員向け一式', 'published', 'cv-1'),
+              ('ca-nested', 'account-1', '入れ子の処理', 'published', 'cv-nested')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO common_action_versions
+         (id, common_action_id, version_number, status, action_config, published_at)
+       VALUES ('cv-nested', 'ca-nested', 2, 'published', ?, datetime('now')),
+              ('cv-1', 'ca-1', 3, 'published', ?, datetime('now'))`,
+    ).run(
+      JSON.stringify([{ id: 'n1', type: 'send_message', params: { content: '入れ子の本文' }, onFailure: 'stop' }]),
+      JSON.stringify([
+        { id: 'a1', type: 'send_message', params: { content: '会員向けの本文' }, onFailure: 'stop' },
+        { id: 'a2', type: 'common_action', params: { commonActionId: 'ca-nested', commonActionVersionId: 'cv-nested' }, onFailure: 'stop' },
+      ]),
+    );
+    const created = await createAutomationDraftFromTemplate(testDb.db, {
+      templateKey: 'received-message-tag',
+      lineAccountId: 'account-1',
+      operationKey: 'op-common-refs',
+    });
+    await updateAutomationDraft(testDb.db, {
+      id: created.id,
+      lineAccountId: 'account-1',
+      expectedDraftVersionId: created.draftVersionId,
+      name: '問い合わせ',
+      eventType: 'message_received',
+      triggerConfig: {},
+      actions: [{
+        id: 'step-1', type: 'common_action',
+        params: { commonActionId: 'ca-1' }, onFailure: 'stop',
+      }],
+    });
+
+    const draft = await getAutomationDraft(testDb.db, { id: created.id, lineAccountId: 'account-1' });
+    expect(draft.commonActionRefs).toEqual([{
+      stepId: 'step-1', commonActionId: 'ca-1',
+      name: '会員向け一式', versionId: 'cv-1', versionNumber: 3,
+    }]);
+    // 版の中身と、入れ子の固定先の版まで同じ地図に入る。
+    expect(draft.commonActionVersions['cv-1']).toMatchObject({
+      commonActionId: 'ca-1', name: '会員向け一式', versionNumber: 3,
+    });
+    expect(draft.commonActionVersions['cv-1'].actions).toHaveLength(2);
+    expect(draft.commonActionVersions['cv-nested']).toMatchObject({
+      commonActionId: 'ca-nested', name: '入れ子の処理', versionNumber: 2,
+    });
+
+    // 束を別の版へ切り替えると、次の読み込みはその版を返す（R487の検知対象）。
+    testDb.raw.prepare(
+      `INSERT INTO common_action_versions
+         (id, common_action_id, version_number, status, action_config, published_at)
+       VALUES ('cv-9', 'ca-1', 9, 'published', '[]', datetime('now'))`,
+    ).run();
+    testDb.raw.prepare(
+      `UPDATE common_action_bindings SET common_action_version_id = 'cv-9'
+        WHERE consumer_id = ? AND consumer_path = 'step-1'`,
+    ).run(created.id);
+    const switched = await getAutomationDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1',
+    });
+    expect(switched.commonActionRefs[0]).toMatchObject({ versionId: 'cv-9', versionNumber: 9 });
+  });
+
+  it('束の無い共通アクション参照は versionId null で返す（確認画面は送信へ進めない）', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO common_actions (id, line_account_id, name, status)
+       VALUES ('ca-1', 'account-1', '会員向け一式', 'published')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO common_action_versions
+         (id, common_action_id, version_number, status, action_config, published_at)
+       VALUES ('cv-1', 'ca-1', 1, 'published', '[]', datetime('now'))`,
+    ).run();
+    const created = await createAutomationDraftFromTemplate(testDb.db, {
+      templateKey: 'received-message-tag',
+      lineAccountId: 'account-1',
+      operationKey: 'op-common-nobind',
+    });
+    // 束の挿入を経ずに共通アクション参照だけを持つ下書きを直接作る。
+    testDb.raw.prepare(
+      `INSERT INTO automation_versions
+         (id, automation_id, version_number, status, trigger_type, trigger_config,
+          condition_config, action_config, created_at)
+       VALUES ('v-nobind', ?, 2, 'draft', 'message_received', '{}', '{}', ?, datetime('now'))`,
+    ).run(
+      created.id,
+      JSON.stringify([{ id: 'step-1', type: 'common_action', params: { commonActionId: 'ca-1' }, onFailure: 'stop' }]),
+    );
+    testDb.raw.prepare(
+      `UPDATE automation_definitions SET current_draft_version_id = 'v-nobind' WHERE id = ?`,
+    ).run(created.id);
+
+    const draft = await getAutomationDraft(testDb.db, { id: created.id, lineAccountId: 'account-1' });
+    expect(draft.commonActionRefs).toEqual([
+      expect.objectContaining({ stepId: 'step-1', commonActionId: 'ca-1', versionId: null }),
+    ]);
+  });
+
   it('別アカウント・停止中の参照先と古い版を拒否する', async () => {
     const created = await createAutomationDraftFromTemplate(testDb.db, {
       templateKey: 'received-message-tag',
