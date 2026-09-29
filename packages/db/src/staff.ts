@@ -204,15 +204,12 @@ export async function getStaffNameMap(
   return names;
 }
 
-export async function createStaffMember(
+function staffInsertStatement(
   db: D1Database,
-  input: CreateStaffInput,
-): Promise<StaffMember> {
-  const id = crypto.randomUUID();
-  const now = jstNow();
-  const apiKey = generateApiKey();
-
-  await db
+  args: { id: string; now: string; apiKey: string; input: CreateStaffInput },
+): D1PreparedStatement {
+  const { id, now, apiKey, input } = args;
+  return db
     .prepare(
       `INSERT INTO staff_members
        (id, name, email, role, access_level, api_key, line_user_id, is_active,
@@ -234,13 +231,67 @@ export async function createStaffMember(
       input.view_permission_keys ? JSON.stringify(input.view_permission_keys) : null,
       input.email_mask ?? null,
       input.tenant_id ?? DEFAULT_TENANT_ID, now, now,
-    )
-    .run();
+    );
+}
+
+export async function createStaffMember(
+  db: D1Database,
+  input: CreateStaffInput,
+): Promise<StaffMember> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const apiKey = generateApiKey();
+
+  await staffInsertStatement(db, { id, now, apiKey, input }).run();
 
   return (await db
     .prepare('SELECT * FROM staff_members WHERE id = ?')
     .bind(id)
     .first<StaffMember>())!;
+}
+
+/**
+ * M957: 招待の作成と担当範囲の割当を同じ取引（batch）で書く。
+ *
+ * 本人だけ作って範囲の途中で止まると、招待が届いていない幽霊行が
+ * 残る。batch は1つの取引なので、どこかで失敗したら本人も範囲も
+ * 残らない。同じメールが同時に届いたときは一意制約で片方だけが
+ * 残り、負けた側は制約違反になる（呼び出し側が409で返す）。
+ */
+export async function createStaffMemberWithScopes(
+  db: D1Database,
+  input: CreateStaffInput,
+  lineAccountIds: string[],
+): Promise<StaffMember> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const apiKey = generateApiKey();
+
+  await db.batch([
+    staffInsertStatement(db, { id, now, apiKey, input }),
+    db.prepare('DELETE FROM staff_account_scopes WHERE staff_id = ?').bind(id),
+    ...lineAccountIds.map((lineAccountId) => db
+      .prepare('INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES (?, ?, ?)')
+      .bind(id, lineAccountId, now)),
+  ]);
+
+  return (await db
+    .prepare('SELECT * FROM staff_members WHERE id = ?')
+    .bind(id)
+    .first<StaffMember>())!;
+}
+
+/**
+ * M957: 招待の後片付け。本人と担当範囲を同じ取引で消す。
+ *
+ * 外部キー任せにしない（D1 は既定で外部キーを強制しない）。範囲だけ
+ * 残ると後の招待の割当に混ざるので、本人と一緒に消す。
+ */
+export async function deleteStaffMemberWithScopes(db: D1Database, id: string): Promise<void> {
+  await db.batch([
+    db.prepare('DELETE FROM staff_account_scopes WHERE staff_id = ?').bind(id),
+    db.prepare('DELETE FROM staff_members WHERE id = ?').bind(id),
+  ]);
 }
 
 export async function updateStaffMember(

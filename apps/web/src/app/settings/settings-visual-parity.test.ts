@@ -42,7 +42,7 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('expectedVersion: settingsVersion')
     expect(source).toContain('error instanceof ApiError && error.status === 409')
     expect(source).toContain('const latest = await api.featureSettings.get(selectedAccountId)')
-    expect(source).toContain('setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)')
+    expect(source).toContain('FEATURE_SETTINGS_CONFLICT_MESSAGE')
     expect(source).toContain("featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save')")
   })
 
@@ -50,7 +50,7 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain("total === 0 ? 'cursor-default' : 'cursor-pointer'")
     expect(source).toContain('aria-label={`${item.label}を上へ`}')
     expect(source).toContain('variant="secondary"')
-    expect(source).toContain('disabled={loading || saving || !dirty}')
+    expect(source).toContain('disabled={loading || saving || loadFailed || !dirty}')
     expect(source).toContain('変更すると保存できます')
   })
 

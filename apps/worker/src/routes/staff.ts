@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import {
   activatePlatformAdminIfAwaitingTotp,
   getStaffMembers, getStaffById, getStaffByInviteTokenHash, getStaffByEmailChangeTokenHash,
-  createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit, getLastLoginByStaff,
+  createStaffMemberWithScopes, updateStaffMember, deleteStaffMemberWithScopes, countLoginAudit, getLastLoginByStaff,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
   reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts,
 } from '@line-crm/db';
@@ -307,6 +307,11 @@ async function guardLastAdmin(
 
 const NOTIFICATION_KEYS = new Set(['operations', 'emergency', 'security', 'updates']);
 const PERMISSION_KEY_PATTERN = /^[A-Za-z0-9_./-]{1,200}$/;
+/* M959: メールアドレスは実用上限254文字まで。超える宛先は招待が届かない行を残すので作らない。 */
+const MAX_EMAIL_LENGTH = 254;
+function emailTooLong(email: string): boolean {
+  return email.length > MAX_EMAIL_LENGTH;
+}
 
 /*
  * 権限キーと通知設定の検証(#515 中3)。
@@ -477,6 +482,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     const email = body.email?.trim().toLowerCase();
     if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
+    if (emailTooLong(email)) return c.json({ success: false, error: 'メールアドレスは254文字以内で入力してください' }, 400);
     if (!body.role || !['admin', 'staff', 'viewer'].includes(body.role)) return c.json({ success: false, error: '役割を選択してください' }, 400);
     if (!body.assignedLineAccountId) {
       return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
@@ -499,45 +505,67 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     if (accountScope.accountScope !== undefined && !await mayAssignAccountScopes(c.env.DB, current, accountScope.accountScope, accountScope.scopedLineAccountIds)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
     }
-    // 同じメールの行があるときは作り直さない。要件 v6-30 §9-2(既存メールは新規行を作らず、管理者へ安全な案内)。
-    // 招待中・期限切れなら再送へ案内し、利用開始済みなら従来どおり登録済みで断る(N-425)。
+    // 同じメールの行があるときの扱い。要件 v6-30 §9-2(既存メールは管理者へ安全な案内)。
+    // M957: 招待中・期限切れの行は作り直す（上書き・掃除）。送信されなかった
+    // 幽霊行が残っていても、同じメールの招待し直しで古い行を消して作り直す
+    // ので、409で永久に塞がらない。利用開始済みは従来どおり登録済みで断る。
     const duplicateInvite = (await getStaffMembers(c.env.DB, currentTenantId(c)))
       .find((item) => item.email?.toLowerCase() === email);
     if (duplicateInvite) {
       if (duplicateInvite.invite_status === 'pending_email' || duplicateInvite.invite_status === 'pending_line' || duplicateInvite.invite_status === 'expired') {
-        return c.json({ success: false, error: 'このメールアドレスは招待中です。新しく作り直さず、ログインユーザー画面の「招待中」タブからもう一度送り直してください。' }, 409);
+        try {
+          await deleteStaffMemberWithScopes(c.env.DB, duplicateInvite.id);
+        } catch (cleanupError) {
+          console.error('POST /api/staff cleanup stale invite error:', cleanupError);
+        }
+      } else {
+        return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
       }
-      return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
     }
 
     const token = randomToken();
     // N-424: 作成時点の role から bundle を写す（role は初期値、実権限は保存キーが決める）。
-    const member = await createStaffMember(c.env.DB, {
-      name, email,
-      role: body.role === 'admin' ? 'admin' : 'staff',
-      access_level: body.role === 'viewer' ? 'read_only' : 'full',
-      role_bundle: body.role === 'admin' ? 'administrator' : body.role === 'viewer' ? 'view_only' : 'custom',
-      view_permission_keys: body.role === 'viewer' ? scopeLevelsToKeys(BUNDLE_PRESETS.view_only.levels).view : [],
-      email_mask: body.role === 'admin' ? 'full' : 'masked',
-      is_active: 0,
-      permission_keys: body.role === 'staff' ? (body.permissionKeys ?? []) : [],
-      notification_preferences: body.notificationPreferences ?? {},
-      invite_status: 'pending_email',
-      invite_token_hash: await sha256Hex(token),
-      invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
-      assigned_line_account_id: body.assignedLineAccountId,
-      can_access_descendant_accounts: body.role === 'admin' && Boolean(body.canAccessDescendantAccounts),
-      account_scope: accountScope.accountScope,
-      tenant_id: current.tenantId ?? DEFAULT_TENANT_ID,
-    });
+    // M957: 本人と担当範囲は同じ取引で書く。範囲の途中で止まっても幽霊行を残さない。
+    let member: StaffMember;
     try {
-      await replaceStaffAccountScopes(c.env.DB, member.id, accountScope.scopedLineAccountIds);
+      member = await createStaffMemberWithScopes(c.env.DB, {
+        name, email,
+        role: body.role === 'admin' ? 'admin' : 'staff',
+        access_level: body.role === 'viewer' ? 'read_only' : 'full',
+        role_bundle: body.role === 'admin' ? 'administrator' : body.role === 'viewer' ? 'view_only' : 'custom',
+        view_permission_keys: body.role === 'viewer' ? scopeLevelsToKeys(BUNDLE_PRESETS.view_only.levels).view : [],
+        email_mask: body.role === 'admin' ? 'full' : 'masked',
+        is_active: 0,
+        permission_keys: body.role === 'staff' ? (body.permissionKeys ?? []) : [],
+        notification_preferences: body.notificationPreferences ?? {},
+        invite_status: 'pending_email',
+        invite_token_hash: await sha256Hex(token),
+        invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+        assigned_line_account_id: body.assignedLineAccountId,
+        can_access_descendant_accounts: body.role === 'admin' && Boolean(body.canAccessDescendantAccounts),
+        account_scope: accountScope.accountScope,
+        tenant_id: current.tenantId ?? DEFAULT_TENANT_ID,
+      }, accountScope.scopedLineAccountIds);
+    } catch (error) {
+      // M958: 同時に届いた招待は一意制約で片方だけが残る。負けた側は作り直さず送り直しへ案内する。
+      if (error instanceof Error && /UNIQUE/i.test(error.message)) {
+        return c.json({ success: false, error: 'このメールアドレスは招待中です。新しく作り直さず、ログインユーザー画面の「招待中」タブからもう一度送り直してください。' }, 409);
+      }
+      throw error;
+    }
+    try {
       await sendStaffInviteEmail(c.env, {
         name, email,
         verifyUrl: invitationConfirmationUrl(c, token),
       });
     } catch (error) {
-      await deleteStaffMember(c.env.DB, member.id);
+      // M957: 後片付け自体が失敗しても握り潰さない。本人と範囲を一緒に消し、
+      // 消せなくても同じメールの招待し直しで掃除できる（上の上書き）。
+      try {
+        await deleteStaffMemberWithScopes(c.env.DB, member.id);
+      } catch (cleanupError) {
+        console.error('POST /api/staff rollback error:', cleanupError);
+      }
       throw error;
     }
     return c.json({ success: true, data: await serializeStaff(c.env.DB, member) }, 201);
@@ -685,6 +713,9 @@ staff.patch('/api/staff/:id', async (c) => {
     const email = body.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
+    }
+    if (emailTooLong(email)) {
+      return c.json({ success: false, error: 'メールアドレスは254文字以内で入力してください' }, 400);
     }
     const duplicate = (await getStaffMembers(c.env.DB, currentTenantId(c))).some((member) => member.id !== id && member.email?.toLowerCase() === email);
     if (duplicate) return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
