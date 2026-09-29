@@ -458,11 +458,12 @@ scoring.post(
 );
 
 const MILEAGE_REDEMPTION_LIST_STATUSES = new Set<string>([
-  'all', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded',
+  'all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded',
 ]);
 
 // 交換履歴の一覧。残高を減らしたのに特典が届かなかった交換を、管理画面で
-// 見つけるための口。既定は失敗中だけ。秘密の処理IDは落として返す。
+// 見つけるための口。既定は要対応（失敗中＋送ったか分からない配送中）。
+// 照合待ちを既定の一覧から消さない（R364）。秘密の処理IDは落として返す。
 scoring.get(
   '/api/mileage/redemptions',
   requireRole('owner', 'admin', 'staff'),
@@ -472,7 +473,7 @@ scoring.get(
       if (!await canUseMileageAccount(c, accountId)) {
         return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
       }
-      const statusValue = c.req.query('status')?.trim() || 'delivery_failed';
+      const statusValue = c.req.query('status')?.trim() || 'needs_attention';
       if (!MILEAGE_REDEMPTION_LIST_STATUSES.has(statusValue)) {
         return c.json({ success: false, error: 'status is invalid' }, 400);
       }
@@ -532,15 +533,17 @@ scoring.post(
         return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
       }
       /*
-       * 失敗中だけやり直せる。成功済み・返金済みの再実行は二重特典の素、
-       * 予約中・配送中の再実行は最初の配送と競合するので、どちらも断る。
+       * 失敗中と配送中だけやり直せる。成功済み・返金済みの再実行は
+       * 二重特典の素、予約中の再実行は最初の配送と競合するので断る。
+       * 配送中（照合待ち）のやり直しも受け付けるが、送ったか
+       * 確かめられない手順は送り直さず照合待ちに残す（R364）。
        * やり直しは同じ交換IDを続け、残高の減算はしない
        * (deliverMileageReward は予約時の減算に触らない)。
        */
-      if (redemption.status !== 'delivery_failed') {
+      if (redemption.status !== 'delivery_failed' && redemption.status !== 'delivering') {
         return c.json({
           success: false,
-          error: '失敗中の交換だけやり直せます',
+          error: '失敗中・配送中の交換だけやり直せます',
           code: 'redemption_not_retryable',
         }, 409);
       }
@@ -548,7 +551,13 @@ scoring.post(
         credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       });
       auditLog(c, 'mileage.redemption.retry', { kind: 'mileage_redemption', id: redemption.id });
-      return c.json({ success: delivery.status === 'succeeded', data: delivery },
+      /*
+       * R367: 配送成否だけでなく交換の今の状態も返す。返却が完了したら
+       * 画面は返却済みとして案内し、古い再試行の行を外せる。
+       */
+      const fresh = await getMileageRedemption(c.env.DB, redemption.id);
+      const data = { ...delivery, redemption: publicMileageRedemption(fresh ?? redemption) };
+      return c.json({ success: delivery.status === 'succeeded', data },
         delivery.status === 'succeeded' ? 200 : 202);
     } catch (error) {
       return mileageRewardError(c, error);

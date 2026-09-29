@@ -423,8 +423,113 @@ describe('V6オートメーションの既存処理接続', () => {
       }),
     });
 
+    // R363: 5xxは受理した可能性があるため照合待ち（再試行は続ける）。
     expect(temporary.status).toBe('waiting');
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'temporary'`,
+    ).get(temporary.runId)).toEqual({ error_code: 'delivery_unconfirmed' });
     expect(rejected.status).toBe('failed');
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'rejected'`,
+    ).get(rejected.runId)).toEqual({ error_code: 'line_request_rejected' });
+  });
+
+  /*
+   * R363: LINEが受理した後の履歴保存だけ失敗したら、未送信として
+   * 返却・再送しない。送達不明として照合待ちに残す。
+   * （直す前は line_temporary_failure になり未送信扱い＝赤）
+   */
+  it('受理後の履歴保存失敗は未送信にせず照合待ちにする', async () => {
+    const pushMessage = vi.fn(async () => ({ requestId: 'line-request-9' }));
+    // 履歴保存（messages_log への書き込みを含む batch）だけ1回落とす。受理は成功している。
+    const realBatch = (testDb.db.batch as (statements: D1PreparedStatement[]) => Promise<unknown[]>)
+      .bind(testDb.db);
+    let armed = true;
+    const faultyDb = {
+      ...testDb.db,
+      batch: async (statements: D1PreparedStatement[]) => {
+        const writesLog = statements.some((statement) =>
+          ((statement as unknown as { sql?: string }).sql ?? '').includes('INTO messages_log'));
+        if (armed && writesLog) {
+          armed = false;
+          throw new Error('injected message log failure');
+        }
+        return realBatch(statements);
+      },
+    } as unknown as typeof testDb.db;
+    const faultyTestDb = { raw: testDb.raw, db: faultyDb };
+    const setup = addAutomation(testDb.raw, 'account-1', {
+      id: 'accepted-log-fault', type: 'send_message',
+      params: { messageType: 'text', content: '届いているはず' }, onFailure: 'stop',
+    });
+    const started = await startAutomationRun(faultyTestDb.db, {
+      lineAccountId: 'account-1',
+      automationId: setup.automationId,
+      friendId: 'friend-1',
+      sourceEventId: crypto.randomUUID(),
+      idempotencyKey: crypto.randomUUID(),
+      inputEvent: { type: 'friend_add' },
+      conditionMatched: true,
+      now: NOW,
+    });
+    const status = await processAutomationRun(faultyTestDb.db, started.runId!, {
+      now: NOW,
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({
+          pushMessage,
+          linkRichMenuToUser: vi.fn(),
+          unlinkRichMenuFromUser: vi.fn(),
+        }),
+        now: () => NOW,
+      }),
+    });
+    // 受理は1回。履歴が無いのに成功にも失敗にもしない。
+    expect(pushMessage).toHaveBeenCalledTimes(1);
+    expect(status).toBe('waiting');
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ?`,
+    ).get(started.runId)).toEqual({ error_code: 'delivery_unconfirmed' });
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS n FROM messages_log WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ n: 0 });
+  });
+
+  /*
+   * R363の追加: 応答が返らない（タイムアウト）・受理後の5xx（status付き）・
+   * 200のJSON読取失敗は、どれも受理不明として照合待ちにする。
+   * 未受理が確定した拒否（4xx）だけが即時失敗のまま。
+   */
+  it('応答なし・受理後5xx・JSON読取失敗は照合待ちにし、再送の目安を残す', async () => {
+    const failure = (error: unknown) => ({
+      pushMessage: vi.fn(async () => { throw error; }),
+      linkRichMenuToUser: vi.fn(),
+      unlinkRichMenuFromUser: vi.fn(),
+    });
+    const withStatus = (status: number, message: string): Error => {
+      const error = new Error(message) as Error & { status: number };
+      error.status = status;
+      return error;
+    };
+    const cases = [
+      { key: 'timeout', error: new TypeError('fetch failed') },
+      { key: 'accepted-5xx', error: withStatus(503, 'LINE API error: 503 Service Unavailable') },
+      { key: 'invalid-json', error: new SyntaxError('Unexpected token < in JSON') },
+    ] as const;
+    for (const item of cases) {
+      const result = await execute(testDb, {
+        accountId: 'account-1', friendId: 'friend-1',
+        action: { id: item.key, type: 'send_message', params: { content: item.key }, onFailure: 'stop' },
+        executors: createAutomationActionExecutors({
+          resolveLineAccessToken: async () => 'token-1',
+          createLineClient: () => failure(item.error),
+        }),
+      });
+      expect(result.status).toBe('waiting');
+      expect(testDb.raw.prepare(
+        `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = ?`,
+      ).get(result.runId, item.key)).toEqual({ error_code: 'delivery_unconfirmed' });
+    }
   });
 
   it('Webhookは登録済みのHTTPSだけへ冪等キー付きで送り、5xxを再試行にする', async () => {

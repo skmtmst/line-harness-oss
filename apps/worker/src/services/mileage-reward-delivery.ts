@@ -1,12 +1,16 @@
 import {
   accountFeatureOffExclusionSql,
   claimRedemptionStep,
+  claimRedemptionStepForRecovery,
   clearRedemptionStepIntent,
   decryptCredential,
   getMileageRewardDeliveryPlan,
   getReservedMileageRewardCode,
+  hasSentRedemptionSteps,
   markRedemptionStepSent,
+  MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS,
   MileageRedemptionConfirmError,
+  MileageRewardError,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
   type MileageRewardFailurePolicy,
@@ -123,6 +127,40 @@ class RedemptionStepBusyError extends Error {
     super('ほかの処理が同じ交換を送信中です');
     this.name = 'RedemptionStepBusyError';
   }
+}
+
+/**
+ * R344: 最初の送信から24時間を過ぎた手順の合図。
+ * 同じキーで送り直すと LINE 側が新規受付して二重に届くので、
+ * 送らず・確定もせず、人が確かめる照合待ちに残す。
+ * 確定失敗と同じ扱い（失敗に落とさない・返却しない）。
+ * db の親クラスは継承しない。最上位で参照すると db を mock した
+ * 試験が読み込み時に落ちるため、Error 継承＋code・名前で見分ける。
+ */
+class RedemptionRetryKeyExpiredError extends Error {
+  readonly code = 'retry_key_expired';
+  constructor() {
+    super('LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました');
+    this.name = 'RedemptionRetryKeyExpiredError';
+  }
+}
+
+/** R344 の合図かどうか。code・名前でも見る。 */
+function isRetryKeyExpiredError(error: unknown): error is RedemptionRetryKeyExpiredError {
+  if (error instanceof RedemptionRetryKeyExpiredError) return true;
+  return error instanceof Error
+    && (error.name === 'RedemptionRetryKeyExpiredError'
+      || (error as { code?: unknown }).code === 'retry_key_expired');
+}
+
+/**
+ * R364: 照合待ちの手順のうち、送り直しても安全な種類。
+ * Webhook は受け先で二重に処理されるため、自動では回復しない。
+ * タグ・属性・シナリオ・リッチメニューは何度実行しても同じ結果、
+ * メッセージは同じキーで LINE 側が重複を防ぐ（期限内のみ）。
+ */
+function isRecoverableStepType(type: string): boolean {
+  return type !== 'send_webhook';
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -245,6 +283,10 @@ export async function deliverMileageReward(
         fetch: options.fetch,
         now: options.now,
       });
+      // R344: 最初の送信から24時間を過ぎた手順は同じキーで送らない。
+      const retryKeyExpiresAt = new Date(
+        new Date(now).getTime() - MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS,
+      ).toISOString();
       for (const [index, action] of actions.entries()) {
         const executor = executors[action.type];
         if (!executor) throw new Error('交換後の動きを実行できません');
@@ -254,11 +296,63 @@ export async function deliverMileageReward(
         const stepLease = {
           redemptionId, stepKey, idempotencyKey: stepExecutionId,
           owner: stepOwner, fenceToken: stepFence,
-          leaseExpiresAt: stepLeaseExpiresAt, now,
+          leaseExpiresAt: stepLeaseExpiresAt, now, retryKeyExpiresAt,
+        };
+        const stepConfirmation = {
+          redemptionId, stepKey, owner: stepOwner, fenceToken: stepFence, now,
+        };
+        const runStep = async (recovery: boolean): Promise<void> => {
+          try {
+            await executor({
+              db,
+              runId: redemptionId,
+              lineAccountId: plan.redemption.lineAccountId,
+              automationId: `mileage-reward:${plan.redemption.rewardId}`,
+              automationVersionId: plan.redemption.rewardVersionId,
+              friendId: plan.redemption.beneficiaryFriendId,
+              sourceEventId: redemptionId,
+              inputEvent: { kind: 'mileage_reward_redeemed', rewardId: plan.redemption.rewardId },
+              action,
+              stepExecutionId,
+              idempotencyKey: stepExecutionId,
+              attemptNumber: plan.redemption.attemptCount + 1,
+              commonActionVersionId: plan.commonActionVersionId,
+              isTest: false,
+            });
+          } catch (error) {
+            if (error instanceof AutomationActionError && error.code === 'delivery_unconfirmed') {
+              // 外部送信は終わっている。証言は送る前に残してあるので、
+              // そのまま照合待ちに残し、送り直さない。
+              throw new MileageRedemptionConfirmError();
+            }
+            if (recovery) {
+              /*
+               * R364: 回復のやり直しで失敗したら、送ったか分からないので
+               * 照合待ちのまま残す。証言は消さない（消すことは
+               * 「送っていないことの確定」であり、回復時は言えない）。
+               * 失敗にも落とさない（返却の素にしない）。
+               */
+              throw new MileageRedemptionConfirmError();
+            }
+            /*
+             * 送る前の失敗：証言を消して、やり直し可能に戻す。
+             * 消せなければ送ったか分からないので、照合待ちに残す。
+             */
+            try {
+              await clearStepIntentWithRetry(db, stepConfirmation);
+            } catch {
+              throw new MileageRedemptionConfirmError();
+            }
+            throw error;
+          }
+          // 証言つき確定を数回試す。通らなければ照合待ちに残す。
+          await confirmStepSentWithRetry(db, stepConfirmation);
         };
         /*
          * 送り直さない：送信済みの手順は飛ばす。貸出中の手順は待つ。
-         * 証言つき(照合待ち)の手順は、送らず勝手に確定もせず待つ。
+         * 期限切れの手順は送らず照合待ちへ回す。
+         * 証言つき(照合待ち)の手順は、送り直しても安全な種類だけ
+         * 期限内に回復を試みる。それ以外は送らず勝手に確定もせず待つ。
          * 受け手側にも同じ冪等キーを渡す。
          */
         const step = await claimRedemptionStep(db, stepLease);
@@ -268,49 +362,25 @@ export async function deliverMileageReward(
           // 送ったとは言わず、交換も押す前の状態へ戻す。
           throw new RedemptionStepBusyError();
         }
+        if (step === 'expired') {
+          throw new RedemptionRetryKeyExpiredError();
+        }
         if (step === 'reconcile') {
-          // 送ったか確かめられない行。送らず、勝手に確定もせず待つ。
-          throw new MileageRedemptionConfirmError();
-        }
-        const stepConfirmation = {
-          redemptionId, stepKey, owner: stepOwner, fenceToken: stepFence, now,
-        };
-        try {
-          await executor({
-            db,
-            runId: redemptionId,
-            lineAccountId: plan.redemption.lineAccountId,
-            automationId: `mileage-reward:${plan.redemption.rewardId}`,
-            automationVersionId: plan.redemption.rewardVersionId,
-            friendId: plan.redemption.beneficiaryFriendId,
-            sourceEventId: redemptionId,
-            inputEvent: { kind: 'mileage_reward_redeemed', rewardId: plan.redemption.rewardId },
-            action,
-            stepExecutionId,
-            idempotencyKey: stepExecutionId,
-            attemptNumber: plan.redemption.attemptCount + 1,
-            commonActionVersionId: plan.commonActionVersionId,
-            isTest: false,
-          });
-        } catch (error) {
-          if (error instanceof AutomationActionError && error.code === 'delivery_unconfirmed') {
-            // 外部送信は終わっている。証言は送る前に残してあるので、
-            // そのまま照合待ちに残し、送り直さない。
+          if (!isRecoverableStepType(action.type)) {
+            // 送ったか確かめられない行。送らず、勝手に確定もせず待つ。
             throw new MileageRedemptionConfirmError();
           }
-          /*
-           * 送る前の失敗：証言を消して、やり直し可能に戻す。
-           * 消せなければ送ったか分からないので、照合待ちに残す。
-           */
-          try {
-            await clearStepIntentWithRetry(db, stepConfirmation);
-          } catch {
+          const recovery = await claimRedemptionStepForRecovery(db, stepLease);
+          if (recovery === 'sent') continue;
+          if (recovery === 'busy') throw new RedemptionStepBusyError();
+          if (recovery === 'expired') throw new RedemptionRetryKeyExpiredError();
+          if (recovery !== 'send') {
             throw new MileageRedemptionConfirmError();
           }
-          throw error;
+          await runStep(true);
+          continue;
         }
-        // 証言つき確定を数回試す。通らなければ照合待ちに残す。
-        await confirmStepSentWithRetry(db, stepConfirmation);
+        await runStep(false);
       }
     }
     try {
@@ -342,6 +412,23 @@ export async function deliverMileageReward(
         message: 'ほかの処理が同じ交換を進めています。少し待ってからもう一度お試しください。',
       };
     }
+    if (isRetryKeyExpiredError(error)) {
+      // R344: 期限切れは自動で送らない。理由だけ残し、人が確かめる。
+      await db.prepare(
+        `UPDATE mileage_redemptions
+            SET failure_code = 'retry_key_expired',
+                failure_message = 'LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました。内容を確かめてください。',
+                updated_at = ?
+          WHERE id = ? AND status = 'delivering'`,
+      ).bind(now, redemptionId).run();
+      return {
+        status: 'delivery_failed', rewardName: plan.rewardName,
+        customerMessage: plan.customerMessage, rewardCode: null,
+        retryAt: null,
+        failurePolicy: plan.failurePolicy,
+        message: 'LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました。内容を確かめてください。',
+      };
+    }
     if (error instanceof MileageRedemptionConfirmError) {
       /*
        * 外部送信は終わっているかもしれない。失敗に落とすとやり直しで
@@ -368,10 +455,46 @@ export async function deliverMileageReward(
       retryAt,
     });
     if (plan.failurePolicy === 'refund') {
-      await refundMileageRewardRedemption(db, {
-        redemptionId,
-        reason: '特典を渡せなかったためマイルを自動で戻す',
-      });
+      /*
+       * R361: 一部の手順を渡し終えていたら、全額は返さない。
+       * 渡し終えた分は返さず、未完了の手順だけやり直せるよう
+       * 失敗のまま残す。返却の判断は提供済み内容と一緒に人が行う。
+       */
+      const partial = plan.rewardKind !== 'coupon'
+        && await hasSentRedemptionSteps(db, redemptionId);
+      if (partial) {
+        const partialRetryAt = nextRetry(now, plan.redemption.attemptCount);
+        await recordMileageRedemptionAttempt(db, {
+          redemptionId,
+          status: 'failed',
+          errorCode: failure.code,
+          errorMessage: '一部の特典は渡し済みのため、マイルは戻していません。',
+          retryAt: partialRetryAt,
+        });
+        return {
+          status: 'delivery_failed', rewardName: plan.rewardName,
+          customerMessage: plan.customerMessage, rewardCode: null, retryAt: partialRetryAt,
+          failurePolicy: plan.failurePolicy,
+          message: '一部の特典は渡し済みのため、マイルは戻していません。残りの手順をやり直せます。',
+        };
+      }
+      try {
+        await refundMileageRewardRedemption(db, {
+          redemptionId,
+          reason: '特典を渡せなかったためマイルを自動で戻す',
+        });
+      } catch (refundError) {
+        // R362: 返却より先に再試行が成功していたら、成功を返す。
+        // 遅れた返却で成功済みの交換を書き換えない。
+        if (refundError instanceof MileageRewardError && refundError.code === 'already_delivered') {
+          return {
+            status: 'succeeded', rewardName: plan.rewardName,
+            customerMessage: plan.customerMessage, rewardCode: null, retryAt: null,
+            failurePolicy: plan.failurePolicy, message: null,
+          };
+        }
+        throw refundError;
+      }
     }
     return {
       status: 'delivery_failed', rewardName: plan.rewardName,
