@@ -133,6 +133,14 @@ export function isForbiddenOrRateLimited(err: unknown): boolean {
 }
 
 /**
+ * 403だけか。429は待ち直せば直るので、再試行の口を残す側で使う（R539）。
+ * 403は押しても直らないので、再試行の口を出さない。
+ */
+export function isForbidden(err: unknown): boolean {
+  return classifyApiFailure(err) === 'forbidden'
+}
+
+/**
  * 帯（Notice）や赤字1行に出す読み込み失敗の1行（m23m）。
  * 生の `API error: NNN` を出さず、見出しと案内をつなげた1行にする。
  */

@@ -81,7 +81,7 @@ export default function NewStaffPage() {
     saveLabel="招待メールを送る"
     showHeader={false}
     variant="v6"
-    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? '正しいメールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
+    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? '正しいメールアドレスを入力してください' : email.trim().length > 254 ? 'メールアドレスは254文字以内で入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
     onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: inheritAccounts, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
       <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-ink">1.</b> 招待メールでアドレスを確認</li><li><b className="text-ink">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-ink">3.</b> 連携完了後はLINE認証でログイン</li></ol></AsideCard>
@@ -92,7 +92,7 @@ export default function NewStaffPage() {
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="名前" htmlFor="staff-name" required><TextInput id="staff-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><TextInput id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><TextInput id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} /></Field>
       </div>
     </FormSection>
 
