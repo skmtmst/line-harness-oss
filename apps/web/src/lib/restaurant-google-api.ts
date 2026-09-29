@@ -317,4 +317,16 @@ export const restaurantGoogleApi = {
   // 第4段：パフォーマンス
   performance: (accountId: string, days: GooglePerformanceDays) =>
     fetchApi<GooglePerformanceData>(withAccount(`${base}/performance`, accountId, { days })),
+  /**
+   * パフォーマンスの取り込みをいま実行する。
+   *
+   * 自動取得は6時間ごとの定期処理に任せているが、つないだ直後はまだ一度も
+   * 走っておらず、画面は「—」のままで何も確かめられない。検証環境には
+   * 定期処理が無いので、そこでは唯一の入口になる。この店舗だけを取り直す。
+   */
+  syncPerformance: (accountId: string) =>
+    fetchApi<{ success: true; synced: number; skipped: number; failed: number; syncedAt: string }>(
+      withAccount(`${base}/performance/sync`, accountId),
+      { method: 'POST', body: '{}' },
+    ),
 }
