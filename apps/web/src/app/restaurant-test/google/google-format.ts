@@ -24,9 +24,40 @@ export function formatDate(value: string | null | undefined): string {
   return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }).format(date)
 }
 
+/**
+ * 本文を画面へ渡さない状態のとき `ApiError` が自分で作る既定文（`api.ts` の
+ * `new ApiError(...)`）。403・404・5xx は `extractApiErrorMessage` が
+ * Workerの日本語本文を捨てるので、`message` がこの形のままになる。
+ */
+const INTERNAL_API_MESSAGE = /^API error: \d+$/
+
+/**
+ * 設定不足など、言い換えただけでは次の動きが分からない失敗に一言足す。
+ *
+ * `code` は状態コードに関係なく本文から取れる（`extractApiErrorCode`）ので、
+ * 本文の日本語が捨てられる5xxでも、何が起きたかはここで伝えられる。
+ */
+const CODE_HINTS: Record<string, string> = {
+  encryption_key_missing: 'この環境の設定が足りていません。運営へ連絡してください。',
+  oauth_not_configured: 'この環境にはGoogle接続の設定がありません。運営へ連絡してください。',
+  rate_limited: 'Googleの利用上限に達しました。しばらく待ってから、もう一度お試しください。',
+  ai_unavailable: 'この環境ではこの機能を使えません。',
+  unavailable: 'Googleに接続できませんでした。時間をおいて、もう一度お試しください。',
+}
+
+/**
+ * Workerが書いた日本語の理由を画面へ出す。
+ *
+ * 本文が届かない状態では `API error: 503` のような内部文言しか残らない。
+ * これをそのまま出すと利用者には何も分からないので（実際に本番のGoogle接続で
+ * `API error: 503` だけが表示された）、呼び出し側が用意した日本語へ戻し、
+ * 原因が設定側にあると分かる `code` のときだけ次の動きを添える。
+ */
 export function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message) return error.message
-  return fallback
+  if (!(error instanceof ApiError)) return fallback
+  if (error.message && !INTERNAL_API_MESSAGE.test(error.message)) return error.message
+  const hint = error.code ? CODE_HINTS[error.code] : undefined
+  return hint ? `${fallback}${hint}` : fallback
 }
 
 /** "YYYY-MM-DD" → 曜日。 */
