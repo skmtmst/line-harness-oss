@@ -18,7 +18,7 @@ import {
   getMileageSelfInsights,
   getMileageConnectedAccountsForFriend,
   jstNow,
-  getTagAddedScenarioIds,
+  getTagAddedScenarioIdsForAccount,
   getSavedSearchById,
   getSavedSearches,
   createSavedSearch,
@@ -1327,8 +1327,10 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), re
      * 「このタグが付いたら始まる」は scenario_triggers から引く（128）。
      * 1本のシナリオが複数のタグで始まる形も作れるようになったので、
      * scenarios.trigger_tag_id は判断に使わない。
+     * 友だちと同じアカウントの公開済みだけを始める（R435）。
+     * 共通タグをきっかけにした別組織のシナリオは混ぜない。
      */
-    for (const scenarioId of await getTagAddedScenarioIds(db, body.tagId)) {
+    for (const scenarioId of await getTagAddedScenarioIdsForAccount(db, body.tagId, friendAccountId)) {
       const existing = await db
         .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
         .bind(friendId, scenarioId)
@@ -1338,8 +1340,23 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), re
       }
     }
 
-    // イベントバス発火: tag_change
-    await fireEvent(db, 'tag_change', { friendId, eventData: { tagId: body.tagId, action: 'add' } });
+    // イベントバス発火: tag_change（R436）。
+    // 手動操作は毎クリックで発火する合図なので、重複付与でも発火は保つ。
+    // V6公開版が受け取れるよう、発生元の不変IDと所属を付ける。
+    // IDは「手動の付与:友だち:タグ:確定時刻」で、台帳の値なので安定する。
+    const assignedRow = await db
+      .prepare(`SELECT assigned_at FROM friend_tags WHERE friend_id = ? AND tag_id = ?`)
+      .bind(friendId, body.tagId)
+      .first<{ assigned_at: string | null }>();
+    const assignedAt = assignedRow?.assigned_at ?? jstNow();
+    const occurredAt = /[+-]\d{2}:?\d{2}$|Z$/.test(assignedAt) ? assignedAt : `${assignedAt}+09:00`;
+    await fireEvent(db, 'tag_change', {
+      sourceEventId: `manual_tag:${friendId}:${body.tagId}:${assignedAt}`,
+      sourceKind: 'manual',
+      occurredAt,
+      friendId,
+      eventData: { tagId: body.tagId, action: 'add' },
+    }, undefined, friendAccountId);
 
     return c.json({ success: true, data: null }, 201);
   } catch (err) {

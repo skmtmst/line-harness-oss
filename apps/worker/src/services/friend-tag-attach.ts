@@ -2,7 +2,7 @@ import {
   enrollFriendInScenario,
   jstNow,
   enqueueMileageEvent,
-  getTagAddedScenarioIds,
+  getTagAddedScenarioIdsForAccount,
   createNotification,
   claimFriendTagSideEffectRun,
   canAutoRetryFriendTagSideEffect,
@@ -87,14 +87,20 @@ const STEP_DEFINITIONS: Record<FriendTagSideEffectStep, StepDefinition> = {
 
   /*
    * 「このタグが付いたら始まる」は scenario_triggers から引く（128）。
-   * 1本のシナリオを複数のタグから始められるようにしたため、
+   * 1本のシナリオが複数のタグで始まる形も作れるようになったので、
    * scenarios.trigger_tag_id は判断に使わない。
+   * 友だちと同じアカウント・全体共通の公開済みだけを始める（R435）。
+   * 共通タグをきっかけにした別組織のシナリオは混ぜない。
    */
   scenario_enroll: {
     propagatesFailure: true,
     label: 'シナリオ登録',
     async run(db, friendId, tagId, _assignedAt, push) {
-      for (const scenarioId of await getTagAddedScenarioIds(db, tagId)) {
+      const friend = await db
+        .prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
+        .bind(friendId)
+        .first<{ line_account_id: string | null }>();
+      for (const scenarioId of await getTagAddedScenarioIdsForAccount(db, tagId, friend?.line_account_id ?? null)) {
         const existing = await db
           .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
           .bind(friendId, scenarioId)
