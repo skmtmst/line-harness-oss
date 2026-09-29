@@ -497,12 +497,18 @@ export async function getMileageRewardRedemptionCounts(
   ).bind(input.friendId, input.lineAccountId).first<{ id: string; user_id: string | null }>();
   if (!friend) throw new MileageRewardError('friend_not_found', '友だち情報を確認できませんでした', 404);
   const beneficiaryKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
+  /*
+   * R388: 交換済みの表示も上限と同じ本人キー集合で数える。統合後に
+   * 「交換できる」と出して上限で止める食い違いを出さない。
+   */
+  const limitKeys = await collectBeneficiaryKeysForLimit(db, input.friendId, friend.user_id, beneficiaryKey);
+  const limitPlaceholders = limitKeys.map(() => '?').join(', ');
   const rows = await db.prepare(
     `SELECT reward_id, reward_version_id, COUNT(*) AS count
        FROM mileage_redemptions
-      WHERE line_account_id = ? AND beneficiary_key = ? AND status != 'refunded'
+      WHERE line_account_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'
       GROUP BY reward_id, reward_version_id`,
-  ).bind(input.lineAccountId, beneficiaryKey).all<{
+  ).bind(input.lineAccountId, ...limitKeys).all<{
     reward_id: string;
     reward_version_id: string;
     count: number;
@@ -839,6 +845,35 @@ export async function listMileageRedemptions(
   };
 }
 
+/*
+ * R388: 一人一回の上限を数える識別キーの集め方。現在のキーに加え、
+ * - この友だち自身の友だちキー（統合前はこのキーで交換していた）
+ * - 今同じ本人に結び付く友だちの友だちキー（統合相手の交換も一人分）
+ * - これらの友だちが結び付いたことのある本人キー（解除・移行後も引き継ぐ）
+ * をまとめる。export は試験から規則を確かめるため。
+ */
+export async function collectBeneficiaryKeysForLimit(
+  db: D1Database,
+  friendId: string,
+  currentUserId: string | null,
+  currentKey: string,
+): Promise<string[]> {
+  const keys = new Set<string>([currentKey, `friend:${friendId}`]);
+  const coLinked = currentUserId
+    ? (await db.prepare(`SELECT id FROM friends WHERE user_id = ?`)
+      .bind(currentUserId).all<{ id: string }>()).results.map((row) => row.id)
+    : [];
+  const friendIds = [...new Set([friendId, ...coLinked])];
+  for (const id of friendIds) keys.add(`friend:${id}`);
+  const placeholders = friendIds.map(() => '?').join(', ');
+  const history = await db.prepare(
+    `SELECT DISTINCT user_id FROM friend_identity_links
+      WHERE friend_id IN (${placeholders}) AND user_id IS NOT NULL`,
+  ).bind(...friendIds).all<{ user_id: string }>();
+  for (const row of history.results) keys.add(`user:${row.user_id}`);
+  return [...keys];
+}
+
 export async function reserveMileageRewardRedemption(
   db: D1Database,
   input: {
@@ -873,6 +908,16 @@ export async function reserveMileageRewardRedemption(
   ).bind(input.friendId, input.lineAccountId).first<{ id: string; user_id: string | null }>();
   if (!friend) throw new MileageRewardError('friend_not_found', '友だち情報を確認できませんでした', 404);
   const beneficiaryKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
+  /*
+   * R388: 確定文と事後確認も事前確認と同じキー集合で数える。確認だけ広げると
+   * 同時実行の隙間で抜けるため、INSERT時の条件と対にしておく。
+   * perFriendLimit が無い特典では現在のキーだけ（余計な読みを足さない）。
+   */
+  let limitKeys = [beneficiaryKey];
+  if (version.perFriendLimit) {
+    limitKeys = await collectBeneficiaryKeysForLimit(db, input.friendId, friend.user_id, beneficiaryKey);
+  }
+  const limitPlaceholders = limitKeys.map(() => '?').join(', ');
   const wallet = await db.prepare(
     `SELECT beneficiary_key, beneficiary_user_id, beneficiary_friend_id, available, version
        FROM mileage_wallets WHERE program_id = ? AND beneficiary_key = ?`,
@@ -881,10 +926,20 @@ export async function reserveMileageRewardRedemption(
     throw new MileageRewardError('insufficient_miles', '交換に必要なマイルが足りません', 409);
   }
   if (version.perFriendLimit) {
+    /*
+     * R388: 一人一回は現在の本人識別だけでなく、統合・解除・移行の前後で
+     * 同じ友だちが名乗った識別キーすべてで数える。現在のキー・友だちキー・
+     * 同じ本人に結び付く友だちのキー・結び付き履歴の本人キーをまとめる。
+     * 規則:
+     * - 異なる本人（結び付きの無い別キー）は別々に数える。
+     * - 返却済み（refunded）は数えない。
+     * - 誤統合の訂正で外れた後は別々に数えるが、統合期間中の本人キーでの
+     *   交換は共有のまま残る（履歴は消さない）。
+     */
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
-        WHERE reward_id = ? AND beneficiary_key = ? AND status != 'refunded'`,
-    ).bind(reward.id, beneficiaryKey).first<{ count: number }>();
+        WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
+    ).bind(reward.id, ...limitKeys).first<{ count: number }>();
     if ((count?.count ?? 0) >= version.perFriendLimit) {
       throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
     }
@@ -968,7 +1023,8 @@ export async function reserveMileageRewardRedemption(
           ) < ?)
           AND (? IS NULL OR (
             SELECT COUNT(*) FROM mileage_redemptions person_limit
-             WHERE person_limit.reward_id = ? AND person_limit.beneficiary_key = ?
+             WHERE person_limit.reward_id = ?
+               AND person_limit.beneficiary_key IN (${limitPlaceholders})
                AND person_limit.status != 'refunded'
           ) < ?)`,
     ).bind(
@@ -979,7 +1035,7 @@ export async function reserveMileageRewardRedemption(
       reward.programId, input.idempotencyKey,
       code?.id ?? null, code?.id ?? null,
       version.stockLimit, version.id, version.stockLimit,
-      version.perFriendLimit, reward.id, beneficiaryKey, version.perFriendLimit,
+      version.perFriendLimit, reward.id, ...limitKeys, version.perFriendLimit,
     ),
     db.prepare(
       `INSERT INTO mileage_ledger
@@ -1060,8 +1116,8 @@ export async function reserveMileageRewardRedemption(
     if (version.perFriendLimit != null) {
       const currentCount = await db.prepare(
         `SELECT COUNT(*) AS count FROM mileage_redemptions
-          WHERE reward_id = ? AND beneficiary_key = ? AND status != 'refunded'`,
-      ).bind(reward.id, beneficiaryKey).first<{ count: number }>();
+          WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
+      ).bind(reward.id, ...limitKeys).first<{ count: number }>();
       if ((currentCount?.count ?? 0) >= version.perFriendLimit) {
         throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
       }
