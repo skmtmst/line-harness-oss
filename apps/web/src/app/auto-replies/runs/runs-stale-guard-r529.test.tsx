@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   runs: vi.fn(),
+  staffMe: vi.fn(),
 }))
 
 vi.mock('@/lib/api', () => ({
@@ -19,6 +20,9 @@ vi.mock('@/lib/api', () => ({
       retryRun: vi.fn(),
       update: vi.fn(),
     },
+    // R530: この試験は変更できる担当者の筋書き。見るだけの出し分けは
+    // runs-viewer-gating で見る。
+    staff: { me: mocks.staffMe },
   },
   ApiError: class MockApiError extends Error {
     readonly status: number
@@ -96,6 +100,7 @@ afterEach(() => {
 
 beforeEach(() => {
   currentQuery = 'id=rule-a'
+  mocks.staffMe.mockResolvedValue({ success: true, data: { role: 'owner' } })
 })
 
 function pauseButton(): HTMLButtonElement | null {
