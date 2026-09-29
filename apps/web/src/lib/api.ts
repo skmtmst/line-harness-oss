@@ -12005,13 +12005,18 @@ export const api = {
       fetchApi<ApiResponse<ActionScoreBands>>(
         `/api/action-scores/bands?accountId=${encodeURIComponent(accountId)}`,
       ),
+    /*
+     * M505: 応答消失後の再送の要求キー。同じ内容のやり直しは同じキーで送り、
+     * サーバは保存済みの結果を返す（`replayed`）。内容を変えたら別のキーにする。
+     */
     saveDraft: (data: {
       accountId: string
       expectedDraftVersionId: string | null
       configuration: ActionScoreRuleBundle
-    }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/draft', {
+    }, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration> & { replayed?: boolean }>('/api/action-scores/rules/draft', {
       method: 'PATCH',
       body: JSON.stringify(data),
+      ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
     }),
     testRules: (data: {
       accountId: string
