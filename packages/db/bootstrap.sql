@@ -6737,10 +6737,23 @@ CREATE TABLE tiktok_pnl_order_lines (
 
 CREATE TABLE tiktok_pnl_settings (
   line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  -- 1 = このアカウントで利益計算シートを使う。既定は 0。
+  -- cron は 1 のアカウントだけ処理する。Google Sheets連携が繋がっているだけで
+  -- 勝手にスプレッドシートを作らないための明示的な有効化。
+  -- 管理画面の手動同期が押された時に 1 へ上げる。
+  enabled INTEGER NOT NULL DEFAULT 0,
   spreadsheet_id TEXT,
   spreadsheet_url TEXT,
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'ready', 'error')),
+  -- 同期中の目印（開始時刻）。手動同期と定期実行が重なると同じ明細を
+  -- 二重に追記してしまうため、アカウント単位の排他に使う。
+  -- 途中で落ちた場合も古い値は期限切れとして無視する。
+  sync_started_at TEXT,
+  -- 雛形（見出し・数式・マスタ）を書き込み終えた時刻。
+  -- 作成と書き込みを分けたので、ここが空なら次tickで書き込みだけやり直す。
+  -- 2つ目のスプレッドシートを作らないための目印。
+  template_filled_at TEXT,
   -- EC側取り込みの再開点（source_updated_at ベース）。
   import_cursor TEXT,
   last_import_at TEXT,
