@@ -213,13 +213,14 @@ export default function MergedPersonDetailView({
     )
   }
   if (phase === 'error' || !person) {
+    // 取得失敗は共通の再読み込み口だけにする（契約試験）。一覧へ戻る口は
+    // forbidden 側に残し、ここでは読み直しを優先する。
     return (
       <ListState
         kind="error"
         title={failure?.title}
         description={failure?.description}
         onRetry={() => setReloadKey((key) => key + 1)}
-        action={<Button type="button" onClick={onClose}>一覧へ戻る</Button>}
       />
     )
   }
