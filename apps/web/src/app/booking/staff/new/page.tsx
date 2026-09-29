@@ -17,6 +17,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 /* R309: メニュー候補の料金は一覧・割当表と同じ共通表示にする。 */
 import { menuPriceLabel } from '../../lib/menu-price'
 import Select from '@/components/shared/select'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -57,21 +58,43 @@ export default function NewBookingStaffPage() {
     setCreatedStaffId(null)
   }, [selectedAccountId])
 
+  /*
+   * R578: 担当メニューの取得失敗と本当の0件を言い分ける。
+   * 失敗しても入力済みのスタッフ情報は state に残る。再取得だけ送り直す。
+   */
+  const [menusLoading, setMenusLoading] = useState(true)
+  const [menusError, setMenusError] = useState<unknown>(null)
+  const [menusReloadKey, setMenusReloadKey] = useState(0)
+
   useEffect(() => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setMenusLoading(false)
+      return
+    }
     let alive = true
+    setMenusLoading(true)
+    setMenusError(null)
     bookingApi
       .listMenus(selectedAccountId)
       .then((r) => {
-        if (alive) setMenus(r.menus)
+        if (alive) {
+          setMenus(r.menus)
+          setMenusError(null)
+          setMenusLoading(false)
+        }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         // メニューが引けなくても、スタッフの登録自体はできる。
+        // 失敗を空と混ぜない。「まだ無い」とは出さず再取得の口を出す。
+        if (alive) {
+          setMenusError(error)
+          setMenusLoading(false)
+        }
       })
     return () => {
       alive = false
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, menusReloadKey])
 
   useEffect(() => {
     let alive = true
@@ -312,7 +335,19 @@ export default function NewBookingStaffPage() {
         label="予約を受けられるメニュー"
         note="チェックしたメニューだけ、このスタッフを指名できます。"
       >
-        {menus.length === 0 ? (
+        {menusLoading ? (
+          <ListState kind="loading" title="メニューを読み込んでいます" />
+        ) : menusError !== null ? (
+          <ListState
+            kind="error"
+            title="メニューを読み込めませんでした"
+            // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+            // それ以外は画面の文のまま。入力は残っているので再取得だけ案内する。
+            description={isForbiddenOrRateLimited(menusError) ? undefined : '通信の不具合などでメニュー一覧を取得できませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
+            error={menusError}
+            onRetry={() => setMenusReloadKey((value) => value + 1)}
+          />
+        ) : menus.length === 0 ? (
           <p className="text-ink-faint text-sm">
             まだメニューがありません。先に予約設定の「メニュー」から登録してください。
           </p>
