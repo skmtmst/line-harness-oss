@@ -31,6 +31,13 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => undefined,
 }))
 
+// R538: この試験は編集できる立場で表を触る。閲覧のみの出し分けは
+// page.r537-r538.test.tsx が担う。
+vi.mock('@/lib/staff-capability', () => ({
+  canEditFeature: () => true,
+  canViewFeature: () => true,
+}))
+
 vi.mock('@/lib/api', () => ({
   bookingApi: {
     listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
