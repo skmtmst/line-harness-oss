@@ -1727,3 +1727,98 @@ describe('describeSaveFailure（WRITE-01: 保存失敗の安全な理由表示�
       .toBe('対象が見つかりません')
   })
 })
+
+describe('fetchApi の Retry-After 受け渡し（m23m）', () => {
+  async function failWith(status: number, headers?: Record<string, string>): Promise<InstanceType<typeof ApiError>> {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: false, error: 'rate_limited' }),
+      { status, headers: { 'content-type': 'application/json', ...(headers ?? {}) } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      await fetchApi('/api/folders?kind=template')
+      throw new Error('投げなかった')
+    } catch (error) {
+      if (error instanceof ApiError) return error
+      throw error
+    }
+  }
+
+  it('429のRetry-After（秒）を失敗に載せる', async () => {
+    const err = await failWith(429, { 'Retry-After': '30' })
+    expect(err.status).toBe(429)
+    expect(err.retryAfterSeconds).toBe(30)
+  })
+
+  it('Retry-After（日時）は今との差を秒にする', async () => {
+    const future = new Date(Date.now() + 65 * 1000).toUTCString()
+    const err = await failWith(429, { 'Retry-After': future })
+    expect(err.retryAfterSeconds).toBeGreaterThan(0)
+    expect(err.retryAfterSeconds).toBeLessThanOrEqual(65)
+  })
+
+  it('読めないRetry-Afterは載せない', async () => {
+    const err = await failWith(429, { 'Retry-After': 'soon' })
+    expect(err.retryAfterSeconds).toBeUndefined()
+  })
+
+  it('Retry-Afterが無ければ載せない', async () => {
+    const err = await failWith(403)
+    expect(err.status).toBe(403)
+    expect(err.retryAfterSeconds).toBeUndefined()
+  })
+})
+
+describe('失敗本文の通過状態（D016）', () => {
+  async function failMessage(status: number, body: unknown): Promise<string> {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify(body),
+      { status, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      await fetchApi('/api/staff/invitations/accept')
+      throw new Error('投げなかった')
+    } catch (error) {
+      if (error instanceof ApiError) return error.message
+      throw error
+    }
+  }
+
+  it('410の期限切れの日本語案内を通す', async () => {
+    const message = await failMessage(410, { success: false, error: 'この招待は無効または期限切れです。管理者へ再発行を依頼してください。' })
+    expect(message).toContain('期限切れ')
+    expect(message).not.toContain('API error')
+  })
+
+  it('404の正しくないURLの日本語案内を通す', async () => {
+    const message = await failMessage(404, { success: false, error: 'この URL は正しくありません。メールの URL をそのまま開いてください' })
+    expect(message).toContain('正しくありません')
+    expect(message).not.toContain('API error')
+  })
+
+  it('500の本文は今までどおり通さない', async () => {
+    const message = await failMessage(500, { success: false, error: '何か日本語' })
+    expect(message).toBe('API error: 500')
+  })
+})
+
+describe('通信断の日本語化（R506系）', () => {
+  it('Failed to fetch を日本語にして投げ直す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    try {
+      await fetchApi('/api/folders?kind=template')
+      throw new Error('投げなかった')
+    } catch (error) {
+      expect(error).not.toBeInstanceOf(ApiError)
+      expect(error instanceof Error && error.message).toContain('通信できませんでした')
+      expect(error instanceof Error && error.message).not.toContain('Failed to fetch')
+    }
+  })
+
+  it('中断（AbortError）はそのまま通す', async () => {
+    const aborted = new DOMException('The operation was aborted.', 'AbortError')
+    vi.stubGlobal('fetch', vi.fn(async () => { throw aborted }))
+    await expect(fetchApi('/api/folders?kind=template')).rejects.toBe(aborted)
+  })
+})

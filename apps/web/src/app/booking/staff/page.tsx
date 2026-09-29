@@ -12,6 +12,7 @@ import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -39,6 +40,8 @@ export default function BookingStaffPage() {
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [removeTarget, setRemoveTarget] = useState<BookingStaff | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [removeError, setRemoveError] = useState('')
@@ -57,6 +60,7 @@ export default function BookingStaffPage() {
       return
     }
     setLoadStatus('loading')
+    setLoadError(null)
     // アカウント切替時の stale state 防止（cross-account 表示/操作の事故防止）。
     setItems([])
     try {
@@ -64,9 +68,10 @@ export default function BookingStaffPage() {
       if (requestId !== loadRequestRef.current) return
       setItems(r.staff)
       setLoadStatus('ready')
-    } catch {
+    } catch (caught) {
       if (requestId !== loadRequestRef.current) return
       setItems([])
+      setLoadError(caught)
       setLoadStatus('error')
     }
   }, [selectedAccountId])
@@ -149,8 +154,11 @@ export default function BookingStaffPage() {
         <ListState
           kind="error"
           title="予約スタッフを表示できませんでした"
-          description="登録したスタッフは消えていません。再読み込みしても直らない場合はエラー報告へ。"
-          action={<Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は画面の文のまま。403は押しても直らないので再試行の口も出さない。
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '登録したスタッフは消えていません。再読み込みしても直らない場合はエラー報告へ。'}
+          error={loadError ?? undefined}
+          action={isForbiddenOrRateLimited(loadError) ? undefined : <Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
         />
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline">

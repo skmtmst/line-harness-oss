@@ -3,7 +3,8 @@ import {
   getSupportMarksWithUsage,
   getSupportMarkArchiveImpact,
   getSupportMarkById,
-  createSupportMarkWithAutomationRules,
+  createSupportMarkIdempotent,
+  SupportMarkCreateError,
   updateSupportMark,
   reorderSupportMarks,
   replaceAndArchiveSupportMark,
@@ -419,6 +420,15 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
+    /*
+     * R512: 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
+     * 同じキー・同じ内容の再送は保存済みのマークを返し、同じキーに
+     * 異なる内容が来たら作らず409で止める（保管の口と同じ約束）。
+     */
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+    if (!idempotencyKey || idempotencyKey.length > 128) {
+      return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+    }
     const body = await c.req.json<Record<string, unknown>>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'マークの名前を入力してください' }, 400);
@@ -445,16 +455,20 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
     } catch {
       return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
     }
-    const mark = await createSupportMarkWithAutomationRules(c.env.DB, scope, {
+    const { mark, replayed } = await createSupportMarkIdempotent(c.env.DB, scope, {
       name,
       color: body.color ? String(body.color) : undefined,
       isDefault: body.isDefault === true,
       autoOnInbound: body.autoOnInbound === true,
       displayOrder,
-    }, c.get('staff').id, automationRules as SaveSupportMarkAutomationRule[]);
+    }, c.get('staff').id, automationRules as SaveSupportMarkAutomationRule[], idempotencyKey);
     const createdRules = await listSupportMarkAutomationRules(c.env.DB, scope, mark.id) ?? [];
-    return c.json({ success: true, data: serializeMark(mark, createdRules) }, 201);
+    // 再送で保存済みを返したときは200、新しく作ったときは201。
+    return c.json({ success: true, data: serializeMark(mark, createdRules) }, replayed ? 200 : 201);
   } catch (err) {
+    if (err instanceof SupportMarkCreateError) {
+      return c.json({ success: false, code: err.code, error: err.message }, 409);
+    }
     console.error('POST /api/support-marks error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -501,6 +515,17 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
     if (body.color !== undefined && !COLOR_PATTERN.test(String(body.color))) {
       return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
     }
+    /*
+     * R513: 読んだときの版を送り、変わっていたら409で止める。
+     * 版が無い古い呼び出しは従来どおり上書きする（後方互換）。
+     */
+    let expectedVersion: number | undefined;
+    if (body.expectedVersion !== undefined) {
+      expectedVersion = Number(body.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: '最新の版を指定してください' }, 400);
+      }
+    }
     // 既定を外す操作は止める。既定が1つも無いと、新しい友だちに何も付かない。
     // 別のマークを既定にすれば、こちらは自動で外れる。
     if (body.isDefault === false && existing.is_default === 1) {
@@ -534,7 +559,17 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
       autoOnInbound: body.autoOnInbound === undefined ? undefined : body.autoOnInbound === true,
       displayOrder: body.displayOrder === undefined ? undefined : Number(body.displayOrder),
       actorId: c.get('staff').id,
+      expectedVersion,
     });
+    if (mark === 'conflict') {
+      const latest = await getSupportMarkById(c.env.DB, id, scope);
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。',
+        code: 'SUPPORT_MARK_VERSION_CONFLICT',
+        data: latest ? { latest: serializeMark(latest) } : undefined,
+      }, 409);
+    }
     return c.json({ success: true, data: serializeMark(mark!) });
   } catch (err) {
     console.error('PATCH /api/support-marks/:id error:', err);

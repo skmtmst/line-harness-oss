@@ -30,20 +30,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: m.account }),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: m.push }) }))
-vi.mock('@/lib/api', () => ({
-  ApiError: class extends Error {},
-  api: {
-    tags: { list: async () => ({ success: true, data: [] }) },
-    mileage: { rules: async () => ({ success: true, data: [] }) },
-  },
-  bookingApi: {
-    createMenu: m.create,
-    listStaff: m.staff,
-    getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
-    getStaffMenus: m.getMatrix,
-    putStaffMenus: m.putMatrix,
-  },
-}))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    ApiError: class extends Error {},
+    api: {
+      tags: { list: async () => ({ success: true, data: [] }) },
+      mileage: { rules: async () => ({ success: true, data: [] }) },
+    },
+    bookingApi: {
+      createMenu: m.create,
+      listStaff: m.staff,
+      getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
+      getStaffMenus: m.getMatrix,
+      putStaffMenus: m.putMatrix,
+    },
+  }
+})
 
 import Page from './page'
 
