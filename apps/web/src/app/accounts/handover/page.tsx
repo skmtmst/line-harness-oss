@@ -466,14 +466,14 @@ function Handover() {
           return (
             <li key={step.order} className="border-hairline bg-canvas rounded-control flex min-w-0 items-center gap-3 border p-3">
               <span className={completed
-                ? 'bg-success text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'
+                ? 'bg-success text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium'
                 : active
-                  ? 'bg-action text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'
-                  : 'bg-canvas-sunken text-ink-secondary flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'}>
+                  ? 'bg-action text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium'
+                  : 'bg-canvas-sunken text-ink-secondary flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium'}>
                 {completed ? '✓' : step.order}
               </span>
               <span className="min-w-0">
-                <span className="text-ink-faint block text-xs font-bold">STEP {step.order}</span>
+                <span className="text-ink-faint block text-xs font-medium">STEP {step.order}</span>
                 <span className="text-ink block text-xs font-medium leading-relaxed">{step.label}</span>
               </span>
             </li>
@@ -491,10 +491,10 @@ function Handover() {
                 className="grid text-sm"
                 style={{ gridTemplateColumns: '7rem minmax(0, 1fr) minmax(0, 1fr)' }}
               >
-                <div className="bg-canvas-sunken border-hairline border-b px-3 py-2 text-xs font-bold">アカウント</div>
+                <div className="bg-canvas-sunken border-hairline border-b px-3 py-2 text-xs font-medium">アカウント</div>
                 <div className="border-hairline border-b border-l px-3 py-2">{account.name}（{account.channelId}）</div>
                 <div className="border-hairline border-b border-l px-3 py-2">{destination ? `${destination.name}（${destination.channelId}）` : '未取得'}</div>
-                <div className="bg-canvas-sunken px-3 py-2 text-xs font-bold">プロバイダー</div>
+                <div className="bg-canvas-sunken px-3 py-2 text-xs font-medium">プロバイダー</div>
                 <div className="border-hairline border-l px-3 py-2">乗り換え元</div>
                 <div className="border-hairline border-l px-3 py-2">受け取り先</div>
               </div>
@@ -680,7 +680,7 @@ function Handover() {
             && handover.rollbackDeadline > new Date().toISOString() && (
             <div className="border-hairline rounded-control flex flex-wrap items-center justify-between gap-2 border px-4 py-3">
               <div>
-                <p className="text-ink text-sm font-medium">移した友だちを元へ戻す</p>
+                <p className="text-ink text-sm font-semibold">移した友だちを元へ戻す</p>
                 <p className="text-ink-secondary mt-1 text-xs">
                   {formatMonthDayTime(handover.rollbackDeadline)} まで切り戻せます。動かした友だちだけを元のアカウントへ戻します。
                 </p>

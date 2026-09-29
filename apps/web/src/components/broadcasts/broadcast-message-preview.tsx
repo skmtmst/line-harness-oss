@@ -70,7 +70,7 @@ export default function BroadcastMessagePreview({
           {index === 0 && (buttons ?? []).map((button) => (
             <p
               key={`${button.label}-${button.value}`}
-              className="mt-1 truncate rounded-control bg-accent-deep px-3 py-2 text-center text-xs font-bold text-on-accent"
+              className="mt-1 truncate rounded-control bg-accent-deep px-3 py-2 text-center text-xs font-medium text-on-accent"
               title={button.value}
             >
               {button.label || 'ボタン'}

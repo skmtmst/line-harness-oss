@@ -471,7 +471,7 @@ export default function MediaDetailDialog({
               <div>
                 <p className="text-sm font-bold">ここにファイルをドラッグ、または押して選ぶ</p>
                 <p className="text-ink-faint mt-1 text-xs">いまのメディアと同じ種類を選びます。</p>
-                {versionFile ? <p className="text-ink mt-2 text-xs font-bold">{versionFile.name}</p> : null}
+                {versionFile ? <p className="text-ink mt-2 text-xs font-medium">{versionFile.name}</p> : null}
               </div>
             </label>
             <input id={fileInputId} type="file" className="sr-only" accept={mediaAcceptForKind(item.kind)} onChange={(event) => chooseVersionFile(event.target.files?.[0] ?? null)} />
@@ -601,7 +601,7 @@ export default function MediaDetailDialog({
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">使われている場所</h3>
               {/* R34: 未確認の0件は「0か所」にしない。件数は「—」で出す。 */}
-              <span className="text-action text-xs font-bold">
+              <span className="text-action text-xs font-medium">
                 {impact && (impact.verified !== false || impact.references.length > 0)
                   ? `${impact.usageCount}か所`
                   : '—'}

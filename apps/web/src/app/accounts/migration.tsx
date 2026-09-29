@@ -491,7 +491,7 @@ export default function AccountMigration() {
         return (
           <div className="bg-canvas rounded-card border-hairline border">
             <div className="px-4 py-3 sm:hidden">
-              <p className="text-action text-xs font-bold">
+              <p className="text-action text-xs font-medium">
                 {currentStep >= STEPS.length ? 'すべて完了' : `現在 ${currentStep + 1}/${STEPS.length}`}
               </p>
               <p className="text-ink mt-1 text-sm font-semibold">
@@ -501,7 +501,7 @@ export default function AccountMigration() {
                 <summary className="text-action cursor-pointer text-xs font-semibold">全手順を見る</summary>
                 <ol className="mt-2 space-y-1">
                   {STEPS.map((step, index) => (
-                    <li key={step} className={`text-xs ${index < currentStep ? 'text-success font-semibold' : index === currentStep ? 'text-action font-bold' : 'text-ink-faint'}`}>
+                    <li key={step} className={`text-xs ${index < currentStep ? 'text-success font-semibold' : index === currentStep ? 'text-action font-medium' : 'text-ink-faint'}`}>
                       {index < currentStep ? '✓' : index === currentStep ? '▶' : `${index + 1}.`}　{step}
                     </li>
                   ))}
@@ -510,7 +510,7 @@ export default function AccountMigration() {
             </div>
             <div className="hidden sm:grid sm:grid-cols-5">
               {STEPS.map((step, index) => <div key={step} className="border-hairline border-r px-3 py-3 last:border-r-0">
-                <p className={`text-xs font-bold ${index < currentStep ? 'text-success' : index === currentStep ? 'text-action' : 'text-ink-faint'}`}>{index < currentStep ? '✓' : index === currentStep ? '▶' : index + 1}　STEP {index + 1}</p>
+                <p className={`text-xs font-medium ${index < currentStep ? 'text-success' : index === currentStep ? 'text-action' : 'text-ink-faint'}`}>{index < currentStep ? '✓' : index === currentStep ? '▶' : index + 1}　STEP {index + 1}</p>
                 <p className="text-ink mt-1 text-sm font-semibold">{step}</p>
               </div>)}
             </div>
@@ -735,7 +735,7 @@ export default function AccountMigration() {
                 : run.status === 'executing' ? { tone: 'info', label: '実行中' }
                   : run.status === 'ready' ? { tone: 'success', label: '確認完了' }
                     : { tone: 'neutral', label: '確認中' }
-        return <button key={run.id} className="hover:bg-canvas-sunken flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => { setPage(0); setClassification(''); setPendingOnly(false); void loadDetail(run.id, 0, '', false) }}><span><span className="text-ink block text-sm font-medium">{run.purpose}</span><span className="text-ink-faint text-xs">{new Date(run.createdAt).toLocaleString('ja-JP')} ・ {run.counts.total.toLocaleString()}件</span></span><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></button>
+        return <button key={run.id} className="hover:bg-canvas-sunken flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => { setPage(0); setClassification(''); setPendingOnly(false); void loadDetail(run.id, 0, '', false) }}><span><span className="text-ink block text-sm font-semibold">{run.purpose}</span><span className="text-ink-faint text-xs">{new Date(run.createdAt).toLocaleString('ja-JP')} ・ {run.counts.total.toLocaleString()}件</span></span><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></button>
       })}</div>}</section>
       {/* #984 LAY-13: 移行元・移行先の選び欄は欄いっぱいに広げる（部品の size="full" を使う）。 */}
     </div>

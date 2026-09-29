@@ -212,7 +212,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
         <div className="flex flex-wrap items-center gap-4">
           <Clock3 size={24} className="text-accent-deep shrink-0" aria-hidden="true" />
           <div className="flex min-w-0 grow flex-col gap-1">
-            <h3 id="gb-today-title" className="text-lead font-bold">本日の営業時間{today.holidayName ? <span className="text-ink-secondary ml-2 text-label font-normal">{formatYmdShort(today.date)}・{today.holidayName}</span> : <span className="text-ink-secondary ml-2 text-label font-normal">{formatYmdShort(today.date)}</span>}</h3>
+            <h3 id="gb-today-title" className="text-lead font-semibold">本日の営業時間{today.holidayName ? <span className="text-ink-secondary ml-2 text-label font-normal">{formatYmdShort(today.date)}・{today.holidayName}</span> : <span className="text-ink-secondary ml-2 text-label font-normal">{formatYmdShort(today.date)}</span>}</h3>
             <p className="text-title font-semibold">{todayText}{today.special ? <span className="text-ink-secondary ml-2 text-label font-normal">特別営業時間</span> : null}</p>
           </div>
           <Button variant="primary" onClick={() => go({ tab: 'profile', view: 'hours', mode: 'text' })} disabled={!canChange}><Pencil size={16} />営業時間を変更</Button>
@@ -580,7 +580,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                       aria-pressed={selected}
                       aria-label={`${formatYmdJa(date, true)}${mark ? ` ${mark}` : ''}${isToday ? ' 今日' : ''}`}
                       onClick={() => setSelectedDate(date)}
-                      className={`flex flex-col items-start gap-1 rounded-control border px-2 py-1.5 text-left text-label disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'text-on-accent border-transparent font-bold' : s || changed ? 'bg-status-warn-soft text-ink' : 'bg-canvas text-ink hover:bg-canvas-sunken'}`}
+                      className={`flex flex-col items-start gap-1 rounded-control border px-2 py-1.5 text-left text-label disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'text-on-accent border-transparent font-medium' : s || changed ? 'bg-status-warn-soft text-ink' : 'bg-canvas text-ink hover:bg-canvas-sunken'}`}
                       style={{ height: 56, backgroundColor: selected ? 'var(--color-accent-deep)' : undefined, borderColor: selected ? 'transparent' : isToday ? 'var(--color-accent)' : 'var(--color-hairline)', borderWidth: isToday && !selected ? 2 : 1 }}
                     >
                       <span className={`${past ? 'text-ink-faint' : ''} leading-tight`}>{Number.parseInt(date.slice(8, 10), 10)}</span>
@@ -683,7 +683,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
               // R109: 狭い画面では曜日ごとの縦カードにし、開始・終了を選ぶ欄を全幅で並べる。
               <div key={d} role="row" className={`border-hairline flex flex-col items-stretch gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:gap-3 sm:py-2 ${changed ? 'bg-accent-soft' : 'bg-canvas'}`} style={{ minHeight: 54 }}>
                 <div role="presentation" className="flex items-center justify-between gap-3 sm:contents">
-                  <span role="rowheader" className={`flex shrink-0 items-center gap-1 text-sm font-bold ${d === 'SATURDAY' ? 'text-status-info' : d === 'SUNDAY' ? 'text-status-danger' : ''}`} style={{ width: 72 }}>{WEEKDAY_JA[d]}曜{changed ? <span className="text-accent-deep text-nano font-semibold">変更</span> : null}</span>
+                  <span role="rowheader" className={`flex shrink-0 items-center gap-1 text-sm font-medium ${d === 'SATURDAY' ? 'text-status-info' : d === 'SUNDAY' ? 'text-status-danger' : ''}`} style={{ width: 72 }}>{WEEKDAY_JA[d]}曜{changed ? <span className="text-accent-deep text-nano font-semibold">変更</span> : null}</span>
                   <span role="cell" className="flex shrink-0 items-center gap-2 sm:w-16"><span className="text-ink-secondary text-xs sm:hidden">定休日</span><Toggle checked={closed} label={`${WEEKDAY_JA[d]}曜を定休日にする`} onChange={(next) => setDayPeriods(d, next ? [] : (profile.regularHours[d]?.length ? profile.regularHours[d] : [{ open: '11:00', close: '22:00' }]))} /></span>
                 </div>
                 <span role="cell" className="flex min-w-0 grow flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
@@ -898,7 +898,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
           <ArrowRight size={24} className="text-ink-faint hidden shrink-0 justify-self-center lg:block" aria-hidden="true" />
           <div className="bg-accent-soft border-accent flex flex-col gap-3 rounded-card border p-5">
             <p className="text-accent-deep text-label font-semibold">変更後</p>
-            <div className={`leading-relaxed font-bold ${isHours ? 'text-hero' : 'text-lead'}`}>{afterNode}</div>
+            <div className={`leading-relaxed ${isHours ? 'text-hero font-semibold' : 'text-lead font-bold'}`}>{afterNode}</div>
             <p className="text-ink-secondary text-label">{afterNote}</p>
           </div>
         </div>

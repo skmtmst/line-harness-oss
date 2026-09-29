@@ -45,7 +45,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     // 10x10 の円は**選んだ色**、名前は label13/700。
     expect(source).toContain('h-2.5 w-2.5 shrink-0 rounded-full')
     expect(source).toContain('style={{ backgroundColor: color }}')
-    expect(source).toContain('text-label text-ink font-bold')
+    expect(source).toContain('text-label text-ink font-medium')
   })
 
   it('フォルダ名の入力欄は h=44・文字13', () => {

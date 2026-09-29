@@ -471,7 +471,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                     <ReorderGrip label={mark.name} disabled={mark.isInherited} disabledReason="共有マークは編集後に並び替えできます" onMove={(direction) => void keyboardMove(mark.id, direction)} />
                   </td>
                   <td className="px-3 py-3">
-                    <Link href={`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`} className="inline-flex max-w-full items-center rounded-pill px-2.5 py-1 text-xs font-bold hover:opacity-80" style={{ backgroundColor: `${mark.color}1A`, color: mark.color }} title={mark.name}>
+                    <Link href={`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`} className="inline-flex max-w-full items-center rounded-pill px-2.5 py-1 text-xs font-semibold hover:opacity-80" style={{ backgroundColor: `${mark.color}1A`, color: mark.color }} title={mark.name}>
                       <span className="truncate">{mark.name}</span>
                     </Link>
                   </td>
@@ -526,7 +526,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                       <ReorderGrip label={mark.name} disabled={mark.isInherited} disabledReason="共有マークは編集後に並び替えできます" onMove={(direction) => void keyboardMove(mark.id, direction)} />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`} className="inline-flex max-w-full items-center rounded-pill px-2.5 py-1 text-xs font-bold hover:opacity-80" style={{ backgroundColor: `${mark.color}1A`, color: mark.color }} title={mark.name}>
+                      <Link href={`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`} className="inline-flex max-w-full items-center rounded-pill px-2.5 py-1 text-xs font-semibold hover:opacity-80" style={{ backgroundColor: `${mark.color}1A`, color: mark.color }} title={mark.name}>
                         <span className="truncate">{mark.name}</span>
                       </Link>
                       <p className="mt-1 text-xs text-ink-secondary">使用中 {mark.friendCount}人・{mark.isDefault ? '新着時の初期値' : '初期値なし'}</p>

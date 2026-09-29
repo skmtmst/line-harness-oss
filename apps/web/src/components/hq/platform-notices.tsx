@@ -42,7 +42,7 @@ export default function PlatformNotices() {
         <div key={n.id} className="flex flex-wrap items-start gap-3 rounded-card border border-accent-border bg-accent-soft px-4 py-3">
           <Megaphone aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-info" />
           <div className="min-w-0 flex-1">
-            <p className="text-label font-bold text-ink">
+            <p className="text-label font-medium text-ink">
               {n.subject}
               <span className="ml-2 text-micro font-normal text-ink-faint">musubo 運営{n.sentAt ? `・${shortDateTime(n.sentAt)}` : ''}</span>
             </p>

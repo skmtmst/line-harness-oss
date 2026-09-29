@@ -31,7 +31,7 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).toContain('rounded-[18px]')
     expect(staffSource).toContain('p-[15px]')
     expect(staffSource).toContain('gap-[5px]')
-    expect(staffSource).toContain('text-xl font-bold leading-[1.45]')
+    expect(staffSource).toContain('text-xl font-semibold leading-[1.45]')
     expect(staffSource).toContain('text-[11px] leading-[1.45]')
   })
 

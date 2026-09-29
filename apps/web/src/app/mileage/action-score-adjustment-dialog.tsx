@@ -166,8 +166,8 @@ export default function ActionScoreAdjustmentDialog({
             <h3 className="text-sm font-bold text-ink">この変更で起きること</h3>
             <dl className="overflow-hidden rounded-panel border border-hairline text-sm">
               <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentScore.toLocaleString('ja-JP')} 点</dd></div>
-              <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent-deep'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} 点</dd></div>
-              <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{scoreAfter.toLocaleString('ja-JP')} 点</dd></div>
+              <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-medium text-danger' : 'font-medium text-accent-deep'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} 点</dd></div>
+              <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-medium text-ink">{scoreAfter.toLocaleString('ja-JP')} 点</dd></div>
             </dl>
             <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
               <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由</dt><dd className="col-span-2 whitespace-pre-wrap text-ink">{reason.trim()}</dd></div>

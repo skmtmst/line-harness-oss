@@ -205,7 +205,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
           />
           <section data-design="TreatLimit" data-design-node="feeding-treat-limit" className="flex flex-wrap items-center gap-4 rounded-card border border-hairline bg-canvas px-4 py-3">
             <div className="min-w-0 flex-1">
-              <h2 className="text-label font-bold text-ink">おやつの上限（1日の必要カロリーに対して）</h2>
+              <h2 className="text-label font-semibold text-ink">おやつの上限（1日の必要カロリーに対して）</h2>
               <p className="mt-1 text-caption text-ink-secondary">獣医師の一般的な目安は 10% 以内。上限を変えると、全員の「然の鹿肉の目安」が計算し直されます。</p>
             </div>
             <span className="flex w-32 items-center gap-2">
@@ -243,7 +243,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
             <h2 className="text-body font-bold text-ink">登録済みのペット</h2>
-            <p className="mt-2 text-heading font-bold tabular-nums text-ink">{data.petCount.toLocaleString('ja-JP')}<span className="ml-1 text-caption font-semibold text-ink-faint">頭</span></p>
+            <p className="mt-2 text-heading font-semibold tabular-nums text-ink">{data.petCount.toLocaleString('ja-JP')}<span className="ml-1 text-caption font-semibold text-ink-faint">頭</span></p>
             <p className="mt-1 text-micro text-ink-faint">保存すると、この全員の目安（主食・然の鹿肉）が計算し直されます。</p>
           </section>
         </div>
@@ -299,7 +299,7 @@ function ProductTable({
   return (
     <section data-design="Table" data-design-node={`feeding-table-${kind}`} className="flex min-w-0 flex-col gap-2">
       <div>
-        <h2 className="text-label font-bold text-ink">{title}</h2>
+        <h2 className="text-label font-semibold text-ink">{title}</h2>
         <p className="mt-1 text-caption text-ink-secondary">{description}</p>
       </div>
       {rows.length === 0 ? (

@@ -175,7 +175,8 @@ function TokenProbe() {
   return (
     <div className="flex gap-2 rounded-card bg-canvas p-4">
       <p className="text-body text-ink">本文</p>
-      <p className="text-hero font-bold text-ink">大きな数値</p>
+      {/* ★V7: 700 は大きな数だけ。text-hero が自分で 700 を持つので font-bold は付けない */}
+      <p className="text-hero text-ink">大きな数値</p>
     </div>
   )
 }

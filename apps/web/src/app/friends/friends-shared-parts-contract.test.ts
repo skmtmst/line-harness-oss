@@ -67,7 +67,7 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
   it('行の担当者に丸アイコンを出し、未割り当ては全角ハイフンで埋める', () => {
     expect(ROW_BODY).toContain('data-operator-avatar={friend.operator ? \'assigned\' : \'unassigned\'}')
     expect(ROW_BODY, '担当者アイコンが16pxでない').toContain('h-4 w-4 shrink-0 items-center justify-center rounded-full')
-    expect(ROW_BODY, '頭文字が10px/800でない').toContain('text-nano font-extrabold')
+    expect(ROW_BODY, '頭文字が10px/500でない').toContain('text-nano font-medium')
     expect(ROW_BODY, '未割り当てが全角ハイフンでない').toContain("'－'")
     expect(ROW_BODY).toContain("担当：{friend.operator?.name ?? '未割り当て'}")
   })

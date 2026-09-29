@@ -1230,7 +1230,7 @@ function VarsPageInner() {
 
               {splitItems(singleImpact.items).blocking.length > 0 ? (
                 <div>
-                  <p className="text-ink text-xs font-bold">削除できない理由になっている場所</p>
+                  <p className="text-ink text-xs font-medium">削除できない理由になっている場所</p>
                   <ul className="mt-1.5 space-y-1.5">
                     {splitItems(singleImpact.items).blocking.map((item) => (
                       <li key={`${item.kind}-${item.href}`} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded-control border px-3 py-2 text-xs">

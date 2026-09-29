@@ -62,7 +62,7 @@
 
 /* 名前のセル。名前・副題・注記の3段。副題と注記は無くてよい。 */
 .name {
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .sub {

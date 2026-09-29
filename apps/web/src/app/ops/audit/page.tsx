@@ -169,7 +169,7 @@ export default function OpsAuditPage() {
             {rows.map((row) => (
               <Tr key={row.id}>
                 <Td><span className="text-caption text-ink-secondary">{formatDateTime(row.created_at)}</span></Td>
-                <Td><span className="block truncate text-caption font-bold text-ink">{row.staff_name}</span></Td>
+                <Td><span className="block truncate text-caption font-medium text-ink">{row.staff_name}</span></Td>
                 <Td><span className="block truncate text-caption text-ink" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span></Td>
                 <Td>{auditActionChip(row.action)}</Td>
                 <Td><span className="block truncate text-caption text-ink-secondary" title={row.reason ?? ''}>{row.reason ?? '—'}</span></Td>

@@ -125,7 +125,7 @@ function OperatorMark({ option }: { option: OperatorOption }) {
   return (
     <span
       aria-hidden="true"
-      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold"
+      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium"
     >
       {mark}
     </span>
@@ -307,7 +307,7 @@ export function StatusDropdown({
         className={`border-hairline rounded-control bg-canvas flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
         <span className={`h-2 w-2 rounded-full ${current.dot}`} aria-hidden="true" />
-        <span className="font-medium">{current.label}</span>
+        <span className="font-semibold">{current.label}</span>
         <span className="text-ink-faint"><Chevron open={open} /></span>
       </button>
       {open ? (

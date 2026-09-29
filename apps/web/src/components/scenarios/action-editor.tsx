@@ -819,7 +819,7 @@ export default function ActionEditor({
                           key={kind.type}
                           type="button"
                           onClick={() => void add(kind)}
-                          className={`${styles.kindButton} border-hairline text-ink hover:bg-canvas-sunken flex flex-col items-center justify-center gap-1 border text-caption font-bold transition-colors`}
+                          className={`${styles.kindButton} border-hairline text-ink hover:bg-canvas-sunken flex flex-col items-center justify-center gap-1 border text-caption font-medium transition-colors`}
                         >
                           <Icon aria-hidden size={18} strokeWidth={1.75} />
                           {kind.label}
@@ -849,7 +849,7 @@ export default function ActionEditor({
                         <div className={`${styles.actionRow} bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 px-4 py-2.5`}>
                           <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
                             {/* 実行順の丸番号（設計 26x26）。並べ替えるとここが変わる。 */}
-                            <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-bold`}>
+                            <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-medium`}>
                               {index + 1}
                             </span>
                             {/*
@@ -1085,7 +1085,7 @@ export function ActionConfigEditor({
     case 'support_mark':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">対応マーク</span>
+          <span className="text-ink text-sm font-semibold">対応マーク</span>
           <Select
             aria-label="対応マーク"
             value={String(c.markId ?? '')}
@@ -1126,7 +1126,7 @@ export function ActionConfigEditor({
           </div>
           {c.op === 'start' && (
             <div className="bg-canvas-sunken rounded-card space-y-2 px-3 py-2.5">
-              <p className="text-ink text-xs font-bold">シナリオを購読する場合</p>
+              <p className="text-ink text-xs font-medium">シナリオを購読する場合</p>
               <RadioCardGroup legend="シナリオを購読する場合">
                 {(
                   [
@@ -1195,7 +1195,7 @@ export function ActionConfigEditor({
       return (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">テンプレート</span>
+            <span className="text-ink text-sm font-semibold">テンプレート</span>
             <TargetSelector
               label="テンプレート"
               kindName="テンプレート"
@@ -1214,7 +1214,7 @@ export function ActionConfigEditor({
     case 'reminder':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">リマインダ</span>
+          <span className="text-ink text-sm font-semibold">リマインダ</span>
           <TargetSelector
             label="リマインダ"
             kindName="リマインダ"
@@ -1228,7 +1228,7 @@ export function ActionConfigEditor({
     case 'event_booking':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">イベント予約</span>
+          <span className="text-ink text-sm font-semibold">イベント予約</span>
           <TargetSelector
             label="イベント予約"
             kindName="イベント予約"

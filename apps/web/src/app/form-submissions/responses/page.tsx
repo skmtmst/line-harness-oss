@@ -491,7 +491,7 @@ export default function FormResponsesPage() {
 }
 
 function Kpi({ label, value, note }: { label: string; value: string; note: string }) {
-  return <section className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-faint text-xs font-medium">{label}</p><p className="text-ink mt-2 text-2xl font-bold tabular-nums">{value}</p><p className="text-ink-faint mt-1 text-xs">{note}</p></section>
+  return <section className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-faint text-xs font-medium">{label}</p><p className="text-ink mt-2 text-2xl font-semibold tabular-nums">{value}</p><p className="text-ink-faint mt-1 text-xs">{note}</p></section>
 }
 
 function ResponseDetail({

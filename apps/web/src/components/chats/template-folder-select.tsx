@@ -92,7 +92,7 @@ export default function TemplateFolderSelect({
                 <button
                   type="button"
                   onClick={() => choose(option.value)}
-                  className={`flex min-h-9 w-full items-center gap-2 rounded-mini px-2.5 py-1.5 text-left text-caption ${selectedOption ? 'bg-accent-soft font-bold text-accent-deep' : 'font-medium text-ink hover:bg-canvas-sunken'}`}
+                  className={`flex min-h-9 w-full items-center gap-2 rounded-mini px-2.5 py-1.5 text-left text-caption ${selectedOption ? 'bg-accent-soft font-medium text-accent-deep' : 'font-medium text-ink hover:bg-canvas-sunken'}`}
                 >
                   {option.depth ? (
                     <ChevronRight aria-hidden="true" size={13} className="ml-3 shrink-0 text-ink-faint" />

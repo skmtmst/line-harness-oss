@@ -86,19 +86,19 @@ export default function AccountSwitcher() {
       <p className="mb-2 text-[11px] font-normal text-ink-faint">現在のLINEアカウント</p>
       {loading ? (
         <div role="status" className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left opacity-60">
-          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-ink">読み込み中…</span><span className="mt-0.5 block truncate text-xs text-ink-faint">LINE情報を確認中</span></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">読み込み中…</span><span className="mt-0.5 block truncate text-xs text-ink-faint">LINE情報を確認中</span></span>
         </div>
       ) : error && !selectedAccount ? (
         // 一覧の取得失敗を「店舗が選ばれていません」に見せない（Issue #978）。
         <div role="alert" className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left">
-          <span className="min-w-0 flex-1"><span className="block text-sm font-bold leading-5 text-danger">読み込みに失敗しました</span><span className="mt-0.5 block truncate text-xs text-ink-faint">アカウント一覧を確認できません</span></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold leading-5 text-danger">読み込みに失敗しました</span><span className="mt-0.5 block truncate text-xs text-ink-faint">アカウント一覧を確認できません</span></span>
           <button type="button" onClick={() => { void refreshAccounts() }} disabled={refreshing} className="rounded-pill bg-accent-soft px-1 py-1 text-nano font-semibold text-accent-deep disabled:opacity-60">
             {refreshing ? '確認中' : '再読み込み'}
           </button>
         </div>
       ) : !selectedAccount ? (
         <Link href="/hq" className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-accent bg-canvas px-2 text-left">
-          <span className="min-w-0 flex-1"><span className="block text-sm font-bold leading-5 text-ink">店舗が選ばれていません</span><span className="mt-0.5 block truncate text-xs text-ink-faint">統括の店舗一覧から選択</span></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold leading-5 text-ink">店舗が選ばれていません</span><span className="mt-0.5 block truncate text-xs text-ink-faint">統括の店舗一覧から選択</span></span>
           <span className="rounded-pill bg-accent-soft px-1 py-1 text-nano font-semibold text-accent-deep">選択</span>
         </Link>
       ) : (

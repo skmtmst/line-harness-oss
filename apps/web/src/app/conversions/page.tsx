@@ -1275,7 +1275,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   {definitionEvents.map((event) => (
                     <li key={event.id} className="text-ink-secondary flex items-baseline justify-between gap-2">
                       <span className="text-ink min-w-0">
-                        <span className="font-medium">{event.friendName ?? '名前のない友だち'}</span>
+                        <span className="font-semibold">{event.friendName ?? '名前のない友だち'}</span>
                         <span
                           className={`ml-2 inline-block rounded px-1.5 py-0.5 font-semibold ${
                             event.status === 'cancelled' ? 'bg-danger-bg text-danger'

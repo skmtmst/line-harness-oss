@@ -1771,11 +1771,11 @@ function StepHeader({ active, groupId }: { active: 1 | 2 | 3; groupId: string })
             step.number === active ? 'bg-accent/5 text-accent-deep' : 'text-ink-secondary'
           }`}
         >
-          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
             step.number === active ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-faint'
           }`}>{step.number}</span>
           <span className="min-w-0">
-            <span className="block text-xs font-bold tracking-wider">STEP {step.number}</span>
+            <span className="block text-xs font-medium tracking-wider">STEP {step.number}</span>
             <span className="block truncate text-sm font-semibold">{step.label}</span>
           </span>
         </button>
@@ -1899,20 +1899,20 @@ function TargetingStep({
 
           {targetingEnabled ? (
             <div className="border-hairline mt-5 rounded-card border p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{conditionSummary}{conditionUnsaved ? '（未保存）' : ''}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
+              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-semibold">条件</p><p className="text-ink-secondary mt-1 text-xs">{conditionSummary}{conditionUnsaved ? '（未保存）' : ''}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
               {conditionEditorOpen && !readOnly ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
             </div>
           ) : null}
 
           <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-3">
-            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
+            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-semibold">{conditionEmpty ? '0人' : previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
             <div>
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
               <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} step={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
               {/* R205: 小数はサーバで弾かれる。欄の近くに制限を書く。 */}
               <p className="text-ink-faint mt-1 text-[11px]">1以上の整数（小数は使えません）</p>
             </div>
-            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
+            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
           {previewUnsaved && !conditionEmpty ? (
             <p className="text-ink-faint mt-2 text-xs">人数はまだ保存していない条件で数えています</p>
@@ -1928,9 +1928,9 @@ function TargetingStep({
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="text-ink text-sm font-bold">利用できる条件軸</h2>
             <p className="text-ink-faint mt-1 text-xs">友だち一覧の詳細検索と同じ条件を使います</p>
-            <p className="text-ink-secondary mt-4 text-xs font-bold">標準互換（15軸）</p>
+            <p className="text-ink-secondary mt-4 text-xs font-medium">標準互換（15軸）</p>
             <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['名前','個別メモ','ステータスメッセージ','友だち登録日','タグ','友だち情報','シナリオ','イベント予約','カレンダー予約','共通情報','リマインダ','回答フォーム','最終反応日','その他','対応マーク'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
-            <p className="text-ink-secondary mt-4 text-xs font-bold">この画面だけの軸（6軸）</p>
+            <p className="text-ink-secondary mt-4 text-xs font-medium">この画面だけの軸（6軸）</p>
             <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当者','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
           </section>
           <Notice tone="info"><strong className="block text-xs">条件はここだけの話ではありません</strong><span className="text-xs">一度作った条件は保存した検索として、配信や自動応答でも呼び出せます。</span></Notice>
@@ -2135,7 +2135,7 @@ function PublishStep({
         </section>
 
         <aside className="space-y-4">
-          <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
+          <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-semibold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
           {/*
             R204: 「公開」は LINE への登録。全員の画面が変わるのは
             isDefaultForAll（全員の既定）のときだけ。条件で出し分ける設定は、

@@ -115,7 +115,7 @@
   background: var(--color-ink);
   color: #ffffff;
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
   transform: translateY(-200%);
 }
 

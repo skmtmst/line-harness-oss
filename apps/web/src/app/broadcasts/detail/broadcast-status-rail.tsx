@@ -112,7 +112,7 @@ export default function BroadcastStatusRail({
                 </span>
                 <span
                   aria-current={current ? 'step' : undefined}
-                  className={current ? 'text-ink text-sm font-bold' : 'text-ink-faint text-xs'}
+                  className={current ? 'text-ink text-sm font-medium' : 'text-ink-faint text-xs'}
                 >
                   {step.label}
                 </span>

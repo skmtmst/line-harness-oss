@@ -39,7 +39,7 @@
   background: var(--color-accent-deep);
   color: var(--color-on-accent);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 /* まだ決めていない段は色を落とす。押せない印ではなく、進みぐあいの印。 */
@@ -51,7 +51,7 @@
 .stepTitle {
   color: var(--color-ink);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .stepNote {
@@ -97,7 +97,7 @@
 .summaryText small {
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .summaryText strong {
@@ -136,7 +136,7 @@
 .eventCardTitle {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .eventCardNote {
@@ -175,7 +175,7 @@
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .conditionAdd:disabled {
@@ -186,7 +186,7 @@
   margin-top: 12px;
   color: var(--color-status-info);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* カードの中のまとまり。設計は r8。 */
@@ -201,7 +201,7 @@
   display: block;
   color: var(--color-ink);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .note {
@@ -254,7 +254,7 @@
   border-radius: var(--radius-control); /* 設計 r8 */
   padding: 0 14px; /* 設計 padding [0,14] */
   font-size: var(--text-label); /* 設計 13 */
-  font-weight: 700; /* 設計 700 */
+  font-weight: 600; /* 設計 700 → V7 ボタンは600 */
   white-space: nowrap;
   cursor: pointer;
 }
@@ -312,7 +312,7 @@
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -349,14 +349,14 @@
 .sideTitle {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* 未接続の枠。値の場所には `—` を置き、理由を続けて書く。 */
 .sideMissingValue {
   margin-top: 8px;
   color: var(--color-ink-faint);
-  font-size: var(--text-display);
+  font-size: var(--text-hero);
   font-weight: 700;
 }
 
@@ -406,7 +406,7 @@
 .rowName {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .field {

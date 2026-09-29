@@ -983,10 +983,10 @@ export function AffiliatorsTab({
                                   <p className="text-danger mt-4 text-sm">締め対象を確認できませんでした。金額を0とは扱いません。</p>
                                 ) : settlement ? (
                                   <dl className="mt-4 grid gap-3 sm:grid-cols-4">
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">今回の金額</dt><dd className="text-ink mt-1 font-bold tabular-nums">{formatYen(settlement.amount)}</dd></div>
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 font-bold tabular-nums">{settlement.conversionCount.toLocaleString('ja-JP')}件</dd></div>
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 font-bold">{formatDate(accountSettlement?.periodTo ?? null)}</dd></div>
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">振込先</dt><dd className={`mt-1 font-bold ${settlement.bankProfileRegistered ? 'text-success' : 'text-warning'}`}>{settlement.bankProfileRegistered ? '登録済み' : '未登録'}</dd><p className="text-ink-faint mt-1 text-xs">口座番号は本人だけに表示</p></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">今回の金額</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatYen(settlement.amount)}</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 font-medium tabular-nums">{settlement.conversionCount.toLocaleString('ja-JP')}件</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 font-medium">{formatDate(accountSettlement?.periodTo ?? null)}</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">振込先</dt><dd className={`mt-1 font-medium ${settlement.bankProfileRegistered ? 'text-success' : 'text-warning'}`}>{settlement.bankProfileRegistered ? '登録済み' : '未登録'}</dd><p className="text-ink-faint mt-1 text-xs">口座番号は本人だけに表示</p></div>
                                   </dl>
                                 ) : (
                                   <p className="text-ink-faint mt-4 text-sm">この方には、今回締められる報酬がありません。</p>

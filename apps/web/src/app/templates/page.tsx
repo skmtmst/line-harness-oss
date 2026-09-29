@@ -1298,7 +1298,7 @@ export default function TemplatesPage() {
 
                 {/* Preview */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
+                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
                   <div className="border border-hairline rounded-lg p-3 bg-canvas-sunken overflow-x-auto">
                     {drawerData.question ? (
                       <div className="space-y-2">
@@ -1363,7 +1363,7 @@ export default function TemplatesPage() {
                     </Button>
                   )
                 ) : <div>
-                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
+                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
                     className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
@@ -1394,7 +1394,7 @@ export default function TemplatesPage() {
 
                 {/* Used by */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">
+                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">
                     使用箇所 ({drawerUsageCount})
                   </h4>
                   {drawerUsageCount === 0 ? (
@@ -1479,14 +1479,14 @@ export default function TemplatesPage() {
             </header>
             <div className="space-y-4 px-6 py-5">
               <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
-            <p className="flex items-start gap-2 text-xs font-bold">
+            <p className="flex items-start gap-2 text-xs font-medium">
               <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
               このテンプレートは{drawerData ? drawerUsageCount : (blockedDelete?.usageCount ?? 0)}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
             </p>
             {drawerLoading ? (
               <p className="mt-3 text-xs">使用先を読み込んでいます…</p>
             ) : drawerError ? (
-              <p className="mt-3 text-xs font-bold">使用先を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
+              <p className="mt-3 text-xs font-medium">使用先を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
             ) : (
               <ul className="mt-3 space-y-2 text-xs font-semibold">
                 {replacementDestinations.map(({ key, label, href, icon: Icon }) => (

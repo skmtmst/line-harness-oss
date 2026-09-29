@@ -208,7 +208,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
             // 最上層では absolute 指定を無効にする（位置は器が決める）。
             style={{ position: 'static' }}
           >
-            <p className="text-ink text-xs font-bold">目標日までの日数</p>
+            <p className="text-ink text-xs font-medium">目標日までの日数</p>
             <p className="text-ink-faint mt-0.5 mb-2 text-xs leading-relaxed">
               「あと3日」のように出ます。配信のたびに数え直すので、書き換えは要りません。
             </p>
@@ -229,7 +229,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
               </button>
             </div>
 
-            <p className="text-ink text-xs font-bold mt-3">配信日から何日後かの日付</p>
+            <p className="text-ink text-xs font-medium mt-3">配信日から何日後かの日付</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {[1, 3, 7, 14, 30].map((n) => (
                 <button

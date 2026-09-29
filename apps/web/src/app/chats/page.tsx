@@ -112,11 +112,11 @@ type InboxSavedView = {
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
-    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-micro font-bold">
+    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-micro font-medium">
       LINE
     </span>
   ) : (
-    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-micro font-bold">
+    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-micro font-medium">
       MAIL
     </span>
   )
@@ -3298,7 +3298,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             chatDetail.friendPictureUrl ? (
                               <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
                             ) : (
-                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-avatar-indigo text-xs font-bold text-on-action" aria-hidden="true">
+                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-avatar-indigo text-xs font-medium text-on-action" aria-hidden="true">
                                 {chatDetail.friendName.charAt(0)}
                               </div>
                             )
@@ -3376,7 +3376,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
-                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-micro font-bold">
+                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-micro font-medium">
                                   {(msg.sentByStaffName ?? '担').charAt(0)}
                                 </span>
                                 <span className="truncate">{msg.sentByStaffName ?? '担当者'}</span>
@@ -3984,7 +3984,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       </section>
 
                       <section className="px-5 py-4">
-                        <p className="text-ink text-xs font-bold">基本情報</p>
+                        <p className="text-ink text-xs font-medium">基本情報</p>
                         <dl className="mt-2 space-y-2 text-xs">
                           <div className="flex items-start justify-between gap-3">
                             <dt className="text-ink-faint shrink-0">名前</dt>
@@ -3998,7 +3998,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       </section>
 
                       <section className="px-5 py-4">
-                        <p className="text-ink text-xs font-bold">LINE友だちとの連携</p>
+                        <p className="text-ink text-xs font-medium">LINE友だちとの連携</p>
                         <p className="text-ink-faint mt-2 text-xs leading-relaxed">
                           このメールアドレスは、まだLINEの友だちと結びついていません。
                         </p>

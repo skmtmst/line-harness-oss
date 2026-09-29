@@ -504,7 +504,7 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-card border border-hairline bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
-            <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-bold">
+            <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-medium">
               AND
             </span>
             <span className="text-ink text-sm font-bold">すべて満たす条件</span>
@@ -684,7 +684,7 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-panel border border-hairline bg-canvas p-3">
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-action px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
+              <span className="rounded-full bg-action px-2 py-0.5 text-xs font-medium text-on-action">OR</span>
               <span className="text-sm font-bold text-ink">いずれか1つ以上満たす条件</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-3">

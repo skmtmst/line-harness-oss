@@ -150,7 +150,7 @@ export default function MemberDialog({
         </div>
 
         <fieldset className="flex flex-col gap-2" disabled={busy}>
-          <legend className="text-label font-bold text-ink">担当範囲</legend>
+          <legend className="text-label font-medium text-ink">担当範囲</legend>
           <RadioCardGroup legend="担当範囲" className="flex flex-wrap gap-4">
             <RadioCard name={`${uid}-scope`} value="all" checked={value.accountScope === 'all'} disabled={busy} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }} title="全アカウント" />
             <RadioCard name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')} title="指定したアカウントだけ" />
@@ -175,7 +175,7 @@ function Field({ label, note, htmlFor, children }: { label: string; note?: strin
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={htmlFor} className="text-label font-bold text-ink">{label}</label>
+        <label htmlFor={htmlFor} className="text-label font-medium text-ink">{label}</label>
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </div>
       {children}
