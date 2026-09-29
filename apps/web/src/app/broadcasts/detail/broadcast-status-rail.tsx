@@ -106,7 +106,7 @@ export default function BroadcastStatusRail({
               <span className="flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
-                  className={`flex h-5 w-5 items-center justify-center rounded-full border text-micro ${done ? 'border-accent-deep bg-accent-soft text-accent-deep' : current ? 'border-accent-deep text-accent-deep' : 'border-hairline text-ink-faint'}`}
+                  className={`flex h-5 w-5 items-center justify-center rounded-pill border text-micro ${done ? 'border-accent-deep bg-accent-soft text-accent-deep' : current ? 'border-accent-deep text-accent-deep' : 'border-hairline text-ink-faint'}`}
                 >
                   {done ? <Check size={12} strokeWidth={3} /> : null}
                 </span>

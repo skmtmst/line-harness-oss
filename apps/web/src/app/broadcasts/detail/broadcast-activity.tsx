@@ -54,7 +54,7 @@ export default function BroadcastActivity({
       <ol className="space-y-4">
         {entries.map((entry, index) => (
           <li key={`${entry.createdAt}-${entry.action}-${index}`} className="flex gap-3">
-            <span aria-hidden="true" className="bg-hairline mt-1.5 h-2 w-2 shrink-0 rounded-full" />
+            <span aria-hidden="true" className="bg-hairline mt-1.5 h-2 w-2 shrink-0 rounded-pill" />
             <div className="min-w-0">
               <p className="text-ink text-sm font-medium">{entry.label}</p>
               <p className="text-ink-faint mt-0.5 text-xs">

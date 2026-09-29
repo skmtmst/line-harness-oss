@@ -956,10 +956,10 @@ function StoreShiftsView() {
       </div>
 
       <div data-design="Tabs" className="border-hairline flex flex-wrap gap-1 border-b">
-        <Link href="/booking/menus" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">メニュー {settings?.menuCount ?? '—'}</Link>
-        <span className="border-accent text-ink rounded-t-md border-b-2 px-4 py-2 text-sm font-medium">受付枠</span>
-        <a href="#special" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">休業日</a>
-        <a href="#rules" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
+        <Link href="/booking/menus" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">メニュー {settings?.menuCount ?? '—'}</Link>
+        <span className="border-accent text-ink rounded-t-mini border-b-2 px-4 py-2 text-sm font-medium">受付枠</span>
+        <a href="#special" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">休業日</a>
+        <a href="#rules" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
       </div>
 
       <Notice data-design="Info" tone="info" message="何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出る日時の選び方がそのまま出ます。" />

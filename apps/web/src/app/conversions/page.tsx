@@ -1028,7 +1028,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             name: point.name,
             status: point.state !== 'active' && STATE_LABELS[point.state] ? (
               <span
-                className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
+                className={`inline-block rounded-mini px-1.5 py-0.5 text-xs font-semibold ${
                   point.state === 'draft' ? 'bg-info-bg text-info'
                     : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
                     : 'bg-canvas-sunken text-ink-faint'
@@ -1102,7 +1102,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     {/* 状態名が無いときは空の札を出さない。口が state を返さない行で灰色の空札が出ていた。 */}
                     {point.state !== 'active' && STATE_LABELS[point.state] ? (
                       <p
-                        className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
+                        className={`mt-1 inline-block rounded-mini px-1.5 py-0.5 text-xs font-semibold ${
                           point.state === 'draft' ? 'bg-info-bg text-info'
                             : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
                             : 'bg-canvas-sunken text-ink-faint'
@@ -1277,7 +1277,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       <span className="text-ink min-w-0">
                         <span className="font-semibold">{event.friendName ?? '名前のない友だち'}</span>
                         <span
-                          className={`ml-2 inline-block rounded px-1.5 py-0.5 font-semibold ${
+                          className={`ml-2 inline-block rounded-mini px-1.5 py-0.5 font-semibold ${
                             event.status === 'cancelled' ? 'bg-danger-bg text-danger'
                               : event.status === 'pending' ? 'bg-info-bg text-info'
                               : event.status === 'rejected' ? 'bg-canvas-sunken text-ink-faint'
@@ -1861,12 +1861,12 @@ function ReportTab({ accountId }: { accountId: string | null }) {
             <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint" aria-label="棒の色と成果地点の対応">
               {daily.names.map((name, index) => (
                 <li key={name} className="flex items-center gap-1">
-                  <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-sm ${index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info' : 'bg-canvas-sunken'}`} />
+                  <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-mini ${index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info' : 'bg-canvas-sunken'}`} />
                   {name}
                 </li>
               ))}
               <li className="flex items-center gap-1">
-                <span aria-hidden="true" className="bg-canvas-sunken inline-block h-2.5 w-2.5 rounded-sm" />
+                <span aria-hidden="true" className="bg-canvas-sunken inline-block h-2.5 w-2.5 rounded-mini" />
                 そのほか
               </li>
             </ul>
@@ -1877,7 +1877,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
             {daily.days.map((day, index) => (
               <div key={day.day} className="flex h-full min-w-0 flex-1 flex-col justify-end">
                 <div
-                  className="flex w-full flex-col-reverse overflow-hidden rounded-sm"
+                  className="flex w-full flex-col-reverse overflow-hidden rounded-mini"
                   style={{ height: `${Math.max(4, Math.round((day.total / daily.max) * 100))}%` }}
                   title={`${day.day} ${day.total}件`}
                 >

@@ -124,7 +124,7 @@ function money(value: number): string {
 
 function Kpi({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
-    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-sm">
+    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-card">
       <p className="text-ink-secondary text-xs font-medium">{title}</p>
       <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}</p>
       <p className="text-ink-faint mt-1 text-xs">{detail}</p>
@@ -143,7 +143,7 @@ function BookingCard({ booking, compact = false, onOpen }: {
     <button
       type="button"
       onClick={() => onOpen(booking.id)}
-      className={`w-full rounded-md border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
+      className={`w-full rounded-mini border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
         phone
           ? 'border-action bg-action-soft text-action'
           : 'border-success bg-success-bg text-success'
@@ -237,7 +237,7 @@ function CalendarFrame({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-sm">
+    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-card">
       <div className="border-hairline flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="h-8 w-8">‹</Button>

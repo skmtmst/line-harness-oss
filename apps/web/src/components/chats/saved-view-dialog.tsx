@@ -149,7 +149,7 @@ export default function SavedViewDialog({
           フッターは固定し、条件の本文だけをスクロールさせる。
           1920×600でもタイトル・取消・保存へ届く。
         */
-        className="bg-canvas rounded-panel flex max-h-[calc(100dvh-2rem)] w-[560px] max-w-full flex-col overflow-hidden shadow-2xl"
+        className="bg-canvas rounded-panel flex max-h-[calc(100dvh-2rem)] w-[560px] max-w-full flex-col overflow-hidden shadow-overlay"
       >
         <header className="border-hairline flex items-start gap-4 border-b px-6 py-5">
           <div>

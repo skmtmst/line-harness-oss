@@ -127,7 +127,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   if (!checked) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-hairline border-t-accent-deep" />
+        <div className="h-8 w-8 animate-spin rounded-pill border-2 border-hairline border-t-accent-deep" />
       </div>
     )
   }
@@ -137,7 +137,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   if (loadError) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken px-4">
-        <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-sm">
+        <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-card">
           <p role="alert" className="text-label font-medium text-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
           <div className="mt-4 flex justify-center gap-2">
             <Button variant="primary" onClick={() => { setChecked(false); setLoadError(''); void load() }}>もう一度試す</Button>
@@ -167,7 +167,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
               type="button"
               aria-expanded={navOpen}
               onClick={() => setNavOpen(true)}
-              className="flex min-h-11 items-center gap-2 rounded-md px-2 text-label font-medium text-ink hover:bg-canvas-sunken"
+              className="flex min-h-11 items-center gap-2 rounded-mini px-2 text-label font-medium text-ink hover:bg-canvas-sunken"
             >
               <Menu aria-hidden="true" className="h-5 w-5" />
               メニュー
@@ -198,10 +198,10 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
       ) : null}
       <aside
         aria-label="運営メニュー"
-        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-50 w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-canvas shadow-xl xl:static xl:z-auto xl:flex xl:shadow-none`}
+        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-50 w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-canvas shadow-float xl:static xl:z-auto xl:flex xl:shadow-none`}
       >
       <div className="flex items-center gap-3 px-4 py-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent-deep text-lg font-bold text-on-accent">m</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-mini bg-accent-deep text-lg font-bold text-on-accent">m</span>
         <div className="min-w-0">
           <p className="truncate text-label font-medium text-ink">musubo</p>
           <p className="truncate text-nano text-ink-faint">運営コンソール</p>
@@ -210,7 +210,7 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
           type="button"
           aria-label="メニューを閉じる"
           onClick={onClose}
-          className="ml-auto flex min-h-11 min-w-11 items-center justify-center rounded-md text-ink-secondary hover:bg-canvas-sunken xl:hidden"
+          className="ml-auto flex min-h-11 min-w-11 items-center justify-center rounded-mini text-ink-secondary hover:bg-canvas-sunken xl:hidden"
         >
           <X aria-hidden="true" className="h-5 w-5" />
         </button>
@@ -227,7 +227,7 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
                 <Link
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex h-10 items-center gap-3 rounded-md px-3 text-label ${active ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
+                  className={`flex h-10 items-center gap-3 rounded-mini px-3 text-label ${active ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
                 >
                   <Icon aria-hidden="true" className={`h-4.5 w-4.5 ${active ? 'text-accent-deep' : 'text-ink-secondary'}`} />
                   {item.label}
@@ -280,7 +280,7 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
         <div
           role="menu"
           data-design-node="RmC2T"
-          className="w-60 rounded-md border border-hairline bg-canvas py-2 shadow-lg"
+          className="w-60 rounded-mini border border-hairline bg-canvas py-2 shadow-float"
           // 最上層では absolute 指定を無効にする（位置は器が決める）。
           style={{ position: 'static' }}
         >
@@ -288,7 +288,7 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
             <p className="text-label font-medium text-ink">{me.name}</p>
             {me.email ? <p className="text-nano text-ink-faint">{me.email}</p> : null}
             <p className="mt-1 flex items-center gap-1.5">
-              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-nano font-medium text-accent-deep">運営マスター</span>
+              <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-nano font-medium text-accent-deep">運営マスター</span>
               <span className="text-nano text-ink-faint">{me.totpEnabled ? '2要素認証 設定済み' : '2要素認証 未設定'}</span>
             </p>
           </div>
@@ -315,12 +315,12 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2.5 rounded-md px-1 py-1 text-left hover:bg-canvas-sunken"
+        className="flex w-full items-center gap-2.5 rounded-mini px-1 py-1 text-left hover:bg-canvas-sunken"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-label font-medium text-on-accent">{initial}</span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-ink text-label font-medium text-on-accent">{initial}</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-label font-medium text-ink">{me.name}</span>
-          <span className="mt-0.5 inline-block rounded-full bg-accent-soft px-1.5 text-nano font-medium text-accent-deep">運営マスター</span>
+          <span className="mt-0.5 inline-block rounded-pill bg-accent-soft px-1.5 text-nano font-medium text-accent-deep">運営マスター</span>
         </span>
         <ChevronsUpDown aria-hidden="true" className="h-4 w-4 text-ink-faint" />
       </button>

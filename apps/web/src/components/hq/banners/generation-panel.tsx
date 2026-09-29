@@ -439,7 +439,7 @@ function ColorPicker({
               checked={checked}
               onChange={() => onChange(hex)}
               title={hex}
-              note={<span aria-hidden="true" style={{ backgroundColor: hex }} className="border-hairline inline-block h-4 w-4 rounded-full border" />}
+              note={<span aria-hidden="true" style={{ backgroundColor: hex }} className="border-hairline inline-block h-4 w-4 rounded-pill border" />}
             />
           )
         })}

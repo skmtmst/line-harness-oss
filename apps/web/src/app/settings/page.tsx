@@ -354,7 +354,7 @@ function FeatureSection({ group, features, ordering, usageByItemId, usageByFeatu
     if (key) switchCount.set(key, (switchCount.get(key) ?? 0) + 1)
   }
   return (
-    <section className="border-hairline overflow-hidden rounded-xl border bg-canvas">
+    <section className="border-hairline overflow-hidden rounded-card border bg-canvas">
       <div className="border-hairline bg-canvas-sunken flex min-h-12 items-center justify-between gap-3 border-b px-3 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <h2 className="text-sm font-bold text-ink">{group.label}</h2>
@@ -409,7 +409,7 @@ function SidebarPreview({ groups, features }: {
   }
   return (
     <aside data-design="サイドメニューの見え方" className="xl:sticky xl:top-6">
-      <div className="border-hairline bg-canvas overflow-hidden rounded-[22px] border">
+      <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
         <div className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-6 pb-3 pt-6">
           {groups.map((group) => (
             <div key={group.id}>
@@ -424,7 +424,7 @@ function SidebarPreview({ groups, features }: {
                         enabled ? 'text-ink' : 'text-ink-faint'
                       }`}
                     >
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${enabled ? 'bg-accent' : 'bg-canvas-sunken'}`} />
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-pill ${enabled ? 'bg-accent' : 'bg-canvas-sunken'}`} />
                       <span className="truncate">{item.label}</span>
                       {!enabled && <EyeOffIcon className="ml-auto h-4 w-4 shrink-0 text-ink-faint" />}
                     </div>

@@ -47,7 +47,7 @@ export default function ReferralQrModal({
   }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-card bg-canvas p-6 shadow-overlay">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-medium text-ink-faint">リファラルリンク・QRコード</p>
@@ -57,12 +57,12 @@ export default function ReferralQrModal({
           <button onClick={onClose} className="text-2xl leading-none text-ink-faint" aria-label="閉じる">×</button>
         </div>
         {stopped ? (
-          <p role="alert" className="mt-5 rounded-xl bg-canvas-sunken p-4 text-sm leading-relaxed text-ink-secondary">
+          <p role="alert" className="mt-5 rounded-card bg-canvas-sunken p-4 text-sm leading-relaxed text-ink-secondary">
             この経路は停止中のため、QRコードは表示できません。読み取っても友だち追加できないQRを配らないよう、出す口自体を止めています。有効な経路を選び直してください。
           </p>
         ) : (
           <>
-            <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
+            <div className="mt-5 rounded-card bg-canvas-sunken p-3">
               <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
               <Button variant="secondary" onClick={copy} className="mt-3 w-full">
                 {copied ? 'コピーしました' : 'URLをコピー'}
@@ -70,7 +70,7 @@ export default function ReferralQrModal({
             </div>
             <div className="mt-5 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
-              <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-xl border border-hairline bg-canvas p-2" />
+              <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-card border border-hairline bg-canvas p-2" />
               <Button variant="primary" href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 w-full">
                 QRコードをダウンロード
               </Button>

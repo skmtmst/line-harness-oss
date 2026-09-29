@@ -38,14 +38,14 @@ const RUN_RUNNING = new Set<FriendFieldMigrationRun['status']>(['previewed', 'qu
 
 function FieldSummary({ title, field, kind }: { title: string; field: FriendField; kind: 'source' | 'target' }) {
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+    <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
       <p className="text-xs font-semibold text-ink-faint">{title}</p>
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-ink">{field.name}</h2>
           <p className="mt-1 font-mono text-xs text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
         </div>
-        <span className={kind === 'source' ? 'rounded-full bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep'}>
+        <span className={kind === 'source' ? 'rounded-pill bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep'}>
           {FIELD_TYPE_LABELS[field.type]}
         </span>
       </div>
@@ -370,7 +370,7 @@ function MigrateFriendField() {
           <span className="xl:hidden">↓</span>
           <span className="hidden xl:block">→</span>
         </div>
-        <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-sm">
+        <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-card">
           <p className="text-xs font-semibold text-ink-secondary">移行先の項目</p>
           {target ? (
             <div className="mt-3">
@@ -430,7 +430,7 @@ function MigrateFriendField() {
         </section>
       </div>
 
-      <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-base font-bold text-ink">値を変換できるか事前確認</h2><p className="mt-1 text-sm text-ink-secondary">登録済みの値を読み取り、移行できる数だけを確認します。</p></div>
           <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (!target && targetMode === 'existing' && !existingTargetId)}>
@@ -455,7 +455,7 @@ function MigrateFriendField() {
         ) : <p className="mt-4 text-sm text-ink-faint">まだ事前確認していません。未取得を0人として表示しません。</p>}
       </section>
 
-      <section data-design="Usage" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Usage" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <h2 className="text-base font-bold text-ink">切り替わる使用先</h2>
         {preview ? preview.usageTargets.length > 0 ? (
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
@@ -467,7 +467,7 @@ function MigrateFriendField() {
       </section>
 
       {run ? (
-        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-live="polite">
+        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-live="polite">
           <h2 className="text-base font-bold text-ink">移行の結果</h2>
           <p className="mt-2 text-sm font-semibold text-ink">{RUN_STATUS_LABELS[run.status]}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">

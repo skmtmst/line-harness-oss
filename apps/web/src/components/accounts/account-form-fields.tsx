@@ -51,7 +51,7 @@ export function FormSection({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="border border-hairline rounded-lg overflow-hidden">
+    <div className="border border-hairline rounded-control overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -97,7 +97,7 @@ export function TextField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+        className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
       />
       {hint && <p className="text-[11px] text-ink-faint mt-1">{hint}</p>}
     </div>
@@ -149,7 +149,7 @@ export function AccountFormSections({
               value={state.channelId}
               readOnly
               disabled
-              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm font-mono bg-surface-pearl text-ink-faint cursor-not-allowed"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm font-mono bg-surface-pearl text-ink-faint cursor-not-allowed"
             />
             <p className="text-[11px] text-ink-faint mt-1">
               Channel ID は変更できません（LINE 側で固定の識別子）
@@ -227,7 +227,7 @@ export function AccountFormSections({
             value={state.ogSiteName ?? ''}
             placeholder={`空欄なら「${state.name || 'アカウント名'}」がフォールバック`}
             onChange={(e) => update({ ogSiteName: e.target.value || null })}
-            className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
           <p className="text-[11px] text-ink-faint mt-1">
             リンクプレビューでブランド名として表示されます。
