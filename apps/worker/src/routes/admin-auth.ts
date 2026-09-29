@@ -547,14 +547,11 @@ adminAuth.post('/api/auth/step-up', async (c) => {
     }
   }
   /*
-   * 再確認済みの時刻をセッションへ刻む。同じセッションは10分の窓で
-   * 何度も聞かれない。APIキー経路（セッション行が無い）は何もしない。
+   * R504: コードの一回限りの確保と確認票発行に成功した要求だけを
+   * 本人確認済みにする。並行要求に負けた側（409「使用済み」）の
+   * セッションには確認済み時刻を残さない。失敗応答と保存状態を一致させる。
    */
   const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
-  if (sessionTokenHash) {
-    await markAdminSessionStepUp(c.env.DB, sessionTokenHash, new Date().toISOString());
-  }
-  if (totpStep === undefined) await clearStepUpAttempts(c.env.DB, staff.id);
   const token = randomToken();
   const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
   // 確認票は発行したセッションと発行時の権限の版に結び付ける。
@@ -570,6 +567,14 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   })) {
     return c.json({ success: false, error: 'この認証コードは使用済みです' }, 409);
   }
+  /*
+   * 再確認済みの時刻をセッションへ刻む。同じセッションは10分の窓で
+   * 何度も聞かれない。APIキー経路（セッション行が無い）は何もしない。
+   */
+  if (sessionTokenHash) {
+    await markAdminSessionStepUp(c.env.DB, sessionTokenHash, new Date().toISOString());
+  }
+  if (totpStep === undefined) await clearStepUpAttempts(c.env.DB, staff.id);
   return c.json({ success: true, data: { token, purpose, expiresAt } }, 201);
 });
 
