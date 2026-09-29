@@ -1030,7 +1030,7 @@ export default function FormSubmissionsPage() {
             onClick={() => !savingName && setEditingForm(null)}
             aria-label="名前変更を閉じる"
           />
-          <div ref={renamePanelRef} role="dialog" aria-modal="true" aria-labelledby="rename-form-title" className="relative w-full max-w-md rounded-xl bg-canvas p-5 shadow-xl">
+          <div ref={renamePanelRef} role="dialog" aria-modal="true" aria-labelledby="rename-form-title" className="relative w-full max-w-md rounded-card bg-canvas p-5 shadow-float">
             <div className="flex items-start justify-between gap-3">
               <h3 id="rename-form-title" className="text-base font-semibold text-ink">フォーム名を変更</h3>
               <button
@@ -1048,9 +1048,9 @@ export default function FormSubmissionsPage() {
             </p>
             <p className="mt-1 text-xs text-ink-faint">推奨：サービス名｜目的（対象・導線）</p>
             <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-ink-faint">
-              <span className="rounded bg-shell px-2 py-1">質問 {editingForm.fields.length}項目</span>
+              <span className="rounded-mini bg-shell px-2 py-1">質問 {editingForm.fields.length}項目</span>
               {editingForm.usedByAccounts.map((account) => (
-                <span key={account.id} className="rounded bg-shell px-2 py-1">
+                <span key={account.id} className="rounded-mini bg-shell px-2 py-1">
                   {account.name}
                 </span>
               ))}
@@ -1064,7 +1064,7 @@ export default function FormSubmissionsPage() {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') void saveName()
                 }}
-                className="w-full rounded-lg border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent"
+                className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent"
               />
             </label>
             {renameError && <p className="mt-2 text-xs text-status-danger">{renameError}</p>}
@@ -1073,7 +1073,7 @@ export default function FormSubmissionsPage() {
                 type="button"
                 onClick={() => setEditingForm(null)}
                 disabled={savingName}
-                className="rounded-lg border border-hairline px-4 py-2 text-sm text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
+                className="rounded-control border border-hairline px-4 py-2 text-sm text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
               >
                 キャンセル
               </button>
@@ -1081,7 +1081,7 @@ export default function FormSubmissionsPage() {
                 type="button"
                 onClick={() => void saveName()}
                 disabled={!editingName.trim() || savingName}
-                className="rounded-lg bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent hover:brightness-92 disabled:opacity-50"
+                className="rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent hover:brightness-92 disabled:opacity-50"
               >
                 {savingName ? '保存中...' : '保存'}
               </button>

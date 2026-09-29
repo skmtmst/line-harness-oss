@@ -67,7 +67,7 @@ export default function OptionsDialog({
       */}
       <div
         ref={panelRef}
-        className={`bg-canvas flex w-full flex-col overflow-hidden rounded-panel shadow-lg ${styles.panel}`}
+        className={`bg-canvas flex w-full flex-col overflow-hidden rounded-panel shadow-float ${styles.panel}`}
       >
         <div className="border-hairline flex shrink-0 items-center justify-between border-b px-5 py-3">
           <div>
@@ -91,7 +91,7 @@ export default function OptionsDialog({
                 <p className="text-ink text-xs font-medium">実行すること</p>
                 <details className="group min-w-0">
                   <summary className="border-accent text-accent-deep rounded-control inline-block cursor-pointer list-none border px-3 py-2 text-xs font-medium">アクションを設定</summary>
-                  <div className="bg-canvas mt-3 min-w-0 p-3 shadow-lg">
+                  <div className="bg-canvas mt-3 min-w-0 p-3 shadow-float">
                     <ActionEditor value={value.afterActions ?? []} onChange={(afterActions: FormAction[]) => patch({ afterActions })} refs={refs} />
                   </div>
                 </details>

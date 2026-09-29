@@ -267,7 +267,7 @@ export function FormSection({
     >
       <div className="mb-3 flex items-start gap-2">
         <span
-          className={`bg-accent text-on-accent mt-0.5 flex shrink-0 items-center justify-center rounded-full font-semibold ${
+          className={`bg-accent text-on-accent mt-0.5 flex shrink-0 items-center justify-center rounded-pill font-semibold ${
             v6 ? 'h-6 w-6 text-[13px]' : 'h-5 w-5 text-xs'
           }`}
         >

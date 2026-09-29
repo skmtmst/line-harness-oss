@@ -466,10 +466,10 @@ function Handover() {
           return (
             <li key={step.order} className="border-hairline bg-canvas rounded-control flex min-w-0 items-center gap-3 border p-3">
               <span className={completed
-                ? 'bg-success text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium'
+                ? 'bg-success text-on-accent flex size-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium'
                 : active
-                  ? 'bg-action text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium'
-                  : 'bg-canvas-sunken text-ink-secondary flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium'}>
+                  ? 'bg-action text-on-accent flex size-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium'
+                  : 'bg-canvas-sunken text-ink-secondary flex size-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium'}>
                 {completed ? '✓' : step.order}
               </span>
               <span className="min-w-0">
@@ -612,7 +612,7 @@ function Handover() {
                               ]}
                             />
                           ) : (
-                            <span className="border-hairline rounded-full border px-2 py-1 text-xs">
+                            <span className="border-hairline rounded-pill border px-2 py-1 text-xs">
                               {shown === 'link' ? '同じ人' : shown === 'new' ? '新しく作る' : '引き継がない'}
                             </span>
                           )}

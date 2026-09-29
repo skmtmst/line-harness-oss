@@ -116,7 +116,7 @@ describe('白文字を載せる緑', () => {
     // オーナー指示 (m13d)：丸い札をやめ、5等分の切り替えにする。
     // 選んだ所は白地に濃い文字。見た目を文字で固定していた旧指定は新指定へ。
     expect(chats!.s).toContain('role="radiogroup"')
-    expect(chats!.s).toContain("'bg-canvas font-semibold text-ink shadow-sm'")
+    expect(chats!.s).toContain("'bg-canvas font-semibold text-ink shadow-card'")
     expect(chats!.s).not.toContain("? 'bg-accent-deep text-on-accent'")
   })
 })

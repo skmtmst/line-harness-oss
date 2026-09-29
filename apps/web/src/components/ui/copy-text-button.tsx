@@ -56,7 +56,7 @@ export default function CopyTextButton({
           value={value}
           onFocus={(event) => event.currentTarget.select()}
           aria-label={ariaLabel}
-          className="border-hairline bg-canvas-sunken text-ink w-full rounded border px-2 py-1 text-xs"
+          className="border-hairline bg-canvas-sunken text-ink w-full rounded-mini border px-2 py-1 text-xs"
         />
         <span role="alert" className="text-danger mt-1 block text-xs">
           コピーできませんでした。上の欄の文字を選択してコピーしてください。

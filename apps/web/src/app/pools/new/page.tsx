@@ -49,7 +49,7 @@ export default function NewPoolPage() {
       parent={['プール', '/pools']}
       variant="v6"
       aside={(
-        <section className="bg-canvas border-hairline rounded-card border p-5 shadow-sm">
+        <section className="bg-canvas border-hairline rounded-card border p-5 shadow-card">
           <h2 className="text-ink text-base font-bold">プレビュー</h2>
           <p className="text-ink-faint mt-1 text-xs">友だちが開く追加先と、現在の受け入れ先です。</p>
           <div className="bg-canvas-sunken rounded-control mt-4 p-4">
@@ -112,7 +112,7 @@ export default function NewPoolPage() {
             {slug && SLUG_PATTERN.test(slug) && (
               <>
                 <br />
-                友だち追加のURLは <code className="bg-canvas-sunken rounded px-1">/pool/{slug}</code>{' '}
+                友だち追加のURLは <code className="bg-canvas-sunken rounded-mini px-1">/pool/{slug}</code>{' '}
                 になります。
               </>
             )}

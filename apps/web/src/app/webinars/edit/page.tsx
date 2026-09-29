@@ -91,7 +91,7 @@ function fmtSession(epoch: number): string {
 }
 
 const inputClass =
-  'w-full border border-hairline rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-action'
+  'w-full border border-hairline rounded-control px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-action'
 
 function webinarStatusLabel(status: Webinar['status']): string {
   if (status === 'active') return '公開中'
@@ -265,7 +265,7 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
           value={importJson}
           onChange={(e) => setImportJson(e.target.value)}
           rows={4}
-          className="w-full rounded-lg border border-hairline p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-action"
+          className="w-full rounded-control border border-hairline p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-action"
         />
         <Button onClick={doImport} className="mt-1">
           読み込む
@@ -325,7 +325,7 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
         </Button>
         <button
           onClick={() => void save()}
-          className="px-4 py-1.5 text-sm font-medium bg-action text-on-action rounded-lg hover:bg-action-hover"
+          className="px-4 py-1.5 text-sm font-medium bg-action text-on-action rounded-control hover:bg-action-hover"
         >
           保存
         </button>
@@ -371,16 +371,16 @@ function UserCommentsSection({ webinarId }: { webinarId: string }) {
   if (!comments || comments.length === 0) return null
 
   return (
-    <details className="group overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
+    <details className="group overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
       <summary className="flex cursor-pointer list-none items-center justify-between p-5">
         <div><h3 className="font-bold text-ink">視聴者コメント</h3><p className="mt-1 text-xs text-ink-secondary">実際に届いたコメントを参加者の顔と一緒に確認</p></div>
-        <span className="rounded-full bg-canvas-sunken px-3 py-1 text-xs text-ink-secondary">{comments.length}件 ▾</span>
+        <span className="rounded-pill bg-canvas-sunken px-3 py-1 text-xs text-ink-secondary">{comments.length}件 ▾</span>
       </summary>
       <div className="grid gap-3 border-t border-divider-soft p-5 md:grid-cols-2">
         {comments.map((c) => {
           const name = c.friendName ?? `友だち ${c.friendId.slice(0, 6)}`
           return (
-            <Link key={c.id} href={`/chats?friend=${c.friendId}`} className="flex gap-3 rounded-xl border border-divider-soft bg-canvas-sunken p-3 hover:border-info hover:bg-action-soft">
+            <Link key={c.id} href={`/chats?friend=${c.friendId}`} className="flex gap-3 rounded-card border border-divider-soft bg-canvas-sunken p-3 hover:border-info hover:bg-action-soft">
               <ParticipantAvatar name={name} pictureUrl={c.pictureUrl} />
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-ink">{name}</span><span className="text-[10px] text-ink-faint">{fmtSec(c.atSeconds)}</span></div><p className="mt-1 text-sm leading-6 text-ink-secondary">{c.body}</p></div>
             </Link>
@@ -414,12 +414,12 @@ function ParticipantAvatar({
         src={pictureUrl}
         alt=""
         referrerPolicy="no-referrer"
-        className={`${sizeClass} shrink-0 rounded-full bg-canvas-sunken object-cover ring-2 ring-canvas`}
+        className={`${sizeClass} shrink-0 rounded-pill bg-canvas-sunken object-cover ring-2 ring-canvas`}
       />
     )
   }
   return (
-    <span className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-info-bg font-bold text-info ring-2 ring-canvas`}>
+    <span className={`${sizeClass} flex shrink-0 items-center justify-center rounded-pill bg-info-bg font-bold text-info ring-2 ring-canvas`}>
       {name.trim().charAt(0) || '?'}
     </span>
   )
@@ -835,7 +835,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           <p className="mt-1 text-sm text-ink-secondary">再入場や複数回参加は、同じ友だちとしてまとめています。</p>
         </div>
         {analytics.participants.length > 0 && (
-          <div className="flex items-center gap-3 rounded-full border border-hairline bg-canvas px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-3 rounded-pill border border-hairline bg-canvas px-3 py-2 shadow-card">
             <div className="flex -space-x-2">
               {analytics.participants.slice(0, 5).map((p) => (
                 <ParticipantAvatar
@@ -853,9 +853,9 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
 
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {metricCards.map((metric) => (
-          <div key={metric.label} className={`rounded-2xl border p-4 ${metric.tone}`}>
+          <div key={metric.label} className={`rounded-card border p-4 ${metric.tone}`}>
             <div className="flex items-center gap-2 text-xs font-semibold text-ink-secondary">
-              <span className={`h-2 w-2 rounded-full ${metric.dot}`} />
+              <span className={`h-2 w-2 rounded-pill ${metric.dot}`} />
               {metric.label}
             </div>
             <div className="mt-3 text-3xl font-bold tabular-nums tracking-[-0.02em] text-ink">{metric.value}</div>
@@ -864,7 +864,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         ))}
       </section>
 
-      <section id="webinar-cta-funnel" className="scroll-mt-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm">
+      <section id="webinar-cta-funnel" className="scroll-mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h3 className="font-bold text-ink">CTAから相談完了まで</h3>
@@ -878,7 +878,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           {formFunnelStages.map((stage, index) => {
             const previous = index === 0 ? stage.value : formFunnelStages[index - 1].value
             return (
-              <div key={stage.label} className="rounded-xl border border-divider-soft bg-canvas-sunken p-3">
+              <div key={stage.label} className="rounded-card border border-divider-soft bg-canvas-sunken p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-ink-secondary">{stage.label}</span>
                   <span className="text-[11px] text-ink-faint">
@@ -888,9 +888,9 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                 <div className="mt-2 text-2xl font-bold text-ink">
                   {stage.value.toLocaleString('ja-JP')}
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas-sunken">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-pill bg-canvas-sunken">
                   <div
-                    className="h-full rounded-full bg-info"
+                    className="h-full rounded-pill bg-info"
                     style={{ width: `${Math.max(0, Math.min(100, (stage.value / maxFormFunnel) * 100))}%` }}
                   />
                 </div>
@@ -899,13 +899,13 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           })}
         </div>
         {analytics.formFunnel.fieldCompletions.length > 0 && (
-          <details className="mt-4 rounded-xl border border-divider-soft bg-canvas-sunken px-4 py-3">
+          <details className="mt-4 rounded-card border border-divider-soft bg-canvas-sunken px-4 py-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink-secondary">
               項目ごとの到達人数を見る
             </summary>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {analytics.formFunnel.fieldCompletions.map((field) => (
-                <div key={field.fieldName} className="flex items-center justify-between rounded-lg bg-canvas px-3 py-2 text-xs">
+                <div key={field.fieldName} className="flex items-center justify-between rounded-control bg-canvas px-3 py-2 text-xs">
                   <span className="text-ink-secondary">{fieldLabels[field.fieldName] ?? field.fieldName}</span>
                   <span className="font-bold text-ink">{field.users.toLocaleString('ja-JP')}人</span>
                 </div>
@@ -916,13 +916,13 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
-        <section id="webinar-watch-funnel" className="scroll-mt-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm">
+        <section id="webinar-watch-funnel" className="scroll-mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="font-bold text-ink">参加ファネル</h3>
               <p className="mt-1 text-xs text-ink-secondary">どこで人数が減っているか</p>
             </div>
-            <span className="rounded-full bg-canvas-sunken px-2.5 py-1 text-[11px] font-medium text-ink-secondary">全期間</span>
+            <span className="rounded-pill bg-canvas-sunken px-2.5 py-1 text-[11px] font-medium text-ink-secondary">全期間</span>
           </div>
           <div className="mt-5 space-y-4">
             {funnel.map((stage) => (
@@ -931,9 +931,9 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                   <span className="font-medium text-ink-secondary">{stage.label}</span>
                   <span className="text-ink-secondary"><strong className="text-ink">{stage.value}</strong>人 · {stage.note}</span>
                 </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-canvas-sunken">
+                <div className="h-2.5 overflow-hidden rounded-pill bg-canvas-sunken">
                   <div
-                    className={`h-full rounded-full ${stage.color}`}
+                    className={`h-full rounded-pill ${stage.color}`}
                     style={{ width: `${Math.max(stage.value > 0 ? 3 : 0, (stage.value / Math.max(1, summary.viewers)) * 100)}%` }}
                   />
                 </div>
@@ -952,17 +952,17 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           </div>
         </section>
 
-        <section className="rounded-2xl border border-hairline bg-canvas p-5 shadow-sm">
+        <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-bold text-ink">日別の参加ペース</h3>
               <p className="mt-1 text-xs text-ink-secondary">直近14日・日ごとのユニーク人数</p>
             </div>
             <div className="flex flex-wrap gap-3 text-[11px] text-ink-secondary">
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-hairline" />予約</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-action" />参加</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-info" />CTA</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-success" />フォーム</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-hairline" />予約</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-action" />参加</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-info" />CTA</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-success" />フォーム</span>
             </div>
           </div>
           {daily.length === 0 ? (
@@ -971,10 +971,10 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             <div className="mt-5 flex h-52 items-end gap-2 overflow-x-auto border-b border-hairline pb-7">
               {daily.map((day) => (
                 <div key={day.date} className="relative flex h-full min-w-10 flex-1 items-end justify-center gap-0.5" title={`${day.date} 予約${day.reservations}・参加${day.viewers}・CTA${day.ctaClicks}・フォーム${day.formSubmissions}`}>
-                  <div className="w-2 rounded-t bg-hairline" style={{ height: `${Math.max(day.reservations > 0 ? 3 : 0, (day.reservations / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t bg-action" style={{ height: `${Math.max(day.viewers > 0 ? 3 : 0, (day.viewers / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t bg-info" style={{ height: `${Math.max(day.ctaClicks > 0 ? 3 : 0, (day.ctaClicks / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t bg-success" style={{ height: `${Math.max(day.formSubmissions > 0 ? 3 : 0, (day.formSubmissions / maxDaily) * 100)}%` }} />
+                  <div className="w-2 rounded-t-mini bg-hairline" style={{ height: `${Math.max(day.reservations > 0 ? 3 : 0, (day.reservations / maxDaily) * 100)}%` }} />
+                  <div className="w-2 rounded-t-mini bg-action" style={{ height: `${Math.max(day.viewers > 0 ? 3 : 0, (day.viewers / maxDaily) * 100)}%` }} />
+                  <div className="w-2 rounded-t-mini bg-info" style={{ height: `${Math.max(day.ctaClicks > 0 ? 3 : 0, (day.ctaClicks / maxDaily) * 100)}%` }} />
+                  <div className="w-2 rounded-t-mini bg-success" style={{ height: `${Math.max(day.formSubmissions > 0 ? 3 : 0, (day.formSubmissions / maxDaily) * 100)}%` }} />
                   <span className="absolute -bottom-6 whitespace-nowrap text-[10px] text-ink-faint">
                     {new Date(`${day.date}T00:00:00+09:00`).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
                   </span>
@@ -985,7 +985,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         </section>
       </div>
 
-      <section id="webinar-recent" className="scroll-mt-4 overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
+      <section id="webinar-recent" className="scroll-mt-4 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
         <div className="flex flex-col gap-3 border-b border-divider-soft p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="font-bold text-ink">最近の参加者</h3>
@@ -1028,18 +1028,18 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                           <div className="flex items-center justify-between text-[11px] text-ink-secondary">
                             <span>{fmtSec(p.maxWatchedSeconds)}</span><span>{watchedRate}%</span>
                           </div>
-                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-canvas-sunken">
-                            <div className="h-full rounded-full bg-action" style={{ width: `${watchedRate}%` }} />
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-pill bg-canvas-sunken">
+                            <div className="h-full rounded-pill bg-action" style={{ width: `${watchedRate}%` }} />
                           </div>
                         </Td>
                         <Td>
                           <div className="flex flex-wrap gap-1.5">
                             {p.formSubmittedAt ? (
-                              <span className="rounded-full bg-success-bg px-2 py-1 text-[10px] font-semibold text-success">フォーム送信</span>
+                              <span className="rounded-pill bg-success-bg px-2 py-1 text-[10px] font-semibold text-success">フォーム送信</span>
                             ) : p.ctaClickedAt ? (
-                              <span className="rounded-full bg-info-bg px-2 py-1 text-[10px] font-semibold text-info">CTAクリック</span>
+                              <span className="rounded-pill bg-info-bg px-2 py-1 text-[10px] font-semibold text-info">CTAクリック</span>
                             ) : (
-                              <span className="rounded-full bg-canvas-sunken px-2 py-1 text-[10px] font-medium text-ink-secondary">視聴のみ</span>
+                              <span className="rounded-pill bg-canvas-sunken px-2 py-1 text-[10px] font-medium text-ink-secondary">視聴のみ</span>
                             )}
                           </div>
                         </Td>
@@ -1062,7 +1062,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                       <div className="truncate text-sm font-semibold text-ink">{name}</div>
                       <div className="mt-1 text-[11px] text-ink-secondary">{compactDateTime(p.latestJoinedAt)} · {fmtSec(p.maxWatchedSeconds)}視聴</div>
                     </div>
-                    <span className={`h-2.5 w-2.5 rounded-full ${p.formSubmittedAt ? 'bg-success' : p.ctaClickedAt ? 'bg-info' : 'bg-hairline'}`} />
+                    <span className={`h-2.5 w-2.5 rounded-pill ${p.formSubmittedAt ? 'bg-success' : p.ctaClickedAt ? 'bg-info' : 'bg-hairline'}`} />
                   </Link>
                 )
               })}
@@ -1071,13 +1071,13 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         )}
       </section>
 
-      <details id="webinar-dropoff" className="group scroll-mt-4 overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
+      <details id="webinar-dropoff" className="group scroll-mt-4 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
           <div>
             <h3 className="font-bold text-ink">視聴維持・回別の詳細</h3>
             <p className="mt-1 text-xs text-ink-secondary">必要なときだけ、離脱位置と各回の数字を確認</p>
           </div>
-          <span className="rounded-full bg-canvas-sunken px-3 py-1 text-xs text-ink-secondary group-open:bg-info-bg group-open:text-action">{analytics.sessions.length}回 ▾</span>
+          <span className="rounded-pill bg-canvas-sunken px-3 py-1 text-xs text-ink-secondary group-open:bg-info-bg group-open:text-action">{analytics.sessions.length}回 ▾</span>
         </summary>
         <div className="grid gap-6 border-t border-divider-soft p-5 xl:grid-cols-2">
           <div>
@@ -1087,8 +1087,8 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             ) : analytics.dropoff.map((d) => (
               <div key={d.bucketStart} className="mb-2 flex items-center gap-2 text-xs">
                 <span className="w-16 shrink-0 text-ink-secondary">{fmtSec(d.bucketStart)}〜</span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-canvas-sunken">
-                  <div className="h-full rounded-full bg-action" style={{ width: `${(d.viewers / maxDropoff) * 100}%` }} />
+                <div className="h-2.5 flex-1 overflow-hidden rounded-pill bg-canvas-sunken">
+                  <div className="h-full rounded-pill bg-action" style={{ width: `${(d.viewers / maxDropoff) * 100}%` }} />
                 </div>
                 <span className="w-7 text-right font-semibold text-ink-secondary">{d.viewers}</span>
               </div>
@@ -1096,7 +1096,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           </div>
           <div className="min-w-0">
             <h4 className="mb-3 text-sm font-semibold text-ink">直近の開催回</h4>
-            <div className="max-h-80 overflow-auto rounded-xl border border-hairline">
+            <div className="max-h-80 overflow-auto rounded-card border border-hairline">
               {/* 外の箱が枠とスクロールを持つため、表の枠は消す。見出しの吸着は欄ごとに残す。 */}
               <DataTable className="rounded-none border-0">
                 <thead>
@@ -1566,7 +1566,7 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
         </Notice>
       )}
       {ctas.map((c, i) => (
-        <div key={i} className="space-y-2 rounded border border-hairline p-3">
+        <div key={i} className="space-y-2 rounded-mini border border-hairline p-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <label className="flex items-center gap-1">
               表示時間
@@ -1576,7 +1576,7 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
                   editCurrent((prev) => ({ ...prev, times: prev.times.map((t, j) => (j === i ? e.target.value : t)) }))
                 }
                 placeholder="45:00"
-                className="w-20 rounded border px-2 py-1"
+                className="w-20 rounded-mini border px-2 py-1"
               />
             </label>
             <Select aria-label="リンクの種類" value={c.kind} onChange={(value) => update(i, { kind: value as 'form' | 'url' })} options={[{ value: "form", label: "フォーム" }, { value: "url", label: "URL" }]} />
@@ -1601,7 +1601,7 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
                 value={c.url ?? ''}
                 onChange={(e) => update(i, { url: e.target.value || null })}
                 placeholder="https://..."
-                className="min-w-60 flex-1 rounded border px-2 py-1"
+                className="min-w-60 flex-1 rounded-mini border px-2 py-1"
               />
             )}
             {c.kind === 'form' && (
@@ -1623,19 +1623,19 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
             value={c.title}
             onChange={(e) => update(i, { title: e.target.value })}
             placeholder="カード見出し（例: 個別導入診断、受付中です）"
-            className="w-full rounded border px-2 py-1 text-sm font-bold"
+            className="w-full rounded-mini border px-2 py-1 text-sm font-bold"
           />
           <input
             value={c.body ?? ''}
             onChange={(e) => update(i, { body: e.target.value || null })}
             placeholder="補足文（任意。例: この配信を見ている方限定・枠が少なめです）"
-            className="w-full rounded border px-2 py-1 text-sm"
+            className="w-full rounded-mini border px-2 py-1 text-sm"
           />
           <input
             value={c.buttonLabel}
             onChange={(e) => update(i, { buttonLabel: e.target.value })}
             placeholder="ボタン文言（例: 無料で診断を受ける）"
-            className="w-full rounded border px-2 py-1 text-sm"
+            className="w-full rounded-mini border px-2 py-1 text-sm"
           />
         </div>
       ))}
@@ -1652,14 +1652,14 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
               times: [...prev.times, '0:00'],
             }))
           }}
-          className="rounded border px-3 py-1 text-sm"
+          className="rounded-mini border px-3 py-1 text-sm"
         >
           + CTAカード追加
         </button>
         <button
           onClick={() => void save()}
           disabled={saving || !loaded}
-          className="rounded bg-action px-4 py-1 text-sm text-on-action disabled:opacity-50"
+          className="rounded-mini bg-action px-4 py-1 text-sm text-on-action disabled:opacity-50"
         >
           {saving ? '保存中...' : '保存'}
         </button>
@@ -1949,7 +1949,7 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
       <div className="flex flex-wrap gap-2">
         {TRIGGERS.map((item) => <Button key={item.key} variant={trigger === item.key ? 'primary' : 'secondary'} onClick={() => setTrigger(item.key)}>{item.label}</Button>)}
       </div>
-      <div className="border-hairline divide-hairline divide-y overflow-hidden rounded-xl border">
+      <div className="border-hairline divide-hairline divide-y overflow-hidden rounded-card border">
         {visible.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">この条件のアクションはまだありません。</p> : visible.map((action, index) => {
           const referenceKey = actionReferenceKey(action.actionType)
           return (
@@ -2133,7 +2133,7 @@ function ReviewStep({ webinar, editor, registrations, ctaCount, onBack, onPublis
           必要なものは揃っています。
         </Notice>
       ) : null}
-      <ul className="divide-hairline border-hairline divide-y rounded-xl border text-sm">
+      <ul className="divide-hairline border-hairline divide-y rounded-card border text-sm">
         {(validation?.checks ?? []).map((check) => <li key={check.key} className="text-ink flex items-start gap-2 px-4 py-3"><span className={check.status === 'passed' ? 'text-success' : check.status === 'warning' ? 'text-warning' : 'text-danger'}>{check.status === 'passed' ? '✓' : '!'}</span><span><strong className="block">{check.label}</strong><span className="text-ink-faint text-xs">{check.detail}</span></span></li>)}
         {validationState === 'loading' ? <li className="text-ink-faint px-4 py-3">公開前検査を読み込んでいます。</li> : null}
       </ul>
@@ -2149,7 +2149,7 @@ function ReviewStep({ webinar, editor, registrations, ctaCount, onBack, onPublis
       </section>
       <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">
       <div><h2 className="text-ink font-bold">最終確認</h2><p className="text-ink-faint mt-1 text-xs">公開すると、申込・配信条件に合う友だちが視聴できます。</p></div>
-      <dl className="divide-hairline border-hairline divide-y rounded-xl border">
+      <dl className="divide-hairline border-hairline divide-y rounded-card border">
         {[
           ['ウェビナー名', webinar.title || '未設定'],
           ['動画・公開', webinar.videoPrefix ? '申込者向け' : '未設定'],
@@ -2568,7 +2568,7 @@ function EditWebinarInner() {
       <nav data-design="Crumb" className="text-action text-xs font-semibold"><Link href="/webinars" className="hover:underline">← ウェビナー一覧</Link></nav>
 
       {showSteps ? (
-        <ol data-design="Steps" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-2xl border p-3 shadow-sm">
+        <ol data-design="Steps" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-card border p-3 shadow-card">
           {STEPS.map((step) => {
             const state = stepStateOf(step.key, railPane, webinar, ctaCount)
             return (
@@ -2579,7 +2579,7 @@ function EditWebinarInner() {
                   data-design-node={step.node}
                   onClick={() => goStep(step.key)}
                   aria-current={railPane === step.key ? 'step' : undefined}
-                  className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                  className={`flex min-w-0 flex-1 items-center gap-2 rounded-card px-3 py-2 text-left text-xs font-semibold transition-colors ${
                     state === 'current'
                       ? 'bg-accent-soft text-ink'
                       : 'text-ink-secondary hover:bg-canvas-sunken'
@@ -2587,7 +2587,7 @@ function EditWebinarInner() {
                 >
                   {/* 印の描き方は共通の Stepper にそろえる。pane 間の自由な移動はこの画面だけの動き（例外）。 */}
                   <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${
                       state === 'done'
                         ? 'bg-accent-deep text-on-accent'
                         : state === 'current'
@@ -2612,7 +2612,7 @@ function EditWebinarInner() {
         R94: 参加者・分析・コメント演出への常設導線。作る手順の段（STEPS）
         とは別に、公開後の運用で開く面をいつでも選べるようにする。
       */}
-      <nav aria-label="参加者・分析・演出へ移動" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-2xl border p-3 shadow-sm">
+      <nav aria-label="参加者・分析・演出へ移動" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-card border p-3 shadow-card">
         {([
           { key: 'participants', label: '参加者' },
           { key: 'analytics', label: '分析' },
@@ -2623,7 +2623,7 @@ function EditWebinarInner() {
             type="button"
             onClick={() => goStep(item.key)}
             aria-current={pane === item.key ? 'page' : undefined}
-            className={`rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+            className={`rounded-card px-3 py-2 text-xs font-semibold transition-colors ${
               pane === item.key
                 ? 'bg-accent-soft text-ink'
                 : 'text-ink-secondary hover:bg-canvas-sunken'
