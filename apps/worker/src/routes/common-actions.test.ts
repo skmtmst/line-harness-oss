@@ -216,6 +216,25 @@ describe('V6共通アクションAPI', () => {
     expect(publish.status).toBe(409);
   });
 
+  it('同じ作成鍵の再送は同じ作成へ戻る（監査 R475）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const post = () => adminApp.request('/api/common-actions?account_id=account-1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '再試行する作成', actions: action, clientRequestKey: 'req-route-1' }),
+    });
+    const first = await post();
+    expect(first.status).toBe(201);
+    const firstBody = await first.json() as { data: { id: string } };
+    // 応答消失後の再試行も201で同じIDへ戻り、二重作成にしない。
+    const retry = await post();
+    expect(retry.status).toBe(201);
+    const retryBody = await retry.json() as { data: { id: string } };
+    expect(retryBody.data.id).toBe(firstBody.data.id);
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM common_actions`).get())
+      .toEqual({ count: 1 });
+  });
+
   it('タグ付与の連動ドロワーへ13種類のschemaと範囲内選択肢を返す', async () => {
     testDb.raw.prepare(
       `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,

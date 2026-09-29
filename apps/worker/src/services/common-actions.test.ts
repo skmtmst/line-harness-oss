@@ -546,6 +546,35 @@ describe('V6共通アクション', () => {
     expect(detail.versions[0].actions[0].params).toEqual({ durationMinutes: 60 });
   });
 
+  it('同じ作成鍵の再試行は同じ作成へ戻り二重作成にしない（監査 R475）', async () => {
+    const count = () => testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM common_actions WHERE line_account_id = 'account-1'`,
+    ).get() as { count: number };
+    const first = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '再試行する作成',
+      actions: tagAction('tag-1'), clientRequestKey: 'req-1',
+    });
+    // 保存確定後の応答消失からの再試行（同じ鍵・同じ内容）は最初の作成へ戻る。
+    const retry = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '再試行する作成',
+      actions: tagAction('tag-1'), clientRequestKey: 'req-1',
+    });
+    expect(retry).toEqual(first);
+    expect(count()).toEqual({ count: 1 });
+    // 別の鍵は独立した新規作成になる。
+    const other = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '再試行する作成',
+      actions: tagAction('tag-1'), clientRequestKey: 'req-2',
+    });
+    expect(other.id).not.toBe(first.id);
+    expect(count()).toEqual({ count: 2 });
+    // 鍵なしの従来の作成もそのまま独立する。
+    await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '再試行する作成', actions: tagAction('tag-1'),
+    });
+    expect(count()).toEqual({ count: 3 });
+  });
+
   it('一覧で旧版利用ありと未使用を区別する', async () => {
     const used = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '利用中', actions: tagAction('tag-1'),

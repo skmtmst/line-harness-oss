@@ -1742,7 +1742,7 @@ CREATE TABLE common_actions (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-);
+, client_request_key TEXT);
 
 CREATE TABLE common_var_export_jobs (
   id TEXT PRIMARY KEY,
@@ -7638,6 +7638,9 @@ CREATE INDEX idx_common_action_versions_action_status
 
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
+
+CREATE UNIQUE INDEX idx_common_actions_request_key
+  ON common_actions(line_account_id, client_request_key);
 
 CREATE INDEX idx_common_var_export_jobs_account
   ON common_var_export_jobs(line_account_id, created_at DESC);

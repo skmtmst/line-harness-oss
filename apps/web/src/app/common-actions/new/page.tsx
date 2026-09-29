@@ -9,7 +9,7 @@ import {
   type CommonActionResources,
   type CommonActionStep,
 } from '@/lib/api'
-import CommonActionEditor, { newCommonActionStep } from '@/components/automations/common-action-editor'
+import CommonActionEditor, { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
@@ -36,6 +36,11 @@ export default function NewCommonActionPage() {
   const [error, setError] = useState('')
   /* 見本の選び欄の表示値。選ぶと受け渡す（素の select の defaultValue 相当）。 */
   const [exampleId, setExampleId] = useState('')
+  /*
+   * 監査 R475: 初回保存から再試行まで同じ作成鍵を持ち、応答消失からの
+   * 再試行で同じ作成へ戻す。画面を開くたびに新しい鍵にする。
+   */
+  const [requestKey] = useState(() => newStepId())
 
   useEffect(() => {
     if (accountLoading || canManage !== true || !selectedAccountId) {
@@ -77,6 +82,7 @@ export default function NewCommonActionPage() {
         name: name.trim(),
         description: description.trim() || null,
         actions,
+        clientRequestKey: requestKey,
       })
       if (!response.success) throw new Error(response.error)
       router.push(`/common-actions/versions?id=${encodeURIComponent(response.data.id)}`)

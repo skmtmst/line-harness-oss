@@ -155,10 +155,12 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (
     name?: unknown;
     description?: unknown;
     actions?: unknown;
+    clientRequestKey?: unknown;
   }>().catch(() => ({} as {
     name?: unknown;
     description?: unknown;
     actions?: unknown;
+    clientRequestKey?: unknown;
   }));
   return endpoint(c, () => createCommonAction(c.env.DB, {
     lineAccountId: id,
@@ -166,6 +168,8 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (
     description: body.description,
     actions: body.actions,
     createdBy: c.get('staff')?.id,
+    // 監査 R475: 応答消失からの再試行で二重作成にしない鍵。
+    clientRequestKey: body.clientRequestKey,
   }), 201);
 });
 

@@ -10336,10 +10336,12 @@ export const api = {
         `/api/common-actions/${id}/duplicate?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: '{}' },
       ),
+    // 監査 R475: 初回保存から再試行まで同じ鍵を送り、二重作成にしない。
     create: (accountId: string, data: {
       name: string;
       description?: string | null;
       actions: CommonActionStep[];
+      clientRequestKey: string;
     }) => fetchApi<ApiResponse<{ id: string; draftVersionId: string; versionNumber: number }>>(
       `/api/common-actions?account_id=${encodeURIComponent(accountId)}`,
       { method: 'POST', body: JSON.stringify(data) },

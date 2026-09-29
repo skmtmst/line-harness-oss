@@ -122,6 +122,11 @@ describe('V6共通アクションの画面契約', () => {
     expect(VERSIONS).toContain('version.draftRevision')
   })
 
+  it('新規作成は再試行鍵を持ち二重作成にしない（監査 R475）', () => {
+    expect(API).toContain('clientRequestKey')
+    expect(CREATE).toContain('clientRequestKey: requestKey')
+  })
+
   it('版操作は店が外れていたら実行しない (#580)', () => {
     expect(VERSIONS).toContain('if (!selectedAccountId) {')
     expect(VERSIONS).toContain('LINEアカウントを選び直してください')

@@ -853,10 +853,47 @@ export async function listCommonActionResources(
   };
 }
 
+/*
+ * 監査 R475: 保存確定後の応答消失からの再試行で二重作成にしない。
+ * 作成画面が初回から再試行まで同じ鍵を送り、鍵が同じ要求は最初の作成を返す。
+ */
+async function findByRequestKey(
+  db: D1Database,
+  lineAccountId: string,
+  requestKey: string,
+): Promise<{ id: string; draftVersionId: string; versionNumber: number } | null> {
+  const row = await db.prepare(
+    `SELECT ca.id AS id, ca.current_draft_version_id AS draft_id, cav.version_number AS version_number
+       FROM common_actions ca
+       JOIN common_action_versions cav ON cav.id = ca.current_draft_version_id
+      WHERE ca.line_account_id = ? AND ca.client_request_key = ?`,
+  ).bind(lineAccountId, requestKey).first<{
+    id: string; draft_id: string | null; version_number: number | null;
+  }>();
+  if (!row || !row.draft_id) return null;
+  return { id: row.id, draftVersionId: row.draft_id, versionNumber: Number(row.version_number ?? 1) };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('UNIQUE constraint failed');
+}
+
 export async function createCommonAction(
   db: D1Database,
-  input: { lineAccountId: string; name: unknown; description?: unknown; actions: unknown; createdBy?: string | null },
+  input: {
+    lineAccountId: string; name: unknown; description?: unknown; actions: unknown;
+    createdBy?: string | null; clientRequestKey?: unknown;
+  },
 ): Promise<{ id: string; draftVersionId: string; versionNumber: number }> {
+  // 同じ鍵の再試行は最初の作成へ戻す。鍵なしの従来の作成は今の動きのまま。
+  const requestKey = input.clientRequestKey === undefined || input.clientRequestKey === null
+    ? null
+    : requiredString(input.clientRequestKey, 'clientRequestKey', '作成の再試行鍵');
+  if (requestKey) {
+    const existing = await findByRequestKey(db, input.lineAccountId, requestKey);
+    if (existing) return existing;
+  }
   const name = requiredString(input.name, 'name', '共通アクション名');
   if (name.length > 120) throw new CommonActionValidationError('name_too_long', '共通アクション名は120文字までです', 'name');
   const description = typeof input.description === 'string' && input.description.trim()
@@ -866,21 +903,30 @@ export async function createCommonAction(
   const id = crypto.randomUUID();
   const versionId = crypto.randomUUID();
   const now = new Date().toISOString();
-  await db.batch([
-    db.prepare(
-      `INSERT INTO common_actions
-         (id, line_account_id, name, description, status, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'draft', ?, ?, ?)`,
-    ).bind(id, input.lineAccountId, name, description, input.createdBy ?? null, now, now),
-    db.prepare(
-      `INSERT INTO common_action_versions
-         (id, common_action_id, version_number, status, action_config, created_by, created_at)
-       VALUES (?, ?, 1, 'draft', ?, ?, ?)`,
-    ).bind(versionId, id, JSON.stringify(actions), input.createdBy ?? null, now),
-    db.prepare(
-      `UPDATE common_actions SET current_draft_version_id = ? WHERE id = ?`,
-    ).bind(versionId, id),
-  ]);
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO common_actions
+           (id, line_account_id, name, description, status, client_request_key, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+      ).bind(id, input.lineAccountId, name, description, requestKey, input.createdBy ?? null, now, now),
+      db.prepare(
+        `INSERT INTO common_action_versions
+           (id, common_action_id, version_number, status, action_config, created_by, created_at)
+         VALUES (?, ?, 1, 'draft', ?, ?, ?)`,
+      ).bind(versionId, id, JSON.stringify(actions), input.createdBy ?? null, now),
+      db.prepare(
+        `UPDATE common_actions SET current_draft_version_id = ? WHERE id = ?`,
+      ).bind(versionId, id),
+    ]);
+  } catch (error) {
+    // 同時到達で先に作られていたら、作り直さず最初の作成へ戻す。
+    if (requestKey && isUniqueViolation(error)) {
+      const existing = await findByRequestKey(db, input.lineAccountId, requestKey);
+      if (existing) return existing;
+    }
+    throw error;
+  }
   return { id, draftVersionId: versionId, versionNumber: 1 };
 }
 
