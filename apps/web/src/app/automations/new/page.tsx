@@ -2363,32 +2363,14 @@ export default function NewAutomationPage() {
           */}
           {resumeTarget && resumeStatus === 'failed' ? (
             <div className="mt-2 flex flex-wrap gap-2">
-              {resumeErrorKind === 'network' ? (
-                <button
-                  type="button"
-                  className={`${styles.action} ${styles.actionSecondary}`}
-                  onClick={retryResume}
-                >
-                  下書きをもう一度読み込む
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={`${styles.action} ${styles.actionSecondary}`}
-                    onClick={retryResume}
-                  >
-                    下書きをもう一度読み込む
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.action} ${styles.actionSecondary}`}
-                    onClick={restartFresh}
-                  >
-                    白紙から作り直す
-                  </button>
-                </>
-              )}
+              <Button variant="secondary" onClick={retryResume}>
+                下書きをもう一度読み込む
+              </Button>
+              {resumeErrorKind !== 'network' ? (
+                <Button variant="secondary" onClick={restartFresh}>
+                  白紙から作り直す
+                </Button>
+              ) : null}
             </div>
           ) : null}
           {notice ? <p className={styles.note}>{notice}</p> : null}
