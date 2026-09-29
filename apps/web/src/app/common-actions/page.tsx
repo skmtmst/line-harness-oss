@@ -22,9 +22,10 @@ import { useAutomationRunPermissions } from '@/components/automations/use-can-ma
 import { useManualHref } from '@/lib/use-manual-href'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
+import Dialog from '@/components/shared/dialog'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
-type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused'
+type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 const PAGE_SIZE = 6
 
 const FILTERS: Array<{ value: Filter; label: string }> = [
@@ -33,6 +34,8 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'draft', label: '下書き' },
   { value: 'old_version', label: '古い版あり' },
   { value: 'unused', label: '呼ばれていない' },
+  // 監査 R480: 保管済みは通常一覧に出さない。この札で見る・戻す。
+  { value: 'archived', label: '保管' },
 ]
 
 const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
@@ -58,6 +61,7 @@ export default function CommonActionsPage() {
   const [items, setItems] = useState<CommonActionSummary[]>([])
   const [summary, setSummary] = useState<{
     total: number; published: number; draft: number; oldVersion: number; unused: number;
+    archived: number;
     actions: number; bindings: number; outdated: number; outdatedItems: number;
     executions: number; failures: number;
   } | null>(null)
@@ -150,6 +154,7 @@ export default function CommonActionsPage() {
     if (value === 'unused') return summary.unused
     if (value === 'published') return summary.published
     if (value === 'draft') return summary.draft
+    if (value === 'archived') return summary.archived
     return undefined
   }
 
@@ -164,6 +169,42 @@ export default function CommonActionsPage() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '共通アクションを複製できませんでした')
       setDuplicatingId(null)
+    }
+  }
+
+  /*
+   * 監査 R480: 未使用なら確認後に保管、利用中は窓内で件数と理由を示して止める。
+   * 保管済みは同じ窓で戻せる。権限なしの操作はサーバでも拒否する。
+   */
+  const [archiving, setArchiving] = useState<{ item: CommonActionSummary; mode: 'archive' | 'unarchive' } | null>(null)
+  const [archivingBusy, setArchivingBusy] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
+
+  const openArchiveDialog = (item: CommonActionSummary, mode: 'archive' | 'unarchive') => {
+    setArchiveError('')
+    setArchiving({ item, mode })
+  }
+
+  const confirmArchive = async () => {
+    if (!archiving || !selectedAccountId || archivingBusy) return
+    // 利用中は理由を示すだけで実行しない（押せない操作に見せかけない）。
+    if (archiving.mode === 'archive' && archiving.item.bindingCount > 0) {
+      setArchiving(null)
+      return
+    }
+    setArchivingBusy(true)
+    setArchiveError('')
+    try {
+      const response = archiving.mode === 'archive'
+        ? await api.commonActions.archive(archiving.item.id, selectedAccountId)
+        : await api.commonActions.unarchive(archiving.item.id, selectedAccountId)
+      if (!response.success) throw new Error(response.error)
+      setArchiving(null)
+      await load()
+    } catch (caught) {
+      setArchiveError(caught instanceof Error ? caught.message : '操作を完了できませんでした')
+    } finally {
+      setArchivingBusy(false)
     }
   }
 
@@ -374,6 +415,17 @@ export default function CommonActionsPage() {
                           ariaLabel={`${item.name}の操作`}
                           onClose={() => setOpenMenuId(null)}
                           items={[
+                            item.status === 'archived'
+                              ? {
+                                  id: 'unarchive',
+                                  label: '保管を戻す',
+                                  onSelect: () => openArchiveDialog(item, 'unarchive'),
+                                }
+                              : {
+                                  id: 'archive',
+                                  label: '保管する',
+                                  onSelect: () => openArchiveDialog(item, 'archive'),
+                                },
                             item.status === 'draft'
                               ? {
                                   id: 'publish',
@@ -411,6 +463,29 @@ export default function CommonActionsPage() {
           <Pagination page={page} pageCount={Math.ceil(total / PAGE_SIZE)} onPageChange={setPage} />
         </div>
       ) : null}
+      {/* 監査 R480: 利用中は件数と理由を示して止める。保管済みの閲覧・復元もここ。 */}
+      <Dialog
+        open={Boolean(archiving)}
+        title={archiving?.mode === 'unarchive'
+          ? `「${archiving?.item.name}」の保管を戻しますか`
+          : `「${archiving?.item.name}」を保管しますか`}
+        description={archiving?.mode === 'unarchive'
+          ? '通常一覧に戻ります。実行記録はそのまま残ります。'
+          : '通常一覧から外れます。実行記録は残ります。'}
+        confirmLabel={archiving?.mode === 'unarchive'
+          ? '保管を戻す'
+          : archiving && archiving.item.bindingCount > 0 ? '閉じる' : '保管する'}
+        busy={archivingBusy}
+        onCancel={() => setArchiving(null)}
+        onConfirm={() => void confirmArchive()}
+      >
+        {archiving?.mode === 'archive' && archiving.item.bindingCount > 0 ? (
+          <p className="text-ink-secondary mt-3 text-sm" role="alert">
+            利用中のため保管できません（{archiving.item.bindingCount}か所）。先に利用先を外してください。
+          </p>
+        ) : null}
+        {archiveError ? <p className="text-danger mt-3 text-sm" role="alert">{archiveError}</p> : null}
+      </Dialog>
     </div>
   )
 }

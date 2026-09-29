@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { createTemplate, publishTemplate } from '@line-crm/db';
 import {
+  archiveCommonAction,
   createCommonAction,
   createCommonActionDraft,
   duplicateCommonAction,
@@ -11,6 +12,7 @@ import {
   listCommonActionResources,
   listCommonActions,
   publishCommonActionDraft,
+  unarchiveCommonAction,
   updateCommonActionBindingVersion,
   updateCommonActionDraft,
 } from './common-actions';
@@ -854,8 +856,9 @@ describe('V6共通アクション', () => {
 
   /*
    * 監査 R123: 「呼ばれていない」の札の件数は、一覧の絞り込みと同じ
-   * 「呼び出し元なし」で数える。以前は集計が公開中に限られ、下書き・保管の
-   * 未使用があると件数と一覧がずれた。
+   * 「呼び出し元なし」で数える。以前は集計が公開中に限られ、下書きの
+   * 未使用があると件数と一覧がずれた。保管の未使用は「保管」で数える
+   * （監査 R480）。
    */
   it('「呼ばれていない」の件数は一覧の絞り込みと同じ対象を数える', async () => {
     const published = await createCommonAction(testDb.db, {
@@ -880,8 +883,59 @@ describe('V6共通アクション', () => {
       await getCommonActionsSummary(testDb.db, 'account-1'),
       await listCommonActions(testDb.db, { lineAccountId: 'account-1', status: 'unused' }),
     ];
-    expect(unusedList.total).toBe(3);
+    // 監査 R480: 保管済みは「保管」で見る。「呼ばれていない」には出さない。
+    expect(unusedList.total).toBe(2);
     expect(summary.unused).toBe(unusedList.total);
+    const all = await listCommonActions(testDb.db, { lineAccountId: 'account-1' });
+    expect(all.total).toBe(2);
+    expect(summary.total).toBe(2);
+    expect(summary.archived).toBe(1);
+    const onlyArchived = await listCommonActions(testDb.db, { lineAccountId: 'account-1', status: 'archived' });
+    expect(onlyArchived.items.map((item) => item.id)).toEqual([archived.id]);
+  });
+
+  it('未使用は保管でき通常一覧から外れる（監査 R480）', async () => {
+    const unused = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '要らない試作', actions: tagAction('tag-1'),
+    });
+    await archiveCommonAction(testDb.db, { id: unused.id, lineAccountId: 'account-1' });
+    // 通常一覧（すべて）から外れ、保管で見える。集計も同じ範囲。
+    const all = await listCommonActions(testDb.db, { lineAccountId: 'account-1' });
+    expect(all.items).toHaveLength(0);
+    const onlyArchived = await listCommonActions(testDb.db, { lineAccountId: 'account-1', status: 'archived' });
+    expect(onlyArchived.items.map((item) => item.id)).toEqual([unused.id]);
+    expect(await getCommonActionsSummary(testDb.db, 'account-1'))
+      .toMatchObject({ total: 0, archived: 1, unused: 0 });
+    // 戻すと下書きとして通常一覧に戻る。
+    await unarchiveCommonAction(testDb.db, { id: unused.id, lineAccountId: 'account-1' });
+    const restored = await listCommonActions(testDb.db, { lineAccountId: 'account-1' });
+    expect(restored.items).toMatchObject([{ id: unused.id, status: 'draft' }]);
+  });
+
+  it('利用中の保管は利用先を示して拒否する（監査 R480）', async () => {
+    const used = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '使っている処理', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: used.id, lineAccountId: 'account-1',
+      draftVersionId: used.draftVersionId, expectedDraftRevision: 1,
+    });
+    testDb.raw.prepare(
+      `INSERT INTO common_action_bindings
+         (id, line_account_id, common_action_id, common_action_version_id,
+          consumer_type, consumer_id, consumer_path)
+       VALUES ('b-used', 'account-1', ?, ?, 'automation', 'auto-1', 'root')`,
+    ).run(used.id, used.draftVersionId);
+    await expect(archiveCommonAction(testDb.db, {
+      id: used.id, lineAccountId: 'account-1',
+    })).rejects.toMatchObject({ code: 'binding_exists' });
+    await expect(archiveCommonAction(testDb.db, {
+      id: used.id, lineAccountId: 'account-1',
+    })).rejects.toThrow(/オートメーション.*1か所/);
+    // 拒否されても状態は変わらない。
+    expect(testDb.raw.prepare(
+      `SELECT status FROM common_actions WHERE id = ?`,
+    ).get(used.id)).toEqual({ status: 'published' });
   });
 
   /*

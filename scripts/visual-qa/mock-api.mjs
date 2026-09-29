@@ -3094,7 +3094,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         ? item.oldVersionBindingCount > 0
         : status === 'unused'
           ? item.status === 'published' && item.bindingCount === 0
-          : status ? item.status === status : true)
+          // 監査 R480: 通常一覧から保管済みを外す（本番口と同じ）。
+          : status ? item.status === status : item.status !== 'archived')
       .filter((item) => !search || `${item.name} ${item.description ?? ''}`.toLocaleLowerCase('ja').includes(search))
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
@@ -3830,6 +3831,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname.startsWith('/api/common-actions/') && !pathname.includes('/resources')) {
+    // 監査 R480: 保管・復元の見本（型どおりの名前で）。
+    if (pathname.endsWith('/archive') && method === 'POST') {
+      return { success: true, data: { archived: true } }
+    }
+    if (pathname.endsWith('/unarchive') && method === 'POST') {
+      return { success: true, data: { unarchived: true } }
+    }
     // `versions` `bindings` が入っていないと `.find` で落ちる。
     return { success: true, data: COMMON_ACTION_DETAIL }
   }

@@ -144,6 +144,16 @@ describe('V6共通アクションの画面契約', () => {
     expect(WORKER).toContain('keepPins')
   })
 
+  it('未使用は保管でき利用中は理由を示して止まる（監査 R480）', () => {
+    expect(LIST).toContain('保管する')
+    expect(LIST).toContain('保管を戻す')
+    expect(LIST).toContain('api.commonActions.archive')
+    expect(LIST).toContain('api.commonActions.unarchive')
+    expect(LIST).toContain("value: 'archived'")
+    expect(WORKER).toContain('binding_exists')
+    expect(API).toContain('archive:')
+  })
+
   it('版操作は店が外れていたら実行しない (#580)', () => {
     expect(VERSIONS).toContain('if (!selectedAccountId) {')
     expect(VERSIONS).toContain('LINEアカウントを選び直してください')

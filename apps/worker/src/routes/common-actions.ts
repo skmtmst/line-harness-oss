@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
+  archiveCommonAction,
   CommonActionValidationError,
   createCommonAction,
   createCommonActionDraft,
@@ -13,6 +14,7 @@ import {
   listCommonActionResources,
   listCommonActions,
   publishCommonActionDraft,
+  unarchiveCommonAction,
   updateCommonActionBindingVersion,
   updateCommonActionDraft,
 } from '../services/common-actions.js';
@@ -198,6 +200,31 @@ commonActions.get('/api/common-actions/:id', requireRole('owner', 'admin', 'staf
     id: c.req.param('id'),
     lineAccountId: id,
   }));
+});
+
+// 監査 R480: 未使用の共通アクションを保管する。利用中は422で利用先を示す。
+commonActions.post('/api/common-actions/:id/archive', requireRole('owner', 'admin'), async (c) => {
+  const id = await requireAccount(c);
+  if (typeof id !== 'string') return id;
+  return endpoint(c, async () => {
+    await archiveCommonAction(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: id,
+    });
+    return { archived: true };
+  });
+});
+
+commonActions.post('/api/common-actions/:id/unarchive', requireRole('owner', 'admin'), async (c) => {
+  const id = await requireAccount(c);
+  if (typeof id !== 'string') return id;
+  return endpoint(c, async () => {
+    await unarchiveCommonAction(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: id,
+    });
+    return { unarchived: true };
+  });
 });
 
 commonActions.post('/api/common-actions/:id/duplicate', requireRole('owner', 'admin'), async (c) => {

@@ -781,11 +781,16 @@ export async function listCommonActions(
     if (input.status === 'old_version') {
       where.push(`EXISTS (SELECT 1 FROM common_action_bindings ob WHERE ob.common_action_id = ca.id AND ob.common_action_version_id <> ca.current_published_version_id)`);
     } else if (input.status === 'unused') {
+      // 監査 R480: 保管済みは「保管」タブで見る。「呼ばれていない」には出さない。
+      where.push(`ca.status <> 'archived'`);
       where.push(`NOT EXISTS (SELECT 1 FROM common_action_bindings ub WHERE ub.common_action_id = ca.id)`);
     } else {
       where.push(`ca.status = ?`);
       binds.push(input.status);
     }
+  } else {
+    // 監査 R480: 通常一覧（すべて）から保管済みを外す。保管タブで見る。
+    where.push(`ca.status <> 'archived'`);
   }
   if (input.query?.trim()) {
     /*
@@ -858,6 +863,7 @@ export async function listCommonActions(
  * 画面は件数表示のために全件取得をもう1回投げていたが、行単価の高い
  * 月次集計サブクエリ4本が行ごとに走るため、表示1回で2倍走っていた。
  * 集計はページ送り・絞り込みに依らずアカウント全体で数える。
+ * 保管済みは通常一覧に出さないため、合計からは外して件数だけ別に数える。
  * 行ごとの内訳式は `listCommonActions` と同じにし、画面の合計と一致させる。
  */
 export async function getCommonActionsSummary(
@@ -869,6 +875,7 @@ export async function getCommonActionsSummary(
   draft: number;
   oldVersion: number;
   unused: number;
+  archived: number;
   actions: number;
   bindings: number;
   outdated: number;
@@ -876,6 +883,11 @@ export async function getCommonActionsSummary(
   executions: number;
   failures: number;
 }> {
+  // 監査 R480: 集計は通常一覧と同じ範囲（保管済みを除く）。保管は件数だけ別に数える。
+  const archivedRow = await db.prepare(
+    `SELECT COUNT(*) AS archived FROM common_actions
+      WHERE line_account_id = ? AND status = 'archived'`,
+  ).bind(lineAccountId).first<{ archived: number }>();
   const row = await db.prepare(
     `SELECT COUNT(*) AS total,
             SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS published,
@@ -906,7 +918,7 @@ export async function getCommonActionsSummary(
                LEFT JOIN common_action_versions pv ON pv.id = ca.current_published_version_id
                LEFT JOIN common_action_bindings b ON b.common_action_id = ca.id
                LEFT JOIN (${COMMON_ACTION_RUN_METRICS_SQL}) run_metrics ON run_metrics.action_id = ca.id
-              WHERE ca.line_account_id = ?
+              WHERE ca.line_account_id = ? AND ca.status <> 'archived'
               GROUP BY ca.id)`,
   ).bind(lineAccountId, lineAccountId).first<{
     total: number; published: number | null; draft: number | null; old_version: number | null;
@@ -919,6 +931,7 @@ export async function getCommonActionsSummary(
     draft: Number(row?.draft ?? 0),
     oldVersion: Number(row?.old_version ?? 0),
     unused: Number(row?.unused ?? 0),
+    archived: Number(archivedRow?.archived ?? 0),
     actions: Number(row?.actions ?? 0),
     bindings: Number(row?.bindings ?? 0),
     outdated: Number(row?.outdated ?? 0),
@@ -1496,4 +1509,62 @@ export async function updateCommonActionBindingVersion(
     if (!binding) throw new CommonActionValidationError('binding_not_found', '利用先が見つかりません');
     throw new CommonActionValidationError('version_conflict', '利用先の固定版が変わりました。再読み込みしてください');
   }
+}
+
+const ARCHIVE_CONSUMER_LABELS: Record<string, string> = {
+  automation: 'オートメーション',
+  scenario: 'シナリオ配信',
+  form: '回答フォーム',
+  auto_reply: '自動応答',
+  rich_menu: 'リッチメニュー',
+};
+
+/*
+ * 監査 R480: 未使用の共通アクションを保管する。利用中は件数と利用先を
+ * 示して拒否する。保管は一方通行ではなく、戻す操作も用意する。
+ * 実行記録は残る（物理削除ではない）。
+ */
+export async function archiveCommonAction(
+  db: D1Database,
+  input: { id: string; lineAccountId: string },
+): Promise<void> {
+  const owner = await getOwnedAction(db, input.id, input.lineAccountId);
+  if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
+  if (owner.status === 'archived') return;
+  const bindings = await db.prepare(
+    `SELECT consumer_type, consumer_id
+       FROM common_action_bindings
+      WHERE common_action_id = ? AND line_account_id = ?
+      ORDER BY consumer_type, consumer_id`,
+  ).bind(owner.id, input.lineAccountId).all<{ consumer_type: string; consumer_id: string }>();
+  const rows = bindings.results ?? [];
+  if (rows.length > 0) {
+    const kinds = [...new Set(rows.map((row) => ARCHIVE_CONSUMER_LABELS[row.consumer_type] ?? row.consumer_type))];
+    throw new CommonActionValidationError(
+      'binding_exists',
+      `利用中のため保管できません（${kinds.join('・')} ${rows.length}か所）。先に利用先を外してください`,
+    );
+  }
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE common_actions SET status = 'archived', archived_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ?`,
+  ).bind(now, now, owner.id, input.lineAccountId).run();
+}
+
+export async function unarchiveCommonAction(
+  db: D1Database,
+  input: { id: string; lineAccountId: string },
+): Promise<void> {
+  const owner = await getOwnedAction(db, input.id, input.lineAccountId);
+  if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
+  if (owner.status !== 'archived') {
+    throw new CommonActionValidationError('version_conflict', '保管中ではありません。再読み込みしてください');
+  }
+  const status = owner.current_published_version_id ? 'published' : 'draft';
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE common_actions SET status = ?, archived_at = NULL, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status = 'archived'`,
+  ).bind(status, now, owner.id, input.lineAccountId).run();
 }

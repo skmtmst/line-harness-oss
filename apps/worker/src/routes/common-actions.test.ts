@@ -282,6 +282,55 @@ describe('V6共通アクションAPI', () => {
     });
   });
 
+  it('保管は未使用なら成功し利用中は422・権限なしは403（監査 R480）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const staffApp = setupApp(testDb.db, { role: 'staff' } as AuthenticatedStaff);
+    const created = await adminApp.request('/api/common-actions?account_id=account-1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '要らない試作', actions: action }),
+    });
+    const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
+    const id = createdBody.data.id;
+
+    // 権限なしの担当者はサーバでも拒否される。
+    expect((await staffApp.request(`/api/common-actions/${id}/archive?account_id=account-1`, {
+      method: 'POST',
+    })).status).toBe(403);
+
+    // 未使用なら保管でき、通常一覧から外れる。
+    const archived = await adminApp.request(`/api/common-actions/${id}/archive?account_id=account-1`, {
+      method: 'POST',
+    });
+    expect(archived.status).toBe(200);
+    await expect(archived.json()).resolves.toMatchObject({ success: true, data: { archived: true } });
+    const list = await adminApp.request('/api/common-actions?account_id=account-1');
+    const listBody = await list.json() as { data: Array<{ id: string }> };
+    expect(listBody.data.map((item) => item.id)).not.toContain(id);
+
+    // 戻すと通常一覧に戻る。
+    const unarchived = await adminApp.request(`/api/common-actions/${id}/unarchive?account_id=account-1`, {
+      method: 'POST',
+    });
+    expect(unarchived.status).toBe(200);
+    const relist = await adminApp.request('/api/common-actions?account_id=account-1');
+    const relistBody = await relist.json() as { data: Array<{ id: string }> };
+    expect(relistBody.data.map((item) => item.id)).toContain(id);
+
+    // 利用中は422で利用先を示す。
+    testDb.raw.prepare(
+      `INSERT INTO common_action_bindings
+         (id, line_account_id, common_action_id, common_action_version_id,
+          consumer_type, consumer_id, consumer_path)
+       VALUES ('b-route-used', 'account-1', ?, ?, 'automation', 'auto-1', 'root')`,
+    ).run(id, createdBody.data.draftVersionId);
+    const inUse = await adminApp.request(`/api/common-actions/${id}/archive?account_id=account-1`, {
+      method: 'POST',
+    });
+    expect(inUse.status).toBe(422);
+    await expect(inUse.json()).resolves.toMatchObject({ success: false, code: 'binding_exists' });
+  });
+
   it('タグ付与の連動ドロワーへ13種類のschemaと範囲内選択肢を返す', async () => {
     testDb.raw.prepare(
       `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,

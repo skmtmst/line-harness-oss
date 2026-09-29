@@ -10313,6 +10313,7 @@ export const api = {
         pagination?: { total: number; limit: number | null; offset: number }
         summary?: {
           total: number; published: number; draft: number; oldVersion: number; unused: number;
+          archived: number;
           actions: number; bindings: number; outdated: number; outdatedItems: number;
           executions: number; failures: number;
         }
@@ -10334,6 +10335,17 @@ export const api = {
     duplicate: (id: string, accountId: string) =>
       fetchApi<ApiResponse<{ id: string; draftVersionId: string; versionNumber: number }>>(
         `/api/common-actions/${id}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    // 監査 R480: 未使用の共通アクションを保管する。利用中はサーバが拒否する。
+    archive: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ archived: true }>>(
+        `/api/common-actions/${id}/archive?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    unarchive: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ unarchived: true }>>(
+        `/api/common-actions/${id}/unarchive?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: '{}' },
       ),
     // 監査 R475: 初回保存から再試行まで同じ鍵を送り、二重作成にしない。
