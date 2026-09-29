@@ -97,6 +97,21 @@ function callbackUrl(c: Context<Env>): string {
   return `${new URL(c.req.url).origin}/api/auth/line/callback`;
 }
 
+/**
+ * 管理画面ログイン用のLINE Loginチャネル。
+ *
+ * `LINE_LOGIN_CHANNEL_ID` は会員向けLIFF連携の既定チャネルも兼ねているため
+ * （`routes/liff.ts`）、他社向けサービスの入口だけを別プロバイダーの
+ * チャネルへ移せるように、管理者ログイン専用の設定を先に見る。
+ * 未設定なら従来どおり共通のチャネルを使うので、設定を入れるまで挙動は変わらない。
+ */
+function adminLoginChannel(env: Env['Bindings']): { id: string; secret: string } {
+  return {
+    id: env.ADMIN_LINE_LOGIN_CHANNEL_ID?.trim() || env.LINE_LOGIN_CHANNEL_ID,
+    secret: env.ADMIN_LINE_LOGIN_CHANNEL_SECRET?.trim() || env.LINE_LOGIN_CHANNEL_SECRET,
+  };
+}
+
 function adminLoginUrl(c: Context<Env>, error?: string, next?: string | null): string {
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
@@ -135,7 +150,8 @@ async function recordLoginAuditBestEffort(c: Context<Env>, staffId: string): Pro
 adminAuth.get('/api/auth/line', async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
-  if (!c.env.LINE_LOGIN_CHANNEL_ID || !c.env.LINE_LOGIN_CHANNEL_SECRET) {
+  const channel = adminLoginChannel(c.env);
+  if (!channel.id || !channel.secret) {
     return c.json({ success: false, error: 'LINE Login is not configured' }, 500);
   }
 
@@ -158,7 +174,7 @@ adminAuth.get('/api/auth/line', async (c) => {
   const authorize = new URL('https://access.line.me/oauth2/v2.1/authorize');
   authorize.search = new URLSearchParams({
     response_type: 'code',
-    client_id: c.env.LINE_LOGIN_CHANNEL_ID,
+    client_id: channel.id,
     redirect_uri: callbackUrl(c),
     state,
     scope: 'openid profile',
@@ -188,6 +204,8 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     return c.redirect(adminLoginUrl(c, 'invalid_state', next));
   }
 
+  const channel = adminLoginChannel(c.env);
+
   try {
     const tokenResponse = await fetch('https://api.line.me/oauth2/v2.1/token', {
       method: 'POST',
@@ -196,8 +214,8 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         grant_type: 'authorization_code',
         code,
         redirect_uri: callbackUrl(c),
-        client_id: c.env.LINE_LOGIN_CHANNEL_ID,
-        client_secret: c.env.LINE_LOGIN_CHANNEL_SECRET,
+        client_id: channel.id,
+        client_secret: channel.secret,
         code_verifier: verifier,
       }),
     });
@@ -210,7 +228,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         id_token: tokens.id_token,
-        client_id: c.env.LINE_LOGIN_CHANNEL_ID,
+        client_id: channel.id,
         nonce,
       }),
     });
