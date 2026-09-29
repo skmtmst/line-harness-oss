@@ -16,6 +16,7 @@ import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import WebhookInteractions from './webhook-interactions'
 import GoogleSheetsPanel from './google-sheets-panel'
+import ApiTokensPanel from './api-tokens-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
@@ -123,6 +124,8 @@ const MERGED_TABS = [
   { key: 'interactions', label: 'やり取りの記録' },
   // #838 第2段: Sheets連携のOAuth戻り先もこのタブ（?tab=sheets&sheets=…）。
   { key: 'sheets', label: 'Google Sheets' },
+  // R434: 公開APIの鍵の発行・棚卸し・停止。口は前からあり、画面が無かった。
+  { key: 'api-tokens', label: 'API接続' },
   { key: 'notify', label: `見本 ${SOURCE_PRESETS.length + OUTGOING_SAMPLES.length}` },
 ]
 
@@ -1068,6 +1071,7 @@ function WebhooksPageHost() {
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'interactions' && <WebhookInteractions />}
       {tab === 'sheets' && <GoogleSheetsPanel />}
+      {tab === 'api-tokens' && <ApiTokensPanel />}
       {tab === 'notify' && <WebhookSamples />}
     </div>
   )
