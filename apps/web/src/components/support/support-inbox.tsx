@@ -112,6 +112,17 @@ function dateTime(iso: string): string {
  * page.tsx の既定エクスポートに PageProps を求めるため、引数を取れない。
  * 中身は SupportInbox に置き、page.tsx はそれを呼ぶだけにする。
  */
+/**
+ * D015: 一覧の取得失敗の文。回復したら消す目印にする。
+ * 送信・詳細の失敗文とは別物なので、成功時に消すのはこの文だけ。
+ */
+const INBOX_LIST_ERROR = 'お問い合わせ一覧を読み込めませんでした'
+
+/** D014: 取得の走らせようがないお問い合わせ（channel 欠落・想定外）。 */
+function isUnknownChannel(item: Pick<InboxItem, 'channel'>): boolean {
+  return (item.channel as string) !== 'line' && (item.channel as string) !== 'email'
+}
+
 export default function SupportInbox({ channel = 'email' }: { channel?: Channel }) {
   const sendKeysRef = useRef(new IdempotencyKeyStore())
   const [status, setStatus] = useState<'open' | ThreadStatus | 'all'>('open')
@@ -146,6 +157,8 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       if (isStale()) return true
       if (response.success) {
         setItems(response.data.items)
+        // D015: 回復したら一覧の失敗文を消す。送信・詳細の文は残す。
+        setError((previous) => (previous === INBOX_LIST_ERROR ? '' : previous))
         const current = selectedRef.current
         if (current) {
           const refreshed = response.data.items.find((item) => item.id === current.id)
@@ -156,7 +169,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       return false
     } catch {
       if (isStale()) return true
-      if (!quiet) setError('お問い合わせ一覧を読み込めませんでした')
+      if (!quiet) setError(INBOX_LIST_ERROR)
       return false
     } finally {
       if (!quiet && !isStale()) setLoading(false)
@@ -415,6 +428,22 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 </div>
               </div>
             </>
+          ) : isUnknownChannel(selected) ? (
+            /*
+             * D014: channel が欠落・想定外だと詳細の取得自体が走らない。
+             * 読み込み中のまま固めず、理由と取り直しを出す。
+             */
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+              <p className="text-sm font-bold text-ink">この会話を表示できません</p>
+              <p className="text-xs text-ink-secondary">お問い合わせの形式が読み取れませんでした。一覧を読み直してください。</p>
+              <button
+                type="button"
+                onClick={() => void loadInbox()}
+                className="text-sm font-bold text-action underline"
+              >
+                もう一度読み込む
+              </button>
+            </div>
           ) : <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">会話を読み込み中...</div>}
         </div>
       </div>
