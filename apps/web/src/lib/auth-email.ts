@@ -118,12 +118,8 @@ export const LEGAL_LINKS = {
   commerce: process.env.NEXT_PUBLIC_COMMERCE_LAW_URL || null,
 }
 
-/**
- * ログイン前に開けるお問い合わせの口。サービスサイトの /contact/ へつなぐ。
- * 新しい公開フォームは作らない（監査 m18e・2026-09-27 司令塔の決定）。
- * 管理画面の /hq/support はログインが要るので、ログイン前の導線には使わない。
- */
-export const CONTACT_URL = process.env.NEXT_PUBLIC_CONTACT_URL || 'https://nen-petfood.com/contact/'
+// ログイン前のお問い合わせ導線（CONTACT_URL）は 2026-09-29 の決定で取り止めた。
+// ログイン後の /hq/support だけを窓口にする。
 
 export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null
 
