@@ -124,7 +124,7 @@ export default function FriendListRow({
             「対応済み」の札と「●対応中」のマークが縦に並んで食い違って見えた。マークが無い時は何も出さない。
           */}
           <p className="flex min-w-0 items-center gap-2">
-            <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-micro font-bold ${status.className}`}>{status.label}</span>
+            <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-micro font-medium ${status.className}`}>{status.label}</span>
             {friend.supportMark ? (
               <span className="flex min-w-0 items-center gap-1 truncate text-micro font-semibold text-ink-secondary" title={`対応マーク：${friend.supportMark.name}`}>
                 <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark.color ?? 'var(--color-ink-disabled)' }} />
@@ -141,7 +141,7 @@ export default function FriendListRow({
             <span
               aria-hidden="true"
               data-operator-avatar={friend.operator ? 'assigned' : 'unassigned'}
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-nano font-extrabold ${friend.operator ? 'text-on-accent' : 'bg-avatar-bg text-ink-faint'}`}
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-nano font-medium ${friend.operator ? 'text-on-accent' : 'bg-avatar-bg text-ink-faint'}`}
               style={friend.operator ? { backgroundColor: avatarTone(friend.operator.name) } : undefined}
             >
               {friend.operator ? (friend.operator.name.charAt(0) || '－') : '－'}
@@ -317,7 +317,7 @@ export function FriendListCard({
         <div className="flex shrink-0 flex-col items-end gap-1">
           {/* statusView() の戻り値を className へ入れると静的に読めない。判定をここへ展開する。 */}
           <span
-            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-micro font-bold ${
+            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium ${
               friend.chatStatus === 'unread'
                 ? 'bg-status-danger-soft text-danger'
                 : friend.chatStatus === 'in_progress' || friend.chatStatus === 'on_hold'

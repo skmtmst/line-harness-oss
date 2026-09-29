@@ -30,7 +30,7 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(CSS).toMatch(/\.category\s*\{[^}]*height: 40px;/)
     expect(CSS).toMatch(/\.category\s*\{[^}]*border-radius: var\(--radius-control\);/)
     expect(CSS).toMatch(/\.category\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.category\s*\{[^}]*font-weight: 700;/)
+    expect(CSS).toMatch(/\.category\s*\{[^}]*font-weight: 500;/)
     expect(PAGE).toContain('className={`${styles.category}')
     // Tailwind直書きの帯へ戻さない。
     expect(PAGE).not.toContain('rounded-control px-3 py-2.5 text-left text-sm')
@@ -41,7 +41,7 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(CSS).toMatch(/\.action\s*\{[^}]*border-radius: var\(--radius-control\);/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*padding: 0 14px;/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 700;/)
+    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 600;/)
     expect(PAGE).toContain('<Button variant="primary" onClick={onPublish}')
     expect(PAGE).toContain('<Button onClick={onTestSend}')
     // 直書きの主要ボタンへ戻さない。

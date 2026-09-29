@@ -581,11 +581,11 @@
           "resolved": "22px"
         },
         {
-          "pencil": "値 fontWeight: 700",
+          "pencil": "値 fontWeight: 600（★V7 §2 3段化）",
           "class": "value",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "説明 fill: $ink-faint",
@@ -1051,11 +1051,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "Blot6 current label fontWeight: 700",
+          "pencil": "Blot6 current label fontWeight: 500（★V7 §2 3段化）",
           "class": "current",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         }
       ]
     },
@@ -1323,11 +1323,11 @@
           "resolved": "#087a3e"
         },
         {
-          "pencil": "J33xq selected label fontWeight: 700",
+          "pencil": "J33xq selected label fontWeight: 500（★V7 §2 3段化）",
           "class": "active",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "J33xq section height: 34",
@@ -1527,11 +1527,11 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "R098Z current fontWeight: 700",
+          "pencil": "R098Z current fontWeight: 500（★V7 §2 3段化）",
           "class": "current",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "R098Z separator fill: $ink-faint",
@@ -1620,11 +1620,11 @@
           "resolved": "#087a3e"
         },
         {
-          "pencil": "VPn1F fontWeight: 700",
+          "pencil": "VPn1F fontWeight: 500（★V7 §2 3段化）",
           "class": "selected",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "z9TQJ height: 50",
@@ -1886,11 +1886,11 @@
           "resolved": "16px"
         },
         {
-          "pencil": "t0jk8p title fontWeight: 700",
+          "pencil": "t0jk8p title fontWeight: 600（★V7 §2 3段化）",
           "class": "title",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "t0jk8p action fill: $action（#669: 緑は主操作専用。見出しリンクはaction色へ）",
@@ -1990,11 +1990,11 @@
           "resolved": "12px"
         },
         {
-          "pencil": "xRvDB fontWeight: 700",
+          "pencil": "xRvDB fontWeight: 500（★V7 §2 3段化）",
           "class": "badge",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "dashboard compact padding: [4,8]（★V7）",
@@ -2534,11 +2534,11 @@
           "resolved": "#e8f8ee"
         },
         {
-          "pencil": "Gfsb4 selected fontWeight: 700",
+          "pencil": "Gfsb4 selected fontWeight: 500（★V7 §2 3段化）",
           "class": "selected",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "Gfsb4 check width: 18",
@@ -2792,11 +2792,11 @@
           "resolved": "16px"
         },
         {
-          "pencil": "J6x4Q title fontWeight: 700",
+          "pencil": "J6x4Q title fontWeight: 600（★V7 §2 3段化）",
           "class": "title",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "J6x4Q description fill: $ink-faint",
@@ -2932,11 +2932,11 @@
           "resolved": "14px"
         },
         {
-          "pencil": "VJKAT title fontWeight: 700",
+          "pencil": "VJKAT title fontWeight: 600（★V7 §2 3段化）",
           "class": "title",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "VJKAT close width: 18 icon in 32 target",
@@ -3423,11 +3423,11 @@
           "resolved": "16px"
         },
         {
-          "pencil": "z6TmF title fontWeight: 700",
+          "pencil": "z6TmF title fontWeight: 600（★V7 §2 3段化）",
           "class": "title",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "z6TmF tabs gap: 6",

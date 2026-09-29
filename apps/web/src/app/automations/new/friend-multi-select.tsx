@@ -82,7 +82,7 @@ export function FriendMultiSelect({
 
   return (
     <div>
-      <p id="au-friends-label" className="text-xs font-bold text-ink">
+      <p id="au-friends-label" className="text-xs font-medium text-ink">
         対象の友だち（{ids.length}人）<RequiredBadge />
       </p>
       {ids.length > 0 ? (
@@ -90,7 +90,7 @@ export function FriendMultiSelect({
           {ids.map((id) => (
             <li
               key={id}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary"
             >
               <span className="max-w-40 truncate" title={labelOf(id)}>{labelOf(id)}</span>
               <button
@@ -130,7 +130,7 @@ export function FriendMultiSelect({
                     <li key={option.id} className="flex items-center justify-between gap-2 border-t border-hairline px-3 py-2 first:border-t-0">
                       <span className="min-w-0 truncate text-sm text-ink" title={option.name}>{option.name}</span>
                       {selected ? (
-                        <span className="shrink-0 text-xs font-bold text-accent-deep">選択中 ✓</span>
+                        <span className="shrink-0 text-xs font-medium text-accent-deep">選択中 ✓</span>
                       ) : (
                         <Button variant="secondary" disabled={full} onClick={() => add(option.id, option.name)}>
                           追加

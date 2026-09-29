@@ -138,7 +138,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken px-4">
         <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-sm">
-          <p role="alert" className="text-label font-bold text-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
+          <p role="alert" className="text-label font-medium text-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
           <div className="mt-4 flex justify-center gap-2">
             <Button variant="primary" onClick={() => { setChecked(false); setLoadError(''); void load() }}>もう一度試す</Button>
             <Button onClick={() => void logoutAndGoToLogin('/ops/login')}>ログインへ戻る</Button>
@@ -167,7 +167,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
               type="button"
               aria-expanded={navOpen}
               onClick={() => setNavOpen(true)}
-              className="flex min-h-11 items-center gap-2 rounded-md px-2 text-label font-bold text-ink hover:bg-canvas-sunken"
+              className="flex min-h-11 items-center gap-2 rounded-md px-2 text-label font-medium text-ink hover:bg-canvas-sunken"
             >
               <Menu aria-hidden="true" className="h-5 w-5" />
               メニュー
@@ -203,7 +203,7 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
       <div className="flex items-center gap-3 px-4 py-4">
         <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent-deep text-lg font-bold text-on-accent">m</span>
         <div className="min-w-0">
-          <p className="truncate text-label font-bold text-ink">musubo</p>
+          <p className="truncate text-label font-medium text-ink">musubo</p>
           <p className="truncate text-nano text-ink-faint">運営コンソール</p>
         </div>
         <button
@@ -227,7 +227,7 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
                 <Link
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex h-10 items-center gap-3 rounded-md px-3 text-label ${active ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
+                  className={`flex h-10 items-center gap-3 rounded-md px-3 text-label ${active ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
                 >
                   <Icon aria-hidden="true" className={`h-4.5 w-4.5 ${active ? 'text-accent-deep' : 'text-ink-secondary'}`} />
                   {item.label}
@@ -285,10 +285,10 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
           style={{ position: 'static' }}
         >
           <div className="px-3.5 pb-2.5 pt-1.5">
-            <p className="text-label font-bold text-ink">{me.name}</p>
+            <p className="text-label font-medium text-ink">{me.name}</p>
             {me.email ? <p className="text-nano text-ink-faint">{me.email}</p> : null}
             <p className="mt-1 flex items-center gap-1.5">
-              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-nano font-bold text-accent-deep">運営マスター</span>
+              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-nano font-medium text-accent-deep">運営マスター</span>
               <span className="text-nano text-ink-faint">{me.totpEnabled ? '2要素認証 設定済み' : '2要素認証 未設定'}</span>
             </p>
           </div>
@@ -301,7 +301,7 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
             type="button"
             role="menuitem"
             onClick={() => void logoutAndGoToLogin('/ops/login')}
-            className="flex h-10 w-full items-center gap-2.5 px-3.5 text-label font-bold text-danger hover:bg-status-danger-soft"
+            className="flex h-10 w-full items-center gap-2.5 px-3.5 text-label font-medium text-danger hover:bg-status-danger-soft"
           >
             <LogOut aria-hidden="true" className="h-4 w-4" />
             ログアウト
@@ -317,10 +317,10 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2.5 rounded-md px-1 py-1 text-left hover:bg-canvas-sunken"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-label font-bold text-on-accent">{initial}</span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-label font-medium text-on-accent">{initial}</span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-label font-bold text-ink">{me.name}</span>
-          <span className="mt-0.5 inline-block rounded-full bg-accent-soft px-1.5 text-nano font-bold text-accent-deep">運営マスター</span>
+          <span className="block truncate text-label font-medium text-ink">{me.name}</span>
+          <span className="mt-0.5 inline-block rounded-full bg-accent-soft px-1.5 text-nano font-medium text-accent-deep">運営マスター</span>
         </span>
         <ChevronsUpDown aria-hidden="true" className="h-4 w-4 text-ink-faint" />
       </button>
@@ -333,7 +333,7 @@ function MenuLink({ href, icon: Icon, highlight, children }: { href: string; ico
     <Link
       href={href}
       role="menuitem"
-      className={`flex h-10 items-center gap-2.5 px-3.5 text-label ${highlight ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
+      className={`flex h-10 items-center gap-2.5 px-3.5 text-label ${highlight ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
     >
       <Icon aria-hidden="true" className={`h-4 w-4 ${highlight ? 'text-accent-deep' : 'text-ink-secondary'}`} />
       {children}

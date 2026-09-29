@@ -35,7 +35,7 @@
 .title {
   margin: 0;
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .linkButton {
@@ -80,7 +80,7 @@
 .count {
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .selected .count {
@@ -147,7 +147,7 @@
 }
 
 .unread .itemTitle {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .meta {

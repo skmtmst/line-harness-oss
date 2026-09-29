@@ -135,8 +135,8 @@ function SettlementCloseDialog({
                 </p>
               ) : null}
             </div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">払う相手</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.affiliates.length.toLocaleString('ja-JP')}人</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">払う相手</dt><dd className="text-ink mt-1 text-lg font-medium">{preview.affiliates.length.toLocaleString('ja-JP')}人</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 text-lg font-medium">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
           </dl>
           <div className="border-hairline overflow-hidden rounded-control border">
             <table className="w-full text-sm">

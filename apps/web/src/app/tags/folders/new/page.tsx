@@ -269,7 +269,7 @@ function FolderEditor() {
               <p className="text-nano text-ink-faint font-semibold">一覧での表示</p>
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
-                <span className="text-label text-ink font-bold">{name.trim() || 'フォルダ名'}</span>
+                <span className="text-label text-ink font-medium">{name.trim() || 'フォルダ名'}</span>
               </div>
             </div>
 

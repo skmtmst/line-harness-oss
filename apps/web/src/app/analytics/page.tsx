@@ -2549,7 +2549,7 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
       const previous = index > 0 ? stages[index - 1].value : null
       const rate = previous && stage.value !== null ? stage.value / previous * 100 : null
       // 監査6 #674: 段ごとの数は MetricValue で単位小・3状態を揃える
-      return <div key={stage.label} className="border-r border-hairline px-4 py-3 last:border-r-0"><p className="text-xs text-ink-faint">{stage.label}</p><p className="mt-1 text-lg font-bold text-ink"><MetricValue value={stage.value} unit={index === 0 ? '回' : index === 3 ? '件' : '人'} /></p>{index > 0 && <p className="text-xs text-ink-secondary">前段の {rate === null ? '—' : `${rate.toFixed(1)}%`}</p>}</div>
+      return <div key={stage.label} className="border-r border-hairline px-4 py-3 last:border-r-0"><p className="text-xs text-ink-faint">{stage.label}</p><p className="mt-1 text-lg font-semibold text-ink"><MetricValue value={stage.value} unit={index === 0 ? '回' : index === 3 ? '件' : '人'} /></p>{index > 0 && <p className="text-xs text-ink-secondary">前段の {rate === null ? '—' : `${rate.toFixed(1)}%`}</p>}</div>
     })}</div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>経路</Th><Th align="right">友だち</Th><Th align="right">反応</Th><Th align="right">成果</Th><Th align="right">売上</Th><Th align="right">かかった費用</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
@@ -2640,7 +2640,7 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>気づいたこと</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
         const observation = usageObservation(item)
-        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-medium">{item.label}</p><p className="text-ink-faint mt-1 truncate text-xs">最終利用 <DateTimeMetricCell metric={item.lastUsedAt} /></p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><p className={`truncate ${observation.tone === 'warning' ? 'text-warning' : observation.tone === 'unknown' ? 'text-ink-faint' : 'text-success'}`} title={observation.text}>{observation.text}</p><p className="text-ink-faint mt-1 truncate text-xs" title={item.brokenReferences.reason ?? undefined}>{referenceHealthText(item.brokenReferences)}</p></td><td className="px-3 py-2"><div className="flex justify-end gap-2 whitespace-nowrap"><Button href={item.href} variant="secondary">中身を見る</Button>{canTidyUsage(item) && <Button href={item.href} variant="secondary" className="border-warning text-warning">片づける</Button>}</div></td></tr>
+        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-semibold">{item.label}</p><p className="text-ink-faint mt-1 truncate text-xs">最終利用 <DateTimeMetricCell metric={item.lastUsedAt} /></p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><p className={`truncate ${observation.tone === 'warning' ? 'text-warning' : observation.tone === 'unknown' ? 'text-ink-faint' : 'text-success'}`} title={observation.text}>{observation.text}</p><p className="text-ink-faint mt-1 truncate text-xs" title={item.brokenReferences.reason ?? undefined}>{referenceHealthText(item.brokenReferences)}</p></td><td className="px-3 py-2"><div className="flex justify-end gap-2 whitespace-nowrap"><Button href={item.href} variant="secondary">中身を見る</Button>{canTidyUsage(item) && <Button href={item.href} variant="secondary" className="border-warning text-warning">片づける</Button>}</div></td></tr>
       })}</tbody>
     </table></div>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -3019,7 +3019,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
         <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? (error ? '読み込めませんでした' : '分析を選んでください')} loading={loading} />
       </div>
       <Notice tone="info">
-        <p className="font-medium">条件の定義と集計結果を分けて保存しています</p>
+        <p className="font-semibold">条件の定義と集計結果を分けて保存しています</p>
         <p className="mt-1 text-xs">
           あとから条件が変わっても、保存時点の結果は書き換わりません。定期レポートはこの下の一覧で止めたり変えたりできます。
         </p>

@@ -236,7 +236,7 @@ function HealthRow({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary: (
             // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
             <img src={row.pet.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
           ) : (
-            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
+            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep">{initial}</span>
           )}
           <span className="min-w-0">
             <span className="block truncate text-label font-semibold text-ink" title={row.pet.callName}>{row.pet.callName || row.pet.name || '（名前なし）'}</span>

@@ -334,7 +334,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span>{row.count !== null ? <span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span> : null}</button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span>{row.count !== null ? <span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span> : null}</button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -1081,15 +1081,15 @@ export default function TagsPageV4({
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
                             {/* 名前は黒文字の太字。押すと編集へ行く（編集ボタンは置かない）。 */}
-                            <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-bold text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
+                            <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-medium text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
                             {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
-                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-medium text-ink-faint">保管済み</span>}
                             {/*
                               IDEA-04: 整理候補の「重複名」を行ごとに示す。
                               KPIの「整理候補」だけだと、どのタグが重複候補か分からない。
                               理由はサーバーの cleanupReasons だけを見る（画面で再判定しない）。
                             */}
-                            {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
+                            {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-medium text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                           </div>
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
@@ -1181,10 +1181,10 @@ export default function TagsPageV4({
                             <div className="min-w-0 flex-1">
                               <div className="flex min-w-0 items-center gap-2">
                                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
-                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-bold text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
-                                {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-medium text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
+                                {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-medium text-ink-faint">保管済み</span>}
                                 {/* IDEA-04: 重複名の整理候補はカード表示でも行ごとに示す。 */}
-                                {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
+                                {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-medium text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                               </div>
                               <p className="mt-0.5 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録・{sourceLabel(tag)}</p>
                               {chips.length > 0 ? (

@@ -184,7 +184,7 @@ export default function OpsMembersPage() {
             <tbody>
               {members.map((m) => (
                 <Tr key={m.staffId}>
-                  <Td><span className="block truncate text-label font-bold text-ink" title={m.name}>{m.name}{m.staffId === me ? '（あなた）' : ''}</span></Td>
+                  <Td><span className="block truncate text-label font-medium text-ink" title={m.name}>{m.name}{m.staffId === me ? '（あなた）' : ''}</span></Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={m.email ?? ''}>{m.email ?? '—'}</span></Td>
                   <Td>{m.totpEnabled ? <Chip tone="ok">設定済み</Chip> : <Chip tone="danger">未設定</Chip>}</Td>
                   <Td>{memberStateChip(m)}</Td>

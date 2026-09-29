@@ -486,7 +486,7 @@ function FriendAddRunsInner() {
                   // すべて並べると狭い幅で右端が切れる。
                   <div key={item.id} className="min-w-0 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-medium text-status-success-deep" aria-hidden="true">
                         {displayName.slice(0, 1)}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -504,7 +504,7 @@ function FriendAddRunsInner() {
                     <div className="mt-1.5 flex items-center justify-between gap-3 pl-12">
                       <time className="min-w-0 text-xs text-ink-secondary" dateTime={item.receivedAt}>{formatJstDateTime(item.receivedAt)}</time>
                       <Link
-                        className="shrink-0 text-xs font-bold text-action hover:underline"
+                        className="shrink-0 text-xs font-medium text-action hover:underline"
                         href={detailHref(item.id)}
                       >
                         詳細
@@ -558,10 +558,10 @@ function FriendAddRunsInner() {
             <h2 className="font-bold">稼働状況</h2>
             <p className="mt-1 text-xs text-ink-faint">現在取得できる初回案内の状態です。</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{ruleStatusLabel}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">{suppressionLabel}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{summary === null ? '—' : summary.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : 'まだありません'}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-medium">{ruleStatusLabel}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-medium">{suppressionLabel}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-medium">{summary === null ? '—' : summary.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : 'まだありません'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-medium">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
             </dl>
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
@@ -582,7 +582,7 @@ function FriendAddRunsInner() {
             <h2 className="font-bold">担当者シナリオ開始</h2>
             <p className="mt-1 text-xs text-ink-faint">{summary?.staffHandoffs.reason ?? '担当者への引き継ぎ結果を集計します。'}</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>実行結果</dt><dd className="font-bold">{summary?.staffHandoffs.value ?? '未取得'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>実行結果</dt><dd className="font-medium">{summary?.staffHandoffs.value ?? '未取得'}</dd></div>
             </dl>
           </section>
         </aside>

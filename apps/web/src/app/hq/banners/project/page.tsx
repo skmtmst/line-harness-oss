@@ -482,7 +482,7 @@ function ProjectInner() {
             <h2 className="text-body font-bold text-ink">このプロジェクトの画像</h2>
             <span className="text-caption text-ink-faint">{images.length}枚</span>
             {running ? (
-              <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info" role="status">
+              <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info" role="status">
                 <LoaderCircle aria-hidden="true" className="h-3 w-3 animate-spin" />
                 {progressBadgeText(running)}
               </span>

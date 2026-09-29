@@ -1188,7 +1188,7 @@ function MediaLibraryInner() {
                           退避済み
                         </span>
                       ) : null}
-                      <span className="text-ink min-w-0 flex-1 truncate text-caption font-bold" title={item.filename}>
+                      <span className="text-ink min-w-0 flex-1 truncate text-caption font-medium" title={item.filename}>
                         {item.filename}
                       </span>
                     </span>
@@ -1196,7 +1196,7 @@ function MediaLibraryInner() {
                       {formatMediaDetails(item)}
                     </p>
                     <p
-                      className={`text-nano font-bold tabular-nums ${
+                      className={`text-nano font-medium tabular-nums ${
                         item.usageCount === undefined
                           ? 'text-ink-faint'
                           : item.usageCount === 0
@@ -1347,7 +1347,7 @@ function MediaLibraryInner() {
 
             {impact.references.length > 0 ? (
               <div>
-                <p className="text-ink text-xs font-bold">使われている場所</p>
+                <p className="text-ink text-xs font-medium">使われている場所</p>
                 <ul className="mt-1.5 space-y-1.5">
                   {impact.references.map((ref: MediaDeleteImpactReference, index: number) => (
                     <li
@@ -1453,7 +1453,7 @@ function MediaLibraryInner() {
         }
       >
         <label className="block space-y-1.5">
-          <span className="text-ink text-xs font-bold">理由<RequiredBadge /><span className="font-normal text-ink-faint">（あとから履歴で確認できます）</span></span>
+          <span className="text-ink text-xs font-medium">理由<RequiredBadge /><span className="font-normal text-ink-faint">（あとから履歴で確認できます）</span></span>
           <input
             type="text"
             autoFocus

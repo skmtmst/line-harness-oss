@@ -901,7 +901,7 @@ function StepMark({
   return (
     <li className="flex items-center gap-2">
       <span
-        className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-bold ${
+        className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-medium ${
           state === 'done'
             ? 'bg-accent-deep text-on-accent'
             : state === 'current'

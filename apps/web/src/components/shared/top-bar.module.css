@@ -29,7 +29,7 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-title);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -53,7 +53,7 @@
   /* 設計 `LoVfp` `B8gqJ` は $ink（黒）。青いリンク色にしない。 */
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   padding: 0 12px;
   text-decoration: none;
@@ -136,7 +136,7 @@
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
   font-size: var(--text-nano);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* `cBSCb/q6d8jk`。$size-label 13 / 700。 */
@@ -145,7 +145,7 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -198,7 +198,7 @@
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
   padding: 0 10px;
 }
 

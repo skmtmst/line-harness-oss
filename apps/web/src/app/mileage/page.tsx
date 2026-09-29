@@ -1176,7 +1176,7 @@ function MileagePageInner() {
                         <p className="mt-0.5 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
                       </div>
                       <p className="shrink-0 text-right">
-                        <span className="block font-bold tabular-nums text-ink">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
+                        <span className="block font-semibold tabular-nums text-ink">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
                         {member.pending > 0 && <span className="block text-micro text-status-warn-deep">保留 {formatMileageNumber(member.pending)}</span>}
                       </p>
                     </div>

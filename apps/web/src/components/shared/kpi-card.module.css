@@ -120,7 +120,7 @@
 .value {
   color: var(--color-ink);
   font-size: var(--text-metric);
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   /*
    * 数の行の高さは1行ぶんにそろえる。題の行（.head 20px）と合わせて、

@@ -118,7 +118,7 @@ export default function FriendListTable({
             未取得の件数は0件に見せない（絞り込みの行の件数を消した後は、
             この見出しがその役目を持つ）。取れるまでは「—」。
           */}
-          友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
+          友だち一覧 <span className="ml-1 text-xs font-medium text-ink-faint">{status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}

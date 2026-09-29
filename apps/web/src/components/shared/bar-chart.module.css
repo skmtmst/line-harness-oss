@@ -151,7 +151,7 @@
 }
 
 .tooltipTitle {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* 横軸の日付は1つおき。短い語なので折らない。 */
@@ -194,7 +194,7 @@
 .emptyTitle {
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .emptyDetail {

@@ -440,10 +440,10 @@ function MigrateFriendField() {
         {preview ? (
           <div className="mt-5">
             <div className="grid gap-3 sm:grid-cols-4">
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.total}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.convertible}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-bold text-warning">{preview.summary.review}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-bold text-danger">{preview.summary.invalid}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-semibold text-ink">{preview.summary.total}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-semibold text-ink">{preview.summary.convertible}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-semibold text-warning">{preview.summary.review}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-semibold text-danger">{preview.summary.invalid}人</p></div>
             </div>
             {preview.rows.length ? (
               <DataTable className="mt-4">
@@ -471,9 +471,9 @@ function MigrateFriendField() {
           <h2 className="text-base font-bold text-ink">移行の結果</h2>
           <p className="mt-2 text-sm font-semibold text-ink">{RUN_STATUS_LABELS[run.status]}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-bold text-accent-deep">{run.summary.succeeded}人</p></div>
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-bold text-danger">{run.summary.failed}人</p></div>
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-bold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-semibold text-accent-deep">{run.summary.succeeded}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-semibold text-danger">{run.summary.failed}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-semibold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
           </div>
           {run.rows.filter((row) => row.status === 'failed').length ? (
             <DataTable className="mt-4">

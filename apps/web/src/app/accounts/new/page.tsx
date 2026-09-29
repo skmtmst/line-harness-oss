@@ -256,7 +256,7 @@ export default function NewLineAccountPage() {
             const complete = currentStep > step.number || Boolean(createdId)
             return <li key={step.number} aria-current={active ? 'step' : undefined} className={`rounded-control border px-3 py-2 ${active ? 'border-action bg-action-soft' : 'border-hairline'}`}>
               <span className="text-ink-faint block text-xs">手順 {step.number} / 5</span>
-              <span className="text-ink mt-0.5 block text-xs font-bold">{step.label}{complete ? '（完了）' : ''}</span>
+              <span className="text-ink mt-0.5 block text-xs font-medium">{step.label}{complete ? '（完了）' : ''}</span>
             </li>
           })}
         </ol>
@@ -274,7 +274,7 @@ export default function NewLineAccountPage() {
               const complete = currentStep > step.number || Boolean(createdId)
               return <li key={step.number} aria-current={active ? 'step' : undefined} className={`rounded-control border px-3 py-2 ${active ? 'border-action bg-action-soft' : 'border-hairline'}`}>
                 <span className="text-ink-faint block text-xs">手順 {step.number} / 5</span>
-                <span className="text-ink mt-0.5 block text-xs font-bold">{step.label}{complete ? '（完了）' : ''}</span>
+                <span className="text-ink mt-0.5 block text-xs font-medium">{step.label}{complete ? '（完了）' : ''}</span>
               </li>
             })}
           </ol>

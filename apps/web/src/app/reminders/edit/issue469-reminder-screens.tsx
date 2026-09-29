@@ -388,5 +388,5 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between gap-3 py-2"><dt className="text-ink-faint">{label}</dt><dd className="text-ink font-bold">{value}</dd></div>
+  return <div className="flex items-center justify-between gap-3 py-2"><dt className="text-ink-faint">{label}</dt><dd className="text-ink font-medium">{value}</dd></div>
 }

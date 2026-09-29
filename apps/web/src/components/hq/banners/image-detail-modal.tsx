@@ -183,7 +183,7 @@ export default function ImageDetailModal({
                             onCheckedChange={() => toggle(account.id)}
                             aria-label={`${account.displayName ?? account.name}へ配布`}
                           />
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-mini bg-accent-soft text-nano font-bold text-accent-deep">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-mini bg-accent-soft text-nano font-medium text-accent-deep">
                             {account.pictureUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={account.pictureUrl} alt="" className="h-full w-full object-cover" />
@@ -195,7 +195,7 @@ export default function ImageDetailModal({
                           <span className="text-micro text-ink-faint">{account.basicId ?? account.channelId}</span>
                           <span className="flex-1" />
                           {already ? (
-                            <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">
+                            <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">
                               <Store aria-hidden="true" className="h-3 w-3" />
                               渡し済み
                             </span>

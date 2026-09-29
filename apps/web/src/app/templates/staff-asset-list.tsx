@@ -43,7 +43,7 @@ export default function StaffAssetList({ kind }: { kind: BroadcastAssetKind }) {
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (
         <article key={item.id} className="bg-canvas rounded-card border-hairline border p-5">
-          <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-1 text-xs font-bold">{meta.title}</span>
+          <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-1 text-xs font-medium">{meta.title}</span>
           <h3 className="text-ink mt-3 truncate font-bold">{item.name}</h3>
           <p className="text-ink-faint mt-1 text-xs">更新 {new Date(item.updatedAt).toLocaleString('ja-JP')}</p>
           <div className="mt-4">

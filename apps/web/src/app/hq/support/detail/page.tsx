@@ -143,8 +143,8 @@ export default function HqSupportDetailPage() {
 
   const statusChip = (status: HqSupportRequest['status']) => (
     <span className={status === 'open'
-      ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-      : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'}>
+      ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+      : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'}>
       {SUPPORT_STATUS_LABELS[status]}
     </span>
   )
@@ -185,7 +185,7 @@ export default function HqSupportDetailPage() {
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-label font-bold text-ink-secondary">{detail.ticketLabel}</span>
+                <span className="text-label font-medium text-ink-secondary">{detail.ticketLabel}</span>
                 <h2 className="text-body font-bold text-ink">{detail.subject}</h2>
                 {statusChip(detail.status)}
                 <span className="text-micro text-ink-faint">{shortDateTime(detail.createdAt)} に送信・{detail.kindLabel}</span>
@@ -207,7 +207,7 @@ export default function HqSupportDetailPage() {
 
               <div className="flex flex-col gap-1.5 border-t border-hairline pt-4">
                 <div className="flex items-center gap-2">
-                  <label htmlFor={`${uid}-body`} className="text-label font-bold text-ink">続きを送る</label>
+                  <label htmlFor={`${uid}-body`} className="text-label font-medium text-ink">続きを送る</label>
                   <span className="text-micro text-ink-faint">運営の返信への返事や、追加で分かったこと</span>
                 </div>
                 <TextArea

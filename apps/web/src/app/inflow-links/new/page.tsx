@@ -277,7 +277,7 @@ export default function NewInflowLinkPage() {
         {previewUrl ? (
           <div className="mt-3">
             {/* #975 U065: 保存前は「未発行の見本」と明記する。 */}
-            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-bold text-ink-secondary">
+            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-medium text-ink-secondary">
               保存前の見本 — まだ発行されていません
             </p>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
@@ -434,7 +434,7 @@ export default function NewInflowLinkPage() {
 function FlowStep({ step, title, description }: { step: string; title: string; description: string }) {
   return (
     <li className="flex gap-2">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{step}</span>
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-deep text-xs font-medium text-on-accent">{step}</span>
       <span><strong className="block text-ink-secondary">{title}</strong>{description}</span>
     </li>
   )

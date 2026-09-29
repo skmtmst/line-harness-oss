@@ -140,9 +140,9 @@ export function AffiliateArchiveDialog({
               紹介者で絞ったもの、リンクはこの紹介者の内訳（リンク一覧）を開く。
             */}
             <dl className="mt-2 divide-y divide-danger/20 text-sm">
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-bold">{impact.activeLinks.toLocaleString('ja-JP')}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=affiliates&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-bold">{yen(impact.unsettledReward)}</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions?tab=payment">ここを開く</a></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-bold">{impact.pendingConversions.toLocaleString('ja-JP')}件</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{impact.activeLinks.toLocaleString('ja-JP')}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=affiliates&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-semibold">{yen(impact.unsettledReward)}</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions?tab=payment">ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{impact.pendingConversions.toLocaleString('ja-JP')}件</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
             </dl>
             <p className="text-danger mt-2 text-xs leading-5">
               紹介リンクは開けなくなります。過去の成果・報酬・支払いの記録は消えません。
@@ -324,10 +324,10 @@ export function AffiliatePaymentConfirmDialog({
       ) : preview ? (
         <div className="space-y-3">
           <dl className="grid grid-cols-2 gap-3 rounded-control bg-canvas-sunken p-4 sm:grid-cols-4">
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">確定する額</dt><dd className="text-ink mt-1 text-lg font-bold">{yen(preview.amount)}</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果の件数</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 text-lg font-bold">{dateLabel(periodTo ?? preview.closeDate)}</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">支払日</dt><dd className="mt-1 text-lg font-bold text-success">{dateLabel(preview.paymentDate)}</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">確定する額</dt><dd className="text-ink mt-1 text-lg font-medium">{yen(preview.amount)}</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果の件数</dt><dd className="text-ink mt-1 text-lg font-medium">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 text-lg font-medium">{dateLabel(periodTo ?? preview.closeDate)}</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">支払日</dt><dd className="mt-1 text-lg font-medium text-success">{dateLabel(preview.paymentDate)}</dd></div>
           </dl>
 
           <div className="border-hairline overflow-hidden rounded-control border">

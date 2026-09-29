@@ -65,7 +65,7 @@
 /* 件数は文字の後ろに小さく。選んだ札では白を少し透かせる。 */
 .v6-filter-chip__count {
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--color-ink-faint);
 }

@@ -25,7 +25,7 @@
 .title {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 /* --- つながる先 ------------------------------------------------------- */
@@ -43,7 +43,7 @@
   gap: 6px; /* gap: 6 */
   color: var(--color-status-info); /* fill: $status-info */
   font-size: var(--text-caption); /* fontSize: $size-caption */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .linkName:hover {
@@ -102,7 +102,7 @@
 .careHead {
   color: var(--color-status-warn-deep);
   font-size: var(--text-caption); /* fontSize: $size-caption */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .careNote {

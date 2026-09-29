@@ -26,7 +26,7 @@
 .metric p {
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .metric strong {
@@ -120,7 +120,7 @@
 .fact dd {
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
   text-align: right;
 }
 
@@ -150,7 +150,7 @@
   border-radius: var(--radius-control);
   background: var(--color-success);
   color: white;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
 }
 

@@ -57,7 +57,7 @@
 .panelHead h2 {
   color: var(--color-ink);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .panelHead p,
@@ -98,7 +98,7 @@
   gap: 12px;
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .reached {
@@ -128,7 +128,7 @@
 .summaryList dd {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .preview {

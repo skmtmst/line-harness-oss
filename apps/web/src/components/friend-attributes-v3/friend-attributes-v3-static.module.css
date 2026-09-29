@@ -23,7 +23,7 @@
 
 .tabs { display: flex; height: 32px; align-items: center; gap: 7px; margin-top: 12px; }
 .tabs span { display: inline-flex; height: 27px; align-items: center; border-radius: 999px; background: #eef0f2; padding: 0 11px; color: #646c74; font-size: 12px; }
-.tabs .tabActive { background: var(--v3-accent-soft); color: #079441; font-weight: 700; }
+.tabs .tabActive { background: var(--v3-accent-soft); color: #079441; font-weight: 500; }
 
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 13px; }
 .kpis article { display: flex; height: 108px; flex-direction: column; border: 1px solid var(--v3-border); border-radius: 13px; background: #fff; padding: 16px 14px 13px; box-shadow: 1px 2px 1px rgb(25 32 38 / 10%); }
@@ -39,7 +39,7 @@
 .folderTitle span { color: #7d858c; font-size: 11px; }
 .folderList { display: flex; flex-direction: column; gap: 2px; }
 .folderList > div { display: grid; height: 40px; grid-template-columns: 12px 1fr 34px; align-items: center; border-radius: 8px; padding: 0 8px; }
-.folderActive { background: var(--v3-accent-soft); color: #079441; font-weight: 700; }
+.folderActive { background: var(--v3-accent-soft); color: #079441; font-weight: 600; }
 .folderList b { display: grid; min-width: 28px; height: 28px; place-items: center; justify-self: end; border-radius: 999px; background: #f0f1f3; color: #6e757c; font-size: 11px; }
 .folderActive b { background: #fff; color: #08a548; }
 .dot { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; }
@@ -58,7 +58,7 @@
 .quickFilters { display: flex; height: 43px; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; }
 .quickFilters span { color: #757d84; font-size: 11px; }
 .quickFilters b, .quickFilters i { display: inline-flex; height: 27px; align-items: center; border: 1px solid #d9dde2; border-radius: 999px; padding: 0 11px; background: #fff; color: #687078; font-size: 11px; font-style: normal; font-weight: 500; }
-.quickFilters b { border-color: var(--v3-accent); color: #079441; font-weight: 700; }
+.quickFilters b { border-color: var(--v3-accent); color: #079441; font-weight: 500; }
 
 .table { min-width: 0; border-top: 1px solid #e3e5e8; border-bottom: 1px solid #e3e5e8; background: #fff; box-shadow: 1px 2px 1px rgb(25 32 38 / 7%); }
 .tableGrid { display: grid; grid-template-columns: 26px minmax(130px, 1.45fr) minmax(78px, .72fr) 68px minmax(90px, .8fr) minmax(130px, 1.2fr) minmax(85px, .75fr) 96px 58px 78px; align-items: center; }

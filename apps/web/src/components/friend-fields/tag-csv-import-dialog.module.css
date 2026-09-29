@@ -74,7 +74,7 @@
 .title {
   margin: 0;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -124,7 +124,7 @@
   padding: 7px 12px;
   color: var(--color-ink);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .fileField:focus-within .fileButton {
@@ -206,7 +206,7 @@
 
 .summaryValue {
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -240,7 +240,7 @@
 .warnTitle {
   margin: 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.6;
 }
 
@@ -280,7 +280,7 @@
   z-index: 1;
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .table th,
@@ -308,7 +308,7 @@
   border-radius: 999px;
   padding: 3px 9px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -348,7 +348,7 @@
 .resultTitle {
   margin: 0;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 

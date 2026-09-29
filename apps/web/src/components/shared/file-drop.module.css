@@ -59,21 +59,21 @@
   margin: 0;
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .activeTitle {
   margin: 0;
   color: var(--color-accent-deep); /* fill: $accent-deep */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .rejectTitle {
   margin: 0;
   color: var(--color-status-danger); /* fill: $status-danger */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .zoneHint {

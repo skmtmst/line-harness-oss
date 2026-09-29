@@ -1436,7 +1436,7 @@ function BookingDetailPanel({
           <aside className="space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">お客様とペット</h3>
-            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-bold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
+            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-semibold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
             <DetailRow label="ペット">{detail?.customer.petName ?? '登録なし'}</DetailRow>
             <DetailRow label="連絡先">{detail?.customer.phone ?? '登録なし'}</DetailRow>
             {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}

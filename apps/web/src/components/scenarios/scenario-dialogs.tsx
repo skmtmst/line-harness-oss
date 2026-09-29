@@ -557,7 +557,7 @@ export function OnCompleteDialog({
 
       {draftMode === 'move' && (
         <div className="mt-4">
-          <label className="text-ink text-sm font-medium" htmlFor="on-complete-move-target">
+          <label className="text-ink text-sm font-semibold" htmlFor="on-complete-move-target">
             移動先のシナリオ
           </label>
           {/*
@@ -932,12 +932,12 @@ export function TestSendDialog({
           {/* #1015 CHK-01 残存対応: 2列の固定比は狭い幅で本文が潰れるので、lg未満は1列に畳む。 */}
           <div className="mt-5 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
             <section><h2 className="text-ink text-xl font-bold">選択した1名へ実際に送信</h2><p className="text-ink-secondary mt-1 text-sm">選んだ友だちのLINEへ、実際のメッセージが届きます。操作者専用の宛先ではありません。</p>
-              <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-bold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">LINEアカウント</dt><dd className="font-medium">{accountName ?? '取得できていません'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-medium">{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">区分</dt><dd className="font-medium">{recipientLabel}</dd></div></dl></div>
+              <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-semibold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">LINEアカウント</dt><dd className="font-semibold">{accountName ?? '取得できていません'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-semibold">{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">区分</dt><dd className="font-semibold">{recipientLabel}</dd></div></dl></div>
               <div className="border-hairline mt-4 rounded-panel border p-5"><h3 className="font-bold">テスト内容</h3><p className="text-ink-secondary mt-2 text-sm">{confirmSteps.length > 1 ? `選択した${confirmSteps.length}通を、通と通のあいだの待機を省略して順番に送信します。` : 'この1通だけを送信します。'}</p>
                 <ul className="mt-4 space-y-2 text-sm">{confirmSteps.map((row) => (<li key={row.stepOrder} className="flex flex-wrap items-baseline gap-x-3"><span className="text-ink shrink-0 font-medium tabular-nums">{row.stepOrder}通目</span>{row.timing ? <span className="text-ink-secondary shrink-0">{row.timing}</span> : null}<span className="text-ink-secondary min-w-0 flex-1 truncate">{row.kind}</span></li>))}</ul>
                 <p className="text-ink-faint mt-2 text-xs">タグ・情報欄の変更などのアクションは実行しません。購読の登録も増えません。</p></div>
             </section>
-            <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。選んだ相手のLINEへ実際に届きます。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt>送る通</dt><dd>{confirmSteps.length}通</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">{friendName}さんへの表示例。名前などの差し込みは送信時に実値へ置き換わります。</p>
+            <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-medium">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。選んだ相手のLINEへ実際に届きます。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt>送る通</dt><dd>{confirmSteps.length}通</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-medium">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">{friendName}さんへの表示例。名前などの差し込みは送信時に実値へ置き換わります。</p>
                 {bodiesStatus === 'loading' && <p className="text-ink-faint mt-4 text-sm">本文を読み込んでいます。</p>}
                 {bodiesStatus === 'error' && <p className="text-danger mt-4 text-sm">本文を読み込めませんでした。送る通と種類は左の一覧どおりです。</p>}
                 {bodiesStatus === 'ready' && confirmSteps.map((row) => {
@@ -1031,7 +1031,7 @@ export function TestSendDialog({
       {steps.length > 0 && (
         <div className="border-hairline rounded-panel mb-4 border">
           <div className="border-hairline flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-2.5">
-            <p className="text-ink text-xs font-bold">送る内容</p>
+            <p className="text-ink text-xs font-medium">送る内容</p>
             <p className="text-ink-faint text-xs tabular-nums">{steps.length}通</p>
           </div>
           <ul>

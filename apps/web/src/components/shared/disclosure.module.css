@@ -24,7 +24,7 @@
   padding: 0 16px;
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
   list-style: none;
   cursor: pointer;
   transition: background-color var(--motion-fast) var(--motion-ease-out);

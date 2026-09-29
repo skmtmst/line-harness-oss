@@ -124,7 +124,7 @@ export default function OpsDashboardPage() {
       <div className="grid gap-4 xl:grid-cols-5">
         <section data-design-node="fyib5" aria-label="月ごとの売上" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
           <div data-design-node="MVufa" className="mb-2 flex items-center gap-2">
-            <h3 className="text-label font-bold text-ink">月ごとの売上</h3>
+            <h3 className="text-label font-semibold text-ink">月ごとの売上</h3>
             <span data-design-node="xaUOz" className="ml-auto text-nano text-ink-faint">{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : '—'}</span>
             {canSyncBilling ? (
               <Button data-design-node="Fo4yb" size="field" disabled={syncingBilling} onClick={() => void syncBilling()}>
@@ -137,7 +137,7 @@ export default function OpsDashboardPage() {
           {data ? <RevenueBars rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
         </section>
         <section aria-label="プラン別の契約" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
-          <h3 className="mb-2 text-label font-bold text-ink">プラン別の契約</h3>
+          <h3 className="mb-2 text-label font-semibold text-ink">プラン別の契約</h3>
           {data ? (
             <div className="flex flex-wrap items-center gap-6">
               <PlanDonut rows={data.planShare.rows} total={data.planShare.total} />
@@ -164,7 +164,7 @@ export default function OpsDashboardPage() {
       {/* 要対応帯 */}
       <div className="grid gap-4 xl:grid-cols-5">
         <section aria-label="要対応" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
-          <h3 className="mb-2 text-label font-bold text-ink">要対応</h3>
+          <h3 className="mb-2 text-label font-semibold text-ink">要対応</h3>
           {data ? (
             <ul className="divide-y divide-hairline">
               <AlertRow label="決済が失敗している契約先" count={data.alerts.pastDue} href="/ops/tenants?status=past_due" />
@@ -176,7 +176,7 @@ export default function OpsDashboardPage() {
         </section>
         <section aria-label="お問い合わせ（チケット）" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-label font-bold text-ink">お問い合わせ（チケット）</h3>
+            <h3 className="text-label font-semibold text-ink">お問い合わせ（チケット）</h3>
             <Link href="/ops/support" className="text-caption text-action underline-offset-2 hover:underline">すべて見る →</Link>
           </div>
           {data ? (
@@ -227,7 +227,7 @@ export default function OpsDashboardPage() {
             <tbody>
               {data.usage.map((row) => (
                 <Tr key={row.tenantId}>
-                  <Td><Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`} className="block truncate text-label font-bold text-ink hover:underline">{row.tenantName}</Link></Td>
+                  <Td><Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`} className="block truncate text-label font-medium text-ink hover:underline">{row.tenantName}</Link></Td>
                   <Td><span className="text-caption text-ink-secondary">{row.planLabel}</span></Td>
                   <Td><span className="text-caption text-ink">{row.messages.toLocaleString('ja-JP')} / {row.limits.messages === null ? '—' : row.limits.messages.toLocaleString('ja-JP')}</span></Td>
                   <Td><span className="text-caption text-ink">{row.bannerUnits} / {row.limits.images ?? '—'}</span></Td>
@@ -284,7 +284,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-control bg-canvas-sunken px-3 py-2">
       <p className="text-micro text-ink-faint">{label}</p>
-      <p className="text-label font-bold text-ink">{value}</p>
+      <p className="text-label font-medium text-ink">{value}</p>
     </div>
   )
 }

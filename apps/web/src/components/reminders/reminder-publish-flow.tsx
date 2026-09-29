@@ -426,5 +426,5 @@ export function DoneStage({ draft, published, preview, validation }: { draft: Re
 }
 
 function Metric({ label, value, success = false, warning = false }: { label: string; value: string; success?: boolean; warning?: boolean }) {
-  return <div className="flex items-center justify-between gap-3 py-2"><dt className="text-ink-faint">{label}</dt><dd className={success ? 'text-success font-bold' : warning ? 'text-warning font-bold' : 'text-ink font-bold'}>{value}</dd></div>
+  return <div className="flex items-center justify-between gap-3 py-2"><dt className="text-ink-faint">{label}</dt><dd className={success ? 'text-success font-medium' : warning ? 'text-warning font-medium' : 'text-ink font-medium'}>{value}</dd></div>
 }

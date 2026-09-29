@@ -32,14 +32,14 @@
 .title {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .percent {
   margin-left: auto;
   color: var(--color-accent-deep); /* fill: $accent-deep（進み具合＝うまくいっている途中） */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 

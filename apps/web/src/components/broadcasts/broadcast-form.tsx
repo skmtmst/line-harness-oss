@@ -256,7 +256,7 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <div className="max-w-[82%]">
     <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
-    {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-bold" title={button.value}>{button.label || 'ボタン'}</div>)}
+    {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>{button.label || 'ボタン'}</div>)}
   </div>
   if (bubble.type === 'sticker') {
     const st = (bubble.content.state as MessageKindState | undefined)?.sticker
@@ -283,18 +283,18 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
     return <div className="flex w-full gap-2 overflow-x-auto pb-1">
       {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow">
         <div className="bg-canvas-sunken h-20 rounded-control" />
-        <p className="text-ink mt-2 truncate text-xs font-bold">{i === 0 ? (name || 'カルーセル') : '…'}</p>
+        <p className="text-ink mt-2 truncate text-xs font-medium">{i === 0 ? (name || 'カルーセル') : '…'}</p>
       </div>)}
     </div>
   }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-sm"><p className="text-xs font-bold text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
+  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-sm"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
   }
-  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
+  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
 function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, onChange, onMove, onDelete }: {
@@ -315,7 +315,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
       右側へ隠れる（監査 R149）。
     */}
     <div className="flex flex-wrap items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{index + 1}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-medium text-on-accent">{index + 1}</span>
       <Select
         aria-label={`吹き出し${index + 1}の種類`}
         value={bubble.type}
@@ -351,7 +351,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
         <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
       </div>}
       {bubble.type === 'flex' && <div>
-        <label className="mb-1 block text-xs font-bold text-ink-secondary">Flex JSON</label>
+        <label className="mb-1 block text-xs font-medium text-ink-secondary">Flex JSON</label>
         <textarea rows={8} value={String(bubble.content.flexJson ?? '')} onChange={(e) => onChange({ ...bubble, content: { ...bubble.content, flexJson: e.target.value, templateId: undefined, templateName: undefined } })} className="w-full resize-y rounded-card border border-hairline p-3 font-mono text-xs focus:border-accent focus:outline-none" />
       </div>}
       {/*
@@ -383,7 +383,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
       )}
       {['image','video','rich_video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
       {isContentTemplateType(bubble.type) && <div>
-        <label className="mb-1 block text-xs font-bold text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
+        <label className="mb-1 block text-xs font-medium text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
         <Combobox
           aria-label="コンテンツで作成したテンプレートから選択"
           placeholder="テンプレートを選択してください"
@@ -1768,17 +1768,17 @@ export default function BroadcastForm({
               <h3 className="text-lg font-bold text-ink">配信内容</h3>
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">{confirmAudienceLabel} {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-bold text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
+                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-medium text-ink">{confirmAudienceLabel} {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-medium text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">確認項目</h3>
               <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は配信できません。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">対象条件</dt><dd className="text-ink-secondary">除外{preflight?.exclusions?.total ?? 0}人を含めて確認済み</dd></div>
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">メッセージ表示</dt><dd className="text-ink-secondary">LINEプレビュー確認済み</dd></div>
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">送信枠</dt><dd className="text-ink-secondary">残り {quota?.remaining?.toLocaleString('ja-JP') ?? '—'} / {quota?.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">対象条件</dt><dd className="text-ink-secondary">除外{preflight?.exclusions?.total ?? 0}人を含めて確認済み</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">メッセージ表示</dt><dd className="text-ink-secondary">LINEプレビュー確認済み</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">送信枠</dt><dd className="text-ink-secondary">残り {quota?.remaining?.toLocaleString('ja-JP') ?? '—'} / {quota?.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</dd></div>
               </dl>
             </section>
           </section>
@@ -1903,10 +1903,10 @@ export default function BroadcastForm({
               <p className="mt-1 text-sm text-ink-faint">全員または詳細条件から、実際に送れる友だちを確認します。</p>
             </div>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
-              <p className="text-xs font-bold text-accent-deep">送信対象</p>
-              <p className="text-2xl font-black text-accent-deep">
+              <p className="text-xs font-medium text-accent-deep">送信対象</p>
+              <p className="text-hero text-accent-deep">
                 {audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'}
-                <span className="ml-1 text-sm">人</span>
+                <span className="ml-1 text-sm font-normal">人</span>
               </p>
             </div>
           </div>
@@ -2022,8 +2022,8 @@ export default function BroadcastForm({
                   ['除外', preflight.exclusions?.total ?? 0, 'text-warning'],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="rounded-control border border-hairline bg-canvas-sunken p-3">
-                    <p className="text-xs font-bold text-ink-faint">{label}</p>
-                    <p className="text-ink mt-1 text-2xl font-black tabular-nums">{Number(value).toLocaleString('ja-JP')}人</p>
+                    <p className="text-xs font-medium text-ink-faint">{label}</p>
+                    <p className="text-ink mt-1 text-hero tabular-nums">{Number(value).toLocaleString('ja-JP')}人</p>
                   </div>
                 ))}
               </div>
@@ -2035,9 +2035,9 @@ export default function BroadcastForm({
                   {preflight.audience.representatives.map((friend) => (
                     <div key={friend.friendId} className="flex items-center gap-3 py-3">
                       {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-full object-cover" /> : (
-                        <span className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
+                        <span className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-xs font-medium text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
                       )}
-                      <div><p className="text-sm font-bold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
+                      <div><p className="text-sm font-semibold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
                     </div>
                   ))}
                   {preflight.audience.representatives.length === 0 && <p className="py-3 text-xs text-ink-faint">表示できる友だちはいません。</p>}
@@ -2062,7 +2062,7 @@ export default function BroadcastForm({
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className={`border-accent text-accent-deep rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
+              className={`border-accent text-accent-deep rounded-control border px-3 py-1 text-xs font-medium hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
             >
               テンプレートから選ぶ
             </button>
@@ -2151,7 +2151,7 @@ export default function BroadcastForm({
               <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm font-semibold text-action hover:underline">メッセージ編集へ戻る</button>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-bold text-ink-secondary">名前・本文で検索
+              <label className="block text-xs font-medium text-ink-secondary">名前・本文で検索
                 <input
                   type="search"
                   aria-label="テンプレート名・本文で検索"
@@ -2161,7 +2161,7 @@ export default function BroadcastForm({
                   className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
                 />
               </label>
-              <label className="block text-xs font-bold text-ink-secondary">フォルダ
+              <label className="block text-xs font-medium text-ink-secondary">フォルダ
                 <Select
                   aria-label="テンプレートのフォルダ"
                   value={templatePickerFolderId}
@@ -2218,7 +2218,7 @@ export default function BroadcastForm({
               <Zap size={17} className="text-ink-secondary" aria-hidden />
               {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'}
             </p>
-          ) : <div className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
+          ) : <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
             <Combobox
               aria-label="配信後のアクション"
               placeholder="実行しない"
@@ -2312,7 +2312,7 @@ export default function BroadcastForm({
           )}
 
           <div className="border-hairline mt-4 border-t pt-4">
-      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-bold">
+      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-medium">
         時間を分散して送る
         <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-[11px] font-normal">
           推奨
@@ -2353,7 +2353,7 @@ export default function BroadcastForm({
                   if (base) base.setDate(base.getDate() + offset)
                   const ymd = base ? base.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }) : '日付未設定'
                   const concurrent = offset === 0 ? concurrentBroadcasts : []
-                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-bold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
+                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-semibold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
                 })}
               </div>
               {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
@@ -2462,9 +2462,9 @@ export default function BroadcastForm({
               <h3 className="text-lg font-bold text-ink">設定サマリー</h3>
               <p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-bold text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-bold text-ink">{selectedTemplate?.updatedAt ? new Date(selectedTemplate.updatedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-bold text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-medium text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-medium text-ink">{selectedTemplate?.updatedAt ? new Date(selectedTemplate.updatedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-medium text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2487,7 +2487,7 @@ export default function BroadcastForm({
           </div>
         ) : preflightDialogOpen ? (
           <div className="space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-bold text-ink">{audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-bold text-danger">不足 {quota && quota.remaining !== null ? Math.max(0, quota.planned - quota.remaining).toLocaleString('ja-JP') : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-bold text-danger">要確認</dd></div></dl></section>
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-medium text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-medium text-ink">{audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-medium text-danger">不足 {quota && quota.remaining !== null ? Math.max(0, quota.planned - quota.remaining).toLocaleString('ja-JP') : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-medium text-danger">要確認</dd></div></dl></section>
             <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3><p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p><div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">8月限定キャンペーンのお知らせです。</div></section>
             <div className="grid grid-cols-2 gap-2"><Button type="button">テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>
@@ -2515,7 +2515,7 @@ export default function BroadcastForm({
                   ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
                   ['送信数', visualQaAugustCampaign ? '1,213通' : audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}通`],
                   ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'],
-                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
+                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
               </dl>
             </section>
           </div>
@@ -2524,9 +2524,9 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-bold text-ink">未設定</dd></div>
-                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-bold text-ink">{bubbles.length}通</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-medium text-ink">未設定</dd></div>
+                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-medium text-ink">{bubbles.length}通</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2547,13 +2547,13 @@ export default function BroadcastForm({
                   ['配信日時', scheduledLabel ?? '未設定'],
                   ['送信数', `${bubbles.length}通`],
                   ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
-                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
+                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">送信枠</h3>
               <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
-              {quota ? <><p className="mt-3 text-sm font-bold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-bold ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
+              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
             </section>
             <LinePreview><div className="rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></LinePreview>
           </div>
@@ -2563,7 +2563,7 @@ export default function BroadcastForm({
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[['配信対象', '未設定'], ['配信日時', '未設定'], ['送信数', '—'], ['配信後', '未設定']].map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="font-bold text-ink">{value}</dd></div>
+                  <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="font-medium text-ink">{value}</dd></div>
                 ))}
               </dl>
             </section>
@@ -2689,9 +2689,9 @@ export default function BroadcastForm({
         </section>
         <section>
           <h3 className="text-sm font-bold text-ink">利用できる条件軸</h3>
-          <p className="mt-2 text-xs font-bold text-ink-secondary">標準互換（15軸）</p>
+          <p className="mt-2 text-xs font-medium text-ink-secondary">標準互換（15軸）</p>
           <div className="mt-2 flex flex-wrap gap-1.5">{STANDARD_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-secondary">{axis}</span>)}</div>
-          <p className="mt-3 text-xs font-bold text-ink-secondary">この画面だけの軸（6軸）</p>
+          <p className="mt-3 text-xs font-medium text-ink-secondary">この画面だけの軸（6軸）</p>
           <div className="mt-2 flex flex-wrap gap-1.5">{BROADCAST_ONLY_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-faint">{axis}</span>)}</div>
           <Notice tone="info" className="mt-3">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。未接続の軸は選択肢に出ません。</Notice>
         </section>

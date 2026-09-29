@@ -62,9 +62,9 @@ export function LineCard({
       )}
       <div className="flex flex-col gap-2 p-3">
         {category ? <p className="text-micro font-semibold text-accent-deep">{category}</p> : null}
-        <p className="text-label font-bold leading-6 text-ink">{title}</p>
+        <p className="text-label font-medium leading-6 text-ink">{title}</p>
         {body ? <p className="whitespace-pre-wrap text-caption leading-6 text-ink-secondary">{body}</p> : null}
-        {buttonLabel ? <p className="mt-1 rounded-control bg-accent-deep py-2 text-center text-caption font-bold text-on-accent">{buttonLabel}</p> : null}
+        {buttonLabel ? <p className="mt-1 rounded-control bg-accent-deep py-2 text-center text-caption font-medium text-on-accent">{buttonLabel}</p> : null}
       </div>
     </div>
   )
