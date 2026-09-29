@@ -235,7 +235,7 @@ googleSheets.get('/api/integrations/google-sheets/runs', requireRole('owner', 'a
   }
   const rows = await dbFor(c.env)
     .prepare(
-      `SELECT id, kind, data_type, status, rows_written, error, started_at, finished_at
+      `SELECT id, kind, data_type, status, rows_written, error, started_at, finished_at, spreadsheet_id
          FROM google_sheets_sync_runs
         WHERE integration_id = ? ORDER BY started_at DESC LIMIT 10`,
     )
@@ -243,6 +243,7 @@ googleSheets.get('/api/integrations/google-sheets/runs', requireRole('owner', 'a
     .all<{
       id: string; kind: string; data_type: string; status: string;
       rows_written: number; error: string | null; started_at: string; finished_at: string | null;
+      spreadsheet_id: string | null;
     }>();
   const payload: GoogleSheetsRunsPayload = {
     runs: rows.results.map((row): GoogleSheetsSyncRun => ({
@@ -254,6 +255,7 @@ googleSheets.get('/api/integrations/google-sheets/runs', requireRole('owner', 'a
       error: row.error,
       startedAt: row.started_at,
       finishedAt: row.finished_at,
+      spreadsheetId: row.spreadsheet_id,
     })),
   };
   return c.json({ success: true, data: payload });
@@ -279,6 +281,15 @@ googleSheets.post('/api/integrations/google-sheets/connect/start', requireIntegr
   } catch (error) {
     return sheetsErrorResponse(c, error);
   }
+  /*
+   * 新しい接続操作を始めたら、このアカウント向けの古い接続操作は全部
+   * 無効にする（R448）。開始済みで使い切り済みのstateも消すので、
+   * いま進行中の古い callback が後から連携行を復活・上書きしない。
+   */
+  await dbFor(c.env)
+    .prepare('DELETE FROM google_sheets_oauth_states WHERE line_account_id = ?')
+    .bind(selected)
+    .run();
   const state = randomToken(32);
   const expiresAt = new Date(Date.now() + OAUTH_STATE_MAX_AGE_SEC * 1000).toISOString();
   await dbFor(c.env)
@@ -334,7 +345,17 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
   if (stateRow.staff_id !== c.get('staff')!.id) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
   }
-  await dbFor(c.env).prepare('UPDATE google_sheets_oauth_states SET used_at = ? WHERE state = ?').bind(nowIso(), state).run();
+  /*
+   * 同じstateが同時に二度来ても片方だけが通るよう、使用済みへの更新は
+   * 「まだ使われていない」条件付きで行う（R448）。
+   */
+  const consumed = await dbFor(c.env)
+    .prepare('UPDATE google_sheets_oauth_states SET used_at = ? WHERE state = ? AND used_at IS NULL')
+    .bind(nowIso(), state)
+    .run();
+  if (Number(consumed.meta?.changes ?? 0) !== 1) {
+    return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
+  }
   if (c.req.query('error') || !code) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:denied'));
   }
@@ -365,6 +386,20 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
       // access_type=offline + prompt=consent でも refresh_token が来ないときは
       // Googleアカウント側の許可済み状態が原因。再接続しても直らないので案内する。
       return c.redirect(adminReturnUrl(c, lineAccountId, 'error:no_refresh_token'));
+    }
+    /*
+     * 保存の直前にもう一度stateの存否を確かめる（R448）。
+     * 接続の解除や新しい接続開始はこのアカウントのstateを消すので、
+     * 途中で解除・再接続された古い操作の結果をここで止める。
+     * これがないと、解除のあとに遅れて届いた callback が連携行を
+     * 作り直したり、新しい接続を古いメールアドレス・トークンで上書きする。
+     */
+    const stateAlive = await dbFor(c.env)
+      .prepare('SELECT state FROM google_sheets_oauth_states WHERE state = ? LIMIT 1')
+      .bind(state)
+      .first();
+    if (!stateAlive) {
+      return c.redirect(adminReturnUrl(c, lineAccountId, 'error:state_cancelled'));
     }
     const now = nowIso();
     await dbFor(c.env)
@@ -415,6 +450,15 @@ googleSheets.post('/api/integrations/google-sheets/disconnect', requireIntegrati
   }
   // 要件 #838 §2: 切断は行ごと消す。同期履歴も CASCADE で消える。
   await dbFor(c.env).prepare('DELETE FROM google_sheets_integrations WHERE id = ?').bind(integration.id).run();
+  /*
+   * このアカウント宛ての接続操作（使い切り済みのものを含む）も消す。
+   * 解除より前に始まっていた遅い callback が、あとから連携行を
+   * 復活させないようにする（R448）。
+   */
+  await dbFor(c.env)
+    .prepare('DELETE FROM google_sheets_oauth_states WHERE line_account_id = ?')
+    .bind(selected)
+    .run();
   auditLog(c, 'google.sheets.disconnect', { id: selected, kind: 'google_sheets_integration' }, { lineAccountId: selected });
   const payload: GoogleSheetsDisconnectPayload = { revoked, connection: publicIntegration(null) };
   return c.json({ success: true, data: payload });

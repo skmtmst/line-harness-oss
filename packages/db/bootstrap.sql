@@ -3113,7 +3113,7 @@ CREATE TABLE google_sheets_sync_runs (
   started_at TEXT NOT NULL,
   finished_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, run_date TEXT, spreadsheet_id TEXT);
 
 CREATE TABLE hq_support_messages (
   id               TEXT PRIMARY KEY,
