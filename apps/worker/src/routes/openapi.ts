@@ -3758,8 +3758,10 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['pending', 'resolved', 'dismissed'] } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0 } },
         ],
-        responses: { '200': { description: '一覧' }, '404': { description: 'Not found' } },
+        responses: { '200': { description: '一覧（total に同条件の総数を返す）' }, '404': { description: 'Not found' } },
       },
     },
     '/api/webhooks/unmatched/{id}/resolve': {
