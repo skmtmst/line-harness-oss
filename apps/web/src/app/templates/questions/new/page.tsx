@@ -4,16 +4,18 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import QuestionEditor, {
   emptyQuestion,
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import type { Folder } from '@line-crm/shared'
@@ -45,6 +47,10 @@ function isEditableQuestion(value: unknown): value is ScenarioQuestion {
     && typeof (choice as Record<string, unknown>).label === 'string')
 }
 
+function snapshotOf(value: { name: string; category: string; folderId: string | null; question: ScenarioQuestion }): string {
+  return JSON.stringify(value)
+}
+
 function questionSummary(question: ScenarioQuestion): string[] {
   const tags = question.choices.reduce((count, choice) => count + (choice.addTagIds?.length ?? 0), 0)
   const fields = question.choices.filter((choice) => choice.field?.fieldId).length
@@ -67,7 +73,9 @@ function QuestionTemplatePageInner() {
   const [folders, setFolders] = useState<Folder[]>([])
   // 編集時はテンプレートが属するアカウント。選択中と食い違うことがある（N-147）。
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
-  const [question, setQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
+  /* 作りたての姿を「保存済み」とする。emptyQuestion() は呼ぶたびに違う鍵を振るため、別々に呼ぶと作りたてなのに未保存になる。 */
+  const [initialQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
+  const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
   const [usageCount, setUsageCount] = useState(0)
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
@@ -113,6 +121,14 @@ function QuestionTemplatePageInner() {
           return
         }
         setQuestion(template.data.question)
+        // R136 監査：読み込んだ直後の姿を「保存済み」とし、変えた分だけ
+        // 未保存にする。読み直すたびに確認が出ることはない。
+        setSavedSnapshot(snapshotOf({
+          name: template.data.name,
+          category: template.data.category || '未分類',
+          folderId: template.data.folderId ?? null,
+          question: template.data.question,
+        }))
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
       .catch(() => {
@@ -125,6 +141,21 @@ function QuestionTemplatePageInner() {
   }, [id, selectedAccountId])
 
   const summaries = useMemo(() => questionSummary(question), [question])
+
+  /*
+   * R136 監査：質問文を変えたまま「シナリオで使う」へ移ると、確認なく
+   * 入力が消える。保存済み（読み込んだ直後・作りたて）の姿との差を
+   * 未保存とし、離れる操作では確認を出す。保存は別画面へ送るため、
+   * 保存の成功後に確認が出ることはない。
+   */
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => snapshotOf({
+    name: '',
+    category: '未分類',
+    folderId: null as string | null,
+    question: initialQuestion,
+  }))
+  const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const save = async (questionStatus: 'draft' | 'published') => {
     if (!selectedAccountId) {
@@ -226,12 +257,12 @@ function QuestionTemplatePageInner() {
               選んだ置き場の名前をそのまま入れて、ずれないようにする。
             */}
             <Field label="置き場" htmlFor="tq-folder">
-              <SelectField
+              <Select
                 id="tq-folder"
                 aria-label="置き場"
                 value={folderId ?? ''}
-                onChange={(event) => {
-                  const next = event.target.value || null
+                onChange={(value) => {
+                  const next = value || null
                   setFolderId(next)
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}
@@ -303,6 +334,8 @@ function QuestionTemplatePageInner() {
           </>
         )}
       />
+      {/* R136 監査：質問文などの書きかけがある間の離脱確認。 */}
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、質問への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

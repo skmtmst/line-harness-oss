@@ -13,7 +13,7 @@ vi.mock('@/components/shared/condition-builder', () => ({ default: () => null })
 vi.mock('@/components/shared/dialog', () => ({ default: () => null }))
 vi.mock('@/components/shared/icon-button', () => ({ default: () => null }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
-vi.mock('@/components/shared/select-field', () => ({ default: ({ value, onChange, options }: any) => <select value={value} onChange={onChange}>{options.map((item: any) => <option key={item.value} value={item.value}>{item.label}</option>)}</select> }))
+vi.mock('@/components/shared/select', () => ({ default: ({ value, onChange, options }: any) => <select value={value} onChange={(event: any) => onChange?.(event.target.value)}>{options.map((item: any) => <option key={item.value} value={item.value}>{item.label}</option>)}</select> }))
 vi.mock('@/components/shared/sticky-bar', () => ({ default: ({ actions }: any) => <div>{actions}</div> }))
 vi.mock('@/components/shared/text-field', () => ({ TextField: (props: any) => <input {...props} />, TextArea: (props: any) => <textarea {...props} /> }))
 vi.mock('@/components/shared/button', () => ({ default: ({ href, children, ...props }: any) => href ? <a href={href}>{children}</a> : <button {...props}>{children}</button> }))
@@ -111,5 +111,16 @@ describe('R30 段移動ではその段の欄だけ確かめ欄の下に出す', 
     await act(async () => { button('流入条件').click(); await Promise.resolve(); await Promise.resolve() })
     expect(host.querySelector('.friend-add-editor-error')?.textContent).toContain('接続を確かめて')
     expect(navigation.replace).not.toHaveBeenCalled()
+  })
+})
+
+describe('R202 初回案内は完成している形式だけ選べる形で出す', () => {
+  it('テンプレート・回答フォームのタブは出さずテキストだけ出す', async () => {
+    state.search = 'step=message'
+    await render()
+    const tabs = [...host.querySelectorAll('.friend-add-editor-messageTabs button')].map((item) => item.textContent)
+    expect(tabs).toEqual(['テキスト'])
+    expect(host.textContent).not.toContain('テンプレート')
+    expect(host.textContent).not.toContain('回答フォーム')
   })
 })

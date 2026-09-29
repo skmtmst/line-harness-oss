@@ -30,10 +30,11 @@ describe('V6 友だち追加時配信 7画面の契約', () => {
     expect(LIST_PAGE).toContain('api.friendAddRules.archive(selectedAccountId, deleting.id)')
     expect(EDITOR).toContain('api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)')
     expect(EDITOR).toContain('api.friendAddRules.saveDraft(ruleId, payload, saveIdempotencyKey.current)')
-    expect(EDITOR).toContain('api.friendAddRules.test(selectedAccountId, activeId)')
+    // R262: テストは試す流入リンク・想定日時・友だちを実行側の判定へ渡す。
+    expect(EDITOR).toContain('api.friendAddRules.test(selectedAccountId, activeId, {')
     expect(API).toContain("'/api/friend-add-rules/drafts'")
     expect(API).toContain("'/api/friend-add-rules/test'")
-    expect(API).toContain('JSON.stringify({ accountId, ruleId })')
+    expect(API).toContain('friendId: input?.friendId')
   })
 
   it('読込中・空・失敗と再読込を用意する', () => {
@@ -134,7 +135,7 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
     // このアカウントのシナリオだけを選ぶ。
     expect(EDITOR).toContain('次に流すシナリオ')
     expect(EDITOR).toContain('value={definition.scenarioId ??')
-    expect(EDITOR).toContain('scenarioId: event.target.value || null')
+    expect(EDITOR).toContain('scenarioId: value || null')
     expect(EDITOR).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
   })
 

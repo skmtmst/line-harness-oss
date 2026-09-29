@@ -34,7 +34,8 @@ describe('手順の進み表示は共通の Stepper', () => {
   it('配信の部品は、共通部品へ渡すだけにする', () => {
     const broadcast = code(fs.readFileSync(BROADCAST, 'utf8'))
     expect(broadcast).toContain("import Stepper from '@/components/shared/stepper'")
-    expect(broadcast).toContain('<Stepper label="配信作成の進み" steps={steps} />')
+    // 設計 C：いまいる所は currentKey（URL の ?step=）で渡す。入力済みの数で決めない。
+    expect(broadcast).toContain('<Stepper label="配信作成の進み" steps={steps} currentKey={currentKey} />')
     expect(broadcast, '描き方を配信側に残さない').not.toContain('STEP {step.order}')
   })
 
@@ -63,5 +64,16 @@ describe('手順の進み表示は共通の Stepper', () => {
     const stepper = code(fs.readFileSync(SHARED, 'utf8'))
     expect(stepper).toContain('step.order')
     expect(stepper).not.toContain('STEP ')
+  })
+
+  it('いまいる所と入力済みを分ける（設計 C）', () => {
+    /*
+     * 「次へ」で進んだ先に印が付く。入力済みの数で居場所を決めない。
+     * 直すところがある段は琥珀色の △ で、その段へ戻れる。
+     */
+    const stepper = code(fs.readFileSync(SHARED, 'utf8'))
+    expect(stepper).toContain('currentKey')
+    expect(stepper).toContain("'attention'")
+    expect(stepper).toContain('aria-current')
   })
 })

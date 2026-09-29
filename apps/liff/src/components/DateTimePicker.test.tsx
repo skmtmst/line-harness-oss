@@ -247,6 +247,11 @@ describe('カレンダー', () => {
     const group = await screen.findByRole('radiogroup', { name: '表示の切り替え' });
     fireEvent.click(within(group).getByRole('radio', { name: 'カレンダー' }));
     await screen.findByRole('button', { name: '10月16日 空きあり' });
+    // 月の読み込みと「一番早い日を自動で選ぶ」は別の描画で来る。ます目が
+    // 出ただけでは自動選択がまだで、先に日を押すと遅れて来た自動選択に
+    // 上書きされ「10/20 の空き」が出ない（CI の間欠失敗）。自動選択の
+    // 結果（10/16 の段）が出てから押す。
+    expect(await screen.findByText('10/16(金) の空き')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '10月20日 空きあり' }));
     expect(await screen.findByText('10/20(火) の空き')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '09:00' }));
@@ -406,6 +411,69 @@ describe('カレンダーの最初の月と月送り', () => {
     fireEvent.click(screen.getByRole('button', { name: '次の月' }));
     expect(await screen.findByText('2026年12月')).toBeTruthy();
     expect(await screen.findByText('この月は空きがありません。')).toBeTruthy();
+  });
+});
+
+describe('選んだ日は遅れて届く応答で上書きしない', () => {
+  it('カレンダー：選んだ後に表示を切り替えて戻っても選んだ日のまま', async () => {
+    const group = await openCalendar();
+    // 最初の自動選択（10/16）が出てから、別の日を選ぶ。
+    expect(await screen.findByText('10/16(金) の空き')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '10月20日 空きあり' }));
+    expect(await screen.findByText('10/20(火) の空き')).toBeTruthy();
+    // リストへ行って戻ると読み直しが走るが、選んだ日は残る。
+    fireEvent.click(within(group).getByRole('radio', { name: 'リスト' }));
+    expect(await screen.findByText('10/16(金) の空き')).toBeTruthy();
+    fireEvent.click(within(group).getByRole('radio', { name: 'カレンダー' }));
+    expect(await screen.findByText('10/20(火) の空き')).toBeTruthy();
+    expect(screen.queryByText('10/16(金) の空き')).toBeNull();
+  });
+
+  it('カレンダー：選んだ後に月を送って戻っても選んだ日のまま', async () => {
+    await openCalendar();
+    expect(await screen.findByText('10/16(金) の空き')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '10月20日 空きあり' }));
+    expect(await screen.findByText('10/20(火) の空き')).toBeTruthy();
+    // 来月を見に行っても、選んだ日を自動選択で置き換えない。
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }));
+    // 来月の読み込みが終わるまで待つ（読んでいる間は時刻の段が出ない）。
+    await screen.findByLabelText('2026年11月の日付');
+    expect(screen.queryByText('11/2(月) の空き')).toBeNull();
+    expect(screen.getByText('10/20(火) の空き')).toBeTruthy();
+    // 今月に戻っても同じ。
+    fireEvent.click(screen.getByRole('button', { name: '前の月' }));
+    expect(await screen.findByText('2026年10月')).toBeTruthy();
+    expect(screen.getByText('10/20(火) の空き')).toBeTruthy();
+    expect(screen.queryByText('10/16(金) の空き')).toBeNull();
+  });
+
+  it('リスト：選んだ日が読み直しで無くなっても選び直さない', async () => {
+    renderPicker();
+    expect(await screen.findByText('10/16(金) の空き')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '火 10/20' }));
+    expect(await screen.findByText('10/20(火) の空き')).toBeTruthy();
+    // 10/20 が埋まった応答が遅れて届いても、選んだ日は残る
+    // （時刻が出ず「満席です」と出る。利用者が選び直す）。
+    availability.mockImplementation(async (_menuId: string, _staffId: string | undefined, from: string, to: string) => ({
+      by_staff: [
+        {
+          staff_id: 's1',
+          display_name: '担当A',
+          slots: MASTER_SLOTS.filter((s) => s.date >= from && s.date <= to && s.date !== '2026-10-20'),
+        },
+      ],
+      closed_dates: MASTER_CLOSED.filter((d) => d >= from && d <= to),
+    }));
+    const group = await screen.findByRole('radiogroup', { name: '表示の切り替え' });
+    fireEvent.click(within(group).getByRole('radio', { name: 'カレンダー' }));
+    await screen.findByText('2026年10月');
+    fireEvent.click(within(group).getByRole('radio', { name: 'リスト' }));
+    // 読み直しが終わるまで待つ（来る前は古い時刻のまま残る）。
+    expect(
+      await screen.findByText('この日は満席です。別の日を選んでください。'),
+    ).toBeTruthy();
+    expect(screen.getByText('10/20(火) の空き')).toBeTruthy();
+    expect(screen.queryByText('10/16(金) の空き')).toBeNull();
   });
 });
 

@@ -62,8 +62,10 @@ function seed(testDb: SqliteD1): void {
      VALUES ('point-web', '購入完了', 'purchase', 'url_reach', 'https://example.com/thanks',
              'source', 'a1', 'tenant-1', 'active', 0, ?),
             ('point-anon', '到達(匿名可)', 'visit', 'url_reach', 'https://example.com/lp',
-             'none', 'a1', 'tenant-1', 'active', 1, ?)`,
-  ).run(NOW, NOW);
+             'none', 'a1', 'tenant-1', 'active', 1, ?),
+            ('point-query', '申込完了', 'form_submitted', 'url_reach', 'https://example.com/entry?utm_source=seed',
+             'none', 'a1', 'tenant-1', 'active', 0, ?)`,
+  ).run(NOW, NOW, NOW);
   testDb.raw.prepare(
     `INSERT INTO friends (id, line_user_id, display_name, line_account_id)
      VALUES ('f1', 'U-f1', '友だち1', 'a1')`,
@@ -209,6 +211,43 @@ describe('POST /api/public/web-conversions', () => {
     expect(eventCount(testDb)).toBe(1);
   });
 
+  it('R282: 保存側・受信側のクエリと#以降を外して判定する', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const siteId = seedSite(testDb);
+    // 保存値に ?utm_source=seed が残っていても、同じページに当たる。
+    // 受信のクエリ違い・ページ内位置が付いても当たる。
+    await postConversion(testDb, {
+      siteId, visitorId: 'visitor-1', host: 'example.com', path: '/entry?x=1#sec', consent: 'granted',
+    });
+    const row = testDb.raw.prepare(
+      `SELECT conversion_point_id FROM conversion_events`,
+    ).get() as { conversion_point_id: string } | undefined;
+    expect(row?.conversion_point_id).toBe('point-query');
+  });
+
+  it('R282: _ を含む保存値は別文字へ広げない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const siteId = seedSite(testDb);
+    testDb.raw.prepare(
+      `INSERT INTO conversion_points
+        (id, name, event_type, measure_method, target_url, value_mode,
+         line_account_id, tenant_id, status, count_anonymous, created_at)
+       VALUES ('point-under', '完了', 'visit', 'url_reach', 'https://example.com/order_done',
+               'none', 'a1', 'tenant-1', 'active', 0, ?)`,
+    ).run(NOW);
+    expect(eventCount(testDb)).toBe(0);
+    await postConversion(testDb, {
+      siteId, visitorId: 'visitor-1', host: 'example.com', path: '/orderXdone', consent: 'granted',
+    });
+    expect(eventCount(testDb)).toBe(0);
+    await postConversion(testDb, {
+      siteId, visitorId: 'visitor-1', host: 'example.com', path: '/order_done', consent: 'granted',
+    });
+    expect(eventCount(testDb)).toBe(1);
+  });
+
   it('Origin ヘッダのドメインも許可判定に使う', async () => {
     const testDb = createTestD1();
     seed(testDb);
@@ -284,6 +323,83 @@ describe('計測サイトの管理口', () => {
     // 差し替え後は旧ドメインからの送信を数えない
     await postConversion(testDb, { siteId, host: 'example.com', path: '/thanks', consent: 'granted' });
     expect(eventCount(testDb)).toBe(0);
+  });
+});
+
+describe('計測サイトの停止・再開 (R275)', () => {
+  function stop(testDb: SqliteD1, siteId: string, body: Record<string, unknown> = { reason: 'サイトを閉じたため' }) {
+    return req(app(staff('owner-1', 'tenant-1')), testDb, `/api/measurement-sites/${siteId}/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('停止すると一覧に状態と理由が出て、公開口は以後の成果を数えない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const siteId = seedSite(testDb);
+
+    const res = await stop(testDb, siteId);
+    expect(res.status).toBe(200);
+
+    const list = await req(app(staff('owner-1', 'tenant-1')), testDb, '/api/measurement-sites?account_id=a1');
+    const body = await list.json() as { data: Array<{ stoppedAt: string | null; stoppedReason: string | null }> };
+    expect(body.data[0].stoppedAt).toBeTruthy();
+    expect(body.data[0].stoppedReason).toBe('サイトを閉じたため');
+
+    // 停止後の受付は数えない。許可外ドメイン扱いにもしない(拒否集計に入れない)。
+    const res204 = await postConversion(testDb, {
+      siteId, visitorId: 'visitor-1', host: 'example.com', path: '/thanks', consent: 'granted',
+    });
+    expect(res204.status).toBe(204);
+    expect(eventCount(testDb)).toBe(0);
+    expect(
+      testDb.raw.prepare('SELECT COUNT(*) AS n FROM measurement_domain_rejections').get() as { n: number },
+    ).toEqual({ n: 0 });
+  });
+
+  it('再開すると受付が戻る。停止していないサイトの再開は409', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const siteId = seedSite(testDb);
+
+    const early = await req(app(staff('owner-1', 'tenant-1')), testDb, `/api/measurement-sites/${siteId}/resume`, { method: 'POST' });
+    expect(early.status).toBe(409);
+
+    await stop(testDb, siteId);
+    const resumed = await req(app(staff('owner-1', 'tenant-1')), testDb, `/api/measurement-sites/${siteId}/resume`, { method: 'POST' });
+    expect(resumed.status).toBe(200);
+
+    await postConversion(testDb, {
+      siteId, visitorId: 'visitor-1', host: 'example.com', path: '/thanks', consent: 'granted',
+    });
+    expect(eventCount(testDb)).toBe(1);
+  });
+
+  it('理由なし・二重の停止・係員・別統括は受け付けない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const siteId = seedSite(testDb);
+
+    expect((await stop(testDb, siteId, {})).status).toBe(400);
+    expect((await stop(testDb, siteId)).status).toBe(200);
+    expect((await stop(testDb, siteId)).status).toBe(409);
+
+    const denied = await req(app(staff('staff-1', 'tenant-1', 'staff', ['/conversions'])), testDb, `/api/measurement-sites/${siteId}/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'x' }),
+    });
+    expect(denied.status).toBe(403);
+
+    // 別統括のサイトには404(存在を明かさない)
+    const otherSite = 'site_'.padEnd(5, 'b').padEnd(37, 'b');
+    testDb.raw.prepare(
+      `INSERT INTO measurement_sites (id, line_account_id, label, created_at, updated_at)
+       VALUES (?, 'b1', '別統括', ?, ?)`,
+    ).run(otherSite, NOW, NOW);
+    expect((await stop(testDb, otherSite)).status).toBe(404);
   });
 });
 

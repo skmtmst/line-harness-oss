@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
@@ -104,6 +105,14 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
   const [uploadBusy, setUploadBusy] = useState(false)
   const busy = requestBusy || uploadBusy
   const [ready, setReady] = useState(false)
+  /*
+   * R119: 参照先に選べる別種類の目録。一覧の `templates` は編集中の種類だけ
+   * しか持たないため、そこから別種類で絞ると常に空になる。種類を指定せず
+   * 取った全部入りを別に持ち、参照候補はここから作る。`null` は未取得か
+   * 取得失敗（0件とは区別する）。
+   */
+  const [catalog, setCatalog] = useState<HqTemplate[] | null>(null)
+  const [catalogFailed, setCatalogFailed] = useState(false)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
   const [message, setMessage] = useState('')
@@ -135,6 +144,12 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
         setTemplates(rows); setAccounts(stores); setReady(true)
       }
     }).catch(e => { if (current) setError(errorText(e)) }).finally(() => { if (current) setBusy(false) })
+    // R119: 目録だけの失敗で一覧や保存まで止めない。失敗は `catalogFailed`
+    // として編集欄の上で知らせ、候補が0件のときとは文を分ける。
+    void hqTemplatesApi.list().then(
+      (rows) => { if (current) { setCatalog(rows); setCatalogFailed(false) } },
+      () => { if (current) { setCatalog(null); setCatalogFailed(true) } },
+    )
     return () => { current = false }
   }, [type])
   useEffect(() => {
@@ -155,6 +170,16 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     finally { lock.current = false; if (alive.current) setBusy(false) }
   }
   const toList = () => { if (createUncertain) return; createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setPendingRun(null); setResult(null); setError(''); setConflict(false); window.history.replaceState(null, '', window.location.pathname + window.location.search) }
+  /** R119: 目録の読み直し。編集中身は残し、候補だけ取り直す。 */
+  const reloadCatalog = () => {
+    setCatalogFailed(false)
+    void hqTemplatesApi.list().then(
+      (rows) => { if (alive.current) { setCatalog(rows); setCatalogFailed(false) } },
+      () => { if (alive.current) { setCatalog(null); setCatalogFailed(true) } },
+    )
+  }
+  /** R119: 参照候補は全部入りの目録から種類別に取り出す。一覧の `templates` は使わない。 */
+  const referenceOptions = (kind: TemplateType) => (catalog ?? []).filter(item => item.template_type === kind).map(item => ({ id: item.id, name: item.name }))
   const loadDetailIntoForm = (loaded: TemplateDetail) => {
     if (loaded.template.template_type !== type || loaded.definition.schemaVersion !== 1 || !definitionName(type, loaded.definition)) throw new Error('ひな形の種類または保存内容を確認できません。')
     setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
@@ -322,6 +347,13 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     </>}
     {stage === 'edit' && <>
       <div className={styles.grid}><div className={styles.stack}><section className={styles.panel}>
+        {catalogFailed ? (
+          <Notice
+            tone="warn"
+            message="参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。"
+            action={<Button onClick={reloadCatalog}>もう一度読み込む</Button>}
+          />
+        ) : null}
         {!canonicalEditorOwnsSave && (!useCanonicalEditors || type !== 'rich_menu') && <>
           <label className={styles.field}><span>種類</span><input className={styles.input} value={LABELS[type]} readOnly /></label>
           <label className={styles.field}><span>名前</span><input className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={e => setName(e.target.value)} /></label>
@@ -342,12 +374,12 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
           onCanonicalSave={useCanonicalEditors ? saveCanonicalDefinition : undefined}
           onRichMenuNameChange={setName}
           richMenuReferences={{
-            tags: templates.filter(item => item.template_type === 'tag').map(item => ({ id: item.id, name: item.name })),
-            templates: templates.filter(item => item.template_type === 'template').map(item => ({ id: item.id, name: item.name })),
-            forms: templates.filter(item => item.template_type === 'form').map(item => ({ id: item.id, name: item.name })),
+            tags: referenceOptions('tag'),
+            templates: referenceOptions('template'),
+            forms: referenceOptions('form'),
           }}
           formReferences={{
-            tags: templates.filter(item => item.template_type === 'tag').map(item => ({ id: item.id, name: item.name })),
+            tags: referenceOptions('tag'),
             friendFields: [], scenarios: [], reminders: [], templates: [],
           }}
         />}
@@ -356,8 +388,8 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
       {!canonicalEditorOwnsSave && <footer className={styles.footer}><Button disabled={busy || createUncertain} onClick={toList}>キャンセル</Button>{createUncertain ? <Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button> : <><Button disabled={busy || Boolean(validation)} onClick={() => save(false)}>下書き保存</Button><Button variant="primary" disabled={busy || Boolean(validation)} onClick={() => save(true)}>保存して配布先を選ぶ</Button></>}</footer>}
     </>}
     {stage === 'accounts' && <>
-      <div className={styles.grid}><section className={styles.panel}><div className={styles.toolbar}><input aria-label="アカウントを検索" className={`${styles.input} ${styles.search}`} placeholder="アカウント名で検索" value={search} onChange={e => setSearch(e.target.value)} /><label><input type="checkbox" disabled={busy || !shownAccounts.length} checked={!!shownAccounts.length && shownAccounts.every(a => selected.includes(a.id))} onChange={e => setSelected(current => e.target.checked ? [...new Set([...current, ...shownAccounts.map(a => a.id)])] : current.filter(id => !shownAccounts.some(a => a.id === id)))} /> 表示中をすべて選択</label></div>
-        {shownAccounts.map(account => <div key={account.id} className={styles.account}><label className={styles.accountChoice}><input type="checkbox" aria-label={account.name} checked={selected.includes(account.id)} disabled={busy} onChange={e => setSelected(current => e.target.checked ? [...current, account.id] : current.filter(id => id !== account.id))} /><span className={styles.name} title={account.name}>{account.name}</span></label><Button disabled={busy} onClick={() => checkStores([account.id])}>{account.name}だけに配布</Button></div>)}{!shownAccounts.length && <p className={styles.empty}>選択できるアカウントがありません。</p>}
+      <div className={styles.grid}><section className={styles.panel}><div className={styles.toolbar}><input aria-label="アカウントを検索" className={`${styles.input} ${styles.search}`} placeholder="アカウント名で検索" value={search} onChange={e => setSearch(e.target.value)} /><Checkbox disabled={busy || !shownAccounts.length} checked={!!shownAccounts.length && shownAccounts.every(a => selected.includes(a.id))} onCheckedChange={(checked) => setSelected(current => checked ? [...new Set([...current, ...shownAccounts.map(a => a.id)])] : current.filter(id => !shownAccounts.some(a => a.id === id)))}>表示中をすべて選択</Checkbox></div>
+        {shownAccounts.map(account => <div key={account.id} className={styles.account}><Checkbox aria-label={account.name} checked={selected.includes(account.id)} disabled={busy} onCheckedChange={(checked) => setSelected(current => checked ? [...current, account.id] : current.filter(id => id !== account.id))}>{account.name}</Checkbox><Button disabled={busy} onClick={() => checkStores([account.id])}>{account.name}だけに配布</Button></div>)}{!shownAccounts.length && <p className={styles.empty}>選択できるアカウントがありません。</p>}
       </section><aside className={styles.stack}><section className={styles.panel}><h2>配布するひな形</h2><p>{detail?.template.name}</p><p className={styles.muted}>参照先 {referenceCount(type, definition)}件を含む</p></section><section className={`${styles.panel} ${styles.success}`}><h2>選択済み</h2><strong className={styles.selection}>{selected.length}アカウント</strong><p>{selected.map(accountName).join('・')}</p></section><p className={styles.notice}>次に重複を確認します。既存の同名項目はアカウントごとに上書き・別名を選べます。</p></aside></div>
       <footer className={styles.footer}><Button disabled={busy} onClick={toList}>戻る</Button><Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}>{selected.length === 1 ? '選択した1アカウントへ配布' : `選択した${selected.length}アカウントへ一括配布`}</Button></footer>
     </>}

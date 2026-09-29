@@ -18,6 +18,17 @@ export interface StaffCalendarConnection {
   access_token: string | null;
 }
 
+/**
+ * 消す対象の予定があるのに、削除できる接続が無い (解除ずみ・無効化)。
+ * 「消す物が無い」とは別物として扱い、台帳を成功にせず回復待ちに残す。
+ */
+export class CalendarConnectionMissingError extends Error {
+  constructor() {
+    super('calendar_connection_missing');
+    this.name = 'calendar_connection_missing';
+  }
+}
+
 export async function getStaffCalendarConnection(
   db: D1Database,
   lineAccountId: string,
@@ -107,6 +118,48 @@ export async function syncConfirmedBookingToGoogle(
     return { synced: false };
   }
 
+  /*
+   * 予定 ID の置き場を、作る前に原子的に確保する (R327)。
+   *
+   * 読み取り→作成→保存の並びだと、作成応答の待ち時間にもう1本の再試行が
+   * 同じ "external_event_id IS NULL" を通り、外部に予定が2本できる。
+   * ID をこちらで先に採番し、条件付き UPDATE で changes=1 を取れた
+   * 処理だけが作成へ進む。負けた処理は確保ずみの ID を読み直して返し、
+   * 予約・台帳・外部予定の ID が常に一致する。
+   * 作成に失敗したら置き場を空けて、次の再試行が作れる状態に戻す。
+   * ID は Google 側の文字種 (a〜v と数字) に収まる形で採番する。
+   */
+  const reservedEventId = `lh${crypto.randomUUID().replaceAll('-', '')}`;
+  const claim = await db
+    .prepare(
+      `UPDATE bookings
+          SET external_event_id = ?, external_calendar_id = ?,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND external_event_id IS NULL AND status = 'confirmed'`,
+    )
+    .bind(reservedEventId, row.calendar_id, bookingId)
+    .run();
+  if ((claim.meta?.changes ?? 0) === 0) {
+    const current = await db
+      .prepare(`SELECT status, external_event_id, external_calendar_id FROM bookings WHERE id = ?`)
+      .bind(bookingId)
+      .first<{
+        status: string;
+        external_event_id: string | null;
+        external_calendar_id: string | null;
+      }>();
+    // 先に確保した処理がいるならその ID を返す。取消などで確定外に
+    // 変わった場合は作成対象ではないので未同期として返す。
+    if (current?.status !== 'confirmed' || !current.external_event_id) {
+      return { synced: false };
+    }
+    return {
+      synced: true,
+      eventId: current.external_event_id,
+      calendarId: current.external_calendar_id ?? row.calendar_id,
+    };
+  }
+
   const connection: StaffCalendarConnection = {
     id: row.connection_id,
     calendar_id: row.calendar_id,
@@ -114,26 +167,40 @@ export async function syncConfirmedBookingToGoogle(
     access_token: row.access_token,
   };
   const client = await clientForConnection(connection, credentials);
-  const created = await client.createEvent({
-    summary: `${row.customer_name ?? 'お客様'}｜${row.menu_name}`,
-    start: row.starts_at,
-    end: row.ends_at,
-    description: [
-      `LINE Harness予約（担当: ${row.staff_name}）`,
-      `予約ID: ${row.id}`,
-      row.customer_note ? `メモ: ${row.customer_note}` : '',
-    ].filter(Boolean).join('\n'),
-  });
-  await db
-    .prepare(
-      `UPDATE bookings
-          SET external_event_id = ?, external_calendar_id = ?,
-              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND external_event_id IS NULL`,
-    )
-    .bind(created.eventId, row.calendar_id, bookingId)
-    .run();
-  return { synced: true, eventId: created.eventId, calendarId: row.calendar_id };
+  try {
+    const created = await client.createEvent({
+      id: reservedEventId,
+      summary: `${row.customer_name ?? 'お客様'}｜${row.menu_name}`,
+      start: row.starts_at,
+      end: row.ends_at,
+      description: [
+        `LINE Harness予約（担当: ${row.staff_name}）`,
+        `予約ID: ${row.id}`,
+        row.customer_note ? `メモ: ${row.customer_note}` : '',
+      ].filter(Boolean).join('\n'),
+    });
+    if (created.eventId !== reservedEventId) {
+      // Google がこちらの ID を使わなかった場合だけ置き場を付け替える。
+      await db
+        .prepare(`UPDATE bookings SET external_event_id = ? WHERE id = ? AND external_event_id = ?`)
+        .bind(created.eventId, bookingId, reservedEventId)
+        .run();
+    }
+    return { synced: true, eventId: created.eventId, calendarId: row.calendar_id };
+  } catch (error) {
+    // 作成失敗は置き場を空けて投げ直す。置き場が残ると再試行が永久に
+    // 「もうある」と判断して作れなくなる。
+    await db
+      .prepare(
+        `UPDATE bookings
+            SET external_event_id = NULL, external_calendar_id = NULL
+          WHERE id = ? AND external_event_id = ?`,
+      )
+      .bind(bookingId, reservedEventId)
+      .run()
+      .catch(() => undefined);
+    throw error;
+  }
 }
 
 /**
@@ -431,11 +498,21 @@ export async function runBookingGoogleSync(
   try {
     if (booking.status === 'cancelled' || booking.status === 'expired') {
       if (booking.external_event_id && booking.external_calendar_id) {
-        await deleteExternalCalendarEvent(db, input.credentials, {
+        const deleted = await deleteExternalCalendarEvent(db, input.credentials, {
           lineAccountId: input.lineAccountId,
           externalCalendarId: booking.external_calendar_id,
           externalEventId: booking.external_event_id,
         });
+        if (deleted === 'connection_missing') {
+          // 実際には消せていない。成功にせず予定IDを保持したまま回復待ちに
+          // 残し、再接続後の再試行・cron で消せる状態にする (R328)。
+          await finishBookingOperation(db, {
+            id: operationId, status: 'retry_wait', completedAt: now,
+            errorCode: 'calendar_connection_missing',
+            result: { direction: 'delete', reason: 'connection_missing' },
+          });
+          return 'retry_wait';
+        }
       }
       await db.prepare(
         `UPDATE bookings SET external_event_id = NULL, external_calendar_id = NULL,
@@ -457,11 +534,21 @@ export async function runBookingGoogleSync(
     }
     // confirmed: 旧イベントを消してから作り直す。
     if (booking.external_event_id && booking.external_calendar_id) {
-      await deleteExternalCalendarEvent(db, input.credentials, {
+      const deleted = await deleteExternalCalendarEvent(db, input.credentials, {
         lineAccountId: input.lineAccountId,
         externalCalendarId: booking.external_calendar_id,
         externalEventId: booking.external_event_id,
       });
+      if (deleted === 'connection_missing') {
+        // 旧予定を消せる接続が無いまま作り直すと、旧予定を追う術を失ったまま
+        // 新しい予定が増える。旧IDを保持して回復待ちに残す (R328)。
+        await finishBookingOperation(db, {
+          id: operationId, status: 'retry_wait', completedAt: now,
+          errorCode: 'calendar_connection_missing',
+          result: { direction: 'sync', reason: 'connection_missing' },
+        });
+        return 'retry_wait';
+      }
       await db.prepare(
         `UPDATE bookings SET external_event_id = NULL, external_calendar_id = NULL,
              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
@@ -493,6 +580,15 @@ export async function runBookingGoogleSync(
   }
 }
 
+/**
+ * 台帳駆動の Calendar 削除で呼ぶ「外部予定を消す」処理 (R328)。
+ *
+ * 接続の探索は「イベントを作ったカレンダー」基準にする (担当変更で
+ * bookings.staff_id が変わっても旧カレンダーの接続を見つけられる)。
+ * 消す対象があるのに接続が無い・無効なときは静かに返さず
+ * CalendarConnectionMissingError を投げる。呼び出し側の台帳が
+ * retry_wait に残り、再接続後の取消再送・cron で削除を再試行できる。
+ */
 export async function removeBookingFromGoogle(
   db: D1Database,
   credentials: GoogleServiceAccountCredentials,
@@ -505,7 +601,7 @@ export async function removeBookingFromGoogle(
          FROM bookings b
          LEFT JOIN google_calendar_connections gc
            ON gc.calendar_id = b.external_calendar_id
-          AND gc.staff_id = b.staff_id
+          AND gc.line_account_id = b.line_account_id
           AND gc.is_active = 1
         WHERE b.id = ?`,
     )
@@ -517,7 +613,8 @@ export async function removeBookingFromGoogle(
       auth_type: string | null;
       access_token: string | null;
     }>();
-  if (!row?.external_event_id || !row.external_calendar_id || !row.id || !row.auth_type) return;
+  if (!row?.external_event_id || !row.external_calendar_id) return;
+  if (!row.id || !row.auth_type) throw new CalendarConnectionMissingError();
   const client = await clientForConnection({
     id: row.id,
     calendar_id: row.external_calendar_id,

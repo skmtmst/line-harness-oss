@@ -15,7 +15,7 @@ import QrDialog from './qr-dialog'
 
 // 共通部品側は React を import していないため、この環境では素の select へ
 // 置き換える。フォーカス移動の対象としては同じ形なので試験の意味は変わらない。
-vi.mock('@/components/shared/select-field', () => ({
+vi.mock('@/components/shared/select', () => ({
   default: ({ id, value, options }: {
     id?: string
     value?: string

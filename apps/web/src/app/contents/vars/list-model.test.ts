@@ -6,7 +6,8 @@ function item(over: Partial<CommonVar> = {}): CommonVar {
   return {
     id: 'v1', lineAccountId: 'a1', folderId: null, name: '会社名', varKey: 'company',
     type: 'text', value: '株式会社NEN', createdAt: '2026-08-01', updatedAt: '2026-08-02',
-    usageCount: 3, nextSchedule: null, validFrom: null, validUntil: null, ...over,
+    usageCount: 3, nextSchedule: null, validFrom: null, validUntil: null,
+    fallbackValue: null, expiryBehavior: 'stop', ...over,
   }
 }
 
@@ -26,6 +27,22 @@ describe('共通情報一覧の絞り込みと並び順', () => {
     expect(filterAndSortCommonVars(values, { ...input, filter: 'scheduled' }).map((value) => value.id))
       .toEqual(['scheduled', 'period-both', 'period-until'])
     expect(filterAndSortCommonVars(values, { ...input, filter: 'unused' }).map((value) => value.id)).toEqual(['unused'])
+  })
+
+  it('状態（下書き・止めた・期限切れ）で絞り込む（Q）', () => {
+    const values = [
+      item({ id: 'draft', status: 'draft', state: 'draft' }),
+      item({ id: 'active', status: 'active', state: 'active' }),
+      item({ id: 'stopped', status: 'stopped', state: 'stopped' }),
+      item({ id: 'expired', status: 'active', state: 'expired' }),
+      // state が来ない旧データは使用中扱い（サーバの既定と同じ）。
+      item({ id: 'legacy', state: undefined }),
+    ]
+    expect(filterAndSortCommonVars(values, { ...input, filter: 'draft' }).map((value) => value.id)).toEqual(['draft'])
+    expect(filterAndSortCommonVars(values, { ...input, filter: 'stopped' }).map((value) => value.id)).toEqual(['stopped'])
+    expect(filterAndSortCommonVars(values, { ...input, filter: 'expired' }).map((value) => value.id)).toEqual(['expired'])
+    expect(filterAndSortCommonVars(values, { ...input, filter: 'all' }).map((value) => value.id))
+      .toEqual(['draft', 'active', 'stopped', 'expired', 'legacy'])
   })
 
   it('使用数が未取得の行を未使用へ混ぜない', () => {

@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Stepper from '@/components/shared/stepper'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -127,10 +128,11 @@ export default function NewWebinarPage() {
               </div>
               <div>
                 <label htmlFor="webinar-folder" className="text-ink-secondary mb-1 block text-sm font-medium">フォルダ</label>
-                <SelectField
+                <Select
                   id="webinar-folder"
+                  aria-label="フォルダ"
                   value={folderId}
-                  onChange={(event) => setFolderId(event.target.value)}
+                  onChange={(value) => setFolderId(value)}
                   options={[
                     { value: '', label: '未分類' },
                     ...folders.map((folder) => ({ value: folder.id, label: `${folder.name}（${folder.count}件）` })),
@@ -143,20 +145,24 @@ export default function NewWebinarPage() {
           <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
             <h2 className="text-ink text-base font-bold">開催形式</h2>
             <p className="text-ink-faint mt-1 text-xs">公開方法と視聴形式を選びます。</p>
-            <div className="mt-4 space-y-3">
-              <label className={`border-hairline flex cursor-pointer items-center gap-4 rounded-control border p-4 ${deliveryKind === 'on-demand' ? 'border-accent bg-accent-soft' : ''}`}>
-                <input type="radio" name="delivery-kind" checked={deliveryKind === 'on-demand'} onChange={() => setDeliveryKind('on-demand')} />
-                <span className="text-ink-faint text-xl">♙</span>
-                <span><strong className="text-ink block text-sm">オンデマンド配信</strong><span className="text-ink-faint mt-1 block text-xs">録画動画をいつでも視聴</span></span>
-                <span className="text-action ml-auto" aria-hidden="true">›</span>
-              </label>
-              <label className={`border-hairline flex cursor-pointer items-center gap-4 rounded-control border p-4 ${deliveryKind === 'scheduled' ? 'border-accent bg-accent-soft' : ''}`}>
-                <input type="radio" name="delivery-kind" checked={deliveryKind === 'scheduled'} onChange={() => setDeliveryKind('scheduled')} />
-                <span className="text-action text-xl">⌑</span>
-                <span><strong className="text-ink block text-sm">日時指定配信</strong><span className="text-ink-faint mt-1 block text-xs">指定日時に公開開始</span></span>
-                <span className="text-action ml-auto" aria-hidden="true">›</span>
-              </label>
-            </div>
+            <RadioCardGroup legend="開催形式" className="mt-4">
+              <RadioCard
+                name="delivery-kind"
+                value="on-demand"
+                checked={deliveryKind === 'on-demand'}
+                onChange={() => setDeliveryKind('on-demand')}
+                title="オンデマンド配信"
+                note="録画動画をいつでも視聴"
+              />
+              <RadioCard
+                name="delivery-kind"
+                value="scheduled"
+                checked={deliveryKind === 'scheduled'}
+                onChange={() => setDeliveryKind('scheduled')}
+                title="日時指定配信"
+                note="指定日時に公開開始"
+              />
+            </RadioCardGroup>
             <p className="text-ink-faint mt-3 text-xs">選んだ開催形式は下書き版へ保存され、動画設定でも変更できます。</p>
           </section>
         </div>
@@ -197,7 +203,7 @@ export default function NewWebinarPage() {
           </>
         )}
       />
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、入力した内容は保存されません。移動しますか？"

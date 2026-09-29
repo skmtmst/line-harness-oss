@@ -10,7 +10,7 @@
  * 4. フォームの「フォルダを追加」は押せない理由を hover 限定の title
  *    ではなく常時表示の注記で伝える。
  * 5. 予約メニューにドラッグできない「⠿」の飾りを戻さない。
- * 6. 残件: 28の並び替えは操作列の↑↓で行い、注意書きに導線を書く。
+ * 6. 残件: 28の並び替えは操作列の「…」の中の上へ・下へで行い、注意書きに導線を書く。
  *    専用APIが無いため既存updateMenu（版つきPUT）でsort_orderを交換する。
  */
 import { readFileSync } from 'node:fs'
@@ -44,7 +44,13 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
 
   it('メディアはメディア総件数（フォルダ数+1ではない）', () => {
     const src = read('contents/page.tsx')
-    expect(src).toContain('total={`${total} 件`}')
+    /*
+     * m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム
+     * #m18k と同じ形）。総件数の置き場所は「すべて」の行。絞り込み後の件数は
+     * 一覧側の ListRange。旧 assertion（見出しに total）は ★V7 に書き換えた。
+     */
+    expect(src).not.toContain('total={`${total} 件`}')
+    expect(src).toContain("{ id: '', label: 'すべて', count: overallTotal ?? total }")
     expect(src).not.toContain('total={`${folders.length + 1}`}')
   })
 
@@ -88,11 +94,19 @@ describe('Issue #709: リッチメニューの状態表示は共有StatusBadge�
   })
 })
 
+/*
+ * R25 で箱を接続したため、「止まっている理由」の表明は外す。
+ * 止めていないので理由も要らない。残すのは意図：押せない飾りの口を
+ * 置かず（addFolderDisabled を戻さない）、消す前の注意は常時表示にする。
+ */
 describe('Issue #709: フォームのフォルダ追加は止まっている理由を常時表示する', () => {
-  it('hover限定のtitleだけでなくaddFolderNoteで説明する', () => {
+  it('止めずにつなぐ。押せない飾りの口は置かない', () => {
     const src = read('form-submissions/page.tsx')
-    expect(src).toContain('addFolderNote={')
-    expect(src).toContain('フォルダ保存先はまだ接続されていません')
+    expect(src).toContain('onAddFolder=')
+    expect(src).not.toContain('addFolderDisabled')
+    expect(src).not.toContain('フォルダ保存先はまだ接続されていません')
+    // 消す前の注意（中身は未分類に残る）は常時表示の文で伝える。
+    expect(src).toContain('フォルダを消しても、入っていたフォームは未分類として残ります。')
   })
 })
 
@@ -106,14 +120,18 @@ describe('Issue #709: 予約メニューに押せないドラッグ飾りを戻�
 describe('Issue #709残件: 28予約メニューは操作列の↑↓で並び替えできる', () => {
   it('行操作に上へ/下へボタンがある（掴めない飾りの代わり）', () => {
     const src = read('booking/menus/page.tsx')
-    expect(src).toContain('を上へ')
-    expect(src).toContain('を下へ')
+    // ★V7 行の操作の決まり：4つ並べると1440pxで器からはみ出すため、
+    // 上へ・下へは操作列の「…」の中へ集める。並び替え自体は残す。
+    expect(src).toContain("id: 'move-up'")
+    expect(src).toContain("label: '上へ'")
+    expect(src).toContain("id: 'move-down'")
+    expect(src).toContain("label: '下へ'")
     expect(src).toContain('moveMenu')
   })
 
   it('注意書きに↑↓の導線を書く', () => {
     const src = read('booking/menus/page.tsx')
-    expect(src).toContain('操作列の↑↓で変えられます')
+    expect(src).toContain('操作列の「…」から変えられます')
   })
 
   it('並び替えは既存updateMenu（版つきPUT）でsort_orderを交換し、新規APIを作らない', () => {

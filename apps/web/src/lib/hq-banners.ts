@@ -136,6 +136,23 @@ export interface BannerRunResult {
   generation: BannerGeneration
   image: BannerImage | null
   finished: boolean
+  /** 用途の指定寸法へ整形できたか。false のときは元の大きさのまま（検証環境で確認）。 */
+  resized?: boolean
+  targetWidth?: number
+  targetHeight?: number
+}
+
+/** 切り抜きの位置。用途寸法へ cover で整えるときに残す側（R120）。 */
+export type BannerCropPosition = 'center' | 'top' | 'bottom'
+
+export const CROP_POSITION_OPTIONS: Array<{ value: BannerCropPosition; label: string }> = [
+  { value: 'center', label: '中央' },
+  { value: 'top', label: '上' },
+  { value: 'bottom', label: '下' },
+]
+
+export function isBannerCropPosition(value: string): value is BannerCropPosition {
+  return value === 'center' || value === 'top' || value === 'bottom'
 }
 
 export interface BannerDeliveryResult {
@@ -147,6 +164,8 @@ export interface BannerDeliveryResult {
 export interface BannerGenerationInput {
   mode: BannerMode
   presetKey: string
+  /** 切り抜きの位置。run のときに送り、条件の登録ではサーバーが無視する。 */
+  cropPosition: BannerCropPosition
   textLines: string[]
   mainColor: string | null
   subColor: string | null
@@ -163,6 +182,7 @@ export interface BannerGenerationInput {
 export const EMPTY_GENERATION_INPUT: BannerGenerationInput = {
   mode: 'banner',
   presetKey: '',
+  cropPosition: 'center',
   textLines: [''],
   mainColor: null,
   subColor: null,
@@ -418,6 +438,8 @@ export function inputFromGeneration(g: BannerGeneration): BannerGenerationInput 
   return {
     mode: g.mode,
     presetKey: g.presetKey,
+    // 切り抜き位置は保存していないので中央に戻す（R120・migration 不要のため）。
+    cropPosition: 'center',
     textLines: g.textLines.length > 0 ? [...g.textLines] : [''],
     mainColor: g.mainColor,
     subColor: g.subColor,

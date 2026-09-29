@@ -14,6 +14,11 @@ describe('V6 予約設定', () => {
     expect(CREATE).toContain('designNode="GhOb3"')
   })
 
+  it('R91: メニューがあるときも見出しに作成の入口を常設する', () => {
+    expect(LIST).toContain("tab === 'menus' && canEditMenus")
+    expect(LIST).toContain('href="/booking/menus/new"')
+  })
+
   it('本文に画面タイトルを重ねず、行き先が分かる操作名にする', () => {
     expect(LIST).not.toContain('<Header')
     expect(CREATE).toContain('showHeader={false}')
@@ -59,7 +64,7 @@ describe('V6 予約設定', () => {
     expect(LIST).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
     expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
-    expect(LIST).toContain('止める・出す')
+    expect(LIST).toContain("label: m.is_active ? '止める' : '再開'")
     expect(LIST).toContain('bookingApi.patchMenu(selectedAccountId, menu.id, version')
     expect(LIST).toContain('error={visibilityError ?? undefined}')
     expect(LIST).not.toContain('メニュー名で検索')

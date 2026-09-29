@@ -9,6 +9,7 @@ import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import KpiCard from '@/components/shared/kpi-card'
@@ -107,7 +108,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       一覧そのものは使える。
     */
     void Promise.allSettled([
-      api.tags.list(),
+      // R23横展開: タグ候補も今のアカウントだけ（表示名の取り違え防止）。
+      api.tags.list({ accountId }),
       api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true }),
       api.scenarios.list({ accountId }),
       api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }),
@@ -227,6 +229,11 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     // 「未集計」を選んだときだけ未集計の行を出す。数字の絞り込みには混ぜない。
     if (matchFilter === 'unknown') return uncounted
     if (uncounted) return matchFilter === 'all'
+    /*
+     * R178: 「すべて」は0人も含めた全件。以前はここが `count > 0` だった
+     * ため、0人の検索が初期一覧から消え、保存失敗と誤認されていた。
+     */
+    if (matchFilter === 'all') return true
     return matchFilter === 'zero' ? count === 0 : count > 0
   })
 
@@ -288,28 +295,28 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           aria-label="条件名で検索"
           className="h-9 w-40 rounded-control border border-hairline bg-canvas px-3 text-label"
         />
-        <select
+        <Select
           value={usageFilter}
-          onChange={(event) => setUsageFilter(event.target.value as SavedSearchUsageFilter)}
+          onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
           aria-label="使用先"
-          className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
-        >
-          <option value="all">使用先：すべて</option>
-          <option value="used">使用中</option>
-          <option value="unused">未使用</option>
-        </select>
-        <select
+          options={[
+            { value: 'all', label: '使用先：すべて' },
+            { value: 'used', label: '使用中' },
+            { value: 'unused', label: '未使用' },
+          ]}
+        />
+        <Select
           value={matchFilter}
-          onChange={(event) => setMatchFilter(event.target.value as typeof matchFilter)}
+          onChange={(value) => setMatchFilter(value as typeof matchFilter)}
           aria-label="該当人数"
-          className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
-        >
-          <option value="all">該当人数：すべて</option>
-          <option value="matched">1人以上</option>
-          <option value="zero">0人</option>
-          {/* ATTR-08: 未集計・集計失敗は「0人」とは別の状態として探せる。 */}
-          <option value="unknown">未集計</option>
-        </select>
+          options={[
+            { value: 'all', label: '該当人数：すべて' },
+            { value: 'matched', label: '1人以上' },
+            { value: 'zero', label: '0人' },
+            // ATTR-08: 未集計・集計失敗は「0人」とは別の状態として探せる。
+            { value: 'unknown', label: '未集計' },
+          ]}
+        />
         <span className="flex-1" />
         {/*
           作る導線はタブの右に1個だけ（#1014 ATTR-22）。

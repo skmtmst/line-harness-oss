@@ -324,6 +324,56 @@ describe('friend add rules API', () => {
     }));
   });
 
+  /*
+   * R262(監査・2026-09-27): テストは参照先の整合だけで「選ばれる」と断定しない。
+   * 経路未選択・期限切れは設定の欠陥として止め、曜日・時間帯・経路の不一致は
+   * 理由つきで「選ばれない」と返す。曜日を待たずに公開できるよう、
+   * 時間の不一致だけではテスト失敗には記録しない。
+   */
+  test('R262: 流入リンク未選択・期限切れはテストで止まる', async () => {
+    db.getFriendAddRule.mockResolvedValueOnce({
+      ...rule,
+      definition_snapshot: JSON.stringify({ ...definition, routeIds: [], activeUntil: '2020-01-01T00:00' }),
+    });
+    const response = await app.request('/api/friend-add-rules/test', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-1', ruleId: 'rule-1' }),
+    }, makeEnv());
+    const body = await response.json() as { success: boolean; data: { matched: boolean; reasons: string[] } };
+    expect(body.success).toBe(false);
+    expect(body.data.matched).toBe(false);
+    expect(body.data.reasons).toEqual(expect.arrayContaining([
+      '対象の流入リンクが選ばれていません。流入条件で1つ以上選んでください。',
+      '有効期間の終了時刻が過ぎています。終了を延ばすか、この設定を消してください。',
+    ]));
+  });
+
+  test('R262: 対象外の曜日・経路では「選ばれない」と理由を返す', async () => {
+    db.getFriendAddRule.mockResolvedValueOnce({
+      ...rule,
+      definition_snapshot: JSON.stringify({ ...definition, weekdays: [0] }),
+    });
+    // 2026-09-28（月）10:00 JST は weekdays:[0]（日曜のみ）の外側。
+    const response = await app.request('/api/friend-add-rules/test', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-1', ruleId: 'rule-1',
+        routeId: 'route-9', expectedAt: '2026-09-28T10:00',
+      }),
+    }, makeEnv());
+    const body = await response.json() as { success: boolean; data: { matched: boolean; reasons: string[] } };
+    expect(body.success).toBe(true);
+    expect(body.data.matched).toBe(false);
+    expect(body.data.reasons).toEqual(expect.arrayContaining([
+      'この曜日は配信対象ではありません。',
+      '試した流入リンクはこの設定の対象ではありません。',
+    ]));
+    // 曜日の不一致は設定の欠陥ではないため、テスト成功（公開の鍵）は残す。
+    expect(db.recordFriendAddRuleTest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      ruleId: 'rule-1', succeeded: true,
+    }));
+  });
+
   test('R31: 一覧のまとめは直近7日にそろえ、送信は実際に送った数で数える', async () => {
     const env = makeEnv();
     const response = await app.request('/api/friend-add-rules?account_id=account-1&kind=first_time', {}, env);

@@ -222,6 +222,12 @@ export interface FriendField {
   type: FriendFieldType;
   /** select / multi_select のときの選択肢 */
   options: string[] | null;
+  /**
+   * R139: 選択肢のIDと表示名の対応（サーバーが実行時に付けている）。
+   * 既定値（IDの配列・IDで保存）を表示名へ戻すときに使う。無いときは
+   * 表示名の突き合わせに倒す。追加のみで既存の形は変えない。
+   */
+  optionDefinitions?: Array<{ id: string; label: string }> | null;
   defaultValue: string | null;
   source: "manual" | "form" | "ec" | "automation";
   ecFieldPath: string | null;
@@ -326,6 +332,11 @@ export interface MediaItem {
   durationMs: number | null;
   url: string;
   uploadedBy: string | null;
+  /**
+   * 入れた人の表示名（R35）。uploadedBy は内部ID（UUID）のまま残し、
+   * 画面にはこちらを出す。退職・削除済みで引けないときは null。
+   */
+  uploadedByName?: string | null;
   createdAt: string;
   /** アーカイブ済みなら退避した時刻・実行者・理由。使用中でも触れない消去ではない。 */
   archivedAt?: string | null;
@@ -382,6 +393,13 @@ export interface MediaDeleteImpact {
   /** 7種類すべてを削除直前に読み切った時刻。0件でも必ず入る。 */
   checkedAt: string;
   lastScannedAt: string | null;
+  /**
+   * 7種類すべてを読み切れたか（R34）。表が無い環境などで一部を読めな
+   * かったときは false。false のとき usageCount 0 は「どこでも使って
+   * いない」ではなく「確かめられなかった」で、canDelete も false
+   * （確かめられないものは消させない）。
+   */
+  verified: boolean;
   canDelete: boolean;
   recommendedAction: "delete" | "review_references";
 }
@@ -450,6 +468,11 @@ export interface CommonVar {
   validUntil: string | null;
   fallbackValue: string | null;
   expiryBehavior: "stop" | "fallback";
+  /** Q: 保存した状態（下書き draft / 使用中 active / 止めた stopped）。 */
+  status?: "draft" | "active" | "stopped";
+  /** 画面に出す状態。期限切れは時刻から計算した表示用の状態。 */
+  state?: "draft" | "active" | "stopped" | "expired";
+  stoppedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   nextSchedule?: {
@@ -1209,6 +1232,10 @@ export interface EntryRoute {
   introTemplateId: string | null;
   runAccountFriendAddScenarios: boolean;
   isActive: boolean;
+  /** 受付を止めた時刻。受付中・記録の無い古い行は null。 */
+  stoppedAt: string | null;
+  /** 止めた理由。受付中は null。 */
+  stoppedReason: string | null;
   /** 所属するLINEアカウント。未割当の古い行では null のことがある。 */
   lineAccountId?: string | null;
   createdAt: string;
@@ -2205,6 +2232,18 @@ export interface ReminderDraftStep {
   action?: Record<string, unknown>;
 }
 
+/**
+ * リマインダの対象条件。一斉配信・シナリオと同じ絞り込みの形。
+ *
+ * settings_snapshot の JSON にだけ持つので列の追加は要らない。
+ * 空 (rules・groups ともに0件) は「絞り込みなし」と同じく扱う。
+ */
+export interface ReminderTargetCondition {
+  operator: 'AND' | 'OR';
+  rules: Array<{ type: string; value: unknown }>;
+  groups?: ReminderTargetCondition[];
+}
+
 export interface ReminderDraftSettings {
   name: string;
   description?: string | null;
@@ -2220,6 +2259,8 @@ export interface ReminderDraftSettings {
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;
+  /** 対象の絞り込み条件。あるときは targetTagId よりこちらが勝つ。 */
+  targetCondition?: ReminderTargetCondition | null;
   folderId?: string | null;
   stopConditions: ReminderStopConditions;
   steps: ReminderDraftStep[];
@@ -2234,6 +2275,11 @@ export interface ReminderDraftVersion {
   lastTestStatus: "succeeded" | "failed" | null;
   lastTestedAt: string | null;
   publishedAt: string | null;
+  /**
+   * 版の更新時刻（R148 監査）。保存のたびに変わるため、開いたときの値と
+   * ずれていれば別の画面が先に保存したと分かる。保存時に送り返す。
+   */
+  updatedAt: string;
 }
 
 export interface ReminderValidationResult {
@@ -2377,6 +2423,11 @@ export interface ReminderDeliveryRunsResponse {
     lifecycleStatus: "draft" | "published" | "stopped";
     /** 公開版スナップショットの停止条件。公開版が無いときは null（未取得と区別する）。 */
     stopConditions: ReminderStopConditions | null;
+    /**
+     * 公開版があるか（R146 監査）。無い下書きは「停止中」ではなく
+     * 「下書き」と出し、再開はさせない。
+     */
+    hasPublishedVersion: boolean;
   };
   summary: {
     sent: number;

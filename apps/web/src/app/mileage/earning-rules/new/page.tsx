@@ -1,6 +1,7 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -20,6 +21,11 @@ import ConditionBuilder, {
   pruneCondition,
   type SegmentCondition,
 } from '@/components/shared/condition-builder'
+import {
+  EARNING_RULE_EVENT_TYPES as EVENT_TYPES,
+  EARNING_RULE_NOTIFY_TEMPLATE,
+  earningRuleCancellationEvent,
+} from '../rule-fields'
 
 /**
  * たまる決めごとをつくる（設計 V6 17-1-D / BmoGY）。
@@ -38,203 +44,7 @@ import ConditionBuilder, {
  * db と worker を通した。
  */
 
-/**
- * きっかけ。実際に awardActivityMileage / enqueueMileageEvent が呼ばれている
- * 行動だけを並べる（N-238: 届かない出来事を選べる見せかけにしない）。
- * source を指定すると、その経路から来たものだけが対象になる。
- */
-const EVENT_TYPES = [
-  {
-    value: 'message_received',
-    label: 'メッセージを受け取った',
-    note: '友だちからトークが届いたとき',
-    sources: [
-      ['', 'すべて'],
-      ['line', 'LINEのトーク'],
-    ],
-  },
-  {
-    value: 'link_clicked',
-    label: 'リンクがクリックされた',
-    note: '計測リンクを開いたとき',
-    sources: [
-      ['', 'すべて'],
-      ['tracked_link', '計測リンク'],
-    ],
-  },
-  {
-    value: 'form_submitted',
-    label: 'フォームが送信された',
-    note: '回答が届いたとき',
-    sources: [
-      ['', 'すべて'],
-      ['form', 'フォーム'],
-    ],
-  },
-  {
-    value: 'booking_created',
-    label: '予約が入った',
-    note: '予約が作られたとき',
-    sources: [
-      ['', 'すべて'],
-      ['booking', '予約'],
-      ['event_booking', 'イベント予約'],
-    ],
-  },
-  {
-    value: 'friend_registered',
-    label: '友だちが増えた',
-    note: '友だち追加されたとき。紹介経由なら、受け取る人で紹介した人を選べます',
-    sources: [
-      ['', 'すべて'],
-      ['line_relationship', 'LINEの友だち追加'],
-    ],
-  },
-  {
-    value: 'friend_following_7d',
-    label: '7日つづけてフォローしてくれた',
-    note: 'フォローが7日つづいたとき',
-    sources: [
-      ['', 'すべて'],
-      ['line_relationship', 'LINEの友だち関係'],
-    ],
-  },
-  {
-    value: 'friend_following_30d',
-    label: '30日つづけてフォローしてくれた',
-    note: 'フォローが30日つづいたとき',
-    sources: [
-      ['', 'すべて'],
-      ['line_relationship', 'LINEの友だち関係'],
-    ],
-  },
-  {
-    value: 'friend_following_90d',
-    label: '90日つづけてフォローしてくれた',
-    note: 'フォローが90日つづいたとき',
-    sources: [
-      ['', 'すべて'],
-      ['line_relationship', 'LINEの友だち関係'],
-    ],
-  },
-  {
-    value: 'friend_following_180d',
-    label: '180日つづけてフォローしてくれた',
-    note: 'フォローが180日つづいたとき',
-    sources: [
-      ['', 'すべて'],
-      ['line_relationship', 'LINEの友だち関係'],
-    ],
-  },
-  {
-    value: 'friend_following_365d',
-    label: '1年つづけてフォローしてくれた',
-    note: 'フォローが1年つづいたとき',
-    sources: [
-      ['', 'すべて'],
-      ['line_relationship', 'LINEの友だち関係'],
-    ],
-  },
-  {
-    value: 'webinar_watch_5m',
-    label: 'ウェビナーを5分見た',
-    note: '再生位置が5分を超えたとき',
-    sources: [
-      ['', 'すべて'],
-      ['webinar', 'ウェビナー'],
-    ],
-  },
-  {
-    value: 'webinar_watch_15m',
-    label: 'ウェビナーを15分見た',
-    note: '再生位置が15分を超えたとき',
-    sources: [
-      ['', 'すべて'],
-      ['webinar', 'ウェビナー'],
-    ],
-  },
-  {
-    value: 'webinar_completed',
-    label: 'ウェビナーを見終えた',
-    note: '9割まで見たとき',
-    sources: [
-      ['', 'すべて'],
-      ['webinar', 'ウェビナー'],
-    ],
-  },
-  {
-    value: 'webinar_cta_clicked',
-    label: 'ウェビナーのボタンが押された',
-    note: '案内のリンクを開いたとき',
-    sources: [
-      ['', 'すべて'],
-      ['webinar', 'ウェビナー'],
-    ],
-  },
-  {
-    value: 'purchase_completed',
-    label: '購入した',
-    note: '決済が通ったとき',
-    sources: [
-      ['', 'すべて'],
-      ['stripe', 'Stripe'],
-    ],
-  },
-  {
-    value: 'instagram_line_returned',
-    label: 'Instagramから戻ってきた',
-    note: 'Instagram経由でLINEに戻ったとき',
-    sources: [
-      ['', 'すべて'],
-      ['instagram', 'Instagram'],
-    ],
-  },
-  {
-    value: 'instagram_dm_received',
-    label: 'InstagramのDMが届いた',
-    note: 'Instagram連携からDMが届いたとき',
-    sources: [
-      ['', 'すべて'],
-      ['instagram', 'Instagram'],
-    ],
-  },
-  {
-    value: 'instagram_comment_created',
-    label: 'Instagramにコメントされた',
-    note: '投稿にコメントが付いたとき',
-    sources: [
-      ['', 'すべて'],
-      ['instagram', 'Instagram'],
-    ],
-  },
-  {
-    value: 'instagram_story_mentioned',
-    label: 'Instagramのストーリーで言及された',
-    note: 'ストーリーでメンションされたとき',
-    sources: [
-      ['', 'すべて'],
-      ['instagram', 'Instagram'],
-    ],
-  },
-  {
-    value: 'tag_added',
-    label: 'タグが付いた',
-    note: '担当者や自動処理でタグが付いたとき',
-    sources: [
-      ['', 'すべて'],
-      ['tag', 'タグ'],
-    ],
-  },
-  {
-    value: 'affiliate_conversion_approved',
-    label: '紹介の成果が承認された',
-    note: '紹介の成果を管理者が承認したとき。行動した人は紹介者です',
-    sources: [
-      ['', 'すべて'],
-      ['affiliate_conversion', '紹介成果'],
-    ],
-  },
-] as const
+
 
 const DAILY_CAPS = [
   ['', '制限なし'],
@@ -271,21 +81,20 @@ export default function NewMileageRulePage() {
 
   useEffect(() => {
     let cancelled = false
-    void api.tags.list().then((res) => {
+    // R23横展開: 倍率つきタグの表示は今のアカウントだけ。切替で取り直す。
+    void api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).then((res) => {
       if (!cancelled && res.success) setTags(res.data)
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   const selected = EVENT_TYPES.find((t) => t.value === eventType) ?? EVENT_TYPES[0]
   const value = Number(amount)
   const validAmount = Number.isInteger(value) && value >= 1
   const expiryDays = expiresAfterDays === '' ? null : Number(expiresAfterDays)
-  const cancellationEvent = eventType === 'booking_created'
-    ? 'booking_cancelled'
-    : eventType === 'purchase_completed' ? 'order_cancelled' : null
+  const cancellationEvent = earningRuleCancellationEvent(eventType)
 
   /** 倍率つきのタグ。優先度がいちばん高い1枚だけが効く。 */
   const multiplierTags = useMemo(
@@ -370,7 +179,7 @@ export default function NewMileageRulePage() {
             sortOrder: 0,
             notification: {
               enabled: notifyFriend,
-              messageTemplate: 'ありがとうございます。{awardedMiles} マイルが付きました。現在の残高は {balance} マイルです。',
+              messageTemplate: EARNING_RULE_NOTIFY_TEMPLATE,
             },
           },
         })
@@ -443,10 +252,11 @@ export default function NewMileageRulePage() {
             <div className="rounded-card bg-canvas p-3 text-sm leading-6 text-ink">
               ありがとうございます。{validAmount ? value.toLocaleString('ja-JP') : '—'} マイルが付きました。現在の残高は、配信時に自動で入ります。
             </div>
-            <label className="mt-3 flex items-start gap-2 text-xs text-ink">
-              <input type="checkbox" checked={notifyFriend} onChange={(event) => setNotifyFriend(event.target.checked)} />
-              <span>マイルが付いたら、この内容を自動で知らせる</span>
-            </label>
+            <Checkbox
+              checked={notifyFriend}
+              onCheckedChange={setNotifyFriend}
+              className="mt-3"
+            >マイルが付いたら、この内容を自動で知らせる</Checkbox>
             <p className="mt-2 text-xs text-ink-secondary">通知するかどうかと本文を、たまる決めごとの下書きへ一緒に保存します。</p>
           </LinePreview>
 
@@ -484,15 +294,16 @@ export default function NewMileageRulePage() {
         </Field>
 
         <Field label="きっかけ" htmlFor="sc-event" required note={selected.note}>
-          <SelectField
+          <Select
+            aria-label="きっかけ"
             id="sc-event"
             value={eventType}
-            onChange={(e) => {
-              setEventType(e.target.value)
+            onChange={(value) => {
+              setEventType(value)
               setSource('')
             }}
             options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-            className={inputClass}
+            size="full"
           />
         </Field>
 
@@ -501,12 +312,12 @@ export default function NewMileageRulePage() {
           htmlFor="sc-source"
           note="同じ行動でも、経由した場所ごとに分けられます。"
         >
-          <SelectField
+          <Select
             id="sc-source"
             value={source}
-            onChange={(e) => setSource(e.target.value)}
+            onChange={(value) => setSource(value)}
             aria-label="行動の出どころ"
-            className={inputClass}
+            size="full"
             options={selected.sources.map(([value, label]) => ({ value, label }))}
           />
         </Field>
@@ -546,10 +357,12 @@ export default function NewMileageRulePage() {
 
         <details className="rounded-control border border-hairline px-3 py-2">
           <summary className="cursor-pointer text-xs font-semibold text-action">倍率の詳細設定</summary>
-          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" className="mt-0.5" checked={ignoreMultiplier} onChange={(e) => setIgnoreMultiplier(e.target.checked)} />
-            <span>会員ランクの倍率をかけない<span className="block text-xs text-ink-faint">誰でも同じ額にしたいときに選びます。</span></span>
-          </label>
+          <Checkbox
+            checked={ignoreMultiplier}
+            onCheckedChange={setIgnoreMultiplier}
+            description="誰でも同じ額にしたいときに選びます。"
+            className="mt-3"
+          >会員ランクの倍率をかけない</Checkbox>
         </details>
       </FormSection>
 
@@ -564,18 +377,18 @@ export default function NewMileageRulePage() {
           htmlFor="sc-cap"
           note="同じ人が1日に何回まで対象になるかです。"
         >
-          <SelectField
+          <Select
             id="sc-cap"
             value={dailyCap}
-            onChange={(e) => setDailyCap(e.target.value)}
+            onChange={(value) => setDailyCap(value)}
             aria-label="1日に数える回数"
-            className={inputClass}
+            size="full"
             options={DAILY_CAPS.map(([value, label]) => ({ value, label }))}
           />
         </Field>
 
         <Field label="同じ対象の数えかた" htmlFor="sc-unique">
-          <SelectField id="sc-unique" value={uniqueMode} onChange={(e) => setUniqueMode(e.target.value as typeof uniqueMode)} options={[{ value: "", label: "何度でも数える" }, { value: "subject", label: "同じ対象は1回だけ" }, { value: "subjectPerDay", label: "同じ対象は1日1回だけ" }]} className={inputClass} />
+          <Select aria-label="同じ対象の数えかた" id="sc-unique" value={uniqueMode} onChange={(value) => setUniqueMode(value as typeof uniqueMode)} size="full" options={[{ value: "", label: "何度でも数える" }, { value: "subject", label: "同じ対象は1回だけ" }, { value: "subjectPerDay", label: "同じ対象は1日1回だけ" }]} />
         </Field>
         </div>
       </FormSection>
@@ -625,15 +438,19 @@ export default function NewMileageRulePage() {
             </Field>
           </div>
           {cancellationEvent ? (
-            <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-              <input type="checkbox" checked={reverseOnCancellation} onChange={(e) => setReverseOnCancellation(e.target.checked)} className="mt-0.5" />
-              <span>取り消されたら、付けたぶんを引く<span className="block text-xs text-ink-faint">{eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。</span></span>
-            </label>
+            <Checkbox
+              checked={reverseOnCancellation}
+              onCheckedChange={setReverseOnCancellation}
+              description={`${eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。`}
+              className="mt-3"
+            >取り消されたら、付けたぶんを引く</Checkbox>
           ) : null}
-          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" className="mt-0.5" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            <span>作成したらすぐ動かす<span className="block text-xs text-ink-faint">オフにすると停止中で保存します。</span></span>
-          </label>
+          <Checkbox
+            checked={isActive}
+            onCheckedChange={setIsActive}
+            description="オフにすると停止中で保存します。"
+            className="mt-3"
+          >作成したらすぐ動かす</Checkbox>
         </details>
       </FormSection>
     </CreatePage>

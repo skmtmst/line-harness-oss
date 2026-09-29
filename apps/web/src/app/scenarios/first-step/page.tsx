@@ -34,8 +34,9 @@ import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scen
 import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -198,6 +199,17 @@ function FirstStepContent() {
           return
         }
         setScenario(res.data)
+        // R23横展開: 対象タグ・テンプレートの候補はこのシナリオのアカウントだけ。
+        // 読み直したシナリオから所属を取る（取り直しは1回だけ）。
+        const candidateAccountId = res.data.lineAccountId ?? undefined
+        void scenarioReferenceData.tags(candidateAccountId).then((tagRes) => {
+          if (seq !== loadSeq.current) return
+          if (tagRes.success) setTags(tagRes.data)
+        })
+        void scenarioReferenceData.templates(candidateAccountId).then((tplRes) => {
+          if (seq !== loadSeq.current) return
+          if (tplRes.success) setTemplates(tplRes.data as unknown as Template[])
+        })
         const first = [...res.data.steps].sort((a, b) => a.stepOrder - b.stepOrder)[0]
         if (first) {
           // 作成フローを途中で閉じて戻った場合は、既存の1通目を再表示する。
@@ -235,12 +247,6 @@ function FirstStepContent() {
         setLoadState('error')
       }
     })()
-    void scenarioReferenceData.tags().then(res => {
-      if (res.success) setTags(res.data)
-    })
-    void scenarioReferenceData.templates().then(res => {
-      if (res.success) setTemplates(res.data as unknown as Template[])
-    })
   }, [id, reloadKey])
 
   const mode: DeliveryMode = scenario?.deliveryMode ?? 'absolute_time'
@@ -552,7 +558,7 @@ function FirstStepContent() {
             この1通目を誰に送るかを決めます。開始のきっかけは、このあとの編集画面で決められます。
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <RadioCardGroup legend="この1通目を誰に送るか" className="mt-4">
             {(
               [
                 { value: 'all', label: 'シナリオ購読中の全員に配信する' },
@@ -560,28 +566,28 @@ function FirstStepContent() {
                 { value: 'advanced', label: '詳細条件で絞り込んで配信する' },
               ] as const
             ).map(opt => (
-              <label key={opt.value} className="text-ink flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="targetMode"
-                  checked={targetMode === opt.value}
-                  onChange={() => setTargetMode(opt.value)}
-                />
-                {opt.label}
-              </label>
+              <RadioCard
+                key={opt.value}
+                name="targetMode"
+                value={opt.value}
+                checked={targetMode === opt.value}
+                onChange={() => setTargetMode(opt.value)}
+                title={opt.label}
+              />
             ))}
-          </div>
+          </RadioCardGroup>
 
           {targetMode === 'tag' && (
             <label className="mt-4 block">
               <span className="text-ink-secondary mb-1 block text-xs font-medium">
                 タグで絞り込み <span className="text-danger">*</span>
               </span>
-              <SelectField
+              <Select
                 value={targetTagId}
-                onChange={e => setTargetTagId(e.target.value)}
+                onChange={value => setTargetTagId(value)}
                 aria-label="絞り込みに使うタグ"
-                className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
+                size="full"
+                className="max-w-md"
                 options={[
                   { value: '', label: '-- 選んでください --' },
                   ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
@@ -672,24 +678,23 @@ function FirstStepContent() {
             この管理画面で送れないことが分からない）。
           */}
           <div className="mt-5">
-            <div className="mb-3 flex flex-wrap items-center gap-4">
+            <RadioCardGroup legend="配信内容の作り方" className="mb-3 flex flex-wrap gap-4">
               {(
                 [
                   { value: 'compose', label: 'この画面で作る' },
                   { value: 'template', label: 'テンプレートから選ぶ' },
                 ] as const
               ).map(o => (
-                <label key={o.value} className="text-ink flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="contentMode"
-                    checked={contentMode === o.value}
-                    onChange={() => changeContentMode(o.value)}
-                  />
-                  {o.label}
-                </label>
+                <RadioCard
+                  key={o.value}
+                  name="contentMode"
+                  value={o.value}
+                  checked={contentMode === o.value}
+                  onChange={() => changeContentMode(o.value)}
+                  title={o.label}
+                />
               ))}
-            </div>
+            </RadioCardGroup>
 
             {preserved && restoreNotice && (
               <Notice tone="warn" message={restoreNotice} className="mb-3" />
@@ -760,11 +765,12 @@ function FirstStepContent() {
               <div>
                 <label className="block">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">テンプレート</span>
-                  <SelectField
+                  <Select
                     value={templateId}
-                    onChange={e => editTemplateId(e.target.value)}
+                    onChange={value => editTemplateId(value)}
                     aria-label="配信するテンプレート"
-                    className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
+                    size="full"
+                    className="max-w-md"
                     options={[
                       { value: '', label: '選んでください' },
                       ...templates.map((template) => ({

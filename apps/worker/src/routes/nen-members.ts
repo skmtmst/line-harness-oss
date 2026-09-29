@@ -3,6 +3,8 @@ import type { Message } from '@line-crm/line-sdk';
 import {
   claimPhotoNotificationDelivery,
   completePhotoNotificationDelivery,
+  findRewardedAdoptedDuplicate,
+  getEffectivePhotoRewardPolicy,
   getFriendByLineUserIdForAccount,
   getPhotoNotificationState,
   jstNow,
@@ -44,7 +46,7 @@ import {
   refreshStoredFeeding,
 } from '../services/nen-feeding.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
-import { APPETITE_LABELS, STOOL_LABELS, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
+import { APPETITE_LABELS, STOOL_LABELS, isCareStoolStatus, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
 import {
   attemptPhotoRewardForPhoto,
   ecPhotoPointClientFromEnv,
@@ -66,7 +68,10 @@ import {
 const nenMembers = new Hono<Env>();
 const CONCERNS = new Set(['tear_stain', 'coat', 'allergy', 'appetite', 'stool', 'weight', 'other']);
 const IMAGE_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-const PHOTO_ADOPTION_POINTS = 5;
+/*
+ * 採用1枚の点数は固定値ではなく、その時点で使っている報酬の決まりの版を
+ * 見る (#817)。版が無い古いDBでは5ptへ倒す。ここに数は書かない。
+ */
 
 /*
  * ECへのポイント付与の接続先。誕生日クーポン（index.ts の cron）と同じ
@@ -828,13 +833,15 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
       (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, concerns,
        recommended_daily_grams, recommended_daily_min_grams, recommended_daily_max_grams,
        venison_daily_grams, food_cycle_days, image_r2_key, image_url, created_at, updated_at,
-       neutered, activity_level, feeding_product_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       weight_updated_at, neutered, activity_level, feeding_product_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id, friend.id, friend.user_id, name, animalType,
     gender,
     birthday, breed, weightKg, JSON.stringify(concerns), guide?.daily ?? null, guide?.min ?? null, guide?.max ?? null,
     guide?.venison ?? null, guide?.cycleDays ?? null, photoKey, imageUrl, now, now,
+    // 登録時に体重を入れているので、測った日＝登録日として記録する（監査 R57）。
+    now,
     feeding.neutered === undefined || feeding.neutered === null ? null : feeding.neutered ? 1 : 0,
     feeding.activityLevel ?? 'normal',
     feeding.feedingProductId ?? null,
@@ -866,6 +873,7 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
 
   const sets: string[] = [];
   const values: unknown[] = [];
+  let weightChanged = false;
   if (body.name !== undefined) {
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name || name.length > 80) return c.json({ success: false, error: '名前は1〜80文字で入力してください' }, 400);
@@ -889,6 +897,12 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
     const weightKg = Number(body.weightKg);
     if (!Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) return c.json({ success: false, error: '体重は 0.2〜150kg で入力してください' }, 400);
     sets.push('weight_kg = ?'); values.push(Math.round(weightKg * 10) / 10);
+    // 監査 R57: 体重が変わったときだけ「体重の更新」を動かす。同じ値の再送や
+    // 名前だけの編集では日付を維持する。
+    const rounded = Math.round(weightKg * 10) / 10;
+    if (rounded !== Number(current.weight_kg)) {
+      weightChanged = true;
+    }
   }
   if (body.concerns !== undefined) {
     const concerns = Array.isArray(body.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
@@ -913,6 +927,7 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
 
   const now = jstNow();
   sets.push('updated_at = ?'); values.push(now);
+  if (weightChanged) { sets.push('weight_updated_at = ?'); values.push(now); }
   await c.env.DB.prepare(`UPDATE nen_pet_profiles SET ${sets.join(', ')} WHERE id = ? AND friend_id = ?`).bind(...values, petId, friend.id).run();
   // 誕生日が変わったら、古い日付へ予約済みの誕生日クーポン配信を取消し、
   // 次の日次走査で新しい誕生日から組み直させる。すでに発行済みの今年分は残る。
@@ -986,10 +1001,40 @@ nenMembers.post('/api/liff/nen/health-logs', async (c) => {
        appetite=excluded.appetite, skin_status=excluded.skin_status, tear_stain_status=excluded.tear_stain_status, note=excluded.note`,
   ).bind(id, body!.petId, friend.id, loggedOn, weightKg, heartRateBpm, respiratoryRateBpm, stool, appetite, skin, tear, String(body?.note || '').slice(0, 500), jstNow()).run();
 
+  // 監査 R59: 日記につけた体重が「今日の目安」に反映されない穴を塞ぐ。
+  // この記録が体重を持つ記録の中でいちばん新しい日付なら、プロフィールの体重を
+  // その値に揃えて給餌目安も計算し直す（過去日の記録で今の体重を戻さない）。
+  if (weightKg != null) {
+    const newestWeightLog = await c.env.DB.prepare(
+      `SELECT MAX(logged_on) AS d FROM nen_health_logs WHERE pet_id = ? AND weight_kg IS NOT NULL`,
+    ).bind(body!.petId).first<{ d: string | null }>();
+    if (newestWeightLog?.d && loggedOn >= newestWeightLog.d) {
+      const [current, catalog] = await Promise.all([
+        c.env.DB.prepare(
+          `SELECT animal_type, birthday, neutered, activity_level, feeding_product_id FROM nen_pet_profiles WHERE id = ?`,
+        ).bind(body!.petId).first<Record<string, unknown>>(),
+        accountFeedingProducts(c, friend),
+      ]);
+      const now = jstNow();
+      // 監査 R57: 「体重の更新」には同期した瞬間ではなく日記の記録日（測った日）を入れる。
+      await c.env.DB.prepare(`UPDATE nen_pet_profiles SET weight_kg = ?, weight_updated_at = ?, updated_at = ? WHERE id = ?`).bind(weightKg, loggedOn, now, body!.petId).run();
+      if (current) {
+        const plan = planForPetRow({
+          id: String(body!.petId), animal_type: String(current.animal_type), weight_kg: weightKg,
+          birthday: (current.birthday as string | null) ?? null,
+          neutered: current.neutered as number | null,
+          activity_level: (current.activity_level as string | null) ?? null,
+          feeding_product_id: (current.feeding_product_id as string | null) ?? null,
+        }, catalog.products, new Date(), catalog.treatLimitPercent);
+        await refreshStoredFeeding(c.env.DB, String(body!.petId), plan, now);
+      }
+    }
+  }
+
   const latest = await c.env.DB.prepare(`SELECT appetite, stool_status FROM nen_health_logs WHERE pet_id = ? ORDER BY logged_on DESC LIMIT 3`).bind(body!.petId).all<{ appetite: string; stool_status: string }>();
   const checks = [
     { type: 'poor_appetite', hit: latest.results.length === 3 && latest.results.every((r) => r.appetite === 'poor') },
-    { type: 'abnormal_stool', hit: latest.results.length === 3 && latest.results.every((r) => r.stool_status !== 'normal') },
+    { type: 'abnormal_stool', hit: latest.results.length === 3 && latest.results.every((r) => isCareStoolStatus(r.stool_status)) },
   ];
   for (const check of checks) {
     if (check.hit) {
@@ -1065,6 +1110,14 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
     return c.json({ success: false, error: '画像の寸法が大きすぎます（20000px以内にしてください）' }, 400);
   }
   const id = crypto.randomUUID();
+  /*
+   * 重複判定のため、中身の hash を付ける (#817)。
+   * 完全に同じ写真だけを「重複」とし、似ている写真は自動で却下しない。
+   */
+  const hashDigest = await crypto.subtle.digest('SHA-256', bytes);
+  const contentHash = Array.from(new Uint8Array(hashDigest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
   const extension = IMAGE_TYPES[body.mimeType];
   const key = `nen-photo-originals/${friend.id}/${id}.${extension}`;
   const reviewKey = `nen-photo-review/${friend.id}/${id}-v1.${extension}`;
@@ -1084,12 +1137,13 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
   await c.env.DB.prepare(`INSERT INTO nen_photo_submissions
     (id, friend_id, pet_id, r2_key, image_url, content_type, caption, status,
      created_at, updated_at, line_account_id, review_image_url, public_image_url,
-     image_width, image_height, image_byte_size)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`)
+     image_width, image_height, image_byte_size, content_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .bind(
       id, friend.id, body.petId, key, reviewImageUrl, body.mimeType,
       String(body.caption || '').trim().slice(0, 300), now, now, friend.line_account_id,
       reviewImageUrl, reviewImageUrl, dimensions.width, dimensions.height, bytes.byteLength,
+      contentHash,
     ).run();
   // 保存の直後に検査の段を入れる。clean になるまで審査へは流さない。
   // 記録に失敗しても投稿自体は返す（門番は出す前にその場で回す）。
@@ -1638,7 +1692,7 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
   const photo = await c.env.DB.prepare(
     `SELECT ps.id, ps.review_image_url AS image_url, ps.caption, ps.status,
             ps.image_width, ps.image_height, ps.image_byte_size, ps.captured_device,
-            ps.review_version, ps.created_at, ps.publication_consent_at,
+            ps.content_hash, ps.review_version, ps.created_at, ps.publication_consent_at,
             ps.publication_consent_version, ps.publication_withdrawn_at,
             ps.display_rotation, ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
             f.photo_watch_required AS submitter_watch,
@@ -1708,6 +1762,19 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
       reason_label: PHOTO_REWARD_REASON_LABELS[String(reward.last_error ?? '')] ?? null,
     }
     : null;
+  /*
+   * 重複の判定 (#817)。完全に同じ中身の写真で、すでに採用されて
+   * 報酬が付いたものがあれば、前の投稿と並べて見せる。
+   * 似ている写真は自動で却下せず、注意の札だけに留める。
+   */
+  const [duplicate, rewardPolicy] = await Promise.all([
+    findRewardedAdoptedDuplicate(c.env.DB, {
+      contentHash: typeof photo.content_hash === 'string' ? photo.content_hash : null,
+      lineAccountId: accountId,
+      excludePhotoId: String(photo.id),
+    }),
+    getEffectivePhotoRewardPolicy(c.env.DB),
+  ]);
   return c.json({
     success: true,
     data: {
@@ -1717,6 +1784,8 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
       history: history.results,
       reward: rewardView,
       publication: publication ? { ...publication, placements: publicationPlacements } : null,
+      duplicate,
+      rewardPolicy,
     },
   });
 });
@@ -1730,6 +1799,8 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     expectedVersion?: number;
     resubmitInvite?: boolean;
     watchSubmitter?: boolean;
+    // 重複のときの「報酬なしで採用」(#817)。点数を付けずに採用だけ残す。
+    withoutReward?: boolean;
   }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   // 再実行キー。連打・応答ロストのやり直しが「別の担当者が更新しました」に
@@ -1835,8 +1906,27 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
       return c.json({ success: false, code: 'file_scan_blocked', error: message }, 409);
     }
   }
-  const awarded = status === 'adopted' ? PHOTO_ADOPTION_POINTS : 0;
-  const pointSync: 'pending' | 'needs_attention' | 'not_required' = status !== 'adopted'
+  /*
+   * 採用する時点の報酬の決まりを写す (#817)。版を変えても過去の付与は
+   * 変わらない。同じ写真が2回採用されても報酬は1回だけ——報酬つきで
+   * 採用済みの重複があるときは、選んだ操作に関わらず点数を付けない。
+   */
+  const policy = status === 'adopted' ? await getEffectivePhotoRewardPolicy(c.env.DB) : null;
+  const rewardedDuplicate = status === 'adopted'
+    ? await findRewardedAdoptedDuplicate(c.env.DB, {
+      contentHash: typeof photo.content_hash === 'string' ? photo.content_hash as string : null,
+      lineAccountId: accountId,
+      excludePhotoId: c.req.param('id'),
+    })
+    : null;
+  const withoutReward = status === 'adopted' && body?.withoutReward === true;
+  const awarded = status === 'adopted' && policy && !withoutReward && !rewardedDuplicate
+    ? policy.points
+    : 0;
+  const rewardSkipped: 'duplicate' | 'requested' | null = status !== 'adopted'
+    ? null
+    : rewardedDuplicate ? 'duplicate' : withoutReward ? 'requested' : null;
+  const pointSync: 'pending' | 'needs_attention' | 'not_required' = awarded <= 0
     ? 'not_required'
     : photo.customer_id ? 'pending' : 'needs_attention';
   const now = jstNow();
@@ -1870,14 +1960,14 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
         status, awarded, reasonCode || null, reasonNote || null, reviewer.id, reviewer.name,
         now, status, now, c.req.param('id'), accountId, body!.expectedVersion,
       ),
-      ...(status === 'adopted' && photo.customer_id ? [c.env.DB.prepare(
+      ...(status === 'adopted' && awarded > 0 && photo.customer_id && policy ? [c.env.DB.prepare(
         `INSERT INTO nen_photo_reward_outbox
           (id, photo_id, line_account_id, friend_id, customer_id, provider_award_key,
            policy_version, points, status, next_attempt_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'legacy-5', ?, 'pending', ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       ).bind(
         crypto.randomUUID(), photo.id, accountId, photo.friend_id, photo.customer_id,
-        `nen-photo:${String(photo.id)}`, awarded, now, now, now,
+        `nen-photo:${String(photo.id)}`, policy.policyKey, awarded, now, now, now,
       )] : []),
       // 「この人の次の投稿は、必ず人が見る」（#931 N-312）。確認対象の印を
       // 友だちへ残し、次に届く写真の一覧へ出す。
@@ -1936,6 +2026,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
       pointBalance: null,
       pointSync: finalPointSync,
       notificationStatus: delivery.notificationStatus,
+      rewardSkipped,
     },
   });
 });

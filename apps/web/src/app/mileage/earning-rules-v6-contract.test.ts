@@ -4,6 +4,7 @@ import { ruleEventLabel } from './earning-rule-view'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const NEW_PAGE = readFileSync(new URL('./earning-rules/new/page.tsx', import.meta.url), 'utf8')
+const EDIT_PAGE = readFileSync(new URL('./earning-rules/edit/page.tsx', import.meta.url), 'utf8')
 
 describe('V6 たまる決めごと（N46cQ）の見せ方', () => {
   it('未知の行動は内部語を出さず、運用者の言葉にする', () => {
@@ -42,6 +43,47 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('利用対象：すべての友だち')
   })
 
+  it('R297: 未公開の決めごとに「公開版の中身」は出さず、下書きと言い分ける', () => {
+    // 公開版が無いのに「公開版の中身を見る」と出すと、見た人は
+    // 公開済みだと思い込む。未公開は下書きの中身と版・保存日時を出す。
+    expect(PAGE).toContain("rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る'")
+    expect(PAGE).toContain('まだ公開版はありません')
+    expect(PAGE).toContain('公開版 v${rule.publishedVersion}')
+    expect(PAGE).toContain('に反映')
+  })
+
+  it('R296: 一覧から下書きの編集画面へ行け、未公開だけ削除できる', () => {
+    // 編集の入口。別画面へ行く項目には external の印を付ける。
+    expect(PAGE).toContain('下書きを編集')
+    expect(PAGE).toContain('/mileage/earning-rules/edit?id=')
+    // 消せるのは公開前の下書きだけ。履歴のある運用済みは口が409で断り、
+    // 画面は確認窓に理由を残す（一覧を消さない）。
+    expect(PAGE).toContain('rule.publishedVersion == null')
+    expect(PAGE).toContain('この決めごとを削除')
+    expect(PAGE).toContain('api.mileage.deleteRule')
+    expect(PAGE).toContain('を削除しますか？')
+    expect(PAGE).toContain('取り消せません')
+    expect(PAGE).toContain('deleteError')
+  })
+
+  it('R296: 編集画面は下書きだけを版つきで保存し、動いている内容に触れない', () => {
+    // 保存は下書き口へ。読んだ版を渡すので、開いている間の他人の直しを
+    // 黙って上書きしない（ずれていたら口が409で断る）。
+    expect(EDIT_PAGE).toContain('api.mileage.saveEarningRuleDraft')
+    expect(EDIT_PAGE).toContain('expectedVersion: rule.draftVersion')
+    // 公開・停止・並び順はこの画面の仕事ではない（一覧の操作へ残す）。
+    expect(EDIT_PAGE).not.toContain('publishEarningRule')
+    expect(EDIT_PAGE).not.toContain('saveEarningRulesOrder')
+    // 動いている内容が変わらないことを画面の言葉で伝える。
+    expect(EDIT_PAGE).toContain('動いている内容は変わりません')
+    // 新規作成と同じ選択肢を使う（直しが片方だけに残らないように）。
+    expect(EDIT_PAGE).toContain("from '../rule-fields'")
+    expect(NEW_PAGE).toContain("from '../rule-fields'")
+    // 見つからない・読み込めないを言い分ける（★V7 共通部品その2）。
+    expect(EDIT_PAGE).toContain('この決めごとが見つかりません')
+    expect(EDIT_PAGE).toContain('たまる決めごとを読み込めませんでした')
+  })
+
   it('一覧を設計の表で出す', () => {
     expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
     expect(PAGE).toContain('>何をしてくれたら</Th>')
@@ -64,6 +106,9 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('ruleSummary?.grantedMiles')
     expect(PAGE).toContain('ruleSummary?.averageBalance')
     expect(PAGE).toContain('grantedMiles30d(rule)')
+    // R53: 決めごと行の30日額は台帳の実額。回数×今の下書き金額にしない。
+    expect(PAGE).toContain('rule.metrics30d.grantedMiles')
+    expect(PAGE).not.toContain('rule.metrics30d.granted * rule.draft.amount')
   })
 
   it('平均の分母と説明文の人数は同じ値を使う（MILEAGE-05）', () => {

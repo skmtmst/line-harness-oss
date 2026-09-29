@@ -9,8 +9,10 @@ import KnowledgeEditor from '@/components/ops/knowledge-editor'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import styles from '@/components/ops/knowledge.module.css'
@@ -62,12 +64,12 @@ export default function KnowledgeList() {
     <div className={styles.filters}>
       <div className={styles.search}><Search aria-hidden="true" /><TextField aria-label="タイトル・質問・キーワードで検索"
         placeholder="タイトル・質問・キーワードで検索" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} maxLength={200} /></div>
-      <SelectField aria-label="種類" className={styles.filter} value={kind} onChange={e => { setKind(e.target.value); setOffset(0) }}
+      <Select aria-label="種類" className={styles.filter} value={kind} onChange={value => { setKind(value); setOffset(0) }}
         options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} />
-      <SelectField data-design-node="aeKindFilter" aria-label="記事の種類" className={styles.articleKindFilter} value={articleKind}
-        onChange={e => { setArticleKind(e.target.value); setOffset(0) }}
-        options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} />
-      <SelectField aria-label="状態" className={styles.filter} value={state} onChange={e => { setState(e.target.value); setOffset(0) }}
+      <span data-design-node="aeKindFilter"><Select aria-label="記事の種類" className={styles.articleKindFilter} value={articleKind}
+        onChange={value => { setArticleKind(value); setOffset(0) }}
+        options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} /></span>
+      <Select aria-label="状態" className={styles.filter} value={state} onChange={value => { setState(value); setOffset(0) }}
         options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} />
       <span className={styles.count}>{loaded && !error ? `${total}件` : '—'}</span>
     </div>
@@ -85,12 +87,12 @@ export default function KnowledgeList() {
           const approved = label.label === '承認済み'
           return <Tr key={article.id}>
             <Td className={styles.titleCell} title={article.title}>{article.title}</Td>
-            <Td>{KNOWLEDGE_KINDS.find(v => v.value === article.kind)?.label}</Td>
-            <Td><Chip tone={articleKindLabel.tone} className={styles.articleKindChip}>{articleKindLabel.label}</Chip></Td>
-            <Td><Chip tone={label.tone} className={styles.chip}>{label.label}</Chip></Td>
-            <Td>{article.usedCount ? `${article.usedCount}回` : '—'}</Td>
-            <Td>{article.helpfulCount ? `${article.helpfulCount}件` : '—'}</Td>
-            <Td>{knowledgeDate(article.updatedAt)}</Td>
+            <Td data-label="種類">{KNOWLEDGE_KINDS.find(v => v.value === article.kind)?.label}</Td>
+            <Td data-label="記事の種類"><Chip tone={articleKindLabel.tone} className={styles.articleKindChip}>{articleKindLabel.label}</Chip></Td>
+            <Td data-label="状態"><Chip tone={label.tone} className={styles.chip}>{label.label}</Chip></Td>
+            <Td data-label="使われた回数">{article.usedCount ? `${article.usedCount}回` : '—'}</Td>
+            <Td data-label="役に立った">{article.helpfulCount ? `${article.helpfulCount}件` : '—'}</Td>
+            <Td data-label="更新日">{knowledgeDate(article.updatedAt)}</Td>
             <Td><div className={styles.rowActions}>
               <button type="button" disabled={busy} onClick={() => void open(article)}>{approved ? '直す' : label.label === '承認待ち' ? '内容を確認' : '理由を確認'}</button>
               {article.reviewState !== 'dismissed' && <button type="button" disabled={busy} onClick={() => void review(article, approved ? 'disable' : 'dismiss')}>{approved ? '無効にする' : '見送る'}</button>}
@@ -98,11 +100,10 @@ export default function KnowledgeList() {
           </Tr>
         })}</tbody>
       </DataTable>}
-    {loaded && !error && total > 50 && <nav className={styles.pagination} aria-label="ページ切り替え">
-      <Button disabled={offset === 0} onClick={() => setOffset(v => Math.max(0, v - 50))}>前へ</Button>
-      <span>{offset + 1}–{Math.min(offset + 50, total)} / {total}件</span>
-      <Button disabled={offset + 50 >= total} onClick={() => setOffset(v => v + 50)}>次へ</Button>
-    </nav>}
+    {loaded && !error && total > 50 && <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <ListRange total={total} first={offset + 1} last={Math.min(offset + 50, total)} />
+      <Pagination page={Math.floor(offset / 50) + 1} pageCount={Math.ceil(total / 50)} onPageChange={(next) => setOffset((next - 1) * 50)} />
+    </div>}
     {editing && <KnowledgeEditor key={editing.id} article={editing} onClose={() => setEditing(null)} onSaved={() => void load()} />}
   </div>
 }

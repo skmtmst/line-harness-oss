@@ -5,10 +5,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
-import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
 
 /**
@@ -125,8 +125,6 @@ export default function PendingInboxCard({
   const staffIdRef = useRef<string | null>(null)
   const total = summary?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
-  const firstRow = total === 0 ? 0 : (page - 1) * pageSize + 1
-  const lastRow = Math.min(total, (page - 1) * pageSize + items.length)
 
   /*
    * 担当者ごとの表示件数を復元する（DASH-25）。
@@ -215,9 +213,9 @@ export default function PendingInboxCard({
           この一覧は可視の全アカウントの合計。同じ画面の小カード
           「対応が必要な受信」(選択中のアカウントの数)とは範囲が違うため、
           範囲を題に書いて混同を防ぐ。
+          件数は小カードの1か所に集約し、見出しの横では繰り返さない（m22d）。
         */
         title="対応が必要な受信（全アカウント）"
-        meta={summary && summary.total > 0 ? `${summary.total}件` : undefined}
         action={<Link href="/chats" className="hover:underline">受信箱をすべて見る →</Link>}
         actionTone="info"
       />
@@ -284,19 +282,22 @@ export default function PendingInboxCard({
               狭い幅で札が右の余白へ食い込む。残りは内容の列で吸収する
               （幅を指定しない列が伸びる）。右端の余白は見出しと同じ px-5。
             */}
-            <table className="w-full table-fixed text-sm">
+            <DataTable className="rounded-none border-0">
               <thead>
-                <tr className="text-ink-faint border-hairline h-[34px] border-b text-left text-xs">
-                  <th className="w-[36%] px-5 font-medium">お名前</th>
-                  <th className="px-3 font-medium">内容</th>
-                  <th className="w-[14%] px-3 text-right font-medium whitespace-nowrap">待ち時間</th>
-                  <th className="w-24 px-5 font-medium whitespace-nowrap">状態</th>
-                </tr>
+                <TableHeadRow>
+                  <Th style={{ width: '36%' }}>お名前</Th>
+                  <Th>内容</Th>
+                  <Th style={{ width: '14%' }} align="right" className="whitespace-nowrap">待ち時間</Th>
+                  {/* 状態の札（約52px＋余白）に合わせた固定幅。96px では右に空く。 */}
+                  <Th style={{ width: 80 }} className="whitespace-nowrap">状態</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-hairline divide-y">
+              <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} className="h-[61px] hover:bg-canvas-sunken">
-                    <td className="overflow-hidden px-5 py-2.5 whitespace-nowrap">
+                  // 行の高さ 61px は設計のまま（共通 Tr の既定 58px ではない）。
+                  // Tailwind v4 は層（utilities）のため部品CSSに負ける。style で保つ。
+                  <Tr key={item.id} interactive className="h-[61px]" style={{ height: 61 }}>
+                    <Td className="overflow-hidden whitespace-nowrap">
                       <ChannelBadge channel={item.channel} />
                       <Link
                         href={inboxItemHref(item)}
@@ -305,20 +306,20 @@ export default function PendingInboxCard({
                       >
                         {item.customerName}
                       </Link>
-                    </td>
-                    <td className="text-ink-secondary truncate px-3 py-2.5" title={item.preview}>
+                    </Td>
+                    <Td className="text-ink-secondary truncate" title={item.preview}>
                       {item.preview}
-                    </td>
-                    <td className="text-ink-faint px-3 py-2.5 text-right text-xs whitespace-nowrap">
+                    </Td>
+                    <Td align="right" className="text-ink-faint text-xs whitespace-nowrap">
                       {elapsed(item.lastIncomingAt)}
-                    </td>
-                    <td className="px-5 py-2.5 whitespace-nowrap">
+                    </Td>
+                    <Td className="whitespace-nowrap">
                       <StatusBadge tone="warning" size="compact">未確認</StatusBadge>
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
           <ul className="divide-hairline divide-y sm:hidden">
             {items.map((item) => (
@@ -344,12 +345,16 @@ export default function PendingInboxCard({
               </li>
             ))}
           </ul>
-          {total > 0 ? (
+          {/*
+            件数は小カードの1か所に集約し、一覧の下では繰り返さない（m22d）。
+            ページ送りだけ残す。1ページに収まるときは Pagination が null を
+            返すので、帯ごと出さない（押せない空の帯を残さない）。
+          */}
+          {total > 0 && pageCount > 1 ? (
             <nav
-              className="border-hairline flex h-[50px] shrink-0 items-center justify-between gap-3 border-t px-5"
+              className="border-hairline flex h-[50px] shrink-0 items-center justify-end gap-3 border-t px-5"
               aria-label="受信一覧のページ送り"
             >
-              <ListRange className="tabular-nums" total={total} first={firstRow} last={lastRow} />
               <Pagination
                 page={page}
                 pageCount={pageCount}

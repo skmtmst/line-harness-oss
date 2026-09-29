@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, GripVertical, Paperclip, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
 import {
   ApiError,
   api,
+  describeSaveFailure,
   type ApiBroadcast,
   type BroadcastBubble,
   type BroadcastBubbleType,
@@ -25,10 +26,12 @@ import {
   messageLengthNotice,
 } from './message-limits'
 import {
+  assetBubbleError,
   bubbleLegacyMessage,
   bubblesForSave,
   contentTemplateToBubble,
   isContentTemplateType,
+  messageButtonsError,
   messageTemplateToBubble,
   type BroadcastTemplateOption,
 } from '@/lib/broadcast-template'
@@ -40,6 +43,7 @@ import {
   type TargetMode,
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import DateField from '@/components/shared/date-field'
@@ -49,7 +53,7 @@ import { audienceSummary } from '@/lib/broadcast-summary'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
   emptyMessageKindState,
-  serializeMessageKind,
+  messageKindProblem,
   type MessageKind,
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
@@ -62,8 +66,10 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Combobox from '@/components/shared/combobox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import Select from '@/components/shared/select'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
@@ -125,16 +131,16 @@ export function typeLabel(type: string): string {
 }
 
 /*
- * まだ送れない種別と、その理由。
+ * 直接は選べない種別と、その理由。
  *
  * ここに無い種別は、シナリオと同じ組み立て（`line-message.ts`）を通って
- * そのまま LINE へ渡る。ここに載っているものは `bubbleLegacyMessage` が
- * 「テキストに JSON を入れたもの」に落とすので、**中身の JSON がそのまま
- * 相手のトークに届く**。送って初めて分かる壊れ方なので、選ばせない。
+ * そのまま LINE へ渡る。ここに載っているものは手書きの中身が無いので、
+ * 種別の選択肢からは選ばせない。送って初めて分かる壊れ方にしない。
  *
- * リッチメッセージ・カードタイプ・クーポン・リサーチは、こちらで作った
- * 独自の型で、LINE に対応する種別が無い。Flex かカルーセルへ組み立て直す
- * 必要があるので、まだ蓋をしてある。
+ * リッチメッセージ・カードタイプ・クーポン・リサーチは、コンテンツの素材
+ * からのみ引用する。引用時は画面の保存と Worker の解析が同じ変換
+ *（`@line-crm/shared` の素材変換）で LINE の種別に直すので、中身の JSON が
+ * そのまま相手のトークに届かない（監査 R144）。
  */
 const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
   rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
@@ -303,18 +309,27 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
   // 差し込みをカーソルの位置に入れるために、入力欄そのものを渡す。
   const textRef = useRef<HTMLTextAreaElement>(null)
   return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
-    <div className="flex items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
+    {/*
+      吹き出しの見出し行。狭い幅では2段に折る。折らないと、種類の選択肢と
+      移動・削除ボタンが横に並んだまま表示域をはみ出し、解除や並べ替えが
+      右側へ隠れる（監査 R149）。
+    */}
+    <div className="flex flex-wrap items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{index + 1}</span>
-      <select value={bubble.type} onChange={(e) => onChange(emptyBubble(e.target.value as BroadcastBubbleType))} className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-semibold">
-        {Object.entries(TYPE_LABELS).map(([value, label]) => {
+      <Select
+        aria-label={`吹き出し${index + 1}の種類`}
+        value={bubble.type}
+        onChange={(value) => onChange(emptyBubble(value as BroadcastBubbleType))}
+        options={Object.entries(TYPE_LABELS).map(([value, label]) => {
           const reason = UNSENDABLE_TYPES[value as BroadcastBubbleType]
-          return (
-            <option key={value} value={value} disabled={Boolean(reason)}>
-              {reason ? `${label}（未対応）` : label}
-            </option>
-          )
+          return {
+            value,
+            label: reason ? `${label}（未対応）` : label,
+            disabled: Boolean(reason),
+          }
         })}
-      </select>
+        className="min-w-0 flex-1"
+      />
       <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
       <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
       <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
@@ -386,23 +401,21 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
   </section>
 }
 
-function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false, visualReference = false, onTrackLinksChange, onButtonsChange, onChange }: {
+function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, visualReference = false, onTrackLinksChange, onChange, onMove, onDelete }: {
   bubble: BroadcastBubble
   index: number
+  total: number
   trackLinks: boolean
-  buttons: BroadcastMessageButton[]
   embedded?: boolean
   visualReference?: boolean
   onTrackLinksChange: (enabled: boolean) => void
-  onButtonsChange: (buttons: BroadcastMessageButton[]) => void
   onChange: (bubble: BroadcastBubble) => void
+  onMove: (direction: -1 | 1) => void
+  onDelete: () => void
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null)
   const text = String(bubble.content.text ?? '')
-  const urls = [...new Set([
-    ...(text.match(/https?:\/\/\S+/g) ?? []),
-    ...buttons.filter((button) => button.type === 'url' && button.value).map((button) => button.value),
-  ])]
+  const urls = [...new Set(text.match(/https?:\/\/\S+/g) ?? [])]
 
   return (
     <section className={embedded ? 'border-hairline border-t pt-4' : 'rounded-card border border-hairline bg-canvas p-4'}>
@@ -416,9 +429,15 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false
           />
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h4 className="text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
-        <Button type="button" onClick={() => onButtonsChange([...buttons, { label: '', type: 'url' as const, value: '' }].slice(0, 4))} disabled={buttons.length >= 4}><Paperclip size={15} aria-hidden /> URL・PDF</Button>
+      {/*
+        監査 R208: テキストも画像などと同じく削除・上下移動ができる。
+        以前はテキストに操作が無く、画像へ切り替えて消す裏技が要った。
+      */}
+      <div className="flex flex-wrap items-center gap-3">
+        <h4 className="min-w-0 flex-1 text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
+        <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
+        <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
+        <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
       </div>
       {!embedded && <div className="mt-3 border-b border-hairline pb-3">
         <InsertToolbar
@@ -441,41 +460,60 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false
         <span className="font-semibold text-action">1通あたり5,000文字・最大5通まで。4,500文字を超えると自動で分割します。</span>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <section className="rounded-control border border-hairline p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div><h5 className="text-sm font-bold text-ink">ボタン</h5><p className="mt-1 text-xs text-ink-faint">メッセージの下に並びます。最大4つまで。</p></div>
-            <Button type="button" onClick={() => onButtonsChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加</Button>
+      <section className="rounded-control mt-4 border border-hairline p-3">
+        <h5 className="text-sm font-bold text-ink">URLの扱い</h5>
+        <p className="mt-1 text-xs text-ink-faint">短縮すると、URLごとのクリック数を計測できます。</p>
+        <Checkbox checked={!trackLinks} onCheckedChange={(checked) => onTrackLinksChange(!checked)} className="mt-3">このメッセージではURLを短縮しない</Checkbox>
+        <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
+          <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
+          {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>{'短縮して計測'}</span></div>) : (
+            <p className="border-t border-hairline px-3 py-3 text-ink-faint">本文にURLはありません。</p>
+          )}
+        </div>
+      </section>
+    </section>
+  )
+}
+
+/**
+ * 配信全体で1組のボタン（監査 R209）。
+ *
+ * 以前は各テキストの下に同じ編集欄が出て、2通目を直すと全通に反映された。
+ * ボタンの置き場は配信に1つ（1通目の下に付く）なので、編集欄も1つにして
+ * 適用範囲を文で明示する。
+ */
+function MessageButtonsSection({ buttons, error, onChange }: {
+  buttons: BroadcastMessageButton[]
+  error: string
+  onChange: (buttons: BroadcastMessageButton[]) => void
+}) {
+  return (
+    <section className="border-hairline mt-4 rounded-card border bg-canvas p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-bold text-ink">ボタン</h3>
+          <p className="mt-1 text-xs text-ink-faint">配信全体で1組です。1通目のメッセージの下に付きます。最大4つまで。</p>
+        </div>
+        <Button type="button" onClick={() => onChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加</Button>
+      </div>
+      <p className="mt-2 text-xs text-ink-faint">URL・PDFは https:// から始まるアドレスを入れてください。</p>
+      {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
+      <div className="mt-3 space-y-2">
+        {buttons.map((button, buttonIndex) => (
+          <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
+            <input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
+            {/*
+              共通の選び欄（幅176px）に合わせて種類の列を広げる。
+              開いた候補が切れないよう overflow-hidden は外す。
+            */}
+            <div className="grid min-w-0 grid-cols-[11rem_minmax(0,1fr)] rounded-control border border-hairline bg-canvas">
+              <Select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(value) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: value as 'url' | 'pdf' } : item))} options={[{ value: 'url', label: 'URLを開く' }, { value: 'pdf', label: 'PDFを開く' }]} />
+              <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="min-w-0 px-2 py-1.5 text-xs" />
+            </div>
+            <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
           </div>
-          <div className="mt-3 space-y-2">
-            {buttons.map((button, buttonIndex) => (
-              <div key={buttonIndex} className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.35fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
-                <GripVertical size={16} className="text-ink-faint" aria-hidden />
-                <input aria-label={`ボタン${buttonIndex + 1}のラベル`} value={button.label} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
-                <div className="grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] overflow-hidden rounded-control border border-hairline bg-canvas">
-                  <select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: event.target.value as 'url' | 'pdf' } : item))} className="border-hairline border-r bg-canvas px-2 py-1.5 text-xs"><option value="url">URLを開く</option><option value="pdf">PDFを開く</option></select>
-                  <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="min-w-0 px-2 py-1.5 text-xs" />
-                </div>
-                <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onButtonsChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
-              </div>
-            ))}
-            {buttons.length === 0 && <p className="rounded-control bg-canvas-sunken p-3 text-xs text-ink-faint">ボタンはまだありません。</p>}
-          </div>
-        </section>
-        <section className="rounded-control border border-hairline p-3">
-          <h5 className="text-sm font-bold text-ink">URLの扱い</h5>
-          <p className="mt-1 text-xs text-ink-faint">短縮すると、URLごとのクリック数を計測できます。</p>
-          <label className="mt-3 flex items-center gap-2 text-xs text-ink-secondary">
-            <input type="checkbox" checked={!trackLinks} onChange={(event) => onTrackLinksChange(!event.target.checked)} />
-            このメッセージではURLを短縮しない
-          </label>
-          <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
-            <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
-            {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>{'短縮して計測'}</span></div>) : (
-              <p className="border-t border-hairline px-3 py-3 text-ink-faint">本文にURLはありません。</p>
-            )}
-          </div>
-        </section>
+        ))}
+        {buttons.length === 0 && <p className="rounded-control bg-canvas-sunken p-3 text-xs text-ink-faint">ボタンはまだありません。</p>}
       </div>
     </section>
   )
@@ -498,17 +536,41 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
     */
     if (KIND_FIELD_TYPES.has(bubble.type)) {
       const state = bubble.content.state as MessageKindState | undefined
-      if (!state || !serializeMessageKind(bubble.type as MessageKind, state)) {
-        return `吹き出し${index + 1}の${TYPE_LABELS[bubble.type]}を入力してください`
+      /*
+       * R234: 空だけでなく「入っているが送れない」（http の音声URL・
+       * 文字のスタンプ番号）も未完成にする。理由は入力欄の検査と同じ文にし、
+       * 5段の帯と保存の検査で食い違わせない。
+       * R210: 範囲外の緯度・経度も messageKindProblem が直し方まで言う
+       * （「未入力」とは言わない）。分岐を分けると文言がずれるので1本化する。
+       */
+      const problem = !state
+        ? `${TYPE_LABELS[bubble.type]}を入力してください`
+        : messageKindProblem(bubble.type as MessageKind, state)
+      if (problem) {
+        return `吹き出し${index + 1}の${problem}`
       }
     }
-    if (bubble.type === 'carousel' && !String(bubble.content.columnsJson ?? '').trim()) {
-      return `吹き出し${index + 1}のカルーセルを選択してください`
+    if (bubble.type === 'carousel') {
+      const columnsProblem = carouselColumnsProblem(bubble.content.columnsJson)
+      if (columnsProblem) {
+        return `吹き出し${index + 1}の${columnsProblem}`
+      }
     }
     if (bubble.type === 'flex') {
-      try { JSON.parse(String(bubble.content.flexJson ?? '')) } catch { return `吹き出し${index + 1}のFlex JSONを確認してください` }
+      const flexProblem = flexContentProblem(bubble.content.flexJson)
+      if (flexProblem) {
+        return `吹き出し${index + 1}の${flexProblem}`
+      }
     }
-    if (isContentTemplateType(bubble.type) && !bubble.content.assetId) return `吹き出し${index + 1}のテンプレートを選択してください`
+    /*
+     * 素材の引用は、選んでいないときも選んだ中身が送れる形に直せないときも
+     * ここで止める。保存の検査と Worker の解析が同じ変換を見るので、
+     * 画面では通るのに送信で断られる形にならない（監査 R144）。
+     */
+    if (isContentTemplateType(bubble.type)) {
+      const problem = assetBubbleError(bubble)
+      if (problem) return `吹き出し${index + 1}の${problem}`
+    }
   }
   return ''
 }
@@ -1149,6 +1211,10 @@ export default function BroadcastForm({
     if (audienceProblem) return audienceProblem
     const bubbleProblem = bubblesError(bubbles)
     if (bubbleProblem) return bubbleProblem
+    // 監査 R206: ボタンの不備は「保存できませんでした」で済ませない。
+    // 何番の何が足りないかを言い、直したら保存できる。
+    const buttonProblem = messageButtonsError(messageButtons)
+    if (buttonProblem) return buttonProblem
     return ''
   }
   /**
@@ -1305,6 +1371,16 @@ export default function BroadcastForm({
   }
 
   const saveDraftNow = async () => {
+    /*
+     * 監査 R206: 下書き保存も確認・テスト送信と同じ検査を通す。
+     * 通さないと、ボタンの不備が Worker で断られて「保存できませんでした」
+     * だけになり、どこを直すべきか分からない。
+     */
+    const validationError = validate()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -1316,8 +1392,13 @@ export default function BroadcastForm({
         // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
         onDraftSaved?.(saved)
       }
-    } catch {
-      setError('下書きを保存できませんでした')
+    } catch (error) {
+      /*
+       * R234: 保存側で弾いた理由（音声URL・スタンプ番号・Flexの形など）を
+       * そのまま出す。「保存できませんでした」だけだと、どこを直すか分からない。
+       * 400 の本文は運用者へ出してよい安全な文だけが来る（api.ts の約束）。
+       */
+      setError(describeSaveFailure(error))
     } finally {
       setSaving(false)
     }
@@ -1551,16 +1632,28 @@ export default function BroadcastForm({
   const progressSteps = broadcastSteps({
     basicDone: title.trim().length > 0 && title.trim().length <= TITLE_MAX,
     audienceDone: !audienceError(targetMode, { scenarioId, tagId, condition }),
-    messageDone: !bubblesError(bubbles),
+    messageDone: !bubblesError(bubbles) && !messageButtonsError(messageButtons),
     scheduleDone: sendMode === 'now' || (sendMode === 'scheduled' && Boolean(scheduledDate) && Boolean(scheduledTime)),
   })
   const stepOrder: BroadcastStepKey[] = ['basic', 'audience', 'message', 'schedule', 'confirm']
   const currentStepIndex = currentStep ? stepOrder.indexOf(currentStep) : -1
+  /*
+   * 設計 C：いまいる所（URL の ?step=）と入力済みを分ける。
+   * 以前は居場所より前の段を全部 done にしていたので、「次へ」で進んでも
+   * 空の段に ✓ が付いた。state は入力済みかだけを表し、居場所は currentKey で渡す。
+   * 確認の段にいるとき、まだ埋まっていない段は直すところ（△）として出す。
+   */
   const steps = currentStep
-    ? progressSteps.map((step, index) => ({
-        ...step,
-        state: index < currentStepIndex ? 'done' as const : index === currentStepIndex ? 'current' as const : 'todo' as const,
-      }))
+    ? progressSteps.map((step) => {
+        const filled = step.state === 'done'
+        const needsFix = !filled && currentStep === 'confirm'
+        return {
+          ...step,
+          state: (needsFix ? 'attention' : filled ? 'done' : 'todo') as 'done' | 'todo' | 'attention',
+          // 段ごとの画面にいるときは、済み・要修正の段を押すとその段へ移る。
+          onSelect: (filled || needsFix) && onStepChange ? () => goToStep(step.key) : undefined,
+        }
+      })
     : progressSteps
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
   const goToStep = (step: BroadcastStepKey) => onStepChange?.(step)
@@ -1661,14 +1754,14 @@ export default function BroadcastForm({
         </button>
       </div>
     )}
-    <BroadcastStepRail steps={steps} />
+    <BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />
     {editingDraft ? (
       <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}
     <div className="mt-2.5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-      <div className={`space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
+      <div className={`min-w-0 space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -1708,15 +1801,16 @@ export default function BroadcastForm({
             </label>
             <label className="block">
               <span className="text-ink block text-sm font-bold">フォルダ</span>
-              <select
+              <Select
                 aria-label="フォルダ"
                 value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
-                className="border-hairline rounded-control mt-2 w-full border px-3 py-2.5 text-sm"
-              >
-                <option value="">未分類</option>
-                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+                onChange={setFolderId}
+                options={[
+                  { value: '', label: '未分類' },
+                  ...folders.map((f) => ({ value: f.id, label: f.name })),
+                ]}
+                size="full"
+              />
             </label>
           </div>
           <label className="mt-4 block">
@@ -1822,41 +1916,22 @@ export default function BroadcastForm({
             そろえて、それぞれに説明を付ける。
           */}
           {/* 4つある。3列だと3+1で折り返して最後の1つだけ浮くので、2列と4列で切り替える。 */}
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <RadioCardGroup legend="配信対象" className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {TARGET_MODES.map((mode) => (
-              <label
+              <RadioCard
                 key={mode.value}
-                className={`flex h-full cursor-pointer flex-col gap-1 rounded-card border p-3 transition-colors ${
-                  targetMode === mode.value
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-hairline hover:bg-canvas-sunken'
-                }`}
-              >
-                <span className="flex items-start gap-2">
-                  {/*
-                    **読み上げ名を付ける。**
-                    `<label>` が丸ごと囲っているので目では押せるが、
-                    丸自体には名前が無く、読み上げでは「ラジオボタン」としか
-                    言われない。撮影ハーネスもこれを名前で探せず、
-                    設計 `cPk8A`（対象条件）が撮れていなかった。
-                  */}
-                  <input
-                    type="radio"
-                    name="broadcast-target-mode"
-                    aria-label={mode.label}
-                    checked={targetMode === mode.value}
-                    onChange={() => {
-                      if (mode.value === 'advanced') openConditionDialog()
-                      else setTargetMode(mode.value)
-                    }}
-                    className="mt-0.5"
-                  />
-                  <span className="text-ink text-sm font-semibold">{mode.label}</span>
-                </span>
-                <span className="text-ink-faint pl-6 text-xs leading-relaxed">{mode.description}</span>
-              </label>
+                name="broadcast-target-mode"
+                value={mode.value}
+                checked={targetMode === mode.value}
+                onChange={() => {
+                  if (mode.value === 'advanced') openConditionDialog()
+                  else setTargetMode(mode.value)
+                }}
+                title={mode.label}
+                note={mode.description}
+              />
             ))}
-          </div>
+          </RadioCardGroup>
           {audienceNotice && targetMode === 'advanced' && conditionHasAnalyticsAudience(condition) && (
             <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
               <p className="text-ink text-sm">
@@ -2031,17 +2106,30 @@ export default function BroadcastForm({
             key={bubble.id}
             bubble={bubble}
             index={index}
+            total={bubbles.length}
             trackLinks={trackLinks}
-            buttons={messageButtons}
             embedded={currentStep === 'message'}
             visualReference={visualQaAugustCampaign}
             onTrackLinksChange={setTrackLinks}
-            onButtonsChange={setMessageButtons}
             onChange={(next) => updateBubble(index, next)}
+            onMove={(direction) => moveBubble(index, direction)}
+            onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))}
           />
         ) : (
           <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
         ))}
+        {/*
+          ボタンは配信全体で1組なので、編集欄はここに1つだけ置く。
+          各テキストの下に置いていた頃は、2通目を直すと全通に反映され、
+          個別設定に見えるのに共通設定だった（監査 R209）。
+        */}
+        {!showTemplatePicker && (
+          <MessageButtonsSection
+            buttons={messageButtons}
+            error={messageButtonsError(messageButtons)}
+            onChange={setMessageButtons}
+          />
+        )}
         {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
           <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
@@ -2074,16 +2162,17 @@ export default function BroadcastForm({
                 />
               </label>
               <label className="block text-xs font-bold text-ink-secondary">フォルダ
-                <select
+                <Select
                   aria-label="テンプレートのフォルダ"
                   value={templatePickerFolderId}
-                  onChange={(event) => setTemplatePickerFolderId(event.target.value)}
-                  className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
-                >
-                  <option value="">すべて</option>
-                  {templateFolders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-                  <option value="__none__">未分類</option>
-                </select>
+                  onChange={setTemplatePickerFolderId}
+                  options={[
+                    { value: '', label: 'すべて' },
+                    ...templateFolders.map((folder) => ({ value: folder.id, label: folder.name })),
+                    { value: '__none__', label: '未分類' },
+                  ]}
+                  size="full"
+                />
               </label>
             </div>
             <div className="mt-4 space-y-3">
@@ -2288,15 +2377,11 @@ export default function BroadcastForm({
           <li className="flex items-center gap-2"><span className={testResult?.kind === 'success' ? 'text-success' : testResult ? 'text-danger' : 'text-warning'}>{testResult?.kind === 'success' ? '✓' : '!'}</span><span>{testResult?.kind === 'success' ? 'テスト送信が完了しています' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです'}</span></li>
           <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
         </ul>
-        {!visualQaAugustCampaign && <label className="border-hairline mt-4 flex cursor-pointer items-center gap-3 border-t pt-4 text-sm font-semibold text-ink">
-          <input
-            type="checkbox"
-            checked={previewConfirmed}
-            onChange={(event) => setPreviewConfirmed(event.target.checked)}
-            className="size-4 accent-[var(--color-accent-deep)]"
-          />
-          <span>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</span>
-        </label>}
+        {!visualQaAugustCampaign && <Checkbox
+          checked={previewConfirmed}
+          onCheckedChange={setPreviewConfirmed}
+          className="border-hairline mt-4 border-t pt-4"
+        >{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox>}
       </section>
 
       {/*

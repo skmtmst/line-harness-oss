@@ -12,8 +12,9 @@ import CreatePage, {
   FormSection,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
+import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 /**
  * 入力欄の幅。
@@ -84,7 +85,9 @@ function Unavailable({ label, reason }: { label: string; reason: string }) {
 type PayoutKind = 'per_conversion' | 'rate' | 'none'
 
 const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = [
-  { value: 'per_conversion', label: '成果1件ごとに定額', note: '1件あたりの金額を決めます' },
+  /* m22d: 金額は案件側で決まる（下の「1件あたりの報酬」と同じ説明）。
+     「1件あたり」を注記にも書くと、同じ「1件」が3回出るので書かない。 */
+  { value: 'per_conversion', label: '成果1件ごとに定額', note: '金額は案件の「報酬額」で決めます' },
   { value: 'rate', label: '売上に対する割合', note: '注文金額の◯%を報酬にします' },
   { value: 'none', label: '報酬なし（計測のみ）', note: '成果の件数だけを記録します' },
 ]
@@ -277,14 +280,18 @@ export default function NewAffiliatePage() {
       aside={
         <>
           <AsideCard title="成果が出たときにすること">
-            <label className="border-hairline flex items-start gap-2 rounded-control border p-3 text-sm">
-              <input type="checkbox" className="mt-0.5" checked={notifyOnConversion} onChange={(e) => setNotifyOnConversion(e.target.checked)} />
-              <span><strong className="text-ink block">本人へメールで知らせる</strong><span className="text-ink-faint text-xs">報酬が確定したタイミングで届きます</span></span>
-            </label>
-            <label className="border-hairline mt-2 flex items-start gap-2 rounded-control border p-3 text-sm">
-              <input type="checkbox" className="mt-0.5" checked={startTracking} onChange={(e) => setStartTracking(e.target.checked)} />
-              <span><strong className="text-ink block">すぐに計測を始める</strong><span className="text-ink-faint text-xs">オフでもリンクは発行されます</span></span>
-            </label>
+            <Checkbox
+              checked={notifyOnConversion}
+              onCheckedChange={setNotifyOnConversion}
+              description="報酬が確定したタイミングで届きます"
+              className="border-hairline rounded-control border p-3"
+            >本人へメールで知らせる</Checkbox>
+            <Checkbox
+              checked={startTracking}
+              onCheckedChange={setStartTracking}
+              description="オフでもリンクは発行されます"
+              className="border-hairline mt-2 rounded-control border p-3"
+            >すぐに計測を始める</Checkbox>
             {/* ★V7: 未接続の断り書きは出さない。接続後に項目として出す。 */}
           </AsideCard>
 
@@ -399,16 +406,16 @@ export default function NewAffiliatePage() {
                   検索
                 </button>
               </form>
-              <SelectField
+              <Select
                 id="af-friend"
                 aria-label="LINEの友だちと結びつける"
                 value={friendId}
-                onChange={(event) => {
-                  const nextId = event.target.value
+                onChange={(nextId) => {
                   setFriendId(nextId)
                   setSelectedFriend(friendOptions.find((friend) => friend.id === nextId) ?? null)
                 }}
                 className="w-full max-w-lg"
+                size="full"
                 options={[
                   { value: '', label: friendLoading ? '読み込んでいます' : '結びつけない' },
                   ...friendOptions.map((friend) => ({ value: friend.id, label: friend.displayName })),
@@ -431,13 +438,14 @@ export default function NewAffiliatePage() {
                     {friendLoading ? '友だちを読み込んでいます' : `全${friendTotal.toLocaleString('ja-JP')}件`}
                   </p>
                   {friendPageCount > 1 ? (
-                    <SelectField
+                    <Select
                       id="af-friend-page"
                       aria-label="友だち候補のページ"
                       value={String(friendPage)}
-                      onChange={(event) => setFriendPage(Number(event.target.value))}
+                      onChange={(value) => setFriendPage(Number(value))}
                       disabled={friendLoading}
                       className="w-40"
+                      size="standard"
                       options={Array.from({ length: friendPageCount }, (_, index) => ({
                         value: String(index + 1),
                         label: `${index + 1} / ${friendPageCount}ページ`,

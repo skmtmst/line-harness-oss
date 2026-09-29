@@ -20,7 +20,6 @@ import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/
 import { api } from '@/lib/api'
 import FriendAddRuleEditor from './friend-add-rule-editor'
 import { useCursorStack } from './use-cursor-stack'
-import ListRange from '@/components/ui/list-range'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -37,12 +36,26 @@ function successRate(delivered: number | null, failed: number | null) {
 }
 
 function deliverySummary(rule: FriendAddRule) {
+  // 「何も配信しない」ではメッセージもシナリオも動かない（R261）。
+  if (rule.friendKind === 'returning' && rule.definition.returningMode === 'none') {
+    return '配信なし（アクションのみ）'
+  }
   const message = rule.definition.messageType === 'template'
     ? 'テンプレート'
     : rule.definition.messageType === 'form'
       ? '回答フォーム'
       : rule.definition.messageText ? 'テキスト' : null
   return [message, rule.scenarioName].filter(Boolean).join('＋') || '未取得'
+}
+
+/*
+ * 流入リンクを1件も選んでいない下書きは、実行側ではどの経路にも
+ * 当たらない（「すべての流入経路」ではない）。未完成のしるしとして
+ * 「未選択」と出す（R260）。
+ */
+function routeLabel(rule: FriendAddRule) {
+  if (rule.isFallback) return '経路が取れなかったとき'
+  return rule.routeNames.join('、') || '未選択'
 }
 
 export default function FriendAddSettingsPage() {
@@ -325,7 +338,7 @@ function FriendAddSettingsList() {
                     <Tr key={rule.id}>
                       <NameCell name={<a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className="text-ink block truncate font-bold" title={rule.name}>{rule.name}</a>} sub={rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`} />
                       <Td><StatusBadge tone={rule.status === 'published' || rule.isFallback ? 'success' : 'neutral'} size="compact">{rule.isFallback ? '常に有効' : rule.status === 'published' ? '有効' : rule.status === 'draft' ? '下書き' : rule.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatusBadge></Td>
-                      <Td><span className="block truncate" title={rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}>{rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}</span></Td>
+                      <Td><span className="block truncate" title={routeLabel(rule)}>{routeLabel(rule)}</span></Td>
                       <Td><span className="block truncate" title={deliverySummary(rule)}>{deliverySummary(rule)}</span></Td>
                       <Td>{countText(rule.matchedLast7Days, '人')}</Td>
                       <ActionCell>
@@ -374,15 +387,18 @@ function FriendAddSettingsList() {
                 </tbody>
               </DataTable>
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <ListRange total={data.total} first={data.total === 0 ? 0 : (cursorPage - 1) * 20 + 1} last={(cursorPage - 1) * 20 + data.items.length} />
-                {(canPrev || data.nextCursor) ? (
+              {/*
+                m22d: 件数は上の「初回案内」カードの1か所に集約し、一覧の
+                下では繰り返さない。ページ送りだけ残す。
+              */}
+              {(canPrev || data.nextCursor) ? (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2" aria-label="ページ送り">
                     <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
                     <Button disabled={!data.nextCursor || loading} onClick={() => goNext(data.nextCursor)}>次へ</Button>
                   </div>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </>
           )}
         </section>

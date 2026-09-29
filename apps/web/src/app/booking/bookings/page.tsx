@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { X } from 'lucide-react'
 import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -12,11 +12,15 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canOperateBookings } from '../lib/booking-permissions'
 import { fetchAllPages } from './fetch-all-pages'
 import BookingCalendar, {
+  isLineBooking,
   moveDay,
   startOfWeek,
   type CalendarAvailability,
@@ -121,6 +125,20 @@ function formatJpTime(iso: string): string {
   })
 }
 
+/**
+ * R316: 予約の日付（9/30(火)）。詳細パネルの見出しで使う。
+ * 「今日」と固定すると、別の日の予約を開いても今日に見える。
+ */
+function formatJpDay(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
+  return new Date(iso).toLocaleDateString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
 function jstDay(iso: string): string {
   return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
 }
@@ -131,30 +149,118 @@ function monthKey(offset: number): string {
   return d.toISOString().slice(0, 7)
 }
 
+/** R90: 「2026-09」→「2026年9月」。対象期間の明示に使う。 */
+function monthLabel(key: string): string {
+  const [year, month] = key.split('-').map(Number)
+  return `${year}年${month}月`
+}
+
+/**
+ * R317: 台帳の状態をURLとタブ内の保存の両方へ残すための鍵。
+ * 日付は `date`、検索語は `q`、ほかは一覧の絞り込み名そのまま。
+ */
+const LEDGER_QUERY_KEYS = ['view', 'status', 'range', 'date', 'q', 'menu', 'staff', 'source', 'page'] as const
+const LEDGER_STORAGE_KEY = 'booking-ledger-state-v1'
+
+type LedgerSavedState = {
+  view?: string | null
+  status?: string | null
+  range?: string | null
+  date?: string | null
+  q?: string | null
+  menu?: string | null
+  staff?: string | null
+  source?: string | null
+  page?: string | null
+}
+
+/** 同じタブで見ていた台帳の状態。無い・壊れているときは null。 */
+function readLedgerState(): LedgerSavedState | null {
+  try {
+    const raw = window.sessionStorage.getItem(LEDGER_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as LedgerSavedState
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 export default function BookingsPage() {
   usePageTitle('予約管理')
   const { selectedAccountId, selectedAccount } = useAccount()
   const urlParams = useSearchParams()
+  const router = useRouter()
   const [view, setView] = useState<'day' | 'week' | 'month' | 'list'>('day')
   const [tab, setTab] = useState<string>('requested')
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
   /*
-   * URLの `?view=` `?status=` `?range=` で絞り込み済みの一覧を開ける
-   * （IDEA-01）。ダッシュボードの「予約状況」カードは
-   * `?view=list&status=requested` でここへ来る。初回だけURLを状態へ
-   * 写し、知らない値は既定へ落とす。
+   * R317: URLの条件（`?view=` `?status=` `?range=` `?date=` `?q=` …）で
+   * 絞り込み済みの一覧を開ける（IDEA-01）。ダッシュボードの「予約状況」
+   * カードは `?view=list&status=requested` でここへ来る。URLに何も
+   * なければ、同じタブで見ていた状態（入力画面のパンくずなど条件を
+   * 持たない行き先から帰ってきたとき）へ戻す。初回だけ状態へ写し、
+   * 知らない値は既定へ落とす。
    */
   const urlInitRef = useRef(false)
+  // R317: 復元で絞り込みが変わっても、戻したページは1へ戻さない。
+  const pageResetRef = useRef({ seenMount: false, restoreTransition: false })
   useEffect(() => {
     if (urlInitRef.current) return
     urlInitRef.current = true
-    const viewParam = urlParams.get('view')
-    if (viewParam === 'week' || viewParam === 'month' || viewParam === 'list') setView(viewParam)
-    const statusParam = urlParams.get('status')
-    if (statusParam && STATUS_TABS.some((item) => item.key === statusParam)) setTab(statusParam)
-    const rangeParam = urlParams.get('range')
-    if (rangeParam === 'today' || rangeParam === 'week') setRange(rangeParam)
+    const hasQuery = LEDGER_QUERY_KEYS.some((key) => urlParams.get(key) !== null)
+    // URLに条件が無いときだけ、同じタブの保存を使う。URLがあるときは
+    // URLを正とし、混ぜない（共有URLを開いた人が他人の条件を見ない）。
+    const saved = !hasQuery ? readLedgerState() : null
+    if (saved) pageResetRef.current.restoreTransition = true
+    const get = (key: keyof LedgerSavedState) => urlParams.get(key) ?? saved?.[key] ?? null
+    const viewParam = get('view')
+    if (viewParam === 'day' || viewParam === 'week' || viewParam === 'month' || viewParam === 'list') {
+      setView(viewParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const statusParam = get('status')
+    if (statusParam && STATUS_TABS.some((item) => item.key === statusParam)) {
+      setTab(statusParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const rangeParam = get('range')
+    if (rangeParam === 'today' || rangeParam === 'week') {
+      setRange(rangeParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const dateParam = get('date')
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      setCalendarAnchor(dateParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const queryParam = get('q')
+    if (queryParam) {
+      setQuery(queryParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const menuParam = get('menu')
+    if (menuParam) {
+      setMenuFilter(menuParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const staffParam = get('staff')
+    if (staffParam) {
+      setStaffFilter(staffParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const sourceParam = get('source')
+    if (sourceParam && SOURCE_FILTERS.some((item) => item.key === sourceParam)) {
+      setSourceFilter(sourceParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const pageParam = get('page')
+    const pageNumber = pageParam ? Number.parseInt(pageParam, 10) : NaN
+    if (Number.isFinite(pageNumber) && pageNumber >= 1) {
+      setPage(Math.floor(pageNumber))
+      pageResetRef.current.restoreTransition = true
+    }
   }, [urlParams])
   const [menuFilter, setMenuFilter] = useState<string>('all')
   // N-398: 担当者・予約経路の絞り込み。一覧の取得とCSV書出しの両方に渡す。
@@ -182,10 +288,15 @@ export default function BookingsPage() {
    */
   const [candidatesStatus, setCandidatesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [availability, setAvailability] = useState<CalendarAvailability>({ status: 'loading', slots: [] })
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<{
+    total: number; requested: number; monthTotal: number; monthConfirmed: number;
+    monthCancelled: number; lastMonthTotal: number; todayTotal: number; weekTotal: number;
+    todayTabTotal?: number; weekTabTotal?: number; monthTabTotal?: number;
+    byMenu: Array<{ name: string; total: number }>;
+  }>({
     total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
     monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
-    byMenu: [] as Array<{ name: string; total: number }>,
+    byMenu: [],
   })
   const [menus, setMenus] = useState<BookingMenu[]>([])
   // 集計の読み込み失敗は0表示と分ける。黙って0のままだと運用者が気づけない。
@@ -193,6 +304,8 @@ export default function BookingsPage() {
   // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
   const [summaryReady, setSummaryReady] = useState(false)
   const [summarySeq, setSummarySeq] = useState(0)
+  // R89: 承認・取消の後にカレンダーの表示範囲の予約も読み直す合図。
+  const [calendarSeq, setCalendarSeq] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
@@ -268,17 +381,27 @@ export default function BookingsPage() {
   }
 
   // 一覧とCSVで同じ期間になるよう、from/to の計算は1か所にする (N-397)。
+  // R90: 「今月」の表示では今月の初め〜来月の初めを条件へ入れる。
+  // 「今日」「今週」と重なったら狭い方へ寄せる（ISO8601は辞書式で比べられる）。
   const rangeFilterParams = useCallback((): { from?: string; to?: string } => {
-    if (range === 'all') return {}
-    const today = jstDay(new Date().toISOString())
-    const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
-    return {
-      from: new Date(`${today}T00:00:00+09:00`).toISOString(),
-      to: range === 'today'
-        ? new Date(`${jstDay(new Date(Date.now() + 86_400_000).toISOString())}T00:00:00+09:00`).toISOString()
-        : new Date(`${weekTo}T00:00:00+09:00`).toISOString(),
+    let from: string | undefined
+    let to: string | undefined
+    if (view === 'month') {
+      from = new Date(`${monthKey(0)}-01T00:00:00+09:00`).toISOString()
+      to = new Date(`${monthKey(1)}-01T00:00:00+09:00`).toISOString()
     }
-  }, [range])
+    if (range !== 'all') {
+      const today = jstDay(new Date().toISOString())
+      const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
+      const rangeFrom = new Date(`${today}T00:00:00+09:00`).toISOString()
+      const rangeTo = range === 'today'
+        ? new Date(`${jstDay(new Date(Date.now() + 86_400_000).toISOString())}T00:00:00+09:00`).toISOString()
+        : new Date(`${weekTo}T00:00:00+09:00`).toISOString()
+      from = from && from > rangeFrom ? from : rangeFrom
+      to = to && to < rangeTo ? to : rangeTo
+    }
+    return { ...(from ? { from } : {}), ...(to ? { to } : {}) }
+  }, [range, view])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -443,7 +566,7 @@ export default function BookingsPage() {
       if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました。もう一度読み込んでください。')
     })
     return () => { alive = false }
-  }, [selectedAccountId, view, calendarFrom, calendarTo])
+  }, [selectedAccountId, view, calendarFrom, calendarTo, calendarSeq])
 
   /*
    * BOOKING-01: 空き枠の実績を空き枠APIから取る。受付可能な時間は
@@ -549,6 +672,10 @@ export default function BookingsPage() {
       if (listAccountRef.current === decideAccountId) {
         setDecideTarget(null)
         await load()
+        // R89: 一覧だけでなく集計・カレンダー・空き枠も読み直す。
+        // 集計の取り直しが届くと空き枠の取得も連動して走り直す。
+        setSummarySeq((n) => n + 1)
+        setCalendarSeq((n) => n + 1)
       }
     } catch (e) {
       if (listAccountRef.current === decideAccountId) {
@@ -601,11 +728,59 @@ export default function BookingsPage() {
     setTab('all')
   }
 
-  // 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
-  // 「該当なし」に見えてしまう。
+  /*
+   * 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
+   * 「該当なし」に見えてしまう。R90: 表示の切り替え（今月など）も条件。
+   * R317: 初回の描画と、URL・保存からの復元では戻さない。戻すと
+   * 戻したページが消えて、再読み込みの意味がなくなる。
+   */
   useEffect(() => {
+    if (!pageResetRef.current.seenMount) {
+      pageResetRef.current.seenMount = true
+      return
+    }
+    if (pageResetRef.current.restoreTransition) {
+      pageResetRef.current.restoreTransition = false
+      return
+    }
     setPage(1)
-  }, [tab, menuFilter, query, range, staffFilter, sourceFilter])
+  }, [tab, menuFilter, query, range, staffFilter, sourceFilter, view])
+
+  /*
+   * R317: 表示方法・対象日・絞り込み・ページをURLへ写す。再読み込みで
+   * 同じ状態へ戻れる。履歴は汚さない（replace）。同じタブ内の保存にも
+   * 残し、条件を持たないパンくずから戻ったときも復元する。
+   * 明示の解除（絞り込みを解除）は既定値へ戻り、URLも既定へ戻る。
+   */
+  const ledgerQuery = [
+    `view=${view}`,
+    `status=${tab}`,
+    ...(range === 'all' ? [] : [`range=${range}`]),
+    `date=${calendarAnchor}`,
+    ...(query.trim() ? [`q=${encodeURIComponent(query.trim())}`] : []),
+    ...(menuFilter === 'all' ? [] : [`menu=${encodeURIComponent(menuFilter)}`]),
+    ...(staffFilter === 'all' ? [] : [`staff=${encodeURIComponent(staffFilter)}`]),
+    ...(sourceFilter === 'all' ? [] : [`source=${sourceFilter}`]),
+    ...(page <= 1 ? [] : [`page=${page}`]),
+  ].join('&')
+  useEffect(() => {
+    if (!urlInitRef.current) return
+    try {
+      window.sessionStorage.setItem(
+        LEDGER_STORAGE_KEY,
+        JSON.stringify({
+          view, status: tab, range, date: calendarAnchor, q: query,
+          menu: menuFilter, staff: staffFilter, source: sourceFilter, page: String(page),
+        }),
+      )
+    } catch {
+      // 保存に失敗しても一覧は使える。URLへの写しは続ける。
+    }
+    const current = window.location.search.replace(/^\?/, '')
+    if (current !== ledgerQuery) {
+      router.replace(ledgerQuery ? `/booking/bookings?${ledgerQuery}` : '/booking/bookings')
+    }
+  }, [ledgerQuery, router])
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
@@ -618,8 +793,11 @@ export default function BookingsPage() {
     }
   }, [calendarItems, items, detailId])
 
-  const todayCount = summary.todayTotal
-  const weekCount = summary.weekTotal
+  // タブの数はその期間の有効な予約だけ（取消・拒否・期限切れを除く）。
+  // 旧Worker（タブ用未返却）では従来の集計に倒す。
+  const todayCount = summary.todayTabTotal ?? summary.todayTotal
+  const weekCount = summary.weekTabTotal ?? summary.weekTotal
+  const monthCount = summary.monthTabTotal ?? kpi.total
 
   const pageHead = (
     <>
@@ -637,13 +815,15 @@ export default function BookingsPage() {
         {([
           ['day', summaryReady ? `今日 ${todayCount}` : '今日'],
           ['week', summaryReady ? `今週 ${weekCount}` : '今週'],
-          ['month', summaryReady ? `今月 ${kpi.total}` : '今月'],
+          ['month', summaryReady ? `今月 ${monthCount}` : '今月'],
           ['list', '一覧'],
         ] as const).map(([key, label]) => (
           <button
             key={key}
             type="button"
             onClick={() => setView(key)}
+            /* R315: 選んでいる表示を色だけでなく意味でも伝える。 */
+            aria-pressed={view === key}
             className={`border-b-2 px-1 py-3 text-sm font-semibold ${
               view === key ? 'border-accent text-accent-deep' : 'border-transparent text-ink-secondary'
             }`}
@@ -784,6 +964,13 @@ export default function BookingsPage() {
 
       {createRow}
 
+      {/* R90: 今月の表示では対象の期間と状態を明示する。 */}
+      {view === 'month' ? (
+        <p className="text-ink-secondary text-xs" role="status">
+          今月（{monthLabel(monthKey(0))}）の予約を「{STATUS_TABS.find((item) => item.key === tab)?.label ?? ''}」で表示しています。
+        </p>
+      ) : null}
+
       <div
         data-design="Body"
         className="flex flex-col items-start gap-4 xl:flex-row"
@@ -826,6 +1013,8 @@ export default function BookingsPage() {
                   <button
                     key={key}
                     onClick={() => setTab(key)}
+                    /* R315: 選んでいる絞り込みを色だけでなく意味でも伝える。 */
+                    aria-pressed={tab === key}
                     className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
                       tab === key
                         ? 'bg-accent-deep text-on-accent'
@@ -838,6 +1027,7 @@ export default function BookingsPage() {
                 <span className="border-hairline mx-1 h-4 border-l" />
                 <button
                   onClick={() => setRange(range === 'today' ? 'all' : 'today')}
+                  aria-pressed={range === 'today'}
                   className={`rounded-pill px-3 py-1 text-xs font-medium ${
                     range === 'today'
                       ? 'bg-accent-deep text-on-accent'
@@ -848,6 +1038,7 @@ export default function BookingsPage() {
                 </button>
                 <button
                   onClick={() => setRange(range === 'week' ? 'all' : 'week')}
+                  aria-pressed={range === 'week'}
                   className={`rounded-pill px-3 py-1 text-xs font-medium ${
                     range === 'week'
                       ? 'bg-accent-deep text-on-accent'
@@ -924,58 +1115,54 @@ export default function BookingsPage() {
               )}
             </div>
           ) : (
-            <div
-              data-design="Table"
-              className="bg-canvas rounded-card border-hairline overflow-hidden border"
-            >
+            <DataTable className="@container" data-design="Table">
               {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「担当」を畳む。
                   担当は予約の詳細で読める補助情報。畳んでいる間も操作列は右端に留める。 */}
-              <div className="overflow-x-auto @container">
-                <table className="w-full min-w-[720px] @[830px]:min-w-[820px]">
                   <thead>
-                    <tr className="bg-canvas-sunken border-hairline border-b">
-                      <Th>日時</Th>
-                      <Th>お客さま</Th>
-                      <Th>メニュー</Th>
-                      <Th className="cq-hide-below-830">担当</Th>
-                      <Th>予約経路</Th>
-                      <Th className="text-right">料金</Th>
-                      <Th>状態</Th>
-                      <Th className="bg-canvas-sunken sticky right-0 text-right">操作</Th>
-                    </tr>
+                    <TableHeadRow>
+                      <Th style={{ width: '12%' }}>日時</Th>
+                      <Th style={{ width: '16%' }}>お客さま</Th>
+                      <Th style={{ width: '16%' }}>メニュー</Th>
+                      <Th style={{ width: '12%' }} className="cq-hide-below-830">担当</Th>
+                      <Th style={{ width: '10%' }}>予約経路</Th>
+                      <Th style={{ width: '10%' }} align="right">料金</Th>
+                      <Th style={{ width: '12%' }}>状態</Th>
+                      <Th style={{ width: '12%' }} align="right" className="sticky right-0 bg-canvas-sunken">操作</Th>
+                    </TableHeadRow>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody>
                     {shown.map((b) => (
-                      <tr key={b.id} className="group hover:bg-canvas-sunken">
-                        <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      <Tr key={b.id} interactive className="group">
+                        <Td className="whitespace-nowrap">
                           {formatShort(b.starts_at)}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
+                        </Td>
+                        <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
                           <span className="text-ink" title={b.friend_name ?? undefined}>
                             {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm">{b.menu_name}</td>
-                        <td className="cq-hide-below-830 px-4 py-3 text-sm">{b.staff_name}</td>
-                        <td className="px-4 py-3 text-sm">
+                        </Td>
+                        <Td>{b.menu_name}</Td>
+                        <Td className="cq-hide-below-830">{b.staff_name}</Td>
+                        <Td>
+                          {/* R88: 受付経路は source で分ける。担当者の代理入力をLINEにしない。 */}
                           <span
-                            className={`${b.friend_id ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
+                            className={`${isLineBooking(b) ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
                           >
-                            {b.friend_id ? 'LINE' : '電話'}
+                            {isLineBooking(b) ? 'LINE' : '電話'}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm tabular-nums">
+                        </Td>
+                        <Td align="right" className="tabular-nums">
                           ¥{b.price_at_booking.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
+                        </Td>
+                        <Td>
                           <span
                             className={`inline-block rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
                           >
                             {statusLabel[b.status] ?? b.status}
                           </span>
-                        </td>
-                        <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-4 py-3 text-right">
+                        </Td>
+                        <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
                           <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => setDetailId(b.id)}
@@ -1001,13 +1188,11 @@ export default function BookingsPage() {
                               />
                             ) : null}
                           </div>
-                        </td>
-                      </tr>
+                        </ActionCell>
+                      </Tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
-            </div>
+            </DataTable>
           )}
 
           <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
@@ -1076,40 +1261,18 @@ export default function BookingsPage() {
           </div>
 
           <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-ink-faint text-xs">全 {total} 件</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={current <= 1}
-                className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-              >
-                前へ
-              </button>
-              <span className="text-ink-secondary px-2 text-xs tabular-nums">
-                {current} / {pageCount}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                disabled={current >= pageCount}
-                className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-              >
-                次へ
-              </button>
-            </div>
+            <ListRange
+              total={total}
+              first={(current - 1) * PAGE_SIZE + 1}
+              last={Math.min(current * PAGE_SIZE, total)}
+            />
+            <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />
           </div>
         </div>
       </div>
 
       {dialogs}
     </div>
-  )
-}
-
-function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <th className={`text-ink-faint px-4 py-3 text-left text-xs font-semibold ${className}`}>
-      {children}
-    </th>
   )
 }
 
@@ -1189,7 +1352,7 @@ function BookingDetailPanel({
       <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-xl">
         <div className="border-hairline sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b bg-canvas px-6 py-3">
           <div className="min-w-0">
-            <p className="text-ink-faint text-xs font-semibold">予約管理　›　今日　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
+            <p className="text-ink-faint text-xs font-semibold">予約管理　›　{formatJpDay(b.starts_at)}　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
             <h2 className="text-ink mt-1 truncate text-xl font-semibold">{b.friend_name ?? 'お客様'} ／ {b.menu_name}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -1219,7 +1382,7 @@ function BookingDetailPanel({
           {detailError ? <Notice tone="danger" message={detailError} onClose={() => setDetailError('')} className="mb-4" /> : null}
           <section className="mb-6">
             <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
-            <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ {isLinked ? 'LINEから入りました。' : '電話・店頭で受け付けました。'}</p>
+            <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ {isLineBooking(b) ? 'LINEから入りました。' : '電話・店頭で受け付けました。'}</p>
             <div className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink mb-1 text-base font-semibold">予約の中身</h3>
             <DetailRow label="メニュー">{b.menu_name}</DetailRow>

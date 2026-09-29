@@ -24,10 +24,22 @@ function asD1(sqlite: Database.Database, seen: string[]): D1Database {
         return { success: true, meta: { changes: info.changes }, results: [] } as T;
       },
       raw: async () => [],
+      _statement: statement,
+      _params: params,
     } as unknown as D1PreparedStatement);
     return make([]);
   }
-  return { prepare } as unknown as D1Database;
+  return {
+    prepare,
+    // D1 の batch と同じく、全部成功か全部巻き戻しの1トランザクションで実行する。
+    async batch(statements: unknown[]) {
+      return sqlite.transaction(() => statements.map((raw) => {
+        const item = raw as { _statement: Database.Statement; _params: unknown[] };
+        const info = item._statement.run(...item._params);
+        return { success: true, meta: { changes: info.changes }, results: [] };
+      }))();
+    },
+  } as unknown as D1Database;
 }
 
 function ruleExists(sqlite: Database.Database, id: string): boolean {
@@ -42,6 +54,9 @@ describe('マイル決めごとの原子削除', () => {
   beforeEach(() => {
     seen = [];
     sqlite = new Database(':memory:');
+    // 本番D1と同じく外部キーを効かせる。切ったままだと下書き行を持つ
+    // 決めごとの削除失敗（R296）をこの試験は再現できない。
+    sqlite.pragma('foreign_keys = ON');
     sqlite.exec(readFileSync(join(ROOT, 'bootstrap.sql'), 'utf8'));
     sqlite.exec(`
       INSERT INTO line_accounts
@@ -54,7 +69,14 @@ describe('マイル決めごとの原子削除', () => {
         (id, program_id, name, event_type, amount, line_account_id, created_at, updated_at)
       VALUES ('rule-used', 'default', '来店', 'visit', 10, 'account-1', datetime('now'), datetime('now')),
              ('rule-void-only', 'default', '取消済み', 'visit', 10, 'account-1', datetime('now'), datetime('now')),
-             ('rule-clean', 'default', '未使用', 'visit', 10, 'account-1', datetime('now'), datetime('now'));
+             ('rule-clean', 'default', '未使用', 'visit', 10, 'account-1', datetime('now'), datetime('now')),
+             ('rule-drafted', 'default', '下書きあり未使用', 'visit', 10, 'account-1', datetime('now'), datetime('now')),
+             ('rule-drafted-used', 'default', '下書きあり履歴あり', 'visit', 10, 'account-1', datetime('now'), datetime('now'));
+
+      INSERT INTO mileage_earning_rule_drafts
+        (rule_id, line_account_id, version, draft_json)
+      VALUES ('rule-drafted', 'account-1', 1, '{}'),
+             ('rule-drafted-used', 'account-1', 1, '{}');
 
       INSERT INTO friends (id, line_user_id, line_account_id)
       VALUES ('friend-1', 'U1', 'account-1');
@@ -68,7 +90,10 @@ describe('マイル決めごとの原子削除', () => {
               'key-1', datetime('now'), datetime('now')),
              ('ledger-2', 'default', 'friend-1', 'rule-void-only',
               'grant', 'void', 10, '来店', 'visit',
-              'key-2', datetime('now'), datetime('now'));
+              'key-2', datetime('now'), datetime('now')),
+             ('ledger-3', 'default', 'friend-1', 'rule-drafted-used',
+              'grant', 'available', 10, '来店', 'visit',
+              'key-3', datetime('now'), datetime('now'));
     `);
     db = asD1(sqlite, seen);
   });
@@ -96,13 +121,30 @@ describe('マイル決めごとの原子削除', () => {
     expect(ruleExists(sqlite, 'rule-clean')).toBe(false);
   });
 
-  it('DELETE文自体が履歴条件を持つ', async () => {
+  it('下書きのある決めごとも履歴がなければ下書きごと消える（R296）', async () => {
+    await expect(deleteMileageRule(db, 'rule-drafted')).resolves.toBe(1);
+    expect(ruleExists(sqlite, 'rule-drafted')).toBe(false);
+    const draft = sqlite
+      .prepare(`SELECT 1 AS one FROM mileage_earning_rule_drafts WHERE rule_id = ?`)
+      .get('rule-drafted');
+    expect(draft).toBeUndefined();
+  });
+
+  it('下書きと履歴の両方がある決めごとは両方残る（R296）', async () => {
+    await expect(deleteMileageRule(db, 'rule-drafted-used')).resolves.toBe(0);
+    expect(ruleExists(sqlite, 'rule-drafted-used')).toBe(true);
+    const draft = sqlite
+      .prepare(`SELECT 1 AS one FROM mileage_earning_rule_drafts WHERE rule_id = ?`)
+      .get('rule-drafted-used');
+    expect(draft).toBeDefined();
+  });
+
+  it('DELETE文すべてが履歴条件を持つ', async () => {
     await deleteMileageRule(db, 'rule-used');
     const deletes = seen.filter((q) => q.trimStart().toUpperCase().startsWith('DELETE'));
     expect(deletes.length).toBeGreaterThan(0);
     for (const q of deletes) {
       const upper = q.toUpperCase();
-      expect(upper).toContain('DELETE FROM MILEAGE_RULES');
       expect(upper).toContain('NOT EXISTS');
       expect(upper).toContain('MILEAGE_LEDGER');
       expect(upper).toContain('MILEAGE_RULE_ID');

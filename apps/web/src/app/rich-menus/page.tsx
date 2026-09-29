@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
@@ -632,6 +632,17 @@ export default function RichMenusListPage() {
   const currentPage = Math.min(page, pageCount)
   const shownGroups = groups
 
+  /**
+   * R173: 検索・絞り込み・フォルダのいずれかが効いているか。
+   * 効いているときの0件は「まだありません」と言わず、条件を外す口を出す。
+   */
+  const richMenuFilterActive = query.trim() !== '' || savedFilter !== '' || folderFilter !== ''
+  const clearRichMenuFilters = () => {
+    setQuery('')
+    setSavedFilter('')
+    setFolderFilter('')
+  }
+
   useEffect(() => {
     setPage(1)
   }, [folderFilter, pageSize, query, savedFilter, sortKey])
@@ -769,12 +780,12 @@ export default function RichMenusListPage() {
           trailing={
             <>
               <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-              <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} />
+              <Select value={sortKey} onChange={(value) => setSortKey(value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} />
               <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-              <SelectField
-                size="compact"
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
+              <Select
+                size="page-size"
+                value={String(pageSize)}
+                onChange={(value) => setPageSize(Number(value))}
                 aria-label="表示件数"
                 options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
               />
@@ -860,12 +871,21 @@ export default function RichMenusListPage() {
                 onRetry={() => void reload()}
               />
             ) : shownGroups.length === 0 ? (
-              <ListState
-                kind="empty"
-                title="まだリッチメニューがありません"
-                description="トークの下に出すメニューを作れます。"
-                action={<Button href="/rich-menus/new" variant="primary">＋ メニューを作る</Button>}
-              />
+              richMenuFilterActive ? (
+                /* R173: 検索・絞り込み・フォルダの結果0件。元データ0件と分け、条件を外す口を出す。 */
+                <ListState
+                  kind="empty"
+                  emptyPreset="filtered"
+                  action={<Button variant="secondary" onClick={clearRichMenuFilters}>条件をクリア</Button>}
+                />
+              ) : (
+                <ListState
+                  kind="empty"
+                  title="まだリッチメニューがありません"
+                  description="トークの下に出すメニューを作れます。"
+                  action={<Button href="/rich-menus/new" variant="primary">＋ メニューを作る</Button>}
+                />
+              )
             ) : (
               <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
                 {/* #641: 操作列が広くなった分は表だけが横に流れる */}
@@ -945,7 +965,7 @@ export default function RichMenusListPage() {
                             だけのボタンは行に直に置かない。撮影口（szXsT）は
                             「…」ボタンへ移す（2段操作の1段目）。
                           */}
-                          <div className="relative inline-flex items-center justify-end gap-1.5">
+                          <div className="relative flex w-full items-center justify-end gap-1.5">
                             <RowActions
                               subjectName={g.name}
                               edit={{ href: `/rich-menus/edit?id=${g.id}` }}

@@ -58,6 +58,19 @@ const dbMocks = {
   markRichMenuTestApplyRevertFailed: vi.fn(),
   getStaffById: vi.fn(),
   getMediaById: vi.fn(),
+  ensureRichMenuVersion: vi.fn(),
+  markRichMenuVersionPublished: vi.fn(),
+  getLatestRichMenuVersion: vi.fn(),
+  recordRichMenuDeviceConfirmation: vi.fn(),
+  findRichMenuDeviceConfirmation: vi.fn(),
+  ensureRichMenuPublishRun: vi.fn(),
+  markRichMenuPublishRun: vi.fn(),
+  listRichMenuPublishRuns: vi.fn(),
+  getLatestRichMenuPublishRun: vi.fn(),
+  ensureRichMenuPublishRunPages: vi.fn(),
+  markRichMenuPublishRunPageStep: vi.fn(),
+  listRichMenuPublishRunPages: vi.fn(),
+  listAccountReferencedLineRichMenuIds: vi.fn(async () => []),
   recordAuditEvent: vi.fn(),
   maskAuditIp: vi.fn(() => null),
   auditDeviceFamily: vi.fn(() => 'unknown'),
@@ -184,6 +197,14 @@ beforeEach(() => {
   dbMocks.getRichMenuManualPublishRequest.mockResolvedValue({ id: 'manual-1', status: 'running' });
   dbMocks.claimRichMenuManualPublishRequest.mockResolvedValue(true);
   dbMocks.renewPublishLease.mockResolvedValue(true);
+  // K・O: 版の凍結と実機確認は公開の前提。門番（自前検査400）を確かめる試験では通しておく。
+  dbMocks.ensureRichMenuVersion.mockImplementation(
+    async (_db: unknown, input: { id: string }) => ({ id: input.id, version_number: 1, status: 'draft' }),
+  );
+  dbMocks.findRichMenuDeviceConfirmation.mockResolvedValue({ id: 'dc1', confirmed_at: '2026-09-07T12:00:00.000' });
+  dbMocks.ensureRichMenuPublishRun.mockImplementation(
+    async (_db: unknown, input: { id: string }) => ({ id: input.id, status: 'running', last_error_code: null }),
+  );
 });
 
 // ----- GET /api/rich-menu-groups -----
@@ -1312,17 +1333,24 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
     dbMocks.isPublishLeaseHeld.mockResolvedValue(false);
     dbMocks.acquirePublishLease.mockResolvedValue(1);
+    // LINE への到達は環境で変わる（遮断なら投げる・通れば 401 が返る）ため、
+    // 「fetch が投げる」前提はここで固定し、実網に触れず決定論的に落とす。
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('LINE fetch failed'));
 
     const app = setupApp();
-    const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', {
-      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-3' },
-    });
-    expect(res.status).toBe(500);
-    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
-      expect.anything(),
-      'gid12345-aaaa',
-      { owner: expect.stringMatching(/^manual-/), generation: 1 },
-    );
+    try {
+      const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', {
+        method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-3' },
+      });
+      expect(res.status).toBe(500);
+      expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
+        expect.anything(),
+        'gid12345-aaaa',
+        { owner: expect.stringMatching(/^manual-/), generation: 1 },
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 

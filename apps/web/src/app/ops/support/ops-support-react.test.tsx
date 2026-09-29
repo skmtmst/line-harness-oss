@@ -210,7 +210,8 @@ describe('画面', () => {
     expect(text).toContain('回答フォームからタグが付かない')
     expect(text).toContain('管理画面のお問い合わせ')
     expect(text).toContain('6人中5人')
-    expect(text).toContain('12件（未解決 0）')
+    // m22d: 一覧の件数と重なる「○件」は出さない。未解決を先に言う。
+    expect(text).toContain('これまで12のうち未解決0件')
     expect(text).toContain('musubo 運営 ／ 坂本 真人')
     expect(text).toContain('a.png（契約先から）')
     expect(text).toContain('AIで下書きを作る')

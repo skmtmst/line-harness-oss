@@ -43,8 +43,16 @@ import {
   type AutoReplyCandidateReasonCode,
 } from '../services/auto-reply.js';
 import { isOperatorHandling } from '../services/auto-reply-conditions.js';
+import { validateFlexContent } from '@line-crm/shared';
 
 const autoReplies = new Hono<Env>();
+
+/*
+ * R200: 「連投を防ぐ」の範囲外は、対象欄の名前と許容範囲が分かる日本語で断る。
+ * 英語の内部項目名（cooldownMinutes ...）をそのまま出さない。
+ * 下書き・直接作成・更新の3つの口で同じ文言を使う。
+ */
+const COOLDOWN_RANGE_ERROR = '「連投を防ぐ」は0〜10080の整数（分）で入力してください';
 
 async function validateAutoReplyFolder(
   db: D1Database,
@@ -547,7 +555,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
     return { ok: false, error: '応答する時間を24時間表記で入力してください' };
   }
   const cooldown = parseCooldown(body.cooldownMinutes);
-  if (!cooldown.ok) return { ok: false, error: '連続応答を止める時間が正しくありません' };
+  if (!cooldown.ok) return { ok: false, error: COOLDOWN_RANGE_ERROR };
   const priority = readPriority(body.priority ?? 0);
   if (!priority.ok) return { ok: false, error: '優先順位が正しくありません' };
   const messageKinds = readMessageKinds(body.messageKinds);
@@ -601,6 +609,15 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   // LINEのテキスト上限と同じ基準。試し文の2000字より緩いが、保存文の上限として見る。
   if ([...responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
     return { ok: false, error: `返信する内容は${AUTO_REPLY_RESPONSE_MAX.toLocaleString('ja-JP')}文字までです` };
+  }
+  /*
+   * R201: カードはJSONとして読めるだけでは足りない。`{}` のような構造のない
+   * 内容は送信時に落ちるだけなので、保存の側で止める。テンプレートから
+   * 写した中身はテンプレート側の検査に任せ、直接入力だけここで見る。
+   */
+  if (!templateId) {
+    const flexError = validateFlexContent(responseType, responseContent);
+    if (flexError) return { ok: false, error: flexError };
   }
 
   return {
@@ -1480,10 +1497,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       return c.json({ success: false, error: 'activeFrom/activeUntil must be HH:MM' }, 400);
     }
     if (!cooldown.ok) {
-      return c.json(
-        { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
-        400,
-      );
+      return c.json({ success: false, error: COOLDOWN_RANGE_ERROR }, 400);
     }
     const priority = body.priority === undefined ? { ok: true as const, value: 0 } : readPriority(body.priority);
     if (!priority.ok) {
@@ -1515,6 +1529,14 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     if (!extras.ok) return c.json({ success: false, error: extras.error }, 400);
     const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
     if (folderError) return c.json({ success: false, error: folderError }, 422);
+    /*
+     * R201: 直接入力のカードは構造まで見る。テンプレートから写した中身
+     * （content を送らず templateId だけ送った場合）は対象外にする。
+     */
+    if (body.responseContent) {
+      const flexError = validateFlexContent(resolvedResponseType, resolvedResponseContent);
+      if (flexError) return c.json({ success: false, error: flexError }, 400);
+    }
 
     const item = await createAutoReply(c.env.DB, {
       ...extras.value,
@@ -1574,6 +1596,15 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
       if (typeof body.responseContent === 'string' && [...body.responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
         return c.json({ success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400);
       }
+      /*
+       * R201: カード種別を名指しで送ってきた中身は構造まで見る。
+       * 種別を送らず中身だけの更新は、既存の種別が読めないため
+       * 下書き保存口の検査に任せる。
+       */
+      if (typeof body.responseContent === 'string' && body.responseType === 'flex') {
+        const flexError = validateFlexContent(body.responseType, body.responseContent);
+        if (flexError) return c.json({ success: false, error: flexError }, 400);
+      }
       input.responseContent = body.responseContent;
     }
     if ('templateId' in body) input.templateId = body.templateId;
@@ -1600,10 +1631,7 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     if ('cooldownMinutes' in body) {
       const parsed = parseCooldown(body.cooldownMinutes);
       if (!parsed.ok) {
-        return c.json(
-          { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
-          400,
-        );
+        return c.json({ success: false, error: COOLDOWN_RANGE_ERROR }, 400);
       }
       input.cooldownMinutes = parsed.value;
     }

@@ -28,6 +28,23 @@ vi.mock('@/lib/use-feature-visibility', () => ({
   }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後のテンプレートの判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 type PageModule = typeof import('./page')
 type Testing = PageModule['default']['__testing']
 
@@ -365,6 +382,23 @@ describe('食い違ったまま保存させない', () => {
     expect(T.validateTemplateSave(saveInput({ name: '   ' }))).toBe('名前を入力してください')
     expect(T.validateTemplateSave(saveInput({ messageContent: '  ' }))).toBe('本文を入力してください')
   })
+
+  it('R249: カード型に通常文・壊れたJSON・型なしJSONを保存しない', async () => {
+    for (const messageContent of ['初回のお届け予定はこちらです', '{壊れている', '{}']) {
+      const input = saveInput({ messageType: 'flex', messageContent })
+      expect(T.validateTemplateSave(input)).toContain('カードの内容')
+      const result = await T.saveTemplateEdit(input)
+      expect(result.ok).toBe(false)
+    }
+  })
+
+  it('R249: 正常なカードは保存できる', () => {
+    const input = saveInput({
+      messageType: 'flex',
+      messageContent: '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[]}}',
+    })
+    expect(T.validateTemplateSave(input)).toBeNull()
+  })
 })
 
 /* ------------------------------------------------------------ 逆順の応答 */
@@ -553,8 +587,9 @@ describe('差し込みボタンの押下', () => {
       .toEqual(['', '{{field.a_pet}}'])
     const select = findElement(controls, (element) =>
       (element.props as { 'aria-label'?: string })['aria-label'] === '友だち情報を差し込む')
-    ;(select?.props as { onChange: (event: unknown) => void })
-      .onChange({ target: { value: '{{field.a_pet}}' } })
+    // 共通 Select の onChange は値そのものを受け取る（イベントではない）。
+    ;(select?.props as { onChange: (value: string) => void })
+      .onChange('{{field.a_pet}}')
 
     expect(inserted).toEqual(['{{field.a_pet}}'])
   })
@@ -563,7 +598,7 @@ describe('差し込みボタンの押下', () => {
 /**
  * 差し込みの並びを、画面と同じ引数で組み立てる。
  *
- * `renderToStaticMarkup` は使わない。この並びは共通の `SelectField` を
+ * `renderToStaticMarkup` は使わない。この並びは共通の `Select` を
  * 含み、その部品は自動JSXで書かれているため、試験の変換では文字列に
  * できない。**組み立てた木をそのまま見るほうが、渡した値まで分かる。**
  */

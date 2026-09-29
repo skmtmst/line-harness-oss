@@ -38,6 +38,9 @@ const PAGES = [{ host: 'shop.example.com', path: '/thanks', views: 4, visitors: 
 let mode: 'empty' | 'active' | 'failing' = 'empty'
 let gated = false
 let gate: Array<() => void> = []
+// R275: 計測サイトの停止・再開を確かめるための投入物。
+let sites: Array<Record<string, unknown>> = []
+let staffRole = 'staff'
 function releaseAll() {
   gate.splice(0).forEach((resolve) => resolve())
 }
@@ -55,6 +58,8 @@ beforeEach(() => {
   mode = 'empty'
   gated = false
   gate = []
+  sites = []
+  staffRole = 'staff'
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
   vi.stubGlobal('fetch', vi.fn(async (input: unknown) => {
     const raw = typeof input === 'string' ? input : (input as Request).url
@@ -81,7 +86,13 @@ beforeEach(() => {
     }
     if (url.pathname === '/api/measurement-sites') {
       return new Response(
-        JSON.stringify({ success: true, data: [] }),
+        JSON.stringify({ success: true, data: sites }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+    if (url.pathname === '/api/staff/me') {
+      return new Response(
+        JSON.stringify({ success: true, data: { role: staffRole } }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
     }
@@ -177,5 +188,66 @@ describe('サイトスクリプトの計測状況', () => {
 
     expect(text()).toContain('サイトの計測を読み込めませんでした')
     expect(text()).toContain('最後に受け取ったのは 9/26 18:02')
+  })
+})
+
+describe('R275 計測サイトの停止と再開', () => {
+  const SITE = {
+    id: 'site-1',
+    label: '公式ショップ',
+    domains: ['shop.example.com'],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    rejectedCount: 0,
+    lastRejectedHost: null,
+    lastRejectedAt: null,
+    stoppedAt: null,
+    stoppedReason: null,
+  }
+  const button = (label: string) =>
+    Array.from(document.querySelectorAll('button')).find((el) => el.textContent?.trim() === label)
+
+  it('ownerには止める入口があり、理由を付けて停止を送る', async () => {
+    staffRole = 'owner'
+    sites = [{ ...SITE }]
+    await act(async () => { root.render(<SiteScript />) })
+    await settle()
+    await settle()
+
+    const stop = button('計測を止める')
+    expect(stop).toBeTruthy()
+    await act(async () => { stop!.click() })
+    // 理由なしでは送らない
+    await act(async () => { button('計測を止める')!.click(); await Promise.resolve() })
+    const confirm = Array.from(document.querySelectorAll('button'))
+      .filter((el) => el.textContent?.trim() === '計測を止める').pop()!
+    await act(async () => { confirm.click(); await Promise.resolve() })
+    expect(document.body.textContent).toContain('止める理由を入れてください')
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST'
+      && String((init?.body as string) ?? '').includes('reason'))).toBe(false)
+  })
+
+  it('停止中のサイトは札と理由を出し、計測コードは出さない', async () => {
+    staffRole = 'owner'
+    sites = [{ ...SITE, stoppedAt: '2026-09-27T00:00:00.000Z', stoppedReason: 'サイトを閉じたため' }]
+    await act(async () => { root.render(<SiteScript />) })
+    await settle()
+    await settle()
+
+    expect(text()).toContain('停止中')
+    expect(text()).toContain('理由: サイトを閉じたため')
+    expect(text()).not.toContain('data-site="site-1"')
+    expect(button('計測を再開する')).toBeTruthy()
+    expect(button('計測を止める')).toBeFalsy()
+  })
+
+  it('staffには止める・再開する入口を出さない', async () => {
+    staffRole = 'staff'
+    sites = [{ ...SITE }]
+    await act(async () => { root.render(<SiteScript />) })
+    await settle()
+    await settle()
+
+    expect(button('計測を止める')).toBeFalsy()
+    expect(button('計測を再開する')).toBeFalsy()
   })
 })

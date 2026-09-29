@@ -307,7 +307,9 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
   it.each([
     ['INSERT OR IGNORE INTO incoming_webhook_receipts', null],
     ["SET status='processing',lease_owner=", 'accepted'],
-    ['SELECT source_event_id,status,received_at', 'processing'],
+    // R425: 本文照合を予約より先に行うため、この文の障害では行が残らない。
+    // 受信自体は失わず、正規再送で回復する（下の 200・completed で確かめる）。
+    ['SELECT source_event_id,status,received_at', null],
   ])('受付途中のDB障害でも受信を失わない: %s', async (fragment, expectedStatus) => {
     const prepare = db.db.prepare.bind(db.db);
     let fail = true;
@@ -323,10 +325,6 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     expect(fireEvent).not.toHaveBeenCalled();
     const row = db.raw.prepare('SELECT status FROM incoming_webhook_receipts').get() as { status: string } | undefined;
     expect(row?.status ?? null).toBe(expectedStatus);
-    if (expectedStatus === 'processing') {
-      expect((await receive(body)).status).toBe(503);
-      db.raw.prepare('UPDATE incoming_webhook_receipts SET lease_expires_at=0').run();
-    }
     expect((await receive(body)).status).toBe(200);
     expect(fireEvent).toHaveBeenCalledTimes(1);
     expect(db.raw.prepare('SELECT status FROM incoming_webhook_receipts').get()).toEqual({ status: 'completed' });

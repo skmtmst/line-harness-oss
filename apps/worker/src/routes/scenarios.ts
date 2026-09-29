@@ -15,6 +15,7 @@ import {
   retryFailedFriendScenario,
   moveFriendScenarioTo,
   getFriendById,
+  listMoveReferrers,
   jstNow,
   getScenarioPublishedVersion,
   publishScenarioVersion,
@@ -264,6 +265,28 @@ function validateQuestionForStorage(
   for (const [i, choice] of question.choices.entries()) {
     if (!choice.label || choice.label.trim() === '') {
       return { ok: false, error: `選択肢${i + 1}の文字が空です。` };
+    }
+    /*
+     * R214: 行き先（URL・電話・メール）の形を見る。not-a-url のような
+     * 値でも保存できると、設定済みに見えて実際は開けない通になる。
+     * 下書きでも通さず、公開・送信前の共通検査としてここで止める。
+     */
+    const behavior = (choice as { behavior?: string }).behavior ?? 'none';
+    if (behavior === 'url' || behavior === 'add_friend' || behavior === 'form') {
+      const url = ((choice as { url?: unknown }).url ?? '').toString().trim();
+      if (!/^https?:\/\/\S+$/.test(url)) {
+        return { ok: false, error: `選択肢${i + 1}のURLが正しくありません。https:// から始まるURLを入力してください。` };
+      }
+    } else if (behavior === 'tel') {
+      const tel = ((choice as { tel?: unknown }).tel ?? '').toString().trim();
+      if (!/[0-9]/.test(tel) || !/^[0-9+\-() ]+$/.test(tel)) {
+        return { ok: false, error: `選択肢${i + 1}の電話番号が正しくありません。数字で入力してください。` };
+      }
+    } else if (behavior === 'mail' || behavior === 'email') {
+      const email = ((choice as { email?: unknown }).email ?? '').toString().trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { ok: false, error: `選択肢${i + 1}のメールアドレスが正しくありません。` };
+      }
     }
   }
   return { ok: true, json: JSON.stringify(question) };
@@ -729,7 +752,38 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
   }
 });
 
+// GET /api/scenarios/:id/move-referrers - 終了後の移動先にしているシナリオの一覧
+//
+// R250: 消す前に「どのシナリオの終了後の処理が変わるか」を確認窓で見せる
+// ための読み取り。消したあとは参照元の終了後の処理が「一時停止」へ戻る
+// （deleteScenario が原子で直す）ので、この一覧は消す前の案内専用。
+scenarios.get('/api/scenarios/:id/move-referrers', scenarioPermission('view'), async (c) => {
+  try {
+    const id = c.req.param('id')!;
+    const scenario = await getScenarioById(c.env.DB, id);
+    if (!scenario) {
+      return c.json({ success: false, error: 'Scenario not found' }, 404);
+    }
+    // 見える範囲だけに絞る。見えないアカウントの名前は数えない。
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const referrers = await listMoveReferrers(c.env.DB, id);
+    const items = referrers
+      .filter((r) => r.lineAccountId === null
+        ? scope.canSeeUnassigned
+        : scope.allowedAccountIds.includes(r.lineAccountId))
+      .map(({ id: referrerId, name }) => ({ id: referrerId, name }));
+    return c.json({ success: true, data: { items, total: items.length } });
+  } catch (err) {
+    console.error('GET /api/scenarios/:id/move-referrers error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // DELETE /api/scenarios/:id - delete
+//
+// R250: 終了後の移動先にされていた場合、参照元の終了後の処理は
+// 「一時停止」へ戻る（deleteScenario が同じ batch で直す）。
+// 「移動先のない移動」は残らない。
 scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -1205,7 +1259,7 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
     const stepsResult = await c.env.DB
       .prepare(
         `SELECT id, step_order, delay_minutes, offset_days, offset_minutes, delivery_time,
-                template_id, message_type, message_content, question_json
+                template_id, message_type, message_content, question_json, is_draft
          FROM scenario_steps WHERE scenario_id = ? ORDER BY step_order ASC`,
       )
       .bind(scenarioId)
@@ -1220,6 +1274,7 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
         message_type: string;
         message_content: string;
         question_json: string | null;
+        is_draft: number | null;
       }>();
     const steps = stepsResult.results;
 
@@ -1270,6 +1325,18 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
         messageType: resolved.messageType,
         messageContent: resolved.messageContent,
         question: parseQuestion(resolved.questionJson),
+        // R212: 下書きの通も並ぶが、実際は送られない。送られる通と
+        // 見分けられるよう別を付ける（友だち別の予定は下書きを除く）。
+        isDraft: Number(step.is_draft ?? 0) !== 0,
+        /*
+         * R237: 公開版・通の控えのどれを表示しているかを出す。
+         * template 参照があるのに控えのときは、未反映の理由も付ける
+         * （保存と公開を取り違えると、確認すべき場所を誤る）。
+         */
+        contentSource: resolved.templateIdAtSend != null
+          ? 'template' as const
+          : (step.template_id != null ? 'step-fallback' as const : 'step' as const),
+        fallbackReason: resolved.fallbackReason,
       };
     });
 

@@ -20,7 +20,8 @@ const UTILS = readFileSync(join(HERE, '..', '..', 'components', 'friends', 'save
 describe('FRIEND-01 対象の選択を1か所の明示的な4値にする', () => {
   it('表示中/非表示のみ/ブロックした人/すべてのラジオを1グループで出す', () => {
     expect(UTILS).toContain("export type FriendVisibilityChoice = 'visible' | 'hidden' | 'blocked' | 'all'")
-    expect(DIALOG).toContain('role="radiogroup"')
+    // m21u: 素の選択群を共通の RadioCardGroup（fieldset＋legend）へ置き換えた。
+    expect(DIALOG).toContain('legend="表示する友だち"')
     for (const label of ['表示中', '非表示のみ', 'ブロックした人', 'すべて']) {
       expect(DIALOG).toContain(`label: '${label}'`)
     }
@@ -84,7 +85,8 @@ describe('FRIEND-04/32 適用した条件を一覧と編集画面で一致させ
 
 describe('FRIEND-05 対応状況は固定4状態', () => {
   it('保留を選べる', () => {
-    expect(DIALOG).toContain('<option value="on_hold">保留</option>')
+    // 対応状況の選び欄は共通 Select。選択肢の配列に「保留」がある。
+    expect(DIALOG).toContain("{ value: 'on_hold', label: '保留' }")
   })
 })
 

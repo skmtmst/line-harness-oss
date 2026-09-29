@@ -10,7 +10,7 @@ import RichMenuCreateForm, {
   type RichMenuCreateValue,
   type RichMenuOption,
 } from '@/components/rich-menus/rich-menu-create-form'
-import { areaDraftsForCreate, createAreaDrafts, unsetAreaLabels } from '@/components/rich-menus/action-drafts'
+import { areaDraftsForCreate, createAreaDrafts, pruneStaleAreaTags, pruneStaleAreaTemplates, unsetAreaLabels } from '@/components/rich-menus/action-drafts'
 import type { Area } from '@/components/rich-menus/canvas-editor'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -86,13 +86,16 @@ export default function NewRichMenuPage() {
     setSelectedMedia(null)
   }, [selectedAccount?.id])
 
+  // R23: 別アカウントの同名タグが混ざらないよう、候補は今のアカウントだけ。
+  const [tagPruneNotice, setTagPruneNotice] = useState<string | null>(null)
+
   useEffect(() => {
     let cancelled = false
     void (async () => {
       const [folderRes, tagRes, templateRes, formRes, linkRes] = await Promise.allSettled([
         api.folders.list('rich_menu'),
-        api.tags.list(),
-        api.templates.list(),
+        api.tags.list(selectedAccount ? { accountId: selectedAccount.id } : undefined),
+        api.templates.list(undefined, selectedAccount?.id ?? undefined),
         selectedAccount ? api.forms.list(selectedAccount.id) : Promise.resolve({ success: true as const, data: [] }),
         api.trackedLinks.list(),
       ])
@@ -105,6 +108,27 @@ export default function NewRichMenuPage() {
     })()
     return () => { cancelled = true }
   }, [selectedAccount])
+
+  /*
+   * R23: アカウントを切り替えたら候補が変わる。前のアカウントにしかない
+   * タグを選んでいたら、新しいアカウントには存在しないため外して知らせる。
+   * 外すものがなければ何もしない（終わりがあるので繰り返さない）。
+   */
+  useEffect(() => {
+    const tagPruned = pruneStaleAreaTags(value.areaDraftsByTemplate, new Set(tags.map((tag) => tag.id)))
+    /*
+     * m18r: テンプレートも今のアカウントだけ。候補がまだ届いていない
+     * （空）と「このアカウントに無い」の区別が付かないため、空の間は
+     * 外さない。届いた候補に無い選択だけ外す。
+     */
+    const tplPruned = templates.length === 0
+      ? { next: tagPruned.next, removed: 0 }
+      : pruneStaleAreaTemplates(tagPruned.next, new Set(templates.map((template) => template.id)))
+    const removed = tagPruned.removed + tplPruned.removed
+    if (removed === 0) return
+    setValue({ ...value, areaDraftsByTemplate: tplPruned.next })
+    setTagPruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+  }, [tags, templates, value])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -139,6 +163,7 @@ export default function NewRichMenuPage() {
     }
     const pageAreas = areaDraftsWithSwitchTargets(areas)
     setSubmitting(true)
+    setTagPruneNotice(null)
     setError(null)
     setNameError(null)
     setChatBarTextError(null)
@@ -179,6 +204,7 @@ export default function NewRichMenuPage() {
   return (
     <div data-design-node="XtfO3" className="mx-auto max-w-screen-2xl py-6">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus" className="hover:underline">リッチメニュー</Link><span className="mx-1.5">/</span><span>新規作成</span></nav>
+      {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} className="mb-3" /> : null}
       <form onSubmit={handleSubmit}>
         <RichMenuCreateForm
           value={value}
@@ -237,7 +263,7 @@ export default function NewRichMenuPage() {
           setMediaPickerOpen(false)
         }}
       />
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力中の内容があります"
         description="このまま移動すると、入力した内容は保存されません。移動しますか？"

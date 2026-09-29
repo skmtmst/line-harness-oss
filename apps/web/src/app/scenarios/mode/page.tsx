@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -52,6 +52,8 @@ function ScenarioModeContent() {
   const [selectedMode, setSelectedMode] = useState<DeliveryMode | null>(null)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderId, setFolderId] = useState('')
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -159,13 +161,31 @@ function ScenarioModeContent() {
   }, [folderAccountId])
 
   /**
+   * R172: 名前空欄の必須エラーは画面上方の帯だけに出すと、スマホでは
+   * 画面外（約844px上）になり押した理由が見えない。該当欄の下にも
+   * 短い案内を出し、入力欄へフォーカスとスクロールを移す。
+   * 戻り値は「空欄で止めたか」。止めたとき真。
+   */
+  const rejectEmptyName = (): boolean => {
+    if (name.trim()) return false
+    setError('シナリオ名を入力してください')
+    setNameError('シナリオ名を入力してください')
+    const input = nameInputRef.current
+    if (input) {
+      input.focus()
+      input.scrollIntoView({ block: 'center' })
+    }
+    return true
+  }
+
+  /**
    * 行をまだ作っていない（id なし）ときの作成。方式を確定したこの瞬間に
    * 初めて作るので、途中で閉じても空の行は残らない（#949 N-055）。
    */
   const createNew = async (mode: DeliveryMode): Promise<string | null> => {
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('シナリオ名を入力してください')
+      rejectEmptyName()
       return null
     }
     const res = await api.scenarios.create({
@@ -195,9 +215,10 @@ function ScenarioModeContent() {
     }
     setSaving(mode)
     setError('')
+    setNameError('')
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('シナリオ名を入力してください')
+      rejectEmptyName()
       setSaving(null)
       return
     }
@@ -240,6 +261,7 @@ function ScenarioModeContent() {
       // 「時刻で指定」（設計でおすすめの方。通が0のあいだは変えられる）。
       setDetailsSaving(true)
       setError('')
+      setNameError('')
       try {
         const createdId = await createNew('absolute_time')
         if (createdId) router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
@@ -249,7 +271,12 @@ function ScenarioModeContent() {
       return
     }
     const saved = await saveDetails()
-    if (saved) router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
+    if (saved) {
+      router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
+    } else if (!name.trim()) {
+      // R172: 名前を消して下書き保存を押しても何も起きないままにしない。
+      rejectEmptyName()
+    }
   }
 
   const selectedFolderName = folderState === 'loading'
@@ -313,36 +340,45 @@ function ScenarioModeContent() {
               シナリオ名 <span className="text-danger">*</span>
             </span>
             <input
+              ref={nameInputRef}
               type="text"
               value={name}
               disabled={(Boolean(id) && !scenario) || detailsSaving || saving !== null}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
               placeholder="例: 友だち追加ウェルカム"
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? 'scenario-name-error' : undefined}
               className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
+            {nameError ? (
+              <span id="scenario-name-error" className="mt-1 block text-xs font-semibold text-danger">
+                {nameError}
+              </span>
+            ) : null}
           </label>
 
           <label className="block">
             <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ：</span>
-            <SelectField
+            <span title={selectedFolderName} className="block">
+            <Select
               value={folderId}
-              title={selectedFolderName}
               disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}
-              onChange={(event) => {
-                const nextFolderId = event.target.value
+              onChange={(value) => {
+                const nextFolderId = value
                 setFolderId(nextFolderId)
                 void saveDetails(nextFolderId)
               }}
               aria-label="シナリオのフォルダ"
-              className="v6-select border-hairline rounded-control bg-canvas text-ink focus:ring-accent disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              size="full"
               options={[
                 { value: '', label: '未分類' },
                 ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
             />
-            {folderState !== 'ready' || detailsSaving ? (
+
+            </span>            {folderState !== 'ready' || detailsSaving ? (
               <span className="text-ink-faint mt-1 block text-xs">
                 {folderState === 'loading'
                   ? 'フォルダを読み込んでいます。'

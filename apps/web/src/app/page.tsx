@@ -14,9 +14,11 @@ import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/ship
 import QrDialog from '@/components/dashboard/qr-dialog'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
 import DashboardFreshness, { dashboardLocalUpdatedAt, dashboardPeriodLabel } from '@/components/dashboard/freshness'
+import GettingStartedBand from '@/components/dashboard/getting-started-band'
 import {
   FriendStatusCard,
   SupportMarkStatusCard,
+  DeliveryFailuresCard,
   MonthlyDeliveryCard,
   RecentResultsCard,
   SideCard,
@@ -36,7 +38,7 @@ import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import HelpTip from '@/components/shared/help-tip'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import {
@@ -281,11 +283,11 @@ function FriendAddLinkCard({
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-[220px] items-center gap-2">
             <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
-            <SelectField
+            <Select
               value={routeId}
-              onChange={(event) => setRouteId(event.target.value)}
+              onChange={(value) => setRouteId(value)}
               aria-label="発行中の追加URL"
-              className="text-ink min-w-0 flex-1 bg-transparent text-xs font-medium focus:outline-none"
+              className="min-w-0 flex-1"
               options={[
                 { value: '', label: '基本の追加URL' },
                 ...(routes ?? []).map((entry) => ({ value: entry.id, label: entry.name })),
@@ -1375,7 +1377,8 @@ function DashboardPageInner() {
     />
     if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={pendingOldest} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={healthFailed} updatedAt={supplementLoadedAt} />
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} healthFailed={healthFailed} updatedAt={supplementLoadedAt} />
-    if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
+    if (id === 'upcoming') return <UpcomingCard accountId={selectedAccountId} bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
+    if (id === 'delivery-failures') return <DeliveryFailuresCard accountId={selectedAccountId} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" section={data.sections?.delivery} onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} freshness={<DashboardFreshness freshness={data.sections?.delivery?.freshness} asOf={data.sections?.delivery?.asOf} reason={data.sections?.delivery?.reason} />} />
@@ -1429,6 +1432,11 @@ function DashboardPageInner() {
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
+      {/*
+        設計 ★V6 34-1：終わっていない段があるあいだだけ進みの帯を出す。
+        閉じた・全部終わった・取れなかったときは何も描かない。
+      */}
+      <GettingStartedBand accountId={selectedAccountId} />
       <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <Button onClick={openEditor}>
           <EditIcon />ダッシュボード編集

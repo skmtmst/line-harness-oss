@@ -13,9 +13,10 @@ import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
+import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { parseFriendCsv, type FriendImportRow } from './friend-csv'
 
@@ -42,7 +43,9 @@ export default function FriendMigrationsPage() {
   const [accountId, setAccountId] = useState('')
   const [jobs, setJobs] = useState<FriendMigrationJob[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [columns, setColumns] = useState<Array<'basic' | 'tags_fields' | 'support'>>(['basic', 'tags_fields'])
+  // R114: タグ・友だち情報と対応情報の書き出しは未接続のため、初期選択は
+  // 実際に出る基本だけにする。選べるのに出ない状態を作らない。
+  const [columns, setColumns] = useState<Array<'basic' | 'tags_fields' | 'support'>>(['basic'])
   // Shift_JIS書き出しはAPI未対応(#496-5)。対応までUTF-8固定で、選択肢は出さない。
   const encoding = 'utf-8' as const
   const [exportResult, setExportResult] = useState<{ rowCount: number | null; downloadUrl: string } | null>(null)
@@ -139,10 +142,11 @@ export default function FriendMigrationsPage() {
     <div className="grid gap-4 xl:grid-cols-2">
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <h2 className="text-ink text-base font-bold">CSVで書き出す</h2>
-        <label className="text-ink-secondary mt-4 block text-xs font-semibold">対象<SelectField aria-label="書き出すLINEアカウント" value={accountId} onChange={(event) => setAccountId(event.target.value)} options={[{ value: '', label: 'アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>
-        <fieldset className="mt-4 space-y-2"><legend className="text-ink-secondary mb-2 text-xs font-semibold">書き出す項目</legend>
-          {([['basic', '基本（名前・LINEアカウント・登録日）'], ['tags_fields', 'タグ・友だち情報'], ['support', '対応状況・対応マーク・担当者']] as const).map(([value, label]) => <Checkbox key={value} checked={columns.includes(value)} onCheckedChange={() => toggleColumn(value)}>{label}</Checkbox>)}
+        <label className="text-ink-secondary mt-4 block text-xs font-semibold">対象<Select aria-label="書き出すLINEアカウント" value={accountId} onChange={(value) => setAccountId(value)} options={[{ value: '', label: 'アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>
+        <fieldset className="mt-4 space-y-2"><legend className="text-ink-secondary mb-2 text-xs font-semibold">書き出す項目<HelpTip label="書き出す項目の説明">基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。</HelpTip></legend>
+          {([['basic', '基本（名前・LINEアカウント・登録日）', false], ['tags_fields', 'タグ・友だち情報', true], ['support', '対応状況・対応マーク・担当者', true]] as const).map(([value, label, unavailable]) => <Checkbox key={value} checked={columns.includes(value)} onCheckedChange={() => toggleColumn(value)} disabled={unavailable} description={unavailable ? 'まだ書き出せません' : undefined}>{label}</Checkbox>)}
         </fieldset>
+        <p className="text-ink-secondary mt-2 text-xs">今書き出せるのは基本の5列だけです。タグ・友だち情報、対応情報は入りません。</p>
         <p className="text-ink-faint mt-2 text-xs">電話番号やメールなどの個人情報は、見る権限がある人だけ選べます。</p>
         <p className="text-ink-secondary mt-4 text-sm">文字コード： UTF-8</p><p className="text-ink-faint mt-1 text-xs">Shift_JISの書き出しはまだ使えません。今はUTF-8を選んでください。</p>
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void createExport()}>書き出しを作る</Button>{exportResult && <a className="text-action text-sm font-semibold hover:underline" href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${exportResult.downloadUrl}`}>CSVをダウンロード（{exportResult.rowCount ?? '—'}件）</a>}</div>
@@ -178,13 +182,17 @@ export default function FriendMigrationsPage() {
     </div>
     {message && <p role="status" className="bg-action-soft text-action rounded-control px-4 py-3 text-sm">{message}</p>}
 
-    <section className="bg-canvas rounded-card border-hairline overflow-hidden border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink flex items-center gap-1 text-sm font-bold">書き出し・取り込みの履歴<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip></h2></div>{jobs.length === 0 ? <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" /> : <table className="w-full"><thead><TableHeadRow>{/*
+    <section className="bg-canvas rounded-card border-hairline overflow-hidden border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink flex items-center gap-1 text-sm font-bold">書き出し・取り込みの履歴<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip></h2></div>{jobs.length === 0 ? <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" /> : <><table className="w-full"><thead><TableHeadRow>{/*
                   表の外側の余白は左右で同じにする。状態の札は中身の幅で固定し、
                   残りは本文の列で吸収する。
-                */}<Th className="pl-5">日時</Th><Th>種類</Th><Th>対象</Th><Th>件数</Th><Th>実行した人</Th><Th className="w-28 pr-5">状態</Th></TableHeadRow></thead><tbody>{jobs.map((job) => <tr key={`${job.kind}-${job.id}`} className="border-hairline border-t"><td className="py-3 pr-4 pl-5 text-sm">{new Date(job.created_at).toLocaleString('ja-JP')}</td><td className="px-4 py-3 text-sm">{job.kind === 'export' ? '書き出し' : '取り込み'}</td><td className="px-4 py-3 text-sm">{accounts.find((account) => account.id === job.line_account_id)?.name ?? '—'}</td><td className="px-4 py-3 text-sm">{job.row_count ?? job.total_count ?? '—'}件</td><td className="px-4 py-3 text-sm">{job.created_by_name}</td><td className="py-3 pr-5 pl-4"><StatusBadge tone={job.status === 'completed' ? 'success' : 'neutral'}>{JOB_STATUS_LABELS[job.status] ?? '確認中'}</StatusBadge>{/*
+                */}<Th className="pl-5">日時</Th><Th>種類</Th><Th>対象</Th><Th>件数</Th><Th>実行した人</Th><Th className="w-28 pr-5">状態</Th></TableHeadRow></thead><tbody>{jobs.map((job) => <tr key={`${job.kind}-${job.id}`} className="border-hairline border-t"><td className="py-3 pr-4 pl-5 text-sm"><span className="block">{new Date(job.created_at).toLocaleString('ja-JP')}</span></td><td className="px-4 py-3 text-sm">{job.kind === 'export' ? '書き出し' : '取り込み'}</td><td className="px-4 py-3 text-sm">{accounts.find((account) => account.id === job.line_account_id)?.name ?? '—'}</td>{/*
+                  m22d: 単位は見出しの「件数」が持つ。行ごとに「○件」と書くと、
+                  同じ数が並んだだけで同じ件数が3回出る。一覧の件数は下の
+                  ListRangeの1か所に出す。
+                */}<td className="px-4 py-3 text-sm tabular-nums">{job.row_count ?? job.total_count ?? '—'}</td><td className="px-4 py-3 text-sm">{job.created_by_name}</td><td className="py-3 pr-5 pl-4"><StatusBadge tone={job.status === 'completed' ? 'success' : 'neutral'}>{JOB_STATUS_LABELS[job.status] ?? '確認中'}</StatusBadge>{/*
                   定期実行分も含め、完成していて期限内の書き出しは履歴から
                   そのまま落とせる（定期分は新しい表や配信経路を増やさず、
                   いまのダウンロード経路を使う）。
-                */}{job.kind === 'export' && job.status === 'completed' && (!job.expires_at || job.expires_at > new Date().toISOString()) ? <a className="text-action mt-1 block text-xs font-semibold hover:underline" href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}>CSVをダウンロード</a> : null}</td></tr>)}</tbody></table>}</section>
+                */}{job.kind === 'export' && job.status === 'completed' && (!job.expires_at || job.expires_at > new Date().toISOString()) ? <a className="text-action mt-1 block text-xs font-semibold hover:underline" href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}>CSVをダウンロード</a> : null}</td></tr>)}</tbody></table><div className="border-hairline border-t px-5 py-3">{/* m22d: 一覧の件数はこの1か所。行の数字の単位は見出しの「件数」。 */}<ListRange label="履歴" total={jobs.length} first={jobs.length === 0 ? 0 : 1} last={jobs.length} /></div></>}</section>
   </div>
 }

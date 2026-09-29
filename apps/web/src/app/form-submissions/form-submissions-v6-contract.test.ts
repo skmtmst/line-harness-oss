@@ -105,17 +105,44 @@ describe('#676 一覧の並び・件数・回答導線（N-172/N-173/N-180/N-181
     expect(PAGE).not.toContain('new Date(form.createdAt).toLocaleDateString')
   })
 
-  it('staffへはフォルダ追加を出さず、owner/adminへは止めて置く（N-175 は #688）', () => {
-    // 役割の判定は自分で書き直さず、1か所に寄せてあるものを読む。
-    expect(PAGE).toContain("from '@/components/automations/use-can-manage'")
-    // staff（false）と読み取り前（null）は要素ごと出さない。
-    expect(PAGE).toContain('addFolderDisabled={canAddFolder === true}')
-    expect(PAGE).toContain('addFolderTitle=')
-    expect(PAGE).not.toContain('FolderAddDialog')
-    expect(PAGE).not.toContain('onAddFolder')
-    // 画面の中で数え方を作らない。フォルダの件数はAPIが返す値だけを出す。
+  /*
+   * R25 で接続したため、未接続の札の表明は外した（#688 の migration 372 待ちは
+   * migration 395 で入り、箱の作成・名前変更・削除・移動の口もつながった）。
+   * 残すのは意図：staff へは箱の操作を見せず、件数は画面で数えない。
+   */
+  it('箱の作成・名前変更・削除・移動は選んだアカウントでつながる（R25）', () => {
+    // 未接続の札は出さない。
+    expect(PAGE).not.toContain('addFolderDisabled')
+    expect(PAGE).not.toContain('保存先は未接続')
+    // 役割の判定は役割だけを見るものに寄せる（箱の口は requireRole）。
+    expect(PAGE).toContain("from '@/lib/staff-capability'")
+    expect(PAGE).toContain('isOwnerOrAdmin()')
+    expect(PAGE).not.toContain('use-can-manage')
+    // 共通の箱部品で作る・直す・消す・並べ替える。移すはフォームの更新口へ。
+    expect(PAGE).toContain("from '@/components/shared/folder-add-dialog'")
+    expect(PAGE).toContain('<FolderAddDialog')
+    expect(PAGE).toContain('kind="form"')
+    expect(PAGE).toContain('onAddFolder=')
+    expect(PAGE).toContain('api.folders.list(')
+    expect(PAGE).toContain('api.folders.swapOrder(')
+    expect(PAGE).toContain('api.folders.delete(')
+    expect(PAGE).toContain('folderId: nextFolderId')
+    // 画面の中で数え方を作らない。箱ごとの件数は数えていないと出す。
+    expect(PAGE).toContain('folder.itemCount ?? null')
     expect(PAGE).not.toContain('folderCounts')
     expect(PAGE).not.toContain("form.folderId || 'unfiled'")
+  })
+
+  it('行の「編集」は質問の編集へ行き、名前変更は「…」の中へ入る（R27）', () => {
+    // 主ボタンはフォームの編集（質問）への行き先。名前変更の窓は開かない。
+    expect(PAGE).toContain('<RowActions')
+    expect(PAGE).toContain('edit={{ href: `/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic` }}')
+    expect(PAGE).toContain("label: '名前を変更'")
+    expect(PAGE).toContain("label: 'フォルダへ移す'")
+    expect(PAGE).not.toContain('openRename(form)}>編集<')
+    // 名前の保存は編集保存と同じ口を通るので、確認した編集の版を添える。
+    expect(PAGE).toContain('renameRevision')
+    expect(PAGE).toContain('expectedContentRevision: revision')
   })
 
   it('実ブラウザ検査は通信が止まるのを待たず、画面が出す印で待つ', () => {
@@ -125,8 +152,9 @@ describe('#676 一覧の並び・件数・回答導線（N-172/N-173/N-180/N-181
     expect(BROWSER).toContain("waitUntil: 'domcontentloaded'")
     expect(BROWSER).toContain('data-design-node="EMBIK"')
     expect(BROWSER).toContain('data-list-state="loading"')
-    // 実在しない `folderId` を混ぜた模擬データへ戻らないようにする。
-    expect(BROWSER).not.toContain('folderId:')
+    // R25: 箱の絞りは API 側が済ませる。模擬も本物と同じく `folder_id` で絞る。
+    expect(BROWSER).toContain('folder_id')
+    expect(BROWSER).toContain('folderId')
   })
 })
 
@@ -180,6 +208,23 @@ describe('V6回答フォームの未実装3画面', () => {
     expect(EDIT_PAGE).toContain('ogTitle: ogTitle.trim() || null')
     expect(EDIT_PAGE).toContain('ogDescription: ogDescription.trim() || null')
     expect(EDIT_PAGE).toContain('ogImageUrl: ogImageUrl.trim() || null')
+  })
+
+  it('オプション設定の窓と動作の欄はスマホ幅に収まる（R26）', () => {
+    const OPTIONS = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'options-dialog.tsx'), 'utf8')
+    const ACTIONS = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'action-editor.tsx'), 'utf8')
+    const PANEL = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'options-dialog.module.css'), 'utf8')
+    // 固定の高さ・幅・最小幅は置かない。窓は画面の高さに収め、中身だけ流す。
+    expect(OPTIONS).not.toContain('height: 900')
+    expect(OPTIONS).not.toContain('minWidth: 680')
+    expect(OPTIONS).not.toMatch(/max-h-\[|max-w-\[|my-\[/)
+    expect(PANEL).toContain('calc(100dvh - 2rem)')
+    expect(PANEL).toContain('max-width: 880px')
+    // 動作の欄は狭い幅で縦に並べ、欄の固定の最小幅をなくす。
+    expect(OPTIONS).toContain('flex-col gap-2 sm:flex-row')
+    expect(ACTIONS).not.toContain('min-w-[16rem] flex-1')
+    expect(ACTIONS).toContain('min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[16rem]')
+    expect(ACTIONS).toContain('min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[10rem]')
   })
 
   it('v9tYhl は専用ルートで通常・読込・空・失敗を言い分ける', () => {
@@ -275,6 +320,40 @@ describe('V6回答フォームの中項目(#503 M3・M9)', () => {
     expect(EDIT_PAGE).toContain('useUnsavedGuard')
     expect(EDIT_PAGE).toContain('保存していない変更があります')
     expect(EDIT_PAGE).toContain('savedSnapshot.current = currentSnapshot')
+  })
+})
+
+describe('P 一覧の数・公開前の試し・読みにくい色', () => {
+  it('一覧の行に今月の件数と完了率を出し、「？」は見出しに1つだけ置く', () => {
+    expect(PAGE).toContain('今月 ${form.monthlySubmitCount')
+    expect(PAGE).toContain('完了率 ${form.monthlyCompletionRate')
+    expect(PAGE).toContain('今月 —')
+    expect(PAGE).toContain('完了率 —')
+    expect(PAGE).toContain('今月の完了率の説明')
+    expect(PAGE).toContain('試しの回答は入れていません')
+    // 「？」の説明は見出しに1つだけ。行に並べない。
+    expect((PAGE.match(/今月の完了率の説明/g) ?? []).length).toBe(1)
+    // 死んでいた今週表示は出さない。数はサーバーが数える。
+    expect(PAGE).not.toContain('今週')
+    expect(PAGE).not.toContain('weeklySubmitCount')
+  })
+
+  it('編集画面から公開前の試しを始められる', () => {
+    expect(EDIT_PAGE).toContain('テスト回答を始める')
+    expect(EDIT_PAGE).toContain('api.forms.issueTestToken(id, selectedAccountId)')
+    expect(EDIT_PAGE).toContain('試しURL')
+    expect(EDIT_PAGE).toContain('試しの回答は集計に入らず')
+    expect(API).toContain('issueTestToken:')
+    expect(API).toContain('/test-token?account_id=')
+  })
+
+  it('読みにくい色は画面と保存の両方で止める', () => {
+    expect(DESIGN_SETTINGS).toContain('formThemeContrastError')
+    expect(DESIGN_SETTINGS).toContain('文字と背景の色の決まりの説明')
+    expect(DESIGN_SETTINGS).toContain('role="alert"')
+    expect(EDIT_PAGE).toContain('formThemeContrastError(normalizeFormTheme(layout.options?.theme))')
+    expect(SHARED_FORM_LAYOUT).toContain('formThemeContrastError')
+    expect(SHARED_FORM_LAYOUT).toContain('FORM_THEME_MIN_CONTRAST')
   })
 })
 

@@ -26,7 +26,7 @@ export type GoogleConnectionData = {
   store: { id: string; name: string; lineAccountId: string }
   connection: GoogleConnection
   candidates: GoogleLocationCandidate[]
-  summary: { unrepliedCount: number; draftCount: number; attentionCount: number; newCount: number; storedCount: number; syncStale: boolean }
+  summary: { unrepliedCount: number; draftCount: number; attentionCount: number; newCount: number; storedCount: number; postsAttentionCount: number; syncStale: boolean }
   writeEnabled: boolean
   oauthConfigured: boolean
   aiAvailable: boolean
@@ -167,6 +167,84 @@ export type GoogleHistoryKind = 'all' | 'hours' | 'profile' | 'review_reply'
 export type GoogleHistoryResult = 'all' | 'applied' | 'pending' | 'failed'
 export type GoogleHistoryData = { success: true; changes: GoogleHistoryEntry[]; total: number; page: number; perPage: number; counts: Record<GoogleHistoryKind, number>; days: number }
 
+// ---------- 第3段：投稿 ----------
+
+export type GooglePostKind = 'standard' | 'event' | 'offer' | 'alert'
+export type GooglePostOrigin = 'admin' | 'google'
+export type GooglePostStatus = 'draft' | 'scheduled' | 'pending_confirm' | 'accepted' | 'published' | 'rejected' | 'failed' | 'cancelled' | 'deleted'
+export type GooglePostFilter = 'all' | 'draft' | 'published' | 'attention' | 'scheduled'
+export type GooglePostCtaType = 'book' | 'order' | 'shop' | 'learn_more' | 'sign_up' | 'call'
+export type GooglePostCta = { type: GooglePostCtaType; url: string | null }
+export type GooglePostOffer = { couponCode: string | null; redeemOnlineUrl: string | null; termsConditions: string | null }
+export type GooglePostSchedule = { startDate: string; startTime: string; endDate: string; endTime: string }
+export type GooglePostMedia = { mediaId: string; filename: string; sourceUrl: string }
+
+export type GooglePost = {
+  id: string
+  kind: GooglePostKind
+  origin: GooglePostOrigin
+  summary: string
+  title: string | null
+  schedule: GooglePostSchedule | null
+  cta: GooglePostCta | null
+  offer: GooglePostOffer | null
+  media: GooglePostMedia[]
+  publishMode: 'now' | 'scheduled'
+  status: GooglePostStatus
+  googleState: string | null
+  searchUrl: string | null
+  staffName: string | null
+  error: string | null
+  createdAt: string
+  sentAt: string | null
+  publishedAt: string | null
+  updatedAt: string
+}
+
+export type GooglePostDraftInput = {
+  kind: GooglePostKind
+  summary: string
+  title?: string | null
+  schedule?: GooglePostSchedule | null
+  cta?: GooglePostCta | null
+  offer?: GooglePostOffer | null
+  mediaId?: string | null
+}
+
+export type GooglePostListData = {
+  success: true
+  posts: GooglePost[]
+  page: number
+  perPage: number
+  total: number
+  counts: Record<GooglePostFilter, number>
+  writeEnabled: boolean
+  permissions: { canPublish: boolean }
+}
+
+// ---------- 第4段：パフォーマンス ----------
+
+export type GooglePerformanceDays = 7 | 28 | 90
+
+export type GooglePerformanceTotals = {
+  impressions: number | null
+  directionRequests: number | null
+  callClicks: number | null
+  websiteClicks: number | null
+}
+
+export type GooglePerformanceData = {
+  success: true
+  days: GooglePerformanceDays
+  range: { startDate: string; endDate: string }
+  previousRange: { startDate: string; endDate: string }
+  totals: GooglePerformanceTotals
+  previousTotals: GooglePerformanceTotals
+  daily: Array<{ date: string; impressions: number | null }>
+  food: { menuClicks: number | null; bookings: number | null; foodOrders: number | null }
+  lastMetricsSyncedAt: string | null
+}
+
 const base = '/api/restaurant-test/google'
 
 export const restaurantGoogleApi = {
@@ -218,4 +296,25 @@ export const restaurantGoogleApi = {
     fetchApi<{ success: true; change: GoogleChange }>(withAccount(`${base}/changes/${encodeURIComponent(id)}/cancel`, accountId), { method: 'POST', body: '{}' }),
   history: (accountId: string, params: { kind?: GoogleHistoryKind; result?: GoogleHistoryResult; days?: number; q?: string; page?: number; perPage?: number }) =>
     fetchApi<GoogleHistoryData>(withAccount(`${base}/changes`, accountId, { kind: params.kind, result: params.result, days: params.days, q: params.q, page: params.page, per_page: params.perPage })),
+
+  // 第3段：投稿
+  posts: (accountId: string, params: { filter?: GooglePostFilter; kind?: GooglePostKind | 'all'; page?: number; perPage?: number }) =>
+    fetchApi<GooglePostListData>(withAccount(`${base}/posts`, accountId, { filter: params.filter, kind: params.kind, page: params.page, per_page: params.perPage })),
+  syncPosts: (accountId: string) => fetchApi<{ success: true }>(withAccount(`${base}/posts/sync`, accountId), { method: 'POST', body: '{}' }),
+  createPost: (accountId: string, input: GooglePostDraftInput) =>
+    fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts`, accountId), { method: 'POST', body: JSON.stringify(input) }),
+  post: (accountId: string, id: string) =>
+    fetchApi<{ success: true; post: GooglePost; store: { id: string; name: string }; writeEnabled: boolean; canPublish: boolean }>(withAccount(`${base}/posts/${encodeURIComponent(id)}`, accountId)),
+  savePost: (accountId: string, id: string, input: GooglePostDraftInput) =>
+    fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}`, accountId), { method: 'PUT', body: JSON.stringify(input) }),
+  cancelPost: (accountId: string, id: string) =>
+    fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/cancel`, accountId), { method: 'POST', body: '{}' }),
+  publishPost: (accountId: string, id: string) =>
+    fetchApi<{ success: true; alreadyPublished: boolean; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/publish`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
+  removePost: (accountId: string, id: string) =>
+    fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/remove`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
+
+  // 第4段：パフォーマンス
+  performance: (accountId: string, days: GooglePerformanceDays) =>
+    fetchApi<GooglePerformanceData>(withAccount(`${base}/performance`, accountId, { days })),
 }

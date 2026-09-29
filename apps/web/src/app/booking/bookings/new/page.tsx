@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -160,6 +161,9 @@ export default function NewProxyBookingPage() {
   const friendInputRef = useRef<HTMLInputElement>(null)
   const [friend, setFriend] = useState<FriendListItem | null>(null)
   const [customer, setCustomer] = useState<BookingCustomerSummary | null>(null)
+  // R147: 台帳を作ったときの入力値。入力へ戻って直した値と違うときは、
+  // 保存済みの表示・使い回しをせず、確定時に作り直す。
+  const customerSavedInput = useRef<{ name: string; phone: string; pet: string } | null>(null)
   const [phoneCustomer, setPhoneCustomer] = useState(false)
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -209,7 +213,26 @@ export default function NewProxyBookingPage() {
 
   const menu = menus.find((item) => item.id === menuId) ?? null
   const selectedStaff = staff.find((item) => item.id === staffId) ?? null
-  const customerLabel = friend?.displayName ?? customer?.display_name ?? (customerName.trim() || 'お客様')
+  // R147: 保存後に入力を直したときは、保存済みの名前を見せない。
+  // 下書き復元などで保存時の値が分からないときは、保存済みを信じる。
+  const savedMatchesInput = customer == null
+    || customerSavedInput.current == null
+    || (customerSavedInput.current.name === customerName.trim()
+      && customerSavedInput.current.phone === customerPhone.trim()
+      && customerSavedInput.current.pet === petName.trim())
+  const customerLabel = friend?.displayName
+    ?? (customer && savedMatchesInput ? customer.display_name : (customerName.trim() || 'お客様'))
+  // 確認画面の電話・ペットも同じ約束。直した値は入力欄の値を出す。
+  const customerPhoneLast4 = friend
+    ? null
+    : customer && savedMatchesInput
+      ? customer.phone_last4
+      : (customerPhone.replace(/\D/g, '').slice(-4) || '—')
+  const customerPetLabel = friend
+    ? null
+    : customer && savedMatchesInput
+      ? (customer.pet_name ?? '未入力')
+      : (petName.trim() || '未入力')
   const selectedSlot = slots.find((item) => item.date === date && item.start === time) ?? null
   // 確認済みの枠があればそれを優先する。入力画面で見えた古い instant を
   // 確認・完了・競合の画面へ持ち越さない。
@@ -230,6 +253,7 @@ export default function NewProxyBookingPage() {
     setStep('input')
     setFriend(null)
     setCustomer(null)
+    customerSavedInput.current = null
     setPhoneCustomer(false)
     setCustomerName('')
     setCustomerPhone('')
@@ -522,8 +546,10 @@ export default function NewProxyBookingPage() {
   const validation = useMemo(() => {
     if (!selectedAccountId) return 'LINEアカウントを選択してください'
     if (!friend && !customer && !phoneCustomer) return '予約するお客様を選択してください'
-    if (phoneCustomer && !customer && (!customerName.trim() || !customerPhone.trim())) return '電話客の名前と電話番号を入力してください'
-    if (phoneCustomer && !customer && customerPhone.trim()) {
+    // R147: 台帳は確定時に作るため、入力の要否は保存の有無で変えない。
+    // 保存後に直した値もここで確かめる。
+    if (phoneCustomer && (!customerName.trim() || !customerPhone.trim())) return '電話客の名前と電話番号を入力してください'
+    if (phoneCustomer && customerPhone.trim()) {
       const phoneError = phoneDigitsError(customerPhone)
       if (phoneError) return phoneError
     }
@@ -533,13 +559,24 @@ export default function NewProxyBookingPage() {
     return null
   }, [selectedAccountId, friend, customer, phoneCustomer, customerName, customerPhone, menu, selectedStaff, date, time])
 
-  async function ensureCustomer(): Promise<BookingCustomerSummary | null> {
+  // R147: 電話客の台帳保存は「登録を確定する」ときだけ行う。確認へ進む
+  // 時点で作ると、入力へ戻って直した名前・電話・ペット名が確認と予約へ
+  // 反映されない（保存済み顧客をそのまま使い続けるため）。確定直前に
+  // その時点の入力値で1件だけ作るので、二重作成も起きない。
+  async function ensureCustomerForBooking(): Promise<BookingCustomerSummary | null> {
     if (!phoneCustomer) return customer
-    if (customer) return customer
+    // 保存済みと入力が同じなら作り直さない（連打・続けてもう1件で二重にしない）。
+    if (customer && (
+      customerSavedInput.current == null
+      || (customerSavedInput.current.name === customerName.trim()
+        && customerSavedInput.current.phone === customerPhone.trim()
+        && customerSavedInput.current.pet === petName.trim())
+    )) return customer
     if (!selectedAccountId) return null
     const response = await bookingApi.createCustomer(selectedAccountId, {
       display_name: customerName.trim(), phone: customerPhone.trim(), pet_name: petName.trim() || undefined,
     })
+    customerSavedInput.current = { name: customerName.trim(), phone: customerPhone.trim(), pet: petName.trim() }
     setCustomer(response.customer)
     return response.customer
   }
@@ -550,12 +587,11 @@ export default function NewProxyBookingPage() {
       return
     }
     if (!selectedAccountId || !menu || !selectedStaff || !date || !time) return
-    let selectedCustomer = customer
-    if (phoneCustomer) {
-      try { selectedCustomer = await ensureCustomer() } catch { setError('電話客の情報を保存できませんでした。名前と電話番号を確認してください。'); return }
-    }
-    if (!friend && !selectedCustomer) { setError('予約するお客様を選択してください'); return }
-    const requestKey = [selectedAccountId, friend?.id ?? selectedCustomer?.id ?? '', menuId, staffId, date, time].join('\u001f')
+    // R147: 確認へ進むときは台帳を作らない。入力へ戻って直した値が
+    // 次の確認にそのまま出る。台帳は確定時に作る。
+    if (!friend && !phoneCustomer) { setError('予約するお客様を選択してください'); return }
+    // R147: 台帳は確定時に作るため、ここでは友だち以外は空キーで束ねる。
+    const requestKey = [selectedAccountId, friend?.id ?? '', menuId, staffId, date, time].join('\u001f')
     latestSelectionKey.current = requestKey
     setLoading(true)
     setError('')
@@ -612,9 +648,12 @@ export default function NewProxyBookingPage() {
     }
   }
 
+  // 二重押しで電話客の台帳が2件できないよう、確定処理の重なりを抑える。
+  const bookingBusy = useRef(false)
   async function createBooking() {
-    const customerPart = friend ? { friend_id: friend.id } : customer ? { booking_customer_id: customer.id } : null
-    if (!selectedAccountId || !customerPart || !menu || !selectedStaff || !date || !time) return
+    if (bookingBusy.current) return
+    if (!selectedAccountId || !menu || !selectedStaff || !date || !time) return
+    if (!friend && !phoneCustomer) return
     // 空キーで送ると400になる(点検#516軽5)。無ければここで作る。
     const key = idempotencyKey || crypto.randomUUID()
     if (!idempotencyKey) setIdempotencyKey(key)
@@ -624,10 +663,31 @@ export default function NewProxyBookingPage() {
       setError('確認した開始時刻が見つかりません。日時を選び直してください。')
       return
     }
-    const requestKey = selectionKey
+    bookingBusy.current = true
+    let requestKey = selectionKey
     setLoading(true)
     setError('')
     try {
+      // R147: 電話客の台帳はこの確定の直前に作る。確認→入力に戻る→直す→
+      // 再確認の往復では作らないので、直した名前・電話・ペット名がそのまま
+      // 台帳と予約へ入る。保存済みと同じ入力なら作り直さない。
+      let bookingCustomer: BookingCustomerSummary | null = null
+      if (phoneCustomer) {
+        try {
+          bookingCustomer = await ensureCustomerForBooking()
+        } catch {
+          setError('電話客の情報を保存できませんでした。名前と電話番号を確認してください。')
+          return
+        }
+      } else {
+        bookingCustomer = customer
+      }
+      const customerPart = friend ? { friend_id: friend.id } : bookingCustomer ? { booking_customer_id: bookingCustomer.id } : null
+      if (!customerPart) { setError('予約するお客様を選択してください'); return }
+      // 台帳を作った分だけ選び直しの鍵が変わる。この確定の返事だけを
+      // 受け付けるよう、ここで束ね直す。
+      requestKey = [selectedAccountId, friend?.id ?? bookingCustomer?.id ?? '', menuId, staffId, date, time].join('\u001f')
+      latestSelectionKey.current = requestKey
       const created = await bookingApi.createProxyBooking(selectedAccountId, {
         ...customerPart,
         menu_id: menu.id,
@@ -661,6 +721,7 @@ export default function NewProxyBookingPage() {
         setError('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
       }
     } finally {
+      bookingBusy.current = false
       if (latestSelectionKey.current === requestKey) setLoading(false)
     }
   }
@@ -713,7 +774,7 @@ export default function NewProxyBookingPage() {
                   <input aria-label="電話客の名前" value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="お客様の名前" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
                   <input aria-label="電話客の電話番号" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="電話番号" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
                   <input aria-label="電話客のペット名" value={petName} onChange={(event) => setPetName(event.target.value)} placeholder="ペットの名前（任意）" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
-                  {customer ? <p className="text-success text-xs">顧客台帳に保存済み（電話末尾 {customer.phone_last4}）</p> : <p className="text-ink-faint text-xs">確認へ進むと顧客台帳へ保存します。</p>}
+                  {customer && savedMatchesInput ? <p className="text-success text-xs">顧客台帳に保存済み（電話末尾 {customer.phone_last4}）</p> : <p className="text-ink-faint text-xs">「この内容で予約を入れる」を押すと顧客台帳へ保存します。入力へ戻って直せます。</p>}
                 </div>
               ) : friend ? (
                 <div className="border-hairline bg-canvas-sunken flex items-center justify-between rounded-control border px-3 py-3">
@@ -891,13 +952,13 @@ export default function NewProxyBookingPage() {
         </div>
       )}
 
-      {step === 'confirm' && (friend || customer) && menu && selectedStaff && (
+      {step === 'confirm' && (friend || customer || phoneCustomer) && menu && selectedStaff && (
         <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
           <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
             <Card title="だれの予約か">
               <Summary label="お客様" value={customerLabel} />
-              <Summary label="電話番号" value={friend ? '友だち情報欄で確認' : `末尾 ${customer?.phone_last4 ?? '—'}`} />
-              <Summary label="ペットの名前" value={customer?.pet_name ?? '未入力'} />
+              <Summary label="電話番号" value={friend ? '友だち情報欄で確認' : `末尾 ${customerPhoneLast4 ?? '—'}`} />
+              <Summary label="ペットの名前" value={customerPetLabel ?? '未入力'} />
               <Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} />
             </Card>
             <Card title="いつ・何を">
@@ -944,7 +1005,7 @@ export default function NewProxyBookingPage() {
         </div>
       )}
 
-      {step === 'conflict' && (friend || customer) && menu && selectedStaff && (
+      {step === 'conflict' && (friend || customer || phoneCustomer) && menu && selectedStaff && (
         <>
           <Notice
             tone="danger"
@@ -996,7 +1057,7 @@ export default function NewProxyBookingPage() {
         </>
       )}
 
-      {step === 'done' && result && (friend || customer) && menu && selectedStaff && (
+      {step === 'done' && result && (friend || customer || phoneCustomer) && menu && selectedStaff && (
         <>
           <section className="bg-action-soft text-action rounded-card px-4 py-3 text-xs font-semibold">
             {timeRangeLabel(slotStartIso, occupiedMinutes, slotTimeZone, slotEndIso)} の枠を押さえました。お知らせはリマインダから自動で届きます。
@@ -1087,18 +1148,11 @@ function NotificationToggle({ checked, onChange, title, detail }: {
   detail: string
 }) {
   return (
-    <label className="flex cursor-pointer gap-3">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="accent-accent-deep mt-1 h-4 w-4"
-      />
-      <div>
-        <p className="text-ink text-sm font-medium">{title}</p>
-        <p className="text-ink-faint mt-0.5 text-xs">{detail}</p>
-      </div>
-    </label>
+    <Checkbox
+      checked={checked}
+      onCheckedChange={onChange}
+      description={detail}
+    >{title}</Checkbox>
   )
 }
 

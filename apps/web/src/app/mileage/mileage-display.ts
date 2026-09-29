@@ -96,6 +96,9 @@ export function friendHistoryItem(item: MileageAdminHistoryItem): MileageDetailH
     ruleName: item.ruleName,
     mode: item.mode,
     executedByStaffName: item.executedByStaffName,
+    lineAccountId: item.lineAccountId ?? null,
+    notificationStatus: item.notificationStatus ?? null,
+    notificationErrorCode: item.notificationErrorCode ?? null,
     balanceAfter: item.balanceAfter,
     occurredAt: item.occurredAt,
   }
@@ -134,6 +137,35 @@ export function formatMileageNumber(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
     ? new Intl.NumberFormat('ja-JP').format(value)
     : '—'
+}
+
+/**
+ * R54: ランクの進みの1行目・2行目。未公開（今のランクも次のランクもなし。
+ * 口の決まりでは公開中のランクが無いときだけ起きる）と、最高ランク到達を
+ * 区別する。未公開の2行目は null を返し、呼び出し側で作り先の案内を出す
+ * （理由の重ね書きにしない）。
+ */
+export function mileageRankProgress(input: {
+  rank: string | null | undefined
+  rankReason: string | null | undefined
+  nextRankLabel: string | null | undefined
+  milesToNextRank: number | null | undefined
+}): { headline: string; detail: string | null; unpublished: boolean } {
+  const rank = input.rank ?? null
+  const nextRankLabel = input.nextRankLabel ?? null
+  const loaded = input.rankReason != null
+  const unpublished = loaded && !rank && !nextRankLabel
+  const headline = nextRankLabel
+    ? `次は「${nextRankLabel}」`
+    : rank
+      ? 'いちばん上のランクです'
+      : (input.rankReason ?? 'ランク情報を確認できません')
+  const detail = input.milesToNextRank != null
+    ? `あと ${input.milesToNextRank.toLocaleString('ja-JP')} マイル`
+    : unpublished
+      ? null
+      : (input.rankReason ?? 'ランク情報を確認できません')
+  return { headline, detail, unpublished }
 }
 
 export function formatMileageDate(value: string | null): string {

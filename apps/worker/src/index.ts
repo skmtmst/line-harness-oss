@@ -68,6 +68,7 @@ import { gettingStarted } from './routes/getting-started.js';
 import { recipes } from './routes/recipes.js';
 import { hqTemplates } from './routes/hq-templates.js';
 import { manualLinks } from './routes/manual-links.js';
+import { errorMessages } from './routes/error-messages.js';
 import { accountHandovers } from './routes/account-handovers.js';
 import { brand } from './routes/brand.js';
 import { conversions } from './routes/conversions.js';
@@ -155,6 +156,8 @@ import { restaurantTest } from './routes/restaurant-test.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
+import { restaurantGooglePosts } from './routes/restaurant-google-posts.js';
+import { restaurantGooglePerformance } from './routes/restaurant-google-performance.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
@@ -225,6 +228,12 @@ export type Env = {
     RAW_MAIL?: R2Bucket;
     ASSETS: Fetcher;
     AI?: Ai;
+    /**
+     * バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+     * R2 の `IMAGES` とは別物なので `CF_IMAGES` という名前にしている。
+     * 未設定の環境（手元・試験）では変換を飛ばして元の画像を保存する。
+     */
+    CF_IMAGES?: ImagesBinding;
     /** 運営コンソールの返信下書きに使う Workers AI のモデル名。未設定なら routes/ops-support.ts の既定。 */
     OPS_SUPPORT_AI_MODEL?: string;
     EMAIL?: SendEmail;
@@ -452,9 +461,14 @@ app.route('/', recipes);
 app.route('/', hqTemplates);
 app.route('/', ops);
 app.route('/', manualLinks);
+app.route('/', errorMessages);
 app.route('/', accountHandovers);
 app.route('/', friendBulkRuns);
 app.route('/', friendMigrations);
+// NOTE: R393 — /api/friends/people 等の固定名は :id より先に載せる。
+// duplicates（本人候補・統合ユーザー）は friends の GET /:id より先でないと
+// people を友だちIDと読んで404になる。broadcastApprovals と同じ考え方。
+app.route('/', duplicates);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
@@ -469,7 +483,6 @@ app.route('/', brand);
 app.route('/', conversions);
 app.route('/', affiliates);
 app.route('/', affiliateOffers);
-app.route('/', duplicates);
 app.route('/', usersGrouped);
 app.route('/', inbox);
 app.route('/', openapi);
@@ -555,6 +568,8 @@ app.route('/', siteTracking);
 app.route('/', restaurantTest);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
+app.route('/', restaurantGooglePosts);
+app.route('/', restaurantGooglePerformance);
 app.route('/', googleSheets);
 app.route('/', tenants);
 app.route('/', hqBanners);
@@ -1457,6 +1472,49 @@ async function runFrequentHeavyJobs(
             `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
           );
         }
+        // m22o: 付与ルールの「通知する」で予約された分だけ、付与の後に届ける。
+        // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
+        if (env.WORKER_PUBLIC_URL) {
+          const { deliverDueMileageGrantNotifications } = await import(
+            './services/mileage-grant-notification.js'
+          );
+          const { dispatchLineProxyLocally } = await import('./services/local-line-proxy.js');
+          const notified = await deliverDueMileageGrantNotifications(
+            {
+              db: env.DB,
+              workerPublicUrl: env.WORKER_PUBLIC_URL,
+              dispatch: (request) => dispatchLineProxyLocally(request, env),
+            },
+            { limit: 20 },
+          );
+          if (notified.delivered + notified.failed > 0) {
+            console.log(
+              `[mileage-grant-notify] delivered=${notified.delivered} failed=${notified.failed}`,
+            );
+          }
+        }
+      },
+    },
+    {
+      // マニュアル導線の週1回の点検（要件 v6-34 §8-4）。cron自体は
+      // 短い間隔で回るので、最終確認から7日を経るまで関数側で何もしない。
+      // 新たに broken になったリンクだけ、運営へ1回だけ知らせる。
+      name: 'manual link weekly check',
+      run: async () => {
+        const { runWeeklyManualLinkCheck, notifyBrokenManualLinks } = await import(
+          './services/manual-link-check.js'
+        );
+        const result = await runWeeklyManualLinkCheck(env.DB);
+        if (!result) return;
+        if (result.newlyBroken.length > 0) {
+          await notifyBrokenManualLinks(env.DB, env, result.newlyBroken);
+        }
+        console.log(JSON.stringify({
+          event: 'manual_link_weekly_check',
+          checked: result.checked,
+          broken: result.broken,
+          newlyBroken: result.newlyBroken.length,
+        }));
       },
     },
     {
@@ -1503,7 +1561,7 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const { processDueAnalyticsReports } = await import('./services/analytics-reports.js');
         const result = await processDueAnalyticsReports(env, new Date(event.scheduledTime));
-        if (result.processed + result.failed + result.purged > 0) {
+        if (result.processed + result.failed + result.purged + result.reclaimed + result.repaired > 0) {
           console.log(JSON.stringify({ event: 'analytics_report_tick', ...result }));
         }
       },
@@ -1549,6 +1607,20 @@ async function runFrequentHeavyJobs(
         if (result.processed > 0) console.log(JSON.stringify({ event: 'nen_rich_menu_job', ...result }));
       },
     },
+    {
+      // K(#822): リッチメニューの毎日の照合。公開中の group を1日1回だけ見る。
+      // 見つけたずれは直さず台帳に残す。直すのは運用者が K-2 画面で行う。
+      name: 'rich menu daily reconcile',
+      run: async () => {
+        const { processDailyRichMenuReconcile } = await import('./services/rich-menu-daily-reconcile.js');
+        const result = await processDailyRichMenuReconcile(env.DB, {
+          now: new Date(event.scheduledTime),
+        });
+        if (result.checked + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'rich_menu_daily_reconcile', ...result }));
+        }
+      },
+    },
   ];
 
   if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
@@ -1558,6 +1630,23 @@ async function runFrequentHeavyJobs(
         const { syncXServerSupportMailbox } = await import('./services/xserver-mail.js');
         const result = await syncXServerSupportMailbox(env);
         if (result.checked > 0) console.log(JSON.stringify({ event: 'support_email_sync', ...result }));
+      },
+    });
+  }
+
+  if (restaurantTestEnabled(env)) {
+    jobs.push({
+      // Googleビジネス第4段: 口コミ・投稿の再同期。5分レーンだが接続ごとの
+      // 55分ゲートで実質1時間ごと。書き込み経路は手動syncと同じ関数を使う。
+      name: 'google business resync',
+      run: async () => {
+        const { processGoogleBusinessHourlyResync } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessHourlyResync(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.reviewsSynced + result.postsSynced + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_resync_tick', ...result }));
+        }
       },
     });
   }
@@ -1693,6 +1782,17 @@ async function runSixHourlyHeavyJobs(
       },
     },
     {
+      // Q: 共通情報の期限の14日前・3日前に運用者へ知らせる。
+      name: 'common var expiry notices',
+      run: async () => {
+        const { sweepCommonVarExpiryNotices } = await import('./services/common-var-expiry-sweep.js');
+        const result = await sweepCommonVarExpiryNotices(env.DB, env, new Date());
+        if (result.notified > 0 || result.errors > 0) {
+          console.log(JSON.stringify({ event: 'common_var_expiry_sweep', ...result }));
+        }
+      },
+    },
+    {
       name: 'billing invoice sync',
       run: async () => {
         const { syncBillingInvoicesDaily } = await import('./services/billing-invoices-sync.js');
@@ -1738,6 +1838,20 @@ async function runSixHourlyHeavyJobs(
         }
       },
     });
+    jobs.push({
+      // Googleビジネス第4段: パフォーマンス指標の取り込み。JST日付でゲートし、
+      // 6時間tickのうち当日未実行の最初の1回（通常は深夜）だけ実際に回る。
+      name: 'google business metrics',
+      run: async () => {
+        const { processGoogleBusinessDailyMetrics } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessDailyMetrics(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.synced + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_metrics_tick', ...result }));
+        }
+      },
+    });
   }
 
   await runIsolatedScheduledJobs(jobs);
@@ -1762,10 +1876,13 @@ async function scheduled(
   }
   if (lane !== 'delivery') return;
 
-  // 管理画面を開いていなくても、各LINEアカウントの6項目を5分窓ごとに保存する。
+  // 管理画面を開いていなくても、各LINEアカウントの確認項目を5分窓ごとに保存する。
   // 各checkと各accountは独立しており、失敗しても配信ジョブを止めない。
   try {
-    await runScheduledOperationHealthChecks(env.DB);
+    await runScheduledOperationHealthChecks(env.DB, {
+      r2: env.IMAGES,
+      queue: env.CODEX_MENTION_QUEUE,
+    });
   } catch (error) {
     console.error('operation health checks error:', error);
   }
@@ -1914,7 +2031,6 @@ async function scheduled(
       const result = await processDueReminders(env.DB, {
         now: new Date(),
         sender: sendBookingNotification,
-        reminderHoursBefore: DEFAULT_ACCOUNT_SETTINGS.reminder_hours_before,
       });
       if (result.sent + result.failed > 0) {
         console.log(`[booking-reminders] sent=${result.sent} failed=${result.failed}`);
@@ -2119,6 +2235,14 @@ async function scheduled(
         });
         if (!res.ok) throw new Error(`LINE createRichMenu failed: ${res.status} ${await res.text()}`);
         return res.json() as Promise<{ richMenuId: string }>;
+      },
+      async validateRichMenu(payload: unknown) {
+        const res = await fetch('https://api.line.me/v2/bot/richmenu/validate', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`LINE validateRichMenu failed: ${res.status} ${await res.text()}`);
       },
       async listRichMenus() {
         const res = await fetch('https://api.line.me/v2/bot/richmenu/list', {

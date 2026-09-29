@@ -11,7 +11,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -55,6 +55,11 @@ export default function NewBookingMenuPage() {
   const [staffLoadState, setStaffLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
   const [bookingMileage, setBookingMileage] = useState<number | null>(null)
+  /**
+   * R306: マイル設定の取得状態。「未設定」と「取得失敗」を混ぜない。
+   * bookingMileage===null だけでは両方に見えるため、読み込みの成否を別に持つ。
+   */
+  const [mileageLoadState, setMileageLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   /**
    * 作成に成功したが担当設定が残っているメニュー（DEEP-16）。
    * ここにIDがある間は createMenu を二度と呼ばず、残りの担当設定だけを
@@ -111,8 +116,9 @@ export default function NewBookingMenuPage() {
   useEffect(() => {
     let cancelled = false
     setTagLoadState('loading')
+    // R23横展開: 候補は今のアカウントだけ。切替で取り直す（選択のリセットは切替効果で済み）。
     api.tags
-      .list()
+      .list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
       .then((r) => {
         if (cancelled) return
         // 取得失敗はタグなし保存の妨げにしない。候補が出ないだけで残す。
@@ -129,7 +135,7 @@ export default function NewBookingMenuPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   // アカウントを変えたら前の選択を残さない。別アカウントのタグを
   // そのまま送ると Worker が tag_not_found で落とすうえ、意図しない結び付きになる。
@@ -148,12 +154,20 @@ export default function NewBookingMenuPage() {
     let alive = true
     api.mileage.rules()
       .then((response) => {
-        if (!alive || !response.success) return
+        if (!alive) return
+        if (!response.success) {
+          setMileageLoadState('error')
+          return
+        }
         const rule = response.data.find((item) => item.eventType === 'booking_created' && item.isActive)
         setBookingMileage(rule?.amount ?? null)
+        setMileageLoadState('ready')
       })
       .catch(() => {
-        if (alive) setBookingMileage(null)
+        if (alive) {
+          setBookingMileage(null)
+          setMileageLoadState('error')
+        }
       })
     return () => { alive = false }
   }, [])
@@ -630,11 +644,31 @@ export default function NewBookingMenuPage() {
             detail="確定した予約は、前日と設定時間前のリマインダへ登録されます。"
             status="自動"
           />
+          {/*
+           * R306: 行き先はマイルの付与ルール（たまる決めごと）。行動スコアの
+           * ルールではない。R306: 未設定と取得失敗は別の言葉で出す。
+           */}
           <ActionSummary
             title={bookingMileage === null ? '予約時のマイル' : `マイルを ${bookingMileage.toLocaleString()} 付ける`}
-            detail={bookingMileage === null ? '「予約した」のマイル設定を取得できませんでした。' : 'たまる決めごと「予約してくれた」が適用されます。'}
-            status={bookingMileage === null ? '未取得' : `予約で ${bookingMileage.toLocaleString()}`}
-            href="/mileage/score-rules"
+            detail={
+              mileageLoadState === 'loading'
+                ? 'マイル設定を読み込んでいます…'
+                : mileageLoadState === 'error'
+                  ? '「予約した」のマイル設定を取得できませんでした。'
+                  : bookingMileage === null
+                    ? '予約イベントのマイル付与ルールは未設定です。'
+                    : 'たまる決めごと「予約してくれた」が適用されます。'
+            }
+            status={
+              mileageLoadState === 'loading'
+                ? '確認中'
+                : mileageLoadState === 'error'
+                  ? '未取得'
+                  : bookingMileage === null
+                    ? '未設定'
+                    : `予約で ${bookingMileage.toLocaleString()}`
+            }
+            href="/mileage?tab=earning-rules"
           />
         </div>
         <Field
@@ -662,14 +696,7 @@ export default function NewBookingMenuPage() {
                 maxLength={100}
                 aria-label="タグを検索"
               />
-              <SelectField
-                id="bm-auto-tag"
-                aria-label="予約後に付けるタグ"
-                value={autoTagId ?? ''}
-                onChange={(e) => setAutoTagId(e.target.value === '' ? null : e.target.value)}
-                options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]}
-                className="w-full"
-              />
+              <Select size="full" id="bm-auto-tag" aria-label="予約後に付けるタグ" value={autoTagId ?? ''} onChange={(value) => setAutoTagId(value === '' ? null : value)} options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]} />
               {trimmedQuery !== '' && visibleTagCandidates.length === 0 && (
                 <p className="text-ink-faint text-xs">
                   「{trimmedQuery}」に合うタグがありません。
@@ -727,7 +754,12 @@ function ActionSummary({ title, detail, status, href }: {
   return (
     <div className="border-hairline flex items-center gap-3 rounded-control border p-3">
       {content}
-      {href && <Button href={href}>設定を見る</Button>}
+      {/*
+       * R307: 作成中の入力を失わせないよう、関連設定は新しいタブで開く。
+       * 同じタブで離れると入力が空に戻るため（離脱確認を挟む代わりに、
+       * この画面自体は残す向きにする）。
+       */}
+      {href && <Button href={href} target="_blank" rel="noreferrer">設定を見る</Button>}
     </div>
   )
 }

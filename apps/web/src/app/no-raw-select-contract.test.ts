@@ -8,18 +8,15 @@ const SRC = path.join(__dirname, '..')
 /**
  * **素の `<select>` を画面に書かない。**
  *
- * プルダウンは共通部品が2つある。
- *
- * - `shared/select-field.tsx`（`SelectField`）—— ブラウザ標準の `<select>` を
- *   包んだもの。**開いた中身はブラウザ任せ**で、キーボードと読み上げが
- *   その環境のまま使える。ふだんはこちら
- * - `shared/select.tsx`（`Select`）—— 開いた形まで自分で描くもの。
- *   設計の「プルダウン開状態」（`Gfsb4`）を絵に写す必要がある画面で使う
+ * プルダウンの共通部品は1つ（`shared/select.tsx` の `Select`）。
+ * 開いた形まで自分で描くため、開状態の設計（`Gfsb4`）も絵に写る。
+ * 旧 `SelectField`（ブラウザ標準の包み）は 2026-09-26 に Select へ
+ * 統一し、削除した。
  *
  * 画面ごとに `<select>` を書くと、**高さ・枠・角丸がそのつどずれる。**
  * 実測で 41 画面・83 か所あり、`h-9` `h-10` `py-2` が混ざっていた。
  *
- * ここは「素で書かない」だけを見張る。どちらの部品を使うかは画面の判断。
+ * ここは「素で書かない」だけを見張る。
  */
 
 function pages(dir: string, out: string[] = []): string[] {
@@ -52,12 +49,12 @@ const NOT_YET: Record<string, number> = {}
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(186)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。
+    expect(PAGES.length).toBe(189)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {
     const found = PAGES.filter((f) => !(f.p in NOT_YET) && count(f.s) > 0).map((f) => f.p)
-    expect(found, '画面に素の <select> が入った。SelectField か Select を使う').toEqual([])
+    expect(found, '画面に素の <select> が入った。Select を使う').toEqual([])
   })
 
   it('表にある画面でも増やさない', () => {
@@ -76,15 +73,34 @@ describe('素の <select> を画面に書かない', () => {
     }
   })
 
+  it('消した SelectField を呼び戻さない', () => {
+    // 旧 `SelectField` は 2026-09-26 に Select へ統一し、部品ごと消した。
+    // 取り込みで古い枝が戻すと型検査が落ちる。呼び出しの復活を見張る。
+    const sources = (dir: string, out: string[] = []): string[] => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name)
+        if (e.isDirectory()) sources(p, out)
+        else if (/\.(ts|tsx)$/.test(e.name)) out.push(p)
+      }
+      return out
+    }
+    const self = path.relative(SRC, __filename).split(path.sep).join('/')
+    const revived = sources(SRC)
+      .filter((p) => {
+        const rel = path.relative(SRC, p).split(path.sep).join('/')
+        return rel !== self && fs.readFileSync(p, 'utf8').includes('shared/select-field')
+      })
+      .map((p) => path.relative(SRC, p).split(path.sep).join('/'))
+    expect(revived, '消した SelectField の呼び出しが戻った。Select を使う').toEqual([])
+  })
+
   it('共通部品は素の <select> を持たない', () => {
-    // 例外は2つだけ。どちらも「ブラウザ標準を使う」ことに理由がある。
+    // 例外は1つだけ。「ブラウザ標準を使う」ことに理由がある。
     const shared = fs.readdirSync(path.join(SRC, 'components', 'shared'))
       .filter((n) => n.endsWith('.tsx') && !n.includes('.test.'))
     const withRaw = shared.filter((n) =>
       count(fs.readFileSync(path.join(SRC, 'components', 'shared', n), 'utf8')) > 0)
     expect(withRaw.sort(), '共通部品に素の <select> が入った').toEqual([
-      // 標準プルダウンそのもの。ここが `<select>` を持つ本体。
-      'select-field.tsx',
       // アカウントの札。印を `select` の中に置けないので札へ重ね、
       // `select` は透明にして上に敷く。開いた中身はブラウザ任せのまま。
       'top-bar.tsx',

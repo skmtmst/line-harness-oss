@@ -8,6 +8,7 @@ import {
   type WebinarNotificationSettingsInput,
 } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -45,8 +46,13 @@ const HOUR_OPTIONS = [15, 30, 60, 120].map((m) => ({
 const SETTINGS_KEYS = [
   'registrationEnabled', 'dayBeforeEnabled', 'dayBeforeTime',
   'hourBeforeEnabled', 'hourBeforeMinutes', 'startEnabled',
-  'missedEnabled', 'missedTime', 'completedEnabled',
+  'missedEnabled', 'missedTime', 'missedWindowDays', 'completedEnabled',
 ] as const
+
+const MISSED_WINDOW_OPTIONS = Array.from({ length: 30 }, (_, index) => ({
+  value: String(index + 1),
+  label: `${index + 1}日`,
+}))
 
 /**
  * まだ保存されていないウェビナーの編集開始値（WEBINAR-09）。
@@ -66,6 +72,7 @@ const emptySettings = (webinarId: string): WebinarNotificationSettings => ({
   startEnabled: false,
   missedEnabled: false,
   missedTime: '20:00',
+  missedWindowDays: 7,
   completedEnabled: false,
   updatedAt: '',
 })
@@ -142,6 +149,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         startEnabled: settings.startEnabled,
         missedEnabled: settings.missedEnabled,
         missedTime: settings.missedTime,
+        missedWindowDays: settings.missedWindowDays ?? 7,
         completedEnabled: settings.completedEnabled,
       }
       const res = await webinarApi.saveNotifications(webinarId, input)
@@ -260,16 +268,23 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
     {
       key: 'missed',
       label: '見逃した人への案内',
-      note: '申し込んだのに見なかった人へ届きます。',
+      note: '申し込んだのに見なかった人へ届きます。期限を過ぎたら送りません。',
       on: settings.missedEnabled,
       toggle: () => patch({ missedEnabled: !settings.missedEnabled }),
       extra: (
-        <span className="text-ink-secondary flex items-center gap-2 text-xs">
+        <span className="text-ink-secondary flex flex-wrap items-center gap-2 text-xs">
           送る時刻
           <TimeField
             value={settings.missedTime}
             onChange={(v) => patch({ missedTime: v })}
             aria-label="見逃した人への案内を送る時刻"
+          />
+          期限
+          <Select
+            aria-label="見逃した人への案内の期限（開催からの日数）"
+            value={String(settings.missedWindowDays ?? 7)}
+            onChange={(value) => patch({ missedWindowDays: Number(value) })}
+            options={MISSED_WINDOW_OPTIONS}
           />
         </span>
       ),
@@ -352,19 +367,13 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-xl border">
         {rows.map((row) => (
           <li key={row.key} className="bg-canvas flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <label className="flex min-w-0 flex-1 items-start gap-3">
-              <input
-                type="checkbox"
-                checked={row.on}
-                onChange={row.toggle}
-                aria-label={`${row.label}を送る`}
-                className="accent-accent mt-0.5"
-              />
-              <span className="min-w-0">
-                <span className="text-ink block text-sm font-semibold">{row.label}</span>
-                <span className="text-ink-faint block text-xs">{row.note}</span>
-              </span>
-            </label>
+            <Checkbox
+              checked={row.on}
+              onCheckedChange={row.toggle}
+              aria-label={`${row.label}を送る`}
+              description={row.note}
+              className="min-w-0 flex-1"
+            >{row.label}</Checkbox>
             {/* 切っているものの細かい設定は出さない。押しても効かない欄を並べない。 */}
             {row.on && row.extra ? <div className="shrink-0">{row.extra}</div> : null}
           </li>

@@ -1,9 +1,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MoreHorizontal } from 'lucide-react'
-import ActionMenu from '@/components/shared/action-menu'
-import IconButton from '@/components/shared/icon-button'
+import { RowActions } from '@/components/shared/row-actions'
 import {
   api,
   describeSaveFailure,
@@ -216,11 +214,14 @@ import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
 import { useAccount } from '@/contexts/account-context'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import MobileTableCards from '@/components/shared/mobile-table-cards'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ListToolbar from '@/components/shared/list-toolbar'
+import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -351,7 +352,6 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [sort, setSort] = useState<PointSort>('cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
-  const [pointMenuId, setPointMenuId] = useState<string | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -540,6 +540,17 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
     if (editForm.deduplicationMode === 'window' && !editForm.deduplicationWindowDays.trim()) {
       setEditError('数えない日数を入れてください')
+      return
+    }
+    // R281: ページ到達は対象URLが無いと1件も数えられないため、空のまま送らせない。
+    if (editForm.sourceType === 'url_reach' && !editForm.targetUrl.trim()) {
+      setEditError('数えてよいページを入れてください')
+      return
+    }
+    if (editForm.attributionDays.trim()
+      && (!Number.isInteger(Number(editForm.attributionDays))
+        || Number(editForm.attributionDays) < 1 || Number(editForm.attributionDays) > 365)) {
+      setEditError('計測期間は1〜365日で入れてください（空欄なら既定の90日です）')
       return
     }
     if (editForm.exclusionMemo.trim().length > 500) {
@@ -1005,7 +1016,56 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           }
         />
       ) : (
-        <div data-design="Table" className="bg-canvas rounded-card border-hairline border">
+        <>
+        {/*
+          ★V7 監査の直し A（`LD96g`）：768px 以上は表、767px 以下は共通の
+          一覧カード（`MobileTableCards`）。表のままだと390pxで6列が潰れて
+          名前が見出しに重なっていた。
+        */}
+        <MobileTableCards
+          items={current.map((point) => ({
+            id: point.id,
+            name: point.name,
+            status: point.state !== 'active' && STATE_LABELS[point.state] ? (
+              <span
+                className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
+                  point.state === 'draft' ? 'bg-info-bg text-info'
+                    : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
+                    : 'bg-canvas-sunken text-ink-faint'
+                }`}
+                title={point.stateReason ?? undefined}
+              >
+                {STATE_LABELS[point.state]}
+              </span>
+            ) : undefined,
+            summary: sourceTriggerLabel(point),
+            metric: `この30日 ${point.metrics.netCount.toLocaleString('ja-JP')}件`,
+            primaryAction: (
+              <Button
+                href={`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`}
+                variant="secondary"
+              >
+                使う場所を足す
+              </Button>
+            ),
+            /*
+             * R280: 開閉は行ごとの共通 RowActions に任せる。以前は画面全体の
+             * `pointMenuId` をスマホカードとPC表で共有していたため、隠れて
+             * いる側の器まで body へ出てメニューが2つに見えた。
+             */
+            moreAction: (
+              <RowActions
+                menuItems={[
+                  { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
+                ]}
+                subjectName={point.name}
+              />
+            ),
+            onSelect: () => setDetailTarget(point),
+            onSelectLabel: `${point.name}の詳細を開く`,
+          }))}
+        />
+        <div data-design="Table" className="bg-canvas rounded-card border-hairline border hidden md:block">
           <table className="w-full table-fixed">
             <thead>
               <TableHeadRow>
@@ -1026,7 +1086,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 <tr
                   key={point.id}
                   ref={point.id === highlightId ? highlightRowRef : null}
-                  className={point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}
+                  /*
+                   * R280: 行のクリックでも詳細が開く。操作列の中の押下は
+                   * 行へ伝えない（選んだ操作の代わりに詳細へ移動してしまう）。
+                   */
+                  className={`${point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'} cursor-pointer`}
+                  onClick={() => setDetailTarget(point)}
                 >
                   <td className="text-ink w-1/6 px-4 py-3 text-sm font-medium">
                     <span className="line-clamp-2" title={point.name}>{point.name}</span>
@@ -1067,11 +1132,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     : 'text-ink-secondary w-1/4 px-4 py-3 text-sm'}>
                     <span className="line-clamp-2" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     {/*
                       幅の決まっていない列へ2つのボタンを右詰めで入れると、
                       狭い幅で内容が左の「使われている場所」へはみ出して
                       文字に重なっていた。主操作だけ残し、詳細はメニューへ畳む。
+                      R280: 「…」は開閉を行ごとに持つ共通 RowActions にする。
+                      画面全体の共有状態だと、隠れているスマホカード側の器まで
+                      body へ出てメニューが2つに見えた。
                     */}
                     <div className="relative flex items-center justify-end gap-2">
                       <Button
@@ -1080,20 +1148,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       >
                         使う場所を足す
                       </Button>
-                      <IconButton
-                        aria-label={`${point.name}のその他操作`}
-                        title={`${point.name}のその他操作`}
-                        onClick={() => setPointMenuId((current) => (current === point.id ? null : point.id))}
-                      >
-                        <MoreHorizontal />
-                      </IconButton>
-                      <ActionMenu
-                        open={pointMenuId === point.id}
-                        ariaLabel={`${point.name}の操作`}
-                        onClose={() => setPointMenuId(null)}
-                        items={[
+                      <RowActions
+                        menuItems={[
                           { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
                         ]}
+                        subjectName={point.name}
                       />
                     </div>
                   </td>
@@ -1102,6 +1161,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -1154,7 +1214,34 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               <div><dt className="text-ink-faint">何が起きたら数えるか</dt><dd className="text-ink mt-1 font-semibold">{sourceTriggerLabel(detailTarget)}</dd></div>
               {/* R41: 対象・金額の説明も対応表と同じものを使う。 */}
               <div><dt className="text-ink-faint">対象</dt><dd className="text-ink mt-1 font-semibold">{originInfoOf(detailTarget.sourceType).target}</dd></div>
+              {/* R281: ページ到達の対象URLは詳細で確認できる。長いURLは安全な位置で折り返す。 */}
+              {detailTarget.measureMethod === 'url_reach' ? (
+                <div className="col-span-2">
+                  <dt className="text-ink-faint">数えてよいページ</dt>
+                  <dd className="text-ink mt-1 font-semibold break-all" title={detailTarget.targetUrl ?? undefined}>
+                    {detailTarget.targetUrl ?? '決まっていません'}
+                  </dd>
+                </div>
+              ) : null}
               <div><dt className="text-ink-faint">金額</dt><dd className="text-ink mt-1 font-semibold">{valueModeLine(detailTarget)}</dd></div>
+              {/* R281: 計測期間と取消方針も詳細で確認できる。空欄は既定の90日と分かる書き方にする。 */}
+              <div>
+                <dt className="text-ink-faint">
+                  計測期間{' '}
+                  <HelpTip label="計測期間の説明">
+                    友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。
+                  </HelpTip>
+                </dt>
+                <dd className="text-ink mt-1 font-semibold">
+                  {detailTarget.attributionDays == null ? '90日（既定）' : `${detailTarget.attributionDays}日`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-faint">取り消しの扱い</dt>
+                <dd className="text-ink mt-1 font-semibold">
+                  {REVERSAL_OPTIONS.find((option) => option.value === detailTarget.reversalPolicy)?.label ?? detailTarget.reversalPolicy}
+                </dd>
+              </div>
               {/* R40: 数えない条件とメモを詳細でも確認できる。 */}
               <div className="col-span-2"><dt className="text-ink-faint">数えない条件</dt><dd className="text-ink mt-1 font-semibold">{exclusionLine(detailTarget.sourceConfig)}</dd></div>
               <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
@@ -1355,6 +1442,20 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
               />
             </label>
+            {/* R281: ページ到達の対象URLも編集できる。URL以外は起点が固定で入力欄は出さない。 */}
+            {editForm.sourceType === 'url_reach' ? (
+              <label className="block">
+                <span className="text-ink-faint text-xs">数えてよいページ</span>
+                <TextField
+                  aria-label="数えてよいページ"
+                  inputMode="url"
+                  value={editForm.targetUrl}
+                  maxLength={2000}
+                  placeholder="https://example.com/thanks"
+                  onChange={(event) => setEditForm({ ...editForm, targetUrl: event.target.value })}
+                />
+              </label>
+            ) : null}
             {/* 起点に金額が無いものは注文の金額を出さない。選択肢は対応表が持つ(作成と同じ)。 */}
             <label className="block">
               <span className="text-ink-faint text-xs">金額の決め方</span>
@@ -1415,6 +1516,23 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 options={REVERSAL_OPTIONS}
                 onChange={(value) => setEditForm({ ...editForm, reversalPolicy: value as EditForm['reversalPolicy'] })}
               />
+            </label>
+            {/* R281: 友だち追加からの計測期間も編集できる。空欄は既定の90日。 */}
+            <label className="block">
+              <span className="text-ink-faint text-xs">
+                友だち追加からの計測期間（日）{' '}
+                <HelpTip label="計測期間の説明">
+                  友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。
+                </HelpTip>
+              </span>
+              <TextField
+                aria-label="友だち追加からの計測期間"
+                inputMode="numeric"
+                value={editForm.attributionDays}
+                placeholder="90"
+                onChange={(event) => setEditForm({ ...editForm, attributionDays: event.target.value })}
+              />
+              <span className="text-ink-faint mt-1 block text-xs">空欄なら既定の90日です。</span>
             </label>
             {/* R40: 数えない条件とメモも編集できる。条件は作成と同じ共通部品。 */}
             <div>
@@ -1506,44 +1624,50 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             </section>
 
             <section>
-              <h3 className="text-ink text-sm font-bold">どうしますか？</h3>
-              <div className="mt-2 space-y-2">
-                <label className={`rounded-control flex cursor-pointer items-start gap-3 border p-3 ${stopAction === 'stop' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'stop'} onChange={() => setStopAction('stop')} className="mt-0.5" />
-                  <div>
-                    <p className="text-ink text-sm font-semibold">数えるのをやめる（おすすめ）</p>
-                    <p className="text-ink-faint mt-0.5 text-xs">これから先は数えません。過去の記録と分析は残します。</p>
-                  </div>
-                </label>
-                <label className={`rounded-control flex cursor-pointer items-start gap-3 border p-3 ${stopAction === 'replace' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'replace'} onChange={() => setStopAction('replace')} className="mt-0.5" disabled={!stopImpact?.replacementCandidates.length} />
-                  <div>
-                    <p className="text-ink text-sm font-semibold">別の成果地点に差し替えてから削除する</p>
-                    <p className="text-ink-faint mt-0.5 text-xs">利用先を別の成果地点へ切り替え、過去の数字を残します。</p>
-                    {stopAction === 'replace' ? (
-                      <Select
-                        aria-label="差し替え先の成果地点"
-                        value={replacementId}
-                        options={[
-                          { value: '', label: '差し替え先を選ぶ' },
-                          ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
-                        ]}
-                        onChange={setReplacementId}
-                        className="mt-2"
-                      />
-                    ) : null}
-                  </div>
-                </label>
-                <label className={`rounded-control flex items-start gap-3 border p-3 ${stopImpact?.canDelete ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${stopAction === 'delete' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'delete'} onChange={() => setStopAction('delete')} className="mt-0.5" disabled={!stopImpact?.canDelete} />
-                  <div>
-                    <p className="text-ink text-sm font-semibold">このまま削除する</p>
-                    <p className="text-ink-faint mt-0.5 text-xs">{stopImpact?.canDelete
-                      ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
-                      : '成果または利用先があるため、物理削除は選べません。'}</p>
-                  </div>
-                </label>
-              </div>
+              <RadioCardGroup legend="どうしますか？" legendVisible>
+                <RadioCard
+                  name="conversion-stop-action"
+                  value="stop"
+                  checked={stopAction === 'stop'}
+                  onChange={() => setStopAction('stop')}
+                  title="数えるのをやめる（おすすめ）"
+                  note="これから先は数えません。過去の記録と分析は残します。"
+                />
+                <RadioCard
+                  name="conversion-stop-action"
+                  value="replace"
+                  checked={stopAction === 'replace'}
+                  onChange={() => setStopAction('replace')}
+                  disabled={!stopImpact?.replacementCandidates.length}
+                  disabledReason="差し替え先の成果地点がありません"
+                  title="別の成果地点に差し替えてから削除する"
+                  note="利用先を別の成果地点へ切り替え、過去の数字を残します。"
+                />
+                <RadioCard
+                  name="conversion-stop-action"
+                  value="delete"
+                  checked={stopAction === 'delete'}
+                  onChange={() => setStopAction('delete')}
+                  disabled={!stopImpact?.canDelete}
+                  disabledReason="成果または利用先があるため、物理削除は選べません。"
+                  title="このまま削除する"
+                  note={stopImpact?.canDelete
+                    ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
+                    : '成果または利用先があるため、物理削除は選べません。'}
+                />
+              </RadioCardGroup>
+              {stopAction === 'replace' ? (
+                <Select
+                  aria-label="差し替え先の成果地点"
+                  value={replacementId}
+                  options={[
+                    { value: '', label: '差し替え先を選ぶ' },
+                    ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
+                  ]}
+                  onChange={setReplacementId}
+                  className="mt-2"
+                />
+              ) : null}
             </section>
 
             <p className="text-ink-faint text-xs">{stopAction === 'replace'
@@ -1725,7 +1849,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
         />
       </KpiCollapse>
 
-      <Notice tone="info" message="成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。" />
+      <Notice tone="info" message="成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。件数と金額は、取り消された成果を除いた数です。" />
 
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1887,6 +2011,11 @@ function ReportTab({ accountId }: { accountId: string | null }) {
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
   const { selectedAccountId } = useAccount()
+  /*
+    R291: 紹介者の停止前確認からの `?affiliate=`。承認待ちは成果承認タブで
+    この紹介者に絞り、リンクは紹介者タブでこの紹介者の内訳を開く。
+  */
+  const affiliateFocus = useSearchParams().get('affiliate')
   // タブごとの画面名をトップバーの h1 へ出す（Issue #637）。
   usePageTitle(conversionsTabTitle(tab))
   /**
@@ -1918,9 +2047,9 @@ function ConversionsPageHost() {
         label="成果とアフィリエイト・コンバージョンの画面"
       />
       {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
-      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}
+      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} focusAffiliateId={affiliateFocus} />}
       {tab === 'offers' && <OffersTab />}
-      {tab === 'approvals' && <ApprovalQueue />}
+      {tab === 'approvals' && <ApprovalQueue focusAffiliateId={affiliateFocus} />}
       {tab === 'report' && <ReportTab accountId={selectedAccountId} />}
       {tab === 'payment' && (selectedAccountId
         ? <AffiliatePaymentTab accountId={selectedAccountId} />

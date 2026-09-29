@@ -2,6 +2,8 @@
 
 import type { EventQuestion } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
 
 const TYPE_LABELS: Record<EventQuestion['type'], string> = {
   text: '1行テキスト',
@@ -83,29 +85,23 @@ export default function EventQuestionsEditor({
             <label htmlFor={`eq-type-${q.id}`} className="text-ink-faint text-xs">
               回答の形
             </label>
-            <select
+            <Select
+              aria-label="回答の形"
               id={`eq-type-${q.id}`}
               value={q.type}
-              onChange={(e) => {
-                const type = e.target.value as EventQuestion['type']
+              onChange={(value) => {
+                const type = value as EventQuestion['type']
                 setAt(index, { type, options: NEEDS_OPTIONS.has(type) ? (q.options ?? ['']) : null })
               }}
-              className="border-hairline rounded-control border px-2 py-1.5 text-sm"
-            >
-              {(Object.keys(TYPE_LABELS) as EventQuestion['type'][]).map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABELS[t]}
-                </option>
-              ))}
-            </select>
-            <label className="text-ink-secondary flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={q.required}
-                onChange={(e) => setAt(index, { required: e.target.checked })}
-              />
-              必須にする
-            </label>
+              options={(Object.keys(TYPE_LABELS) as EventQuestion['type'][]).map((t) => ({
+                value: t,
+                label: TYPE_LABELS[t],
+              }))}
+            />
+            <Checkbox
+              checked={q.required}
+              onCheckedChange={(checked) => setAt(index, { required: checked })}
+            >必須にする</Checkbox>
           </div>
           {NEEDS_OPTIONS.has(q.type) && (
             <div className="space-y-1.5">

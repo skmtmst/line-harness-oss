@@ -4,7 +4,7 @@ import { Upload } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { api } from '@/lib/api'
 import type { BannerProject } from '@/lib/hq-banners'
 import UploadButton from './upload-button'
@@ -81,13 +81,14 @@ export default function UploadTargetDialog({
       ) : (
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${uid}-project`} className="text-label font-bold text-ink">入れるプロジェクト</label>
-          <SelectField
+          <Select
+            aria-label="入れるプロジェクト"
+            size="full"
             id={`${uid}-project`}
             className="w-full"
-            style={{ width: '100%' }}
             value={projectId}
             disabled={loading}
-            onChange={(event) => setProjectId(event.target.value)}
+            onChange={(value) => setProjectId(value)}
             options={projects.map((p) => ({ value: p.id, label: p.name }))}
           />
         </div>

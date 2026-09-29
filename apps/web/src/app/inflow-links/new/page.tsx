@@ -9,14 +9,16 @@ import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { qrToDataURL } from '@/lib/qr-image'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import CreatePage, {
   AsideCard,
   Field,
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
 
@@ -63,6 +65,8 @@ export default function NewInflowLinkPage() {
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [qrDataUrl, setQrDataUrl] = useState('')
+  // R23横展開: アカウントを切り替えたら、前の候補にしかない選択を外して知らせる。
+  const [pruneNotice, setPruneNotice] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -74,12 +78,14 @@ export default function NewInflowLinkPage() {
         ? api.pools.list({ suppressFeatureDisabledEvent: true })
         : { success: false as const, error: 'feature_disabled' },
     )
+    // R23横展開: 候補は今のアカウントだけ。別アカウントの同名タグ混入防止。
+    const accountParams = selectedAccountId ? { accountId: selectedAccountId } : undefined
     void Promise.allSettled([
-      api.tags.list(),
-      api.scenarios.list(),
+      api.tags.list(accountParams),
+      api.scenarios.list(accountParams),
       poolsRequest,
-      api.templates.list(),
-      api.tagGroups.list(),
+      api.templates.list(undefined, selectedAccountId ?? undefined),
+      api.tagGroups.list(selectedAccountId),
     ]).then(([t, s, p, tp, tg]) => {
       if (cancelled) return
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
@@ -100,6 +106,24 @@ export default function NewInflowLinkPage() {
     // R39: 候補（タグ・シナリオ・プール・テンプレート）はアカウントごとに
     // 違う。切替後に古い候補のまま保存しないよう、取り直す。入力は残す。
   }, [selectedAccountId])
+
+  /*
+   * R23横展開(m18hと同じ形): 新しい候補にない選択は外す。
+   * 外すものがなければ何もしない。選び直しが必要なときだけ帯で知らせる。
+   */
+  useEffect(() => {
+    const tagIds = new Set(tags.map((tag) => tag.id))
+    const scenarioIds = new Set(scenarios.map((scenario) => scenario.id))
+    const templateIds = new Set(templates.map((template) => template.id))
+    let removed = 0
+    if (tagId && !tagIds.has(tagId)) { setTagId(''); removed += 1 }
+    if (scenarioId && !scenarioIds.has(scenarioId)) { setScenarioId(''); removed += 1 }
+    if (introTemplateId && !templateIds.has(introTemplateId)) { setIntroTemplateId(''); removed += 1 }
+    if (removed > 0) {
+      setPruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags, scenarios, templates])
 
   const validRef = REF_PATTERN.test(refCode)
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -152,7 +176,7 @@ export default function NewInflowLinkPage() {
       successHref={(id) => `/inflow-links/detail?id=${id}`}
       designNode="TEVk8"
       variant="v6"
-      statusLabel="まだ発行されていません。発行すると、すぐにこのURLが使えます。"
+      statusLabel={isActive ? 'まだ発行されていません。発行すると、すぐにこのURLが使えます。' : 'まだ発行されていません。公開オフのまま発行すると、URLを開いても友だち追加できません。'}
       validate={() => {
         if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
         if (!name.trim()) return 'リンク名を入力してください'
@@ -214,6 +238,7 @@ export default function NewInflowLinkPage() {
         </>
       }
     >
+      {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} className="mb-3" /> : null}
       <FormSection step={1} label="どこに置くリンクですか">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
@@ -287,12 +312,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-tag"
           note="あとで配信の絞り込みに使えます。"
         >
-          <SelectField
+          <Select
             id="ir-tag"
             value={tagId}
-            onChange={(e) => setTagId(e.target.value)}
+            onChange={(value) => setTagId(value)}
             aria-label="自動で付けるタグ"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '（なし）' },
               ...tagOptionGroups.flatMap((group) =>
@@ -310,12 +335,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-scenario"
           note="経路ごとに違う案内を送れます。"
         >
-          <SelectField
+          <Select
             id="ir-scenario"
             value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
+            onChange={(value) => setScenarioId(value)}
             aria-label="開始するシナリオ配信"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '（なし）' },
               ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
@@ -328,12 +353,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-intro"
           note="シナリオとは別に、その場で1通だけ送ります。"
         >
-          <SelectField
+          <Select
             id="ir-intro"
             value={introTemplateId}
-            onChange={(e) => setIntroTemplateId(e.target.value)}
+            onChange={(value) => setIntroTemplateId(value)}
             aria-label="追加直後に送るメッセージ"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '送らない' },
               ...templates.map((template) => ({ value: template.id, label: template.name })),
@@ -353,10 +378,12 @@ export default function NewInflowLinkPage() {
               <input id="ir-redirect" type="url" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="https://example.com/lp" className={inputClass} />
             </Field>
           </div>
-          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" className="mt-0.5" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            <span>発行したらすぐ使えるようにする<span className="block text-xs text-ink-faint">オフにすると、URLを開いても友だち追加できません。</span></span>
-          </label>
+          <Checkbox
+            checked={isActive}
+            onCheckedChange={setIsActive}
+            description="オフにすると、URLを開いても友だち追加できません。"
+            className="mt-3"
+          >発行したらすぐ使えるようにする</Checkbox>
         </details>
       </FormSection>
 
@@ -380,12 +407,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-pool"
           note="選ばないと、全体の既定の振り分けに従います。"
         >
-          <SelectField
+          <Select
             id="ir-pool"
             value={poolId}
-            onChange={(e) => setPoolId(e.target.value)}
+            onChange={(value) => setPoolId(value)}
             aria-label="友だちの追加先アカウント"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: 'メインプールで自動振り分け' },
               ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
@@ -399,7 +426,7 @@ export default function NewInflowLinkPage() {
 
     </CreatePage>
 
-    <ConfirmDialog
+    <ConfirmDialog primaryAction="cancel"
       open={leaveTarget !== null}
       title="保存していない変更があります"
       description="このまま移動すると、入力した流入リンクは失われます。保存せずに移動しますか？"

@@ -17,6 +17,10 @@ export interface MeasurementSite {
   label: string;
   created_at: string;
   updated_at: string | null;
+  /** R275: 停止した日時。NULL なら計測を受け付ける。 */
+  stopped_at: string | null;
+  /** R275: 停止の理由(画面で入力)。履歴として残す。 */
+  stopped_reason: string | null;
 }
 
 export interface MeasurementSiteWithDomains extends MeasurementSite {
@@ -43,7 +47,8 @@ export function normalizeSiteHost(raw: unknown): string | null {
   }
   host = host.replace(/\.$/, '').split(':')[0];
   if (!HOST_PATTERN.test(host)) return null;
-  return host;
+  const bare = host.replace(/^www\./, '');
+  return HOST_PATTERN.test(bare) ? bare : host;
 }
 
 export async function listMeasurementSites(
@@ -145,19 +150,58 @@ export async function updateMeasurementSiteDomains(
     .run();
 }
 
+/**
+ * R275: 計測を止める。行は消さず、サイトと許可ドメイン・これまでの
+ * 記録は残る。止めると公開口は成果を受け付けなくなる。
+ * すでに止まっているサイトへの重ねがけは 'already_stopped' を返す。
+ */
+export async function stopMeasurementSite(
+  db: D1Database,
+  siteId: string,
+  reason: string,
+): Promise<'stopped' | 'already_stopped'> {
+  const now = jstNow();
+  const result = await db
+    .prepare(
+      `UPDATE measurement_sites
+          SET stopped_at = ?, stopped_reason = ?, updated_at = ?
+        WHERE id = ? AND stopped_at IS NULL`,
+    )
+    .bind(now, reason.trim(), now, siteId)
+    .run();
+  return result.meta.changes > 0 ? 'stopped' : 'already_stopped';
+}
+
+/** R275: 止めた計測をもう一度受け付ける。止まっていなければ 'not_stopped'。 */
+export async function resumeMeasurementSite(
+  db: D1Database,
+  siteId: string,
+): Promise<'resumed' | 'not_stopped'> {
+  const result = await db
+    .prepare(
+      `UPDATE measurement_sites
+          SET stopped_at = NULL, stopped_reason = NULL, updated_at = ?
+        WHERE id = ? AND stopped_at IS NOT NULL`,
+    )
+    .bind(jstNow(), siteId)
+    .run();
+  return result.meta.changes > 0 ? 'resumed' : 'not_stopped';
+}
+
 /** 許可ドメインか。www あり/なしは同一サイトとみなす。 */
 export async function siteAllowsHost(
   db: D1Database,
   siteId: string,
   host: string,
 ): Promise<boolean> {
-  const bare = host.replace(/^www\./, '');
+  const bare = normalizeSiteHost(host);
+  if (!bare) return false;
   const row = await db
     .prepare(
       `SELECT 1 AS ok FROM measurement_site_domains
         WHERE site_id = ? AND (host = ? OR host = ?)`,
     )
-    .bind(siteId, host, bare)
+    .bind(siteId, bare, `www.${bare}`)
     .first<{ ok: number }>();
   return row !== null;
 }

@@ -903,6 +903,7 @@ describe('送信直前の原子的claim', () => {
         friendReminderId: enrollment,
         now: at(0),
         leaseExpiresAt: at(5 * MINUTE_MS),
+        expectedLeaseExpiresAt: at(5 * MINUTE_MS),
       }),
     ).toBe(false);
     expect(
@@ -1195,6 +1196,7 @@ describe('送信権と取消の直列化', () => {
       friendReminderId: enrollment,
       now: at(0),
       leaseExpiresAt: at(5 * MINUTE_MS),
+      expectedLeaseExpiresAt: at(5 * MINUTE_MS),
     })).toBe(true);
     const deferred = await cancelByTrigger(db, {
       triggerType: 'booking',
@@ -1216,6 +1218,7 @@ describe('送信権と取消の直列化', () => {
       lineRequestId: null,
       messageLogId: 'log-1',
       now: at(0),
+      expectedLeaseExpiresAt: at(5 * MINUTE_MS),
     }).run();
     expect(Number(completed.meta?.changes ?? 0)).toBe(1);
     expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = ?`).get(run!.id)).toEqual({
@@ -1253,6 +1256,7 @@ describe('送信権と取消の直列化', () => {
       friendReminderId: enrollment,
       now: at(0),
       leaseExpiresAt: at(5 * MINUTE_MS),
+      expectedLeaseExpiresAt: at(5 * MINUTE_MS),
     })).toBe(true);
 
     // 利用者操作は 409 の元になる投げで返す。何も書かない。
@@ -1278,6 +1282,7 @@ describe('送信権と取消の直列化', () => {
       lineRequestId: null,
       messageLogId: 'log-1',
       now: at(0),
+      expectedLeaseExpiresAt: at(5 * MINUTE_MS),
     }).run();
     expect(await cancelByTrigger(db, cancelInput)).toEqual({ cancelledEnrollments: 1, cancelledRuns: 0 });
     expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = ?`).get(enrollment)).toEqual({
@@ -1318,10 +1323,83 @@ describe('送信権と取消の直列化', () => {
       lineRequestId: null,
       messageLogId: 'log-1',
       now: at(0),
+      expectedLeaseExpiresAt: at(5 * MINUTE_MS),
     }).run();
     expect(Number(completed.meta?.changes ?? 0)).toBe(0);
     expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = ?`).get(run!.id)).toEqual({
       status: 'claimed',
+    });
+  });
+});
+
+describe('監査の直し (R334)', () => {
+  it('版ずれの登録も固定版の起点で追随する', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    seedRule(raw, 'rule-booking-1', 'booking');
+    // 現行版は起点60分・固定版(V1)は起点0分。
+    raw.prepare(`UPDATE reminders SET trigger_offset_minutes = 60 WHERE id = 'rule-booking-1'`).run();
+    raw.prepare(
+      `INSERT INTO reminder_versions
+         (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
+       VALUES ('V1','rule-booking-1',1,'superseded','{"triggerOffsetMinutes":0}','2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z')`,
+    ).run();
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    const OLD = at(0);
+    const NEW = at(DAY_MS);
+    // 登録は固定版の起点 (OLDそのもの) で残っている。
+    raw.prepare(
+      `INSERT INTO friend_reminders
+         (id, friend_id, reminder_id, reminder_version_id, target_date, status, source_kind, source_id, source_event_id)
+       VALUES ('E1','friend-1','rule-booking-1','V1',?,'active','booking','B1','B1')`,
+    ).run(OLD);
+
+    const moved = await rescheduleByTrigger(db, {
+      triggerType: 'booking',
+      sourceId: 'B1',
+      sourceEventId: 'B1',
+      friendId: 'friend-1',
+      oldStartsAtIso: OLD,
+      newStartsAtIso: NEW,
+    });
+    expect(moved.movedEnrollments).toBe(1);
+    // 現行版の起点 (60分) で新日時に移る。
+    const expected = new Date(new Date(NEW).getTime() + 60 * MINUTE_MS).toISOString();
+    expect(raw.prepare(`SELECT target_date FROM friend_reminders WHERE id = 'E1'`).get()).toEqual({
+      target_date: expected,
+    });
+  });
+
+  it('タグ追加の新版でも既存登録は日時へ追随する', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    seedRule(raw, 'rule-booking-1', 'booking');
+    raw.prepare(`UPDATE reminders SET trigger_offset_minutes = 60 WHERE id = 'rule-booking-1'`).run();
+    // 新版で対象タグが付いたが、友だちにタグは無い。
+    raw.prepare(`INSERT INTO tags (id, line_account_id, name) VALUES ('tag-1', ?, 'VIP')`).run(ACCOUNT_1);
+    raw.prepare(`UPDATE reminders SET target_tag_id = 'tag-1' WHERE id = 'rule-booking-1'`).run();
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    const OLD = at(0);
+    const NEW = at(DAY_MS);
+    const oldAnchor = new Date(new Date(OLD).getTime() + 60 * MINUTE_MS).toISOString();
+    raw.prepare(
+      `INSERT INTO friend_reminders
+         (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+       VALUES ('E1','friend-1','rule-booking-1',?,'active','booking','B1','B1')`,
+    ).run(oldAnchor);
+
+    const moved = await rescheduleByTrigger(db, {
+      triggerType: 'booking',
+      sourceId: 'B1',
+      sourceEventId: 'B1',
+      friendId: 'friend-1',
+      oldStartsAtIso: OLD,
+      newStartsAtIso: NEW,
+    });
+    expect(moved.movedEnrollments).toBe(1);
+    const expected = new Date(new Date(NEW).getTime() + 60 * MINUTE_MS).toISOString();
+    expect(raw.prepare(`SELECT target_date FROM friend_reminders WHERE id = 'E1'`).get()).toEqual({
+      target_date: expected,
     });
   });
 });

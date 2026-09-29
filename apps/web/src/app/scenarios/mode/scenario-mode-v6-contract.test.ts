@@ -41,11 +41,12 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain('folderId: nextFolder')
     expect(page).toContain('folderId: folderId || null')
     expect(page).toContain("setFolderId(res.data.folderId ?? '')")
-    expect(page).toContain("import SelectField from '@/components/shared/select-field'")
+    expect(page).toContain("import Select from '@/components/shared/select'")
     expect(page).toContain("{ value: '', label: '未分類' }")
     expect(page).toContain("...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : [])")
     expect(page).toContain("...folders.map((folder) => ({ value: folder.id, label: folder.name }))")
-    expect(page).toContain('className="v6-select ')
+    expect(page).toContain('aria-label="シナリオのフォルダ"')
+    expect(page).toContain('size="full"')
   })
 
   it('フォルダを取得できないとき未分類と決めつけず変更を止める', () => {
@@ -53,7 +54,7 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain("disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}")
     expect(page).toContain('フォルダを確認できないため、いまは変更できません。')
     expect(page).toContain("folderState === 'error'")
-    expect(page).toContain("? '確認できません'")
+    expect(page).toContain("label: '名前を確認できません'")
     expect(page).toContain("folderState === 'loading'")
     expect(page).toContain("? '読み込み中…'")
   })
@@ -78,7 +79,10 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     const draft = page.slice(start, page.indexOf('const selectedFolderName', start))
     // id あり（既存）は保存してから進む。id なし（新規）はこの確定で初めて作る。
     expect(draft).toContain('const saved = await saveDetails()')
-    expect(draft).toContain('if (saved) router.push(`/scenarios/first-step')
+    // R172: 名前空欄の失敗時は進まず入力欄へ戻すため、`if (saved)` の中は
+    // 波括弧で続けている（1行のままではない）。
+    expect(draft).toContain('if (saved) {')
+    expect(draft).toContain('router.push(`/scenarios/first-step')
     expect(draft).toContain("createNew('absolute_time')")
     expect(page).not.toContain('href={`/scenarios/first-step')
   })
@@ -110,7 +114,11 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     const create = page.slice(page.indexOf('const createNew = async'), page.indexOf('const choose = async'))
     expect(create).toContain('deliveryMode: mode')
     expect(create).toContain('folderId: folderId || null')
-    expect(create).toContain('シナリオ名を入力してください')
+    // R172: 空欄の必須エラーは `rejectEmptyName` に寄せ、入力欄へ
+    // フォーカスとスクロールを移す。文言自体は変わらない。
+    expect(create).toContain('rejectEmptyName()')
+    expect(page).toContain('const rejectEmptyName')
+    expect(page).toContain('シナリオ名を入力してください')
     // 途中で閉じても残らないことを画面でも断る。
     expect(page).toContain('途中で閉じても一覧には残りません。')
   })

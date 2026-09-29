@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { cloneElement, isValidElement, useEffect, useId, useState, type ReactNode } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { MANUAL_LINKS } from '@/lib/manual-links'
@@ -10,6 +10,9 @@ import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import TermsConsent from './terms-consent'
 import { initialWizardStep, STEP } from './terms-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import Checkbox from '@/components/shared/checkbox'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 
 const steps = [
@@ -51,11 +54,29 @@ function Field({
   error?: string
   children: ReactNode
 }) {
+  /*
+   * R174: 見出しと入力を `htmlFor`・`id` で結ぶ。結ばないと4つの入力欄
+   * （店舗名・略称・チャネルID・チャネルシークレット）が読み上げ用の
+   * 項目名を持たない textbox になる。補足とエラーも `aria-describedby`
+   * で結ぶ（WCAG 3.3.2・1.3.1）。
+   */
+  const baseId = useId()
+  const inputId = `${baseId}-input`
+  const helpId = `${baseId}-help`
+  const errorId = `${baseId}-error`
+  const describedBy = error ? `${helpId} ${errorId}` : helpId
+  const field = isValidElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>(children)
+    ? cloneElement(children, {
+      id: inputId,
+      'aria-describedby': describedBy,
+      ...(error ? { 'aria-invalid': true as const } : null),
+    })
+    : children
   return <div>
-    <div className="mb-2 flex items-center gap-2"><label className="text-sm font-semibold text-ink">{label}</label><span className={`rounded-pill px-2 py-1 text-[10px] font-semibold ${required ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-secondary'}`}>{required ? '必須' : '任意'}</span></div>
-    {children}
-    <p className="mt-2 text-xs leading-5 text-ink-secondary">{help}</p>
-    {error && <p role="alert" className="mt-1 text-xs font-semibold text-danger">{error}</p>}
+    <div className="mb-2 flex items-center gap-2"><label htmlFor={inputId} className="text-sm font-semibold text-ink">{label}</label><span className={`rounded-pill px-2 py-1 text-[10px] font-semibold ${required ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-secondary'}`}>{required ? '必須' : '任意'}</span></div>
+    {field}
+    <p id={helpId} className="mt-2 text-xs leading-5 text-ink-secondary">{help}</p>
+    {error && <p id={errorId} role="alert" className="mt-1 text-xs font-semibold text-danger">{error}</p>}
   </div>
 }
 
@@ -74,6 +95,16 @@ export default function NewRestaurantStorePage() {
   const [connectionError, setConnectionError] = useState('')
   const [saving, setSaving] = useState(false)
   const [created, setCreated] = useState<{ id: string; storeName: string; lineAccountName: string } | null>(null)
+
+  /*
+   * R161 監査：店舗名などを入れたまま規約を別画面で読むと、戻ったときに
+   * 空欄へ戻る。登録が済むまで、入力が残っている間は未保存とし、
+   * 離れる操作では確認を出す。
+   */
+  const dirty = created === null && (
+    name !== '' || alias !== '' || officialAccountReady || channelId !== '' || channelSecret !== ''
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   useEffect(() => {
     let active = true
@@ -205,7 +236,7 @@ export default function NewRestaurantStorePage() {
               <p className="font-semibold text-ink">まずはLINE公式アカウントの登録を行いましょう。</p>
               <p className="mt-2">LINE公式アカウントをお持ちでない方は、LINE for Businessから無料で店舗専用のアカウントを開設してください。作成後、この画面へ戻ってチェックを入れます。</p>
             </div>
-            <label className="flex cursor-pointer items-start gap-3 rounded-control border border-hairline px-4 py-3 text-sm font-semibold text-ink"><input type="checkbox" checked={officialAccountReady} onChange={(event) => setOfficialAccountReady(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />LINE公式アカウントを作成済みです</label>
+            <Checkbox checked={officialAccountReady} onCheckedChange={setOfficialAccountReady} className="rounded-control border border-hairline px-4 py-3">LINE公式アカウントを作成済みです</Checkbox>
             <StickyBar actions={<><button type="button" onClick={() => setStep(STEP.BASICS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">次へ</button></>} />
           </div>}
 
@@ -246,5 +277,7 @@ export default function NewRestaurantStorePage() {
         </aside>
       </div>
     </div>
+    {/* R161 監査：店舗名などの書きかけがある間の離脱確認。 */}
+    <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、入力した店舗の内容は保存されません。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </div>
 }

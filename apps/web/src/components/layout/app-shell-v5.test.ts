@@ -15,6 +15,7 @@ const FRIEND_TREND = join(ROOT, '..', 'dashboard', 'friend-trend-table.tsx')
 const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
 const MENU = join(ROOT, '..', '..', 'lib', 'menu.ts')
 const CARD = join(ROOT, '..', 'shared', 'card.module.css')
+const DATA_TABLE_CSS = join(ROOT, '..', 'shared', 'data-table.module.css')
 
 // 描画して数えるための見本。1行だけ推定（行に「推定」の文字が残る形）。
 const TREND_SAMPLE = [
@@ -65,8 +66,10 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
     expect(dashboard).not.toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
   })
 
-  it('編集画面は矢印ではなくドラッグ・表示切替・プレビューで操作する', () => {
+  it('編集画面はドラッグ・キーボード・表示切替・プレビューで操作する', () => {
     // 2026-09-03: 設計 `ZN0ov` は「「今日やること」は4枠までです」と書く。
+    // R116: ドラッグだけでは操作できない人がいるため、上下ボタンによる
+    // キーボード操作を残す（WCAG 2.5.7）。旧い「矢印禁止」の期待を更新する。
     for (const label of ['表示するカードと位置を変更します', 'カードと配置', 'プレビュー', '4枠までです', 'ダッシュボードに反映']) {
       expect(dashboardEditor).toContain(label)
     }
@@ -81,8 +84,9 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
     */
     expect(dashboardEditor).toContain("from '@line-crm/shared'")
     expect(dashboardEditor).toContain('DashboardGroup = DashboardCardGroup')
-    expect(dashboardEditor).not.toContain('上へ移動')
-    expect(dashboardEditor).not.toContain('下へ移動')
+    expect(dashboardEditor).toContain('上へ移動')
+    expect(dashboardEditor).toContain('下へ移動')
+    expect(dashboardEditor).toContain('KeyboardSensor')
   })
 
   it('対応が必要な受信はV4の4列だけを出し、件数に合わせて高さを縮める', () => {
@@ -156,15 +160,19 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
       こと（`overflow-x-auto`）で同じ意図を守る。案内文と流入元列
       （「すべて表示」）は ★V7 で外れた。
     */
-    const headers = body.match(/<th[\s>][^>]*>/g) ?? []
+    // 見出しは共通 Th（大文字）で書く。素の th も同じ形とみなす。
+    const headers = body.match(/<[tT]h[\s>][^>]*>/g) ?? []
     expect(headers).toHaveLength(5)
     for (const header of headers) expect(header).toContain('whitespace-nowrap')
     for (const label of ['日付', '前日比', '登録', 'ブロック', '有効友だち']) {
       expect(body).toContain(label)
     }
-    expect(body).toContain('overflow-x-auto')
+    // 表は共通 DataTable。狭い幅の横スクロールは外枠（frame）が持つ。
+    expect(body).toContain('<DataTable')
+    const frame = readFileSync(DATA_TABLE_CSS, 'utf8')
+    expect(frame).toContain('overflow-x: auto')
     // 日付の見出しは「？」と一緒でも折り返さない：日付を含む th が nowrap で HelpTip を持つ。
-    const cells = body.match(/<th[^>]*>[\s\S]*?<\/th>/g) ?? []
+    const cells = body.match(/<[tT]h[^>]*>[\s\S]*?<\/[tT]h>/g) ?? []
     const dateCell = cells.find((cell) => cell.includes('日付')) ?? ''
     expect(dateCell).toContain('whitespace-nowrap')
     expect(dateCell).toContain('日付の推定値の説明')

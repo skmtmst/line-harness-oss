@@ -8,6 +8,7 @@ import ListRange from '@/components/ui/list-range'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -15,6 +16,7 @@ import { RowActions } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import FilterChip from '@/components/shared/filter-chip'
 import './webinars.css'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
@@ -98,10 +100,13 @@ function WebinarFolderDialog({
   onSave: (name: string) => void
 }) {
   const [name, setName] = useState(folder?.name ?? '')
+  // 保存中は×と同じくEscapeでも閉じない。共通の約束（初期フォーカス・
+  // Tabの循環・起点へのフォーカス復帰・背面スクロール停止）もそろえる。
+  const panelRef = useOverlayFocus(true, onCancel, busy)
 
   return (
     <div className="bg-ink/35 fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="webinar-folder-title">
-      <section className="bg-canvas rounded-card w-full max-w-md border border-hairline p-5 shadow-card">
+      <section ref={panelRef} className="bg-canvas rounded-card w-full max-w-md border border-hairline p-5 shadow-card">
         <div className="flex items-start justify-between gap-3">
           <h2 id="webinar-folder-title" className="text-ink text-lg font-bold">
             {folder ? 'フォルダ名を変更' : 'フォルダを追加'}
@@ -119,7 +124,6 @@ function WebinarFolderDialog({
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
-            if (event.key === 'Escape' && !busy) onCancel()
           }}
           className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
           placeholder="例: 商品説明"
@@ -294,6 +298,7 @@ function WebinarListTable({
   items: WebinarListItem[]
   onArchive: (target: WebinarListItem) => void
 }) {
+  const router = useRouter()
   return (
     <>
       <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
@@ -315,7 +320,12 @@ function WebinarListTable({
             <div className="flex items-center gap-1.5 md:col-span-2"><RowActions
               subjectName={w.title}
               edit={{ href: `/webinars/edit?id=${w.id}` }}
-              menuItems={[{ id: 'archive', label: 'アーカイブする', onSelect: () => onArchive(w) }]}
+              menuItems={[
+                { id: 'participants', label: '参加者を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=participants`) },
+                { id: 'analytics', label: '分析を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=analytics`) },
+                { id: 'comments', label: 'コメント演出を開く', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=comments`) },
+                { id: 'archive', label: 'アーカイブする', onSelect: () => onArchive(w) },
+              ]}
               menuButtonProps={{ 'data-qa-open': w.id === 'webinar-5' ? 'LKuAQ' : undefined }}
             /></div>
           </div>

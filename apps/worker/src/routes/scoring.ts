@@ -23,6 +23,8 @@ import {
   applyMileageRulesForEvent,
   getMileageManualAdjustmentPolicy,
   setMileageManualAdjustmentPolicy,
+  getMileageAdjustmentNotificationRecord,
+  findCommittedMileageAdjustment,
   postMileageAdjustment,
   MileageAdjustmentError,
   MileageV6Error,
@@ -47,6 +49,15 @@ import {
   publishMileageEarningRule,
   ensureDefaultMileageProgram,
   jstNow,
+  confirmPendingMileageEntry,
+  voidMileageLedgerEntry,
+  createMileageAdjustmentApprovalRequest,
+  listMileageAdjustmentApprovalRequests,
+  approveMileageAdjustmentRequest,
+  rejectMileageAdjustmentRequest,
+  cancelMileageAdjustmentRequest,
+  testMileageEarningRuleDraft,
+  validateMileageEarningRuleDraft,
 } from '@line-crm/db';
 import type {
   ActionScoreFilter,
@@ -447,11 +458,12 @@ scoring.post(
 );
 
 const MILEAGE_REDEMPTION_LIST_STATUSES = new Set<string>([
-  'all', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded',
+  'all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded',
 ]);
 
 // 交換履歴の一覧。残高を減らしたのに特典が届かなかった交換を、管理画面で
-// 見つけるための口。既定は失敗中だけ。秘密の処理IDは落として返す。
+// 見つけるための口。既定は要対応（失敗中＋送ったか分からない配送中）。
+// 照合待ちを既定の一覧から消さない（R364）。秘密の処理IDは落として返す。
 scoring.get(
   '/api/mileage/redemptions',
   requireRole('owner', 'admin', 'staff'),
@@ -461,7 +473,7 @@ scoring.get(
       if (!await canUseMileageAccount(c, accountId)) {
         return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
       }
-      const statusValue = c.req.query('status')?.trim() || 'delivery_failed';
+      const statusValue = c.req.query('status')?.trim() || 'needs_attention';
       if (!MILEAGE_REDEMPTION_LIST_STATUSES.has(statusValue)) {
         return c.json({ success: false, error: 'status is invalid' }, 400);
       }
@@ -521,15 +533,17 @@ scoring.post(
         return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
       }
       /*
-       * 失敗中だけやり直せる。成功済み・返金済みの再実行は二重特典の素、
-       * 予約中・配送中の再実行は最初の配送と競合するので、どちらも断る。
+       * 失敗中と配送中だけやり直せる。成功済み・返金済みの再実行は
+       * 二重特典の素、予約中の再実行は最初の配送と競合するので断る。
+       * 配送中（照合待ち）のやり直しも受け付けるが、送ったか
+       * 確かめられない手順は送り直さず照合待ちに残す（R364）。
        * やり直しは同じ交換IDを続け、残高の減算はしない
        * (deliverMileageReward は予約時の減算に触らない)。
        */
-      if (redemption.status !== 'delivery_failed') {
+      if (redemption.status !== 'delivery_failed' && redemption.status !== 'delivering') {
         return c.json({
           success: false,
-          error: '失敗中の交換だけやり直せます',
+          error: '失敗中・配送中の交換だけやり直せます',
           code: 'redemption_not_retryable',
         }, 409);
       }
@@ -537,7 +551,13 @@ scoring.post(
         credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       });
       auditLog(c, 'mileage.redemption.retry', { kind: 'mileage_redemption', id: redemption.id });
-      return c.json({ success: delivery.status === 'succeeded', data: delivery },
+      /*
+       * R367: 配送成否だけでなく交換の今の状態も返す。返却が完了したら
+       * 画面は返却済みとして案内し、古い再試行の行を外せる。
+       */
+      const fresh = await getMileageRedemption(c.env.DB, redemption.id);
+      const data = { ...delivery, redemption: publicMileageRedemption(fresh ?? redemption) };
+      return c.json({ success: delivery.status === 'succeeded', data },
         delivery.status === 'succeeded' ? 200 : 202);
     } catch (error) {
       return mileageRewardError(c, error);
@@ -888,8 +908,8 @@ scoring.post(
       if (typeof notifyFriend !== 'boolean') {
         return c.json({ success: false, error: 'notifyFriend must be a boolean' }, 400);
       }
-      if (expiresAt && (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now())) {
-        return c.json({ success: false, error: 'expiresAt must be a future date-time' }, 400);
+      if (expiresAt && Number.isNaN(expiresAt.getTime())) {
+        return c.json({ success: false, error: 'expiresAt must be a date-time' }, 400);
       }
       if (expiresAt && direction !== 'increase') {
         return c.json({ success: false, error: 'expiresAt can only be set when increasing mileage' }, 400);
@@ -904,26 +924,9 @@ scoring.post(
       ).bind(friendId, accountId).first<{ id: string }>();
       if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
 
-      const policy = await getMileageManualAdjustmentPolicy(c.env.DB, accountId);
-      if (!policy) {
-        return c.json({
-          success: false,
-          error: '高額調整の承認境界が未設定です。オーナーが先に設定してください。',
-          code: 'ADJUSTMENT_POLICY_REQUIRED',
-        }, 400);
-      }
-      if (amount >= policy.approvalThreshold) {
-        return c.json({
-          success: false,
-          error: `${policy.approvalThreshold.toLocaleString('ja-JP')} mile以上は別のオーナー承認が必要です。`,
-          code: 'OWNER_APPROVAL_REQUIRED',
-          data: { approvalThreshold: policy.approvalThreshold },
-        }, 400);
-      }
-
       const staff = c.get('staff');
       const signedAmount = direction === 'decrease' ? -amount : amount;
-      const result = await postMileageAdjustment(c.env.DB, {
+      const adjustmentInput = {
         friendId,
         amount: signedAmount,
         reason,
@@ -935,7 +938,97 @@ scoring.post(
         lineAccountId: accountId,
         expiresAt: expiresAt?.toISOString() ?? null,
         notifyFriend,
-      });
+      };
+
+      /*
+       * R378: 確定済みの同じ要求は当時の結果をそのまま返す。承認境界の
+       * 引き下げや元の有効期限の経過は「新しい調整への判定」なので、
+       * 確定済みの再送には適用しない。同じキーで別の内容なら409。
+       * 通知だけの復旧（前回は残高反映済み・通知のみ失敗）もここで行い、
+       * 残高へ再適用しない。
+       */
+      const committed = await findCommittedMileageAdjustment(c.env.DB, adjustmentInput);
+      if (committed) {
+        const replayedNotification = notifyFriend
+          ? await sendMileageAdjustmentNotification(c, {
+              lineAccountId: accountId,
+              friendId,
+              ledgerEntryId: committed.entry.id,
+              idempotencyKey,
+              message: mileageAdjustmentMessage({
+                direction,
+                amount,
+                balanceAfter: committed.balanceAfter,
+                expiresAt: expiresAt?.toISOString() ?? null,
+              }),
+            }).catch(() => ({
+              id: null,
+              status: 'failed' as const,
+              attemptCount: 0,
+              errorCode: 'notification_record_failed',
+            }))
+          : null;
+        return c.json({
+          success: true,
+          data: {
+            entryId: committed.entry.id,
+            balanceBefore: committed.balanceBefore,
+            amount: committed.entry.amount,
+            balanceAfter: committed.balanceAfter,
+            replayed: true,
+            expiresAt: expiresAt?.toISOString() ?? null,
+            notification: replayedNotification,
+          },
+        }, 200);
+      }
+
+      // R378: 期限切れの判定と承認境界は「新しい調整」だけに適用する。
+      if (expiresAt && expiresAt.getTime() <= Date.now()) {
+        return c.json({ success: false, error: 'expiresAt must be a future date-time' }, 400);
+      }
+
+      const policy = await getMileageManualAdjustmentPolicy(c.env.DB, accountId);
+      if (!policy) {
+        return c.json({
+          success: false,
+          error: '高額調整の承認境界が未設定です。オーナーが先に設定してください。',
+          code: 'ADJUSTMENT_POLICY_REQUIRED',
+        }, 400);
+      }
+      if (amount >= policy.approvalThreshold) {
+        /*
+         * R: 境界以上の調整は実行せず、別のオーナーへの承認依頼として残す
+         * （一斉配信の二者承認と同じ形）。依頼票は同じ Idempotency-Key の
+         * 再送で重複しない。
+         */
+        const { request } = await createMileageAdjustmentApprovalRequest(c.env.DB, {
+          lineAccountId: accountId,
+          friendId,
+          direction,
+          amount,
+          reasonCategory,
+          reason,
+          sourceReferenceId: sourceReferenceId || null,
+          expiresAt: expiresAt?.toISOString() ?? null,
+          notifyFriend,
+          idempotencyKey,
+          staffId: staff.id,
+          staffName: staff.name,
+        });
+        auditLog(c, 'mileage.adjustment.approval.request', {
+          kind: 'mileage_adjustment_approval_requests', id: request.id,
+        });
+        return c.json({
+          success: true,
+          data: {
+            approvalRequired: true as const,
+            approvalThreshold: policy.approvalThreshold,
+            request,
+          },
+        }, 202);
+      }
+
+      const result = await postMileageAdjustment(c.env.DB, adjustmentInput);
       auditLog(c, 'mileage.adjustment.create', { kind: 'mileage_ledger', id: result.entry.id });
       const notification = notifyFriend
         ? await sendMileageAdjustmentNotification(c, {
@@ -982,6 +1075,312 @@ scoring.post(
       }
       console.error('POST /api/mileage/adjustments error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+/*
+ * R: 高額調整の承認依頼の一覧・承認・差し戻し・取り下げ。
+ * 承認は「依頼した人とは別のオーナー」だけが行える（二者承認）。
+ */
+scoring.get('/api/mileage/adjustment-approvals', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+    }
+    const rawStatus = c.req.query('status')?.trim() ?? '';
+    const status = ['pending', 'approved', 'rejected', 'cancelled'].includes(rawStatus)
+      ? rawStatus as 'pending' | 'approved' | 'rejected' | 'cancelled'
+      : undefined;
+    const requests = await listMileageAdjustmentApprovalRequests(c.env.DB, {
+      lineAccountId: accountId,
+      status,
+    });
+    return c.json({ success: true, data: requests });
+  } catch (error) {
+    return mileageV6Error(c, error);
+  }
+});
+
+scoring.post(
+  '/api/mileage/adjustment-approvals/:id/approve',
+  requireRole('owner'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const staff = c.get('staff');
+      const { request, entry } = await approveMileageAdjustmentRequest(c.env.DB, {
+        requestId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: staff.id,
+        staffName: staff.name,
+        decisionReason: typeof body.reason === 'string' ? body.reason.trim() || null : null,
+      });
+      auditLog(c, 'mileage.adjustment.approval.approve', {
+        kind: 'mileage_adjustment_approval_requests', id: request.id,
+      });
+      /*
+       * 依頼時に「友だちに知らせる」が選ばれていれば、承認で残高へ
+       * 反映されたこのタイミングで通知する。失敗は残高を巻き戻さず、
+       * 失敗の記録として残る（あとから通知だけ再送できる）。
+       */
+      const approvedMetadata = entry.metadata
+        ? JSON.parse(entry.metadata) as { balanceAfter?: number }
+        : {};
+      const notification = request.notify_friend === 1
+        ? await sendMileageAdjustmentNotification(c, {
+            lineAccountId: request.line_account_id,
+            friendId: request.friend_id,
+            ledgerEntryId: entry.id,
+            idempotencyKey: request.idempotency_key,
+            message: mileageAdjustmentMessage({
+              direction: request.direction,
+              amount: request.amount,
+              balanceAfter: Number(approvedMetadata.balanceAfter ?? 0),
+              expiresAt: request.expires_at,
+            }),
+          }).catch(() => null)
+        : null;
+      return c.json({ success: true, data: { request, entryId: entry.id, notification } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+scoring.post(
+  '/api/mileage/adjustment-approvals/:id/reject',
+  requireRole('owner'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const staff = c.get('staff');
+      const request = await rejectMileageAdjustmentRequest(c.env.DB, {
+        requestId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: staff.id,
+        staffName: staff.name,
+        decisionReason: typeof body.reason === 'string' ? body.reason.trim() || null : null,
+      });
+      auditLog(c, 'mileage.adjustment.approval.reject', {
+        kind: 'mileage_adjustment_approval_requests', id: request.id,
+      });
+      return c.json({ success: true, data: { request } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+scoring.post(
+  '/api/mileage/adjustment-approvals/:id/cancel',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const request = await cancelMileageAdjustmentRequest(c.env.DB, {
+        requestId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: c.get('staff').id,
+      });
+      auditLog(c, 'mileage.adjustment.approval.cancel', {
+        kind: 'mileage_adjustment_approval_requests', id: request.id,
+      });
+      return c.json({ success: true, data: { request } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+/*
+ * R: 確定待ちの確定・取消。どちらも理由が必須。確定は pending→available、
+ * 取消は逆向きの記録を足す（台帳の行は消さない）。
+ */
+scoring.post(
+  '/api/mileage/entries/:id/confirm',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (!accountId) {
+        return c.json({ success: false, error: 'accountId is required' }, 400);
+      }
+      if (!reason) {
+        return c.json({ success: false, error: '理由を入力してください', code: 'reason_required' }, 400);
+      }
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
+      const staff = c.get('staff');
+      const { entry, alreadyConfirmed } = await confirmPendingMileageEntry(c.env.DB, {
+        entryId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: staff.id,
+        staffName: staff.name,
+        reason,
+      });
+      if (!alreadyConfirmed) {
+        auditLog(c, 'mileage.entry.confirm', { kind: 'mileage_ledger', id: entry.id });
+      }
+      return c.json({ success: true, data: { entry, alreadyConfirmed } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+scoring.post(
+  '/api/mileage/entries/:id/void',
+  requireRole('owner', 'admin'),
+  requireIrreversibleConfirmation('mileage-entry-void'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (!accountId) {
+        return c.json({ success: false, error: 'accountId is required' }, 400);
+      }
+      if (!reason) {
+        return c.json({ success: false, error: '理由を入力してください', code: 'reason_required' }, 400);
+      }
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
+      const staff = c.get('staff');
+      const result = await voidMileageLedgerEntry(c.env.DB, {
+        entryId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: staff.id,
+        staffName: staff.name,
+        reason,
+      });
+      if (!result.replayed) {
+        auditLog(c, 'mileage.entry.void', { kind: 'mileage_ledger', id: result.entry.id });
+      }
+      return c.json({ success: true, data: result });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+/*
+ * R380/R381: 手動調整の友だち通知だけをあとから再送する。
+ * 残高は動かさない。通知記録があれば保存済みの本文・送信キーで再送し、
+ * 記録自体が作れなかった調整では台帳の依頼印（notifyFriend）を見て
+ * 本文を組み直して送る。sent 済みの再送は sendMileageNotification 側で
+ * 何もしない（二重送信しない）。
+ */
+scoring.post(
+  '/api/mileage/entries/:id/notification-retry',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const entryId = c.req.param('id');
+      const entry = await c.env.DB.prepare(
+        `SELECT id, beneficiary_friend_id, idempotency_key, amount, metadata
+           FROM mileage_ledger
+          WHERE id = ? AND program_id = 'default' AND entry_type = 'adjustment'
+            AND json_extract(metadata, '$.lineAccountId') = ?`,
+      ).bind(entryId, accountId).first<{
+        id: string; beneficiary_friend_id: string | null; idempotency_key: string;
+        amount: number; metadata: string | null;
+      }>();
+      if (!entry || !entry.beneficiary_friend_id) {
+        return c.json({ success: false, error: 'Notification target not found' }, 404);
+      }
+      const record = await getMileageAdjustmentNotificationRecord(c.env.DB, {
+        lineAccountId: accountId,
+        ledgerEntryId: entry.id,
+      });
+      const metadata = entry.metadata ? JSON.parse(entry.metadata) as {
+        notifyFriend?: boolean;
+        adjustmentFingerprint?: string;
+        balanceAfter?: number;
+        expiresAt?: string | null;
+      } : {};
+      /*
+       * 通知記録が無い＝依頼時に記録の作成自体が失敗した場合。古い台帳には
+       * notifyFriend がないので、指紋の中の notifyFriend でも確かめる。
+       */
+      const fingerprintRequested = (() => {
+        try {
+          return JSON.parse(metadata.adjustmentFingerprint ?? '{}')?.notifyFriend === true;
+        } catch {
+          return false;
+        }
+      })();
+      if (!record && metadata.notifyFriend !== true && !fingerprintRequested) {
+        return c.json({ success: false, error: 'この調整に通知の依頼はありません' }, 404);
+      }
+      const notification = await sendMileageAdjustmentNotification(c, {
+        lineAccountId: accountId,
+        friendId: record?.friendId ?? entry.beneficiary_friend_id,
+        ledgerEntryId: entry.id,
+        idempotencyKey: record?.idempotencyKey ?? entry.idempotency_key,
+        message: record?.messageText ?? mileageAdjustmentMessage({
+          direction: entry.amount > 0 ? 'increase' : 'decrease',
+          amount: Math.abs(entry.amount),
+          balanceAfter: Number(metadata.balanceAfter ?? 0),
+          expiresAt: metadata.expiresAt ?? null,
+        }),
+      });
+      auditLog(c, 'mileage.adjustment.notification.retry', {
+        kind: 'mileage_adjustment_notifications', id: notification.id ?? entry.id,
+      });
+      return c.json({ success: true, data: { notification } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+scoring.post(
+  '/api/mileage/earning-rules/test',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; draft?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; draft?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const draft = validateMileageEarningRuleDraft(body.draft);
+      const data = await testMileageEarningRuleDraft(c.env.DB, {
+        lineAccountId: accountId,
+        draft,
+      });
+      return c.json({ success: true, data });
+    } catch (error) {
+      return mileageV6Error(c, error);
     }
   },
 );

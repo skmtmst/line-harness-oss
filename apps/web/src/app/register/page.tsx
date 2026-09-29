@@ -6,9 +6,10 @@ import { useCallback, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
-import { authRequest, emailError, LEGAL_LINKS, readDeviceMarker, rememberSignupEmail, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
+import { authRequest, CONTACT_URL, emailError, LEGAL_LINKS, readDeviceMarker, rememberSignupEmail, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 
 /**
  * 会員登録の 1 歩目。★V6 36-4（`JBd7P`、カード `NIOtl`）。
@@ -86,18 +87,24 @@ export default function RegisterPage() {
         <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
 
         <div className="flex flex-col gap-1.5">
-          <label className="flex items-start gap-2.5 text-caption text-ink">
-            <input
-              type="checkbox"
-              checked={agreed}
-              onChange={(event) => setAgreed(event.target.checked)}
-              className="mt-0.5 h-4.5 w-4.5 shrink-0 accent-accent-deep"
-              aria-invalid={Boolean(agreeMessage) || undefined}
-            />
-            <span>
-              <LegalWord href={LEGAL_LINKS.terms}>利用規約</LegalWord>と<LegalWord href={LEGAL_LINKS.privacy}>プライバシーポリシー</LegalWord>に同意します
-            </span>
-          </label>
+          <Checkbox
+            checked={agreed}
+            onCheckedChange={setAgreed}
+            invalid={Boolean(agreeMessage)}
+          ><LegalWord href={LEGAL_LINKS.terms}>利用規約</LegalWord>と<LegalWord href={LEGAL_LINKS.privacy}>プライバシーポリシー</LegalWord>に同意します</Checkbox>
+          {/*
+            R169: 文書の公開先が未設定の間は、開けない文書への同意を説明なしに求めない。
+            まだ公開されていないことと、確認の入口（お問い合わせはログイン不要）を添える。
+          */}
+          {!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy ? (
+            <p className="text-micro text-ink-faint">
+              文書のページはまだ公開されていません。公開までの間、内容は{' '}
+              <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="text-action underline underline-offset-2">
+                お問い合わせ
+              </a>
+              {' '}からご確認いただけます。
+            </p>
+          ) : null}
           {agreeMessage ? (
             <p role="alert" className="text-micro text-danger">
               {agreeMessage}

@@ -35,6 +35,12 @@ bucket_name = "musubo-raw-mail-stg"
 [ai]
 binding = "AI"
 
+# バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+# R2 の `IMAGES` と名前が重なるため `CF_IMAGES` にしている。
+# 注意: Images の有効化が必要か・変換回ごとの料金を、配備の前にオーナーへ確認する。
+[images]
+binding = "CF_IMAGES"
+
 [[queues.producers]]
 binding = "CODEX_MENTION_QUEUE"
 queue = "nen-codex-mentions-stg"
@@ -47,9 +53,10 @@ max_retries = 5
 retry_delay = 60
 
 [vars]
+DEPLOY_ENV = "staging"
 RESTAURANT_TEST_ENABLED = "true"
 GOOGLE_BUSINESS_OAUTH_CLIENT_ID = "904803281314-ufqj5bmmhqnl9hv58uigo4ct6jvfmdkg.apps.googleusercontent.com"
-GOOGLE_BUSINESS_WRITE_ENABLED = "true"
+GOOGLE_BUSINESS_WRITE_ENABLED = "false"
 WORKER_NAME = "nen-line-stg"
 ADMIN_PAGES_PROJECT = "nen-line-stg-admin"
 LIFF_PAGES_PROJECT = ""

@@ -87,6 +87,15 @@ export function commonVarValueError(type: string, value: string, label = '値'):
       ? null
       : `${label}は https:// からはじまるURLで入力してください`
   }
+  // URL型はリンク先として差し込まれる。URLでない文章は配信・予約導線で
+  // 壊れるため、画面でも止める（R36。サーバも同じ判定）。画像と違い
+  // http も受ける。
+  if (type === 'url') {
+    if (value === '') return null
+    return value.length <= 200 && /^https?:\/\/\S+$/.test(value)
+      ? null
+      : `${label}は http:// または https:// からはじまるURLで入力してください`
+  }
   return value.length <= 200 ? null : `${label}は200文字までで入力してください`
 }
 
@@ -99,4 +108,37 @@ export function formatStamp(value: string): string {
     new Date(Number(y), Number(m) - 1, Number(d)).getDay()
   ]
   return `${y}/${m}/${d}(${week})${hh ? ` ${hh}:${mm}` : ''}`
+}
+
+/*
+ * Q: 鍵の形・長い乱数は共通情報に保存できない（サーバの isSecretLikeValue と同じ判定）。
+ * サーバが422で止めるので、画面ではAPIを呼ぶ前に理由を出して欄へ戻す。
+ * URL はパスやクエリに英数字が混ざるだけなので鍵扱いしない。
+ */
+const SECRET_SHAPED_PATTERNS: readonly RegExp[] = [
+  /sk[-_](live|test|prod)?[-_]?[A-Za-z0-9]{10,}/i,
+  /AKIA[0-9A-Z]{16}/,
+  /AIza[0-9A-Za-z_-]{35}/,
+  /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /xox[baprs]-[0-9A-Za-z-]{10,}/,
+  /ya29\.[0-9A-Za-z_-]{10,}/,
+  /^[0-9a-f]{32,}$/i,
+]
+
+export function isSecretLikeVarValue(value: string): boolean {
+  if (SECRET_SHAPED_PATTERNS.some((pattern) => pattern.test(value))) return true
+  if (/^https?:\/\//i.test(value)) return false
+  if (value.length < 32 || /\s/.test(value)) return false
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/]
+    .filter((pattern) => pattern.test(value)).length
+  return classes >= 3
+}
+
+/** Q: 共通情報の状態の呼び名。一覧と編集で同じ言葉を使う。 */
+export const COMMON_VAR_STATE_LABELS: Record<string, string> = {
+  draft: '下書き',
+  active: '使用中',
+  stopped: '止めた',
+  expired: '期限切れ',
 }

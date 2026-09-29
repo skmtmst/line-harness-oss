@@ -10,7 +10,10 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+/* R309: メニュー候補の料金は一覧・割当表と同じ共通表示にする。 */
+import { menuPriceLabel } from '../../lib/menu-price'
 import Select from '@/components/shared/select'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -39,6 +42,18 @@ export default function NewBookingStaffPage() {
   // N-411 本人勤務: 登録と同時にログインユーザーへ紐づけられるようにする。
   const [staffMemberId, setStaffMemberId] = useState('')
   const [members, setMembers] = useState<StaffMember[]>([])
+  /**
+   * R310: 登録は済んだが担当メニューの設定が残っているスタッフのID。
+   * ここにIDがある間は createStaff を二度と呼ばず、残りの割当だけを
+   * やり直す（予約メニュー作成の DEEP-16 と同じ形）。同名スタッフの
+   * 二重登録を防ぐ。
+   */
+  const [createdStaffId, setCreatedStaffId] = useState<string | null>(null)
+
+  // R310: 控えた登録済みIDは作ったアカウントのもの。切替後は使い回さない。
+  useEffect(() => {
+    setCreatedStaffId(null)
+  }, [selectedAccountId])
 
   useEffect(() => {
     if (!selectedAccountId) return
@@ -113,8 +128,13 @@ export default function NewBookingStaffPage() {
       description="お客様が予約するときに指名できる担当者を登録します。"
       showHeader={false}
       parent={['予約設定', '/booking/menus?tab=staff']}
-      saveLabel="スタッフを登録"
+      saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを登録'}
       variant="v6"
+      statusLabel={
+        createdStaffId
+          ? 'スタッフは登録済みです。担当メニューの設定が残っています'
+          : undefined
+      }
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
         const parsed = parseBookingStaffInput(staffInput(), 'create')
@@ -123,28 +143,43 @@ export default function NewBookingStaffPage() {
           return '担当メニューを1つ以上選んでください。0だと予約画面に表示されません'
         return null
       }}
-      onReset={() => {
+      // R310: 割当が残っている間は「保存して続けて作る」を出さない。
+      // 続けて作るボタンが別スタッフの登録に見え、残りの割当を見失うため。
+      onReset={createdStaffId ? undefined : () => {
         setName('')
         setDisplayName('')
         setBio('')
         setOffered(new Set())
       }}
       onSave={async () => {
-        const parsed = parseBookingStaffInput(staffInput(), 'create')
-        if (!parsed.ok) throw new Error(parsed.error)
-        const res = await bookingApi.createStaff(selectedAccountId!, parsed.value)
+        // R310: 割当だけ失敗して戻ってきた再試行では、スタッフを作り直さない。
+        // 控えたIDを使い回して割当だけ送り直す。
+        let staffId = createdStaffId
+        if (staffId == null) {
+          const parsed = parseBookingStaffInput(staffInput(), 'create')
+          if (!parsed.ok) throw new Error(parsed.error)
+          const res = await bookingApi.createStaff(selectedAccountId!, parsed.value)
+          staffId = res.id
+        }
         // 担当メニューは staff_menus に入る。作ってから流し込む。
-        await bookingApi.putStaffMenus(
-          selectedAccountId!,
-          res.id,
-          menus.map((m) => ({
-            menu_id: m.id,
-            is_offered: offered.has(m.id),
-            override_duration_minutes: null,
-            override_price: null,
-          })),
-        )
-        return res.id
+        try {
+          await bookingApi.putStaffMenus(
+            selectedAccountId!,
+            staffId,
+            menus.map((m) => ({
+              menu_id: m.id,
+              is_offered: offered.has(m.id),
+              override_duration_minutes: null,
+              override_price: null,
+            })),
+          )
+        } catch {
+          // スタッフ自体は残っている。IDを控えて割当のやり直しに備える。
+          setCreatedStaffId(staffId)
+          throw new Error('スタッフは登録できましたが、担当メニューの設定に失敗しました。入力は残っています。「割当をやり直す」を押してください。')
+        }
+        setCreatedStaffId(null)
+        return staffId
       }}
       aside={
         <>
@@ -271,18 +306,15 @@ export default function NewBookingStaffPage() {
           <ul className="space-y-1.5">
             {menus.map((m) => (
               <li key={m.id}>
-                <label className="border-hairline hover:bg-canvas-sunken flex cursor-pointer items-center gap-2 rounded-md border p-2.5">
-                  <input
-                    type="checkbox"
-                    checked={offered.has(m.id)}
-                    onChange={() => toggle(m.id)}
-                    className="accent-accent"
-                  />
-                  <span className="text-ink text-sm">{m.name}</span>
+                <Checkbox
+                  checked={offered.has(m.id)}
+                  onCheckedChange={() => toggle(m.id)}
+                  className="border-hairline hover:bg-canvas-sunken w-full rounded-md border p-2.5"
+                ><span className="flex w-full items-center gap-2"><span className="text-ink text-sm">{m.name}</span>
                   <span className="text-ink-faint ml-auto text-xs tabular-nums">
-                    {m.duration_minutes}分 / ¥{m.base_price.toLocaleString()}
-                  </span>
-                </label>
+                    {m.duration_minutes}分 / {menuPriceLabel(m)}
+                  </span></span>
+                </Checkbox>
               </li>
             ))}
           </ul>
@@ -304,35 +336,17 @@ export default function NewBookingStaffPage() {
           </p>
         </Field>
 
-        <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
-            checked={isDesignationOptional}
-            onChange={(e) => setIsDesignationOptional(e.target.checked)}
-            className="accent-accent mt-0.5"
-          />
-          <span>
-            <span className="text-ink text-sm">「指名なし」の枠にも含める</span>
-            <span className="text-ink-faint block text-xs">
-              お客様が担当者を選ばなかったときの割り当て対象になります。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={isDesignationOptional}
+          onCheckedChange={setIsDesignationOptional}
+          description="お客様が担当者を選ばなかったときの割り当て対象になります。"
+        >「指名なし」の枠にも含める</Checkbox>
 
-        <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            className="accent-accent mt-0.5"
-          />
-          <span>
-            <span className="text-ink text-sm">登録したらすぐ予約を受ける</span>
-            <span className="text-ink-faint block text-xs">
-              オフにすると予約画面に表示されません。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={isActive}
+          onCheckedChange={setIsActive}
+          description="オフにすると予約画面に表示されません。"
+        >登録したらすぐ予約を受ける</Checkbox>
 
         <Field
           label="ログインユーザーとの紐づけ"

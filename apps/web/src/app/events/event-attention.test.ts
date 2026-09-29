@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import type { EventListItem } from '@/lib/api'
 import {
   daysUntilEvent,
+  daysUntilIso,
   describeBookingCapacity,
+  eventRowState,
+  isLowApplication,
   summarizeEventAttention,
 } from './event-attention'
 
@@ -84,5 +87,44 @@ describe('イベント予約の行動につながる帯', () => {
     expect(describeBookingCapacity(6, 10)).toBe('定員 10 ・ 残り4')
     expect(describeBookingCapacity(10, 10)).toBe('定員 10 ・ 満席です')
     expect(describeBookingCapacity(0, null)).toBe('定員なし')
+  })
+
+  it('R81: 公開済みでも今後の枠が無ければ終了にする', () => {
+    const base = { total_capacity: 5, total_active: 0 }
+    expect(eventRowState({ ...base, is_published: 0, next_slot_starts_at: '2026-08-27T00:00:00.000Z' })).toBe('draft')
+    expect(eventRowState({ ...base, is_published: 1, next_slot_starts_at: null })).toBe('ended')
+    expect(eventRowState({ ...base, is_published: 1, next_slot_starts_at: '2026-08-27T00:00:00.000Z', total_active: 5 })).toBe('full')
+    expect(eventRowState({ ...base, is_published: 1, next_slot_starts_at: '2026-08-27T00:00:00.000Z' })).toBe('open')
+  })
+
+  it('U: 保存する状態が正本で、満席だけが計算の札', () => {
+    const base = { total_capacity: 5, total_active: 0, next_slot_starts_at: '2026-08-27T00:00:00.000Z' }
+    expect(eventRowState({ ...base, is_published: 1, lifecycle_status: 'paused' })).toBe('paused')
+    expect(eventRowState({ ...base, is_published: 0, lifecycle_status: 'cancelled' })).toBe('cancelled')
+    expect(eventRowState({ ...base, is_published: 1, lifecycle_status: 'ended' })).toBe('ended')
+    expect(eventRowState({ ...base, is_published: 1, lifecycle_status: 'published' })).toBe('open')
+    // 保存する状態に「満席」は無い。満席は数えた札。
+    expect(eventRowState({ ...base, is_published: 1, lifecycle_status: 'published', total_active: 5 })).toBe('full')
+  })
+
+  it('U: 申し込みが少ない札は集計と同じ決め方', () => {
+    const nearFew = {
+      lifecycle_status: 'published',
+      is_published: 1,
+      next_slot_starts_at: '2026-08-28T00:00:00.000Z',
+      total_capacity: 10,
+      total_active: 4,
+    } as const
+    expect(isLowApplication({ ...nearFew }, NOW)).toBe(true)
+    // 満席・下書き・遠い回には付けない
+    expect(isLowApplication({ ...nearFew, total_active: 10 }, NOW)).toBe(false)
+    expect(isLowApplication({ ...nearFew, lifecycle_status: 'draft', is_published: 0 }, NOW)).toBe(false)
+    expect(isLowApplication({ ...nearFew, next_slot_starts_at: '2026-09-30T00:00:00.000Z' }, NOW)).toBe(false)
+  })
+
+  it('R79/R80: 集計の日付からあと何日かを数えられる', () => {
+    expect(daysUntilIso('2026-08-28T00:00:00.000Z', NOW)).toBe(3)
+    expect(daysUntilIso(null, NOW)).toBeNull()
+    expect(daysUntilIso('not-a-date', NOW)).toBeNull()
   })
 })

@@ -12,8 +12,10 @@ describe('V6回答フォーム削除確認 gBp2J', () => {
     expect(PAGE).toContain('<ConfirmDialog')
     expect(PAGE).toContain('displayFormName(deleteTarget.name)')
     // 削除は行に直に置かず、…メニューの中の危ない操作から確認ダイアログへつなぐ。
-    expect(PAGE).toContain("label: '削除する'")
-    expect(PAGE).toContain("tone: 'danger'")
+    // R27 で共通の RowActions へ寄せた。赤と区切りは部品側が付ける。
+    expect(PAGE).toContain('<RowActions')
+    expect(PAGE).toContain("destructiveItem={{ id: 'delete', label: '削除する'")
+    expect(PAGE).not.toContain("tone: 'danger'")
   })
 
   it('影響確認を先に読み、公開中・回答あり・利用中はアーカイブへ分ける', () => {
@@ -33,8 +35,19 @@ describe('V6回答フォーム削除確認 gBp2J', () => {
 
   it('APIが失敗したときは成功扱いせず安全な日本語をダイアログ内に出す', () => {
     expect(PAGE).toContain('if (!result.success) throw new Error')
+    /*
+     * R199: 完全削除と保管で文言を分ける。削除したのに「アーカイブできなかった」と
+     * 出すと結果を誤認する。どちらもダイアログ内の deleteError に出す。
+     */
+    expect(PAGE).toContain('この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     expect(PAGE).toContain('この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
     expect(PAGE).toContain('error={deleteError}')
+  })
+
+  it('R199: 応答を失ったときは読み直し、既に消えていれば成功として閉じる', () => {
+    // 削除が通ったのに失敗表示になるのを防ぐ。取得口で404なら行を外して閉じる。
+    expect(PAGE).toContain('await api.forms.get(targetId, selectedAccountId)')
+    expect(PAGE).toContain('checkError instanceof ApiError && checkError.status === 404')
   })
 
   it('受付だけ止めるときは回答と一覧を残す', () => {

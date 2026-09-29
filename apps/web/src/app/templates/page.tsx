@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { MoreAction } from '@/components/shared/row-actions'
@@ -12,16 +12,18 @@ import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import StaffAssetList from './staff-asset-list'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import MobileTableCards from '@/components/shared/mobile-table-cards'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
+import { validateFlexContent } from '@line-crm/shared'
 import {
   createBlockedReason,
   failureOf,
@@ -42,6 +44,8 @@ interface Template {
   category: string
   messageType: string
   messageContent: string
+  /** R194: 最新の下書き本文。公開版だけのときは null。 */
+  draftMessageContent?: string | null
   /** 置き場。未分類は null。一覧の口が返している。 */
   folderId: string | null
   question: TemplateQuestion | null
@@ -51,6 +55,10 @@ interface Template {
   tapCount: number
   monthlySendCount: number | null
   totalSendCount: number | null
+  /** 347: 公開待ちの下書きがあるか。 */
+  hasDraft?: boolean
+  /** 347: 最後に公開した日時。未公開はnull。 */
+  publishedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -79,12 +87,20 @@ interface TemplateDetail {
     reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
     richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
     trackedLinks: Array<{ id: string; name: string }>
+    /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。来ない古い応答では空扱い。 */
+    reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>
   }
   createdAt: string
   updatedAt: string
 }
 
-type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'question' | 'unused'
+/*
+ * R135: 種類タブ（メッセージ／質問）と絞り込み札（すべて／未使用など）は
+ * 別の状態で持つ。以前は1つの `typeFilter` で両方を表していたため、
+ * 質問タブで「未使用」を押すと種類が上書きされ、メッセージタブへ
+ * 切り替わって質問以外が混ざっていた。札は種類を変えない。
+ */
+type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'unused'
 
 /*
  * 種類の名前は `./template-message-type` に一本化した。
@@ -98,6 +114,15 @@ const typeBadgeColor: Record<string, string> = {
   image: 'bg-info-bg text-info',
   carousel: 'bg-amber-100 text-amber-700',
   question: 'bg-accent-soft text-accent-deep',
+}
+
+/** 種別の札。一覧の表とスマホのカードで同じ顔にする。 */
+function TemplateKindBadge({ kind }: { kind: string }) {
+  return (
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+      {messageTypeText(kind)}
+    </span>
+  )
 }
 
 /** 今年は「1月13日」、それ以外は「2025年1月13日」。時刻は title で見せる（★V7：1行に収める）。 */
@@ -141,6 +166,8 @@ export default function TemplatesPage() {
   // 案内どおり、名前・本文・差し込んでいる項目を同じ検索欄で絞る。
   const [templateQuery, setTemplateQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  /* R135: 質問タブが選ばれているか。絞り込み札とは独立に動く。 */
+  const [questionTab, setQuestionTab] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
   /*
@@ -181,6 +208,12 @@ export default function TemplatesPage() {
 
   // Drawer
   const [drawerId, setDrawerId] = useState<string | null>(null)
+  // 削除できない案内の窓も共通の約束へ: Escapeで閉じる・Tabは窓の中・
+  // 閉じたら起点へ戻す。
+  const blockedPanelRef = useOverlayFocus(blockedDelete !== null, () => {
+    setBlockedDelete(null)
+    setDrawerId(null)
+  })
   const [drawerData, setDrawerData] = useState<TemplateDetail | null>(null)
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [drawerError, setDrawerError] = useState<string | null>(null)
@@ -244,24 +277,34 @@ export default function TemplatesPage() {
   useEffect(() => { load() }, [load])
 
   /*
-   * PERF-04: 種類タブの件数は集計専用の口で1回だけ取る。
+   * PERF-04: 種類タブの件数は集計専用の口で取る。
    * 以前は4種類それぞれの素材一覧（各行のpayload込み）を取って
    * 件数を数えていた。中身は種類の節を開いたとき loadAssets が取る。
+   *
+   * R135: 作った直後はタブの件数を取り直す。以前はアカウントを
+   * 切り替えるまで取り直さず、9枚のカルーセルを作ってもタブが
+   * 0件のままだった。素材の管理（`BroadcastAssetManager`）が
+   * 変わったことを `onChanged` で知らせる。
    */
-  useEffect(() => {
-    let cancelled = false
-    if (!selectedAccountId) {
+  const loadAssetCounts = useCallback(async () => {
+    const accountId = selectedAccountId
+    if (!accountId) {
       setAssetCounts({})
-      return () => { cancelled = true }
+      return
     }
-    void api.broadcastMessageAssets.counts({ accountId: selectedAccountId })
-      .then((result) => {
-        if (cancelled || !result.success) return
-        setAssetCounts(result.data)
-      })
-      .catch(() => undefined)
-    return () => { cancelled = true }
+    try {
+      const result = await api.broadcastMessageAssets.counts({ accountId })
+      // 切り替えた後に前の要求が返ってきても採用しない（N-147）。
+      if (activeAccountRef.current !== accountId) return
+      if (result.success) setAssetCounts(result.data)
+    } catch {
+      /* 件数が取れなくても一覧は出す。黙って古い件数のままにする。 */
+    }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadAssetCounts()
+  }, [loadAssetCounts])
 
   // Drawer fetch
   useEffect(() => {
@@ -296,9 +339,16 @@ export default function TemplatesPage() {
     が替わったときだけ検索索引を作り、入力中は正規化済み文字列だけを比べる。
     差し込み項目の文字列は messageContent 自体に含まれるため、別の正規表現走査は不要。
   */
+  /*
+    R194: 管理一覧の抜粋・検索は「いまの最新」を対象にする。公開版しか無い
+    テンプレートは公開版、編集中の下書きがあるものは下書きを読む
+    （送信で選ぶ側は公開版だけを見る決まりは変えない）。旧公開版にも
+    合うよう messageContent も索引に残す。
+  */
+  const latestContentOf = (t: Template) => t.draftMessageContent ?? t.messageContent
   const templateSearchIndex = useMemo(() => templates.map((template) => ({
     template,
-    normalizedSearchText: [template.name, template.messageContent]
+    normalizedSearchText: [template.name, template.messageContent, template.draftMessageContent ?? '']
       .map(normalizeTemplateSearchText)
       .join('\0'),
   })), [templates])
@@ -315,13 +365,16 @@ export default function TemplatesPage() {
     */
     if (selectedCategory === 'unfiled' && t.folderId !== null) return []
     if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return []
+    /* R135: 種類タブの絞り込み。メッセージタブに質問を混ぜない。 */
+    if (questionTab && !t.question) return []
+    if (!questionTab && t.question) return []
     if (typeFilter === 'unused' && t.usageCount !== 0) return []
-    if (typeFilter === 'question' && !t.question) return []
     if (typeFilter === 'single' && (t.question !== null || t.messageType === 'carousel')) return []
-    if (typeFilter === 'multiple' && t.messageType !== 'carousel' && !t.messageContent.includes('\n\n')) return []
-    if (typeFilter === 'variables' && !t.messageContent.includes('{{')) return []
+    const content = latestContentOf(t)
+    if (typeFilter === 'multiple' && t.messageType !== 'carousel' && !content.includes('\n\n')) return []
+    if (typeFilter === 'variables' && !content.includes('{{')) return []
     return [t]
-  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, typeFilter])
+  }), [normalizedTemplateQuery, questionTab, selectedCategory, templateSearchIndex, typeFilter])
 
   /** フォルダを読み直す。並び順は API の `displayOrder` に従う。アカウント単位。 */
   const loadFolders = useCallback(async () => {
@@ -380,6 +433,8 @@ export default function TemplatesPage() {
       if (!res.success) throw new Error(res.error ?? '移せませんでした')
       setTemplates((prev) => prev.map((item) => item.id === template.id ? { ...item, folderId } : item))
       setDrawerData((prev) => prev?.id === template.id ? { ...prev, folderId } : prev)
+      // R195: 移動元・移動先どちらの件数も変わるので、フォルダの数も読み直す。
+      await loadFolders()
     } catch (cause) {
       setFolderError(cause instanceof Error ? cause.message : '置き場を変えられませんでした。')
     } finally {
@@ -418,7 +473,9 @@ export default function TemplatesPage() {
       if (res.success) {
         setShowCreate(false)
         setForm({ name: '', category: 'general', messageType: 'text', messageContent: '' })
+        // R195: 新しく作った分、未分類の件数も増えるので合わせて読み直す。
         load()
+        void loadFolders()
       } else {
         setFormError(res.error)
       }
@@ -511,7 +568,8 @@ export default function TemplatesPage() {
       if (!res.success) throw new Error(res.error)
       setPendingDelete(null)
       if (drawerId === target.id) setDrawerId(null)
-      await load()
+      // R195: 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
+      await Promise.all([load(), loadFolders()])
     } catch {
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
       setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -593,6 +651,13 @@ export default function TemplatesPage() {
       label: `リマインダ「${usage.reminderName}」`,
       icon: Workflow,
     })),
+    // R347: 旧公開版に固定された登録は版と状態を出す。消すと本文が控えに変わる。
+    ...(drawerData.usedBy.reminderEnrollments ?? []).map((usage) => ({
+      key: `reminder-enrollment-${usage.enrollmentId}`,
+      href: `/reminders/detail?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」第${usage.versionNumber}版（${usage.enrollmentStatus === 'cancelled' ? '取消ずみ' : '送信待ち'}）`,
+      icon: Workflow,
+    })),
     ...drawerData.usedBy.richMenuAreas.map((usage) => ({
       key: `rich-menu-${usage.areaId}`,
       href: `/rich-menus/edit?id=${usage.groupId}`,
@@ -613,6 +678,7 @@ export default function TemplatesPage() {
       + reminderStepUsages.length
       + richMenuAreaUsages.length
       + trackedLinkUsages.length
+      + (drawerData.usedBy.reminderEnrollments ?? []).length
     : 0
 
   return (
@@ -623,8 +689,8 @@ export default function TemplatesPage() {
             {
               label: 'メッセージ',
               count: loading ? undefined : templates.filter((item) => !item.question).length,
-              current: activeSection === 'message' && typeFilter !== 'question',
-              onClick: () => { setActiveSection('message'); setTypeFilter('all'); setShowCreate(false) },
+              current: activeSection === 'message' && !questionTab,
+              onClick: () => { setActiveSection('message'); setQuestionTab(false); setTypeFilter('all'); setShowCreate(false) },
             },
             {
               label: 'カルーセル',
@@ -641,8 +707,8 @@ export default function TemplatesPage() {
             {
               label: '質問',
               count: loading ? undefined : templates.filter((item) => Boolean(item.question)).length,
-              current: activeSection === 'message' && typeFilter === 'question',
-              onClick: () => { setActiveSection('message'); setTypeFilter('question'); setShowCreate(false) },
+              current: activeSection === 'message' && questionTab,
+              onClick: () => { setActiveSection('message'); setQuestionTab(true); setTypeFilter('all'); setShowCreate(false) },
             },
             {
               label: 'クーポン',
@@ -838,7 +904,7 @@ export default function TemplatesPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
-              <SelectField value={form.messageType} onChange={(e) => setForm({ ...form, messageType: e.target.value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas" />
+              <Select aria-label="タイプ" value={form.messageType} onChange={(value) => setForm({ ...form, messageType: value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} size="full" />
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
@@ -941,12 +1007,61 @@ export default function TemplatesPage() {
           description={`${templates.length}件のうち0件が一致しました。検索語か絞り込みを変えてください。`}
         />
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          {/* U044: 767px以下は data-template-list 宛の畳み込みCSSで
-              1件ずつのカードに変わる（templates-v6.module.css）。
-              右端が画面外へ逃げる表をそのまま小さくしても、項目と操作を
-              同時に読めないため。 */}
-          <div className="overflow-x-auto" data-template-list>
+        <>
+        {/*
+          ★V7 監査の直し A（`LD96g`）：768px 以上は表、767px 以下は共通の
+          一覧カード（`MobileTableCards`）。以前のCSS畳み込みは、名前欄の
+          `max-w-0` が残って名前が消える原因だったのでやめる。
+        */}
+        <MobileTableCards
+          items={filteredTemplates.map((t) => ({
+            id: t.id,
+            name: t.name,
+            status: (
+              <span className="inline-flex items-center gap-1">
+                <TemplateKindBadge kind={t.question ? 'question' : t.messageType} />
+                {t.hasDraft && (
+                  <StatusBadge size="compact" tone={t.publishedAt == null ? 'warning' : 'info'}>
+                    {t.publishedAt == null ? '未公開' : '編集中'}
+                  </StatusBadge>
+                )}
+              </span>
+            ),
+            summary: `${latestContentOf(t).slice(0, 60)}${latestContentOf(t).length > 60 ? '...' : ''}`,
+            metric: typeof t.usageCount !== 'number' ? '使用先を確認できません' : t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`,
+            primaryAction: canMutateTemplates ? (
+              <Button
+                href={
+                  t.question
+                    ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
+                    : `/templates/edit?id=${encodeURIComponent(t.id)}`
+                }
+              >
+                編集
+              </Button>
+            ) : undefined,
+            moreAction: (
+              <span className="relative flex h-9 w-9 items-center justify-center">
+                <MoreAction
+                  label={`${t.name}のその他操作`}
+                  aria-expanded={openRowMenuId === t.id}
+                  onClick={() =>
+                    setOpenRowMenuId((current) => (current === t.id ? null : t.id))
+                  }
+                />
+                <ActionMenu
+                  open={openRowMenuId === t.id}
+                  ariaLabel={`${t.name}の操作`}
+                  onClose={() => setOpenRowMenuId(null)}
+                  items={rowMenuItems(t)}
+                />
+              </span>
+            ),
+            onSelect: () => setDrawerId(t.id),
+          }))}
+        />
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden hidden md:block">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
                 <TableHeadRow>
@@ -979,14 +1094,20 @@ export default function TemplatesPage() {
                     {/* 1列目は表の幅に合わせて縮む（以前は抜粋が最大 448px で、1440px でも表が右へはみ出した）。 */}
                     <td className="w-2/5 max-w-0 px-4 py-3">
                       <p className="truncate text-sm font-medium text-ink" title={t.name}>{t.name}</p>
-                      <p className="text-micro text-ink-faint mt-0.5 truncate">
-                        {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
+                      {/* R194: 抜粋は最新（下書きがあれば下書き）。どの版か分かるように札を添える。 */}
+                      <p className="text-micro text-ink-faint mt-0.5 flex min-w-0 items-center gap-1.5">
+                        {t.hasDraft && (
+                          <StatusBadge size="compact" tone={t.publishedAt == null ? 'warning' : 'info'}>
+                            {t.publishedAt == null ? '未公開' : '編集中'}
+                          </StatusBadge>
+                        )}
+                        <span className="truncate">
+                          {latestContentOf(t).slice(0, 60)}{latestContentOf(t).length > 60 ? '...' : ''}
+                        </span>
                       </p>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                        {messageTypeText(t.question ? 'question' : t.messageType)}
-                      </span>
+                      <TemplateKindBadge kind={t.question ? 'question' : t.messageType} />
                       {/*
                         **`category` は内部の値**（`text` `general` など）。
                         そのまま出すと、種類の欄に英語が2つ並ぶ。
@@ -1055,16 +1176,28 @@ export default function TemplatesPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* Drawer */}
       {drawerId && !blockedDelete && (
         <>
+          {/*
+            ★V7 監査の直し：この面の重なり順は共通の最上層の器にそろえる。
+            固定のモバイル帯（`sidebar.module.css` の `.mobileHeader`・z 50）より
+            下（z-30/z-40）だったので、スマホで面いっぱいに開いたときに上の帯が
+            頭（×のある行）に被さっていた。共通の右面（`drawer.module.css` の
+            `.overlay`）と同じ 80 に上げ、閉じる操作をいつも見える所に残す。
+          */}
           <div
-            className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+            className="fixed inset-0 bg-black/30 lg:hidden"
+            style={{ zIndex: 80 }}
             onClick={() => setDrawerId(null)}
           />
-          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline z-40 overflow-y-auto">
+          <div
+            className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline overflow-y-auto"
+            style={{ zIndex: 80 }}
+          >
             <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-canvas z-10">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {editName !== null ? (
@@ -1139,14 +1272,14 @@ export default function TemplatesPage() {
                       <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
                         置き場
                       </label>
-                      <SelectField
+                      <Select
                         id="template-folder-select"
                         aria-label="置き場"
                         value={drawerData.folderId ?? ''}
                         disabled={movingId === drawerData.id}
-                        onChange={(event) => void moveTemplate(
+                        onChange={(value) => void moveTemplate(
                           drawerData,
-                          event.target.value === '' ? null : event.target.value,
+                          value === '' ? null : value,
                         )}
                         options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                       />
@@ -1177,11 +1310,21 @@ export default function TemplatesPage() {
                       </div>
                     ) : drawerData.messageType === 'flex' ? (
                       (() => {
-                        try {
-                          return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
-                        } catch {
-                          return <p className="text-danger text-xs">カード型の中身を読めませんでした。作り直すか、テキストで作り直してください。</p>
+                        /*
+                         * R249: 描画部品は壊れた内容でも例外を出さないので、
+                         * try/catch では形式の誤いを拾えない。検査で先に
+                         * 見分け、直し方（下の編集欄）と合わせて知らせる。
+                         */
+                        const flexError = validateFlexContent('flex', drawerData.messageContent)
+                        if (flexError) {
+                          return (
+                            <div role="alert">
+                              <p className="text-danger text-xs font-semibold">{flexError}</p>
+                              <p className="text-ink-secondary mt-1 text-xs">下の「内容 / JSON 編集」で直して保存してください。このままでは公開できません。</p>
+                            </div>
+                          )
                         }
+                        return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
                       })()
                     ) : drawerData.messageType === 'image' ? (
                       (() => {
@@ -1317,7 +1460,7 @@ export default function TemplatesPage() {
       )}
       {blockedDelete !== null ? (
         <div className="fixed inset-0 flex items-center justify-center bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="M9cij">
-          <section className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
+          <section ref={blockedPanelRef} className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
             <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
               <h2 id="blocked-template-title" className="text-lead font-bold text-ink">使用中のテンプレートは削除できません</h2>
               <button
@@ -1454,7 +1597,7 @@ export default function TemplatesPage() {
       </div>
       </div>
       </> : canMutateTemplates ? (
-        <BroadcastAssetManager kind={activeSection} />
+        <BroadcastAssetManager kind={activeSection} onChanged={() => void loadAssetCounts()} />
       ) : (
         /*
          * N-144: 資産タブの作成・編集・削除APIも owner/admin 限定。

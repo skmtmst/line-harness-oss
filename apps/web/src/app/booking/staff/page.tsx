@@ -8,10 +8,13 @@ import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '
 import ImageUploader from '@/components/shared/image-uploader'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { api, bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -154,23 +157,26 @@ export default function BookingStaffPage() {
           <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ スタッフを作る」から最初のスタッフを追加してください。" />
         </div>
       ) : (
-        <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+        <DataTable data-design="Table">
               <thead>
-                <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">スタッフ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">役職</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">指名なし枠</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">並び順</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">有効</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">操作</th>
-                </tr>
+                <TableHeadRow>
+                  {/* 名前は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
+                  <Th>スタッフ</Th>
+                  <Th style={{ width: '16%' }}>役職</Th>
+                  <Th style={{ width: '14%' }} align="center">指名なし枠</Th>
+                  <Th style={{ width: '10%' }} align="right">並び順</Th>
+                  <Th style={{ width: '10%' }} align="center">有効</Th>
+                  {/*
+                    操作列は固定幅（128px）。割合（24%）では右に大きく空く。
+                    中身（編集＋…約118px）に合わせる。残りは割合と自動の列で吸う。
+                  */}
+                  <Th align="right" className="w-32">操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {items.map((s) => (
-                  <tr key={s.id} className="hover:bg-canvas-sunken">
-                    <td className="px-4 py-3 text-sm">
+                  <Tr key={s.id} interactive>
+                    <Td>
                       <div className="flex items-center gap-3">
                         {s.profile_image_url ? (
                           <img
@@ -190,24 +196,24 @@ export default function BookingStaffPage() {
                           )}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary">{s.role ?? '-'}</td>
-                    <td className="px-4 py-3 text-center">
+                    </Td>
+                    <Td className="text-ink-secondary">{s.role ?? '-'}</Td>
+                    <Td align="center">
                       {s.is_designation_optional ? (
                         <span className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs">指名なし</span>
                       ) : (
                         <span className="text-xs text-gray-300">-</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right tabular-nums text-ink-faint">{s.sort_order}</td>
-                    <td className="px-4 py-3 text-center">
+                    </Td>
+                    <Td align="right" className="tabular-nums text-ink-faint">{s.sort_order}</Td>
+                    <Td align="center">
                       {s.is_active ? (
                         <span className="inline-block px-2 py-0.5 rounded bg-success-bg text-success text-xs">ON</span>
                       ) : (
                         <span className="inline-block px-2 py-0.5 rounded bg-canvas-sunken text-ink-faint text-xs">OFF</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    </Td>
+                    <ActionCell>
                       {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、メニューの中の危ない操作へ。 */}
                       <div className="relative inline-flex items-center justify-end gap-1.5">
                         {canManageStaff ? (
@@ -243,13 +249,11 @@ export default function BookingStaffPage() {
                           </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </div>
+        </DataTable>
       )}
 
       {editing && <Modal staff={editing} onSave={save} onClose={() => setEditing(null)} />}
@@ -285,6 +289,8 @@ function Modal({
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
+  const panelRef = useOverlayFocus(true, onClose, saving)
   // N-411 本人勤務: 予約スタッフをログインユーザーへ紐づけるための一覧。
   const [members, setMembers] = useState<StaffMember[]>([])
 
@@ -321,9 +327,9 @@ function Modal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
-          <h2 className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
+          <h2 id="booking-staff-modal-title" className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
@@ -388,24 +394,14 @@ function Modal({
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(form.is_designation_optional)}
-              onChange={(e) => set('is_designation_optional', e.target.checked ? 1 : 0)}
-              className="rounded"
-            />
-            <span>「指名なし」枠（仮想スタッフ）</span>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(form.is_active)}
-              onChange={(e) => set('is_active', e.target.checked ? 1 : 0)}
-              className="rounded"
-            />
-            <span>有効（顧客に表示する）</span>
-          </label>
+          <Checkbox
+            checked={Boolean(form.is_designation_optional)}
+            onCheckedChange={(checked) => set('is_designation_optional', checked ? 1 : 0)}
+          >「指名なし」枠（仮想スタッフ）</Checkbox>
+          <Checkbox
+            checked={Boolean(form.is_active)}
+            onCheckedChange={(checked) => set('is_active', checked ? 1 : 0)}
+          >有効（顧客に表示する）</Checkbox>
           <Field label="ログインユーザー（本人の勤務）">
             <Select
               aria-label="ログインユーザーとの紐づけ"

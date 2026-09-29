@@ -325,6 +325,9 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   // 共通アップローダ。受信箱の 1 対 1 返信など staff の付与機能から使う。
   // 読み取りは公開の /images/* 経由で、鍵は機能 API の応答で渡る。
   ['POST', '/api/images'],
+  // 失敗文面の対応表。エラー表示は役割を問わず全スタッフに必要な
+  // シェル機能で、内容は文言の対応表だけ（秘密値・個人情報を含まない）。
+  ['GET', '/api/error-messages'],
 ];
 
 /**
@@ -406,6 +409,14 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['POST', '/api/restaurant-test/google/hours/propose'],
   ['POST', '/api/restaurant-test/google/profile/propose'],
   ['GET', '/api/restaurant-test/google/changes'],
+  // Googleビジネス第3段（GB-4〜GB-14）：担当者も投稿を読み、下書きを作れる。Googleへの送信・削除は店舗管理者以上。
+  ['GET', '/api/restaurant-test/google/posts'],
+  ['POST', '/api/restaurant-test/google/posts'],
+  ['POST', '/api/restaurant-test/google/posts/sync'],
+  // Googleビジネス第4段（GB-9）：パフォーマンスは読み取りのみ。担当者も見られる。
+  // performance/sync は口コミ・投稿・プロフィールのsyncと同じくGoogleから読んで自DBに書くだけ（Googleへの書き込みは無い）ため、担当者にも許可する。
+  ['GET', '/api/restaurant-test/google/performance'],
+  ['POST', '/api/restaurant-test/google/performance/sync'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
@@ -413,11 +424,15 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
+  ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
   ['GET', /^\/api\/restaurant-test\/google\/changes\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/changes\/[^/]+\/cancel$/],
+  ['GET', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
+  ['PUT', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/google\/posts\/[^/]+\/cancel$/],
   ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
 ];
 

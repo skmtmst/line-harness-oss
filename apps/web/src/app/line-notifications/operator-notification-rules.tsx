@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, Plus, Search, X } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import NoteBar from '@/components/shared/note-bar'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
@@ -46,6 +48,8 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
   const [notice, setNotice] = useState('')
   const [exportReason, setExportReason] = useState('')
   const [showExport, setShowExport] = useState(false)
+  // 書き出し中は×と同じくEscapeでも閉じない。
+  const exportPanelRef = useOverlayFocus(showExport, () => setShowExport(false), busy === 'csv')
 
   const load = useCallback(async () => {
     if (!lineAccountId) { setRules([]); setSummary(null); setState('ready'); return }
@@ -152,7 +156,9 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
 
     <div className="flex flex-wrap items-center gap-2">
       <label className="flex min-w-72 max-w-md flex-1 items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2"><Search aria-hidden="true" size={17} className="text-ink-faint" /><span className="sr-only">お知らせを検索</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お知らせ名・きっかけで探す" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
-      {(['all', 'published', 'draft', 'missing'] as const).map((value) => <label key={value}><input className="peer sr-only" type="radio" name="operator-filter" checked={filter === value} onChange={() => setFilter(value)} /><span className="inline-flex min-h-9 cursor-pointer items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-deep">{{ all: `すべて ${summary?.total ?? '—'}`, published: `出している ${summary?.published ?? '—'}`, draft: `止めている ${summary?.stopped ?? '—'}`, missing: `受け取る人がいない ${summary?.missingRecipients ?? '—'}` }[value]}</span></label>)}
+      <RadioCardGroup legend="公開状態で絞り込む" className="flex flex-wrap gap-2">
+        {(['all', 'published', 'draft', 'missing'] as const).map((value) => <RadioCard key={value} name="operator-filter" value={value} checked={filter === value} onChange={() => setFilter(value)} title={{ all: `すべて ${summary?.total ?? '—'}`, published: `出している ${summary?.published ?? '—'}`, draft: `止めている ${summary?.stopped ?? '—'}`, missing: `受け取る人がいない ${summary?.missingRecipients ?? '—'}` }[value]} />)}
+      </RadioCardGroup>
       <span className="rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">よく届く順</span>
     </div>
 
@@ -173,6 +179,6 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
         <Td><div className="flex flex-wrap items-center gap-2"><Button onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>{rule.status === 'draft' ? <Button variant="secondary" onClick={() => void publish(rule)} disabled={busy === rule.id || rule.recipientCount === 0}>{rule.recipientCount === 0 ? '受け取る人を決める' : '公開'}</Button> : <Button onClick={() => void stop(rule)} disabled={busy === rule.id}>止める</Button>}</div></Td>
       </Tr>)}</tbody></DataTable>}
     {state === 'ready' && rules.length > 0 ? <div className="flex items-center justify-between"><ListRange total={summary?.total ?? rules.length} first={1} last={rules.length} /></div> : null}
-    {showExport ? <div role="dialog" aria-modal="true" aria-label="CSVを書き出す理由" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4"><div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-5 shadow-lg"><div className="flex items-start justify-between gap-3"><h2 className="font-bold text-ink">CSVを書き出す理由</h2><button type="button" onClick={() => setShowExport(false)} disabled={busy === 'csv'} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div><p className="mt-2 text-sm text-ink-secondary">個人情報を含むため、確認した目的を記録します。</p><input autoFocus value={exportReason} onChange={(event) => setExportReason(event.target.value)} className="mt-4 w-full rounded-control border border-hairline px-3 py-2 text-sm" placeholder="例：月次の運用確認" /><div className="mt-4 flex justify-end gap-2"><Button onClick={() => setShowExport(false)}>キャンセル</Button><Button variant="primary" onClick={() => void exportCsv()} disabled={!exportReason.trim() || busy === 'csv'}>書き出す</Button></div></div></div> : null}
+    {showExport ? <div role="dialog" aria-modal="true" aria-label="CSVを書き出す理由" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4"><div ref={exportPanelRef} className="w-full max-w-md rounded-card border border-hairline bg-canvas p-5 shadow-lg"><div className="flex items-start justify-between gap-3"><h2 className="font-bold text-ink">CSVを書き出す理由</h2><button type="button" onClick={() => setShowExport(false)} disabled={busy === 'csv'} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div><p className="mt-2 text-sm text-ink-secondary">個人情報を含むため、確認した目的を記録します。</p><input autoFocus value={exportReason} onChange={(event) => setExportReason(event.target.value)} className="mt-4 w-full rounded-control border border-hairline px-3 py-2 text-sm" placeholder="例：月次の運用確認" /><div className="mt-4 flex justify-end gap-2"><Button onClick={() => setShowExport(false)}>キャンセル</Button><Button variant="primary" onClick={() => void exportCsv()} disabled={!exportReason.trim() || busy === 'csv'}>書き出す</Button></div></div></div> : null}
   </section>
 }

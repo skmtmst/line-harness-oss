@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Select from '@/components/shared/select'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 
 const LABELS: Record<BroadcastAssetKind, { title: string; description: string; singular: string }> = {
@@ -20,8 +22,11 @@ const newCard = (): CardDraft => ({ id: crypto.randomUUID(), imageUrl: '', title
 /**
  * カルーセルのパネルの上限。
  *
- * **要件 11 §156 は「最大10パネル」。** 実装は 9 で止めていたので、
- * 10 枚目を作れないのに理由も出ない状態だった。
+ * **要件 11 §156 は「最大10パネル」。** 画面・API・LINE用変換で同じ数を使う。
+ * 2か所に散ると、画面では10枚まで作れるのに保存で止まる（監査 R141）。
+ *
+ * 「もっと見る」パネルも LINE の10列のうち1列を使う。付けるときは本文を
+ * 9枚までにして、数え方を欄のそばに出す。
  * 呼び名も設計・要件にそろえて「パネル」にする（実装だけ「カード」だった）。
  */
 const MAX_PANELS = 10
@@ -32,7 +37,12 @@ function formatAssetBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))}KB`
 }
 
-export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKind }) {
+/*
+ * R135: 素材を作り・直し・消ししたあと、親（テンプレート一覧の種類タブの
+ * 件数）へ知らせる口。以前は件数の取り直しがアカウント切替のときだけで、
+ * 作った直後のタブが0件のままになっていた。渡さなければ今までどおり。
+ */
+export default function BroadcastAssetManager({ kind, onChanged }: { kind: BroadcastAssetKind; onChanged?: () => void }) {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BroadcastMessageAsset[]>([])
   const [editing, setEditing] = useState<BroadcastMessageAsset | null>(null)
@@ -44,6 +54,11 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
   const [description, setDescription] = useState('')
   const [actionUrl, setActionUrl] = useState('')
   const [cards, setCards] = useState<CardDraft[]>([newCard()])
+  /*
+   * 末尾の「もっと見る」パネルを付けるか。以前は readOnly で固定の ON だった
+   * ので、見た目と操作の約束が食い違っていた（監査 R143）。OFF も保存する。
+   */
+  const [moreCard, setMoreCard] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -79,6 +94,7 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
       if (!res.success) throw new Error(res.error)
       setDeleteTarget(null)
       await load()
+      onChanged?.()
     } catch {
       // 生のAPIエラーは出さない。運用者が次に何をすればよいかだけを書く。
       setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -93,10 +109,17 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
   }, [kind, selectedAccountId])
   useEffect(() => { void load() }, [load])
 
-  const reset = () => { setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards([newCard()]); setError('') }
+  const reset = useCallback(() => { setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards([newCard()]); setMoreCard(true); setError('') }, [])
+  /*
+   * 種類・LINEアカウントが切り替わったら、編集中の対象を離す。
+   * 離さないと、別種類の一覧の上で前の素材の編集欄が残り、保存が
+   * 前の素材への更新要求になる（監査 R142）。
+   */
+  useEffect(() => { reset() }, [reset, kind, selectedAccountId])
   const startEdit = (item: BroadcastMessageAsset) => {
     setEditing(item); setShowForm(true); setName(item.name); setImageUrl(String(item.payload.imageUrl ?? '')); setImageFile(null); setDescription(String(item.payload.description ?? '')); setActionUrl(String(item.payload.actionUrl ?? ''))
     if (kind === 'card_message' && Array.isArray(item.payload.cards)) setCards(item.payload.cards as CardDraft[])
+    if (kind === 'card_message') setMoreCard(item.payload.moreCard !== false)
   }
   const upload = async (file: File, cardIndex?: number) => {
     if (!['image/jpeg','image/png'].includes(file.type) || file.size > 10 * 1024 * 1024) { setError('JPEG・PNG（10MB以下）を選択してください'); return }
@@ -107,10 +130,13 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
   }
 
   const clearImage = () => { setImageUrl(''); setImageFile(null) }
+  // 「もっと見る」も1列使うので、付けるとき本文は9枚まで（API と同じ数え方）。
+  const maxCards = moreCard && kind === 'card_message' ? MAX_PANELS - 1 : MAX_PANELS
   const save = async () => {
     if (!name.trim()) { setError('名前を入力してください'); return }
+    if (kind === 'card_message' && cards.length > maxCards) { setError(`「もっと見る」パネルを付けるときは${MAX_PANELS - 1}枚までです。パネルを減らすか、「もっと見る」を外してください`); return }
     const payload: Record<string, unknown> = kind === 'card_message'
-      ? { cards, moreCard: true }
+      ? { cards, moreCard }
       : kind === 'rich_message'
         ? { imageUrl, description, actionUrl, tapAreas: actionUrl ? [{ x: 0, y: 0, width: 100, height: 100, actionType: 'uri', value: actionUrl }] : [] }
         : { description, actionUrl }
@@ -123,6 +149,7 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
         : await api.broadcastMessageAssets.create({ lineAccountId: selectedAccountId || null, kind, name: name.trim(), payload })
       if (!res.success) { setError(res.error); return }
       reset(); await load()
+      onChanged?.()
     } catch { setError('保存できませんでした') } finally { setSaving(false) }
   }
 
@@ -164,7 +191,7 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
         )}
         <input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder="タップ時に開くURL" className="w-full rounded-xl border px-3 py-2.5 text-sm" />
       </>}
-      {kind === 'card_message' && <div className="space-y-3">{cards.map((card, index) => <div key={card.id} className="rounded-xl border bg-slate-50 p-4"><div className="mb-3 flex justify-between"><b className="text-sm">パネル {index + 1}</b><button disabled={cards.length === 1} onClick={() => setCards((all) => all.filter((_, i) => i !== index))} className="text-xs text-rose-600 disabled:opacity-30">削除</button></div><div className="grid gap-3 md:grid-cols-2"><select value={card.template} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,template:e.target.value}:c))} className="rounded-lg border px-3 py-2 text-sm"><option value="product">プロダクト</option><option value="location">ロケーション</option><option value="person">人物</option><option value="image">画像</option></select><label className="rounded-lg border border-dashed px-3 py-2 text-center text-sm">{card.imageUrl ? '画像設定済み' : '画像を選択'}<input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { const f=e.target.files?.[0]; if(f) void upload(f,index) }}/></label><input value={card.title} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,title:e.target.value}:c))} placeholder="タイトル" className="rounded-lg border px-3 py-2 text-sm"/><input value={card.description} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,description:e.target.value}:c))} placeholder="説明" className="rounded-lg border px-3 py-2 text-sm"/><input value={card.actionLabel} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionLabel:e.target.value}:c))} placeholder="ボタン名" className="rounded-lg border px-3 py-2 text-sm"/><input value={card.actionUrl} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionUrl:e.target.value}:c))} placeholder="アクションURL" className="rounded-lg border px-3 py-2 text-sm"/></div></div>)}<button disabled={cards.length >= MAX_PANELS} onClick={() => setCards((all) => [...all,newCard()])} className="w-full rounded-xl border border-dashed py-3 text-sm font-bold text-success disabled:text-slate-400">＋ パネルを追加（{cards.length}/{MAX_PANELS}）</button><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked readOnly />末尾に「もっと見る」パネルを表示</label></div>}
+      {kind === 'card_message' && <div className="space-y-3">{cards.map((card, index) => <div key={card.id} className="rounded-xl border bg-slate-50 p-4"><div className="mb-3 flex justify-between"><b className="text-sm">パネル {index + 1}</b><button disabled={cards.length === 1} onClick={() => setCards((all) => all.filter((_, i) => i !== index))} className="text-xs text-rose-600 disabled:opacity-30">削除</button></div><div className="grid gap-3 md:grid-cols-2"><Select aria-label={`パネル ${index + 1} の種類`} value={card.template} onChange={(value) => setCards((all) => all.map((c,i) => i===index ? {...c,template:value}:c))} options={[{ value: 'product', label: 'プロダクト' }, { value: 'location', label: 'ロケーション' }, { value: 'person', label: '人物' }, { value: 'image', label: '画像' }]} size="full" /><label className="rounded-lg border border-dashed px-3 py-2 text-center text-sm">{card.imageUrl ? '画像設定済み' : '画像を選択'}<input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { const f=e.target.files?.[0]; if(f) void upload(f,index) }}/></label><input value={card.title} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,title:e.target.value}:c))} placeholder="タイトル" className="rounded-lg border px-3 py-2 text-sm"/><input value={card.description} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,description:e.target.value}:c))} placeholder="説明" className="rounded-lg border px-3 py-2 text-sm"/><input value={card.actionLabel} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionLabel:e.target.value}:c))} placeholder="ボタン名" className="rounded-lg border px-3 py-2 text-sm"/><input value={card.actionUrl} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionUrl:e.target.value}:c))} placeholder="アクションURL" className="rounded-lg border px-3 py-2 text-sm"/></div></div>)}<button disabled={cards.length >= maxCards} onClick={() => setCards((all) => [...all,newCard()])} className="w-full rounded-xl border border-dashed py-3 text-sm font-bold text-success disabled:text-slate-400">＋ パネルを追加（{cards.length}/{MAX_PANELS}）</button><Checkbox checked={moreCard} onCheckedChange={setMoreCard}>末尾に「もっと見る」パネルを表示</Checkbox>{moreCard && <p className="text-xs text-ink-faint">「もっと見る」で1枠使うため、パネルは{MAX_PANELS - 1}枚までです。</p>}</div>}
       {(kind === 'coupon' || kind === 'research') && <><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={kind === 'coupon' ? '特典内容・利用条件' : 'アンケートの説明'} className="w-full rounded-xl border p-3 text-sm" rows={3}/><input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder={kind === 'coupon' ? 'クーポンを開くURL' : '回答フォームURL'} className="w-full rounded-xl border px-3 py-2.5 text-sm" /></>}
       {error && <p className="text-sm text-rose-600">{error}</p>}<div className="flex justify-end gap-2"><button onClick={reset} className="rounded-lg border px-4 py-2 text-sm">キャンセル</button><button disabled={saving} onClick={() => void save()} className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button></div></div>
     </section>}

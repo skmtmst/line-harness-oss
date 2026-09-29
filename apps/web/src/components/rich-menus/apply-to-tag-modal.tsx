@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
 
 type Tag = { id: string; name: string; color: string }
 
@@ -53,6 +56,8 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
   const [phase, setPhase] = useState<'config' | 'running' | 'done' | 'error'>(
     'config',
   )
+  // 一括適用の走っている最中はEscapeで窓だけ消えないようにする。
+  const panelRef = useOverlayFocus(true, onClose, phase === 'running')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{
     chunks: number
@@ -127,10 +132,16 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="apply-to-tag-title"
+        className="bg-white rounded-lg shadow-xl w-full max-w-md"
+      >
         <div className="p-6">
           <div className="mb-1 flex items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-ink">
+            <h2 id="apply-to-tag-title" className="text-lg font-semibold text-ink">
               友だちにこのメニューを表示
             </h2>
             <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -141,68 +152,69 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'config' && (
             <>
-              <div className="space-y-3 mb-5">
-                <RadioOption
-                  checked={mode.kind === 'all-followers'}
-                  onChange={() => pickMode({ kind: 'all-followers' })}
-                  label="このアカウントの全員に適用"
-                  description="現時点で friend 状態の友だち全員に LINE のメニューを link します。新規友だちには適用されません。"
-                />
-                <RadioOption
-                  checked={mode.kind === 'tag'}
-                  onChange={() =>
-                    pickMode({
-                      kind: 'tag',
-                      tagId: tags[0]?.id ?? '',
-                    })
-                  }
-                  label="タグで絞り込んで適用"
-                  description="指定したタグを持つ友だちだけに表示します。"
-                  disabled={tags.length === 0}
-                >
-                  {mode.kind === 'tag' && (
-                    <>
-                      <select
-                        value={mode.tagId}
-                        onChange={(e) =>
-                          pickMode({ kind: 'tag', tagId: e.target.value })
-                        }
-                        className="mt-2 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                      >
-                        {tags.length === 0 ? (
-                          <option value="">
-                            {tagsLoading ? 'タグを読み込んでいます' : 'タグがありません'}
-                          </option>
-                        ) : (
-                          tags.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                      {tagsLoadError && (
-                        <p className="text-ink-faint mt-2 text-xs">
-                          タグを読み込めませんでした。タグの絞り込みは使えません。
-                          <button
-                            type="button"
-                            onClick={loadTags}
-                            className="text-action ml-1 font-medium underline"
-                          >
-                            もう一度読み込む
-                          </button>
-                        </p>
-                      )}
-                    </>
-                  )}
-                </RadioOption>
-                <RadioOption
-                  checked={mode.kind === 'set-default'}
-                  onChange={() => pickMode({ kind: 'set-default' })}
-                  label="全員のデフォルトに設定する"
-                  description="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同じアカウント内の他のメニューのデフォルト設定は解除されます。"
-                  warn
-                />
+              <div className="mb-5">
+                <RadioCardGroup legend="適用する相手" className="grid gap-2">
+                  <RadioCard
+                    name="apply-mode"
+                    value="all-followers"
+                    checked={mode.kind === 'all-followers'}
+                    onChange={() => pickMode({ kind: 'all-followers' })}
+                    title="このアカウントの全員に適用"
+                    note="現時点で friend 状態の友だち全員に LINE のメニューを link します。新規友だちには適用されません。"
+                  />
+                  <RadioCard
+                    name="apply-mode"
+                    value="tag"
+                    checked={mode.kind === 'tag'}
+                    disabled={tags.length === 0}
+                    disabledReason={tagsLoading ? 'タグを読み込んでいます' : '使えるタグがありません'}
+                    onChange={() =>
+                      pickMode({
+                        kind: 'tag',
+                        tagId: tags[0]?.id ?? '',
+                      })
+                    }
+                    title="タグで絞り込んで適用"
+                    note="指定したタグを持つ友だちだけに表示します。"
+                  />
+                  <RadioCard
+                    name="apply-mode"
+                    value="set-default"
+                    checked={mode.kind === 'set-default'}
+                    onChange={() => pickMode({ kind: 'set-default' })}
+                    title="全員のデフォルトに設定する"
+                    note="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同じアカウント内の他のメニューのデフォルト設定は解除されます。"
+                  />
+                </RadioCardGroup>
+                {mode.kind === 'tag' && (
+                  <div className="mt-2">
+                    <Select
+                      value={mode.tagId}
+                      onChange={(value) =>
+                        pickMode({ kind: 'tag', tagId: value })
+                      }
+                      aria-label="適用するタグ"
+                      options={
+                        tags.length === 0
+                          ? [{ value: '', label: tagsLoading ? 'タグを読み込んでいます' : 'タグがありません' }]
+                          : tags.map((t) => ({ value: t.id, label: t.name }))
+                      }
+                      size="full"
+                    />
+                    {tagsLoadError && (
+                      <p className="text-ink-faint mt-2 text-xs">
+                        タグを読み込めませんでした。タグの絞り込みは使えません。
+                        <button
+                          type="button"
+                          onClick={loadTags}
+                          className="text-action ml-1 font-medium underline"
+                        >
+                          もう一度読み込む
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-2">
                 <button
@@ -293,52 +305,5 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
         }}
       />
     </div>
-  )
-}
-
-function RadioOption({
-  checked,
-  onChange,
-  label,
-  description,
-  warn,
-  disabled,
-  children,
-}: {
-  checked: boolean
-  onChange: () => void
-  label: string
-  description: string
-  warn?: boolean
-  disabled?: boolean
-  children?: React.ReactNode
-}) {
-  return (
-    <label
-      className={`block border rounded-lg p-3 transition-colors ${
-        disabled
-          ? 'opacity-50 cursor-not-allowed border-gray-200'
-          : checked
-            ? warn
-              ? 'border-amber-400 bg-amber-50 cursor-pointer'
-              : 'border-green-500 bg-green-50 cursor-pointer'
-            : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <input
-          type="radio"
-          checked={checked}
-          onChange={onChange}
-          disabled={disabled}
-          className="mt-1"
-        />
-        <div className="flex-1">
-          <div className="text-sm font-medium text-ink">{label}</div>
-          <p className="text-xs text-gray-600 mt-0.5">{description}</p>
-          {children}
-        </div>
-      </div>
-    </label>
   )
 }

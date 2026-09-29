@@ -11,7 +11,6 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import SelectField from '@/components/shared/select-field'
 import Dialog from '@/components/shared/dialog'
 import DateField from '@/components/shared/date-field'
 import { TextField } from '@/components/shared/text-field'
@@ -54,6 +53,19 @@ type AdCostRow = {
   friendAdds: number | null
   costPerFriendMinor: number | null
   lastImportedAt: string | null
+}
+
+/** R275: 手で入れた費用の1行。取消しても履歴に残る。 */
+type ManualCostEntry = {
+  id: string
+  sourceLabel: string
+  day: string
+  amountMinor: number
+  currency: string
+  entryRouteId: string | null
+  cancelledAt: string | null
+  cancelReason: string | null
+  createdAt: string
 }
 
 /** #818: 媒体ごとの取込状況。 */
@@ -186,6 +198,9 @@ export default function AdIntegration({
   const [platforms, setPlatforms] = useState<AdPlatform[]>([])
   const [logs, setLogs] = useState<AdConversionLog[]>([])
   const [logTotal, setLogTotal] = useState(0)
+  // R278: 30日の送信結果は一覧の口が返す集計を使う。ページ・絞り込みで
+  // 変わらない全アカウント範囲の数で、口が返さない時だけ従来の推測へ戻る。
+  const [logSummary, setLogSummary] = useState<{ sentLast30Days: number; pendingLast30Days: number; failedLast30Days: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [query, setQuery] = useState('')
@@ -198,6 +213,13 @@ export default function AdIntegration({
   const [costRows, setCostRows] = useState<AdCostRow[]>([])
   const [costPlatforms, setCostPlatforms] = useState<AdCostPlatformStatus[]>([])
   const [costFailed, setCostFailed] = useState(false)
+  // R275: 手で入れた費用を1行ずつ持つ。間違えた記録はここから取消す。
+  const [manualEntries, setManualEntries] = useState<ManualCostEntry[]>([])
+  const [canManage, setCanManage] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<ManualCostEntry | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelError, setCancelError] = useState('')
   const [manualOpen, setManualOpen] = useState(false)
   const [manualBusy, setManualBusy] = useState(false)
   const [manualError, setManualError] = useState('')
@@ -216,6 +238,7 @@ export default function AdIntegration({
       setPlatforms([])
       setLogs([])
       setLogTotal(0)
+      setLogSummary(null)
       setCostRows([])
       setCostPlatforms([])
       setFailed(false)
@@ -239,13 +262,16 @@ export default function AdIntegration({
       setPlatforms(platformResponse.data)
       setLogs(logResponse.data.items)
       setLogTotal(logResponse.data.total)
+      setLogSummary(logResponse.data.summary ?? null)
       if (costResponse.success) {
         setCostRows(costResponse.data.rows ?? [])
         setCostPlatforms(costResponse.data.platforms ?? [])
+        setManualEntries(costResponse.data.manualEntries ?? [])
         setCostFailed(false)
       } else {
         setCostRows([])
         setCostPlatforms([])
+        setManualEntries([])
         setCostFailed(true)
       }
     } catch {
@@ -261,9 +287,46 @@ export default function AdIntegration({
     setPlatforms([])
     setLogs([])
     setLogTotal(0)
+    setLogSummary(null)
     void load()
     return () => { loadGenerationRef.current += 1 }
   }, [load])
+
+  // R275: 手入力の取消は owner/admin だけ。staff は閲覧まで。
+  // アカウント未選択では権限も取りにいかない（画面が通信しない約束）。
+  useEffect(() => {
+    if (!selectedAccountId) { setCanManage(false); return }
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [selectedAccountId])
+
+  const openCancelDialog = useCallback((entry: ManualCostEntry) => {
+    setCancelTarget(entry)
+    setCancelReason('')
+    setCancelError('')
+  }, [])
+
+  const submitCancel = useCallback(async () => {
+    if (!cancelTarget || cancelBusy) return
+    const reason = cancelReason.trim()
+    if (!reason) { setCancelError('取り消す理由を入れてください'); return }
+    setCancelBusy(true)
+    setCancelError('')
+    try {
+      const res = await api.adCosts.cancel(cancelTarget.id, reason)
+      if (!res.success) { setCancelError(res.error ?? '取り消せませんでした'); return }
+      setCancelTarget(null)
+      void load()
+    } catch {
+      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。')
+    } finally {
+      setCancelBusy(false)
+    }
+  }, [cancelTarget, cancelBusy, cancelReason, load])
 
   const connected = platforms.filter((platform) => platform.isActive)
   /*
@@ -281,9 +344,9 @@ export default function AdIntegration({
           },
     )
   }, [onPlatformCountsChange, loading, failed, selectedAccountId, platforms])
-  const sentCount = configNumber(platforms, 'sent_count') ?? logs.filter((log) => matchesStatus(log, 'sent')).length
-  const pendingCount = configNumber(platforms, 'pending_count') ?? logs.filter((log) => log.status === 'pending').length
-  const failedCount = configNumber(platforms, 'failed_count') ?? logs.filter((log) => log.status === 'failed').length
+  const sentCount = logSummary?.sentLast30Days ?? configNumber(platforms, 'sent_count') ?? logs.filter((log) => matchesStatus(log, 'sent')).length
+  const pendingCount = logSummary?.pendingLast30Days ?? configNumber(platforms, 'pending_count') ?? logs.filter((log) => log.status === 'pending').length
+  const failedCount = logSummary?.failedLast30Days ?? configNumber(platforms, 'failed_count') ?? logs.filter((log) => log.status === 'failed').length
   // #514-13: 取れない数を 0 と書かない。retry_success_count が無ければ「—」。
   const retrySuccessCount = configNumber(platforms, 'retry_success_count')
   const visibleLogs = logs
@@ -304,9 +367,10 @@ export default function AdIntegration({
 
   const submitManualEntry = useCallback(async () => {
     if (!selectedAccountId || manualBusy) return
-    const amount = Number(manualAmount)
     if (!manualLabel.trim()) { setManualError('流入元の名前を入れてください'); return }
     if (!manualDay) { setManualError('費用の日付を選んでください'); return }
+    if (!manualAmount.trim()) { setManualError('費用を入力してください'); return }
+    const amount = Number(manualAmount)
     if (!Number.isInteger(amount) || amount < 0) { setManualError('費用は0以上の整数(円)で入れてください'); return }
     setManualBusy(true)
     setManualError('')
@@ -604,9 +668,14 @@ export default function AdIntegration({
       totalCostByCurrency.set(total.currency, (totalCostByCurrency.get(total.currency) ?? 0) + total.amountMinor)
     }
   }
-  const linkedFriendAdds = costRows.reduce((sum, row) => sum + (row.friendAdds ?? 0), 0)
-  const jpyCost = totalCostByCurrency.get('JPY')
-  const avgCostPerFriend = jpyCost != null && linkedFriendAdds > 0 ? Math.round(jpyCost / linkedFriendAdds) : null
+  const linkedJpyRows = costRows.filter((row) => row.entryRouteId && row.totals.some((total) => total.currency === 'JPY'))
+  const addsByRoute = new Map<string, number>()
+  for (const row of linkedJpyRows) {
+    if (row.entryRouteId && !addsByRoute.has(row.entryRouteId)) addsByRoute.set(row.entryRouteId, row.friendAdds ?? 0)
+  }
+  const linkedFriendAdds = [...addsByRoute.values()].reduce((sum, count) => sum + count, 0)
+  const linkedJpyCost = linkedJpyRows.reduce((sum, row) => sum + (row.totals.find((total) => total.currency === 'JPY')?.amountMinor ?? 0), 0)
+  const avgCostPerFriend = linkedFriendAdds > 0 ? Math.round(linkedJpyCost / linkedFriendAdds) : null
 
   return (
     <div className="space-y-4" data-design-node="v0HaI">
@@ -623,7 +692,7 @@ export default function AdIntegration({
             : '—'}
           detail={totalCostByCurrency.size > 0 ? '取込分と手入力分の合計です' : 'まだ費用の記録がありません'}
         />
-        <Metric label="友だち1人あたり" value={avgCostPerFriend} detail="費用÷友だち追加。人数が取れる流入元だけで割ります" prefix="¥" />
+        <Metric label="友だち1人あたり" value={avgCostPerFriend} detail="経路がある円の費用だけを合計し、同じ経路の追加人数は1回だけ数えます。経路なし・追加0人・他通貨は計算に含めません" prefix="¥" />
         <Metric label="成果1件あたり" value={null} detail="認めた成果の件数は未接続のため表示できません" prefix="¥" />
       </div>
 
@@ -713,6 +782,39 @@ export default function AdIntegration({
             </tbody>
           </table>
         )}
+        {/*
+          R275: 手で入れた費用は1行ずつ出す。間違えて入れた分は理由を付けて
+          取消せる。取消すと集計から外れるが行と理由は残る。
+        */}
+        {manualEntries.length > 0 && (
+          <div className="border-t border-hairline px-4 py-3">
+            <h4 className="text-xs font-bold text-ink-secondary">手で入れた費用</h4>
+            <ul className="mt-2 divide-y divide-hairline">
+              {manualEntries.map((entry) => {
+                const cancelled = entry.cancelledAt != null
+                return (
+                  <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <div className="min-w-0">
+                      <p className={`text-xs font-semibold ${cancelled ? 'text-ink-faint line-through' : 'text-ink'}`}>
+                        {entry.day} ／ {entry.sourceLabel} ／ {formatMinor(entry.amountMinor, entry.currency)}
+                      </p>
+                      {cancelled ? (
+                        <p className="mt-0.5 text-xs text-ink-faint">
+                          取り消し済み（{entry.cancelReason ?? '理由の記録なし'}）— 集計には入りません
+                        </p>
+                      ) : null}
+                    </div>
+                    {!cancelled && canManage ? (
+                      <Button variant="secondary" onClick={() => openCancelDialog(entry)}>
+                        取り消す
+                      </Button>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
       </section>
 
       {costPlatforms.length > 0 && (
@@ -775,12 +877,13 @@ export default function AdIntegration({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-route">計測リンク（分かれば）</label>
-            <SelectField
+            <Select
               id="ad-cost-route"
+              aria-label="計測リンク"
               value={manualRouteId}
-              onChange={(event) => {
-                setManualRouteId(event.target.value)
-                const route = entryRoutes.find((item) => item.id === event.target.value)
+              onChange={(value) => {
+                setManualRouteId(value)
+                const route = entryRoutes.find((item) => item.id === value)
                 if (route && !manualLabel.trim()) setManualLabel(route.name)
               }}
               options={[
@@ -805,6 +908,35 @@ export default function AdIntegration({
             />
           </div>
         </div>
+      </Dialog>
+
+      <Dialog
+        open={cancelTarget !== null}
+        title="この費用を取り消す"
+        description="取り消すと集計と「1人あたり」から外れます。記録そのものは残り、取り消した理由と日時が履歴に残ります。同じ流入元・同じ日に入れ直すと新しい記録として戻ります。"
+        confirmLabel="取り消す"
+        busy={cancelBusy}
+        error={cancelError}
+        onConfirm={() => void submitCancel()}
+        onCancel={() => { if (!cancelBusy) setCancelTarget(null) }}
+      >
+        {cancelTarget ? (
+          <div className="space-y-4">
+            <p className="text-xs text-ink-secondary">
+              対象: <strong>{cancelTarget.day} ／ {cancelTarget.sourceLabel} ／ {formatMinor(cancelTarget.amountMinor, cancelTarget.currency)}</strong>
+            </p>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-cancel-reason">取り消す理由（必須）</label>
+              <TextField
+                id="ad-cost-cancel-reason"
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+                placeholder="例: 金額を間違えた"
+                maxLength={200}
+              />
+            </div>
+          </div>
+        ) : null}
       </Dialog>
     </div>
   )

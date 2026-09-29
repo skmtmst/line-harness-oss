@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -12,6 +13,7 @@ import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
+import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
@@ -442,16 +444,17 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                     return (
                       <div key={area.label} className="border-hairline rounded-control border p-3 text-sm">
                         <p className="font-bold">面 {area.label}</p>
-                        <select
-                          className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                        <Select
                           value={draft.kind}
-                          onChange={(event) => updateArea(area.label, { kind: event.target.value as AreaActionKind })}
+                          onChange={(value) => updateArea(area.label, { kind: value as AreaActionKind })}
                           aria-label={`面 ${area.label} の動き`}
-                        >
-                          <option value="none">未設定（押しても何も起きません）</option>
-                          <option value="uri">URLを開く</option>
-                          <option value="actions">動きを実行する</option>
-                        </select>
+                          options={[
+                            { value: 'none', label: '未設定（押しても何も起きません）' },
+                            { value: 'uri', label: 'URLを開く' },
+                            { value: 'actions', label: '動きを実行する' },
+                          ]}
+                          size="full"
+                        />
                         {draft.kind === 'uri' ? (
                           <input
                             type="url"
@@ -506,25 +509,16 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 <Field label="使い方のご案内（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
                 <div className="grid gap-3 text-sm">
                   <Field label="使える回数">
-                    <select aria-label="使える回数" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={couponOnce} onChange={(event) => setCouponOnce(event.target.value as 'once' | 'unlimited')}>
-                      <option value="once">1人1回だけ</option>
-                      <option value="unlimited">期間中なら何回でも</option>
-                    </select>
+                    <Select aria-label="使える回数" value={couponOnce} onChange={(value) => setCouponOnce(value as 'once' | 'unlimited')} options={[{ value: 'once', label: '1人1回だけ' }, { value: 'unlimited', label: '期間中なら何回でも' }]} size="full" />
                   </Field>
                   <Field label="だれに見えるか">
-                    <select aria-label="だれに見えるか" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={couponVisibility} onChange={(event) => setCouponVisibility(event.target.value as 'friends' | 'link')}>
-                      <option value="friends">友だちだけ</option>
-                      <option value="link">リンクを知っている人</option>
-                    </select>
+                    <Select aria-label="だれに見えるか" value={couponVisibility} onChange={(value) => setCouponVisibility(value as 'friends' | 'link')} options={[{ value: 'friends', label: '友だちだけ' }, { value: 'link', label: 'リンクを知っている人' }]} size="full" />
                   </Field>
                 </div>
               </section>
               <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
                 <Field label="抽選にする">
-                  <select aria-label="抽選にする" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={lottery} onChange={(event) => setLottery(event.target.value as 'on' | 'off')}>
-                    <option value="on">する</option>
-                    <option value="off">しない</option>
-                  </select>
+                  <Select aria-label="抽選にする" value={lottery} onChange={(value) => setLottery(value as 'on' | 'off')} options={[{ value: 'on', label: 'する' }, { value: 'off', label: 'しない' }]} size="full" />
                 </Field>
                 {lottery === 'on' ? (
                   <>
@@ -613,16 +607,15 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   </Field>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <Field label="答え方">
-                      <select aria-label="答え方" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={previewQuestion.format} onChange={(event) => updateQuestion(previewQuestionIndex, { format: event.target.value as ResearchFormat })}>
-                        <option value="single">1つだけ選ぶ</option>
-                        <option value="multiple">いくつでも選ぶ</option>
-                        <option value="free">自由に書く</option>
-                      </select>
+                      <Select aria-label="答え方" value={previewQuestion.format} onChange={(value) => updateQuestion(previewQuestionIndex, { format: value as ResearchFormat })} options={[{ value: 'single', label: '1つだけ選ぶ' }, { value: 'multiple', label: 'いくつでも選ぶ' }, { value: 'free', label: '自由に書く' }]} size="full" />
                     </Field>
-                    <label className="mt-2 flex items-start gap-2 text-sm font-normal md:mt-8">
-                      <input type="checkbox" aria-label="必ず答えてもらう" checked={previewQuestion.required} onChange={(event) => updateQuestion(previewQuestionIndex, { required: event.target.checked })} className="accent-accent mt-0.5" />
-                      <span><strong className="block">必ず答えてもらう</strong><span className="text-ink-faint text-xs">外すと、この質問は飛ばせます。</span></span>
-                    </label>
+                    <Checkbox
+                      checked={previewQuestion.required}
+                      onCheckedChange={(checked) => updateQuestion(previewQuestionIndex, { required: checked })}
+                      aria-label="必ず答えてもらう"
+                      description="外すと、この質問は飛ばせます。"
+                      className="mt-2 md:mt-8"
+                    >必ず答えてもらう</Checkbox>
                   </div>
                   {previewQuestion.format !== 'free' ? (
                     <div className="mt-3">

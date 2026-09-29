@@ -10,10 +10,12 @@ const mocks = vi.hoisted(() => ({
   getRun: vi.fn(),
   retryRun: vi.fn(),
   getPublishedVersion: vi.fn(),
+  getScope: vi.fn(),
 }))
 
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: mocks.canAccess,
+  getVisibleLineAccountScope: mocks.getScope,
 }))
 vi.mock('@line-crm/db', async (importOriginal) => ({
   ...await importOriginal<typeof import('@line-crm/db')>(),
@@ -55,6 +57,13 @@ const run = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.getScope.mockResolvedValue({
+    accounts: [],
+    ids: ['account-1'],
+    allowedAccountIds: ['account-1'],
+    canSeeUnassigned: false,
+    isAccountScoped: false,
+  })
   mocks.getReminderById.mockResolvedValue(reminder)
   mocks.listRuns.mockResolvedValue({ items: [], total: 0 })
   mocks.getSummary.mockResolvedValue({
@@ -77,8 +86,10 @@ describe('リマインダ実行記録のアカウント範囲', () => {
 
     const response = await createApp().request('/api/reminders/reminder-1/runs')
 
+    // R349: 行の送信元アカウントで絞ってから、見える行がなく親も見えなければ 404。
+    // 絞り込み自体が DB 照会のため listRuns は呼ばれる。
     expect(response.status).toBe(404)
-    expect(mocks.listRuns).not.toHaveBeenCalled()
+    expect(mocks.listRuns).toHaveBeenCalled()
   })
 
   it('見られるアカウントだけ実行一覧を返し、既読率を作らない', async () => {
@@ -263,5 +274,34 @@ describe('リマインダ実行記録のアカウント範囲', () => {
 
     expect(response.status).toBe(200)
     expect(body.data).toEqual({ id: 'run-1', status: 'queued', replayed: true })
+  })
+})
+
+describe('R146 監査：実行結果に公開版の有無を載せる', () => {
+  it('公開版が無い下書きは hasPublishedVersion=false で返す', async () => {
+    mocks.canAccess.mockResolvedValue(true)
+    mocks.getPublishedVersion.mockResolvedValue(null)
+
+    const response = await createApp().request('/api/reminders/reminder-1/runs')
+    const body = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(body.data.reminder.hasPublishedVersion).toBe(false)
+  })
+
+  it('公開版があるときは hasPublishedVersion=true で返す', async () => {
+    mocks.canAccess.mockResolvedValue(true)
+    mocks.getPublishedVersion.mockResolvedValue({
+      id: 'pv-1',
+      reminder_id: 'reminder-1',
+      status: 'published',
+      settings_snapshot: JSON.stringify({ stopConditions: null }),
+    })
+
+    const response = await createApp().request('/api/reminders/reminder-1/runs')
+    const body = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(body.data.reminder.hasPublishedVersion).toBe(true)
   })
 })

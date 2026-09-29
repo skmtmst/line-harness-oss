@@ -8,6 +8,7 @@ import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -18,6 +19,7 @@ import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { formatCampaignTiming } from '../campaign-display'
 import styles from './campaign-editor.module.css'
 
 const TRIGGER_LABEL: Record<string, string> = {
@@ -200,7 +202,14 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     setError('')
     setNotice('')
     try {
-      await api.nenCampaigns.testSend({ campaignKey, accountId: selectedAccountId, friendId })
+      // 監査 R65: 保存済みの本文ではなく、今編集している下書きを試送する。
+      await api.nenCampaigns.testSend({
+        campaignKey, accountId: selectedAccountId, friendId,
+        draft: {
+          title: merged.title, bodyText: merged.bodyText,
+          buttonLabel: merged.buttonLabel ?? '', buttonUrl: merged.buttonUrl ?? '', imageUrl: merged.imageUrl ?? '',
+        },
+      })
       setNotice('テスト送信しました')
       setTestSearchOpen(false)
     } catch {
@@ -265,7 +274,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   if (loading) return <ListState kind="loading" title="NEN配信を読み込んでいます" />
   if (!setting) return <ListState kind="error" title={error || 'この配信が見つかりませんでした'} />
 
-  const timing = isBirthday ? '誕生日の3日前 10:00 に届きます' : `注文が届いてから${merged.delayDays}日後 ${merged.deliveryTime.slice(0, 5)} に届きます`
+  // 監査 R64: 一覧と同じ説明を同じ関数から作る。起点は発送（scheduledAfter と同じ）。
+  const timing = `${formatCampaignTiming({ campaignKey, delayDays: merged.delayDays, deliveryTime: merged.deliveryTime.slice(0, 5) })} に届きます`
 
   return (
     <div data-design-node="HpKyF" className="space-y-4">
@@ -302,8 +312,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
              </div>
              {isBirthday && <p className="text-ink-faint mt-3 text-xs">この日時は誕生日配信の実行処理で固定されています。</p>}
              {!isBirthday && <div className="mt-4 space-y-3">
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={merged.dedupWindowDays > 0} onChange={(event) => setDraft((previous) => ({ ...previous, dedupWindowDays: event.target.checked ? 30 : 0 }))} className="accent-accent mt-0.5" /><span><strong className="block">同じ人に何度も送らない</strong><span className="text-ink-faint text-xs">30日のあいだに1回だけにします。まとめ買いのときに何通も届くのを防ぎます。</span></span></label>
-              {merged.campaignKey === 'review_request' && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={Boolean(formAction) && merged.excludeFormRespondents} disabled={!formAction} onChange={(event) => setDraft((previous) => ({ ...previous, excludeFormRespondents: event.target.checked }))} className="accent-accent mt-0.5" /><span><strong className="block">すでに口コミを書いた人には送らない</strong><span className="text-ink-faint text-xs">この配信につないだ口コミフォームの回答記録を見ます。先に回答フォームを選んでください。</span></span></label>}
+              <Checkbox checked={merged.dedupWindowDays > 0} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, dedupWindowDays: checked ? 30 : 0 }))} description="30日のあいだに1回だけにします。まとめ買いのときに何通も届くのを防ぎます。">同じ人に何度も送らない</Checkbox>
+              {merged.campaignKey === 'review_request' && <Checkbox checked={Boolean(formAction) && merged.excludeFormRespondents} disabled={!formAction} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, excludeFormRespondents: checked }))} description="この配信につないだ口コミフォームの回答記録を見ます。先に回答フォームを選んでください。">すでに口コミを書いた人には送らない</Checkbox>}
             </div>}
           </section>
 
@@ -351,7 +361,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
             <LinePreview caption={`◷ ${timing}`}><div className="bg-canvas rounded-card p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-bold">★ {merged.buttonLabel}</p>}</div></LinePreview>
           </section>
           <section className="bg-canvas rounded-card border-hairline border p-4"><h2 className="text-sm font-bold">つながる先</h2><dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ EC連携</dt><dd className="text-ink-secondary">注文と到着の記録</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 共通情報</dt><dd className="text-ink-secondary">差し込んでいる「商品名」</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 友だち属性</dt><dd className="text-ink-secondary">友だち情報欄「ペットの名前」</dd></div>{mileageAction?.kind === 'award_mileage' && <div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ マイル</dt><dd className="text-ink-secondary">書いてくれたら {mileageAction.amount}</dd></div>}{formAction?.kind === 'open_form' && <div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 回答フォーム</dt><dd className="text-ink-secondary">{formAction.formName}{selectedForm ? (selectedForm.isActive ? '（公開中）' : '（公開されていません）') : '（見つかりません）'}</dd></div>}</dl></section>
-          <section className="border-warning bg-warning-bg text-warning rounded-card border p-4"><h2 className="text-sm font-bold">気をつけること</h2><div className="mt-3 space-y-3 text-xs"><p><strong className="block">◷ 20時台がいちばん押されます</strong>分析の「配信の反応」で確かめられます</p><p><strong className="block">▣ 3つ以上の吹き出しは嫌がられます</strong>1回に3つ送った配信は、ブロック率が3倍でした</p></div></section>
+          {/* 監査 R63: このアカウントの実績ではなく一般的な目安。実績の断定文（「3倍でした」等）は事実に見えるため、目安だと分かる言い方にする。 */}
+          <section className="border-warning bg-warning-bg text-warning rounded-card border p-4"><h2 className="text-sm font-bold">気をつけること（一般的な目安）</h2><div className="mt-3 space-y-3 text-xs"><p><strong className="block">◷ 届く時間は実績で確かめられます</strong>このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます</p><p><strong className="block">▣ 吹き出しは少なめが安心です</strong>1回にたくさんの吹き出しを送るとブロックされやすい傾向があります</p></div></section>
         </aside>
       </div>
 
@@ -366,7 +377,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           : '動いています。保存した新しい中身は、次のきっかけからの配信に使われます。すでに配信待ちの分は、予約したときの中身のまま届きます。'
         : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
       {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力中の内容があります"
         description="このまま移動すると、入力した内容は保存されません。移動しますか？"

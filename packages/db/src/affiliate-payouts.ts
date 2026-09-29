@@ -152,7 +152,12 @@ export interface AffiliateSettlementPreviewRow {
   affiliateId: string;
   affiliateName: string;
   code: string;
+  /** 今回払う額。取消の差し引き後。 */
   amount: number;
+  /** 差し引き前の報酬額。amount + deduction と等しい。 */
+  grossAmount: number;
+  /** 今回差し引く取消額。無いときは 0。 */
+  deduction: number;
   conversionCount: number;
   bankProfileRegistered: boolean;
 }
@@ -187,6 +192,24 @@ export interface AffiliateAccountSettlementPreview {
   excludedZeroAmount: {
     count: number;
     rows: AffiliateSettlementExcludedRow[];
+  };
+  /**
+   * 期間の始まりより前に承認され、まだ締められていない繰越分。
+   * 月をまたいで保留が明けた成果や前月の積み残しをここで数える。
+   */
+  carriedOver: {
+    count: number;
+    amount: number;
+  };
+  /** 今回差し引く取消額の合計。 */
+  totalDeduction: number;
+  /**
+   * R288: 今回引ききれず次回へ繰り越す取消額。次回200円・取消300円なら
+   * 200を引き、残り100を繰り越す(正の振込はしない)。
+   */
+  carriedDeduction: {
+    count: number;
+    amount: number;
   };
   previewVersion: string;
 }
@@ -232,7 +255,15 @@ async function eligibleRewardRows(
         AND bp.line_account_id = a.line_account_id
       WHERE COALESCE(ce.approval_status, 'pending') = 'approved'
         AND ce.approved_at IS NOT NULL
-        AND ce.approved_at >= ? AND ce.approved_at <= ?
+        /*
+         * R44/R45:
+         * - 左側の下限は付けない。前の締めに間に合わなかった承認済み・
+         *   未クレジットの成果は繰越として今回の対象に含める。
+         * - 境界の比較は julianday で時刻値に揃える。approved_at は
+         *   JST(+09:00)文字列、期間の端は UTC(Z)文字列が来るため、
+         *   文字列どうしの比較だと月またぎで誤判定する。
+         */
+        AND julianday(ce.approved_at) <= julianday(?)
         AND julianday(ce.approved_at) <= julianday(?, '-' || COALESCE(a.hold_days, 0) || ' days')
         AND NOT EXISTS (
           SELECT 1 FROM affiliate_reward_entries re
@@ -241,7 +272,7 @@ async function eligibleRewardRows(
       ORDER BY a.id, ce.approved_at, ce.id`,
   ).bind(
     input.lineAccountId, input.tenantId, input.lineAccountId,
-    input.periodFrom, input.periodTo, input.periodTo,
+    input.periodTo, input.periodTo,
   ).all<EligibleRewardRow>();
   return result.results;
 }
@@ -261,15 +292,143 @@ async function eligibleRewards(
  * プレビュー版の算出。プレビュー表示と全体締めで同じ行集合から同じ版を
  * 作るための共通関数。締めはこの版の照合に使った行集合をそのまま明細へ
  * 書き込む(照合後に取り直さない = TOCTOU排除)。
+ * R288: 版は取消の差し引き計画も含める。プレビュー後に新しい取消が
+ * 来たら版が変わり、締めは changed で止まる(黙って別額では締めない)。
  */
-export async function accountPreviewVersion(rows: EligibleRewardRow[]): Promise<string> {
+export async function accountPreviewVersion(rows: EligibleRewardRow[], deductionFingerprint = ''): Promise<string> {
   const versionSource = rows.map((row) => [
     row.conversion_event_id,
     row.affiliate_id,
     Math.round(Number(row.reward_amount)),
     row.approved_at,
   ].join(':')).join('|');
-  return sha256(versionSource);
+  return sha256(deductionFingerprint ? `${versionSource}|${deductionFingerprint}` : versionSource);
+}
+
+type UnappliedDebit = {
+  id: string;
+  affiliateId: string;
+  amount: number;
+  unapplied: number;
+  createdAt: string;
+};
+
+/**
+ * R288: まだ次の締めへ入れていない取消(debit)を古い順で返す。
+ * 消費の記録は締め明細行(entry_id 参照)。行が付けば適用済みで、
+ * もう次の締めには出てこない(二重控除しない)。
+ * 台帳が無い環境(移行前)では空を返して既存表示を壊さない。
+ */
+/**
+ * m22u R358 の回帰用に公開する、未適用の取り立て(clawback)の読み取り。
+ * 締め→却下で起こした相殺は、再承認で確定が戻ると取り立て対象から外す。
+ */
+export async function unappliedSettlementDebits(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string },
+): Promise<UnappliedDebit[]> {
+  const tables = await db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('affiliate_reward_entries','affiliate_settlement_lines')",
+  ).all<{ name: string }>();
+  if (tables.results.length < 2) return [];
+  const rows = await db.prepare(
+    `SELECT d.id, d.affiliate_id,
+            d.amount_minor AS amount,
+            d.amount_minor + COALESCE(SUM(sl.amount_minor), 0) AS unapplied,
+            d.created_at
+       FROM affiliate_reward_entries d
+       LEFT JOIN affiliate_settlement_lines sl
+         ON sl.entry_id = d.id AND sl.status = 'included'
+      WHERE d.organization_id = ? AND d.line_account_id = ?
+        AND d.entry_type = 'debit'
+        -- m22u R358: 再承認で確定が戻った成果の相殺は取り立てない。
+        -- 確定が有効なまま残る限り、却下の取り消しは無かったことになる。
+        AND NOT EXISTS (
+          SELECT 1 FROM affiliate_reward_entries c
+           WHERE c.conversion_event_id = d.conversion_event_id
+             AND c.entry_type = 'credit'
+             AND c.status <> 'reversed'
+        )
+      GROUP BY d.id
+      ORDER BY d.created_at, d.id`,
+  ).bind(input.tenantId, input.lineAccountId).all<{
+    id: string; affiliate_id: string; amount: number; unapplied: number; created_at: string;
+  }>();
+  return rows.results
+    .map((row) => ({
+      id: row.id,
+      affiliateId: row.affiliate_id,
+      amount: Math.round(Number(row.amount)),
+      unapplied: Math.round(Number(row.unapplied)),
+      createdAt: row.created_at,
+    }))
+    .filter((debit) => debit.unapplied > 0);
+}
+
+type DeductionPlan = {
+  /** 紹介者ごとの今回差し引き額。 */
+  perAffiliate: Map<string, number>;
+  /** 書き込む取消行。amount は負数。 */
+  lines: Array<{ debitId: string; affiliateId: string; amount: number }>;
+  totalDeduction: number;
+  /** 版照合に入れる指紋。 */
+  fingerprint: string;
+  /** 今回引ききれず次回へ繰り越す分。 */
+  carried: { count: number; amount: number };
+};
+
+/**
+ * R288: 紹介者の今回報酬へ、未適用の古い取消から充てる計画。
+ * 同一アカウント・同一紹介者の締めへ一度だけ適用する。
+ * 報酬を超える取消は報酬分だけ引き、残りは繰り越す(正の振込はしない)。
+ * プレビューと締めはこの同じ計画から作る。
+ */
+function planDeductionApplication(
+  grossByAffiliate: Map<string, number>,
+  debits: UnappliedDebit[],
+): DeductionPlan {
+  const byAffiliate = new Map<string, UnappliedDebit[]>();
+  for (const debit of debits) {
+    const list = byAffiliate.get(debit.affiliateId) ?? [];
+    list.push(debit);
+    byAffiliate.set(debit.affiliateId, list);
+  }
+  const perAffiliate = new Map<string, number>();
+  const lines: DeductionPlan['lines'] = [];
+  const consumed = new Map<string, number>();
+  let totalDeduction = 0;
+  for (const [affiliateId, gross] of grossByAffiliate) {
+    let rest = gross;
+    let deduction = 0;
+    for (const debit of byAffiliate.get(affiliateId) ?? []) {
+      if (rest <= 0) break;
+      const use = Math.min(rest, debit.unapplied);
+      if (use <= 0) continue;
+      lines.push({ debitId: debit.id, affiliateId, amount: -use });
+      consumed.set(debit.id, (consumed.get(debit.id) ?? 0) + use);
+      deduction += use;
+      rest -= use;
+    }
+    perAffiliate.set(affiliateId, deduction);
+    totalDeduction += deduction;
+  }
+  let carriedCount = 0;
+  let carriedAmount = 0;
+  for (const debit of debits) {
+    const remainder = debit.unapplied - (consumed.get(debit.id) ?? 0);
+    if (remainder > 0) {
+      carriedCount += 1;
+      carriedAmount += remainder;
+    }
+  }
+  const fingerprint = debits
+    .map((debit) => `${debit.id}:${debit.unapplied}:${consumed.get(debit.id) ?? 0}`)
+    .join('|');
+  return {
+    perAffiliate, lines, totalDeduction,
+    fingerprint,
+    carried: { count: carriedCount, amount: carriedAmount },
+  };
 }
 
 export async function previewAffiliateAccountSettlement(
@@ -290,33 +449,60 @@ export async function previewAffiliateAccountSettlement(
       approvedAt: row.approved_at,
       rewardAmount: Math.round(Number(row.reward_amount)),
     }));
+  const grossByAffiliate = new Map<string, number>();
+  for (const row of rows) {
+    grossByAffiliate.set(
+      row.affiliate_id,
+      (grossByAffiliate.get(row.affiliate_id) ?? 0) + Math.round(Number(row.reward_amount)),
+    );
+  }
+  // R288: 締め後の取消は次の締めで差し引く。紹介者ごとに未適用の
+  // 古い取消から充て、引ききれない分は次回へ繰り越す。
+  const plan = planDeductionApplication(
+    grossByAffiliate,
+    await unappliedSettlementDebits(db, input),
+  );
   const grouped = new Map<string, AffiliateSettlementPreviewRow>();
   for (const row of rows) {
+    const gross = grossByAffiliate.get(row.affiliate_id) ?? 0;
+    const deduction = plan.perAffiliate.get(row.affiliate_id) ?? 0;
     const current = grouped.get(row.affiliate_id) ?? {
       affiliateId: row.affiliate_id,
       affiliateName: row.affiliate_name,
       code: row.affiliate_code,
-      amount: 0,
+      // amount は純額(報酬−差し引き)。元の報酬と差し引きは別に持つ。
+      amount: gross - deduction,
+      grossAmount: gross,
+      deduction,
       conversionCount: 0,
       bankProfileRegistered: row.bank_profile_version !== null,
     };
-    current.amount += Math.round(Number(row.reward_amount));
     current.conversionCount += 1;
     grouped.set(row.affiliate_id, current);
   }
+  // 期間の始まりより前の承認分は「繰越」として別に数える。
+  // 時刻は julianday 相当の瞬時比較(new Date の時刻値)で揃える。
+  const periodFromMs = new Date(input.periodFrom).getTime();
+  const carried = rows.filter((row) => new Date(row.approved_at).getTime() < periodFromMs);
   return {
     lineAccountId: input.lineAccountId,
     periodFrom: input.periodFrom,
     periodTo: input.periodTo,
     currency: 'JPY',
-    totalAmount: rows.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0),
+    totalAmount: Array.from(grouped.values()).reduce((sum, item) => sum + item.amount, 0),
     conversionCount: rows.length,
     affiliates: Array.from(grouped.values()),
     excludedZeroAmount: {
       count: excluded.length,
       rows: excluded.slice(0, EXCLUDED_ZERO_AMOUNT_PREVIEW_ROWS),
     },
-    previewVersion: await accountPreviewVersion(rows),
+    carriedOver: {
+      count: carried.length,
+      amount: carried.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0),
+    },
+    totalDeduction: plan.totalDeduction,
+    carriedDeduction: plan.carried,
+    previewVersion: await accountPreviewVersion(rows, plan.fingerprint),
   };
 }
 
@@ -359,8 +545,27 @@ export async function closeAffiliateAccountSettlement(
   // 照合後に取り直すと、その隙に承認・締めが変わってheaderと明細がずれる。
   const rows = await eligibleRewards(db, input);
   if (rows.length === 0) return { kind: 'empty' };
-  if (await accountPreviewVersion(rows) !== input.expectedPreviewVersion) return { kind: 'changed' };
-  const totalAmount = rows.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0);
+  // R288: プレビューと同じ差し引き計画を作り、版で照合する。
+  // 報酬だけでなく未適用の取消も版に入るため、プレビュー後に来た
+  // 取消は changed で止まる(黙って別額では締めない)。
+  const grossByAffiliate = new Map<string, number>();
+  for (const row of rows) {
+    grossByAffiliate.set(
+      row.affiliate_id,
+      (grossByAffiliate.get(row.affiliate_id) ?? 0) + Math.round(Number(row.reward_amount)),
+    );
+  }
+  const plan = planDeductionApplication(
+    grossByAffiliate,
+    await unappliedSettlementDebits(db, input),
+  );
+  if (await accountPreviewVersion(rows, plan.fingerprint) !== input.expectedPreviewVersion) {
+    return { kind: 'changed' };
+  }
+  const totalAmount = Array.from(grossByAffiliate).reduce(
+    (sum, [affiliateId, gross]) => sum + gross - (plan.perAffiliate.get(affiliateId) ?? 0),
+    0,
+  );
   const now = input.now ?? new Date().toISOString();
   const settlementId = crypto.randomUUID();
   const statements: D1PreparedStatement[] = [db.prepare(
@@ -388,6 +593,10 @@ export async function closeAffiliateAccountSettlement(
       amount: Math.round(Number(row.reward_amount)),
       approvedAt: row.approved_at,
     })),
+    // R288: 取消の消費行。同じ取消を別締めが先に付けたら書かず、
+    // 巻き戻しで締めごと消える(部分適用は残らない)。
+    expectedDebitEntryIds: plan.lines.map((line) => line.debitId),
+    debitLines: plan.lines,
   }));
   try {
     await db.batch(statements);
@@ -651,6 +860,9 @@ export interface AffiliateStatementSnapshot {
   settlementId: string; settlementVersion: number; affiliateId: string;
   affiliateName: string; affiliateCode: string; periodFrom: string; periodTo: string;
   totalAmount: number; currency: string; lineCount: number;
+  /** R288: 明細でも元報酬・差し引きを分けて見せる。無いときは 0。 */
+  grossAmount: number;
+  deductionAmount: number;
 }
 
 export async function prepareAffiliateStatement(
@@ -661,6 +873,8 @@ export async function prepareAffiliateStatement(
     `SELECT s.id AS settlement_id, s.version, s.period_from, s.period_to, s.currency,
             a.id AS affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
             COALESCE(SUM(sl.amount_minor), 0) AS total_amount,
+            COALESCE(SUM(CASE WHEN sl.amount_minor > 0 THEN sl.amount_minor ELSE 0 END), 0) AS gross_amount,
+            COALESCE(SUM(CASE WHEN sl.amount_minor < 0 THEN -sl.amount_minor ELSE 0 END), 0) AS deduction_amount,
             COUNT(sl.id) AS line_count
        FROM affiliate_settlements s
        JOIN affiliate_settlement_lines sl ON sl.settlement_id = s.id AND sl.affiliate_id = ?
@@ -670,13 +884,14 @@ export async function prepareAffiliateStatement(
   ).bind(input.affiliateId, input.settlementId, input.tenantId, input.lineAccountId).first<{
     settlement_id: string; version: number; period_from: string; period_to: string; currency: string;
     affiliate_id: string; affiliate_name: string; affiliate_code: string;
-    total_amount: number; line_count: number;
+    total_amount: number; gross_amount: number; deduction_amount: number; line_count: number;
   }>();
   return row ? {
     settlementId: row.settlement_id, settlementVersion: Number(row.version),
     affiliateId: row.affiliate_id, affiliateName: row.affiliate_name,
     affiliateCode: row.affiliate_code, periodFrom: row.period_from, periodTo: row.period_to,
     totalAmount: Number(row.total_amount), currency: row.currency, lineCount: Number(row.line_count),
+    grossAmount: Number(row.gross_amount), deductionAmount: Number(row.deduction_amount),
   } : null;
 }
 
@@ -768,4 +983,109 @@ export async function getAffiliateStatementDownload(
     input.now ?? new Date().toISOString(),
   ).first<StatementRow>();
   return row ? { statement: affiliateStatement(row), objectKey: row.pdf_object_key, checksum: row.file_checksum } : null;
+}
+
+/**
+ * R43: 締め済み台帳の再開情報。画面を離れても `closed` 状態が消えるだけで
+ * 台帳自体は残るため、期間で引き直して明細発行・CSV準備を再開できる
+ * ようにする。
+ */
+export interface AffiliateSettlementResume {
+  settlementId: string;
+  state: string;
+  version: number;
+  closedAt: string | null;
+  totalAmount: number;
+  conversionCount: number;
+  periodFrom: string;
+  periodTo: string;
+  affiliates: Array<{
+    affiliateId: string;
+    affiliateName: string;
+    code: string;
+    amount: number;
+    conversionCount: number;
+    statementIssued: boolean;
+    bankProfileRegistered: boolean;
+  }>;
+  batch: { id: string; state: string; lineCount: number } | null;
+}
+
+export async function getClosedAccountSettlement(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
+): Promise<AffiliateSettlementResume | null> {
+  // 期間文字列の書式は書き込んだ時期で揺れる(JST/UTC)ため、julianday で
+  // 同じ時刻範囲かを照合する。
+  const settlement = await db.prepare(
+    `SELECT s.id, s.state, s.version, s.closed_at, s.total_amount_minor,
+            s.period_from, s.period_to,
+            (SELECT COUNT(*) FROM affiliate_settlement_lines sl
+              WHERE sl.settlement_id = s.id AND sl.status = 'included'
+                AND sl.amount_minor > 0) AS line_count
+       FROM affiliate_settlements s
+      WHERE s.organization_id = ? AND s.line_account_id = ?
+        AND julianday(s.period_from) = julianday(?) AND julianday(s.period_to) = julianday(?)
+        AND s.state IN ('closed', 'exported', 'paid', 'partial')
+      ORDER BY s.closed_at DESC, s.id DESC
+      LIMIT 1`,
+  ).bind(input.tenantId, input.lineAccountId, input.periodFrom, input.periodTo).first<{
+    id: string; state: string; version: number; closed_at: string | null;
+    total_amount_minor: number; period_from: string; period_to: string; line_count: number;
+  }>();
+  if (!settlement) return null;
+
+  const lines = await db.prepare(
+    `SELECT sl.affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
+            SUM(sl.amount_minor) AS amount,
+            COUNT(CASE WHEN sl.amount_minor > 0 THEN 1 END) AS line_count,
+            MAX(EXISTS(
+              SELECT 1 FROM affiliate_statements st
+               WHERE st.settlement_id = sl.settlement_id
+                 AND st.affiliate_id = sl.affiliate_id
+                 AND st.status = 'generated')) AS statement_issued,
+            MAX(bp.version IS NOT NULL) AS bank_profile_registered
+       FROM affiliate_settlement_lines sl
+       JOIN affiliates a ON a.id = sl.affiliate_id
+       LEFT JOIN affiliate_bank_profiles bp
+         ON bp.affiliate_id = sl.affiliate_id
+        AND bp.organization_id = ? AND bp.line_account_id = ?
+      WHERE sl.settlement_id = ? AND sl.status = 'included'
+      GROUP BY sl.affiliate_id
+      ORDER BY a.name, sl.affiliate_id`,
+  ).bind(input.tenantId, input.lineAccountId, settlement.id).all<{
+    affiliate_id: string; affiliate_name: string; affiliate_code: string;
+    amount: number; line_count: number; statement_issued: number; bank_profile_registered: number;
+  }>();
+
+  const batch = await db.prepare(
+    `SELECT id, state, line_count FROM affiliate_payout_batches
+      WHERE organization_id = ? AND line_account_id = ? AND settlement_id = ?
+      ORDER BY created_at DESC, id DESC LIMIT 1`,
+  ).bind(input.tenantId, input.lineAccountId, settlement.id).first<{
+    id: string; state: string; line_count: number;
+  }>();
+
+  return {
+    settlementId: settlement.id,
+    state: settlement.state,
+    version: Number(settlement.version),
+    closedAt: settlement.closed_at,
+    totalAmount: Number(settlement.total_amount_minor),
+    conversionCount: Number(settlement.line_count),
+    periodFrom: settlement.period_from,
+    periodTo: settlement.period_to,
+    affiliates: lines.results.map((line) => ({
+      affiliateId: line.affiliate_id,
+      affiliateName: line.affiliate_name,
+      code: line.affiliate_code,
+      amount: Number(line.amount),
+      conversionCount: Number(line.line_count),
+      statementIssued: line.statement_issued === 1,
+      bankProfileRegistered: line.bank_profile_registered === 1,
+    })),
+    batch: batch
+      ? { id: batch.id, state: batch.state, lineCount: Number(batch.line_count) }
+      : null,
+  };
 }

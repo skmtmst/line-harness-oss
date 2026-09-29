@@ -15,11 +15,13 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import { shortDate } from '../../lib/format-time'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -726,6 +728,13 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     return Array.from({ length: 14 }, (_, index) => addDays(from, index))
   }, [timeZone])
 
+  // R163: 14日は「今日から」並ぶため、月曜始まりの7列とそのままでは
+  // ずれる。初日の曜日（月=0…日=6）ぶん空きマスを置き、日付を正しい
+  // 曜日の列へ置く。どの曜日に開いても日付と曜日が一致する。
+  const previewLeadBlanks = previewDates.length === 0
+    ? 0
+    : (weekdayOf(previewDates[0]) + 6) % 7
+
   const previewMarks = useMemo(() => previewDates.map((date) => {
     const exception = storeExceptions.find((item) => item.dateFrom <= date && date <= item.dateTo)
     if (exception?.kind === 'closed') return { date, mark: '休' as const }
@@ -827,16 +836,12 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
         </nav>
         <label className="text-ink-secondary ml-auto flex items-center gap-2 text-xs">
           担当者を切り替える
-          <select
+          <Select
             aria-label="担当者を切り替える"
             value={staffId}
-            onChange={(event) => router.push(`/booking/staff/shifts?staff_id=${event.target.value}`)}
-            className="border-hairline rounded-control border bg-canvas px-3 py-2 text-sm"
-          >
-            {staffList.map((item) => (
-              <option key={item.id} value={item.id}>{item.display_name}</option>
-            ))}
-          </select>
+            onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
+            options={staffList.map((item) => ({ value: item.id, label: item.display_name }))}
+          />
         </label>
       </div>
 
@@ -860,16 +865,11 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 return (
                   <div className="flex min-h-10 flex-wrap items-center gap-3 px-4 py-2 text-sm" key={day.weekday}>
                     <strong className="w-24 shrink-0 whitespace-nowrap">{day.label}</strong>
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        aria-label={`${day.label}は出勤する`}
-                        checked={row.active}
-                        onChange={(event) => updateDraft(day.weekday, { active: event.target.checked })}
-                        className="rounded"
-                      />
-                      <span>出る</span>
-                    </label>
+                    <Checkbox
+                      checked={row.active}
+                      onCheckedChange={(checked) => updateDraft(day.weekday, { active: checked })}
+                      aria-label={`${day.label}は出勤する`}
+                    >出る</Checkbox>
                     {row.active ? (
                       <>
                         <span className="flex items-center gap-1 text-xs">
@@ -907,7 +907,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
 
           <section className="bg-canvas border-hairline rounded-card border p-4">
             <h2 className="text-ink font-semibold">休憩</h2>
-            <p className="text-ink-faint mt-1 text-xs">いつもの勤務時間の中での休み時間です。保存はできますが、まだ予約枠には反映されません。</p>
+            <p className="text-ink-faint mt-1 text-xs">いつもの勤務時間の中での休み時間です。休憩の時間は予約枠から除きます。</p>
             <div className="mt-4 space-y-2">
               {breakRows.length === 0 ? (
                 <p className="text-ink-faint text-sm">休憩はありません。</p>
@@ -915,16 +915,13 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <div key={row.key} className="border-hairline flex flex-wrap items-center gap-3 rounded-control border p-3 text-sm">
                   <label className="flex items-center gap-1 text-xs">
                     曜日
-                    <select
+                    <Select
                       aria-label="休憩の曜日"
-                      value={row.weekday}
-                      onChange={(event) => updateBreakRow(row.key, { weekday: Number(event.target.value) })}
-                      className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm"
-                    >
-                      {STAFF_DAYS.map((day) => (
-                        <option key={day.weekday} value={day.weekday}>{day.short}</option>
-                      ))}
-                    </select>
+                      value={String(row.weekday)}
+                      onChange={(value) => updateBreakRow(row.key, { weekday: Number(value) })}
+                      options={STAFF_DAYS.map((day) => ({ value: String(day.weekday), label: day.short }))}
+                      size="page-size"
+                    />
                   </label>
                   <span className="flex items-center gap-1 text-xs">
                     始め
@@ -954,11 +951,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             <div className="border-hairline bg-canvas-sunken mt-4 grid gap-3 rounded-control border p-3 sm:grid-cols-4">
               <label className="text-ink-secondary text-xs">
                 曜日
-                <select aria-label="足す休憩の曜日" value={newBreakWeekday} onChange={(event) => setNewBreakWeekday(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm">
-                  {STAFF_DAYS.map((day) => (
-                    <option key={day.weekday} value={day.weekday}>{day.label}</option>
-                  ))}
-                </select>
+                <Select size="full" aria-label="足す休憩の曜日" value={newBreakWeekday} onChange={(value) => setNewBreakWeekday(value)} options={STAFF_DAYS.map((day) => ({ value: String(day.weekday), label: day.label }))} className="mt-1" />
               </label>
               <span className="text-ink-secondary text-xs">
                 始め
@@ -981,7 +974,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             </div>
 
             <h3 className="text-ink mt-6 text-sm font-semibold">この日だけの休憩</h3>
-            <p className="text-ink-faint mt-1 text-xs">その日だけ休むときに足します。その日の出る時間の中に入れてください。保存はできますが、まだ予約枠には反映されません。</p>
+            <p className="text-ink-faint mt-1 text-xs">その日だけ休むときに足します。その日の出る時間の中に入れてください。休憩の時間は予約枠から除きます。</p>
             <div className="mt-4 space-y-2">
               {dateRows.length === 0 ? (
                 <p className="text-ink-faint text-sm">この日だけの休憩はありません。</p>
@@ -1158,12 +1151,23 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             ) : (
               <div className="text-ink-faint mt-3 grid grid-cols-7 gap-1 text-center text-xs">
                 {['月', '火', '水', '木', '金', '土', '日'].map((day) => <span key={day} className="font-medium">{day}</span>)}
-                {previewMarks.map((item) => (
-                  <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={item.date}>
-                    <span className="block tabular-nums">{Number(item.date.slice(8, 10))}</span>
-                    <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
-                  </span>
+                {Array.from({ length: previewLeadBlanks }).map((_, index) => (
+                  <span key={`blank-${index}`} aria-hidden="true" />
                 ))}
+                {previewMarks.map((item, index) => {
+                  // R163: 月をまたぐ位置が分かるよう、月の初めと先頭の日は
+                  // 「月/日」で出す（それ以外は日のみ）。枠の title には
+                  // 日付と曜日を添え、列の曜日と読み違えないようにする。
+                  const day = Number(item.date.slice(8, 10))
+                  const showMonth = index === 0 || day === 1
+                  const label = showMonth ? `${Number(item.date.slice(5, 7))}/${day}` : `${day}`
+                  return (
+                    <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={`${item.date}（${weekdayLabel(item.date)}）`}>
+                      <span className="block tabular-nums">{label}</span>
+                      <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
+                    </span>
+                  )
+                })}
               </div>
             )}
             {previewError ? <p className="text-danger mt-3 text-xs">予約枠だけ読み込めませんでした。</p> : null}

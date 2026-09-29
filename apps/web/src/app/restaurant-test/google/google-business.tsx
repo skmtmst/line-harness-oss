@@ -7,13 +7,15 @@ import { ExternalLink, Link2, RefreshCw, Sparkles, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
@@ -23,6 +25,9 @@ import { ApiError } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { errorMessage, formatDate, formatDateTime } from './google-format'
 import { ChangeConfirmScreen, HistoryScreen, HoursEditor, PROFILE_DESIGN_NODES, ProfileEditScreen, ProfileTab, type HoursMode } from './google-profile'
+import { POSTS_DESIGN_NODES, PostConfirmScreen, PostEditor, PostsTab } from './google-posts'
+import { PERFORMANCE_DESIGN_NODES, PerformanceTab } from './google-performance'
+import type { GooglePostKind } from '@/lib/restaurant-google-api'
 import {
   restaurantGoogleApi,
   type GoogleConnectionData,
@@ -41,7 +46,8 @@ import {
  *  - GB-16 xSudF  返信の公開確認      - GB-15 oQRFu  状態・エラー
  *
  * 第2段（プロフィール・営業時間・変更履歴）は `google-profile.tsx`（GB-10〜GB-12、GB-17〜GB-19）。
- * 投稿・パフォーマンスは第3段以降。タブは見せるが押せない（未対応機能を利用可能に見せない）。
+ * 第3段（投稿：最新情報・イベント・特典）は `google-posts.tsx`（GB-4〜GB-8、GB-14）。
+ * 第4段（パフォーマンス）は `google-performance.tsx`（GB-9）。
  */
 
 type TabKey = 'reviews' | 'posts' | 'performance' | 'profile' | 'settings'
@@ -148,11 +154,12 @@ function GoogleBusinessInner() {
   const canPublish = data.permissions.canPublishReply
   const canManageConnection = data.permissions.canManageConnection
 
+  // タブの件数は「まだやることが残っている数」：口コミ＝未返信、投稿＝要対応（不承認・送信失敗）。
   const tabItems = (Object.keys(TAB_LABELS) as TabKey[]).map((key) => ({
     label: TAB_LABELS[key],
     current: tab === key,
-    count: key === 'reviews' && connected ? data.summary.newCount : undefined,
-    disabled: !connected && key !== 'settings' ? true : key === 'posts' || key === 'performance',
+    count: !connected ? undefined : key === 'reviews' ? data.summary.unrepliedCount || undefined : key === 'posts' ? data.summary.postsAttentionCount || undefined : undefined,
+    disabled: !connected && key !== 'settings',
     onClick: () => go({ tab: key }),
   }))
 
@@ -161,7 +168,11 @@ function GoogleBusinessInner() {
   const hoursMode: HoursMode = searchParams.get('mode') === 'calendar' ? 'calendar' : searchParams.get('mode') === 'weekly' ? 'weekly' : 'text'
   const profileView = tab === 'profile' && connected ? (view === 'hours' || view === 'confirm' || view === 'history' || view === 'edit' ? view : 'profile') : null
   const profileNode = profileView === 'hours' ? PROFILE_DESIGN_NODES[`hours:${hoursMode}`] : profileView === 'confirm' ? PROFILE_DESIGN_NODES['confirm:hours'] : profileView ? PROFILE_DESIGN_NODES[profileView] : null
-  const panelNode = profileNode ?? designNode
+  const postsView = tab === 'posts' && connected ? (view === 'new' || view === 'edit' || view === 'confirm' ? view : 'list') : null
+  const postKind: GooglePostKind = searchParams.get('kind') === 'event' ? 'event' : searchParams.get('kind') === 'offer' ? 'offer' : 'standard'
+  const postsNode = postsView === 'new' || postsView === 'edit' ? POSTS_DESIGN_NODES[`edit:${postKind}`] : postsView ? POSTS_DESIGN_NODES[postsView] : null
+  const performanceNode = tab === 'performance' && connected ? PERFORMANCE_DESIGN_NODES.performance : null
+  const panelNode = profileNode ?? postsNode ?? performanceNode ?? designNode
 
   return (
     <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={panelNode}>
@@ -180,6 +191,14 @@ function GoogleBusinessInner() {
           <ProfileEditScreen accountId={selectedAccountId} go={go} />
         ) : profileView === 'profile' ? (
           <ProfileTab accountId={selectedAccountId} go={go} />
+        ) : postsView === 'new' || postsView === 'edit' ? (
+          <PostEditor accountId={selectedAccountId} kind={postKind} postId={postsView === 'edit' ? reviewId : null} go={go} />
+        ) : postsView === 'confirm' && reviewId ? (
+          <PostConfirmScreen key={reviewId} accountId={selectedAccountId} id={reviewId} go={go} />
+        ) : postsView === 'list' ? (
+          <PostsTab accountId={selectedAccountId} go={go} />
+        ) : tab === 'performance' && connected ? (
+          <PerformanceTab accountId={selectedAccountId} />
         ) : tab === 'settings' ? (
           <SettingsTab accountId={selectedAccountId} data={data} canManage={canManageConnection} onChanged={() => { void load() }} />
         ) : (
@@ -334,24 +353,19 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
               </div>
             </div>
             <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウント（{data.store.name}）に接続する店舗を1つ選んでください。接続後は、選んだ店舗だけを表示します。</p>
-            <div className="flex flex-col gap-2" role="radiogroup" aria-label="接続するGoogleビジネスプロフィール">
+            <RadioCardGroup legend="接続するGoogleビジネスプロフィール" className="flex flex-col gap-2">
             {data.candidates.map((candidate) => (
-              <label
+              <RadioCard
                 key={candidate.locationName}
-                className={`gb-location-option flex min-w-0 cursor-pointer items-center gap-3 rounded-control border px-3.5 py-2 transition-colors ${
-                  selectedLocation === candidate.locationName
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-hairline bg-surface-pearl hover:bg-canvas-sunken'
-                }`}
-              >
-                <input type="radio" name="location" value={candidate.locationName} checked={selectedLocation === candidate.locationName} onChange={() => setSelectedLocation(candidate.locationName)} className="gb-accent-control h-4 w-4 shrink-0" />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold" title={candidate.locationTitle}>{candidate.locationTitle}</span>
-                  {candidate.addressText ? <span className="text-ink-secondary block truncate text-xs" title={candidate.addressText}>{candidate.addressText}</span> : null}
-                </span>
-              </label>
+                name="location"
+                value={candidate.locationName}
+                checked={selectedLocation === candidate.locationName}
+                onChange={() => setSelectedLocation(candidate.locationName)}
+                title={candidate.locationTitle}
+                note={candidate.addressText ?? undefined}
+              />
             ))}
-            </div>
+            </RadioCardGroup>
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div className="border-hairline flex flex-wrap justify-center gap-2 border-t pt-4">
               <Button onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>Googleアカウントを選び直す</Button>
@@ -513,8 +527,8 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
         }))}
         actions={(
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-            <SelectField size="compact" aria-label="評価で絞り込み" value={rating} onChange={(event) => { setRating(event.target.value); setPage(1) }} options={[{ value: '', label: '評価：すべて' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `★${n}` }))]} />
-            <SelectField size="compact" aria-label="並び順" value={order} onChange={(event) => { setOrder(event.target.value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
+            <Select size="page-size" aria-label="評価で絞り込み" value={rating} onChange={(value) => { setRating(value); setPage(1) }} options={[{ value: '', label: '評価：すべて' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `★${n}` }))]} />
+            <Select size="page-size" aria-label="並び順" value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
             <SearchField placeholder="口コミを検索" aria-label="口コミを検索" value={search} onChange={setSearch} onClear={() => setSearch('')} />
           </div>
         )}
@@ -694,10 +708,11 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
           </Card>
           <Card padding="roomy">
             <h3 className="mb-3 text-base font-bold">公開前の確認</h3>
-            <label className="mb-4 flex items-start gap-2 text-sm leading-relaxed">
-              <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} className="gb-accent-control mt-1 h-4 w-4 shrink-0" />
-              <span>返信先・内容・個人情報の有無を確認しました</span>
-            </label>
+            <Checkbox
+              checked={checked}
+              onCheckedChange={setChecked}
+              className="mb-4"
+            >返信先・内容・個人情報の有無を確認しました</Checkbox>
             <ul className="text-ink-secondary flex flex-col gap-2 text-xs leading-relaxed">
               <li>・予約内容や来店履歴などを追記していません</li>
               <li>・返信は店舗を代表して公開されます</li>
@@ -774,7 +789,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
           ) : null}
         </aside>
       </div>
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない下書きがあります"
         description="このまま移動すると、返信文の変更は失われます。下書き保存をしてから移動するか、保存せずに移動してください。"

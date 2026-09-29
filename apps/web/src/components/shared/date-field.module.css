@@ -71,17 +71,23 @@
   color: var(--color-ink-faint);
 }
 
+/*
+ * 消すボタンは欄の右端に収める（40px の欄の中・上下1px空け）。
+ * 素のボタン扱い（globals の min-height:32px）で 32px に伸びると、
+ * 隣の欄（40px）と高さがずれて見える。
+ */
 .clear {
   position: absolute;
-  top: 8px;
-  right: 6px;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
   display: inline-flex;
-  width: 24px;
-  height: 24px;
+  width: 34px;
+  min-height: 0;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: var(--radius-icon);
+  border-radius: 0 calc(var(--radius-control) - 1px) calc(var(--radius-control) - 1px) 0;
   background: transparent;
   color: var(--color-ink-faint);
   cursor: pointer;

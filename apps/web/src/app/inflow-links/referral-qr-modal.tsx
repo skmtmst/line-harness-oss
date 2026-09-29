@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import Button from '@/components/shared/button'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
@@ -33,6 +34,8 @@ export default function ReferralQrModal({
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const titleId = useId()
+  const panelRef = useOverlayFocus(true, onClose)
   const stopped = route.isActive === false
   const url = referralUrl(route.refCode)
   const qrBase = `${WORKER_BASE.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}`
@@ -44,11 +47,11 @@ export default function ReferralQrModal({
   }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
-      <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-medium text-ink-faint">リファラルリンク・QRコード</p>
-            <h2 className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
+            <h2 id={titleId} className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
             <p className="mt-1 text-sm text-ink-faint">{route.genre ?? '未分類'}</p>
           </div>
           <button onClick={onClose} className="text-2xl leading-none text-ink-faint" aria-label="閉じる">×</button>

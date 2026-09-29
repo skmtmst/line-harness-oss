@@ -25,6 +25,10 @@ export interface AdCostEntry {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** R275: 取り消した日時。NULL なら集計に数える行。 */
+  cancelled_at: string | null;
+  /** R275: 取消の理由(画面で入力)。履歴として残す。 */
+  cancel_reason: string | null;
 }
 
 export interface AdCostImportRun {
@@ -89,11 +93,14 @@ export async function upsertAdCostEntry(
     .first<{ id: string }>();
 
   if (existing) {
+    // R275: 取り消した記録と同じ識別条件・同じ日への再登録は「新しい記録」
+    // として受け、取消の印を外す(そうしないと再登録が永久に集計から外れる)。
     await db
       .prepare(
         `UPDATE ad_cost_entries
             SET amount_minor = ?, currency = ?, source = ?,
-                imported_at = COALESCE(?, imported_at), updated_at = ?
+                imported_at = COALESCE(?, imported_at), updated_at = ?,
+                cancelled_at = NULL, cancel_reason = NULL
           WHERE id = ?`,
       )
       .bind(
@@ -139,6 +146,59 @@ export async function upsertAdCostEntry(
     .prepare('SELECT * FROM ad_cost_entries WHERE id = ?')
     .bind(id)
     .first<AdCostEntry>())!;
+}
+
+/**
+ * R275: 手入力の費用を1行ずつ一覧にする(取消ボタンと取消済みの履歴表示用)。
+ * 取消済みの行も履歴として返す。新しい日付が先に来る順。
+ */
+export async function listManualAdCostEntries(
+  db: D1Database,
+  input: { lineAccountId: string; from: string; to: string },
+): Promise<AdCostEntry[]> {
+  const rows = await db
+    .prepare(
+      `SELECT * FROM ad_cost_entries
+        WHERE line_account_id = ? AND source = 'manual'
+          AND day >= ? AND day <= ?
+        ORDER BY day DESC, created_at DESC, id`,
+    )
+    .bind(input.lineAccountId, input.from, input.to)
+    .all<AdCostEntry>();
+  return rows.results;
+}
+
+export type CancelAdCostResult =
+  | 'cancelled'
+  | 'not_found'
+  | 'not_manual'
+  | 'already_cancelled';
+
+/**
+ * R275: 手入力の費用を取消する。行は消さず、取消した日時と理由を残し、
+ * 集計からは外れる。取込分は媒体側の記録なのでここでは取り消せない。
+ */
+export async function cancelAdCostEntry(
+  db: D1Database,
+  input: { entryId: string; reason: string },
+): Promise<CancelAdCostResult> {
+  const row = await db
+    .prepare(`SELECT source, cancelled_at FROM ad_cost_entries WHERE id = ?`)
+    .bind(input.entryId)
+    .first<{ source: string; cancelled_at: string | null }>();
+  if (!row) return 'not_found';
+  if (row.source !== 'manual') return 'not_manual';
+  if (row.cancelled_at !== null) return 'already_cancelled';
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE ad_cost_entries
+          SET cancelled_at = ?, cancel_reason = ?, updated_at = ?
+        WHERE id = ?`,
+    )
+    .bind(now, input.reason.trim(), now, input.entryId)
+    .run();
+  return 'cancelled';
 }
 
 /** 取込の成否を日ごとに残す。同じ日に取り直したら最新の結果に差し替える。 */
@@ -222,6 +282,7 @@ export async function getAdCostSummary(
        FROM ad_cost_entries
        WHERE line_account_id = ?
          AND day >= ? AND day <= ?
+         AND cancelled_at IS NULL
        GROUP BY route_key, platform_key, source_label, currency`,
     )
     .bind(input.lineAccountId, input.from, input.to)
@@ -301,6 +362,7 @@ export async function getAdCostTotalsByRoute(
          FROM ad_cost_entries
         WHERE line_account_id = ? AND entry_route_id IS NOT NULL
           AND day >= ? AND day <= ?
+          AND cancelled_at IS NULL
         GROUP BY entry_route_id, currency`,
     )
     .bind(input.lineAccountId, input.from, input.to)

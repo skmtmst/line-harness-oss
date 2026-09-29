@@ -26,6 +26,22 @@ const fixture = vi.hoisted(() => ({
   scenariosImpl: null as null | (() => Promise<unknown>),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の候補境界の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select aria-label={label} value={value} onChange={(e) => onChange((e.target as HTMLSelectElement).value)}>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  ),
+}))
 vi.mock('@/lib/api', () => ({
   api: {
     conversionApprovals: {
@@ -41,6 +57,35 @@ vi.mock('@/lib/api', () => ({
         return fixture.offerUpdateImpl!(id, body)
       },
       create: vi.fn(),
+      // 決まりの欄の初期値（#823）。この試験の対象はタグ・シナリオ候補なので、
+      // 上限なし・期間30日の版で埋める。
+      capStatus: () => Promise.resolve({
+        success: true,
+        data: {
+          version: {
+            id: 'ver-1',
+            offerId: 'off-1',
+            versionNumber: 1,
+            rewardAmount: 1000,
+            rewardMiles: 0,
+            windowDays: 30,
+            capTotal: null,
+            capMonthlyPerAffiliate: null,
+            receptionFrom: null,
+            receptionTo: null,
+            effectiveFrom: null,
+            createdAt: '2026-09-01T00:00:00.000+09:00',
+          },
+          capped: false,
+          capTotal: null,
+          totalUsed: 0,
+          totalRemaining: null,
+          capMonthlyPerAffiliate: null,
+          monthlyUsed: 0,
+          monthlyRemaining: null,
+        },
+      }),
+      versions: () => Promise.resolve({ success: true, data: [] }),
     },
     lineAccounts: { list: () => fixture.accountsImpl!() },
     tags: { list: () => fixture.tagsImpl!() },

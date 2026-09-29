@@ -10,6 +10,8 @@ import {
   listLineAccountsWithTenantStatus,
   getAffiliateLinkStats,
   listAffiliateOffers,
+  getCurrentOfferVersion,
+  getOfferCapStatus,
   enrollAffiliateInOffer,
   getMileageSummaryForFriend,
   getMileageHistoryForFriend,
@@ -763,19 +765,30 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
       if (l.offer_id) linkByOffer.set(l.offer_id, l);
     }
 
-    const data = offers.map((o) => {
+    // 案件の決まり(今の版)と上限の残りを添える(#823)。上限に達した受付の
+    // 自動停止は、紹介した人の画面にも出す。
+    const data = [];
+    for (const o of offers) {
       const link = linkByOffer.get(o.id);
-      return {
+      const version = await getCurrentOfferVersion(db, o.id);
+      const status = await getOfferCapStatus(db, o.id, { affiliateId: affiliate.id });
+      data.push({
         id: o.id,
         name: o.name,
         description: o.description,
-        rewardAmount: o.reward_amount,
-        rewardMiles: o.reward_miles ?? 0,
+        rewardAmount: version?.reward_amount ?? o.reward_amount,
+        rewardMiles: version?.reward_miles ?? o.reward_miles ?? 0,
+        windowDays: version?.window_days ?? 30,
+        receptionFrom: version?.reception_from ?? null,
+        receptionTo: version?.reception_to ?? null,
+        halted: status.capped,
+        totalRemaining: status.totalRemaining,
+        monthlyRemaining: status.monthlyRemaining,
         enrolled: Boolean(link),
         refCode: link ? link.ref_code : null,
         url: link ? `${baseUrl}/${link.ref_code}` : null,
-      };
-    });
+      });
+    }
 
     return c.json({ offers: data });
   } catch (err) {
@@ -825,6 +838,13 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', async (c) => {
     const offer = activeOffers.find((o) => o.id === c.req.param('id'));
     if (!offer) {
       return c.json({ success: false, error: 'Offer not found' }, 404);
+    }
+
+    // 上限に達した案件の受付は自動で止める(#823)。参加済みの人の紹介リンクは
+    // 残るが、新しい参加と成果の付与は止まる。
+    const capStatus = await getOfferCapStatus(db, offer.id, { affiliateId: affiliate.id });
+    if (capStatus.capped) {
+      return c.json({ success: false, error: 'この案件の受付は上限に達したため終了しました' }, 409);
     }
 
     const { link } = await enrollAffiliateInOffer(db, {

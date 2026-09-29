@@ -14,8 +14,10 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import Dialog from '@/components/shared/dialog'
 import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { Tabs } from '@/components/shared/tabs'
@@ -24,6 +26,7 @@ import { formatPhotoReceivedAt } from './photo-review-time'
 import { formatMinutesRough } from '@/lib/format-duration'
 import { PhotoReviewDetail } from './photo-review-detail'
 import { PhotoPublications } from './photo-publications'
+import { PhotoRewardPolicyCard } from './photo-reward-policy'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
@@ -84,6 +87,8 @@ export default function PhotoReviewsPage() {
   const [hasMorePhotos, setHasMorePhotos] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
+  // #817: いま使っている報酬の決まりの点数。まとめ採用の合計に使う。未取得は null。
+  const [policyPoints, setPolicyPoints] = useState<number | null>(null)
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [rejectingPhotoId, setRejectingPhotoId] = useState<string | null>(null)
   const [rejectingPhotoDetail, setRejectingPhotoDetail] = useState<Record<string, unknown> | null>(null)
@@ -444,6 +449,8 @@ export default function PhotoReviewsPage() {
     id: string,
     nextStatus: 'adopted' | 'rejected',
     rejection?: { reasonCode: ReviewReasonCode; reasonNote: string; resubmitInvite: boolean; watchSubmitter: boolean },
+    // #817: 重複のときの「報酬なしで採用」。点数を付けずに採用だけ残す。
+    options?: { withoutReward?: boolean },
   ) => {
     if (!selectedAccountId) {
       setAccountNotice('LINEアカウントを選んでください。')
@@ -471,6 +478,7 @@ export default function PhotoReviewsPage() {
               watchSubmitter: rejection.watchSubmitter,
             }
           : {}),
+        ...(options?.withoutReward ? { withoutReward: true } : {}),
       }, idempotencyKey)
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
@@ -483,11 +491,15 @@ export default function PhotoReviewsPage() {
        * つながっていない採用に「手続きを始めました」と伝えるのは、
        * できていない約束をすることになる（#931 N-307）。
        */
-      const adoptedNote = response.data.pointSync === 'pending'
-        ? `ECへ${response.data.awardedPoints}マイルを付ける手続きを始めました。`
-        : response.data.pointSync === 'needs_attention'
-          ? 'EC会員とつながっていないため、マイルの手続きはまだ始まっていません。'
-          : ''
+      const adoptedNote = response.data.rewardSkipped === 'duplicate'
+        ? '同じ写真はすでに報酬付きで採用されているため、点数は付けずに採用しました。'
+        : response.data.rewardSkipped === 'requested'
+          ? '報酬なしで採用しました。点数は付けていません。'
+          : response.data.pointSync === 'pending'
+            ? `ECへ${response.data.awardedPoints}マイルを付ける手続きを始めました。`
+            : response.data.pointSync === 'needs_attention'
+              ? 'EC会員とつながっていないため、マイルの手続きはまだ始まっていません。'
+              : ''
       notifyToast(nextStatus === 'adopted'
         ? `写真を採用しました。${adoptedNote}公開は本人の同意がある場合だけ行います。${notification}`
         : `見送り理由を保存しました。${notification}`)
@@ -719,6 +731,7 @@ export default function PhotoReviewsPage() {
         if (next) void openDetail(text(next.id))
       }}
       onApprove={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted') }}
+      onAdoptWithoutReward={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted', undefined, { withoutReward: true }) }}
       onReturn={() => {
         if (!detailPhoto) return
         writeEntryToUrl({ view: 'list', status, q: searchQuery || undefined })
@@ -836,9 +849,10 @@ export default function PhotoReviewsPage() {
           <p className="mt-0.5 text-xs text-ink-faint">{reviewedStatsReady ? (reviewedIn30Days > 0 ? '採用・見送りの合計' : 'この30日に見た写真はまだありません') : 'まだ記録がありません'}</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
-          <p className="text-xs font-semibold text-ink-secondary">1枚にかかる時間</p>
+          {/* 監査 R62: 集計は「投稿されてから採用・見送りが決まるまで」。審査の作業時間ではないので名前を実態に合わせる。 */}
+          <p className="text-xs font-semibold text-ink-secondary">投稿から審査までの日数</p>
           <p className="mt-1 text-2xl font-bold text-ink"><MetricValue prefix="平均" text={averageReviewDurationText(reviewMetrics?.averageReviewMinutes)} /></p>
-          <p className="mt-0.5 text-xs text-ink-faint">{reviewMetrics?.averageReviewMinutes != null ? '審査を始めてから保存するまでの平均' : 'まだ記録がありません'}</p>
+          <p className="mt-0.5 text-xs text-ink-faint">{reviewMetrics?.averageReviewMinutes != null ? '投稿されてから採用・見送りが決まるまでの平均' : 'まだ記録がありません'}</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">気をつけたい写真</p>
@@ -865,15 +879,19 @@ export default function PhotoReviewsPage() {
           writeEntryToUrl({ view: 'list', status, q: q || undefined })
         }}
       >
-        <label className="min-w-0 flex-1 sm:max-w-md">
-          <span className="sr-only">写真を探す</span>
-          <input
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="名前・ペット名・コメントで探す"
-            className="w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink"
-          />
-        </label>
+        {/*
+         * 絞り込み欄は共通 SearchField（ListToolbar と同じ部品）。
+         * 幅320・下限240・虫眼鏡・消すボタンを部品に任せ、画面で手組みしない。
+         */}
+        <SearchField
+          aria-label="写真を探す"
+          value={searchInput}
+          onChange={setSearchInput}
+          onClear={() => setSearchInput('')}
+          placeholder="名前・ペット名・コメントで探す"
+          maxLength={100}
+          className="w-80 max-w-full min-w-60 shrink-0"
+        />
         <Button variant="secondary" type="submit">探す</Button>
         {searchQuery && <Button variant="secondary" type="button" onClick={() => {
           setSearchInput('')
@@ -988,6 +1006,8 @@ export default function PhotoReviewsPage() {
           </p>
         </section>
 
+        <PhotoRewardPolicyCard onCurrentPointsChange={setPolicyPoints} />
+
         <FeatureLinkCard
           items={[
             { label: '受信箱', note: '写真が届いたやりとり', href: '/chats' },
@@ -1003,7 +1023,7 @@ export default function PhotoReviewsPage() {
     <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
       <dl className="space-y-3 rounded-control bg-surface-pearl p-4 text-sm text-ink-secondary">
         <div className="flex justify-between gap-4"><dt>写真</dt><dd className="font-semibold text-ink">{selectedPendingPhotos.length}枚</dd></div>
-        <div className="flex justify-between gap-4"><dt>付与するマイル</dt><dd className="font-semibold text-ink">合計 {selectedPendingPhotos.length * 5}マイル</dd></div>
+        <div className="flex justify-between gap-4"><dt>付与するマイル</dt><dd className="font-semibold text-ink">合計 {policyPoints == null ? '—' : `${selectedPendingPhotos.length * policyPoints}マイル`}</dd></div>
         <div className="flex justify-between gap-4"><dt>公開範囲</dt><dd className="font-semibold text-ink">公開しない</dd></div>
       </dl>
       <p className="mt-3 text-xs text-ink-faint">写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
@@ -1027,14 +1047,13 @@ export default function PhotoReviewsPage() {
               <p className="mt-1 text-xs text-ink-faint">{Number.isFinite(Number(rejectingPhoto.returned_count)) ? Number(rejectingPhoto.returned_count) === 0 ? 'この方を見送るのははじめてです' : `この方を見送ったこと ${Number(rejectingPhoto.returned_count)}回` : 'この方を以前に見送った回数は未取得です'}</p>
               </div>
             </div>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-semibold text-ink">見送る理由</legend>
-              {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span><span className="font-medium text-ink">{reason.label}</span><span className="mt-1 block text-xs text-ink-faint">「{reason.message}」</span></span></label>)}
-            </fieldset>
+            <RadioCardGroup legend="見送る理由">
+              {REVIEW_REASONS.map((reason) => <RadioCard key={reason.value} name="photo-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} title={reason.label} note={`「${reason.message}」`} />)}
+            </RadioCardGroup>
             <label className="block text-sm font-semibold text-ink">お客様に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
             <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます（直せます）</p><p className="mt-1 whitespace-pre-line">{photoPetDisplayName(rejectingPhoto.pet_name, { callName: rejectingPhoto.pet_call_name, gender: rejectingPhoto.pet_gender })}の写真をありがとうございます。{reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReasonMessage}{reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}{`\n`}お手数をおかけします。</p></div>
-            <label className="flex cursor-pointer items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked={resubmitInvite} onChange={(event) => setResubmitInvite(event.target.checked)} className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">チェックを付けると、見送りのお知らせに別のお写真をお願いする案内を添えます。</span></span></label>
-            <label className="flex cursor-pointer items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked={watchSubmitter} onChange={(event) => setWatchSubmitter(event.target.checked)} className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">この方に印を付け、次に届く写真を一覧で「確認対象」として表示します。</span></span></label>
+            <Checkbox checked={resubmitInvite} onCheckedChange={setResubmitInvite} description="チェックを付けると、見送りのお知らせに別のお写真をお願いする案内を添えます。">もう一度 送ってもらえるようお願いする</Checkbox>
+            <Checkbox checked={watchSubmitter} onCheckedChange={setWatchSubmitter} description="この方に印を付け、次に届く写真を一覧で「確認対象」として表示します。">この人の次の投稿は、必ず人が見る</Checkbox>
             <p className="text-xs font-semibold text-ink-faint">見送っても、この方のマイルは減りません。</p>
         </div>
     </Dialog>}
@@ -1042,10 +1061,9 @@ export default function PhotoReviewsPage() {
       if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
       void bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
     }}>
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-semibold text-ink">見送り理由</legend>
-        {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-bulk-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span className="font-medium text-ink">{reason.label}</span></label>)}
-      </fieldset>
+      <RadioCardGroup legend="見送り理由">
+        {REVIEW_REASONS.map((reason) => <RadioCard key={reason.value} name="photo-bulk-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} title={reason.label} />)}
+      </RadioCardGroup>
       <label className="mt-4 block text-sm font-semibold text-ink">投稿者に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
       <div className="mt-4 rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">投稿者に届く内容</p><p className="mt-1 whitespace-pre-line">お写真をご投稿いただきありがとうございます。{`\n`}今回は「{selectedReasonLabel}」のため、掲載を見送らせていただきました。{reasonNote && `\n${reasonNote}`}{`\n`}内容をご確認のうえ、よろしければ別のお写真をご投稿ください。</p></div>
     </Dialog>

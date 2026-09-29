@@ -6,9 +6,10 @@ import type { Folder, FriendField, ReminderDraftSettings, ReminderDraftStep, Rem
 import { api, eventsApi, type EventListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
@@ -302,7 +303,7 @@ export default function NewReminderPage() {
         triggerEventId: triggerType === 'event' ? triggerEventId || null : null,
         repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
         leapYearPolicy,
-        triggerOffsetMinutes: null, sendAtTime: appliedTemplate?.step.sendAtTime ?? null, targetTagId: null,
+        triggerOffsetMinutes: null, sendAtTime: appliedTemplate?.step.sendAtTime ?? null, targetTagId: null, targetCondition: null,
         stopConditions: { bookingCancelled: true, supportMarkCompleted: true, daysAfterTarget: 7, friendBlocked: true },
         steps: firstStep ? [firstStep] : [],
       }
@@ -362,7 +363,7 @@ export default function NewReminderPage() {
           <div className={`${styles.basicFields} ${styles.basicFieldsGrid}`}>
             {/* #996 DEEP-01: カウンターはラベル行右（labelAside）。補足文は入力の下。 */}
             <Field label="リマインダ名" required labelAside={`${name.length} / 60文字`}><TextInput value={name} maxLength={60} placeholder="例：Google Meet相談の前日案内" onChange={(event) => setName(event.target.value)} className={inputClass} /></Field>
-            <Field label="フォルダ" note={foldersLoadState === 'ready' && folders.length === 0 ? 'フォルダはまだありません。一覧から追加できます。' : undefined}><div className="flex items-center gap-2"><SelectField value={folderId} onChange={(event) => setFolderId(event.target.value)} disabled={foldersLoadState !== 'ready'} aria-label="リマインダのフォルダ" className={inputClass} options={[{ value: '', label: foldersLoadState === 'loading' ? 'フォルダを読み込み中' : foldersLoadState === 'error' ? 'フォルダを読み込めませんでした' : '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />{foldersLoadState === 'error' ? <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>フォルダを再読み込み</Button> : null}</div></Field>
+            <Field label="フォルダ" note={foldersLoadState === 'ready' && folders.length === 0 ? 'フォルダはまだありません。一覧から追加できます。' : undefined}><div className="flex items-center gap-2"><Select value={folderId} onChange={(value) => setFolderId(value)} disabled={foldersLoadState !== 'ready'} aria-label="リマインダのフォルダ" size="full" options={[{ value: '', label: foldersLoadState === 'loading' ? 'フォルダを読み込み中' : foldersLoadState === 'error' ? 'フォルダを読み込めませんでした' : '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />{foldersLoadState === 'error' ? <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>フォルダを再読み込み</Button> : null}</div></Field>
             {/* #996 DEEP-03: 社内メモは最低3行。共通TextAreaの120px基準を潰さない。 */}
             <div className="md:col-span-2"><Field label="社内メモ　任意" note="友だちには表示されません"><TextArea rows={3} value={description} placeholder="運用目的や注意点を入力" onChange={(event) => setDescription(event.target.value)} className={inputClass} /></Field></div>
           </div>
@@ -383,12 +384,12 @@ export default function NewReminderPage() {
             <div className="mt-3">
               <Field label="基準日に使う情報欄" required note="日付・日時型の項目だけを表示しています">
                 <div className="flex items-center gap-2">
-                  <SelectField
+                  <Select
                     value={triggerFieldId}
-                    onChange={(event) => setTriggerFieldId(event.target.value)}
+                    onChange={(value) => setTriggerFieldId(value)}
                     disabled={fieldsLoadState !== 'ready'}
                     aria-label="基準日に使う情報欄"
-                    className={inputClass}
+                    size="full"
                     options={[
                       { value: '', label: fieldsLoadState === 'loading' || fieldsLoadState === 'idle' ? '情報欄を読み込み中' : fieldsLoadState === 'error' ? '情報欄を読み込めませんでした' : '選んでください' },
                       ...dateFields.map((field) => ({ value: field.id, label: field.name })),
@@ -399,21 +400,17 @@ export default function NewReminderPage() {
               </Field>
               {fieldsLoadState === 'ready' && dateFields.length === 0 ? <small>このアカウントに日付型の情報欄がまだありません。友だち情報欄から追加してください。</small> : null}
               <div className="mt-3">
-                <label className="flex items-center gap-2 text-sm font-bold text-ink">
-                  <input
-                    type="checkbox"
-                    checked={repeatYearly}
-                    onChange={(event) => setRepeatYearly(event.target.checked)}
-                    aria-label="毎年くり返す"
-                  />
-                  毎年くり返す（誕生日・契約更新日など）
-                </label>
+                <Checkbox
+                  checked={repeatYearly}
+                  onCheckedChange={setRepeatYearly}
+                  aria-label="毎年くり返す"
+                >毎年くり返す（誕生日・契約更新日など）</Checkbox>
                 {repeatYearly ? (
                   <div className="mt-2">
                     <Field label="2月29日が基準日のとき" note="うるう年は2月29日に届きます。平年の扱いを選んでください。">
-                      <SelectField
+                      <Select
                         value={leapYearPolicy}
-                        onChange={(event) => setLeapYearPolicy(event.target.value as 'feb28' | 'mar1' | 'skip')}
+                        onChange={(value) => setLeapYearPolicy(value as 'feb28' | 'mar1' | 'skip')}
                         aria-label="2月29日が基準日のときの平年の扱い"
                         options={[
                           { value: 'feb28', label: '2月28日に届ける' },
@@ -431,12 +428,12 @@ export default function NewReminderPage() {
             <div className="mt-3">
               <Field label="基準日にするイベント" required note="このイベントへの予約の開始日時を起点にします">
                 <div className="flex items-center gap-2">
-                  <SelectField
+                  <Select
                     value={triggerEventId}
-                    onChange={(event) => setTriggerEventId(event.target.value)}
+                    onChange={(value) => setTriggerEventId(value)}
                     disabled={eventsLoadState !== 'ready'}
                     aria-label="基準日にするイベント"
-                    className={inputClass}
+                    size="full"
                     options={[
                       { value: '', label: eventsLoadState === 'loading' || eventsLoadState === 'idle' ? 'イベントを読み込み中' : eventsLoadState === 'error' ? 'イベントを読み込めませんでした' : '選んでください' },
                       ...events.map((event) => ({ value: event.id, label: event.name })),
@@ -456,7 +453,7 @@ export default function NewReminderPage() {
         </div>
       </ReminderWorkspace>
       <ReminderFooter status={saveStatusLabel} primary={saving ? '保存中…' : '下書きを保存して対象設定へ'} primaryDisabled={saving || candidatesPending} onPrimary={() => void save()} />
-      <ConfirmDialog open={leaveTarget !== null} title="入力中の内容があります" description="このまま移動すると、入力した内容は保存されません。移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="入力中の内容があります" description="このまま移動すると、入力した内容は保存されません。移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <ConfirmDialog open={pendingTemplate !== null} title="ひな形で入力を置き換えますか？" description={pendingTemplate ? `「${pendingTemplate.title}」を使うと、基準日・タイミング・本文の設定がひな形の内容に置き換わります。` : ''} confirmLabel="このひな形を使う" cancelLabel="やめる" onConfirm={() => { if (pendingTemplate) applyTemplate(pendingTemplate); setPendingTemplate(null) }} onCancel={() => setPendingTemplate(null)} />
     </div>
   )

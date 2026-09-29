@@ -27,12 +27,19 @@ bucket_name = "nen-line-images"
 [ai]
 binding = "AI"
 
+# バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+# R2 の `IMAGES` と名前が重なるため `CF_IMAGES` にしている。
+# 注意: Images の有効化が必要か・変換回ごとの料金を、配備の前にオーナーへ確認する。
+[images]
+binding = "CF_IMAGES"
+
 [triggers]
 # :00/:05... は時刻厳守の通知・配信、:01/:06... は再実行可能な重い集計。
 # 6時間処理も別 invocation にして、走査の遅延を通知へ波及させない。
 crons = ["*/5 * * * *", "1-56/5 * * * *", "0 */6 * * *"]
 
 [vars]
+DEPLOY_ENV = "production"
 RESTAURANT_TEST_ENABLED = "false"
 WORKER_NAME = "nen-line"
 ADMIN_PAGES_PROJECT = "nen-line-admin-98712679"

@@ -51,7 +51,7 @@ const applicantSnapshotMocks = {
 };
 vi.mock('../services/event-applicant-snapshot.js', () => applicantSnapshotMocks);
 
-const { default: events } = await import('./events.js');
+const { default: events, summarizeFutureEventSlots } = await import('./events.js');
 
 type TestEnv = {
   Variables: { staff: { id: string; role: 'owner' | 'admin' | 'staff' } };
@@ -167,6 +167,16 @@ function makeEventDb(state: {
       if (event.deleted_at != null || !eventMatchesAccount(event, account)) return false;
       if (query && !event.name.includes(query)) return false;
       if (sql.includes('e.is_published = 1') && event.is_published !== 1) return false;
+      // R81: 公開済みを要求する問い（受付中のみ・全体集計）は、今後の有効な
+      // 枠がある行だけ（本番の EXISTS と同じ決め方）。次回日時の副問い合わせ
+      // にも同じ文字列があるため、公開条件と組み合わせて判定する。
+      if (sql.includes('e.is_published = 1') && sql.includes('s.starts_at >= strftime')) {
+        const hasFuture = (state.slots ?? []).some(
+          (slot) => slot.event_id === event.id && slot.deleted_at == null && slot.is_active === 1
+            && slot.starts_at > new Date().toISOString(),
+        );
+        if (!hasFuture) return false;
+      }
       if (sql.includes('pending.event_id = e.id') && !(state.bookings ?? []).some((booking) => booking.event_id === event.id && booking.status === 'requested')) return false;
       if (sql.includes('NOT EXISTS (SELECT 1 FROM event_slots cap')) {
         const slots = (state.slots ?? []).filter((slot) => slot.event_id === event.id && slot.deleted_at == null && slot.is_active === 1);
@@ -640,6 +650,28 @@ function makeEventDb(state: {
           }
           if (sql.startsWith('SELECT * FROM line_accounts')) {
             return { results: state.accounts ?? [] } as { results: T[] };
+          }
+          // R79/R80: 一覧の全体集計。今後の有効な枠だけを数える。
+          // 管理一覧の問い（`FROM events e` を含む）より前に置く。
+          if (sql.includes('e.id = s.event_id')) {
+            const nowIso = new Date().toISOString();
+            const targets = filterAdminEvents(sql, bound);
+            const rows = [];
+            for (const e of targets) {
+              for (const s of (state.slots ?? []).filter(
+                (slot) => slot.event_id === e.id && slot.deleted_at == null && slot.is_active === 1
+                  && slot.starts_at > nowIso,
+              )) {
+                const active = (state.bookings ?? [])
+                  .filter((b) => (b.slot_id === s.id) && (b.status === 'requested' || b.status === 'confirmed'))
+                  .reduce((sum, b) => sum + (Number((b as Record<string, unknown>).party_size) || 1), 0)
+                  + (state.waitlist ?? [])
+                    .filter((w) => w.slot_id === s.id && (w.status === 'offered' || w.status === 'accepted'))
+                    .reduce((sum, w) => sum + (Number(w.party_size) || 1), 0);
+                rows.push({ id: s.id, event_id: s.event_id, starts_at: s.starts_at, capacity: s.capacity, active_count: active });
+              }
+            }
+            return { results: rows as unknown as T[] };
           }
           // admin events list (must come before event_slots branch since
           // its sub-queries also reference event_slots s)
@@ -1555,7 +1587,11 @@ describe('GET /api/events/admin/events', () => {
         baseEvent({ id: 'e2', line_account_id: 'la1', name: 'Hidden meeting', is_published: 0 }),
         baseEvent({ id: 'e3', line_account_id: 'la1', name: 'Alpha meeting', is_published: 1 }),
       ],
-      slots: [],
+      // R81: 受付中のみは今後の枠がある行だけ。公開済みの行には枠を付ける。
+      slots: [
+        { id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null },
+        { id: 's3', event_id: 'e3', starts_at: '2099-06-02T10:00:00Z', ends_at: '2099-06-02T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null },
+      ],
       bookings: [],
     };
     const app = setupApp(state);
@@ -1568,10 +1604,85 @@ describe('GET /api/events/admin/events', () => {
     expect(body.sort.map((item) => item.field)).toEqual(['name', 'id']);
   });
 
+  test('summarizeFutureEventSlots counts only future slots with the same thresholds', () => {
+    const now = Date.parse('2026-09-27T00:00:00.000Z');
+    const iso = (days: number) => new Date(now + days * 24 * 60 * 60 * 1000).toISOString();
+    const summary = summarizeFutureEventSlots([
+      // 残り2席・3日後 → あと少しで満席。8割埋まりで「少ない」には入らない。
+      { starts_at: iso(3), capacity: 10, active_count: 8 },
+      // 8日後 → 7日以内ではないので「少ない」には入らない。
+      { starts_at: iso(8), capacity: 10, active_count: 1 },
+      // 翌日・2割 → 申し込みが少ない。
+      { starts_at: iso(1), capacity: 10, active_count: 2 },
+      // 定員なし → 定員合計は出さない。
+      { starts_at: iso(2), capacity: null, active_count: 4 },
+    ], now);
+    expect(summary.upcoming_slots).toBe(4);
+    expect(summary.upcoming_active).toBe(15);
+    expect(summary.upcoming_capacity).toBeNull();
+    expect(summary.fill_rate).toBeNull();
+    expect(summary.nearly_full).toBe(1);
+    expect(summary.low_applications).toBe(1);
+    expect(summary.nearest_upcoming_starts_at).toBe(iso(1));
+    expect(summary.nearest_low_starts_at).toBe(iso(1));
+  });
+
   test('rejects unsupported list filters', async () => {
     const app = setupApp({ events: [] });
     expect((await app.request('/api/events/admin/events?account_id=la1&filter=unknown')).status).toBe(400);
     expect((await app.request('/api/events/admin/events?account_id=la1&sort=unknown')).status).toBe(400);
+  });
+
+  test('filter=open excludes published events with only past slots (R81)', async () => {
+    const state = {
+      events: [
+        baseEvent({ id: 'open', line_account_id: 'la1', name: '受付中の会', is_published: 1 }),
+        baseEvent({ id: 'ended', line_account_id: 'la1', name: '終わった会', is_published: 1 }),
+        baseEvent({ id: 'draft', line_account_id: 'la1', name: '下書きの会', is_published: 0 }),
+      ],
+      slots: [
+        { id: 's-open', event_id: 'open', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null },
+        { id: 's-ended', event_id: 'ended', starts_at: '2020-06-01T10:00:00Z', ends_at: '2020-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null },
+        { id: 's-draft', event_id: 'draft', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null },
+      ],
+      bookings: [],
+    };
+    const app = setupApp(state);
+    const openBody = (await (await app.request('/api/events/admin/events?account_id=la1&filter=open')).json()) as { items: EventRow[] };
+    expect(openBody.items.map((e) => e.id)).toEqual(['open']);
+    const allBody = (await (await app.request('/api/events/admin/events?account_id=la1&filter=all')).json()) as { items: EventRow[] };
+    expect(allBody.items.map((e) => e.id).sort()).toEqual(['draft', 'ended', 'open']);
+  });
+
+  test('summary counts future slots across all filtered events, not the page (R79/R80)', async () => {
+    const events = [baseEvent({ id: 'e-pastfull', line_account_id: 'la1', name: '終わり満席の会', is_published: 1 })];
+    for (let i = 1; i <= 21; i += 1) {
+      events.push(baseEvent({ id: `e${i}`, line_account_id: 'la1', name: `未来の会${i}`, is_published: 1 }));
+    }
+    const slots = [
+      // 終わった回は100席満席。今後の回は5席で申込なし。
+      { id: 's-past', event_id: 'e-pastfull', starts_at: '2020-06-01T10:00:00Z', ends_at: '2020-06-01T12:00:00Z', capacity: 100, is_active: 1, sort_order: 0, deleted_at: null },
+      { id: 's-future', event_id: 'e-pastfull', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 1, deleted_at: null },
+    ];
+    const bookings = [];
+    for (let i = 0; i < 100; i += 1) {
+      bookings.push({ id: `bp${i}`, event_id: 'e-pastfull', slot_id: 's-past', status: 'confirmed', party_size: 1 });
+    }
+    for (let i = 1; i <= 21; i += 1) {
+      slots.push({ id: `s${i}`, event_id: `e${i}`, starts_at: '2099-07-01T10:00:00Z', ends_at: '2099-07-01T12:00:00Z', capacity: 10, is_active: 1, sort_order: 0, deleted_at: null });
+      bookings.push({ id: `b${i}`, event_id: `e${i}`, slot_id: `s${i}`, status: 'confirmed', party_size: 1 });
+    }
+    const app = setupApp({ events, slots, bookings });
+    const body = (await (await app.request('/api/events/admin/events?account_id=la1&limit=20')).json()) as {
+      items: unknown[]; total: number; summary: Record<string, number | string | null>;
+    };
+    // 1ページは20件だが、集計は絞り込みに合う全22イベントの今後の枠22枠。
+    expect(body.items).toHaveLength(20);
+    expect(body.total).toBe(22);
+    expect(body.summary.upcoming_slots).toBe(22);
+    // 終わった回の100席は含まない。今後は5席+21枠×10席=215席、申込は21人。
+    expect(body.summary.upcoming_capacity).toBe(215);
+    expect(body.summary.upcoming_active).toBe(21);
   });
 });
 
@@ -3115,7 +3226,7 @@ describe('V6 occurrence applicants / waitlist promotion routes', () => {
     expect(forbidden.status).toBe(403);
   });
 
-  test('conflict: expectedVersionを必須にし、版違いを409で返す', async () => {
+  test('conflict: expectedVersionと理由を必須にし、版違いを409で返す', async () => {
     const app = setupApp(structuredClone(state));
     const missingVersion = await app.request(
       '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
@@ -3123,13 +3234,25 @@ describe('V6 occurrence applicants / waitlist promotion routes', () => {
     );
     expect(missingVersion.status).toBe(422);
 
+    // U: 手動の繰り上げは理由が必須。版より先に見る。
+    const noReason = await app.request(
+      '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 2 }),
+      },
+    );
+    expect(noReason.status).toBe(422);
+    await expect(noReason.json()).resolves.toEqual({ error: 'waitlist_reason_required' });
+
     waitlistMocks.promoteEventWaitlist.mockResolvedValueOnce({ kind: 'conflict', currentVersion: 3 });
     const conflict = await app.request(
       '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ expectedVersion: 2 }),
+        body: JSON.stringify({ expectedVersion: 2, reason: '空きが出たため' }),
       },
     );
     expect(conflict.status).toBe(409);

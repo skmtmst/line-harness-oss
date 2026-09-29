@@ -7,20 +7,25 @@
  * 「どこを直すと何が変わるか」が追えなくなる。
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import { api, type ScenarioFriendPlan, type ScenarioFriendPlanStep } from '@/lib/api'
 import { shortDateTime } from '@/lib/hq-banners'
 import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
 import ConditionBuilder, {
+  findInvalidRangeIssue,
   isEmptyCondition,
   isRuleComplete,
   pruneCondition,
   type SegmentCondition,
   type SegmentRule,
 } from '@/components/shared/condition-builder'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 function Shell({
   title,
@@ -37,12 +42,20 @@ function Shell({
   footer?: React.ReactNode
   wide?: boolean
 }) {
+  /*
+   * 共通ダイアログと同じ約束: 開いたら窓の中へフォーカス・Tabは窓の中・
+   * Escapeで閉じる・閉じたら起点へ戻す・背面はスクロールしない。
+   * 入れ子窓（テスト送信の最終確認）が開いている間は、呼出側が渡す
+   * onClose で先に入れ子だけを閉じる。
+   */
+  const titleId = useId()
+  const panelRef = useOverlayFocus(true, onClose)
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div className="rounded-panel flex w-full flex-col shadow-lg" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-lg" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
         <div className={`border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
           <div className="min-w-0">
-            <h2 className="text-ink text-lg font-bold">{title}</h2>
+            <h2 id={titleId} className="text-ink text-lg font-bold">{title}</h2>
             {description && <p className="text-ink-secondary mt-0.5 text-sm">{description}</p>}
           </div>
           <button
@@ -115,6 +128,8 @@ export function ConditionDialog({
   const [draft, setDraft] = useState<SegmentCondition | null>(value)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /* R247: 入力済みの不正範囲は欄の下で知らせて止める。保存済みは維持する。 */
+  const [rangeError, setRangeError] = useState('')
 
   return (
     <Shell
@@ -135,6 +150,16 @@ export function ConditionDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
+              /*
+               * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
+               * 欄の下で知らせて止める。保存済みの条件は維持する。
+               */
+              const rangeIssue = findInvalidRangeIssue(draft)
+              if (rangeIssue) {
+                setRangeError(rangeIssue)
+                return
+              }
+              setRangeError('')
               setSaving(true)
               setError('')
               try {
@@ -161,6 +186,9 @@ export function ConditionDialog({
     >
       {error && (
         <Notice tone="danger" className="mb-4" message={error} />
+      )}
+      {rangeError && (
+        <Notice tone="validation" className="mb-4" message={rangeError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
@@ -231,21 +259,95 @@ export function ConditionDialog({
           </p>
         )}
       </section>
+      {/*
+        R238: ここに並べるのは、下の「詳しい条件を編集」を開いたときの
+        追加ボタンと同じものだけにする。足せない軸（イベント予約・
+        カレンダー予約・共通情報・リマインダ・担当者・流入経路・配信状況・
+        予約状況・購入履歴）を「利用できる」と書くと、無い操作を探し続ける
+        ことになる。並び・名前は ConditionBuilder の追加ボタンと同じ
+        （RULE_KINDS）。増減したら両方を直す（下の試験が見張る）。
+      */}
       <section className="mt-4">
-        <h3 className="text-ink text-sm font-bold">利用できる条件軸</h3>
-        <p className="text-ink-secondary mt-2 text-xs font-medium">標準互換（15軸） <span className="text-ink-faint ml-2 font-normal">友だち一覧の詳細検索・属性の保存した検索と同じ並び</span></p>
+        <h3 className="text-ink text-sm font-bold">足せる条件</h3>
+        <p className="text-ink-secondary mt-2 text-xs font-medium">下の「詳しい条件を編集」を開くと出る追加ボタンと同じ並び</p>
         <div className="mt-2 space-y-3">{[
           ['名前','個別メモ','ステータスメッセージ','友だち登録日'],
-          ['タグ','友だち情報','シナリオ','イベント予約','カレンダー予約'],
-          ['共通情報','リマインダ','回答フォーム','最終反応日','その他'],
-          ['対応マーク'],
+          ['対応マーク','タグ','友だち情報','シナリオ購読','シナリオ'],
+          ['回答フォーム','最終反応日','反応状態','行動スコア'],
+          ['ブロック状態','表示状態'],
         ].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
-        <p className="text-ink-secondary mt-3 text-xs font-medium">この画面だけの軸（6軸） <span className="text-ink-faint ml-2 font-normal">配信の絞り込みで使える追加の軸</span></p>
-        <div className="mt-2 space-y-3">{[['担当者','流入経路','配信状況'],['予約状況','購入履歴','ブロック状態']].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
+        <p className="text-ink-faint mt-2 text-xs">対応マーク・友だち情報は、任意機能をオンにしているアカウントだけで出ます。</p>
       </section>
       <Notice tone="info" className="mt-5">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</Notice>
       <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
     </Shell>
+  )
+}
+
+/* -------------------------------------- 終了後の移動先にされているときの注意 */
+
+export type MoveReferrer = { id: string; name: string }
+
+/**
+ * R250: 削除の確認窓で「どのシナリオの終了後の処理が変わるか」を見せる。
+ *
+ * 一覧・詳細の両方の削除確認から使う。件数は取れたときだけ出す。
+ * 読み込み中・失敗は件数を書かず、失敗は「戻ることがある」とだけ伝える。
+ * 参照が無いときは何も出さない（0件の断りは書かない）。
+ */
+export function MoveReferrersNotice({ scenarioId }: { scenarioId: string }) {
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [items, setItems] = useState<MoveReferrer[]>([])
+
+  useEffect(() => {
+    let stale = false
+    setState('loading')
+    setItems([])
+    api.scenarios.moveReferrers(scenarioId).then(
+      (res) => {
+        if (stale) return
+        if (res.success) {
+          setItems(res.data.items)
+          setState('ready')
+        } else {
+          setState('error')
+        }
+      },
+      () => {
+        if (!stale) setState('error')
+      },
+    )
+    return () => {
+      stale = true
+    }
+  }, [scenarioId])
+
+  if (state === 'loading') {
+    return <p className="text-ink-faint text-xs">終了後の移動先としての利用を確認しています…</p>
+  }
+  if (state === 'error') {
+    return (
+      <p className="text-warning text-xs font-medium">
+        終了後の移動先としての利用を確認できませんでした。削除すると、利用していたシナリオの終了後の処理が「一時停止」に戻ることがあります。
+      </p>
+    )
+  }
+  if (items.length === 0) return null
+  const shown = items.slice(0, 5)
+  const rest = items.length - shown.length
+  return (
+    <div>
+      <p className="text-warning text-sm font-medium">
+        このシナリオは{items.length}件のシナリオの終了後の移動先になっています。
+      </p>
+      <p className="text-ink-secondary mt-1 text-xs">
+        {shown.map((s) => s.name).join('、')}
+        {rest > 0 ? `、ほか${rest}件` : ''}
+      </p>
+      <p className="text-ink-secondary mt-1 text-xs">
+        削除すると、これらのシナリオの終了後の処理は「一時停止」に戻ります。
+      </p>
+    </div>
   )
 }
 
@@ -279,6 +381,8 @@ export function OnCompleteDialog({
 }) {
   const [draftMode, setDraftMode] = useState<OnCompleteMode>(mode)
   const [draftTarget, setDraftTarget] = useState<string | null>(targetScenarioId)
+  /* R239: 移動先の未選択は入力不足として欄の下で案内し、通信失敗と分ける。 */
+  const [targetError, setTargetError] = useState('')
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -367,6 +471,17 @@ export function OnCompleteDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
+              /*
+               * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
+               * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
+               * 欄の下（targetError）が入力不足、窓の上（error）が保存前の止め。
+               */
+              if (draftMode === 'move' && !draftTarget) {
+                setTargetError('移動先を選んでください')
+                setError('「次のシナリオへ移動」には移動先のシナリオが要ります。')
+                return
+              }
+              setTargetError('')
               setSaving(true)
               try {
                 const err = await onSave(draftMode, draftMode === 'move' ? draftTarget : null)
@@ -393,7 +508,7 @@ export function OnCompleteDialog({
       }
     >
       {error && <Notice tone="danger" className="mb-4" message={error} />}
-      <div className="space-y-3">
+      <RadioCardGroup legend="最後の1通を配り終えた人をどうするか" className="space-y-3">
         {(
           [
             {
@@ -414,25 +529,17 @@ export function OnCompleteDialog({
             },
           ]
         ).map((opt) => (
-          <label
+          <RadioCard
             key={opt.value}
-            className={`rounded-panel flex cursor-pointer gap-3 border p-4 ${
-              draftMode === opt.value ? 'border-accent bg-accent-soft' : 'border-hairline'
-            }`}
-          >
-            <input
-              type="radio"
-              className="mt-1"
-              checked={draftMode === opt.value}
-              onChange={() => setDraftMode(opt.value)}
-            />
-            <span className="min-w-0">
-              <span className="text-ink block text-sm font-bold">{ON_COMPLETE_LABEL[opt.value]}</span>
-              <span className="text-ink-secondary mt-0.5 block text-xs">{opt.hint}</span>
-            </span>
-          </label>
+            name="scenario-complete-action"
+            value={opt.value}
+            checked={draftMode === opt.value}
+            onChange={() => setDraftMode(opt.value)}
+            title={ON_COMPLETE_LABEL[opt.value]}
+            note={opt.hint}
+          />
         ))}
-      </div>
+      </RadioCardGroup>
 
       <div className="border-hairline mt-5 border-t pt-5">
         <p className="text-ink text-sm font-bold">その他のアクション</p>
@@ -471,30 +578,43 @@ export function OnCompleteDialog({
             </p>
           ) : (
             <>
-              <select
+              <Select
+                aria-label="移動先のシナリオ"
                 id="on-complete-move-target"
                 value={draftTarget ?? ''}
-                onChange={(e) => setDraftTarget(e.target.value || null)}
+                onChange={(next) => {
+                  setDraftTarget(next || null)
+                  if (next) setTargetError('')
+                }}
+                error={targetError || undefined}
                 disabled={candidatesState === 'loading'}
-                className="border-hairline rounded-control text-ink mt-1.5 h-10 w-full border bg-white px-3 text-sm"
-              >
-                <option value="">
-                  {candidatesState === 'loading' ? '候補を読み込んでいます' : '選んでください'}
-                </option>
-                {scenarios.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-                {savedTargetMissing && targetScenarioId ? (
-                  <option value={targetScenarioId}>
-                    {savedTargetName ?? '現在の保存値（名前を取得できません）'}
-                  </option>
-                ) : null}
-              </select>
+                options={[
+                  {
+                    value: '',
+                    label: candidatesState === 'loading' ? '候補を読み込んでいます' : '選んでください',
+                  },
+                  ...scenarios.map((s) => ({ value: s.id, label: s.name })),
+                  // SCENARIO-14: 保存済みの移動先が候補に無いときは、現在の保存値を選択肢に残す。
+                  ...(savedTargetMissing && targetScenarioId
+                    ? [{ value: targetScenarioId, label: savedTargetName ?? '現在の保存値（名前を取得できません）' }]
+                    : []),
+                ]}
+                size="full"
+                className="mt-1.5"
+              />
               {savedTargetMissing ? (
                 <p className="text-warning mt-1.5 text-xs">
                   保存されている移動先はこのアカウントの候補にありません（別アカウント・削除済み・権限外の可能性）。そのまま保存すると現在の値が維持されます。
+                </p>
+              ) : null}
+              {/*
+                R250: 移動先が空のままの「次のシナリオへ移動」は保存できない
+                設定。選ばずに閉じると気づけないので、窓の中で理由を出す。
+                （失敗・警告は HelpTip に入れない決まりのため、本文に書く）
+              */}
+              {candidatesState === 'ready' && !draftTarget ? (
+                <p className="text-warning mt-1.5 text-xs font-medium">
+                  移動先が選ばれていません。選んで保存してください。
                 </p>
               ) : null}
             </>
@@ -579,6 +699,8 @@ export function TestSendDialog({
   const [selected, setSelected] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [sending, setSending] = useState(false)
+  // 最終確認の面は本体とは別の面。送信中はEscapeで面だけ消えないようにする。
+  const confirmPanelRef = useOverlayFocus(confirming, () => setConfirming(false), sending)
   const [result, setResult] = useState<{ ok: boolean; partial?: boolean; message: string } | null>(null)
   const [lastTest, setLastTest] = useState<{ sentAt: string; messageCount: number } | null>(null)
   // NEXT-02: 送信可否に結ぶ確認。未チェックから始め、相手が変わればやり直す。
@@ -840,7 +962,7 @@ export function TestSendDialog({
           「戻る」「テスト送信を開始」へ必ず到達できるようにする。
         */}
         <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
-          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<label key={label} className="flex items-center gap-2"><input type="checkbox" checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onChange={(e) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? e.target.checked : v)))} />{label}</label>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
+          <div ref={confirmPanelRef} role="dialog" aria-modal="true" aria-labelledby="test-send-confirm-title" className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 id="test-send-confirm-title" className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
             {sending && <Notice tone="info">送信中です。完了までこの画面のまま待ってください。</Notice>}
             {result && (
               <Notice tone={result.ok ? 'success' : 'danger'}>

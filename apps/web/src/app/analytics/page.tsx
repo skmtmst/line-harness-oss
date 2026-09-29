@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
@@ -18,9 +18,17 @@ import {
   type AnalyticsRoutesOverview,
   type AnalyticsUsageOverview,
   type AnalyticsUrlClicksOverview,
+  type RecentOneTimeReport,
   type SavedAnalyticsSnapshot,
   type SavedAnalyticsSummary,
 } from '@/lib/api'
+import Disclosure from '@/components/shared/disclosure'
+import {
+  deliveryChannelLabel,
+  deliveryStatusLabel,
+  runErrorLabel,
+  runStateLabel,
+} from './report-run-state'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import MetricValue from '@/components/ui/metric-value'
@@ -109,10 +117,10 @@ function AnalyticsNotice({ children }: { children: ReactNode }) {
   return <Notice tone="info">{children}</Notice>
 }
 
-function AnalyticsExportButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+function AnalyticsExportButton({ onClick, disabled, label }: { onClick: () => void; disabled: boolean; label?: string }) {
   return (
     <Button onClick={onClick} disabled={disabled} variant="secondary">
-      CSVで書き出す
+      {label ?? 'CSVで書き出す'}
     </Button>
   )
 }
@@ -789,18 +797,19 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <div>
             <label className="text-ink-secondary mb-1 block text-xs font-medium">たての軸</label>
-            <SelectField value={rowKind} onChange={(event) => setRowKind(event.target.value as typeof rowKind)} options={[{ value: "tag", label: "タグ" }, { value: "route", label: "流入経路" }, { value: "score_band", label: "スコア帯" }, { value: "conversion_point", label: "成果地点" }, { value: "booking_status", label: "予約状態" }, { value: "purchase_status", label: "購入状態" }]} className="v6-select w-full" />
+            <Select aria-label="たての軸" value={rowKind} onChange={(value) => setRowKind(value as typeof rowKind)} options={[{ value: "tag", label: "タグ" }, { value: "route", label: "流入経路" }, { value: "score_band", label: "スコア帯" }, { value: "conversion_point", label: "成果地点" }, { value: "booking_status", label: "予約状態" }, { value: "purchase_status", label: "購入状態" }]} className="v6-select w-full" size="full" />
           </div>
           <div>
             <label htmlFor="cross-field" className="text-ink-secondary mb-1 block text-xs font-medium">
               よこの軸
             </label>
-            <SelectField
+            <Select
               id="cross-field"
               value={fieldId}
-              onChange={(e) => setFieldId(e.target.value)}
+              onChange={(value) => setFieldId(value)}
               aria-label="よこの軸"
               className="v6-select w-full"
+              size="full"
               options={fields.map((field) => ({
                 value: field.id,
                 label: `友だち情報 / ${field.name}`,
@@ -815,24 +824,26 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
           <div>
             <dt className="mb-1 text-xs font-medium text-ink-secondary"><label htmlFor="cross-measure">数えるもの</label></dt>
             <dd className="grid gap-1">
-              <SelectField
+              <Select
                 id="cross-measure"
                 value={measureKind}
-                onChange={(e) => setMeasureKind(e.target.value as 'unique_friends' | 'events')}
+                onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')}
                 aria-label="数えるもの"
                 className="v6-select w-full"
+                size="full"
                 options={[
                   { value: 'unique_friends', label: '友だちの人数（重複なし）' },
                   { value: 'events', label: 'イベントの回数' },
                 ]}
               />
               {measureKind === 'events' && (
-                <SelectField
+                <Select
                   id="cross-measure-event"
                   value={measureEventType}
-                  onChange={(e) => setMeasureEventType(e.target.value)}
+                  onChange={(value) => setMeasureEventType(value)}
                   aria-label="数えるイベント"
                   className="v6-select w-full"
+                  size="full"
                   options={CROSS_MEASURE_EVENT_OPTIONS}
                 />
               )}
@@ -1495,12 +1506,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-xs font-medium">
                 ファネル
               </label>
-              <SelectField
+              <Select
                 id="funnel-select"
                 value={selected}
-                onChange={(e) => setSelected(e.target.value)}
+                onChange={(value) => setSelected(value)}
                 aria-label="ファネル"
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm sm:w-72"
+                size="full"
                 options={
                   funnels.some((funnel) => funnel.status === 'active' || funnel.id === selected)
                     ? funnels
@@ -1625,12 +1637,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
                 <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
-                <SelectField
+                <Select
                   id="funnel-group"
                   value={groupKey}
-                  onChange={(event) => setGroupKey(event.target.value)}
+                  onChange={(value) => setGroupKey(value)}
                   aria-label="比較する条件"
                   className="v6-select w-full"
+                  size="full"
                   options={run.groups.map((group) => ({
                     value: group.key,
                     label: `${group.label}（入口 ${group.entrants}人）`,
@@ -1750,12 +1763,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   selectedFunnel?.status === 'active' ? (
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="space-y-2">
-                        <SelectField
+                        <Select
                           id="funnel-audience-selection"
                           value={audienceSelection}
-                          onChange={(event) => setAudienceSelection(event.target.value as 'reached' | 'stopped' | 'in_progress')}
+                          onChange={(value) => setAudienceSelection(value as 'reached' | 'stopped' | 'in_progress')}
                           aria-label="対象者の種類"
                           className="v6-select w-full sm:w-64"
+                          size="full"
                           options={[
                             { value: 'reached', label: 'この段まで到達した人' },
                             { value: 'stopped', label: 'この段で止まった人' },
@@ -2071,10 +2085,11 @@ function FunnelForm({
         <label htmlFor="fn-window" className="text-ink-secondary mb-1 block text-sm font-medium">
           何日以内の通過で数えるか
         </label>
-        <SelectField
+        <Select
           id="fn-window"
+          aria-label="何日以内の通過で数えるか"
           value={windowDays}
-          onChange={(e) => setWindowDays(e.target.value)}
+          onChange={(value) => setWindowDays(value)}
           options={[
             // API経由で7/30/90以外の日数が付いたファネルも、編集で値を失わないよう現在値を足す
             ...(['7', '30', '90'].includes(windowDays)
@@ -2085,6 +2100,7 @@ function FunnelForm({
             { value: '90', label: '90日以内' },
           ]}
           className="max-w-md"
+          size="standard"
         />
       </div>
 
@@ -2109,16 +2125,17 @@ function FunnelForm({
             </div>
             <div>
               <label className="text-ink-faint mb-1 block text-xs">何をしたら</label>
-              <SelectField
+              <Select
                 value={step.kind}
-                onChange={(e) =>
+                onChange={(value) =>
                   setSteps((prev) =>
                     // 種類を変えた段は旧条件のmatchを引き継がない（別種類のキーが残ると誤集計になる）
-                    prev.map((s, j) => (i === j ? { ...s, kind: e.target.value, matchBase: undefined } : s)),
+                    prev.map((s, j) => (i === j ? { ...s, kind: value, matchBase: undefined } : s)),
                   )
                 }
                 aria-label={`${i + 1}段目で何をしたら進むか`}
                 className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                size="standard"
                 options={FUNNEL_STEP_KIND_OPTIONS.map((kind) => ({ value: kind.key, label: kind.label }))}
               />
             </div>
@@ -2446,13 +2463,14 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
   const clickReason = overview.metrics.lineClicked.reason ?? overview.metrics.delivered.reason ?? undefined
   const clickHelp = clickReason ? undefined : 'LINEクリックを届いた人で割った割合です'
   const exportCampaigns = () => downloadCsv('analytics-reactions.csv', [
-    ['配信', '種類', '送った日時', '対象', '到達', '開封', 'LINEクリック', '成果'],
+    ['配信', '種類', '送った日時', '対象', '到達', '送信通数', '開封', 'LINEクリック', '成果'],
     ...overview.campaigns.map((item) => [
       item.name,
       item.kind === 'broadcast' ? '一斉配信' : 'シナリオ',
       item.sentAt,
       shownValue(item.targetPeople),
       shownValue(item.delivered),
+      shownValue(item.sentMessages),
       shownValue(item.opened),
       shownValue(item.lineClicked),
       shownValue(item.outcomes),
@@ -2465,15 +2483,16 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
     <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
       <KpiCard title={`この${days}日に送った`} value={overview.campaigns.length} unit="回" detail="" help="一覧に取得できた配信の回数です" />
-      <KpiCard title="届いた人" value={delivered} unit="人" help="配信ごとの到達数の合計です" {...metricCardState(overview.metrics.delivered, { detail: '' }, state.retry)} />
+      <KpiCard title="届いた人" value={delivered} unit="人" help="一斉配信の到達数の合計です。シナリオは届いた人数が取れないため含みません" {...metricCardState(overview.metrics.delivered, { detail: '' }, state.retry)} />
       <KpiCard title="押された割合" value={clickRate} unit="%" detail="" help={clickHelp} description={clickReason} />
       <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" help="開封などを取得できない配信の件数です" {...metricCardState(overview.metrics.unavailableCampaigns, { detail: '' }, state.retry)} />
     </div>
     <AnalyticsNotice>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。</AnalyticsNotice>
     {truncationNote && <AnalyticsNotice>{truncationNote}までを表示しています。それより古い配信は一覧にもCSVの書き出しにも入りません。</AnalyticsNotice>}
     <section className="bg-canvas rounded-card border-hairline border p-4">
-      <h2 className="font-semibold text-ink">送った時間ごとの「押された回数」</h2>
-      <p className="mt-1 text-xs text-ink-faint">こちらで作った中継URLのクリックを、時間帯ごとに並べています。</p>
+      {/* 監査 R71: 集計はクリックされた時刻の時間帯。送った時刻ではないので名前を実態に合わせる。 */}
+      <h2 className="font-semibold text-ink">押された時間帯ごとの回数</h2>
+      <p className="mt-1 text-xs text-ink-faint">こちらで作った中継URLを、相手が押した時刻で時間帯ごとに並べています。送った時刻ではありません。</p>
       <div className="mt-4 flex h-28 items-end gap-2">
         {Array.from({ length: 24 }, (_, hour) => {
           const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
@@ -2487,8 +2506,8 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
       <AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} />
     </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right" help="配信ごとの到達数の合計です">到達</Th><Th align="right" help="開いた人数です。20人未満など取得できない数は「—」で示します">開封</Th><Th align="right" help="こちらで作った中継URLを押した人数です">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{formatAnalyticsDateTime(item.sentAt)}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
+      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right" help="一斉配信で届いた人数です。シナリオは届いた人数が取れないため「—」です">到達</Th><Th align="right" help="開いた人数です。20人未満など取得できない数は「—」で示します">開封</Th><Th align="right" help="こちらで作った中継URLを押した人数です">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{formatAnalyticsDateTime(item.sentAt)}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} />{item.kind === 'scenario' && <p className="mt-1 text-xs text-ink-faint">送信 <MetricCell metric={item.sentMessages} />通</p>}</td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
     </table></div>
   </div>
 }
@@ -2638,13 +2657,19 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
   const [days, setDays] = useState(30)
   const range = useMemo(() => rangeFor(days - 1), [days])
   const [query, setQuery] = useState('')
+  // 監査 R72: 検索語はAPIへ渡し、200件を超えたURLにも届くようにする。
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
   const state = useOverview<AnalyticsUrlClicksOverview>(
-    () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200 }),
-    `${accountId}:${range.from}:${range.to}:url-clicks`,
+    () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200, query: debouncedQuery || undefined }),
+    `${accountId}:${range.from}:${range.to}:${debouncedQuery}:url-clicks`,
   )
   if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
   const overview = state.data.data
-  const visibleLinks = overview.links.filter((item) => `${item.name} ${item.originalUrl} ${item.usageLocations.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const visibleLinks = overview.links
   const clicks = metricSum(overview.links.map((item) => item.clicks))
   const people = metricSum(overview.links.map((item) => item.knownClickPeople))
   const zeroLinks = overview.links.filter((item) => shownValue(item.clicks) === 0).length
@@ -2662,7 +2687,8 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
     </div>
     <AnalyticsNotice>数えているのは、こちらで作った中継URLだけです。直接貼ったURLは数えられません。同じURLを同じ人が何度押しても「押した人」は1人と数えます。</AnalyticsNotice>
     {overview.stateReason && <Notice tone="warn">{overview.stateReason}</Notice>}
-    {overview.hasMore && <AnalyticsNotice>200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。</AnalyticsNotice>}
+    {overview.hasMore && <AnalyticsNotice>条件に合うもののうち200件までを表示しています。探す言葉で絞るとこの中だけではなく全体から探します。CSVの書き出しも、表示している範囲だけが入ります。</AnalyticsNotice>}
+    {debouncedQuery && <p className="text-ink-faint text-xs">「{debouncedQuery}」で絞り込んでいます。上の件数とCSVの書き出しは、この絞り込みの結果が対象です。</p>}
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
       <input id="url-click-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
@@ -2708,6 +2734,73 @@ function reportScheduleCadenceLabel(schedule: AnalyticsReportSchedule): string {
     : `毎月${schedule.monthDay}日 ${schedule.sendTime}`
 }
 
+/*
+ * R463: 保存した時点の結果を読む部品。履歴から数値・条件へ到達させる。
+ *
+ * 結果の形は分析の種類で違う（クロス・ファネル）ので、葉の値を
+ * そのまま並べる。0は「0件」と出し、null・欠けは「未取得」と
+ * 分ける。現在の再集計で過去結果を置き換えることはしない。
+ */
+function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: string; text: string }> {
+  const rows: Array<{ path: string; text: string }> = []
+  const visit = (node: unknown, path: string, depth: number) => {
+    if (rows.length >= limit || depth > 3) return
+    if (node === null || node === undefined) {
+      rows.push({ path, text: '未取得' })
+      return
+    }
+    if (typeof node === 'number' || typeof node === 'string' || typeof node === 'boolean') {
+      rows.push({ path, text: typeof node === 'number' ? node.toLocaleString('ja-JP') : String(node) })
+      return
+    }
+    if (Array.isArray(node)) {
+      if (node.length === 0) rows.push({ path, text: '0件' })
+      node.slice(0, 4).forEach((item, index) => visit(item, `${path}[${index + 1}]`, depth + 1))
+      if (node.length > 4) rows.push({ path, text: `ほか${node.length - 4}件` })
+      return
+    }
+    if (typeof node === 'object') {
+      const entries = Object.entries(node)
+      if (entries.length === 0) rows.push({ path, text: '—' })
+      entries.slice(0, 8).forEach(([key, child]) => visit(child, path ? `${path}・${key}` : key, depth + 1))
+    }
+  }
+  visit(result, '', 0)
+  return rows.filter((row) => row.path !== '' || row.text !== '—')
+}
+
+function SnapshotResultDetail({ snapshot }: { snapshot: SavedAnalyticsSnapshot }) {
+  const rows = summarizeSnapshotResult(snapshot.result)
+  return (
+    <Disclosure size="compact" title="この時点の結果を見る" hint={`${SAVED_STATE_LABELS[snapshot.state]}`}>
+      <dl className="grid gap-1 text-xs">
+        <div className="flex justify-between gap-3">
+          <dt className="text-ink-faint">対象期間</dt>
+          <dd className="text-ink tabular-nums">{formatAnalyticsDate(snapshot.periodFrom)}〜{formatAnalyticsDate(snapshot.periodTo)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-ink-faint">データ締切</dt>
+          <dd className="text-ink tabular-nums">{formatAnalyticsDateTime(snapshot.dataCutoffAt)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-ink-faint">集計状態</dt>
+          <dd className="text-ink">{SAVED_STATE_LABELS[snapshot.state]}</dd>
+        </div>
+        {rows.length === 0 && (
+          <div className="text-ink-faint">保存された数値はありません。</div>
+        )}
+        {rows.map((row, index) => (
+          <div key={index} className="flex justify-between gap-3">
+            <dt className="text-ink-faint truncate" title={row.path}>{row.path || '結果'}</dt>
+            <dd className="text-ink tabular-nums">{row.text}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-ink-faint mt-2 text-xs">保存時点の固定結果です。いま集計し直しても変わりません。</p>
+    </Disclosure>
+  )
+}
+
 function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   accountId: string
   onCountChange?: (count: number | null) => void
@@ -2721,9 +2814,14 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [error, setError] = useState('')
   const [schedules, setSchedules] = useState<AnalyticsReportSchedule[]>([])
+  // R454: しまった1回送信の直近分（一覧から消えても失敗に気づけるように）。
+  const [recentOneTime, setRecentOneTime] = useState<RecentOneTimeReport[]>([])
   const [schedulesLoading, setSchedulesLoading] = useState(true)
   const [schedulesError, setSchedulesError] = useState('')
   const [scheduleBusyId, setScheduleBusyId] = useState('')
+  // R462: 履歴の失敗は一覧の失敗と分ける。一覧の取得済み件数を
+  // 履歴の失敗で隠さないし、回復したら古い案内を消す。
+  const [snapshotError, setSnapshotError] = useState('')
   // 一覧・履歴の取り直し用。選んだ分析や検索語はそのままに、同じ取得だけをやり直す。
   const [savedReload, setSavedReload] = useState(0)
   const [snapshotReload, setSnapshotReload] = useState(0)
@@ -2763,37 +2861,50 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   useEffect(() => () => {
     schedulesAlive.current = false
   }, [])
+  // R456: 再読込の応答も「どのアカウントへ向けた取得か」で比べる。
+  // マウントの有無だけでは、アカウント切替後に遅い旧応答が
+  // 新しい一覧へ上書きする。世代が変わっていたら捨てる。
+  const schedulesGen = useRef(0)
 
   const reloadSchedules = useCallback(() => {
+    const gen = (schedulesGen.current += 1)
     setSchedulesLoading(true)
     void api.analytics.reportSchedules
       .list(accountId)
       .then((response) => {
-        if (!schedulesAlive.current) return
+        if (!schedulesAlive.current || gen !== schedulesGen.current) return
         if (!response.success) throw new Error(response.error)
         setSchedules(response.data.items)
+        setRecentOneTime(response.data.recentOneTime ?? [])
       })
       .catch((caught: unknown) => {
-        if (!schedulesAlive.current) return
+        if (!schedulesAlive.current || gen !== schedulesGen.current) return
         // ★V7 `x63W5x`：接続切れの英語（`Failed to fetch`）をそのまま出さない。
         setSchedulesError(caught instanceof TypeError ? '定期レポートを確認できませんでした' : caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
       })
       .finally(() => {
-        if (schedulesAlive.current) setSchedulesLoading(false)
+        if (schedulesAlive.current && gen === schedulesGen.current) setSchedulesLoading(false)
       })
   }, [accountId])
 
   useEffect(() => {
     let active = true
+    // 切替で旧アカウント向けの再読込応答を無効にする（R456）。
+    schedulesGen.current += 1
     setSchedulesLoading(true)
     setSchedules([])
+    setRecentOneTime([])
     setSchedulesError('')
+    // R456: アカウントが変わったら前の確認窓は閉じる。対象だけ残すと
+    // 別アカウントへ操作要求を送る原因になる。
+    setArchiveTarget(null)
     void api.analytics.reportSchedules
       .list(accountId)
       .then((response) => {
         if (!active) return
         if (!response.success) throw new Error(response.error)
         setSchedules(response.data.items)
+        setRecentOneTime(response.data.recentOneTime ?? [])
       })
       .catch((caught: unknown) => {
         if (!active) return
@@ -2836,20 +2947,25 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   useEffect(() => {
     if (!selectedId) {
       setSnapshots([])
+      setSnapshotError('')
       return
     }
     let active = true
     setSnapshotLoading(true)
     setSnapshots([])
+    // R462: 取り直しを始めたら古い失敗案内は消す。成功時も消す。
+    // 一覧の error とは別の棚に置き、一覧KPIを隠さない。
+    setSnapshotError('')
     void api.analytics.saved
       .snapshots(accountId, selectedId)
       .then((response) => {
         if (!active) return
         if (!response.success) throw new Error(response.error)
         setSnapshots(response.data)
+        setSnapshotError('')
       })
       .catch((caught: unknown) => {
-        if (active) setError(caught instanceof Error ? caught.message : '結果の履歴を確認できませんでした')
+        if (active) setSnapshotError(caught instanceof Error ? caught.message : '結果の履歴を確認できませんでした')
       })
       .finally(() => {
         if (active) setSnapshotLoading(false)
@@ -2860,7 +2976,17 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   }, [accountId, selectedId, snapshotReload])
 
   const selected = items.find((item) => item.id === selectedId) ?? null
-  const visibleItems = items.filter((item) => `${item.name} ${item.createdByName}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const visibleItems = useMemo(
+    () => items.filter((item) => `${item.name} ${item.createdByName}`.toLowerCase().includes(query.trim().toLowerCase())),
+    [items, query],
+  )
+  // 監査 R226: 絞り込みで選んだ項目が見えなくなったら、見えている先頭へ
+  // 選び直す。0件なら選択を外す——条件に合わない分析の履歴を出し続けない。
+  useEffect(() => {
+    if (!visibleItems.some((item) => item.id === selectedId)) {
+      setSelectedId(visibleItems[0]?.id ?? '')
+    }
+  }, [visibleItems, selectedId])
   // ANALYTICS-05: 「定義が古い」のは版ずれだけを数える。未取得・失敗は
   // 集計状態の話で、定義の新旧とは別の軸——混ぜると、新しい定義で
   // まだ集計していないものと、単に取れなかったものが区別できない。
@@ -2994,6 +3120,39 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
         )}
       </section>
 
+      {/*
+        R454: 1回だけ送った直近の結果。一覧からは消えるため、
+        ここから失敗理由・宛先別結果（依頼IDの画面）へ進める。
+      */}
+      {recentOneTime.length > 0 && (
+        <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
+            <h2 className="text-sm font-semibold">1回だけ送った結果</h2>
+            <span className="text-ink-faint text-xs">{recentOneTime.length}件</span>
+          </div>
+          <ul className="divide-hairline divide-y">
+            {recentOneTime.map((item) => (
+              <li key={item.schedule.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-ink truncate text-sm font-medium" title={item.schedule.name}>
+                    {item.schedule.name}
+                  </p>
+                  <p className="text-ink-secondary mt-1 text-xs">
+                    {item.lastRun ? runStateLabel(item.lastRun.state) : 'まだ送信されていません'}
+                    {item.lastRun && runErrorLabel(item.lastRun.errorCode, item.lastRun.state)
+                      ? `：${runErrorLabel(item.lastRun.errorCode, item.lastRun.state)}`
+                      : ''}
+                  </p>
+                </div>
+                <Button href={`/analytics/reports/new?id=${item.schedule.id}`} variant="secondary">
+                  結果を見る
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="saved-analysis-search" className="sr-only">分析名・作った人で探す</label>
         <input id="saved-analysis-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="分析名・作った人で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
@@ -3039,6 +3198,12 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-hairline divide-y">
+                  {visibleItems.length === 0 && (
+                    <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">
+                      条件に合う保存済み分析はありません。
+                      <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setQuery('')}>検索をやめる</button>
+                    </td></tr>
+                  )}
                   {visibleItems.map((item) => {
                     const active = selectedId === item.id
                     return (
@@ -3095,8 +3260,10 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
             {/*
               ★V7 `x63W5x`：補助のデータ（結果の履歴）だけ取れないときは、
               その場所に小さく1行だけ。赤字・口の生文言にしない。
+              R462: 一覧の error ではなく履歴専用の error を見る。
+              取り直しの成功・別の分析の取得成功で消える。
             */}
-            {error && items.length > 0 && (
+            {snapshotError && (
               <p className="text-ink-secondary mt-3 text-xs" role="alert">
                 結果の履歴を読み込めませんでした。
                 <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button>
@@ -3104,6 +3271,8 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
             )}
             {snapshotLoading ? (
               <p className="text-ink-faint mt-4 text-sm">結果を読み込んでいます</p>
+            ) : !selected ? (
+              <p className="text-ink-faint mt-4 text-sm">一覧から分析を選んでください</p>
             ) : snapshots.length === 0 ? (
               <p className="text-ink-faint mt-4 text-sm">保存された結果はありません</p>
             ) : (
@@ -3122,9 +3291,31 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                     <p className="text-ink-faint mt-1 text-xs tabular-nums">
                       データ締切 {formatAnalyticsDateTime(snapshot.dataCutoffAt)}
                     </p>
+                    {/* R463: 履歴1件ごとに固定結果を開ける。 */}
+                    <div className="mt-2">
+                      <SnapshotResultDetail snapshot={snapshot} />
+                    </div>
                   </li>
                 ))}
               </ol>
+            )}
+            {/* R463: 保存結果のCSVは一覧のCSVと分ける。 */}
+            {selected && snapshots.length > 0 && (
+              <div className="mt-3">
+                <AnalyticsExportButton
+                  label="この分析の結果をCSVで書き出す"
+                  onClick={() => downloadCsv(`analytics-saved-${selected.id}.csv`, [
+                    ['対象期間', 'データ締切', '集計状態', '結果の要約'],
+                    ...snapshots.map((snapshot) => [
+                      `${snapshot.periodFrom}〜${snapshot.periodTo}`,
+                      snapshot.dataCutoffAt,
+                      SAVED_STATE_LABELS[snapshot.state],
+                      summarizeSnapshotResult(snapshot.result, 6).map((row) => `${row.path || '結果'}: ${row.text}`).join(' / ').slice(0, 200),
+                    ]),
+                  ])}
+                  disabled={false}
+                />
+              </div>
             )}
           </aside>
         </div>
@@ -3144,7 +3335,12 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
 }
 
 function AnalyticsInner() {
-  const tab = useMergedTab(TABS)
+  /*
+   * 旧キー `clicks`（Search Console 側の以前の表記）で来たURLも
+   * URLクリックへ寄せる。知らない値は先頭（友だちの増減）へ落ちる
+   * useMergedTab の既定のままにすると、調べたい分析と違う画面が開く。
+   */
+  const tab = useMergedTab(TABS, 'tab', undefined, { clicks: 'url-clicks' })
   /*
    * N-256: 成果地点の一覧から「使う場所を足す」で渡された地点を
    * ファネル作成へ引き渡す。`?tab=funnel&conversionPointId=…` が入口。

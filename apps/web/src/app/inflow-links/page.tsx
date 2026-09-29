@@ -26,6 +26,7 @@ import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
@@ -372,15 +373,17 @@ function InflowLinksPageInner({
             }))
             : { success: false as const, error: 'feature_disabled' },
         )
+      // R23横展開: 行の名前解決に使う候補は今のアカウントだけ。
+      const candidateParams = accountAtRequest ? { accountId: accountAtRequest } : undefined
       const [p, s, t, tagRes] = await Promise.all([
         poolsPromise,
         featureAllowed('scenarios')
-          ? api.scenarios.list().catch(() => ({ success: false as const, data: [] as Scenario[] }))
+          ? api.scenarios.list(candidateParams).catch(() => ({ success: false as const, data: [] as Scenario[] }))
           : Promise.resolve({ success: false as const, data: [] as Scenario[] }),
         featureAllowed('templates')
           ? api.messageTemplates.list().catch(() => ({ success: false as const, data: [] as MessageTemplate[] }))
           : Promise.resolve({ success: false as const, data: [] as MessageTemplate[] }),
-        api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
+        api.tags.list(candidateParams).catch(() => ({ success: false, data: [] as Tag[] })),
       ])
       if (!isCurrent()) return
       if (p.success) setPools(p.data)
@@ -681,15 +684,18 @@ function InflowLinksPageInner({
   }
 
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
-  // 「稼働中」は登録済みの行。orphan（外部が発行した未登録 ref）は流入実績が
-  // あるだけで、こちらから止める・直すができないので数に入れない。
+  // R273: 「受付中」は isActive が真の登録済み行だけを数える。orphan（外部が
+  // 発行した未登録 ref）は流入実績があるだけで、こちらから止める・直すが
+  // できないので数に入れない。停止中も別に数え、一覧・一括操作・詳細と同じ
+  // 言葉（受付中・停止中）で出す。
   // 帯は画面全体の要約なので、**フォルダの選択や検索文字で数が変わってはいけない。**
   // ここを `sortedRows`（フォルダ＋検索で絞ったもの）から数えていたため、
   // フォルダ列が「SNS 2／未分類 1」と出ている横で帯が「流入元 0件」になっていた。
   // フォルダ列の件数は `accountFilteredRows` から数えている（下の `:genreCount`）ので、
   // 同じ画面の中で数え方が2通りある状態だった。帯もそちらに揃える。
   const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length
-  const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length
+  const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === true).length
+  const stoppedRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === false).length
   /*
     **読み込めていないときに0件と書かない。**
 
@@ -751,7 +757,7 @@ function InflowLinksPageInner({
             routeCountAvailable
               ? summary?.routeTotal != null
                 ? '4つのフォルダ・今月 8/01〜8/25'
-                : `稼働中 ${activeRouteCount}`
+                : `受付中 ${activeRouteCount}・停止中 ${stoppedRouteCount}`
               : loading
                 ? '読み込んでいます'
                 : '読み込めませんでした'
@@ -941,14 +947,19 @@ function InflowLinksPageInner({
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
                   編集ボタンは割合でなく固定幅にして右端で切れないようにする。 */}
               {/* 先頭・末尾の列は見出しの余白（20px）にそろえる。編集ボタンがはみ出さない幅にする。 */}
+              {/*
+                数字の列は中身に合わせる。友だち追加（72px）・クリック（60px）が
+                列幅（68px・53px）より広くはみ出していた。流入元名から回して
+                合計は変えない（86%）。名前は省略＋title で確認する。
+              */}
               <col className="w-14" />
-              <col className="w-[17%]" />
+              <col className="w-[13%]" />
               <col className="w-[8%]" />
               <col className="w-[12%]" />
               <col className="w-[8%]" />
               <col className="w-[8%]" />
+              <col className="w-[11%]" />
               <col className="w-[9%]" />
-              <col className="w-[7%]" />
               <col className="w-[8%]" />
               <col className="w-[9%]" />
               <col className="w-32" />
@@ -1138,6 +1149,7 @@ function InflowLinksPageInner({
                           onClick={() => onCopy(r.refCode, r.refCode)}
                           className="text-[11px] font-medium text-action hover:underline"
                           aria-label={`${r.name}のURLをコピー`}
+                          title={r.isActive === false ? '停止中のため、このURLを開いても友だち追加できません' : undefined}
                         >
                           {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
@@ -1501,13 +1513,12 @@ function BulkRoutesDialog({
               {remaining.length > 8 ? ` ほか${(remaining.length - 8).toLocaleString('ja-JP')}件` : ''}
             </p>
           </div>
-          <fieldset className="space-y-2">
-            <legend className="text-ink mb-1 text-sm font-bold">どの操作をしますか？</legend>
+          <RadioCardGroup legend="どの操作をしますか？">
             {([
               {
                 value: 'pause' as const,
                 label: 'まとめて停止する',
-                note: `選んだ中の稼働中 ${pauseTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                note: `選んだ中の受付中 ${pauseTargets.length.toLocaleString('ja-JP')}件が対象です。`,
                 count: pauseTargets.length,
               },
               {
@@ -1525,46 +1536,33 @@ function BulkRoutesDialog({
             ]).map((option) => {
               const unavailable = option.count === 0
               return (
-                <label
+                <RadioCard
                   key={option.value}
-                  className={`block rounded-control border p-3 ${unavailable ? 'border-hairline bg-canvas-sunken' : action === option.value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas cursor-pointer'}`}
-                >
-                  <span className="flex gap-3">
-                    <input
-                      type="radio"
-                      name="inflow-bulk-action"
-                      value={option.value}
-                      checked={action === option.value}
-                      disabled={unavailable}
-                      onChange={() => setAction(option.value)}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className={`block text-sm font-semibold ${unavailable ? 'text-ink-faint' : 'text-ink'}`}>
-                        {option.label}
-                      </span>
-                      <span className="text-ink-faint mt-0.5 block text-xs">
-                        {unavailable ? `${option.note} 今の選択には効きません。` : option.note}
-                      </span>
-                      {option.value === 'move' && action === 'move' ? (
-                        <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
-                          <Select
-                            aria-label="移動先のフォルダ"
-                            value={genre}
-                            size="full"
-                            onChange={setGenre}
-                            options={[
-                              { value: '', label: '未分類' },
-                              ...genreOptions.map((name) => ({ value: name, label: name })),
-                            ]}
-                          />
-                        </span>
-                      ) : null}
-                    </span>
-                  </span>
-                </label>
+                  name="inflow-bulk-action"
+                  value={option.value}
+                  checked={action === option.value}
+                  disabled={unavailable}
+                  disabledReason="今の選択には効きません"
+                  onChange={() => setAction(option.value)}
+                  title={option.label}
+                  note={option.note}
+                />
               )
             })}
-          </fieldset>
+          </RadioCardGroup>
+          {action === 'move' ? (
+            <Select
+              aria-label="移動先のフォルダ"
+              value={genre}
+              size="full"
+              onChange={setGenre}
+              options={[
+                { value: '', label: '未分類' },
+                ...genreOptions.map((name) => ({ value: name, label: name })),
+              ]}
+              className="mt-2"
+            />
+          ) : null}
         </div>
       )}
     </Dialog>

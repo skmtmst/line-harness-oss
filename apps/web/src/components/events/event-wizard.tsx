@@ -18,11 +18,14 @@ import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/compone
 import { BULK_SLOT_LIMIT, generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 // #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
 import {
@@ -103,6 +106,10 @@ export interface EventWizardProps {
   step: 1 | 2 | 3
 }
 
+function wizardSnapshot(draft: EventDetail, firstSlot: FirstSlotDraft): string {
+  return JSON.stringify({ draft, firstSlot })
+}
+
 export default function EventWizard({ accountId, eventId, step }: EventWizardProps) {
   const router = useRouter()
   const [draft, setDraft] = useState<EventDetail>(DEFAULT_DRAFT)
@@ -118,6 +125,14 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
     入れ替わるため、更新対象の識別には使えない。
   */
   const [firstSlotId, setFirstSlotId] = useState<string | null>(null)
+  /*
+   * R161 監査：名前・質問を入れたままパンくずで一覧へ戻ると、確認なく
+   * 空欄に戻る。保存済み（読み込み・保存の直後）の姿との差を未保存とし、
+   * 離れる操作では確認を出す。
+   */
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => wizardSnapshot(DEFAULT_DRAFT, DEFAULT_FIRST_SLOT))
+  const dirty = wizardSnapshot(draft, firstSlot) !== savedSnapshot
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   // ②③は①を保存したあとにしか入れない。URL を直接叩かれても①へ戻す。
   useEffect(() => {
@@ -151,12 +166,14 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
         if (cancelled) return
         // Worker は質問定義を questions_json の文字列で返す。フォームは
         // 配列で触るので、ここでほぐしてから draft に載せる。
-        setDraft({ ...ev, questions: parseEventQuestions(ev.questions_json) })
+        const loadedDraft = { ...ev, questions: parseEventQuestions(ev.questions_json) }
+        setDraft(loadedDraft)
         setSlots(slotsRes.items)
         const first = slotsRes.items[0]
         // フォームへ写した枠のIDを記録する。あとで一覧が並び替わっても
         // 「最初の予約枠」の保存先はこの枠のまま(DETAIL-09)。
         setFirstSlotId(first?.id ?? null)
+        let loadedFirstSlot: FirstSlotDraft | null = null
         if (first) {
           const startsAt = new Date(first.starts_at)
           const endsAt = new Date(first.ends_at)
@@ -165,13 +182,16 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
             hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Tokyo',
           }).formatToParts(startsAt)
           const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((x) => x.type === type)?.value ?? ''
-          setFirstSlot({
+          loadedFirstSlot = {
             date: `${part('year')}-${part('month')}-${part('day')}`,
             startTime: `${part('hour')}:${part('minute')}`,
             durationMinutes: Math.max(15, Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000)),
             capacity: first.capacity == null ? '' : String(first.capacity),
-          })
+          }
+          setFirstSlot(loadedFirstSlot)
         }
+        // R161 監査：読み込んだ直後の姿を「保存済み」とし、変えた分だけ未保存にする。
+        setSavedSnapshot(wizardSnapshot(loadedDraft, loadedFirstSlot ?? DEFAULT_FIRST_SLOT))
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
       } finally {
@@ -260,9 +280,11 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
     let eventSaved = false
     try {
       let id = eventId
+      let savedDraft = draft
       if (id) {
         const updated = await eventsApi.updateEvent(accountId, id, payloadOf(draft), draft.version ?? 1)
         setDraft(updated)
+        savedDraft = updated
       } else {
         const created = await eventsApi.createEvent(accountId, payloadOf(draft))
         id = created.id
@@ -303,6 +325,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
           }
         }
       }
+      // R161 監査：保存の直後の姿を「保存済み」とし、確認が出ないようにする。
+      // 枠の保存で例外になったときはここへ来ないため、書きかけは残る。
+      setSavedSnapshot(wizardSnapshot(savedDraft, firstSlot))
       if (goto === null) {
         router.push(`/events?highlight=${id}`)
         return
@@ -356,6 +381,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
           {error}
         </Notice>
       )}
+
+      {/* R161 監査：概要・予約枠・公開設定の書きかけがある間の離脱確認。 */}
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、イベントへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
       {step === 1 && (
         <OverviewStep
@@ -575,14 +603,13 @@ function OverviewStep({
             placeholder="例：開催趣旨、注意事項、持ち物などを記載…"
             className={inputClass}
           />
-          <label className="text-ink-secondary mt-2 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.description_centered === 1}
-              onChange={(e) => update('description_centered', e.target.checked ? 1 : 0)}
-            />
+          <Checkbox
+            className="mt-2"
+            checked={draft.description_centered === 1}
+            onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
+          >
             詳細を中央揃えで表示する
-          </label>
+          </Checkbox>
         </div>
       </FormSection>
 
@@ -647,23 +674,25 @@ function OverviewStep({
           htmlFor="ev-max"
           note="同じ友だちが何回まで申し込めるかを決めます。"
         >
-          <select
+          <Select
+            aria-label="1人あたりの予約回数"
+            size="full"
             id="ev-max"
-            value={draft.max_bookings_per_friend ?? 'unlimited'}
-            onChange={(e) =>
+            value={draft.max_bookings_per_friend == null ? 'unlimited' : String(draft.max_bookings_per_friend)}
+            onChange={(value) =>
               update(
                 'max_bookings_per_friend',
-                e.target.value === 'unlimited' ? null : Number(e.target.value),
+                value === 'unlimited' ? null : Number(value),
               )
             }
-            className={inputClass}
-          >
-            <option value="unlimited">制限なし</option>
-            <option value="1">1回まで</option>
-            <option value="2">2回まで</option>
-            <option value="3">3回まで</option>
-            <option value="5">5回まで</option>
-          </select>
+            options={[
+              { value: 'unlimited', label: '制限なし' },
+              { value: '1', label: '1回まで' },
+              { value: '2', label: '2回まで' },
+              { value: '3', label: '3回まで' },
+              { value: '5', label: '5回まで' },
+            ]}
+          />
         </Field>
       </FormSection>
 
@@ -708,20 +737,13 @@ function OverviewStep({
         label="満席になったとき"
         note="満席後も申し込みを受けるかを決めます。"
       >
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.waitlist_enabled === 1}
-            onChange={(event) => update('waitlist_enabled', event.target.checked ? 1 : 0)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-ink block font-medium">キャンセル待ちを受け付ける</span>
-            <span className="text-ink-faint block text-xs">
-              空きが出たら、申込者一覧で待っている方を順に確認できます。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={draft.waitlist_enabled === 1}
+          onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+          description="空きが出たら、申込者一覧で待っている方を順に確認できます。"
+        >
+          キャンセル待ちを受け付ける
+        </Checkbox>
       </FormSection>
 
       <FormSection
@@ -729,20 +751,13 @@ function OverviewStep({
         label="申し込んだ人にすること"
         note="受付と前日のお知らせを自動で行います。"
       >
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.requires_approval === 1}
-            onChange={(event) => update('requires_approval', event.target.checked ? 1 : 0)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-ink block font-medium">承認してから予約を確定する</span>
-            <span className="text-ink-faint block text-xs">
-              申し込み後、申込者一覧で承認するまで確定しません。承認待ちの分も残席を使います。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={draft.requires_approval === 1}
+          onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
+          description="申し込み後、申込者一覧で承認するまで確定しません。承認待ちの分も残席を使います。"
+        >
+          承認してから予約を確定する
+        </Checkbox>
         <Field label="承認の期限" htmlFor="approval-deadline-hours">
           <Select
             id="approval-deadline-hours"
@@ -754,20 +769,13 @@ function OverviewStep({
             size="full"
           />
         </Field>
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.reminder_day_before_enabled === 1}
-            onChange={(event) => update('reminder_day_before_enabled', event.target.checked ? 1 : 0)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-ink block font-medium">前日に思い出してもらう</span>
-            <span className="text-ink-faint block text-xs">
-              開催前日にLINEで自動のお知らせを送ります。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={draft.reminder_day_before_enabled === 1}
+          onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+          description="開催前日にLINEで自動のお知らせを送ります。"
+        >
+          前日に思い出してもらう
+        </Checkbox>
       </FormSection>
       </div>
 
@@ -1131,18 +1139,14 @@ function SlotsStep({
               />
             </Field>
             <Field label="1枠の長さ" htmlFor="slot-min">
-              <select
+              <Select
+                aria-label="1枠の長さ"
+                size="full"
                 id="slot-min"
-                value={slotMinutes}
-                onChange={(e) => setSlotMinutes(Number(e.target.value))}
-                className={inputClass}
-              >
-                {[30, 45, 60, 90, 120].map((m) => (
-                  <option key={m} value={m}>
-                    {m}分
-                  </option>
-                ))}
-              </select>
+                value={String(slotMinutes)}
+                onChange={(value) => setSlotMinutes(Number(value))}
+                options={[30, 45, 60, 90, 120].map((m) => ({ value: String(m), label: `${m}分` }))}
+              />
             </Field>
             <Field label="各枠の定員" htmlFor="bulk-cap">
               <input
@@ -1174,35 +1178,34 @@ function SlotsStep({
               まだ枠がありません。枠を1つも作らないと公開できません。
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
+            <DataTable>
                 <thead>
-                  <tr className="border-hairline text-ink-faint border-b text-xs">
-                    <th className="px-2 py-2 text-left font-semibold">日時</th>
-                    <th className="px-2 py-2 text-right font-semibold">定員</th>
-                    <th className="px-2 py-2 text-right font-semibold">申込</th>
-                    <th className="px-2 py-2 text-right font-semibold">残り</th>
-                    <th className="px-2 py-2 text-right font-semibold">操作</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th style={{ width: '32%' }}>日時</Th>
+                    <Th style={{ width: '14%' }} align="right">定員</Th>
+                    <Th style={{ width: '14%' }} align="right">申込</Th>
+                    <Th style={{ width: '14%' }} align="right">残り</Th>
+                    <Th style={{ width: '26%' }} align="right">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
                   {slots.map((s) => {
                     const taken = s.active_count ?? 0
                     return (
-                      <tr key={s.id} className="border-hairline border-b last:border-b-0">
-                        <td className="text-ink px-2 py-2">
+                      <Tr key={s.id}>
+                        <Td>
                           {formatSlotJp(s.starts_at, s.ends_at)}
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {s.capacity == null ? '無制限' : `${s.capacity}名`}
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {taken}名
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {s.capacity == null ? '—' : `${Math.max(0, s.capacity - taken)}名`}
-                        </td>
-                        <td className="px-2 py-2 text-right">
+                        </Td>
+                        <ActionCell>
                           <button
                             onClick={() => { setRemoveError(''); setRemoveTarget(s) }}
                             disabled={busy || taken > 0}
@@ -1211,13 +1214,12 @@ function SlotsStep({
                           >
                             削除
                           </button>
-                        </td>
-                      </tr>
+                        </ActionCell>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+            </DataTable>
           )}
         </FormSection>
 
@@ -1233,51 +1235,47 @@ function SlotsStep({
                 null=不可、0=開始直前まで、正数=開始N時間前。
                 選択肢は event-draft-shared で共有し、編集と食い違わせない。
               */}
-              <select
+              <Select
+                aria-label="キャンセルできる期限"
+                size="full"
                 id="cancel-deadline"
                 value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
-                onChange={(e) =>
-                  update('cancel_deadline_hours_before', parseDeadlineSelect(e.target.value))
+                onChange={(value) =>
+                  update('cancel_deadline_hours_before', parseDeadlineSelect(value))
                 }
-                className={inputClass}
-              >
-                {deadlineOptionsWithSaved(
+                options={deadlineOptionsWithSaved(
                   EVENT_CANCEL_DEADLINE_OPTIONS,
                   draft.cancel_deadline_hours_before,
-                ).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                )}
+              />
             </Field>
             <Field label="開始前のお知らせ" htmlFor="reminder-hours">
-              <select
+              <Select
+                aria-label="開始前のお知らせ"
+                size="full"
                 id="reminder-hours"
-                value={draft.reminder_hours_before ?? ''}
-                onChange={(e) =>
+                value={draft.reminder_hours_before == null ? '' : String(draft.reminder_hours_before)}
+                onChange={(value) =>
                   update(
                     'reminder_hours_before',
-                    e.target.value === '' ? null : Number(e.target.value),
+                    value === '' ? null : Number(value),
                   )
                 }
-                className={inputClass}
-              >
-                <option value="">送らない</option>
-                <option value="1">開始の1時間前に送る</option>
-                <option value="2">開始の2時間前に送る</option>
-                <option value="3">開始の3時間前に送る</option>
-              </select>
+                options={[
+                  { value: '', label: '送らない' },
+                  { value: '1', label: '開始の1時間前に送る' },
+                  { value: '2', label: '開始の2時間前に送る' },
+                  { value: '3', label: '開始の3時間前に送る' },
+                ]}
+              />
             </Field>
           </div>
-          <label className="text-ink-secondary flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.reminder_day_before_enabled === 1}
-              onChange={(e) => update('reminder_day_before_enabled', e.target.checked ? 1 : 0)}
-            />
+          <Checkbox
+            checked={draft.reminder_day_before_enabled === 1}
+            onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+          >
             前日にもお知らせを送る
-          </label>
+          </Checkbox>
         </FormSection>
 
         <StepFooter
@@ -1432,20 +1430,13 @@ function PublishStep({
               size="full"
             />
           </Field>
-          <label className="text-ink-secondary flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={draft.waitlist_enabled === 1}
-              onChange={(e) => update('waitlist_enabled', e.target.checked ? 1 : 0)}
-            />
-            <span>
-              定員に達したらキャンセル待ちを受け付ける
-              <span className="text-ink-faint block text-xs">
-                空きが出たら、待っている方に自動でお知らせします。
-              </span>
-            </span>
-          </label>
+          <Checkbox
+            checked={draft.waitlist_enabled === 1}
+            onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+            description="空きが出たら、待っている方に自動でお知らせします。"
+          >
+            定員に達したらキャンセル待ちを受け付ける
+          </Checkbox>
         </FormSection>
 
         <FormSection step={2} label="誰に見せるか">
@@ -1465,19 +1456,17 @@ function PublishStep({
           </div>
           {draft.visible_tag_id && (
             <Field label="対象のタグ" htmlFor="visible-tag">
-              <select
+              <Select
+                aria-label="対象のタグ"
+                size="full"
                 id="visible-tag"
                 value={draft.visible_tag_id ?? ''}
-                onChange={(e) => update('visible_tag_id', e.target.value || null)}
-                className={inputClass}
-              >
-                {tags.length === 0 && <option value="">（タグがありません）</option>}
-                {tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => update('visible_tag_id', value || null)}
+                options={[
+                  ...(tags.length === 0 ? [{ value: '', label: '（タグがありません）' }] : []),
+                  ...tags.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+              />
             </Field>
           )}
         </FormSection>
@@ -1490,23 +1479,19 @@ function PublishStep({
                 無いときは「保存済み：…」として出し、先頭項目を選んだように
                 見せない。
               */}
-              <select
+              <Select
+                aria-label="申込の締め切り"
+                size="full"
                 id="entry-cutoff"
                 value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
-                onChange={(e) =>
-                  update('entry_cutoff_hours_before', parseDeadlineSelect(e.target.value))
+                onChange={(value) =>
+                  update('entry_cutoff_hours_before', parseDeadlineSelect(value))
                 }
-                className={inputClass}
-              >
-                {deadlineOptionsWithSaved(
+                options={deadlineOptionsWithSaved(
                   EVENT_ENTRY_CUTOFF_OPTIONS,
                   draft.entry_cutoff_hours_before,
-                ).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                )}
+              />
             </Field>
           </div>
         </FormSection>
@@ -1539,21 +1524,14 @@ function PublishStep({
         </FormSection>
 
         <FormSection step={5} label="公開">
-          <label className="text-ink-secondary flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={draft.is_published === 1}
-              disabled={noSlots}
-              onChange={(e) => update('is_published', e.target.checked ? 1 : 0)}
-            />
-            <span>
-              保存したらすぐ公開する
-              <span className="text-ink-faint block text-xs">
-                オフにすると下書きとして保存され、URLを開いても表示されません。
-              </span>
-            </span>
-          </label>
+          <Checkbox
+            checked={draft.is_published === 1}
+            disabled={noSlots}
+            onCheckedChange={(checked) => update('is_published', checked ? 1 : 0)}
+            description="オフにすると下書きとして保存され、URLを開いても表示されません。"
+          >
+            保存したらすぐ公開する
+          </Checkbox>
           {/* 枠が0件のイベントは、公開しても friend 側に日時が1つも出ない。
               公開できてしまうと「公開したのに申し込めない」になる。 */}
           {noSlots && (

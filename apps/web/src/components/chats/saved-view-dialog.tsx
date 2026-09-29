@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import Checkbox from '@/components/shared/checkbox'
 import Combobox from '@/components/shared/combobox'
+import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
@@ -198,43 +200,67 @@ export default function SavedViewDialog({
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">対応状況</dt>
                   <dd>
-                    <select aria-label="保存する対応状況" value={status} onChange={(event) => setStatus(event.target.value as SavedViewDraft['status'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">すべて</option>
-                      <option value="unread">未対応</option>
-                      <option value="in_progress">対応中</option>
-                      <option value="on_hold">保留</option>
-                      <option value="resolved">対応済み</option>
-                    </select>
+                    <Select
+                      aria-label="保存する対応状況"
+                      value={status}
+                      onChange={(value) => setStatus(value as SavedViewDraft['status'])}
+                      options={[
+                        { value: 'all', label: 'すべて' },
+                        { value: 'unread', label: '未対応' },
+                        { value: 'in_progress', label: '対応中' },
+                        { value: 'on_hold', label: '保留' },
+                        { value: 'resolved', label: '対応済み' },
+                      ]}
+                      className="h-9 w-40 text-xs font-medium"
+                    />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">絞り込み</dt>
                   <dd>
-                    <select aria-label="保存する絞り込み" value={quickFilter} onChange={(event) => setQuickFilter(event.target.value as SavedViewDraft['quickFilter'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">すべて</option>
-                      <option value="reply">要返信</option>
-                      {/* INBOX-10: 対応期限ではなく「未対応のまま1時間」を数える。 */}
-                      <option value="overdue">1時間以上待ち</option>
-                    </select>
+                    <Select
+                      aria-label="保存する絞り込み"
+                      value={quickFilter}
+                      onChange={(value) => setQuickFilter(value as SavedViewDraft['quickFilter'])}
+                      options={[
+                        { value: 'all', label: 'すべて' },
+                        { value: 'reply', label: '要返信' },
+                        // INBOX-10: 対応期限ではなく「未対応のまま1時間」を数える。
+                        { value: 'overdue', label: '1時間以上待ち' },
+                      ]}
+                      className="h-9 w-40 text-xs font-medium"
+                    />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">未読</dt>
                   <dd>
-                    <select aria-label="保存する未読条件" value={unreadOnly ? 'unread' : 'all'} onChange={(event) => setUnreadOnly(event.target.value === 'unread')} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">すべて</option>
-                      <option value="unread">未読だけ</option>
-                    </select>
+                    <Select
+                      aria-label="保存する未読条件"
+                      value={unreadOnly ? 'unread' : 'all'}
+                      onChange={(value) => setUnreadOnly(value === 'unread')}
+                      options={[
+                        { value: 'all', label: 'すべて' },
+                        { value: 'unread', label: '未読だけ' },
+                      ]}
+                      className="h-9 w-40 text-xs font-medium"
+                    />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">受信経路</dt>
                   <dd>
-                    <select aria-label="保存する受信経路" value={channel} onChange={(event) => setChannel(event.target.value as SavedViewDraft['channel'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">LINE・MAIL</option>
-                      <option value="line">LINE</option>
-                      <option value="email">MAIL</option>
-                    </select>
+                    <Select
+                      aria-label="保存する受信経路"
+                      value={channel}
+                      onChange={(value) => setChannel(value as SavedViewDraft['channel'])}
+                      options={[
+                        { value: 'all', label: 'LINE・MAIL' },
+                        { value: 'line', label: 'LINE' },
+                        { value: 'email', label: 'MAIL' },
+                      ]}
+                      className="h-9 w-40 text-xs font-medium"
+                    />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
@@ -256,17 +282,12 @@ export default function SavedViewDialog({
               </dl>
             </div>
 
-            <label className="flex items-center justify-between gap-4">
-              <span>
-                <span className="text-ink block text-xs font-medium">よく使うに追加</span>
-                <span className="text-ink-faint text-micro mt-0.5 block">保存した検索一覧の上部に表示します</span>
-              </span>
-              <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
-                <input type="checkbox" checked={favorite} onChange={(event) => setFavorite(event.target.checked)} aria-label="よく使うに追加" className="peer sr-only" />
-                <span className="bg-canvas-sunken peer-checked:bg-accent-deep absolute inset-0 rounded-full transition-colors" />
-                <span className="bg-canvas absolute left-1 h-4 w-4 rounded-full shadow transition-transform peer-checked:translate-x-5" />
-              </span>
-            </label>
+            <Checkbox
+              checked={favorite}
+              onCheckedChange={setFavorite}
+              aria-label="よく使うに追加"
+              description="保存した検索一覧の上部に表示します"
+            >よく使うに追加</Checkbox>
 
             {/* 設計 `AuSDY` と同じく、直す場所を見たあとに理由を読む。 */}
             {error || showMissingError ? (

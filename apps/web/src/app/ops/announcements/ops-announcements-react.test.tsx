@@ -10,6 +10,28 @@ import { previewLabel, toLocalInput, toPublishAt } from './format'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
+const navigation = vi.hoisted(() => ({ push: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: navigation.push, replace: vi.fn(), back: vi.fn() }),
+}))
+
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の配信予約の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 /** ★V6 37-7 お知らせ配信。作成欄・送り方・宛先の見込み・一覧（LINE送達／画面で既読）が API の形どおりに出ること。 */
 
 const sent = {
@@ -24,10 +46,13 @@ let host: HTMLDivElement
 let root: Root
 let calls: Array<{ url: string; method: string; body: unknown }>
 let lineConfigured = true
+let announcements: unknown[] = []
 
 beforeEach(() => {
   calls = []
   lineConfigured = true
+  announcements = [sent, draft]
+  navigation.push.mockClear()
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
@@ -37,7 +62,7 @@ beforeEach(() => {
     let payload: unknown
     if (url.endsWith('/api/ops/announcements/preview')) payload = { success: true, data: { tenants: 12, staff: 24, lineLinked: 21, withEmail: 24 } }
     else if (url.endsWith('/api/ops/announcements') && method === 'POST') payload = { success: true, data: { ...sent, id: 'a3', recipientsTotal: 24, lineSent: 21, mailSent: 24 } }
-    else if (url.endsWith('/api/ops/announcements')) payload = { success: true, data: [sent, draft], linked: { linked: 21, total: 24 }, noticeLineConfigured: lineConfigured }
+    else if (url.endsWith('/api/ops/announcements')) payload = { success: true, data: announcements, linked: { linked: 21, total: 24 }, noticeLineConfigured: lineConfigured }
     else if (url.includes('/api/ops/tenants')) payload = { success: true, data: [] }
     else payload = { success: true, data: null }
     return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -157,5 +182,56 @@ describe('画面', () => {
     await flush()
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください')
     expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toBe(false)
+  })
+
+  it('未入力で保存を押しても一覧は失敗表示に変わらない（監査 R154）', async () => {
+    announcements = []
+    await act(async () => { root.render(<OpsAnnouncementsPage />) })
+    await flush()
+    expect(host.textContent).toContain('まだお知らせはありません')
+    // 件名も本文も空のまま「下書きとして保存」→ 入力の検証エラー
+    await act(async () => { button('下書きとして保存')!.click() })
+    await flush()
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('件名を入力してください')
+    // 一覧は「読み込み失敗」に変わらず、空の案内のまま保つ
+    expect(host.textContent).toContain('まだお知らせはありません')
+    expect(host.textContent).not.toContain('お知らせを表示できませんでした')
+  })
+
+  it('入力中に画面内リンクを押すと離脱の確認が出て、「編集を続ける」で入力が残る（監査 R155）', async () => {
+    await act(async () => { root.render(<OpsAnnouncementsPage />) })
+    await flush()
+    await act(async () => {
+      setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '書きかけの件名')
+    })
+    // 左メニューなどの画面内リンクを踏むのと同じクリックを起こす
+    const link = document.createElement('a')
+    link.href = '/ops/knowledge'
+    document.body.appendChild(link)
+    await act(async () => { link.click() })
+    await flush()
+    link.remove()
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    await act(async () => { button('編集を続ける')!.click() })
+    await flush()
+    expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toBe('書きかけの件名')
+    expect(navigation.push).not.toHaveBeenCalled()
+  })
+
+  it('離脱の確認で「保存せずに移動」を押すと移動する（監査 R155）', async () => {
+    await act(async () => { root.render(<OpsAnnouncementsPage />) })
+    await flush()
+    await act(async () => {
+      setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '書きかけの件名')
+    })
+    const link = document.createElement('a')
+    link.href = '/ops/knowledge'
+    document.body.appendChild(link)
+    await act(async () => { link.click() })
+    await flush()
+    link.remove()
+    await act(async () => { button('保存せずに移動')!.click() })
+    await flush()
+    expect(navigation.push).toHaveBeenCalledWith('/ops/knowledge')
   })
 })

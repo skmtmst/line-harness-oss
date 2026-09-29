@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { LockKeyhole, X } from 'lucide-react'
 import { RowActions } from '@/components/shared/row-actions'
@@ -10,6 +10,7 @@ import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem 
 import { createResponseGate } from '@/lib/latest-request'
 import Button from '@/components/shared/button'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Select from '@/components/shared/select'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -74,6 +75,8 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
   onConfirm: () => void
 }) {
   const dialogRef = useOverlayFocus(true, onCancel, saving)
+  /* R138横展開: 確認窓の名前として見出しを読ませる。 */
+  const titleId = useId()
   const selected = impact?.replacementOptions.find((option) => option.id === replacementMarkId)
   /*
     ATTR-17: 以前は画面上端から margin-top:310px に固定しており、
@@ -81,33 +84,59 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
     画面の中に収め、中身が溢れたらダイアログの内側だけをスクロールする。
     見出しと操作ボタンは常に見えたままにする。
   */
+  /*
+   * R180: 使っている友だちが0人のときは置換先なしで保管できる。
+   * 以前は0人でも置換先が必須で、独自マーク1件だけのアカウントでは
+   * 候補が空（共有は除外・自身も除外）になり保管実行を押せなかった。
+   * 友だちがいるときに候補が無い・保管できないときは理由と次の操作を出す。
+   */
+  const friendCount = impact?.friendCount ?? 0
+  const needsReplacement = friendCount > 0
+  const noCandidates = needsReplacement && (impact?.replacementOptions.length ?? 0) === 0
+  const blockReason = !impact
+    ? ''
+    : !impact.canArchive
+      ? (mark.isDefault
+        ? '初期値のマークは保管できません。先に別のマークを初期値にしてください。'
+        : mark.isInherited
+          ? '共有のマークは保管できません。'
+          : '使用先があるため保管できません。使用先を外してから保管してください。')
+      : noCandidates
+        ? '置き換え先にできる対応マークがありません。先に新しい対応マークを作ってください。'
+        : ''
+  const canConfirm = !loading && !saving && Boolean(impact?.canArchive) && (!needsReplacement || Boolean(replacementMarkId))
   return (
     <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/45 p-4">
-      <section data-design-node="zGZMA" data-design-part="archive-position" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[680px] flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-2xl" role="alertdialog" aria-modal="true">
+      <section data-design-node="zGZMA" data-design-part="archive-position" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[680px] flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="flex items-start justify-between gap-3 p-4 pb-0">
           <div>
-            <h2 className="text-lg font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
-            <p className="mt-2 text-xs leading-5 text-ink-secondary">保管後は新しく選べません。いま付いている友だちは、選んだマークへ置き換えて履歴を残します。</p>
+            <h2 id={titleId} className="text-lg font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
+            <p className="mt-2 text-xs leading-5 text-ink-secondary">保管後は新しく選べません。{needsReplacement ? 'いま付いている友だちは、選んだマークへ置き換えて履歴を残します。' : '使っている友だちはいないので、そのまま保管できます。'}</p>
           </div>
           <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-1 pt-3">
-          {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact ? (
+          {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact && needsReplacement ? (
             <div>
               <label className="block text-sm font-semibold text-ink">置き換え先
-                <select value={replacementMarkId} onChange={(event) => onReplacement(event.target.value)} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal">
-                  <option value="">選んでください</option>
-                  {impact.replacementOptions.map((option) => <option key={option.id} value={option.id}>{option.name}{option.isDefault ? '（初期値）' : ''}</option>)}
-                </select>
+                <Select
+                  aria-label="置き換え先"
+                  value={replacementMarkId}
+                  onChange={onReplacement}
+                  options={[{ value: '', label: '選んでください' }, ...impact.replacementOptions.map((option) => ({ value: option.id, label: `${option.name}${option.isDefault ? '（初期値）' : ''}` }))]}
+                  size="full"
+                  className="mt-1.5"
+                />
               </label>
               {selected ? <p className="mt-2 text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
             </div>
           ) : null}
+          {blockReason ? <p className="mt-4 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">{blockReason}</p> : null}
           {error ? <Notice tone="danger" className="mt-4">{error}</Notice> : null}
         </div>
-        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>やめる</Button><button type="button" onClick={onConfirm} disabled={loading || saving || !impact?.canArchive || !replacementMarkId} className="h-9 rounded-control bg-danger px-4 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : '置き換えて保管する'}</button></div>
+        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>やめる</Button><button type="button" onClick={onConfirm} disabled={!canConfirm} className="h-9 rounded-control bg-danger px-4 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : needsReplacement ? '置き換えて保管する' : '保管する'}</button></div>
       </section>
     </div>
   )
@@ -278,13 +307,15 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
   }
 
   const confirmRemove = async (mark: MarkRow) => {
-    if (!accountId || !archiveImpact || !replacementMarkId || deleting) return
+    // R180: 0人のときは置換先なしで保管する。
+    const replacement = (archiveImpact?.friendCount ?? 0) > 0 ? replacementMarkId : (replacementMarkId || null)
+    if (!accountId || !archiveImpact || ((archiveImpact.friendCount ?? 0) > 0 && !replacementMarkId) || deleting) return
     setError('')
     setDeleteError('')
     setDeleting(true)
     try {
       const res = await api.supportMarks.archive(mark.id, accountId, {
-        replacementMarkId,
+        replacementMarkId: replacement,
         impactRevision: archiveImpact.impactRevision,
         expectedVersion: archiveImpact.expectedVersion,
       }, crypto.randomUUID())
@@ -363,11 +394,17 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="マーク名で検索" aria-label="マーク名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label" />
-        <select value={usage} onChange={(event) => setUsage(event.target.value as typeof usage)} className="v6-select h-9 w-[142px] rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink" aria-label="利用状態">
-          <option value="all">利用状態：すべて</option>
-          <option value="used">使用中</option>
-          <option value="unused">未使用</option>
-        </select>
+        <Select
+          label="利用状態"
+          aria-label="利用状態"
+          value={usage}
+          onChange={(value) => setUsage(value as typeof usage)}
+          options={[
+            { value: 'all', label: 'すべて' },
+            { value: 'used', label: '使用中' },
+            { value: 'unused', label: '未使用' },
+          ]}
+        />
         <span className="flex-1" />
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>

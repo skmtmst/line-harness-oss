@@ -1,8 +1,10 @@
 'use client'
 
 import { X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Link from 'next/link'
 import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount } from '@line-crm/shared'
@@ -232,7 +234,7 @@ function EmergencyControlFeedback({
   </>
 }
 
-type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friends'
+type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friends' | 'monitoring' | 'infra' | 'credential'
 
 interface HealthCheckItem {
   id: HealthCheckId
@@ -248,11 +250,14 @@ interface HealthCheckItem {
 
 const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | 'description' | 'threshold' | 'href'>> = [
   { id: 'line', label: 'LINE接続', icon: 'L', description: 'LINEのアカウントとつながっているか', threshold: '応答がない状態が5分つづくと「エラー」', href: '/accounts' },
-  { id: 'quota', label: '月間配信数', icon: '↗', description: 'LINEの上限に近づいていないか', threshold: '80%で「注意」・95%で「エラー」', href: '/broadcasts' },
+  { id: 'quota', label: '月間配信数', icon: '↗', description: 'LINEとHarness両方の上限に近づいていないか（送れる数は少ない方）', threshold: '80%で「注意」・95%・予定分の超過で「エラー」', href: '/broadcasts' },
   { id: 'api', label: 'API・外部連携', icon: '↔', description: '管理画面とEC連携が動いているか', threshold: '応答なし・取り込み0件で「注意」', href: '/ec-commerce' },
   { id: 'webhook', label: 'Webhook', icon: 'W', description: '合言葉が入り、送信が通っているか', threshold: '合言葉なしが1本でもあれば「注意」', href: '/webhooks' },
   { id: 'delivery', label: '配信処理', icon: '▷', description: '予約した配信が時刻どおりに出ているか', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
-  { id: 'friends', label: '友だち変化', icon: '人', description: '急に減っていないか', threshold: '1日で5%以上減ると「注意」', href: '/friends' },
+  { id: 'friends', label: '友だち変化', icon: '人', description: '急に減っていないか（同曜日・28日の基準と比較）', threshold: '1日で5%以上・10人以上減ると「注意」', href: '/friends' },
+  { id: 'infra', label: '裏の仕組み', icon: '▣', description: 'データの置き場（DB・保管庫・順番待ち）へ読み書きできるか', threshold: '遅い・失敗が3回続くと「エラー」', href: '/emergency?tab=health' },
+  { id: 'credential', label: '鍵の期限', icon: '鍵', description: 'LINEの鍵の期限が近づいていないか', threshold: '14日前で「注意」・期限切れで「エラー」', href: '/accounts' },
+  { id: 'monitoring', label: '見張り自体', icon: '◎', description: '5分ごとの確認が動いているか', threshold: '10分止まると「エラー」', href: '/emergency?tab=health' },
 ]
 
 const HEALTH_CHECK_ID: Record<OperationHealthCheckKey, HealthCheckId> = {
@@ -262,6 +267,9 @@ const HEALTH_CHECK_ID: Record<OperationHealthCheckKey, HealthCheckId> = {
   webhook: 'webhook',
   dispatch_jobs: 'delivery',
   friend_change: 'friends',
+  monitoring_heartbeat: 'monitoring',
+  infra_canary: 'infra',
+  credential_expiry: 'credential',
 }
 
 const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
@@ -373,6 +381,21 @@ const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; re
     impact: '友だちが急に減っている可能性があります。誤配信やブロックが原因の可能性があります。',
     recovery: '直近の配信内容を確認し、必要なら緊急停止してください。',
     href: '/emergency?tab=control',
+  },
+  monitoring_heartbeat: {
+    impact: '異常があっても通知されない可能性があります。',
+    recovery: '時間をおいても直らなければ、運営へ連絡してください。',
+    href: '/emergency?tab=health',
+  },
+  infra_canary: {
+    impact: '配信・保存・画面表示が止まる可能性があります。',
+    recovery: '時間をおいて再確認し、続く場合は運営へ連絡してください。',
+    href: '/emergency?tab=health',
+  },
+  credential_expiry: {
+    impact: '期限切れ後はLINEとのやり取りが止まる可能性があります。',
+    recovery: 'アカウント設定でLINEの鍵を確認し直してください。',
+    href: '/accounts',
   },
 }
 
@@ -984,6 +1007,15 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const accountName = targetAccountId === 'all' ? 'すべてのアカウント' : accounts.find((account) => account.id === targetAccountId)?.name ?? '選択したアカウント'
   const fullReason = reasonDetail.trim() ? `${reason}: ${reasonDetail.trim()}` : reason
   const mutationLocked = isEmergencyMutationLocked(needsReload, running)
+  // 停止・復旧の実行中は、×と同じくEscapeでも窓を閉じない。
+  const confirmPanelRef = useOverlayFocus(!!confirmMode, () => {
+    setConfirmMode(null)
+    setConfirmWord('')
+  }, mutationLocked)
+  const stepUpPanelRef = useOverlayFocus(!!stepUpMode, () => {
+    setStepUpMode(null)
+    setStepUpCode('')
+  }, mutationLocked)
   const targetLabels: Record<StopTarget, { label: string; note: string }> = {
     broadcasts: { label: '予約中の一斉配信', note: '予約を下書きに戻します' },
     scenarios: { label: 'シナリオ配信', note: '稼働中のものを止めます' },
@@ -1094,12 +1126,12 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
         <div className="min-w-0 flex-1 space-y-4">
           <section className={`border-hairline rounded-card overflow-hidden border bg-canvas ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
             <div className="border-hairline border-b px-4 py-4"><h2 className="text-base font-bold text-ink">何を止めますか</h2><p className="mt-1 text-xs text-ink-faint">停止前に、何本と何人に関わるかを実測で確認します。</p></div>
-            <div>{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-hairline px-4 py-3 last:border-0 hover:bg-canvas-sunken"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} disabled={mutationLocked || isStopped} className="h-4 w-4 accent-danger" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{targetLabels[key].label}</span><span className="block text-xs text-ink-faint">{targetLabels[key].note}</span></span><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></label>)}</div>
+            <div>{(Object.keys(targetLabels) as StopTarget[]).map((key) => <div key={key} className="flex items-center gap-3 border-b border-hairline px-4 py-3 last:border-0"><Checkbox checked={targets[key]} onCheckedChange={(checked) => setTargets((current) => ({ ...current, [key]: checked }))} disabled={mutationLocked || isStopped} description={targetLabels[key].note} className="min-w-0 flex-1">{targetLabels[key].label}</Checkbox><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></div>)}</div>
           </section>
 
           <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
             <h2 className="text-base font-bold text-ink">どのアカウントを、なぜ止めますか</h2>
-            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><SelectField id="emergency-account" value={targetAccountId} onChange={(event) => handleTargetAccountChange(event.target.value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の対象アカウント" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><SelectField id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の理由" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
+            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><Select size="full" id="emergency-account" value={targetAccountId} onChange={(value) => handleTargetAccountChange(value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の対象アカウント" className="mt-2" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><Select size="full" id="emergency-reason" value={reason} onChange={(value) => setReason(value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の理由" className="mt-2" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
           </section>
 
           <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
@@ -1142,7 +1174,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       </div>
 
       {confirmMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title">
-        <div className="flex w-full flex-col overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}>
+        <div ref={confirmPanelRef} className="flex w-full flex-col overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}>
           <div className="flex items-start gap-3 border-b border-hairline px-6 py-6" style={{ minHeight: 112 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger-bg text-xl font-bold text-danger">!</span><div className="min-w-0 flex-1"><h2 id="emergency-confirm-title" className="text-xl font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-sm text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div><button type="button" onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} aria-label="閉じる" className="rounded-mini shrink-0 p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div>
           <div className="flex-1 space-y-3 overflow-y-auto p-6">{confirmMode === 'stop' ? <>
             <section className="rounded-control border border-danger bg-danger-bg p-4 text-danger"><p className="text-sm font-bold">{accountName}</p><div className="mt-3 divide-y divide-danger/15">{selectedTargets.map((key) => <div key={key} className="flex items-center justify-between gap-4 py-2" style={{ minHeight: 58 }}><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas text-danger">■</span><div><p className="text-sm font-bold">{targetLabels[key].label}</p><p className="mt-0.5 text-xs">{targetLabels[key].note}</p></div></div><strong className="text-right text-sm">{impactText(key)}</strong></div>)}</div><p className="mt-3 text-xs font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></section>
@@ -1160,7 +1192,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       </div>}
       {stepUpMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-step-up-title">
-          <div className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl">
+          <div ref={stepUpPanelRef} className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <h2 id="emergency-step-up-title" className="text-lg font-bold text-ink">
                 {stepUpMethod === 'password' ? 'パスワードで本人確認' : '認証アプリで本人確認'}
@@ -1306,7 +1338,7 @@ function HistoryPanel() {
   return (
     <div className="space-y-4" data-design="V3 Update history">
       <div className="flex flex-wrap justify-end gap-2">
-        <SelectField aria-label="表示期間" value={period} onChange={(event) => setPeriod(event.target.value as typeof period)} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: 'この30日' }]} className="border-hairline rounded-control min-h-9 border bg-canvas px-3 text-xs" />
+        <Select aria-label="表示期間" value={period} onChange={(value) => setPeriod(value as typeof period)} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: 'この30日' }]} />
         <button type="button" onClick={downloadCsv} className="rounded-control min-h-9 px-3 text-xs font-bold text-action hover:bg-action-soft">CSVで書き出す</button>
       </div>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}

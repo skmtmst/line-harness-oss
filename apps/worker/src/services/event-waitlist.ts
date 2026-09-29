@@ -301,7 +301,7 @@ export async function getEventOccurrenceApplicants(
            FROM event_waitlist w
            JOIN friends f ON f.id = w.friend_id AND f.line_account_id = ?
           WHERE w.slot_id = ? AND w.status IN ('waiting', 'offered', 'accepted')
-          ORDER BY w.created_at ASC, w.id ASC`,
+          ORDER BY w.sort_order ASC, w.created_at ASC, w.id ASC`,
       )
       .bind(params.lineAccountId, params.occurrenceId)
       .all<WaitlistApplicantRow>(),
@@ -773,7 +773,7 @@ export async function promoteEventWaitlist(
               event_snapshot_json
          FROM event_waitlist
         WHERE slot_id = ? AND status = 'waiting'
-        ORDER BY created_at ASC, id ASC
+        ORDER BY sort_order ASC, created_at ASC, id ASC
         LIMIT 1`,
     )
     .bind(occurrence.id)
@@ -1112,6 +1112,135 @@ export async function processEventWaitlistPromotionJobs(
 function formatJst(utcIso: string): string {
   const jst = new Date(new Date(utcIso).getTime() + 9 * 3600_000).toISOString();
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
+}
+
+// ----------------------------------------------------------------
+// U: 待ちの手動操作（順番の変更・飛ばし）。どちらも理由が必須で、
+// 適用口（route 側）が event_change_logs へ残す。
+// 順番は sort_order 列で持ち、案内の取り出しも表示も
+// (sort_order, created_at) の順に読む。既存行は 0 のままなので、
+// 触っていない枠の「先に並んだ人から」は変わらない。
+// ----------------------------------------------------------------
+
+export type ReorderWaitlistResult =
+  | { kind: 'reordered'; occurrenceVersion: number; order: string[] }
+  | { kind: 'not_found' }
+  | { kind: 'conflict'; currentVersion: number }
+  | { kind: 'invalid'; error: string };
+
+export async function reorderEventWaitlist(
+  db: D1Database,
+  params: {
+    occurrenceId: string;
+    lineAccountId: string;
+    /** 先頭から順に並べた waiting 行の ID。枠の waiting 全件と一致すること。 */
+    orderedIds: string[];
+    expectedVersion?: number;
+    now?: Date;
+  },
+): Promise<ReorderWaitlistResult> {
+  const nowIso = (params.now ?? new Date()).toISOString();
+  const occurrence = await loadOccurrence(db, params.occurrenceId, params.lineAccountId);
+  if (!occurrence) return { kind: 'not_found' };
+  if (params.expectedVersion != null && params.expectedVersion !== occurrence.version) {
+    return { kind: 'conflict', currentVersion: occurrence.version };
+  }
+  if (!Array.isArray(params.orderedIds) || params.orderedIds.length === 0) {
+    return { kind: 'invalid', error: 'ordered_ids_required' };
+  }
+  if (new Set(params.orderedIds).size !== params.orderedIds.length) {
+    return { kind: 'invalid', error: 'duplicate_ids' };
+  }
+  const rows = await db
+    .prepare(`SELECT id FROM event_waitlist WHERE slot_id = ? AND status = 'waiting'`)
+    .bind(params.occurrenceId)
+    .all<{ id: string }>();
+  const current = new Set((rows.results ?? []).map((r) => r.id));
+  if (current.size !== params.orderedIds.length
+    || params.orderedIds.some((id) => !current.has(id))) {
+    return { kind: 'invalid', error: 'ordered_ids_mismatch' };
+  }
+  const statements = params.orderedIds.map((id, index) =>
+    db
+      .prepare(
+        `UPDATE event_waitlist
+            SET sort_order = ?, version = version + 1, updated_at = ?
+          WHERE id = ? AND status = 'waiting'`,
+      )
+      .bind(index + 1, nowIso, id),
+  );
+  statements.push(
+    db
+      .prepare(`UPDATE event_slots SET version = version + 1, updated_at = ? WHERE id = ?`)
+      .bind(nowIso, params.occurrenceId),
+  );
+  await db.batch(statements);
+  const latest = await loadOccurrence(db, params.occurrenceId, params.lineAccountId);
+  return {
+    kind: 'reordered',
+    occurrenceVersion: latest?.version ?? occurrence.version + 1,
+    order: [...params.orderedIds],
+  };
+}
+
+export type SkipWaitlistResult =
+  | { kind: 'skipped'; occurrenceVersion: number; waitlistId: string }
+  | { kind: 'not_found' }
+  | { kind: 'conflict'; currentVersion: number }
+  | { kind: 'invalid'; error: string };
+
+export async function skipEventWaitlist(
+  db: D1Database,
+  params: {
+    occurrenceId: string;
+    waitlistId: string;
+    lineAccountId: string;
+    expectedVersion?: number;
+    now?: Date;
+  },
+): Promise<SkipWaitlistResult> {
+  const nowIso = (params.now ?? new Date()).toISOString();
+  const occurrence = await loadOccurrence(db, params.occurrenceId, params.lineAccountId);
+  if (!occurrence) return { kind: 'not_found' };
+  if (params.expectedVersion != null && params.expectedVersion !== occurrence.version) {
+    return { kind: 'conflict', currentVersion: occurrence.version };
+  }
+  const target = await db
+    .prepare(`SELECT id, version FROM event_waitlist
+               WHERE id = ? AND slot_id = ? AND status = 'waiting'`)
+    .bind(params.waitlistId, params.occurrenceId)
+    .first<{ id: string; version: number }>();
+  if (!target) return { kind: 'invalid', error: 'waitlist_not_waiting' };
+  // 飛ばしは最後尾へ回す（行は消さない・取り消しは status の役目）。
+  // 末尾の基準は今の最大値 + 1。並走する手動操作があっても順序が
+  // 壊れないよう、条件付き更新で直列化する。
+  const maxRow = await db
+    .prepare(`SELECT COALESCE(MAX(sort_order), 0) AS m FROM event_waitlist WHERE slot_id = ?`)
+    .bind(params.occurrenceId)
+    .first<{ m: number }>();
+  const tail = (maxRow?.m ?? 0) + 1;
+  const moved = await db
+    .prepare(
+      `UPDATE event_waitlist
+          SET sort_order = ?, version = version + 1, updated_at = ?
+        WHERE id = ? AND status = 'waiting' AND version = ?`,
+    )
+    .bind(tail, nowIso, params.waitlistId, target.version)
+    .run();
+  if ((moved.meta?.changes ?? 0) === 0) {
+    const latest = await loadOccurrence(db, params.occurrenceId, params.lineAccountId);
+    return { kind: 'conflict', currentVersion: latest?.version ?? occurrence.version };
+  }
+  await db
+    .prepare(`UPDATE event_slots SET version = version + 1, updated_at = ? WHERE id = ?`)
+    .bind(nowIso, params.occurrenceId)
+    .run();
+  const latest = await loadOccurrence(db, params.occurrenceId, params.lineAccountId);
+  return {
+    kind: 'skipped',
+    occurrenceVersion: latest?.version ?? occurrence.version + 1,
+    waitlistId: params.waitlistId,
+  };
 }
 
 export function createEventWaitlistOfferSender(

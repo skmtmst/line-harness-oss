@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import Combobox from '@/components/shared/combobox'
+import Select from '@/components/shared/select'
 import { api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import type {
@@ -152,7 +154,8 @@ export default function EditRouteModal({
     await doSave()
   }
 
-  const saveDisabled = submitting || !form.genre?.trim() || !form.name.trim() || !form.refCode.trim()
+  // R270: 作成と同じくフォルダは任意。空欄は未分類のまま保存する。
+  const saveDisabled = submitting || !form.name.trim() || !form.refCode.trim()
   return (
     <Dialog
       open
@@ -176,14 +179,16 @@ export default function EditRouteModal({
       }
     >
       <div className="space-y-3">
-        <Field label="ジャンル（協力会社・グループ）">
+        <Field label="フォルダ（任意）">
           <input
             list={genreLocked ? undefined : 'referral-genre-options'}
             value={form.genre ?? ''}
-            onChange={(e) => setForm({ ...form, genre: e.target.value })}
+            // R270: 空欄は未分類として null で送る。空文字のまま送ると
+            // 口が400ではじくため、ここで null に寄せる。
+            onChange={(e) => setForm({ ...form, genre: e.target.value.trim() ? e.target.value : null })}
             readOnly={genreLocked}
             className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-            placeholder="例: A店"
+            placeholder="例: SNS（空欄なら未分類）"
             maxLength={80}
           />
           <datalist id="referral-genre-options">
@@ -191,12 +196,12 @@ export default function EditRouteModal({
           </datalist>
           <p className="text-ink-faint mt-1 text-xs">
             {genreLocked
-              ? '左側で選択したジャンルへ登録されます。'
-              : '同じ協力会社や媒体を同じジャンル名にすると、一覧でまとめて管理できます。'}
+              ? '左側で選択したフォルダへ登録されます。'
+              : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
           </p>
         </Field>
 
-        <Field label="名前（ジャンル内の流入経路）">
+        <Field label="流入元の名前">
           <input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -210,13 +215,20 @@ export default function EditRouteModal({
           <input
             value={form.refCode}
             onChange={(e) => setForm({ ...form, refCode: e.target.value })}
-            disabled={refCodeLocked}
+            // R271: 作成済みの識別子は口も変更を拒否する。保存時にはじめて
+            // 拒否せず、欄自体を読み取り専用にして理由を近くに出す。
+            disabled={refCodeLocked || !isNew}
             className="border-hairline rounded-control bg-canvas text-ink disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 font-mono text-sm"
             placeholder="例: youtube"
           />
           {refCodeLocked && (
             <p className="text-ink-faint mt-1 text-xs">
               既に流入があった識別子を登録中のため、URLに出る識別子は変更できません。
+            </p>
+          )}
+          {!isNew && (
+            <p className="text-ink-faint mt-1 text-xs">
+              URLに出る識別子は作成後に変更できません。新しいURLが必要な場合は、新しいリンクを作成してください。
             </p>
           )}
         </Field>
@@ -236,25 +248,23 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="送り先 Pool">
-          <select
+          <Select
+            aria-label="送り先 Pool"
             value={form.poolId ?? ''}
-            onChange={(e) => setForm({ ...form, poolId: e.target.value || null })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-          >
-            {pools.map((p) => {
+            onChange={(value) => setForm({ ...form, poolId: value || null })}
+            size="full"
+            options={pools.map((p) => {
               const members = poolMembers[p.id] ?? []
               const memberText =
                 members.length === 0
                   ? '（アカウント未所属）'
                   : `— ${members.join(', ')}`
-              return (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.slug === 'main' ? '（既定）' : ''} {memberText}
-                </option>
-              )
+              return {
+                value: p.id,
+                label: `${p.name}${p.slug === 'main' ? '（既定）' : ''} ${memberText}`,
+              }
             })}
-          </select>
+          />
         </Field>
 
         <Field label="起動シナリオ（任意）">
@@ -279,26 +289,17 @@ export default function EditRouteModal({
           />
         </Field>
 
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.runAccountFriendAddScenarios ?? true}
-            onChange={(e) => {
-              setForm({
-                ...form,
-                runAccountFriendAddScenarios: e.target.checked,
-              })
-              setWarning(null)
-            }}
-            className="mt-0.5"
-          />
-          <span>
-            アカウント標準の友だち追加時設定も実行する（並走モード）
-            <span className="text-ink-faint mt-0.5 block text-xs">
-              OFF にするとアカウント標準シナリオは抑止され、このリンクの設定だけが流れます。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={form.runAccountFriendAddScenarios ?? true}
+          onCheckedChange={(checked) => {
+            setForm({
+              ...form,
+              runAccountFriendAddScenarios: checked,
+            })
+            setWarning(null)
+          }}
+          description="OFF にするとアカウント標準シナリオは抑止され、このリンクの設定だけが流れます。"
+        >アカウント標準の友だち追加時設定も実行する（並走モード）</Checkbox>
 
         {warning && (
           <Notice

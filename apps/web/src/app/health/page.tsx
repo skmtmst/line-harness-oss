@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Progress from '@/components/shared/progress'
-import SelectField from '@/components/shared/select-field'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Select from '@/components/shared/select'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { parseJstDateTime, shortDateTime } from '@/lib/hq-banners'
 import { ChevronDown } from 'lucide-react'
 
 interface LineAccount {
@@ -29,7 +31,14 @@ interface AccountHealthLog {
   createdAt: string
 }
 
-type AccountHealthState = AccountHealthLog['riskLevel'] | 'unknown' | 'error'
+/*
+ * R168: BAN検知はcronで5分ごとに走る。最後の確認がしきい値より古いなら
+ * 「確認が止まっている」として区別する。古い正常の記録を現在の
+ * 正常稼働として見せないための区切り。
+ */
+const STALE_CHECK_AFTER_MS = 60 * 60 * 1000
+
+type AccountHealthState = AccountHealthLog['riskLevel'] | 'unknown' | 'error' | 'stale'
 
 interface AccountHealthSnapshot {
   state: AccountHealthState
@@ -60,7 +69,16 @@ const riskConfig = {
   danger: { label: '危険', color: 'bg-danger', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
   unknown: { label: '未確認', color: 'bg-ink-faint', textColor: 'text-ink-faint', bgColor: 'bg-canvas-sunken' },
   error: { label: '取得失敗', color: 'bg-danger', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
+  stale: { label: '確認停止中', color: 'bg-status-warn', textColor: 'text-status-warn-deep', bgColor: 'bg-status-warn-soft' },
 } satisfies Record<AccountHealthState, { label: string; color: string; textColor: string; bgColor: string }>
+
+/** 最終確認がしきい値より古いか。時刻が読めないものは「古い」とは言えないので stale にしない。 */
+function isStaleCheck(createdAt: string | null | undefined, now = new Date()): boolean {
+  if (!createdAt) return false
+  const checkedAt = parseJstDateTime(createdAt)
+  if (Number.isNaN(checkedAt.getTime())) return false
+  return now.getTime() - checkedAt.getTime() > STALE_CHECK_AFTER_MS
+}
 
 function isRiskLevel(value: unknown): value is AccountHealthLog['riskLevel'] {
   return value === 'normal' || value === 'warning' || value === 'danger'
@@ -232,11 +250,15 @@ export default function HealthPage() {
           {/* Account Health Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
-              const risk = latestRisk[account.id] ?? 'unknown'
-              const config = riskConfig[risk]
+              const storedRisk = latestRisk[account.id] ?? 'unknown'
               const isExpanded = expandedId === account.id
               const logs = healthLogs[account.id] || []
-              const healthUnavailable = risk === 'unknown' || risk === 'error'
+              const latestLog = logs[0] ?? null
+              // R168: 最終確認が古いときは、記録上の結果ではなく「確認が止まっている」を出す。
+              const stale = storedRisk !== 'unknown' && storedRisk !== 'error' && isStaleCheck(latestLog?.createdAt)
+              const risk: AccountHealthState = stale ? 'stale' : storedRisk
+              const config = riskConfig[risk]
+              const healthUnavailable = risk === 'unknown' || risk === 'error' || risk === 'stale'
 
               return (
                 <div key={account.id} className="bg-canvas rounded-card border border-hairline overflow-hidden">
@@ -251,6 +273,10 @@ export default function HealthPage() {
                         <div>
                           <h3 className="text-sm font-bold text-ink">{account.name}</h3>
                           <p className="text-xs text-ink-faint">チャネル {account.channelId}</p>
+                          {/* R168: いつ確かめた結果かを常に出す。 */}
+                          <p className="text-xs text-ink-faint">
+                            最終確認 {latestLog ? shortDateTime(latestLog.createdAt) : '—'}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -271,7 +297,9 @@ export default function HealthPage() {
                           <p>
                             {risk === 'error'
                               ? 'ヘルス情報を取得できませんでした。'
-                              : 'まだ確認結果がありません。'}
+                              : risk === 'stale'
+                                ? `最後の確認は ${latestLog ? shortDateTime(latestLog.createdAt) : '—'} です。確認が止まっているため、現在の状態は分かりません（最後の結果は「${latestLog ? riskConfig[latestLog.riskLevel].label : '—'}」）。`
+                                : 'まだ確認結果がありません。'}
                           </p>
                           <button
                             type="button"
@@ -284,7 +312,8 @@ export default function HealthPage() {
                         </div>
                       )}
 
-                      {risk === 'danger' && (
+                      {/* 確認が止まっていても、最後の結果が危険なら移行の入口は残す。 */}
+                      {storedRisk === 'danger' && (
                         <div className="mb-3">
                           <button
                             onClick={() => {
@@ -299,42 +328,40 @@ export default function HealthPage() {
                       )}
 
                       {logs.length > 0 ? (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                        <DataTable>
                             <thead>
-                              <tr className="text-left text-xs text-ink-secondary border-b border-hairline">
-                                <th className="px-4 py-3 font-medium">エラーコード</th>
-                                <th className="px-4 py-3 font-medium">エラー数</th>
-                                <th className="px-4 py-3 font-medium">チェック期間</th>
-                                <th className="px-4 py-3 font-medium">リスク</th>
-                                <th className="px-4 py-3 font-medium">日時</th>
-                              </tr>
+                              <TableHeadRow>
+                                <Th style={{ width: '20%' }}>エラーコード</Th>
+                                <Th style={{ width: '12%' }}>エラー数</Th>
+                                <Th style={{ width: '20%' }}>チェック期間</Th>
+                                <Th style={{ width: '18%' }}>リスク</Th>
+                                <Th style={{ width: '30%' }}>日時</Th>
+                              </TableHeadRow>
                             </thead>
                             <tbody>
                               {logs.map((log) => {
                                 const logConfig = riskConfig[log.riskLevel]
                                 return (
-                                  <tr key={log.id} className="border-b border-hairline">
-                                    <td className="py-2 pr-3 font-mono text-ink-secondary">
+                                  <Tr key={log.id}>
+                                    <Td className="font-mono text-ink-secondary">
                                       {log.errorCode !== null ? log.errorCode : '-'}
-                                    </td>
-                                    <td className="py-2 pr-3 text-ink-secondary">{log.errorCount}</td>
-                                    <td className="py-2 pr-3 text-ink-secondary">{log.checkPeriod}</td>
-                                    <td className="py-2 pr-3">
+                                    </Td>
+                                    <Td className="text-ink-secondary">{log.errorCount}</Td>
+                                    <Td className="text-ink-secondary">{log.checkPeriod}</Td>
+                                    <Td>
                                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${logConfig.bgColor} ${logConfig.textColor}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${logConfig.color} ${log.riskLevel === 'danger' ? 'animate-pulse' : ''}`} />
                                         {logConfig.label}
                                       </span>
-                                    </td>
-                                    <td className="py-2 text-ink-faint text-xs">
+                                    </Td>
+                                    <Td className="text-ink-faint text-xs">
                                       {new Date(log.createdAt).toLocaleString('ja-JP')}
-                                    </td>
-                                  </tr>
+                                    </Td>
+                                  </Tr>
                                 )
                               })}
                             </tbody>
-                          </table>
-                        </div>
+                        </DataTable>
                       ) : !healthUnavailable ? (
                         <p className="text-sm text-ink-faint text-center py-4">ヘルスログがありません</p>
                       ) : null}
@@ -354,12 +381,10 @@ export default function HealthPage() {
               <form onSubmit={handleMigrate}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-ink-secondary mb-1">移行先アカウント</label>
-                  <SelectField
+                  <Select size="full"
                     value={migrateToId}
-                    onChange={(e) => setMigrateToId(e.target.value)}
+                    onChange={(value) => setMigrateToId(value)}
                     aria-label="移行先アカウント"
-                    className="w-full border border-hairline rounded-control px-3 py-2 text-sm bg-canvas focus:outline-none focus:ring-2 focus:ring-accent"
-                    required
                     options={[
                       { value: '', label: '選択してください' },
                       ...accounts
@@ -415,18 +440,16 @@ export default function HealthPage() {
                 移行履歴はありません
               </div>
             ) : (
-              <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[640px]">
+              <DataTable>
                     <thead>
-                      <tr className="text-left text-xs text-ink-secondary bg-canvas-sunken border-b border-hairline">
-                        <th className="px-4 py-3 font-medium">移行元</th>
-                        <th className="px-4 py-3 font-medium">移行先</th>
-                        <th className="px-4 py-3 font-medium">ステータス</th>
-                        <th className="px-4 py-3 font-medium">進捗</th>
-                        <th className="px-4 py-3 font-medium">開始日時</th>
-                        <th className="px-4 py-3 font-medium">完了日時</th>
-                      </tr>
+                      <TableHeadRow>
+                        <Th style={{ width: '16%' }}>移行元</Th>
+                        <Th style={{ width: '16%' }}>移行先</Th>
+                        <Th style={{ width: '14%' }}>ステータス</Th>
+                        <Th style={{ width: '24%' }}>進捗</Th>
+                        <Th style={{ width: '15%' }}>開始日時</Th>
+                        <Th style={{ width: '15%' }}>完了日時</Th>
+                      </TableHeadRow>
                     </thead>
                     <tbody>
                       {migrations.map((migration) => {
@@ -436,19 +459,19 @@ export default function HealthPage() {
                           ? (migration.migratedCount / migration.totalCount) * 100
                           : 0
                         return (
-                          <tr key={migration.id} className="border-b border-hairline hover:bg-canvas-sunken">
-                            <td className="px-4 py-3 text-ink font-medium">
+                          <Tr key={migration.id} interactive>
+                            <Td className="text-ink font-medium">
                               {getAccountName(migration.fromAccountId)}
-                            </td>
-                            <td className="px-4 py-3 text-ink font-medium">
+                            </Td>
+                            <Td className="text-ink font-medium">
                               {getAccountName(migration.toAccountId)}
-                            </td>
-                            <td className="px-4 py-3">
+                            </Td>
+                            <Td>
                               <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full ${status.bgColor} ${status.textColor}`}>
                                 {status.label}
                               </span>
-                            </td>
-                            <td className="px-4 py-3">
+                            </Td>
+                            <Td>
                               {/*
                                 移行の進みは共通部品 Progress（★V7 xiHO8）で出す。
                                 実行中→active、完了→done、失敗→partial（残りは赤の欠け）、
@@ -468,22 +491,20 @@ export default function HealthPage() {
                               ) : (
                                 <Progress state="preparing" title="移行待ち" note={countText} className="min-w-48" />
                               )}
-                            </td>
-                            <td className="px-4 py-3 text-ink-faint text-xs">
+                            </Td>
+                            <Td className="text-ink-faint text-xs">
                               {new Date(migration.createdAt).toLocaleString('ja-JP')}
-                            </td>
-                            <td className="px-4 py-3 text-ink-faint text-xs">
+                            </Td>
+                            <Td className="text-ink-faint text-xs">
                               {migration.completedAt
                                 ? new Date(migration.completedAt).toLocaleString('ja-JP')
                                 : '-'}
-                            </td>
-                          </tr>
+                            </Td>
+                          </Tr>
                         )
                       })}
                     </tbody>
-                  </table>
-                </div>
-              </div>
+              </DataTable>
             )}
           </div>
         </div>

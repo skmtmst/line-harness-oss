@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
 import type { Env } from '../index.js';
+import type { AuthenticatedStaff } from './auth.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import {
@@ -177,6 +178,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/hq/templates', 'core', '統括ひな形。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/recipes', 'core', '設定テンプレート'),
   exempt('/api/manual-links', 'core', 'ヘルプ導線設定'),
+  exempt('/api/error-messages', 'core', '失敗文面の対応表。全画面の失敗表示が引く共通基盤'),
   exempt('/api/account-handovers', 'core', 'アカウント引継ぎ'),
   exempt('/api/friend-bulk-runs', 'core', '複数機能から使う友だち操作'),
   exempt('/api/friend-migrations', 'core', '友だち移行'),
@@ -375,7 +377,8 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/broadcasts\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcasts WHERE id = ?' },
   { pattern: /^\/api\/broadcast-message-assets\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcast_message_assets WHERE id = ?' },
   { pattern: /^\/api\/reminders\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminders WHERE id = ?' },
-  { pattern: /^\/api\/friend-reminders\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_reminders WHERE id = ?' },
+  // R348: friend_reminders 表に所属列は無い。友だちの所属で判定する。
+  { pattern: /^\/api\/friend-reminders\/([^/]+)/, sql: 'SELECT f.line_account_id AS account_id FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.id = ?' },
   { pattern: /^\/api\/reminder-runs\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminder_delivery_runs WHERE id = ?' },
   { pattern: /^\/api\/auto-replies\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM auto_replies WHERE id = ?' },
   { pattern: /^\/api\/rich-menu-groups\/([^/]+)/, sql: 'SELECT account_id FROM rich_menu_groups WHERE id = ?' },
@@ -390,12 +393,78 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/ad-platforms\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
   { pattern: /^\/api\/friend-add-rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_add_rules WHERE id = ?' },
   { pattern: /^\/api\/conversions\/(?:definitions|points)\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_points WHERE id = ?' },
-  { pattern: /^\/api\/conversions\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_events WHERE id = ?' },
+  // R351: 成果の所属は地点表が持つ。イベント表に列は無いので結合して引く。
+  { pattern: /^\/api\/conversions\/events\/([^/]+)/, sql: 'SELECT cp.line_account_id AS account_id FROM conversion_events ce JOIN conversion_points cp ON cp.id = ce.conversion_point_id WHERE ce.id = ?' },
   { pattern: /^\/api\/events\/admin\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM events WHERE id = ?' },
   // #1075: たまる決めごとの停止・再開・削除は payload に account を載せない。
   // 照合が無いと PUT/DELETE /api/mileage/rules/:id が全部 LINE_ACCOUNT_REQUIRED で止まる。
   { pattern: /^\/api\/mileage\/rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM mileage_rules WHERE id = ?' },
 ];
+
+/**
+ * R348/R349: 親ではなく行の送信元アカウントで担当を判定する口。
+ * 履歴・登録の一覧と、登録1件の操作（日時変更・取消・再開）が対象。
+ * 行の絞り込み自体は route 側で行い、ここでは「通してよいか」だけ決める。
+ */
+const ROW_SCOPED_REMINDER_PATTERN = /^\/api\/reminders\/([^/]+)\/(runs|registrants([/?].*)?$)/;
+
+function matchRowScopedReminderId(path: string): string | null {
+  const match = ROW_SCOPED_REMINDER_PATTERN.exec(path);
+  return match ? decodeURIComponent(match[1]!) : null;
+}
+
+/**
+ * ルールの今の所属に加え、実行行の送信元と登録の友だちの所属を集める。
+ * 所属を変えた後も、旧所属の担当者が旧行へ届くようにするため。
+ */
+async function reminderRowAccountSet(db: D1Database, reminderId: string): Promise<string[]> {
+  const result = await db.prepare(
+    `SELECT line_account_id AS account_id FROM reminders WHERE id = ?
+     UNION
+     SELECT line_account_id FROM reminder_delivery_runs WHERE reminder_id = ?
+     UNION
+     SELECT f.line_account_id
+       FROM friend_reminders fr
+       JOIN friends f ON f.id = fr.friend_id
+      WHERE fr.reminder_id = ?`,
+  ).bind(reminderId, reminderId, reminderId).all<{ account_id: string | null }>();
+  return [...new Set(
+    (result.results ?? []).map((row) => row.account_id).filter((id): id is string => Boolean(id)),
+  )];
+}
+
+async function rowScopedReminderAccountIds(
+  c: Context<Env>,
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+  reminderId: string,
+): Promise<{ ids: string[]; accountMismatch: boolean; forbidden: boolean }> {
+  let queryAccount: string | null = null;
+  for (const key of ACCOUNT_KEYS) {
+    const value = c.req.query(key);
+    if (value?.trim()) {
+      queryAccount = value.trim();
+      break;
+    }
+  }
+  const fromBody = await bodyAccountIds(c);
+  const bodySingle = fromBody.length === 1 ? fromBody[0]! : null;
+  if (queryAccount && bodySingle && queryAccount !== bodySingle) {
+    return { ids: [], accountMismatch: true, forbidden: false };
+  }
+  const owned = await reminderRowAccountSet(db, reminderId);
+  const candidates = queryAccount ? [queryAccount] : fromBody.length > 0 ? fromBody : owned;
+  if (candidates.length === 0) return { ids: [], accountMismatch: false, forbidden: false };
+  if (candidates.some((id) => !owned.includes(id))) {
+    return { ids: [], accountMismatch: true, forbidden: false };
+  }
+  // 担当外の所属だけを指定・保持しているときは通さない。行の絞り込みは
+  // route 側で行うため、ここでは見える所属だけを機能判定へ渡す。
+  const scope = await getVisibleLineAccountScope(db, staff);
+  const visible = candidates.filter((id) => scope.ids.includes(id));
+  if (visible.length === 0) return { ids: [], accountMismatch: false, forbidden: true };
+  return { ids: visible, accountMismatch: false, forbidden: false };
+}
 
 /**
  * URL が指す対象の所属accountを返す。対象が無い・account未割当なら null。
@@ -422,18 +491,51 @@ async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
 }
 
 async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
-  const explicit: string[] = [];
+  /*
+   * R423/R426/R428: 公開受信口は受信口IDから所属を確定する。
+   * 画面のコピーURL（queryなし）でも通り、外部指定の account は使わない。
+   * 別 account・不存在の指定で所有先の機能停止をすり抜けられない。
+   * 有効な所有先の受信を無関係な指定で拒否しない。
+   * 本文の account 探索のために JSON を先読みしない
+   * （巨大本文は route の申告サイズ検査で読まずに413へ）。
+   */
+  const receiveMatch = /^\/api\/webhooks\/incoming\/([^/]+)\/receive$/.exec(c.req.path);
+  if (receiveMatch) {
+    let webhookId: string | null = null;
+    try {
+      webhookId = decodeURIComponent(receiveMatch[1]!);
+    } catch {
+      webhookId = null;
+    }
+    if (webhookId) {
+      const owner = await dbFor(c.env).prepare(
+        'SELECT line_account_id AS account_id FROM incoming_webhooks WHERE id = ? AND deleted_at IS NULL',
+      ).bind(webhookId).first<{ account_id: string | null }>();
+      if (owner?.account_id) return { ids: [owner.account_id], accountMismatch: false };
+    }
+    // 未知の受信口は従来の解決へ（route が 404 を返す）。
+  }
+  // R348: query と body の両方に所属があるときは両方を見る。query だけを
+  // 見ると、query に旧所属・body に新所属を書いて検査をすり抜けられる。
+  // 両方が食い違う入力はどちらを信じるか決められないため断る。
+  let queryAccount: string | null = null;
   for (const key of ACCOUNT_KEYS) {
     const value = c.req.query(key);
     if (value?.trim()) {
-      explicit.push(value.trim());
+      queryAccount = value.trim();
       break;
     }
   }
-  if (explicit.length === 0) {
-    const fromBody = await bodyAccountIds(c);
-    explicit.push(...fromBody);
+  const fromBody = await bodyAccountIds(c);
+  // 一括指定の配列（accountIds 等）は別用途の絞り込みに使う口があるため、
+  // 単一指定のときだけ query との食い違いを見る。
+  const bodySingle = fromBody.length === 1 ? fromBody[0]! : null;
+  if (queryAccount && bodySingle && queryAccount !== bodySingle) {
+    return { ids: [], accountMismatch: true };
   }
+  const explicit: string[] = [];
+  if (queryAccount) explicit.push(queryAccount);
+  else explicit.push(...fromBody);
   if (explicit.length > 0) {
     /*
      * 明示されたaccountとURLの対象の所属が食い違うときは断る。
@@ -508,6 +610,153 @@ async function appendFeatureScopeMeta(c: Context<Env>, excluded: number): Promis
   }
 }
 
+const BULK_APPROVAL_PATH = '/api/conversions/approvals/bulk';
+const BULK_APPROVAL_MAX_ITEMS = 100;
+
+/**
+ * m22u R352・R355：一括承認の対象IDから所属アカウントを引く。
+ *
+ * 一括の body は items（成果IDの列）だけで、アカウントを載せない。
+ * URL にも対象IDが無いため従来の解決では空になり、固定アカウントのない
+ * 管理者は LINE_ACCOUNT_REQUIRED で止まっていた。ここでは items の成果ID
+ * から所属を引き、対象ごとの権限・機能状態を判定できるようにする。
+ */
+function bulkApprovalEventIds(body: unknown): string[] {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return [];
+  const items = (body as { items?: unknown }).items;
+  if (!Array.isArray(items)) return [];
+  const ids: string[] = [];
+  for (const raw of items) {
+    if (ids.length >= BULK_APPROVAL_MAX_ITEMS) break;
+    const id = (raw as { id?: unknown } | null | undefined)?.id;
+    if (typeof id === 'string' && id) ids.push(id);
+  }
+  return ids;
+}
+
+type BulkApprovalScope =
+  | { ok: true; enabled: string[] }
+  | { ok: false; response: Response };
+
+/**
+ * 一括承認の入口判定。null のときは対象が引けなかったため、従来の解決
+ * （割当アカウント・LINE_ACCOUNT_REQUIRED）へ進む。handler が入力検査で
+ * 400 にするため、状態は変わらない。
+ */
+async function resolveBulkApprovalScope(
+  c: Context<Env>,
+  featureId: FeatureId,
+): Promise<BulkApprovalScope | null> {
+  let parsed: unknown = null;
+  try {
+    if (c.req.header('content-type')?.toLowerCase().includes('application/json')) {
+      parsed = await c.req.raw.clone().json();
+    }
+  } catch {
+    parsed = null;
+  }
+  const eventIds = bulkApprovalEventIds(parsed);
+  if (eventIds.length === 0) return null;
+  const db = dbFor(c.env);
+  const rows = await db.prepare(
+    `SELECT ce.id AS event_id, cp.line_account_id AS account_id
+       FROM conversion_events ce
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      WHERE ce.id IN (${eventIds.map(() => '?').join(',')})`,
+  ).bind(...eventIds).all<{ event_id: string; account_id: string | null }>();
+  const byId = new Map(rows.results.map((row) => [row.event_id, row.account_id]));
+  // 行が無い対象は handler が denied/failed へ1件ずつ振り分ける。
+  const resolved = eventIds
+    .map((id) => byId.get(id))
+    .filter((account): account is string | null => account !== undefined);
+  // 所属が NULL（全アカウント共用）の対象が混ざるときは従来の解決へ。
+  if (resolved.some((account) => account === null)) return null;
+  const union = [...new Set(resolved as string[])];
+  if (union.length === 0) return null;
+
+  // 一括の URL に資源は無いため、ここでの mismatch は起きない。
+  const { ids: explicit } = await requestAccountIds(c);
+  const staff = c.get('staff');
+  if (explicit.length > 0) {
+    /*
+     * R355: 指定したアカウントと対象の所属が違うときは全体を拒否する。
+     * A の名前で B の成果を通す抜け道にしない。
+     */
+    if (union.some((account) => !explicit.includes(account))) {
+      return {
+        ok: false,
+        response: c.json({
+          success: false,
+          error: '指定されたLINEアカウントと対象データの所属が一致しません',
+          code: 'LINE_ACCOUNT_MISMATCH',
+        }, 403),
+      };
+    }
+    if (staff) {
+      const scope = await getVisibleLineAccountScope(db, staff);
+      if (explicit.some((account) => !scope.ids.includes(account))) {
+        return {
+          ok: false,
+          response: c.json({
+            success: false,
+            error: 'このLINEアカウントを操作する権限がありません',
+          }, 403),
+        };
+      }
+    }
+    const enabled = await bulkEnabledAccounts(c, explicit, featureId);
+    if (enabled.length === 0) {
+      return { ok: false, response: await bulkUnavailable(c, explicit, featureId) };
+    }
+    return { ok: true, enabled };
+  }
+  /*
+   * 明示がないときは対象の所属の和集合で見る。権限外の対象は全体を
+   * 落とさず、handler が1件ずつ denied へ振り分ける。機能オフの対象も
+   * 同じく handler が1件ずつ失敗として返し、許可分は処理する。
+   */
+  const enabled = await bulkEnabledAccounts(c, union, featureId);
+  if (enabled.length === 0) {
+    return { ok: false, response: await bulkUnavailable(c, union, featureId) };
+  }
+  return { ok: true, enabled };
+}
+
+/** 指定アカウントのうち機能が有効なものだけを返す。 */
+async function bulkEnabledAccounts(
+  c: Context<Env>,
+  accountIds: string[],
+  featureId: FeatureId,
+): Promise<string[]> {
+  const staff = c.get('staff');
+  const db = dbFor(c.env);
+  const requestContext = staff
+    ? createFeatureAvailabilityRequestContext((await getVisibleLineAccountScope(db, staff)).accounts)
+    : undefined;
+  const states = await Promise.all(accountIds.map(async (accountId) => ({
+    accountId,
+    availability: await accountFeatureAvailability(db, accountId, featureId, requestContext),
+  })));
+  return states
+    .filter(({ availability }) => availabilityAllowsOperation(availability, c.req.method))
+    .map(({ accountId }) => accountId);
+}
+
+/** 対象すべてが機能オフのときの全体拒否（従来の unavailableResponse と同じ形）。 */
+async function bulkUnavailable(
+  c: Context<Env>,
+  accountIds: string[],
+  featureId: FeatureId,
+): Promise<Response> {
+  const staff = c.get('staff');
+  const db = dbFor(c.env);
+  const requestContext = staff
+    ? createFeatureAvailabilityRequestContext((await getVisibleLineAccountScope(db, staff)).accounts)
+    : undefined;
+  const availability = await accountFeatureAvailability(db, accountIds[0]!, featureId, requestContext);
+  return unavailableResponse(c, availability);
+}
+
 /**
  * 認証・tenant scope の後、handler の前で会社の機能設定を強制する。
  * manifest は CI で全 route 分類済みのため、未知の管理 API は fail closed にする。
@@ -534,9 +783,52 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
   }
   if (classification.kind !== 'feature') return next();
 
-  const { ids: accountIds, accountMismatch } = await requestAccountIds(c);
+  // m22u R352・R355: 一括承認は items の成果IDから所属を引いて判定する。
+  // URL に資源が無いため従来の解決では空になり、固定アカウントの無い管理者が
+  // LINE_ACCOUNT_REQUIRED で止まる。items の成果IDから所属を引いて判定する。
+  if (c.req.method === 'POST' && c.req.path === BULK_APPROVAL_PATH) {
+    const bulk = await resolveBulkApprovalScope(c, classification.featureId);
+    if (bulk) {
+      if (!bulk.ok) return bulk.response;
+      const bulkStaff = c.get('staff');
+      if (bulkStaff) c.set('staff', { ...bulkStaff, featureEnabledLineAccountIds: bulk.enabled });
+      return next();
+    }
+    // 対象が引けない要求は下の従来の解決へ（handler が入力検査で400にする）。
+  }
   const staff = c.get('staff');
   const db = dbFor(c.env);
+  // R348/R349: 履歴・登録の口は親の所属だけで閉じない。行の送信元
+  // アカウントのどれかを担当していれば通し、行の絞り込みは route 側で行う。
+  const rowScopedReminderId = matchRowScopedReminderId(c.req.path);
+  if (rowScopedReminderId) {
+    const decided = await rowScopedReminderAccountIds(c, db, staff, rowScopedReminderId);
+    if (decided.forbidden) {
+      return c.json({
+        success: false,
+        error: 'このLINEアカウントを操作する権限がありません',
+      }, 403);
+    }
+    return enforceAccounts(c, next, db, staff, classification, decided.ids, decided.accountMismatch);
+  }
+
+  const { ids: accountIds, accountMismatch } = await requestAccountIds(c);
+  return enforceAccounts(c, next, db, staff, classification, accountIds, accountMismatch);
+};
+
+/**
+ * 機能設定の強制（本文）。行単位の口（R348/R349）と通常の口で共有する。
+ * accountIds は「この要求で機能判定する所属」の確定ずみ一覧。
+ */
+async function enforceAccounts(
+  c: Context<Env>,
+  next: () => Promise<void>,
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+  classification: Extract<RouteClassification, { kind: 'feature' }>,
+  accountIds: string[],
+  accountMismatch: boolean,
+): Promise<Response | void> {
   const isReadOperation = c.req.method === 'GET' || c.req.method === 'HEAD';
   if (accountMismatch) {
     return c.json({

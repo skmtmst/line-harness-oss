@@ -18,7 +18,9 @@ import {
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Combobox from '@/components/shared/combobox'
+import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
@@ -565,14 +567,15 @@ export default function AdvancedSearchDialog({
                     </datalist>
                     <label className="@3xl:shrink-0">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">比較方法</span>
-                      <select
+                      <Select
+                        aria-label="比較方法"
                         value={b.op}
-                        onChange={(e) => patch(i, { ...b, op: e.target.value as 'eq' | 'ne' })}
-                        className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm @3xl:w-auto"
-                      >
-                        <option value="eq">等しい</option>
-                        <option value="ne">等しくない</option>
-                      </select>
+                        onChange={(value) => patch(i, { ...b, op: value as 'eq' | 'ne' })}
+                        options={[
+                          { value: 'eq', label: '等しい' },
+                          { value: 'ne', label: '等しくない' },
+                        ]}
+                      />
                     </label>
                     <label className="min-w-0 @3xl:flex-1">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">値</span>
@@ -595,36 +598,44 @@ export default function AdvancedSearchDialog({
                 )}
 
                 {b.kind === 'created_at' && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <DateField
-                      value={b.from}
-                      onChange={(v) => patch(i, { ...b, from: v })}
-                      aria-label="友だち登録日の開始"
-                    />
-                    <span className="text-ink-secondary text-sm">〜</span>
-                    <DateField
-                      value={b.to}
-                      onChange={(v) => patch(i, { ...b, to: v })}
-                      aria-label="友だち登録日の終了"
-                    />
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <DateField
+                        value={b.from}
+                        onChange={(v) => patch(i, { ...b, from: v })}
+                        aria-label="友だち登録日の開始"
+                      />
+                      <span className="text-ink-secondary text-sm">〜</span>
+                      <DateField
+                        value={b.to}
+                        onChange={(v) => patch(i, { ...b, to: v })}
+                        aria-label="友だち登録日の終了"
+                      />
+                    </div>
+                    {/* R183: 逆転期間は保存・実行のどちらも断られる。欄で先に知らせる。 */}
+                    {b.from && b.to && b.from > b.to ? (
+                      <p role="alert" className="mt-1 text-xs text-danger">開始日が終了日より後になっています。入れ替えると保存できます。</p>
+                    ) : null}
                   </div>
                 )}
 
                 {b.kind === 'chat_status' && (
-                  <select
-                    value={b.value}
-                    onChange={(e) =>
-                      patch(i, { ...b, value: e.target.value as 'unread' | 'in_progress' | 'on_hold' | 'resolved' })
-                    }
-                    aria-label="対応状況"
-                    className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-                  >
+                  <>
                     {/* FRIEND-05: 説明どおり固定4状態。保留も検索できる。 */}
-                    <option value="unread">未対応</option>
-                    <option value="in_progress">対応中</option>
-                    <option value="on_hold">保留</option>
-                    <option value="resolved">対応済み</option>
-                  </select>
+                    <Select
+                      aria-label="対応状況"
+                      value={b.value}
+                      onChange={(value) =>
+                        patch(i, { ...b, value: value as 'unread' | 'in_progress' | 'on_hold' | 'resolved' })
+                      }
+                      options={[
+                        { value: 'unread', label: '未対応' },
+                        { value: 'in_progress', label: '対応中' },
+                        { value: 'on_hold', label: '保留' },
+                        { value: 'resolved', label: '対応済み' },
+                      ]}
+                    />
+                  </>
                 )}
               </div>
 
@@ -710,25 +721,28 @@ export default function AdvancedSearchDialog({
               「対象」プルダウンの2か所が同じ変数へ別の意味で書き込み、
               「すべて」が非表示だけを検索していた。
             */}
-            <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-ink-secondary" role="radiogroup" aria-label="表示する友だち">
+            <RadioCardGroup legend="表示する友だち" className="mt-2 flex flex-wrap gap-4">
               {VISIBILITY_OPTIONS.map((item) => (
-                <label key={item.value} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="friend-search-visibility"
-                    checked={visibility === item.value}
-                    onChange={() => setVisibility(item.value)}
-                    className="h-4 w-4 accent-accent"
-                  />
-                  {item.label}
-                </label>
+                <RadioCard
+                  key={item.value}
+                  name="friend-search-visibility"
+                  value={item.value}
+                  checked={visibility === item.value}
+                  onChange={() => setVisibility(item.value)}
+                  title={item.label}
+                />
               ))}
-            </div>
+            </RadioCardGroup>
             <label className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-ink-secondary">
               友だちの状態
-              <select disabled className="min-w-64 rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs text-ink-faint">
-                <option>このアカウントをブロックしていない</option>
-              </select>
+              {/* 共通Selectはvalue/onChange必須のため、操作なしの固定表示として値と空の変更受けを付ける。disabledの見た目・文言は変えない。 */}
+              <Select
+                aria-label="友だちの状態"
+                value=""
+                onChange={() => {}}
+                options={[{ value: '', label: 'このアカウントをブロックしていない' }]}
+                disabled
+              />
               <span className="text-nano font-normal text-ink-faint">相手側のブロック状態を絞る口の接続後に選べます</span>
             </label>
           </section>
@@ -736,25 +750,29 @@ export default function AdvancedSearchDialog({
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">並び順</span>
-                <select
+                <Select
+                  aria-label="並び順"
                   value={sort}
-                  onChange={(e) => setSort(e.target.value as 'recent' | 'oldest')}
-                  className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-ink-secondary outline-none"
-                >
-                  <option value="recent">友だち追加の新しい順</option>
-                  <option value="oldest">友だち追加の古い順</option>
-                </select>
+                  onChange={(value) => setSort(value as 'recent' | 'oldest')}
+                  options={[
+                    { value: 'recent', label: '友だち追加の新しい順' },
+                    { value: 'oldest', label: '友だち追加の古い順' },
+                  ]}
+                  size="full"
+                  className="mt-0.5"
+                />
             </label>
             {/* FRIEND-04: 表示件数も条件の一部として適用する。 */}
             <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">表示件数</span>
-              <select
-                value={limit}
-                onChange={(e) => setLimit(Number(e.target.value))}
-                className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-ink-secondary outline-none"
-              >
-                {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}件</option>)}
-              </select>
+              <Select
+                aria-label="表示件数"
+                value={String(limit)}
+                onChange={(value) => setLimit(Number(value))}
+                options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}件` }))}
+                size="page-size"
+                className="mt-0.5"
+              />
             </label>
           </div>
         </div>
@@ -945,15 +963,15 @@ function TagPicker({
         className="w-full"
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as 'include' | 'exclude')}
+        <Select
           aria-label="タグの含め方"
-          className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-        >
-          <option value="include">付いている</option>
-          <option value="exclude">付いていない</option>
-        </select>
+          value={mode}
+          onChange={(value) => setMode(value as 'include' | 'exclude')}
+          options={[
+            { value: 'include', label: '付いている' },
+            { value: 'exclude', label: '付いていない' },
+          ]}
+        />
         {/* 設計の「タグフォルダで指定」。フォルダからタグを引く口が無い。 */}
         <button
           type="button"

@@ -355,12 +355,27 @@ export async function updateScenario(
  * - 参照解除（entry_routes / tracked_links / forms の送信後シナリオ・
  *   他シナリオ完了時の遷移先）も同じ batch に入れる。FK OFF の環境では
  *   CASCADE も SET NULL も走らないので、明示で NULL に寄せる。
+ * - 他シナリオ完了時の遷移先（R250）は、移動先だけを NULL にしない。
+ *   mode='move' のまま target だけ空になると、通常の保存では作れない
+ *   「移動先のない移動」が残り、運用者は気づけない。削除と同時に
+ *   mode='pause'（何もしない）へ戻し、整合した設定にする。削除の確認窓で
+ *   参照元の名前を見せてから消す（窓側の役目）。
  */
 export async function deleteScenario(db: D1Database, id: string): Promise<void> {
   const dependent = await db.prepare(
     `SELECT id FROM affiliate_offers WHERE scenario_id = ? LIMIT 1`,
   ).bind(id).first<{ id: string }>();
   if (dependent) throw new Error('SCENARIO_HAS_DEPENDENTS');
+
+  /*
+   * R250: 参照元は消す前に押さえる。外部キーが有効な環境では親 DELETE の
+   * 時点で SET NULL が走り、あとの `WHERE on_complete_scenario_id = ?` が
+   * 誰にも当たらなくなる。ID 指定ならどちらの環境でも同じ終状態になる。
+   */
+  const referrers = await db.prepare(
+    `SELECT id FROM scenarios WHERE on_complete_scenario_id = ?`,
+  ).bind(id).all<{ id: string }>();
+  const referrerIds = referrers.results.map((row) => row.id);
 
   await db.batch([
     db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id),
@@ -383,10 +398,46 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
     db.prepare(`UPDATE entry_routes SET scenario_id = NULL WHERE scenario_id = ?`).bind(id),
     db.prepare(`UPDATE tracked_links SET scenario_id = NULL WHERE scenario_id = ?`).bind(id),
     db.prepare(`UPDATE forms SET on_submit_scenario_id = NULL WHERE on_submit_scenario_id = ?`).bind(id),
-    db.prepare(`UPDATE scenarios SET on_complete_scenario_id = NULL WHERE on_complete_scenario_id = ?`).bind(id),
+    ...(referrerIds.length > 0
+      ? [
+        db.prepare(
+          `UPDATE scenarios SET on_complete_mode = 'pause', on_complete_scenario_id = NULL WHERE id IN (${referrerIds.map(() => '?').join(',')})`,
+        ).bind(...referrerIds),
+      ]
+      : []),
   ]);
   // 467: 消えたシナリオの参照を消す。残すと削除の止めが誤作動する。
   await removeConsumerReferences(db, 'scenario', id);
+}
+
+/**
+ * 終了後の移動先として `id` を指しているシナリオの一覧（R250）。
+ *
+ * 削除の確認窓で「どのシナリオの終了後の処理が変わるか」を見せるための
+ * 読み取り。消す側の権限ではなく、見える範囲の名前だけ返す。
+ */
+export interface MoveReferrer {
+  id: string;
+  name: string;
+  /** null = 全アカウント共通。窓側で権限の絞り込みに使う。 */
+  lineAccountId: string | null;
+}
+
+export async function listMoveReferrers(
+  db: D1Database,
+  id: string,
+): Promise<MoveReferrer[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, name, line_account_id FROM scenarios WHERE on_complete_scenario_id = ? ORDER BY name`,
+    )
+    .bind(id)
+    .all<{ id: string; name: string; line_account_id: string | null }>();
+  return result.results.map((row) => ({
+    id: row.id,
+    name: row.name,
+    lineAccountId: row.line_account_id ?? null,
+  }));
 }
 
 // ============================================================

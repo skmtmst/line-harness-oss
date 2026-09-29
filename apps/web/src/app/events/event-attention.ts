@@ -1,6 +1,19 @@
-import type { EventListItem } from '@/lib/api'
+import type { EventLifecycleStatus, EventListItem } from '@/lib/api'
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * U: 保存する状態が無い旧応答は is_published から読み替える
+ * （公開済み=公開中、それ以外=下書き）。両書きしているので数は合う。
+ */
+export function lifecycleOf(item: Pick<EventListItem, 'is_published' | 'lifecycle_status'>): EventLifecycleStatus {
+  if (item.lifecycle_status === 'draft' || item.lifecycle_status === 'published'
+    || item.lifecycle_status === 'paused' || item.lifecycle_status === 'ended'
+    || item.lifecycle_status === 'cancelled') {
+    return item.lifecycle_status
+  }
+  return item.is_published === 1 ? 'published' : 'draft'
+}
 
 export interface EventAttentionSummary {
   upcoming: EventListItem[]
@@ -30,7 +43,7 @@ export function summarizeEventAttention(
   nowMs = Date.now(),
 ): EventAttentionSummary {
   const upcoming = items
-    .filter((item) => item.is_published === 1)
+    .filter((item) => lifecycleOf(item) === 'published')
     .filter((item) => {
       const start = startsAt(item)
       return start !== null && start >= nowMs
@@ -66,9 +79,49 @@ export function summarizeEventAttention(
 }
 
 export function daysUntilEvent(item: EventListItem, nowMs = Date.now()): number | null {
-  const start = startsAt(item)
-  if (start === null) return null
-  return Math.max(0, Math.ceil((start - nowMs) / DAY_MS))
+  return daysUntilIso(item.next_slot_starts_at, nowMs)
+}
+
+/** 開催日時の ISO 文字列までの日数。全体集計の日付にも使う。 */
+export function daysUntilIso(iso: string | null, nowMs = Date.now()): number | null {
+  if (!iso) return null
+  const parsed = Date.parse(iso)
+  if (!Number.isFinite(parsed)) return null
+  return Math.max(0, Math.ceil((parsed - nowMs) / DAY_MS))
+}
+
+/**
+ * U: 一覧・編集の状態印の決め方。保存する状態が正本で、「満席」だけが
+ * 計算の札（R81: 公開中でも今後の枠が無ければ終了）。
+ */
+export type EventRowState = 'draft' | 'paused' | 'cancelled' | 'ended' | 'full' | 'open'
+
+export function eventRowState(item: Pick<EventListItem, 'is_published' | 'lifecycle_status' | 'next_slot_starts_at' | 'total_capacity' | 'total_active'>): EventRowState {
+  const lifecycle = lifecycleOf(item)
+  if (lifecycle === 'draft') return 'draft'
+  if (lifecycle === 'paused') return 'paused'
+  if (lifecycle === 'cancelled') return 'cancelled'
+  if (lifecycle === 'ended') return 'ended'
+  if (!item.next_slot_starts_at) return 'ended'
+  if (item.total_capacity != null && item.total_active >= item.total_capacity) return 'full'
+  return 'open'
+}
+
+/**
+ * U: 行ごとの「申し込みが少ない」札の決め方。一覧上部の集計
+ * （summarizeEventAttention の lowApplications）と同じ値にすること。
+ * 片方だけ変えると数が食い違う。
+ */
+export function isLowApplication(
+  item: Pick<EventListItem, 'lifecycle_status' | 'is_published' | 'next_slot_starts_at' | 'total_capacity' | 'total_active'>,
+  nowMs = Date.now(),
+): boolean {
+  if (lifecycleOf(item) !== 'published') return false
+  if (item.total_capacity == null || item.total_capacity <= 0) return false
+  if (item.total_active >= item.total_capacity) return false
+  const parsed = item.next_slot_starts_at ? Date.parse(item.next_slot_starts_at) : NaN
+  if (!Number.isFinite(parsed) || parsed > nowMs + 7 * DAY_MS) return false
+  return item.total_active / item.total_capacity < 0.5
 }
 
 /**

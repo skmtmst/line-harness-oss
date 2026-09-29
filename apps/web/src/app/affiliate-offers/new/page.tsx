@@ -1,10 +1,12 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import Checkbox from '@/components/shared/checkbox'
 import { useEffect, useRef, useState } from 'react'
 import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   Field,
@@ -35,6 +37,7 @@ function rewardIntegerError(value: string, kind: 'amount' | 'miles'): string | n
  * ここを取り違えると、紹介の成果がいつまでも確定しない設定ができてしまう。
  */
 export default function NewAffiliateOfferPage() {
+  usePageTitle('案件を作る')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -73,7 +76,13 @@ export default function NewAffiliateOfferPage() {
     let cancelled = false
     // N-211: 選択accountのタグ・シナリオだけを選べるようにする。
     // 保存時の所属再検査はサーバーが済ませている(案件routeの参照検査)。
-    const accountParams = selectedAccountId ? { accountId: selectedAccountId } : undefined
+    // R50: アカウントを切り替えたら旧アカウントの候補を捨てて取り直す。
+    if (!selectedAccountId) {
+      setTags([])
+      setScenarios([])
+      return () => { cancelled = true }
+    }
+    const accountParams = { accountId: selectedAccountId }
     void Promise.allSettled([api.tags.list(accountParams), api.scenarios.list(accountParams)]).then(
       ([t, s]) => {
         if (cancelled) return
@@ -86,7 +95,7 @@ export default function NewAffiliateOfferPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   const yen = rewardAmount ? Number(rewardAmount) : 0
   const miles = rewardMiles ? Number(rewardMiles) : 0
@@ -301,11 +310,18 @@ export default function NewAffiliateOfferPage() {
       >
         <div className="grid gap-3 lg:grid-cols-2">
         <Field label="付けるタグ" htmlFor="of-tag" note="あとで配信の絞り込みに使えます。">
-          <SelectField
+          <Select
+            aria-label="付けるタグ"
             id="of-tag"
             value={tagId}
-            onChange={(e) => setTagId(e.target.value)}
-            options={[{ value: '', label: '（なし）' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+            onChange={(value) => setTagId(value)}
+            options={[
+              { value: '', label: '（なし）' },
+              // 保管済みのタグは成果承認の時点で付けられない。選べるように見せて
+              // あとで失敗させるより、候補から外す（編集モーダルと同じ決まり #798）。
+              ...tags.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ value: t.id, label: t.name })),
+            ]}
+            size="standard"
           />
         </Field>
 
@@ -314,29 +330,28 @@ export default function NewAffiliateOfferPage() {
           htmlFor="of-scenario"
           note="選ばなければ何も送りません。"
         >
-          <SelectField
+          <Select
+            aria-label="開始するシナリオ"
             id="of-scenario"
             value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
-            options={[{ value: '', label: '（なし）' }, ...scenarios.map((s) => ({ value: s.id, label: s.name }))]}
+            onChange={(value) => setScenarioId(value)}
+            options={[
+              { value: '', label: '（なし）' },
+              // 停止中のシナリオは成果承認時に始まらないので候補から外す。
+              ...scenarios.filter((s) => s.isActive !== false).map((s) => ({ value: s.id, label: s.name })),
+            ]}
+            size="standard"
           />
         </Field>
         </div>
 
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={publishNow}
-            onChange={(e) => setPublishNow(e.target.checked)}
-          />
-          <span>
-            作成したらすぐ公開する
-            <span className="text-ink-faint block text-xs">
-              オフにすると下書きとして保存され、アフィリエイターに表示されません。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={publishNow}
+          onCheckedChange={setPublishNow}
+          description="オフにすると下書きとして保存され、アフィリエイターに表示されません。"
+        >
+          <span className="text-ink-secondary text-sm">作成したらすぐ公開する</span>
+        </Checkbox>
       </FormSection>
     </CreatePage>
   )

@@ -5,6 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null }))
@@ -174,5 +175,136 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     expect(host.textContent).toContain('LINEアカウントを選択してください')
     expect(host.textContent).not.toContain('$2,000.00')
     expect(requestedUrls).toHaveLength(callsAfterClearing)
+  })
+
+  it('R277: 同じ経路の費用名で人数を重複せず、円以外と経路なしを分母・分子へ混ぜない', async () => {
+    const row = (sourceLabel: string, routeId: string | null, currency: string, amount: number, friends: number | null) => ({
+      sourceLabel, entryRouteId: routeId, adPlatformId: null, source: 'manual',
+      totals: [{ currency, amountMinor: amount }], friendAdds: friends, costPerFriendMinor: friends ? Math.round(amount / friends) : null, lastImportedAt: null,
+    })
+    handler = async (path) => {
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return { success: true, data: { platforms: [], rows: [
+        row('広告A', 'route-1', 'JPY', 10000, 10), row('広告B', 'route-1', 'JPY', 5000, 10),
+        row('海外', 'route-2', 'USD', 10000, 10), row('チラシ', null, 'JPY', 7000, null),
+      ] } }
+      return { success: true, data: [] }
+    }
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    expect(host.textContent).toContain('友だち1人あたり¥1,500')
+    expect(host.textContent).toContain('経路がある円の費用')
+  })
+
+  it('R278: 30日の送信数はAPIの集計を使い、設定値や表示中の行で変わらない', async () => {
+    const trap = platform('meta', undefined, undefined)
+    trap.config = { sent_count: 99, pending_count: 88, failed_count: 77 }
+    handler = async (path) => {
+      if (path.startsWith('/api/ad-platforms/logs')) return {
+        success: true,
+        data: {
+          items: [{
+            id: 'l1', adPlatformId: 'p1', friendId: 'f1', lineAccountId: 'account-a',
+            eventName: 'Purchase', clickId: null, clickIdType: 'gclid',
+            status: 'failed', errorMessage: null, createdAt: '2026-09-27T00:00:00+09:00',
+          }],
+          total: 1, page: 1, limit: 20,
+          summary: { sentLast30Days: 8, pendingLast30Days: 1, failedLast30Days: 1 },
+          sort: [],
+        },
+      }
+      if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
+      return { success: true, data: [trap] }
+    }
+    await act(async () => { root.render(<AdIntegration view="history" />) })
+    await settle()
+    const metricValue = (label: string) =>
+      Array.from(host.querySelectorAll('p')).find((p) => p.textContent === label)?.nextElementSibling?.textContent ?? ''
+    expect(metricValue('送った件数')).toBe('8')
+    expect(metricValue('待っている')).toBe('1')
+    expect(metricValue('断られた')).toBe('1')
+  })
+
+  it('R276: 広告費の空欄・空白は送信せず、明示的な0円だけ送る', async () => {
+    handler = async (path) => {
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
+      return { success: true, data: [] }
+    }
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    const button = (label: string) => Array.from(document.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)!
+    await act(async () => { button('費用を手で入れる').click() })
+    fireEvent.change(document.querySelector('#ad-cost-label')!, { target: { value: 'チラシ' } })
+    await act(async () => { fireEvent.click(document.querySelector('#ad-cost-day')!) })
+    await act(async () => { fireEvent.click(document.querySelector('[role="grid"] button[data-today]')!) })
+    await act(async () => { button('記録する').click(); await Promise.resolve() })
+    expect(document.body.textContent).toContain('費用を入力してください')
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+    fireEvent.change(document.querySelector('#ad-cost-amount')!, { target: { value: '   ' } })
+    await act(async () => { button('記録する').click(); await Promise.resolve() })
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+    fireEvent.change(document.querySelector('#ad-cost-amount')!, { target: { value: '0' } })
+    await act(async () => { button('記録する').click(); await Promise.resolve() })
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true)
+  })
+
+  it('R275: 手で入れた費用を理由つきで取り消し、取消済みは集計外と分かる', async () => {
+    const entry = {
+      id: 'e-1', sourceLabel: 'チラシ', day: '2026-09-20', amountMinor: 8000,
+      currency: 'JPY', entryRouteId: null, cancelledAt: null, cancelReason: null,
+      createdAt: '2026-09-20T00:00:00.000Z',
+    }
+    handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'owner' } }
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return {
+        success: true,
+        data: { rows: [], platforms: [], manualEntries: [entry] },
+      }
+      return { success: true, data: [] }
+    }
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    const button = (label: string) => Array.from(document.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)!
+
+    expect(host.textContent).toContain('手で入れた費用')
+    await act(async () => { button('取り消す').click() })
+    // 窓の確定ボタンは一覧の同名ボタンと分ける（窓は最後に描かれる）。
+    const confirmButton = Array.from(document.querySelectorAll('button'))
+      .filter((item) => item.textContent?.trim() === '取り消す').pop()!
+    // 理由なしでは送らない
+    await act(async () => { confirmButton.click(); await Promise.resolve() })
+    expect(document.body.textContent).toContain('取り消す理由を入れてください')
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST' && String(init?.body ?? '').includes('reason'))).toBe(false)
+
+    fireEvent.change(document.querySelector('#ad-cost-cancel-reason')!, { target: { value: '金額を間違えた' } })
+    await act(async () => { confirmButton.click(); await Promise.resolve() })
+    const cancelCall = vi.mocked(fetch).mock.calls.find(([input, init]) =>
+      init?.method === 'POST' && String(input).includes('/api/ad-costs/e-1/cancel'))
+    expect(cancelCall).toBeTruthy()
+    expect(String(cancelCall![1]?.body)).toContain('金額を間違えた')
+  })
+
+  it('R275: 取消済みの記録は取り消し済み表示で、もう一度は取り消せない', async () => {
+    const entry = {
+      id: 'e-2', sourceLabel: 'チラシ', day: '2026-09-20', amountMinor: 8000,
+      currency: 'JPY', entryRouteId: null, cancelledAt: '2026-09-21T00:00:00.000Z',
+      cancelReason: '日付を間違えた', createdAt: '2026-09-20T00:00:00.000Z',
+    }
+    handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'owner' } }
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return {
+        success: true,
+        data: { rows: [], platforms: [], manualEntries: [entry] },
+      }
+      return { success: true, data: [] }
+    }
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    expect(host.textContent).toContain('取り消し済み')
+    expect(host.textContent).toContain('日付を間違えた')
+    expect(Array.from(document.querySelectorAll('button')).some((item) => item.textContent?.trim() === '取り消す')).toBe(false)
   })
 })

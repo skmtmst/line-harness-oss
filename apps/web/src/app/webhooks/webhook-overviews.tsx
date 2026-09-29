@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
-import { api, type IncomingWebhookDetail, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem, type OutgoingWebhookOverview } from '@/lib/api'
+import { ApiError, api, type IncomingWebhookDetail, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem, type OutgoingWebhookOverview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -12,9 +12,10 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ActionCell, DataTable, NameCell, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -22,6 +23,9 @@ type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
 type OutgoingSort = 'volume' | 'name'
 
 const PAGE_SIZE = 5
+
+/* R401: 未照合の箱の1回の読み取り件数。一覧APIの既定と同じ50。 */
+const UNMATCHED_PAGE_SIZE = 50
 
 const EVENT_LABEL: Record<string, string> = {
   'conversion.confirmed': '注文が確定したとき',
@@ -165,6 +169,7 @@ export function OutgoingOverview({
   togglingIds,
   onRotate,
   onDelete,
+  canManage,
 }: {
   items: OutgoingWebhookOverview[]
   status: LoadStatus
@@ -179,6 +184,12 @@ export function OutgoingOverview({
   togglingIds: string[]
   onRotate: (item: OutgoingWebhookOverview) => void
   onDelete: (item: OutgoingWebhookOverview) => void
+  /**
+   * 送り先の変更（開始・停止・直す・合言葉・削除）は統括だけ（R32）。
+   * 口側が `requireRole('owner')` で守っている。試し送信とやり取りの記録は
+   * 管理者も使えるので残す。
+   */
+  canManage: boolean
 }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<OutgoingFilter>('all')
@@ -338,10 +349,10 @@ export function OutgoingOverview({
       <ListToolbar
         search={{ placeholder: 'つなぎ先・送るタイミングで検索', value: query, onChange: setQuery }}
         filters={
-          <SelectField
+          <Select
             aria-label="外部連携の状態"
             value={filter}
-            onChange={(event) => setFilter(event.target.value as OutgoingFilter)}
+            onChange={(value) => setFilter(value as OutgoingFilter)}
             // ★V7 `x63W5x`：取れていない間の件数は出さない（0 と読めるため）。
             options={(() => {
               const count = (n: number) => (status === 'ready' ? ` ${n}` : '')
@@ -355,10 +366,10 @@ export function OutgoingOverview({
           />
         }
         trailing={
-          <SelectField
+          <Select
             aria-label="外部連携の並び順"
             value={sort}
-            onChange={(event) => setSort(event.target.value as OutgoingSort)}
+            onChange={(value) => setSort(value as OutgoingSort)}
             options={[
               { value: 'volume', label: '送った回数が多い順' },
               { value: 'name', label: '名前順' },
@@ -381,7 +392,9 @@ export function OutgoingOverview({
           <ListState
             kind="empty"
             title="まだ連携がありません"
-            description="うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。"
+            description={canManage
+              ? 'うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。'
+              : 'うちで起きたことを、ほかのサービスに知らせられます。送り先の作成は統括に頼んでください。'}
           />
         </div>
       ) : visible.length === 0 ? (
@@ -517,24 +530,28 @@ export function OutgoingOverview({
                             押下前後の座標で見張る。押した指の下でボタンの大きさが
                             変わらなくなる利点も兼ねる。
                           */}
-                          <Button
-                            variant="secondary"
-                            role="menuitem"
-                            className="min-w-36"
-                            onClick={() => onToggle(item.id, item.isActive)}
-                            disabled={!item.isActive && !canActivate}
-                            aria-busy={toggling || undefined}
-                            data-webhook-toggle-pending={toggling ? `outgoing:${item.id}` : undefined}
-                            title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
-                          >
-                            {toggling
-                              ? (item.isActive ? '止めています…' : '動かしています…')
-                              : (item.isActive ? '止める' : '動かす')}
-                          </Button>
-                          {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
-                          <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
-                          <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
-                          <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除</Button>
+                          {canManage ? (
+                            <>
+                              <Button
+                                variant="secondary"
+                                role="menuitem"
+                                className="min-w-36"
+                                onClick={() => onToggle(item.id, item.isActive)}
+                                disabled={!item.isActive && !canActivate}
+                                aria-busy={toggling || undefined}
+                                data-webhook-toggle-pending={toggling ? `outgoing:${item.id}` : undefined}
+                                title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
+                              >
+                                {toggling
+                                  ? (item.isActive ? '止めています…' : '動かしています…')
+                                  : (item.isActive ? '止める' : '動かす')}
+                              </Button>
+                              {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
+                              <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
+                              <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
+                              <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除</Button>
+                            </>
+                          ) : null}
                           {/*
                             試し送信は本物のURLへ届くので、押しただけでは送らず
                             確認ダイアログへ回す(N-388)。確認を開くと同時に
@@ -617,6 +634,8 @@ export function IncomingOverview({
   togglingIds,
   onRotate,
   onDelete,
+  canManage,
+  canResolveUnmatched,
 }: {
   items: IncomingWebhook[]
   status: LoadStatus
@@ -624,6 +643,12 @@ export function IncomingOverview({
   lineAccountId: string | null
   endpointUrl: (id: string) => string
   onReload: () => void
+  /**
+   * 受け取り口の変更（開始・停止・合言葉・削除）は統括だけ（R32）。
+   * 口側が `requireRole('owner')` で守っている。「届いたつもりで試す」は
+   * 管理者も使えるので残す。
+   */
+  canManage: boolean
   onToggle: (id: string, active: boolean) => void
   /**
    * 開始・停止の応答を待っている行のID(#707)。
@@ -635,6 +660,12 @@ export function IncomingOverview({
   togglingIds: string[]
   onRotate: (item: IncomingWebhook) => void
   onDelete: (item: IncomingWebhook) => void
+  /**
+   * R399: 未照合の「結び付ける」「確認した」は owner/admin の口
+   * （`POST /api/webhooks/unmatched/:id/resolve`）なので、その権限で
+   * 出し分ける。staff にはボタンを出さず依頼案内にする。
+   */
+  canResolveUnmatched: boolean
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<IncomingWebhookDetail | null>(null)
@@ -647,6 +678,16 @@ export function IncomingOverview({
   const [unmatched, setUnmatched] = useState<IncomingWebhookUnmatchedItem[]>([])
   const [unmatchedStatus, setUnmatchedStatus] = useState<LoadStatus>('ready')
   const [dismissingId, setDismissingId] = useState<string | null>(null)
+  /*
+   * R399: 行の操作が失敗したときの理由と次の行動。操作は1件ずつ直列
+   * （dismissingId）なので置き場は1つで足りる。
+   * R401: 50件超えは shown 件ずつ読み足す。total は空表示の判定にも使う。
+   */
+  const [unmatchedActionError, setUnmatchedActionError] = useState<{ id: string; message: string } | null>(null)
+  const [unmatchedTotal, setUnmatchedTotal] = useState<number | null>(null)
+  const [unmatchedShown, setUnmatchedShown] = useState(UNMATCHED_PAGE_SIZE)
+  const [unmatchedReloadKey, setUnmatchedReloadKey] = useState(0)
+  const [unmatchedMoreBusy, setUnmatchedMoreBusy] = useState(false)
   /*
     S (#939 機能26): 届いたつもりで試す窓。見本のJSONを入れて
     「どの人に届くか・何が動くか」を確かめる。実行はしない。
@@ -689,15 +730,19 @@ export function IncomingOverview({
 
   /*
     箱の中身は詳細が読めたときに一緒に読む。「何もしない」を選んでいる口でも、
-    以前の選択で溜まった届物があれば見せる。
+    以前の選択で溜まった届物があれば見せる（R400）。
+    R401: shown 件ずつ読む。処理が終わるたび読み直して不足分を補充するので、
+    件数の勘定は手元で引かずサーバー（total・詳細の件数）に任せる。
   */
   useEffect(() => {
     let cancelled = false
-    setUnmatched([])
-    setUnmatchedStatus('ready')
     if (!selectedDetailId || !lineAccountId || detailStatus !== 'ready') return
-    setUnmatchedStatus('loading')
-    void api.webhooks.incoming.unmatched(selectedDetailId, lineAccountId)
+    const webhookId = selectedDetailId
+    const accountId = lineAccountId
+    const limit = unmatchedShown
+    // 既に並んでいる読み直しは静かに（R401）。初回と失敗後は帯を出す。
+    if (unmatched.length === 0) setUnmatchedStatus('loading')
+    void api.webhooks.incoming.unmatched(webhookId, accountId, undefined, { limit })
       .then((response) => {
         if (cancelled) return
         if (!response.success) {
@@ -705,45 +750,90 @@ export function IncomingOverview({
           return
         }
         setUnmatched(response.data)
+        setUnmatchedTotal(response.total ?? null)
         setUnmatchedStatus('ready')
       })
       .catch(() => {
         if (!cancelled) setUnmatchedStatus('error')
       })
+      .finally(() => {
+        if (!cancelled) setUnmatchedMoreBusy(false)
+      })
     return () => { cancelled = true }
-  }, [detailStatus, lineAccountId, selectedDetailId])
+  }, [detailStatus, lineAccountId, selectedDetailId, unmatchedShown, unmatchedReloadKey])
 
-  const dismissUnmatched = async (item: IncomingWebhookUnmatchedItem) => {
+  /* 受け取り口が変わったら箱の表示を捨てる（R401: 古い50件を残さない）。 */
+  useEffect(() => {
+    setUnmatched([])
+    setUnmatchedTotal(null)
+    setUnmatchedShown(UNMATCHED_PAGE_SIZE)
+    setUnmatchedActionError(null)
+    setUnmatchedStatus('ready')
+  }, [lineAccountId, selectedDetailId])
+
+  /*
+   * R399: 403/409/500/通信断で未処理Promiseを残さず、行に理由と次の行動を出す。
+   * - 403 … 権限不足。統括または管理者への引き継ぎ
+   * - 409 … 処理済み。最新を読み直した旨
+   * - 応答なし（通信断）… 結果不明。先に読み直し、残っていれば再試行
+   * - その他の応答あり失敗 … 確定失敗。再試行の案内
+   * 成功時は手元で引かず読み直す（R401: 残件と空表示の矛盾を防ぐ）。
+   */
+  const reloadUnmatchedBox = () => {
+    setUnmatchedReloadKey((key) => key + 1)
+    setDetailReloadKey((key) => key + 1)
+  }
+
+  const resolveUnmatched = async (
+    item: IncomingWebhookUnmatchedItem,
+    payload: { action: 'dismiss' } | { action: 'link'; friendId: string },
+  ) => {
     if (!lineAccountId || dismissingId !== null) return
     setDismissingId(item.id)
+    setUnmatchedActionError(null)
     try {
-      const res = await api.webhooks.incoming.resolveUnmatched(item.id, lineAccountId, { action: 'dismiss' })
-      if (res.success) {
-        setUnmatched((current) => current.filter((entry) => entry.id !== item.id))
-        setDetail((current) => current
-          ? { ...current, pendingUnmatched: Math.max(0, current.pendingUnmatched - 1) }
-          : current)
+      const res = await api.webhooks.incoming.resolveUnmatched(item.id, lineAccountId, payload)
+      if (!res.success) {
+        setUnmatchedActionError({
+          id: item.id,
+          message: res.error || '保存できませんでした。一覧を読み直してから、もう一度お試しください。',
+        })
+        return
       }
+      reloadUnmatchedBox()
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        reloadUnmatchedBox()
+        setUnmatchedActionError({ id: item.id, message: 'すでに処理済みです。最新の状態を読み直しました。' })
+        return
+      }
+      if (caught instanceof ApiError && caught.status === 403) {
+        setUnmatchedActionError({ id: item.id, message: 'この操作は統括または管理者だけができます。必要なときは統括に頼んでください。' })
+        return
+      }
+      if (caught instanceof ApiError) {
+        setUnmatchedActionError({
+          id: item.id,
+          message: describeApiFailure(caught, '確認', {
+            forbidden: 'この操作は統括または管理者だけができます。必要なときは統括に頼んでください。',
+          }),
+        })
+        return
+      }
+      reloadUnmatchedBox()
+      setUnmatchedActionError({ id: item.id, message: '結果が分かりませんでした。一覧を読み直しました。残っていれば、もう一度お試しください。' })
     } finally {
       setDismissingId(null)
     }
   }
 
+  const dismissUnmatched = async (item: IncomingWebhookUnmatchedItem) => {
+    await resolveUnmatched(item, { action: 'dismiss' })
+  }
+
   /* S: 複数一致で保留した届物から、運用者が友だちを1人選んで結び付ける。 */
   const linkUnmatched = async (item: IncomingWebhookUnmatchedItem, friendId: string) => {
-    if (!lineAccountId || dismissingId !== null) return
-    setDismissingId(item.id)
-    try {
-      const res = await api.webhooks.incoming.resolveUnmatched(item.id, lineAccountId, { action: 'link', friendId })
-      if (res.success) {
-        setUnmatched((current) => current.filter((entry) => entry.id !== item.id))
-        setDetail((current) => current
-          ? { ...current, pendingUnmatched: Math.max(0, current.pendingUnmatched - 1) }
-          : current)
-      }
-    } finally {
-      setDismissingId(null)
-    }
+    await resolveUnmatched(item, { action: 'link', friendId })
   }
 
   const runIncomingTest = async () => {
@@ -765,8 +855,11 @@ export function IncomingOverview({
         return
       }
       setTestResult(res.data)
-    } catch {
-      setTestError('試せませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (caught) {
+      // 試す口は管理者も使える。失敗は原因どおりに（R32）。
+      setTestError(describeApiFailure(caught, '試し', {
+        forbidden: 'この操作を行う権限がありません。統括に頼んでください。',
+      }))
       setTestResult(null)
     } finally {
       setTestBusy(false)
@@ -791,7 +884,9 @@ export function IncomingOverview({
       <ListState
         kind="empty"
         title="まだ受け取り口がありません"
-        description="相手のサービスから知らせを受け取るURLを、「＋ 受け取り口を作る」から作成してください。"
+        description={canManage
+          ? '相手のサービスから知らせを受け取るURLを、「＋ 受け取り口を作る」から作成してください。'
+          : '相手のサービスから知らせを受け取るURLは、まだありません。受け取り口の作成は統括に頼んでください。'}
       />
     )
   }
@@ -854,19 +949,23 @@ export function IncomingOverview({
               </div>
             </dl>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                className="min-w-36"
-                onClick={() => onToggle(selected.id, selected.isActive)}
-                disabled={!selected.hasSecret && !selected.isActive}
-                aria-busy={togglingIds.includes(selected.id) || undefined}
-                data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined}
-              >
-                {togglingIds.includes(selected.id)
-                  ? (selected.isActive ? '止めています…' : '動かしています…')
-                  : (selected.isActive ? '止める' : '動かす')}
-              </Button>
-              <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
+              {canManage ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    className="min-w-36"
+                    onClick={() => onToggle(selected.id, selected.isActive)}
+                    disabled={!selected.hasSecret && !selected.isActive}
+                    aria-busy={togglingIds.includes(selected.id) || undefined}
+                    data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined}
+                  >
+                    {togglingIds.includes(selected.id)
+                      ? (selected.isActive ? '止めています…' : '動かしています…')
+                      : (selected.isActive ? '止める' : '動かす')}
+                  </Button>
+                  <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
+                </>
+              ) : null}
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -880,8 +979,13 @@ export function IncomingOverview({
               >
                 届いたつもりで試す
               </Button>
-              <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
+              {canManage ? (
+                <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
+              ) : null}
             </div>
+            {canManage ? null : (
+              <p className="text-ink-secondary mt-2 text-xs">止める・合言葉の更新・削除は統括だけができます。</p>
+            )}
           <div className="border-hairline mt-4 border-t pt-3.5">
             <h2 className="text-ink mb-3 text-lg font-bold">届いたらすること</h2>
             {detailStatus === 'loading' ? (
@@ -912,8 +1016,13 @@ export function IncomingOverview({
             N-367: 「未照合として確認する」「友だち候補を作る」を選んだ口に
             届いて、人が見つからなかったものをここへ置く。選び方が変わっても
             溜まった届物は残るので、残っている限り見せる。
+            R400: 「何もしない」を選んでいても、未確認が残っていれば欄を出す。
+            読めなかったときも欄ごと消さず、理由と読み直しを出す。
           */}
-          {(detail && (detail.identityMatching.onNotFound !== 'do_nothing' || unmatched.length > 0)) ? (
+          {(detail && (detail.identityMatching.onNotFound !== 'do_nothing'
+            || unmatched.length > 0
+            || (detail.pendingUnmatched ?? 0) > 0
+            || unmatchedStatus === 'error')) ? (
             <section className="bg-canvas border-hairline rounded-card border p-5">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-ink text-lg font-bold">人が見つからなかった届物</h2>
@@ -926,59 +1035,98 @@ export function IncomingOverview({
               {unmatchedStatus === 'loading' ? (
                 <p className="text-ink-secondary text-sm">届物を読み込んでいます。</p>
               ) : unmatchedStatus === 'error' ? (
-                <p className="text-ink-secondary text-sm">届物を表示できませんでした。読み直してください。</p>
-              ) : unmatched.length === 0 ? (
+                <div className="space-y-2">
+                  <p className="text-ink-secondary text-sm">届物を表示できませんでした。確認待ちの届物は消えていません。</p>
+                  <Button variant="secondary" onClick={() => setUnmatchedReloadKey((key) => key + 1)}>
+                    届物だけ読み直す
+                  </Button>
+                </div>
+              ) : (unmatchedTotal ?? detail.pendingUnmatched ?? unmatched.length) === 0 ? (
                 <p className="text-ink-secondary text-sm">いま確認が必要な届物はありません。</p>
               ) : (
-                <ul className="space-y-2">
-                  {unmatched.map((item) => (
-                    <li key={item.id} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 px-4 py-2">
-                      <div className="min-w-0">
-                        <strong className="text-ink block text-sm">
-                          {item.kind === 'candidate'
-                            ? '友だち候補'
-                            : item.kind === 'ambiguous'
-                              ? '2人以上に一致'
-                              : '未照合'}・{formatReceivedAt(item.receivedAt)}
-                        </strong>
-                        <span className="text-ink-secondary mt-1 block text-xs">
-                          {item.identityAttempts.length > 0
-                            ? item.identityAttempts.map((attempt) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')
-                            : '照合に使える値が届いていません'}
-                        </span>
+                <>
+                  <ul className="space-y-2">
+                    {unmatched.map((item) => (
+                      <li key={item.id} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 px-4 py-2">
+                        <div className="min-w-0">
+                          <strong className="text-ink block text-sm">
+                            {item.kind === 'candidate'
+                              ? '友だち候補'
+                              : item.kind === 'ambiguous'
+                                ? '2人以上に一致'
+                                : '未照合'}・{formatReceivedAt(item.receivedAt)}
+                          </strong>
+                          <span className="text-ink-secondary mt-1 block text-xs">
+                            {item.identityAttempts.length > 0
+                              ? item.identityAttempts.map((attempt) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')
+                              : '照合に使える値が届いていません'}
+                          </span>
+                          {/*
+                            S: 同じ値で2人以上に一致した届物は自動では動かさない。
+                            どの友だちか候補から人が選ぶ。どれでもなければ閉じる。
+                          */}
+                          {item.kind === 'ambiguous' && item.candidates.length > 0 && canResolveUnmatched ? (
+                            <ul className="mt-2 space-y-1">
+                              {item.candidates.map((candidate) => (
+                                <li key={candidate.friendId} className="flex items-center gap-2">
+                                  <span className="text-ink text-xs">{candidate.displayName ?? candidate.friendId}</span>
+                                  <Button
+                                    variant="secondary"
+                                    disabled={dismissingId !== null}
+                                    onClick={() => void linkUnmatched(item, candidate.friendId)}
+                                  >
+                                    {dismissingId === item.id ? '結び付けています…' : 'この人に結び付ける'}
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                        {canResolveUnmatched ? (
+                          <Button
+                            variant="secondary"
+                            disabled={dismissingId !== null}
+                            onClick={() => void dismissUnmatched(item)}
+                          >
+                            {dismissingId === item.id
+                              ? '閉じています…'
+                              : item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
+                          </Button>
+                        ) : (
+                          <p className="text-ink-secondary text-xs">結び付け・確認は統括または管理者に頼んでください。</p>
+                        )}
                         {/*
-                          S: 同じ値で2人以上に一致した届物は自動では動かさない。
-                          どの友だちか候補から人が選ぶ。どれでもなければ閉じる。
+                          R399: 失敗の理由と次の行動は操作した行に出す。
+                          失敗・警告の文は ? に入れず行に書く（直し方が要るため）。
                         */}
-                        {item.kind === 'ambiguous' && item.candidates.length > 0 ? (
-                          <ul className="mt-2 space-y-1">
-                            {item.candidates.map((candidate) => (
-                              <li key={candidate.friendId} className="flex items-center gap-2">
-                                <span className="text-ink text-xs">{candidate.displayName ?? candidate.friendId}</span>
-                                <Button
-                                  variant="secondary"
-                                  disabled={dismissingId !== null}
-                                  onClick={() => void linkUnmatched(item, candidate.friendId)}
-                                >
-                                  {dismissingId === item.id ? '結び付けています…' : 'この人に結び付ける'}
-                                </Button>
-                              </li>
-                            ))}
-                          </ul>
+                        {unmatchedActionError && unmatchedActionError.id === item.id ? (
+                          <p role="alert" className="text-danger w-full text-xs leading-5">{unmatchedActionError.message}</p>
                         ) : null}
-                      </div>
+                      </li>
+                    ))}
+                  </ul>
+                  {/*
+                    R401: 残りがあれば「ほかN件」と次への導線を出す。
+                    空表示は残件0のときだけ（total が無い古い応答では件数表示で代用）。
+                  */}
+                  {(unmatchedTotal ?? detail.pendingUnmatched ?? 0) > unmatched.length ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="text-ink-secondary text-xs">
+                        ほか{(unmatchedTotal ?? detail.pendingUnmatched ?? 0) - unmatched.length}件あります。
+                      </p>
                       <Button
                         variant="secondary"
-                        disabled={dismissingId !== null}
-                        onClick={() => void dismissUnmatched(item)}
+                        disabled={unmatchedMoreBusy}
+                        onClick={() => {
+                          setUnmatchedMoreBusy(true)
+                          setUnmatchedShown((shown) => shown + UNMATCHED_PAGE_SIZE)
+                        }}
                       >
-                        {dismissingId === item.id
-                          ? '閉じています…'
-                          : item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
+                        {unmatchedMoreBusy ? '読み込んでいます…' : 'さらに表示'}
                       </Button>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  ) : null}
+                </>
               )}
             </section>
           ) : null}

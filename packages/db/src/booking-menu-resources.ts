@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { recordMenuVersion } from './menu-versions.js';
 
 export interface BookingMenuResourceAssignment {
   menuId: string;
@@ -85,6 +86,8 @@ export async function replaceBookingMenuResources(
     lineAccountId: string;
     expectedVersion: number;
     resources: Array<{ resourceId: string; quantity: number }>;
+    /** 版に残す「誰が」。無ければ空で残す。 */
+    staffId?: string | null;
   },
 ): Promise<ReplaceBookingMenuResourcesResult> {
   const wantedJson = JSON.stringify(input.resources);
@@ -117,6 +120,8 @@ export async function replaceBookingMenuResources(
   const results = await db.batch<D1Result<{ version: number }>>(statements);
   const final = results[results.length - 1];
   if ((final?.meta?.changes ?? 0) > 0) {
+    // 保存するたびに版を1つ足す（T）。前の版は変えない。
+    await recordMenuVersion(db, { menuId: input.menuId, staffId: input.staffId ?? null });
     return {
       status: 'updated',
       version: input.expectedVersion + 1,

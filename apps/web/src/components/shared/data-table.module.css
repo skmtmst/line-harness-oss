@@ -92,5 +92,6 @@
   padding: 0 12px;
   vertical-align: middle;
   white-space: nowrap;
+  text-align: right; /* 中身を右端にそろえ、右の余白を左（12px）と同じにする。 */
 }
 }

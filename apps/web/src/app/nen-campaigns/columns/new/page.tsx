@@ -10,6 +10,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field as FormField, RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import PageHeader from '@/components/shared/page-header'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -61,9 +62,21 @@ function NewNenColumnInner() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(EMPTY_DRAFT)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
+  // R23横展開: 対象タグの候補は今のアカウントだけ。切替で取り直す。
+  const [tagPruneNotice, setTagPruneNotice] = useState<string | null>(null)
   useEffect(() => {
-    void api.tags.list().then((response) => response.success && setTags(response.data)).catch(() => undefined)
-  }, [])
+    void api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
+      .then((response) => response.success && setTags(response.data)).catch(() => undefined)
+  }, [selectedAccountId])
+  // R23横展開(m18hと同じ形): 新しい候補にない対象タグは外して知らせる。
+  useEffect(() => {
+    if (draft.targetMode !== 'tag' || !draft.targetTagId) return
+    if (!tags.some((tag) => tag.id === draft.targetTagId)) {
+      setDraft({ ...draft, targetTagId: '' })
+      setTagPruneNotice('選んでいたタグは、今のアカウントにないため外しました。選び直してください。')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags])
   useEffect(() => {
     if (!selectedAccountId || (draft.targetMode === 'tag' && !draft.targetTagId)) {
       setAudienceCount(null)
@@ -148,6 +161,7 @@ function NewNenColumnInner() {
           {failure.message}
         </p>
       ) : null}
+      {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} className="mb-3" /> : null}
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -373,7 +387,7 @@ function NewNenColumnInner() {
         )}
       />
       {/* #935 N-301: 入力途中で離れるときの確認。 */}
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力中の内容があります"
         description="このまま移動すると、入力した内容は保存されません。移動しますか？"

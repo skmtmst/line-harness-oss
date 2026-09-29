@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, History, Info, Mic, Pencil, Plus, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Clock3, Download, History, Info, Mic, Pencil, Plus, Sparkles, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -10,7 +10,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import Toggle from '@/components/shared/toggle'
@@ -226,7 +226,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
         {earlyClose !== null ? (
           <div className="border-hairline bg-canvas flex flex-wrap items-center gap-3 rounded-control border px-4 py-3">
             <span className="text-sm font-semibold">今日の閉店時刻</span>
-            <SelectField size="compact" aria-label="今日の閉店時刻" value={earlyClose} onChange={(event) => setEarlyClose(event.target.value)} options={closeOptions} />
+            <Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} />
             <span className="text-ink-secondary text-caption">現在 {formatPeriods(today.periods)}</span>
             <span className="grow" />
             <Button size="field" onClick={() => setEarlyClose(null)} disabled={busy}>やめる</Button>
@@ -286,21 +286,35 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
               <p className="text-ink-secondary text-sm leading-relaxed">{data.googleUpdates.fields.map((f) => f.label).join('・')}の変更提案があります。以前の情報と比較して、店舗の実態に合うか確認してください。</p>
               <div><Button onClick={() => setShowDiff((v) => !v)} aria-expanded={showDiff}>{showDiff ? '差分を閉じる' : '差分を見る'}</Button></div>
               {showDiff ? (
-                <dl className="border-hairline flex flex-col gap-2 rounded-control border p-3 text-caption">
-                  {data.googleUpdates.fields.map((f) => {
-                    const key = f.mask.split('.')[0]
-                    const current = key === 'regularHours' ? summarizeWeekly(profile.regularHours) : key === 'specialHours' ? profile.specialHours.map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') || 'なし' : key === 'storefrontAddress' ? addressText(profile.address) : key === 'phoneNumbers' ? profile.phone ?? '—' : key === 'profile' ? profile.description ?? '—' : key === 'title' ? profile.title ?? '—' : key === 'websiteUri' ? profile.websiteUri ?? '—' : '—'
-                    const u = data.googleUpdates!.updated
-                    const proposed = key === 'regularHours' && u.regularHours ? summarizeWeekly(u.regularHours) : key === 'specialHours' && u.specialHours ? u.specialHours.map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') || 'なし' : key === 'storefrontAddress' ? addressText(u.address) : key === 'phoneNumbers' ? u.phone ?? '—' : key === 'profile' ? u.description ?? '—' : key === 'title' ? u.title ?? '—' : key === 'websiteUri' ? u.websiteUri ?? '—' : '（この画面では表示できない項目です）'
-                    return (
-                      <div key={f.mask} className="flex flex-col gap-1">
-                        <dt className="font-semibold">{f.label}</dt>
-                        <dd className="text-ink-secondary">現在：{current}</dd>
-                        <dd className="text-status-warn-deep">Googleの提案：{proposed}</dd>
-                      </div>
-                    )
-                  })}
-                </dl>
+                <>
+                  <dl className="border-hairline flex flex-col gap-3 rounded-control border p-3 text-caption">
+                    {data.googleUpdates.fields.map((f) => {
+                      const key = f.mask.split('.')[0]
+                      const comparable = ['regularHours', 'specialHours', 'storefrontAddress', 'phoneNumbers', 'profile', 'title', 'websiteUri'].includes(key)
+                      if (!comparable) {
+                        // R108: 比較できない項目で行き止まりにしない。管理画面への導線を出す。
+                        return (
+                          <div key={f.mask} className="flex flex-col gap-1">
+                            <dt className="font-semibold">{f.label}</dt>
+                            <dd className="text-ink-secondary">この項目はこの画面で比較できません。</dd>
+                            <dd><a href="https://business.google.com/" target="_blank" rel="noreferrer" className="text-action font-semibold underline">Googleの管理画面で確認する</a></dd>
+                          </div>
+                        )
+                      }
+                      const current = key === 'regularHours' ? summarizeWeekly(profile.regularHours) : key === 'specialHours' ? profile.specialHours.map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') || 'なし' : key === 'storefrontAddress' ? addressText(profile.address) : key === 'phoneNumbers' ? profile.phone ?? '—' : key === 'profile' ? profile.description ?? '—' : key === 'title' ? profile.title ?? '—' : key === 'websiteUri' ? profile.websiteUri ?? '—' : '—'
+                      const u = data.googleUpdates!.updated
+                      const proposed = key === 'regularHours' && u.regularHours ? summarizeWeekly(u.regularHours) : key === 'specialHours' && u.specialHours ? u.specialHours.map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') || 'なし' : key === 'storefrontAddress' ? addressText(u.address) : key === 'phoneNumbers' ? u.phone ?? '—' : key === 'profile' ? u.description ?? '—' : key === 'title' ? u.title ?? '—' : key === 'websiteUri' ? u.websiteUri ?? '—' : '—'
+                      return (
+                        <div key={f.mask} className="flex flex-col gap-1">
+                          <dt className="font-semibold">{f.label}</dt>
+                          <dd className="text-ink-secondary">現在：{current}</dd>
+                          <dd className="text-status-warn-deep">Googleの提案：{proposed}</dd>
+                        </div>
+                      )
+                    })}
+                  </dl>
+                  <p className="text-ink-faint text-caption">この画面で比較できるのは、店舗名・住所・電話番号・ウェブサイト・通常の営業時間・特別営業時間・店舗紹介文です。</p>
+                </>
               ) : null}
             </>
           ) : (
@@ -324,19 +338,17 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
 
 // ---------- GB-11 / 11-B / 11-C 営業時間を変更 ----------
 
+// 全幅配置の中で縮む欄（本線の flex 指定）。中身は共通 Select。
 function TimeSelect({ value, onChange, kind, label }: { value: string; onChange: (v: string) => void; kind: 'open' | 'close'; label: string }) {
   return (
-    <span className="relative inline-flex min-w-0 shrink" style={{ flex: '1 1 84px', maxWidth: 120 }}>
-      <select
+    <span className="inline-flex min-w-0 shrink" style={{ flex: '1 1 84px', maxWidth: 120 }}>
+      <Select
         aria-label={label}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="bg-canvas text-ink h-9 w-full appearance-none rounded-control border pr-7 pl-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
-        style={{ borderColor: 'var(--color-hairline)' }}
-      >
-        {TIME_OPTIONS.map((t) => <option key={t} value={t}>{kind === 'close' && t === '00:00' ? '24:00' : t}</option>)}
-      </select>
-      <ChevronDown size={14} className="text-ink-faint pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2" aria-hidden="true" />
+        onChange={onChange}
+        options={TIME_OPTIONS.map((t) => ({ value: t, label: kind === 'close' && t === '00:00' ? '24:00' : t }))}
+        size="full"
+      />
     </span>
   )
 }
@@ -660,7 +672,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
         <h3 className="text-lead font-bold">毎週の営業時間（通常の営業時間）を決めます</h3>
         <p className="text-ink-faint text-label">基準日：{formatYmdJa(today.date, true)}・{timeZone === 'Asia/Tokyo' ? '日本時間（Asia/Tokyo）' : timeZone}・{storeName}</p>
         <div className="border-hairline overflow-hidden rounded-card border" role="table" aria-label="曜日ごとの営業時間">
-          <div className="bg-surface-pearl text-ink-faint flex items-center gap-3 px-4 text-caption font-semibold" style={{ height: 40 }} role="row">
+          <div className="bg-surface-pearl text-ink-faint hidden items-center gap-3 px-4 text-caption font-semibold sm:flex" style={{ height: 40 }} role="row">
             <span role="columnheader" className="shrink-0" style={{ width: 72 }}>曜日</span><span role="columnheader" className="shrink-0" style={{ width: 64 }}>定休日</span><span role="columnheader">営業時間の枠（開始–終了、1日3枠まで）</span>
           </div>
           {WEEKDAYS.map((d) => {
@@ -668,12 +680,15 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
             const closed = periods.length === 0
             const changed = weeklyChanged.includes(d)
             return (
-              <div key={d} role="row" className={`border-hairline flex items-center gap-3 border-t px-4 py-2 ${changed ? 'bg-accent-soft' : 'bg-canvas'}`} style={{ minHeight: 54 }}>
-                <span role="rowheader" className={`flex shrink-0 items-center gap-1 text-sm font-bold ${d === 'SATURDAY' ? 'text-status-info' : d === 'SUNDAY' ? 'text-status-danger' : ''}`} style={{ width: 72 }}>{WEEKDAY_JA[d]}曜{changed ? <span className="text-accent-deep text-nano font-semibold">変更</span> : null}</span>
-                <span role="cell" className="shrink-0" style={{ width: 64 }}><Toggle checked={closed} label={`${WEEKDAY_JA[d]}曜を定休日にする`} onChange={(next) => setDayPeriods(d, next ? [] : (profile.regularHours[d]?.length ? profile.regularHours[d] : [{ open: '11:00', close: '22:00' }]))} /></span>
-                <span role="cell" className="flex min-w-0 grow flex-wrap items-center gap-4">
+              // R109: 狭い画面では曜日ごとの縦カードにし、開始・終了を選ぶ欄を全幅で並べる。
+              <div key={d} role="row" className={`border-hairline flex flex-col items-stretch gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:gap-3 sm:py-2 ${changed ? 'bg-accent-soft' : 'bg-canvas'}`} style={{ minHeight: 54 }}>
+                <div role="presentation" className="flex items-center justify-between gap-3 sm:contents">
+                  <span role="rowheader" className={`flex shrink-0 items-center gap-1 text-sm font-bold ${d === 'SATURDAY' ? 'text-status-info' : d === 'SUNDAY' ? 'text-status-danger' : ''}`} style={{ width: 72 }}>{WEEKDAY_JA[d]}曜{changed ? <span className="text-accent-deep text-nano font-semibold">変更</span> : null}</span>
+                  <span role="cell" className="flex shrink-0 items-center gap-2 sm:w-16"><span className="text-ink-secondary text-xs sm:hidden">定休日</span><Toggle checked={closed} label={`${WEEKDAY_JA[d]}曜を定休日にする`} onChange={(next) => setDayPeriods(d, next ? [] : (profile.regularHours[d]?.length ? profile.regularHours[d] : [{ open: '11:00', close: '22:00' }]))} /></span>
+                </div>
+                <span role="cell" className="flex min-w-0 grow flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
                   {closed ? <span className="text-ink-faint text-sm">定休日</span> : periods.map((p, i) => (
-                    <span key={i} className="flex items-center gap-2">
+                    <span key={i} className="flex w-full items-center gap-2 sm:w-auto">
                       <TimeSelect kind="open" label={`${WEEKDAY_JA[d]}曜 枠${i + 1}の開始`} value={p.open} onChange={(v) => setDayPeriods(d, periods.map((x, j) => (j === i ? { ...x, open: v } : x)))} />
                       <span className="text-ink-faint">–</span>
                       <TimeSelect kind="close" label={`${WEEKDAY_JA[d]}曜 枠${i + 1}の終了`} value={p.close} onChange={(v) => setDayPeriods(d, periods.map((x, j) => (j === i ? { ...x, close: v } : x)))} />
@@ -992,8 +1007,8 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
       <div className="flex flex-wrap items-center gap-3">
         <PillTabs label="変更の種類" items={HISTORY_KINDS.map((k) => ({ key: k.key, label: `${k.label}${data ? ` ${data.counts[k.key]}` : ''}`, current: kind === k.key, onClick: () => { setKind(k.key); setPage(1) } }))} />
         <span className="grow" />
-        <SelectField aria-label="結果で絞り込み" value={result} onChange={(event) => { setResult(event.target.value as GoogleHistoryResult); setPage(1) }} options={[{ value: 'all', label: '結果：すべて' }, { value: 'applied', label: '反映済み' }, { value: 'pending', label: '反映確認中' }, { value: 'failed', label: '失敗・取り消し' }]} />
-        <SelectField size="compact" aria-label="期間" value={days} onChange={(event) => { setDays(event.target.value); setPage(1) }} options={[{ value: '7', label: '期間：7日' }, { value: '30', label: '期間：30日' }, { value: '90', label: '期間：90日' }, { value: '365', label: '期間：1年' }]} />
+        <Select aria-label="結果で絞り込み" value={result} onChange={(value) => { setResult(value as GoogleHistoryResult); setPage(1) }} options={[{ value: 'all', label: '結果：すべて' }, { value: 'applied', label: '反映済み' }, { value: 'pending', label: '反映確認中' }, { value: 'failed', label: '失敗・取り消し' }]} />
+        <Select size="page-size" aria-label="期間" value={days} onChange={(value) => { setDays(value); setPage(1) }} options={[{ value: '7', label: '期間：7日' }, { value: '30', label: '期間：30日' }, { value: '90', label: '期間：90日' }, { value: '365', label: '期間：1年' }]} />
         <SearchField placeholder="内容で検索" aria-label="内容で検索" value={search} onChange={setSearch} onClear={() => setSearch('')} />
       </div>
 

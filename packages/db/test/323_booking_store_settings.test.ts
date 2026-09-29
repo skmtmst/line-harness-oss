@@ -37,6 +37,12 @@ const liffDateViewMigration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '502_booking_liff_date_view.sql'),
   'utf8',
 );
+// 490 で menu_versions 表ができ、updateBookingMenuSettings が保存のたび版を残す。
+// 版に写す側が menus の列を読むので、表と一緒に追従させる。
+const menuVersionsMigration = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '490_menu_versions.sql'),
+  'utf8',
+);
 
 describe('migration 323 店舗共通の予約設定', () => {
   let sqlite: Database.Database;
@@ -60,10 +66,19 @@ describe('migration 323 店舗共通の予約設定', () => {
         id TEXT PRIMARY KEY,
         line_account_id TEXT NOT NULL,
         name TEXT NOT NULL,
+        -- 版の写しが読む列 (036・091 の本番定義に合わせる)。
+        -- duration_minutes の既定 60 は fixture 専用（本番は 036 で必須・既定なし）。
+        category_label TEXT,
+        description TEXT,
+        duration_minutes INTEGER NOT NULL DEFAULT 60,
+        buffer_after_minutes INTEGER NOT NULL DEFAULT 0,
         base_price INTEGER NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
         booking_window_days INTEGER,
         cutoff_hours_before INTEGER,
         cancel_deadline_hours_before INTEGER,
+        intake_question TEXT,
+        concurrent_capacity INTEGER NOT NULL DEFAULT 1,
         is_active INTEGER NOT NULL DEFAULT 1,
         deleted_at TEXT,
         created_at TEXT NOT NULL,
@@ -87,6 +102,7 @@ describe('migration 323 店舗共通の予約設定', () => {
     sqlite.exec(businessHoursConfiguredMigration);
     sqlite.exec(auditAndReminderMigration);
     sqlite.exec(liffDateViewMigration);
+    sqlite.exec(menuVersionsMigration);
     sqlite.exec(`
       INSERT INTO booking_business_hours
         (id, booking_settings_id, weekday, start_time, end_time)

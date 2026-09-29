@@ -13,7 +13,9 @@ import {
   normalizeSiteHost,
   recordAnonymousConversionDay,
   recordDomainRejection,
+  resumeMeasurementSite,
   siteAllowsHost,
+  stopMeasurementSite,
   updateMeasurementSiteDomains,
 } from '../src/web-measurement.js';
 import { asD1 } from './d1-test-helper.js';
@@ -47,7 +49,9 @@ function setup(): Database.Database {
       VALUES ('ev-1', 'point-1', 'friend-1', 1000, '2026-09-02 10:00:00'),
              ('ev-2', 'point-1', 'friend-2', 2000, '2026-09-02 11:00:00');
   `);
-  for (const file of ['503_measurement_sites.sql', '504_conversion_reversal_ledger.sql']) {
+  // R275の465は表の作成(503)より前の番号。新しいDBではこの順で流れるため、
+  // ここでも同じ順で当てて「表が無くても止まらない」ことを固定する。
+  for (const file of ['465_inflow_stop_cancel.sql', '503_measurement_sites.sql', '504_conversion_reversal_ledger.sql']) {
     sqlite.exec(
       readFileSync(join(import.meta.dirname, '..', 'migrations', file), 'utf8'),
     );
@@ -83,6 +87,18 @@ describe('計測サイトと許可ドメイン', () => {
     expect(await siteAllowsHost(db, site.id, 'sub.example.com')).toBe(false);
   });
 
+  it('R279 wwwつき・なしの既存登録と来訪ホスト4通りを同じサイトとして扱う', async () => {
+    const db = asD1(setup());
+    for (const [index, stored] of ['example.com', 'www.example.com'].entries()) {
+      const site = await createMeasurementSite(db, { lineAccountId: 'a1', label: `site-${index}`, domains: [stored] });
+      for (const visiting of ['example.com', 'www.example.com']) {
+        expect(await siteAllowsHost(db, site.id, visiting)).toBe(true);
+      }
+      expect(await siteAllowsHost(db, site.id, 'sub.example.com')).toBe(false);
+      expect(await siteAllowsHost(db, site.id, 'evil-example.com')).toBe(false);
+    }
+  });
+
   it('ドメインの更新は差し替えになる', async () => {
     const db = asD1(setup());
     const site = await createMeasurementSite(db, {
@@ -102,6 +118,7 @@ describe('ドメイン名の検査', () => {
     expect(normalizeSiteHost('example.com.')).toBe('example.com');
     expect(normalizeSiteHost('example.com:8443')).toBe('example.com');
     expect(normalizeSiteHost('EXAMPLE.COM')).toBe('example.com');
+    expect(normalizeSiteHost('https://WWW.Example.COM/path')).toBe('example.com');
   });
 
   it('ドメインでない入力は弾く', () => {
@@ -240,5 +257,31 @@ describe('地点ごとの取消集計(純数から引く分)', () => {
     expect(await isConversionEventReversed(db, 'ev-1')).toBe(true);
     const metrics = await getReversalMetricsByPoint(db, ['point-1']);
     expect(metrics.get('point-1')).toEqual({ count: 1, value: 1000 });
+  });
+});
+
+describe('計測サイトの停止・再開 (R275)', () => {
+  it('止めると日時と理由が残り、一覧は「停止中」を返す。再開で戻る', async () => {
+    const db = asD1(setup());
+    const site = await createMeasurementSite(db, {
+      lineAccountId: 'a1', label: '公式ショップ', domains: ['example.com'],
+    });
+
+    const stopped = await stopMeasurementSite(db, site.id, 'サイトを閉じたため');
+    expect(stopped).toBe('stopped');
+    // 重ねて止めても状態は1つだけ
+    expect(await stopMeasurementSite(db, site.id, 'もう一度')).toBe('already_stopped');
+
+    const listed = await listMeasurementSites(db, 'a1');
+    expect(listed[0].stopped_at).toBeTruthy();
+    expect(listed[0].stopped_reason).toBe('サイトを閉じたため');
+    // 行と許可ドメインは消えない
+    expect(listed[0].domains).toEqual(['example.com']);
+
+    expect(await resumeMeasurementSite(db, site.id)).toBe('resumed');
+    expect(await resumeMeasurementSite(db, site.id)).toBe('not_stopped');
+    const after = await listMeasurementSites(db, 'a1');
+    expect(after[0].stopped_at).toBeNull();
+    expect(after[0].stopped_reason).toBeNull();
   });
 });

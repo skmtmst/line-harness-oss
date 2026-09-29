@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -15,7 +16,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
-import { validateReward, type FormState } from './reward-form'
+import { LIMIT_FIELD_ERRORS, normalizeDigits, optionalInteger, validateReward, type FormState } from './reward-form'
 import {
   api,
   ApiError,
@@ -108,12 +109,15 @@ function isMileageRewardSummary(value: unknown): value is MileageRewardSummary {
     && (candidate.currentVersion === null || typeof candidate.currentVersion === 'object')
 }
 
-/** 空文字は `null`（限りなし・決めない）。**0 を null に潰さない。** */
+/*
+ * R298: 空欄だけが `null`（限りなし・決めない）。0 は潰さない。
+ * 数にならない入力は検証で止まるはずだが、万一ここへ来ても
+ * 「無制限」へ黙って潰さず失敗にする。
+ */
 function numberOrNull(value: string): number | null {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
+  const parsed = optionalInteger(value)
+  if (parsed === undefined) throw new Error('数の限り・上限・日数の入力を確認してください')
+  return parsed
 }
 
 function draftOf(form: FormState): MileageRewardDraftInput {
@@ -348,29 +352,21 @@ function MileageRewardEditorInner() {
             **並べたタイルで選ぶ**（設計 `p9CcEB`）。選び口に畳むと、
             何が渡るのかを1つずつ開いて確かめることになる。
           */}
-          <div role="radiogroup" aria-label="渡すもの" className="grid gap-2 sm:grid-cols-2">
+          <RadioCardGroup legend="渡すもの" className="grid gap-2 sm:grid-cols-2">
             {KINDS.map((kind) => {
               return (
-                <label
+                <RadioCard
                   key={kind.value}
-                  className="block cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="reward-kind"
-                    value={kind.value}
-                    checked={form.rewardKind === kind.value}
-                    onChange={() => set('rewardKind', kind.value)}
-                    className="peer sr-only"
-                  />
-                  <span className="rounded-control border-hairline bg-canvas block border p-3 text-left hover:bg-canvas-sunken peer-checked:border-accent peer-checked:bg-accent-soft peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-deep">
-                    <span className="text-ink block text-sm font-bold">{kind.label}</span>
-                    <span className="text-ink-faint mt-0.5 block text-xs">{kind.note}</span>
-                  </span>
-                </label>
+                  name="reward-kind"
+                  value={kind.value}
+                  checked={form.rewardKind === kind.value}
+                  onChange={() => set('rewardKind', kind.value)}
+                  title={kind.label}
+                  note={kind.note}
+                />
               )
             })}
-          </div>
+          </RadioCardGroup>
           <div className="mt-4">
             <Field
               label="交換後に渡すもの"
@@ -407,11 +403,11 @@ function MileageRewardEditorInner() {
             **「限りなし」と「品切れ」を混ぜない。** 空欄は限りなし、0 は品切れ。
             同じ見た目にすると、出したつもりのものが誰にも交換できない。
           */}
-          <Field label="数の限り" htmlFor="reward-stock" note="空欄なら限りなし。0 と書くと品切れ（交換できません）">
-            <TextInput id="reward-stock" inputMode="numeric" value={form.stockLimit} onChange={(e) => set('stockLimit', e.target.value)} placeholder="限りなし" />
+          <Field label="数の限り" htmlFor="reward-stock" note="空欄なら限りなし。0 と書くと品切れ（交換できません）" error={touched && errors.includes(LIMIT_FIELD_ERRORS.stockLimit) ? LIMIT_FIELD_ERRORS.stockLimit : undefined}>
+            <TextInput id="reward-stock" inputMode="numeric" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="限りなし" />
           </Field>
-          <Field label="1人あたりの上限" htmlFor="reward-per-friend" note="空欄なら何回でも">
-            <TextInput id="reward-per-friend" inputMode="numeric" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', e.target.value)} placeholder="制限なし" />
+          <Field label="1人あたりの上限" htmlFor="reward-per-friend" note="空欄なら何回でも" error={touched && errors.includes(LIMIT_FIELD_ERRORS.perFriendLimit) ? LIMIT_FIELD_ERRORS.perFriendLimit : undefined}>
+            <TextInput id="reward-per-friend" inputMode="numeric" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
           </Field>
           <Field label="交換できる期間" htmlFor="reward-starts" note="空欄ならいつでも" error={touched && errors.includes('交換終了は交換開始より後にしてください') ? '交換終了は交換開始より後にしてください' : undefined}>
             <div className="flex flex-wrap items-center gap-2">
@@ -420,8 +416,8 @@ function MileageRewardEditorInner() {
               <DateTimeField aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} />
             </div>
           </Field>
-          <Field label="交換後に使える日数" htmlFor="reward-expires" note="空欄なら期限なし">
-            <TextInput id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', e.target.value)} placeholder="期限なし" />
+          <Field label="交換後に使える日数" htmlFor="reward-expires" note="空欄なら期限なし" error={touched && errors.includes(LIMIT_FIELD_ERRORS.benefitExpiresDays) ? LIMIT_FIELD_ERRORS.benefitExpiresDays : undefined}>
+            <TextInput id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" />
           </Field>
         </Card>
 

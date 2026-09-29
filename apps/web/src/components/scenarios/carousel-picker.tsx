@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Select from '@/components/shared/select'
 import { scenarioReferenceData } from './scenario-reference-data'
 
 interface SendableTemplateCandidate {
@@ -140,21 +141,22 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
         <span className="text-ink-secondary mb-1 block text-xs font-medium">
           カルーセル <span className="text-danger">*</span>
         </span>
-        <select
+        <Select
           value={value}
-          onChange={(e) => {
-            const picked = items.find((t) => t.id === e.target.value) ?? null
-            onChange(e.target.value, picked)
+          onChange={(next) => {
+            const picked = items.find((t) => t.id === next) ?? null
+            onChange(next, picked)
           }}
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-        >
-          <option value="">選んでください</option>
-          {items.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}（{t.panels}枚{t.firstTitle ? `／${t.firstTitle}` : ''}）
-            </option>
-          ))}
-        </select>
+          aria-label="カルーセル"
+          options={[
+            { value: '', label: '選んでください' },
+            ...items.map((t) => ({
+              value: t.id,
+              label: `${t.name}（${t.panels}枚${t.firstTitle ? `／${t.firstTitle}` : ''}）`,
+            })),
+          ]}
+          size="full"
+        />
       </label>
       <p className="text-ink-faint text-xs leading-relaxed">
         カルーセルを直すと、この通の中身も一緒に変わります。

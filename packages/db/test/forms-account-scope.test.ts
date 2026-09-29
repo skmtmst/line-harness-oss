@@ -26,7 +26,12 @@ function setup(): D1Database {
     );
     CREATE TABLE friends (id TEXT PRIMARY KEY, line_account_id TEXT);
     CREATE TABLE form_submissions (
-      id TEXT PRIMARY KEY, form_id TEXT NOT NULL, friend_id TEXT, created_at TEXT NOT NULL
+      id TEXT PRIMARY KEY, form_id TEXT NOT NULL, friend_id TEXT, created_at TEXT NOT NULL,
+      is_test INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE form_opens (
+      id TEXT PRIMARY KEY, form_id TEXT NOT NULL, friend_id TEXT,
+      opened_at TEXT NOT NULL, is_test INTEGER NOT NULL DEFAULT 0
     );
 
     INSERT INTO line_accounts VALUES
@@ -37,7 +42,8 @@ function setup(): D1Database {
       ('legacy', '要確認', NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 0, NULL, NULL, NULL, '2026-08-03', '2026-08-03', 'active', NULL, 1);
     INSERT INTO form_accounts VALUES ('form-a', 'account-a'), ('form-b', 'account-b');
     INSERT INTO friends VALUES ('friend-a', 'account-a');
-    INSERT INTO form_submissions VALUES ('submission-a', 'form-a', 'friend-a', '2026-08-04');
+    INSERT INTO form_submissions (id, form_id, friend_id, created_at)
+      VALUES ('submission-a', 'form-a', 'friend-a', '2026-08-04');
   `);
   return asD1(sqlite);
 }

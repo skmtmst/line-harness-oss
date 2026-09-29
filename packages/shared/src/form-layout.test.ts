@@ -5,6 +5,8 @@ import {
   fieldsToLayout,
   formChoiceIsSelected,
   formThemeButtonText,
+  FORM_THEME_DEFAULT,
+  formThemeContrastError,
   isCalendarDateString,
   isFormAnswerEmpty,
   layoutToFields,
@@ -17,6 +19,7 @@ import {
   validateAnswers,
   validateFormDefinition,
   validateFormForPublish,
+  type FormBlock,
   type FormInputBlock,
   type FormLayout,
 } from "./form-layout";
@@ -638,6 +641,120 @@ describe("公開前の検査(FORM-05/07/14)", () => {
       ...(layout.sections[0].blocks[0] as FormInputBlock),
       reminder: { reminderId: "rm-1", time: "09:00" },
     };
+    expect(validateFormForPublish(layout)).toBeNull();
+  });
+});
+
+describe("画像ブロックのURL検証（保存時。R197）", () => {
+  function layoutWithImage(mediaUrl: string, linkUrl?: string): FormLayout {
+    const layout = emptyLayout();
+    const image: FormBlock =
+      linkUrl === undefined
+        ? { id: "img1", kind: "image", mediaUrl }
+        : { id: "img1", kind: "image", mediaUrl, linkUrl };
+    layout.sections[0].blocks = [input({ name: "x", label: "ひとこと" }), image];
+    return layout;
+  }
+
+  test("URLでない画像URL・リンクは保存で止める", () => {
+    expect(validateFormDefinition(layoutWithImage("not-a-url"))).toContain("URLの形ではありません");
+    expect(validateFormDefinition(layoutWithImage("https://example.com/a.png", "not-a-url"))).toContain(
+      "URLの形ではありません",
+    );
+  });
+
+  test("正しいhttps URLと未指定は通す", () => {
+    expect(
+      validateFormDefinition(layoutWithImage("https://example.com/a.png", "https://example.com/go")),
+    ).toBeNull();
+    expect(validateFormDefinition(layoutWithImage(""))).toBeNull();
+  });
+});
+
+describe("初期値の公開前検証（R196）", () => {
+  test("形式と矛盾する初期値は対象欄と理由を示して止める", () => {
+    const badMail = layoutWith([
+      input({ name: "mail", label: "メール", limit: { format: "email" }, defaultValue: "not-an-email" }),
+    ]);
+    expect(validateFormForPublish(badMail)).toContain("初期値");
+
+    const badDate = layoutWith([input({ name: "day", label: "希望日", type: "date", defaultValue: "2026-02-30" })]);
+    expect(validateFormForPublish(badDate)).toContain("初期値");
+
+    const badPref = layoutWith([
+      input({ name: "pref", label: "住まい", type: "prefecture", defaultValue: "存在しない県" }),
+    ]);
+    expect(validateFormForPublish(badPref)).toContain("初期値");
+  });
+
+  test("合っている初期値・空の初期値は通す（下書き保存も通す）", () => {
+    const good = layoutWith([
+      input({ name: "mail", label: "メール", limit: { format: "email" }, defaultValue: "a@example.com" }),
+      input({ name: "day", label: "希望日", type: "date", defaultValue: "2026-03-01" }),
+      input({ name: "pref", label: "住まい", type: "prefecture", defaultValue: "東京都" }),
+      input({ name: "memo", label: "メモ", required: true }),
+    ]);
+    expect(validateFormForPublish(good)).toBeNull();
+
+    const draft = layoutWith([
+      input({ name: "mail", label: "メール", limit: { format: "email" }, defaultValue: "not-an-email" }),
+    ]);
+    // 下書きでは許す（公開の直前で止める）
+    expect(validateFormDefinition(draft)).toBeNull();
+  });
+});
+
+/**
+ * P（回答フォームの読みにくい色）：文字（text）と背景（sub）の差が
+ * 4.5:1 未満なら保存できない。比は WCAG の式で測り、独立に python で
+ * 検算した値（既定 15.3・#999/白 2.8・#777/白 4.4・同色 1.0）と突き合わせる。
+ */
+describe("文字と背景のコントラスト（P）", () => {
+  test("既定の組み合わせは通る", () => {
+    expect(formThemeContrastError(FORM_THEME_DEFAULT)).toBeNull();
+  });
+
+  test("4.5未満は測った比を文に入れて止める", () => {
+    const error = formThemeContrastError({
+      ...FORM_THEME_DEFAULT,
+      text: "#999999",
+      sub: "#ffffff",
+    });
+    expect(error).toContain("保存できません");
+    expect(error).toContain("いま 2.8:1");
+    expect(error).toContain("4.5:1以上");
+  });
+
+  test("同じ色は 1:1 で止める", () => {
+    const error = formThemeContrastError({
+      ...FORM_THEME_DEFAULT,
+      text: "#ffffff",
+      sub: "#ffffff",
+    });
+    expect(error).toContain("いま 1:1");
+  });
+
+  test("4.5ぎりぎり（#777/白 = 4.47）は通さない", () => {
+    expect(
+      formThemeContrastError({
+        ...FORM_THEME_DEFAULT,
+        text: "#777777",
+        sub: "#ffffff",
+      }),
+    ).toContain("保存できません");
+  });
+
+  test("公開前の検査で読みにくい色を止める", () => {
+    const layout = layoutWith([
+      input({ name: "name", label: "お名前", type: "text" }),
+    ]);
+    layout.options.theme = {
+      ...FORM_THEME_DEFAULT,
+      text: "#999999",
+      sub: "#ffffff",
+    };
+    expect(validateFormForPublish(layout)).toContain("保存できません");
+    layout.options.theme = { ...FORM_THEME_DEFAULT };
     expect(validateFormForPublish(layout)).toBeNull();
   });
 });

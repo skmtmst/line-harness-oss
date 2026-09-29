@@ -23,11 +23,17 @@ import {
   collectFriendAddReferences,
   doFriendAddTimeWindowsOverlap,
   doFriendAddWeekdaySetsOverlap,
+  evaluateFriendAddRuleConditions,
+  evaluateFriendAddSchedule,
+  type FriendAddSuppressReason,
   findFriendAddUnusableReferences,
+  friendAddJstHhmm,
+  hasInvalidFriendAddTimeWindows,
   isValidFriendAddHhmm,
   parseFriendAddConditionAst,
   retryFailedFriendAddActions,
 } from '../services/friend-add-routing.js';
+import { toJstParts } from '@line-crm/shared';
 
 const friendAddRules = new Hono<Env>();
 const KINDS = new Set<FriendAddRuleKind>(['first_time', 'returning']);
@@ -56,6 +62,7 @@ type RuleTestInput = {
   friendKind?: FriendAddRuleKind;
   routeId?: string | null;
   expectedAt?: string | null;
+  friendId?: string | null;
 };
 
 function accountIdFrom(c: Context<Env>, body?: RuleInput): string | null {
@@ -281,12 +288,45 @@ async function validateReferences(
   accountId: string,
   definition: FriendAddRuleDefinition,
   friendKind: FriendAddRuleKind,
-  options?: { allowIncomplete?: boolean },
+  options?: { allowIncomplete?: boolean; isFallback?: boolean },
 ): Promise<FriendAddRuleReferenceError[]> {
   const messages: FriendAddRuleReferenceError[] = [];
   const push = (key: ReferenceErrorKey, message: string) => {
     messages.push({ key, message });
   };
+  /*
+   * テスト・公開前確認では「そもそも動かない設定」をここで止める。
+   * 下書き保存（allowIncomplete）は未完成を許すので対象外（R30）。
+   * 実行側は routeIds の中身だけで拾う（EXISTS json_each）ため、
+   * 空は「全部に届く」ではなく「どこにも届かない」。
+   */
+  if (!options?.allowIncomplete) {
+    if (!options?.isFallback && definition.routeIds.length === 0) {
+      push(friendKind, '対象の流入リンクが選ばれていません。流入条件で1つ以上選んでください。');
+    }
+    /*
+     * 期限切れの設定は公開しても1件も動かない。有効期間はJSTの壁時計
+     * （DateTimeField の値と振り分けSQLの `+9 hours` が同じ形）。
+     */
+    const nowJst = `${toJstParts(new Date()).date}T${friendAddJstHhmm(new Date())}`;
+    // 実行側は `activeUntil >= now` で拾う（終了時刻ちょうどはまだ対象）。
+    if (definition.activeUntil && definition.activeUntil < nowJst) {
+      push(friendKind, '有効期間の終了時刻が過ぎています。終了を延ばすか、この設定を消してください。');
+    }
+    if (hasInvalidFriendAddTimeWindows(definition.timeWindows)) {
+      push(friendKind, '配信する時間帯に読めない値があります。時間帯を入れ直してください。');
+    }
+    /*
+     * 読めない友だち条件は実行時に fail-closed で止まる。
+     * 旧形式の自由文は保存だけは許す（直せるように）ので、ここで理由を出す。
+     */
+    const conditionAst = parseFriendAddConditionAst(definition.friendCondition);
+    if (!conditionAst.ok) {
+      push(friendKind, conditionAst.error === 'legacy_text'
+        ? '以前の形式の友だち条件が入っているため配信には使えません。条件を作り直してください。'
+        : (CONDITION_AST_MESSAGES[conditionAst.error] ?? '友だち条件が読み取れません。条件を作り直してください。'));
+    }
+  }
   if (definition.routeIds.length > 0) {
     const placeholders = definition.routeIds.map(() => '?').join(',');
     const rows = await db.prepare(
@@ -367,16 +407,144 @@ async function validateReferences(
   return messages;
 }
 
-async function ruleTestResponse(c: Context<Env>, accountId: string, ruleId: string) {
+/**
+ * 想定日時を Date へ直す。
+ * 画面の日時欄（"YYYY-MM-DDTHH:MM"）は日本時間の壁時計、
+ * "Z" や "+09:00" 付きはそのまま ISO として読む。
+ */
+function parseExpectedAt(value: string | null | undefined): Date | null | 'invalid' {
+  if (!value) return null;
+  const wall = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value) ? `${value}+09:00` : value;
+  const parsed = new Date(wall);
+  return Number.isNaN(parsed.getTime()) ? 'invalid' : parsed;
+}
+
+/**
+ * 優先順位がこの設定より小さい（＝先に動く）同じ対象の設定のうち、
+ * 流入リンクが重なるものの名前を返す。テスト結果の注意書き用。
+ */
+async function higherPriorityRouteNames(
+  db: D1Database,
+  input: { accountId: string; kind: FriendAddRuleKind; selfId: string; selfPriority: number; routeIds: string[] },
+): Promise<string[]> {
+  if (input.routeIds.length === 0) return [];
+  const siblings = await listFriendAddRules(db, { lineAccountId: input.accountId, friendKind: input.kind });
+  const mine = new Set(input.routeIds);
+  return siblings
+    .filter((other) =>
+      other.id !== input.selfId
+      && other.archived_at === null
+      && other.priority < input.selfPriority
+      && parseSnapshot(other.definition_snapshot).routeIds.some((id) => mine.has(id)))
+    .map((other) => other.name);
+}
+
+/*
+ * 実判定の不一致理由を運用者の言葉へ写す表。
+ * evaluateFriendAddSchedule / evaluateFriendAddRuleConditions が返す
+ * reason を、画面にそのまま出せる文にする。
+ */
+const CONDITION_MISS_MESSAGES: Partial<Record<FriendAddSuppressReason, string>> = {
+  outside_weekday: 'この曜日は配信対象ではありません。',
+  outside_time_window: 'この時刻は配信対象の時間帯ではありません。',
+  invalid_time_window: '配信する時間帯に読めない値があります。',
+  friend_condition_not_met: '試した友だちは、設定した友だち条件を満たしていません。',
+  friend_condition_unreadable: '友だち条件が読み取れません。条件を作り直してください。',
+  friend_condition_invalid: '友だち条件の内容が壊れています。条件を作り直してください。',
+  reference_out_of_account: '設定が、このアカウントで使えない参照を含んでいます。',
+  resend_suppressed: 'この友だちは二重送信防止の期間内のため、実行しても届きません。',
+};
+
+async function ruleTestResponse(
+  c: Context<Env>,
+  accountId: string,
+  ruleId: string,
+  input?: { routeId?: string | null; expectedAt?: string | null; friendId?: string | null },
+) {
   const staff = c.get('staff');
   if (staff.role === 'staff' && !staff.permissionKeys?.includes('/friend-add-settings')) {
     return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
   }
   const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId });
   if (!row) return c.json({ success: false, error: '設定が見つかりません' }, 404);
+  const at = parseExpectedAt(input?.expectedAt);
+  if (at === 'invalid') return c.json({ success: false, error: '想定日時が読めません' }, 400);
   const definition = parseSnapshot(row.definition_snapshot);
-  const errors = await validateReferences(c.env.DB, accountId, definition, row.friend_kind);
+  const errors = await validateReferences(c.env.DB, accountId, definition, row.friend_kind, {
+    isFallback: row.is_unknown_route_fallback === 1,
+  });
+
+  /*
+   * 整合の確認（参照先・必須の欠落）と、条件の確かめ（曜日・時間帯・
+   * 有効期間・試した流入リンク）は分ける。前者だけで「選ばれる」と
+   * 断定すると、期限切れ・対象外の曜日でも成功に見えてしまう（R262）。
+   */
+  const misses: string[] = [];
+  const caveats: string[] = [];
+  if (errors.length === 0) {
+    const when = at ?? new Date();
+    const whenJst = `${toJstParts(when).date}T${friendAddJstHhmm(when)}`;
+    if (definition.activeFrom && definition.activeFrom > whenJst) {
+      misses.push('有効期間の開始前です。開始を過ぎると動き始めます。');
+    }
+    if (input?.friendId) {
+      /*
+       * 友だちを指定したときは、本番と同じ判定器で曜日・時間帯・
+       * 友だち条件・再送制限まで確かめる。読み取るだけで、
+       * 送信・属性・履歴は書き換えない。
+       */
+      const friend = await c.env.DB.prepare(
+        'SELECT id FROM friends WHERE id = ? AND line_account_id = ?',
+      ).bind(input.friendId, accountId).first<{ id: string }>();
+      if (!friend) {
+        misses.push('試す友だちがこのアカウントに見つかりません。');
+      } else {
+        const verdict = await evaluateFriendAddRuleConditions(c.env.DB, {
+          lineAccountId: accountId,
+          friendId: friend.id,
+          definition,
+          now: when,
+        });
+        if (!verdict.matched && verdict.reason) {
+          misses.push(CONDITION_MISS_MESSAGES[verdict.reason] ?? 'この友だち・日時では条件に合いません。');
+        }
+      }
+    } else {
+      const schedule = evaluateFriendAddSchedule(definition, when);
+      if (schedule.reason) {
+        misses.push(CONDITION_MISS_MESSAGES[schedule.reason] ?? 'この曜日・時刻では条件に合いません。');
+      }
+    }
+    if (input?.routeId != null) {
+      if (row.is_unknown_route_fallback === 1) {
+        misses.push('この設定は流入経路を確定できなかった人にだけ動きます。');
+      } else if (!definition.routeIds.includes(input.routeId)) {
+        misses.push('試した流入リンクはこの設定の対象ではありません。');
+      }
+    }
+    /*
+     * 優先順位の小さい設定が同じリンクを使っていても、この設定の条件自体は
+     * 通る。選ばれない理由ではなく「先に動き得るもの」として注意書きにする。
+     */
+    const ahead = await higherPriorityRouteNames(c.env.DB, {
+      accountId,
+      kind: row.friend_kind,
+      selfId: row.id,
+      selfPriority: row.priority,
+      routeIds: input?.routeId != null ? [input.routeId] : definition.routeIds,
+    });
+    if (ahead.length > 0) {
+      caveats.push(`同じ流入リンクを、優先順位の小さい設定（${ahead.join('、')}）も使っています。その設定の条件に合うときは、そちらが先に動きます。`);
+    }
+  }
+
+  const matched = errors.length === 0 && misses.length === 0;
   if (row.version_status === 'draft') {
+    /*
+     * 公開の鍵（テスト成功）は「設定の整合が取れたか」で判断する。
+     * 「いまは対象の曜日・時間帯ではない」は設定の欠陥ではないため、
+     * 曜日を待たずに公開できるよう失敗には数えない。
+     */
     await recordFriendAddRuleTest(c.env.DB, {
       lineAccountId: accountId,
       ruleId: row.id,
@@ -394,8 +562,15 @@ async function ruleTestResponse(c: Context<Env>, accountId: string, ruleId: stri
     data: {
       stateChanged: false,
       ruleId: row.id,
-      matched: errors.length === 0,
-      reasons: errors.length === 0 ? ['この設定が優先順位どおりに選ばれます。'] : errors.map((error) => error.message),
+      matched,
+      reasons: errors.length > 0
+        ? errors.map((error) => error.message)
+        : [
+            ...(matched
+              ? ['保存済みの参照先と、曜日・時間帯・有効期間の条件を確認できました。']
+              : misses),
+            ...caveats,
+          ],
       scenarioId: definition.scenarioId,
       message: definition.messageText || null,
       actions: definition.actions,
@@ -467,9 +642,13 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
     const total = await c.env.DB.prepare(
       `SELECT COUNT(*) AS count FROM friend_add_events e WHERE ${clauses.join(' AND ')}`,
     ).bind(...bindings).first<{ count: number }>();
+    // 上部の集計も同じ絞り込みの中だけを数える（R264）。絞り込み中に
+    // アカウント全体の数が出ると、対象範囲が読み手に伝わらない。
+    const listClauses = [...clauses];
+    const listBindings = [...bindings];
     if (cursor) {
-      clauses.push('(e.occurred_at < ? OR (e.occurred_at = ? AND e.id < ?))');
-      bindings.push(cursor.occurredAt, cursor.occurredAt, cursor.id);
+      listClauses.push('(e.occurred_at < ? OR (e.occurred_at = ? AND e.id < ?))');
+      listBindings.push(cursor.occurredAt, cursor.occurredAt, cursor.id);
     }
     const [result, summary] = await Promise.all([
       c.env.DB.prepare(
@@ -496,9 +675,9 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
                FROM friend_add_action_runs
               GROUP BY event_id
            ) ar ON ar.event_id = e.id
-          WHERE ${clauses.join(' AND ')}
+          WHERE ${listClauses.join(' AND ')}
           ORDER BY e.occurred_at DESC, e.id DESC LIMIT ?`,
-      ).bind(...bindings, limit + 1).all<{
+      ).bind(...listBindings, limit + 1).all<{
         id: string; friend_id: string; display_name: string | null; friend_kind: string;
         attribution_status: string; entry_route_id: string | null; entry_route_name: string | null;
         ref_code: string | null; routing_status: string; error_code: string | null;
@@ -507,18 +686,28 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
         scenario_id: string | null; scenario_name: string | null; enrollment_id: string | null;
         delivery_count: number; action_count: number; failed_action_count: number;
       }>(),
+      /*
+       * 「直近28日の追加」は人数（同じ人の再追加は1人）と回数（記録数）を
+       * 分けて数える。期間の境界はJSTで計算し、オフセットなしで保存した
+       * 古い行とも比較できるよう空白区切りを T に揃えてから比べる（R264）。
+       * last_delivery_at は実際に送った記録だけの最新日時で、一覧の先頭行の
+       * 処理時刻（届いていない記録を含む）とは別物（R266）。
+       */
       c.env.DB.prepare(
-        `SELECT COUNT(*) AS total_runs,
-                SUM(delivery_count) AS delivery_count,
-                SUM(CASE WHEN routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed_runs,
-                AVG(CASE WHEN first_delivery_sent_at IS NOT NULL
-                    THEN (julianday(first_delivery_sent_at) - julianday(occurred_at)) * 86400000 END) AS average_send_ms,
-                SUM(CASE WHEN scenario_enrollment_id IS NOT NULL THEN 1 ELSE 0 END) AS scenario_starts
-           FROM friend_add_events
-          WHERE line_account_id = ?`,
-      ).bind(accountId).first<{
-        total_runs: number; delivery_count: number | null; failed_runs: number | null;
-        average_send_ms: number | null; scenario_starts: number | null;
+        `SELECT COUNT(DISTINCT CASE WHEN REPLACE(e.occurred_at, ' ', 'T') >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-28 days') THEN e.friend_id END) AS recent_friends,
+                SUM(CASE WHEN REPLACE(e.occurred_at, ' ', 'T') >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-28 days') THEN 1 ELSE 0 END) AS recent_events,
+                SUM(e.delivery_count) AS delivery_count,
+                SUM(CASE WHEN e.routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed_runs,
+                AVG(CASE WHEN e.first_delivery_sent_at IS NOT NULL
+                    THEN (julianday(e.first_delivery_sent_at) - julianday(REPLACE(e.occurred_at, ' ', 'T'))) * 86400000 END) AS average_send_ms,
+                SUM(CASE WHEN e.scenario_enrollment_id IS NOT NULL THEN 1 ELSE 0 END) AS scenario_starts,
+                MAX(e.first_delivery_sent_at) AS last_delivery_at
+           FROM friend_add_events e
+          WHERE ${clauses.join(' AND ')}`,
+      ).bind(...bindings).first<{
+        recent_friends: number; recent_events: number | null; delivery_count: number | null;
+        failed_runs: number | null; average_send_ms: number | null; scenario_starts: number | null;
+        last_delivery_at: string | null;
       }>(),
     ]);
     const allRows = result.results ?? [];
@@ -558,11 +747,13 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
         total: total?.count ?? 0,
         nextCursor: allRows.length > limit && items.length > 0 ? makeRunCursor(items[items.length - 1]) : null,
         summary: {
-          totalRuns: summary?.total_runs ?? 0,
+          recentFriends: summary?.recent_friends ?? 0,
+          recentEvents: summary?.recent_events ?? 0,
           cumulativeDeliveries: summary?.delivery_count ?? 0,
           scenarioStarts: summary?.scenario_starts ?? 0,
           averageSendTimeMs: summary?.average_send_ms == null ? null : Math.max(0, Math.round(summary.average_send_ms)),
           failed: summary?.failed_runs ?? 0,
+          lastDeliveryAt: summary?.last_delivery_at ?? null,
           staffHandoffs: { value: null, state: 'unavailable', reason: '担当者引き継ぎと実行イベントを結ぶ記録がありません' },
         },
       },
@@ -903,7 +1094,11 @@ friendAddRules.post('/api/friend-add-rules/test', requireRole('owner', 'admin', 
   const accountId = accountIdFrom(c, body);
   if (!accountId || !body.ruleId) return c.json({ success: false, error: 'accountId と ruleId が必要です' }, 400);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
-  return ruleTestResponse(c, accountId, body.ruleId);
+  return ruleTestResponse(c, accountId, body.ruleId, {
+    routeId: body.routeId ?? null,
+    expectedAt: body.expectedAt ?? null,
+    friendId: body.friendId ?? null,
+  });
 });
 
 friendAddRules.post('/api/friend-add-rules/drafts', requireRole('owner', 'admin'), async (c) => {
@@ -1031,7 +1226,9 @@ friendAddRules.post('/api/friend-add-rules/:id/validate', requireRole('owner', '
   const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
   if (!row) return c.json({ success: false, error: '設定が見つかりません' }, 404);
   const definition = parseSnapshot(row.definition_snapshot);
-  const errors = await validateReferences(c.env.DB, accountId, definition, row.friend_kind);
+  const errors = await validateReferences(c.env.DB, accountId, definition, row.friend_kind, {
+    isFallback: row.is_unknown_route_fallback === 1,
+  });
   /*
    * 確認は鍵付きで返す。画面は鍵で突き合わせ、説明文はサーバの値をそのまま出す。
    * 順番 (配列の位置) に意味を持たせない。
@@ -1070,7 +1267,13 @@ friendAddRules.post('/api/friend-add-rules/:id/test', requireRole('owner', 'admi
   const accountId = accountIdFrom(c);
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
-  return ruleTestResponse(c, accountId, c.req.param('id'));
+  let body: Partial<RuleTestInput> = {};
+  try { body = await c.req.json<RuleTestInput>(); } catch { /* 本文なしの呼び出しは「いま・経路不問」で確かめる */ }
+  return ruleTestResponse(c, accountId, c.req.param('id'), {
+    routeId: body.routeId ?? null,
+    expectedAt: body.expectedAt ?? null,
+    friendId: body.friendId ?? null,
+  });
 });
 
 friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'admin'), async (c) => {

@@ -68,7 +68,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_AUDIENCE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -81,16 +81,18 @@ import {
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
+  OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
-  BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
+  BOOKING_MENUS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
-  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
+  NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
@@ -100,7 +102,7 @@ import {
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_COMMENTS, WEBINAR_ANALYTICS,
-  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
+  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS, WEBINAR_VIDEO_ASSET,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
@@ -120,6 +122,17 @@ const HOST = '127.0.0.1'
 
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+
+// J-1・N 撮影用。動画の準備の段と開催回の定員を同じプロセス内で保存結果として返す。
+let mockVideoAsset = WEBINAR_VIDEO_ASSET ? { ...WEBINAR_VIDEO_ASSET } : null
+let mockSessionCapacity = 50
+
+// R25専用。回答フォームの箱も作る・直す・消すを見本で返す。
+let formFolders = FORM_FOLDERS.map((folder) => ({ ...folder }))
+// R37 撮影用。登録メディア・共通情報のフォルダ名変更・削除を同じ
+// プロセス内で保存結果として返す。
+let mediaFolders = MEDIA_FOLDERS.map((folder) => ({ ...folder }))
+let commonVarFolders = COMMON_VAR_FOLDERS.map((folder) => ({ ...folder }))
 
 // 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
@@ -591,11 +604,53 @@ const DASHBOARD_PREFERENCES = {
     ],
     right: [
       ...['send-quota', 'operational-alerts', 'connection-status', 'support-mark-status',
-        'friend-status', 'upcoming', 'monthly-delivery', 'recent-results'].map((id) => ({ id, visible: true })),
+        'friend-status', 'upcoming', 'delivery-failures', 'monthly-delivery', 'recent-results'].map((id) => ({ id, visible: true })),
       ...['booking-status', 'inflow-top', 'funnel-alert', 'automation-failures'].map((id) => ({ id, visible: false })),
     ],
   },
 }
+
+/**
+ * M (今後の予定)の見本。型は `api.ts` の `DashboardUpcoming` どおり。
+ * 予約配信・リマインダー・予約を時刻順に並べた形。
+ */
+const DASHBOARD_UPCOMING = {
+  items: [
+    { kind: 'reminder', id: 'fr-1', title: '来店前日（あおい）', startsAt: `${FIXED_TO}T01:00:00.000Z`, href: '/reminders' },
+    { kind: 'broadcast', id: 'bc-1', title: '秋の案内', startsAt: `${FIXED_TO}T02:00:00.000Z`, href: '/broadcasts' },
+    { kind: 'booking', id: 'bk-1', title: '相談30分（あおい）', startsAt: `${FIXED_TO}T03:00:00.000Z`, href: '/booking/bookings?view=list' },
+  ],
+  asOf: `${FIXED_TO}T00:00:00.000Z`,
+  rangeDays: 7,
+}
+
+/**
+ * L (#824 数字の出どころ)の見本。型は `api.ts` の `DeliveryFailureOrigins` どおり。
+ * 同じ失敗は1件・送り直しは数えない形（合計3件）。
+ */
+const DASHBOARD_DELIVERY_FAILURE_ORIGINS = {
+  total: 3,
+  asOf: `${FIXED_TO}T11:50:00.000Z`,
+  origins: [
+    { source: 'broadcast.failed', failures: 2, latestFailedAt: `${FIXED_TO}T11:50:00.000Z`, sampleDeliveryIds: ['delivery-a', 'delivery-b'] },
+    { source: 'scenario.failed', failures: 1, latestFailedAt: `${FIXED_TO}T10:20:00.000Z`, sampleDeliveryIds: ['delivery-c'] },
+  ],
+}
+
+/** M (止めた経路のQR)の印刷用PDFの見本。A4・1枚の骨組みだけ。 */
+const QR_PRINT_PDF_SAMPLE = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] >>
+endobj
+trailer
+<< /Size 4 /Root 1 0 R >>
+%%EOF`
 
 const DASHBOARD_OVERVIEW = {
   period: 'today',
@@ -1178,6 +1233,7 @@ const SHAPES = {
   */
   '/api/analytics/report-schedules': {
     items: [],
+    recentOneTime: [],
     options: {
       timeZone: 'Asia/Tokyo',
       savedAnalyses: [
@@ -1287,8 +1343,18 @@ function visualQaWriteBody(method, pathname) {
    * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
    * 本番と同じ器（`{success:true,data}`）で固定の返事を返す。
    */
-  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) return REMINDER_DRAFT
+  /*
+   * 対象者ステップはどのIDで開いても描けるように、要求のIDをそのまま返す。
+   * 固定の `reminder-3` を返すと、別ID（例 `reminder-1`）では画面の
+   * 照合（`draft.reminderId === reminderId`）に落ち、いつまでも
+   * 「下書きを読み込んでいます」になる。F-1 の撮影は ID を変えて行う。
+   */
+  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
+    const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    return { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId }
+  }
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/audience$/.test(pathname)) return REMINDER_AUDIENCE
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
@@ -1436,6 +1502,25 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/slots$/.test(pathname)) {
     return { items: EVENT_SLOTS }
   }
+  /* U: 変更の確認・状態・待ちの手動操作・LIFF開催回変更の見本（実APIと同じ器）。 */
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/lifecycle$/.test(pathname)) {
+    return EVENT_LIFECYCLE_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review$/.test(pathname)) {
+    return EVENT_CHANGE_PREVIEW
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review\/apply$/.test(pathname)) {
+    return EVENT_CHANGE_APPLY_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/occurrences\/[^/]+\/waitlist\/reorder$/.test(pathname)) {
+    return EVENT_WAITLIST_REORDER_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/occurrences\/[^/]+\/waitlist\/skip$/.test(pathname)) {
+    return EVENT_WAITLIST_SKIP_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(pathname)) {
+    return EVENT_LIFF_CHANGE_RESULT
+  }
   if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
     return EVENT_SLOTS[0]
   }
@@ -1449,7 +1534,7 @@ function visualQaWriteBody(method, pathname) {
 const RAW = {
   // `0.0.0-dev` のときはバナー自体を出さない。manifest も見に行かない。
   //（update-banner.tsx の DEV_VERSION と同じ値でないと効かない）
-  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '' },
+  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '', git_commit: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', deploy_env: 'staging', released_at: '2026-09-27T04:05:00.000Z' },
   '/admin/manifest': { releases: [], versions: [] },
 
   /*
@@ -1504,6 +1589,13 @@ const RAW = {
  */
 const RAW_PATTERNS = [
   [/^\/api\/booking\/admin\/bookings\/[^/]+$/, BOOKING_ADMIN_DETAIL],
+  [/^\/api\/booking\/admin\/menus\/[^/]+\/versions$/, { versions: BOOKING_MENU_VERSIONS }],
+  [/^\/api\/booking\/admin\/menus\/[^/]+\/versions\/\d+$/, (url) => {
+    const wanted = Number(url.pathname.split('/').pop())
+    const version = BOOKING_MENU_VERSIONS.find((item) => item.version_number === wanted)
+      ?? BOOKING_MENU_VERSIONS[0]
+    return { version }
+  }],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/menus$/, (url) => ({
     matrix: BOOKING_STAFF_MENUS[url.pathname.split('/')[5]] ?? [],
   })],
@@ -1991,6 +2083,34 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/analytics/saved') {
     return { success: true, data: ANALYTICS_SAVED }
   }
+  /* R454: 1回送信の履歴と送り直し。型どおりの器で返す。 */
+  const reportRuns = /^\/api\/analytics\/report-schedules\/([^/]+)\/runs$/.exec(pathname)
+  if (method === 'GET' && reportRuns) {
+    return {
+      success: true,
+      data: {
+        schedule: {
+          id: reportRuns[1], lineAccountId: 'visual-qa-account', name: '1回送信の見本',
+          sections: ['friends'], savedAnalysisIds: [], cadence: 'weekly', weekday: 1,
+          monthDay: null, sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+          recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }],
+          channels: ['email'], alertRules: [], status: 'archived', isOneTime: true,
+          nextRunAt: '2026-09-07T00:00:00.000Z', createdBy: null,
+          createdAt: '2026-09-06T00:00:00.000Z', updatedAt: '2026-09-07T01:00:00.000Z',
+        },
+        runs: [{
+          id: 'visual-run-1', scheduleId: reportRuns[1], lineAccountId: 'visual-qa-account',
+          scheduledFor: '2026-09-07T00:00:00.000Z', periodFrom: '2026-08-31', periodTo: '2026-09-06',
+          timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-09-07T00:00:00.000Z', state: 'failed',
+          result: {}, deliveryResults: [{ channel: 'email', recipient: 'report@example.com', status: 'failed', reason: '見本の失敗' }],
+          errorCode: 'synthetic_mail_failed', startedAt: '2026-09-07T00:00:00.000Z', completedAt: '2026-09-07T00:01:00.000Z',
+        }],
+      },
+    }
+  }
+  if (method === 'POST' && /^\/api\/analytics\/report-schedules\/[^/]+\/retry$/.test(pathname)) {
+    return { success: true, data: null }
+  }
   const savedSnapshots = /^\/api\/analytics\/saved\/([^/]+)\/snapshots$/.exec(pathname)
   if (savedSnapshots) {
     const saved = ANALYTICS_SAVED.find((item) => item.id === savedSnapshots[1])
@@ -2178,6 +2298,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: DASHBOARD_PREFERENCES }
   }
+  // M (今後の予定)・L (#824 数字の出どころ)の見本。型どおりの名前で返す。
+  if (pathname === '/api/dashboard/upcoming') return { success: true, data: DASHBOARD_UPCOMING }
+  if (pathname === '/api/dashboard/delivery-failure-origins') {
+    return { success: true, data: DASHBOARD_DELIVERY_FAILURE_ORIGINS }
+  }
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
   // 受信箱（設計 `xGLVe`）。空で返すと一覧も吹き出しも出ない。
@@ -2343,6 +2468,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
     return { success: true, data: null }
   }
+  // P: 公開前の試し合言葉の発行。生の値はこの応答でしか返らない。
+  const formTestToken = method === 'POST' && /^\/api\/forms\/([^/]+)\/test-token$/.exec(pathname)
+  if (formTestToken) {
+    return { success: true, data: { token: 'test-token-qa', expiresAt: '2026-09-28T15:00:00.000+09:00' } }
+  }
+  // R230: フォーム全体の複製。絵の検証用に新しい下書き（受付停止）を返す。
+  const formDuplicate = method === 'POST' && /^\/api\/forms\/([^/]+)\/duplicate$/.exec(pathname)
+  if (formDuplicate) {
+    return { success: true, data: { id: 'form-duplicate-qa', isActive: false } }
+  }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }
@@ -2365,7 +2500,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { ...FORM_SUBMISSIONS, items: FORM_SUBMISSIONS.items.slice(start, start + safeLimit), page: safePage, limit: safeLimit } }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'form') {
-    return { success: true, data: FORM_FOLDERS }
+    // R25: 作った箱も同じプロセス内では返す（webinar と同じ流儀）。
+    return { success: true, data: formFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
@@ -2390,10 +2526,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
-    return { success: true, data: COMMON_VAR_FOLDERS }
+    return { success: true, data: commonVarFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
-    return { success: true, data: MEDIA_FOLDERS }
+    return { success: true, data: mediaFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
     const accountId = query.get('account_id')
@@ -2473,8 +2609,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /*
+   * 対象者の画面が読む口（条件・人数・顔ぶれ・数え直し）の見本。
+   * 下書きは要求のIDをそのまま返す。固定IDだと別IDの撮影が
+   * 照合に落ち、F-1（条件を足す・変える・消す・人数がすぐ変わる・
+   * 顔ぶれを見る）を確かめられない。人数・顔ぶれ・数え直しは
+   * `REMINDER_VALIDATE` / `REMINDER_AUDIENCE` が固定で返す。
+   */
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
-    return { success: true, data: REMINDER_DRAFT }
+    const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    return { success: true, data: { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId } }
   }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
   if (reminderOne) {
@@ -2575,6 +2719,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         .sort((left, right) => left.sortOrder - right.sortOrder),
     }
   }
+  // R250: 終了後の移動先にしているシナリオの一覧。型どおり `{items,total}`。
+  const scenarioMoveReferrers = pathname.match(/^\/api\/scenarios\/([^/]+)\/move-referrers$/)
+  if (scenarioMoveReferrers) return { success: true, data: { items: [], total: 0 } }
   const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)
   if (scenario) {
     // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。
@@ -2961,6 +3108,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
+  // #823 案件の決まりの版・上限の残り・成果の付け方の記録。
+  const offerVersions = /^\/api\/affiliate-offers\/([^/]+)\/versions$/.exec(pathname)
+  if (offerVersions) return { success: true, data: OFFER_VERSIONS }
+  const offerCapStatus = /^\/api\/affiliate-offers\/([^/]+)\/cap-status$/.exec(pathname)
+  if (offerCapStatus) return { success: true, data: OFFER_CAP_STATUS }
+  const conversionAttribution = /^\/api\/conversions\/events\/([^/]+)\/attribution$/.exec(pathname)
+  if (conversionAttribution) return { success: true, data: ATTRIBUTION_DECISION }
   if (pathname === '/api/common-actions') {
     const status = query.get('status')
     const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
@@ -3154,6 +3308,37 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: NEN_PHOTO_DERIVATIVES }
   }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
+  // #817: 報酬の決まりの版。新しい版から返す。
+  if (pathname === '/api/nen-members/photo-reward-policy/versions') {
+    return { success: true, data: NEN_PHOTO_REWARD_POLICY_VERSIONS }
+  }
+  // #817: 新しい版を作る・この版に戻す。過去の版は変えず、新しい版を作る。
+  if (method === 'POST' && pathname === '/api/nen-members/photo-reward-policy/versions') {
+    return {
+      success: true,
+      data: {
+        created: true,
+        version: {
+          versionNumber: 5, policyKey: 'v5', points: 10,
+          summary: '報酬を5pt→10ptに', effectiveFrom: null,
+          createdAt: '2026-09-27T10:00:00+09:00',
+        },
+      },
+    }
+  }
+  if (method === 'POST' && pathname === '/api/nen-members/photo-reward-policy/revert') {
+    return {
+      success: true,
+      data: {
+        created: true,
+        version: {
+          versionNumber: 5, policyKey: 'v5', points: 5,
+          summary: '最初の報酬の決まり', effectiveFrom: null,
+          createdAt: '2026-09-27T10:00:00+09:00',
+        },
+      },
+    }
+  }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
   /* 取り込みの記録。`?view=actions` は処理1件ずつの形（`ec-commerce.ts`）。 */
   if (pathname === '/api/ec-commerce/events') {
@@ -3226,6 +3411,45 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
+  /*
+   * 要対応の交換の一覧。型どおりの名前（items/pagination）で返す。
+   * 失敗中と送ったか分からない配送中（照合待ち）を混ぜ、21件以上でも
+   * limit/offset で残りを出せる見本にする（R364・R365）。
+   */
+  if (pathname === '/api/mileage/redemptions') {
+    const limit = Math.min(100, Math.max(1, Number(query.get('limit') || 20)))
+    const offset = Math.max(0, Number(query.get('offset') || 0))
+    const items = [
+      {
+        id: 'mock-redemption-1', rewardName: '500円ぶんのクーポン', status: 'delivery_failed',
+        attemptCount: 2, failureCode: 'reward_delivery_failed',
+        failureMessage: '特典を渡せませんでした。時間をおいてもう一度お試しください。',
+        updatedAt: '2026-09-09T01:02:03.000Z',
+      },
+      {
+        id: 'mock-redemption-2', rewardName: '送料無料', status: 'delivering',
+        attemptCount: 1, failureCode: null, failureMessage: null,
+        updatedAt: '2026-09-09T02:03:04.000Z',
+      },
+    ]
+    return {
+      success: true,
+      data: {
+        items: items.slice(offset, offset + limit),
+        pagination: { total: items.length, limit, offset },
+      },
+    }
+  }
+  if (method === 'POST' && /^\/api\/mileage\/redemptions\/[^/]+\/retry-fulfillment$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        status: 'succeeded', rewardName: '500円ぶんのクーポン', customerMessage: '交換できました',
+        rewardCode: null, retryAt: null, failurePolicy: 'retry', message: null,
+        redemption: { id: pathname.split('/')[4], status: 'succeeded' },
+      },
+    }
+  }
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
   if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
   if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
@@ -3715,6 +3939,24 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/webinars\/[^/]+\/comments$/.test(pathname)) return { success: true, data: WEBINAR_COMMENTS }
   if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
   if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
+  if (/^\/api\/webinars\/[^/]+\/video-asset$/.test(pathname)) {
+    return { success: true, data: { asset: mockVideoAsset } }
+  }
+  if (/^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(pathname)) {
+    const startAt = Number(pathname.split('/').pop())
+    const capacity = mockSessionCapacity
+    const reservedCount = 3
+    return {
+      success: true,
+      data: {
+        session: {
+          sessionStartAt: startAt, capacity, reservedCount,
+          state: capacity !== null && reservedCount >= capacity ? 'full' : 'open',
+          remaining: capacity === null ? null : Math.max(0, capacity - reservedCount),
+        },
+      },
+    }
+  }
   if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
     /*
       ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
@@ -3920,6 +4162,25 @@ const server = createServer((req, res) => {
   //
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
+  // M (止めた経路のQR): 印刷用PDFの見本。止めた経路は409で出さない。
+  const qrPdf = /^\/api\/entry-routes\/([^/]+)\/qr-pdf$/.exec(url.pathname)
+  if (method === 'POST' && qrPdf) {
+    const route = ENTRY_ROUTES.find((item) => item.id === qrPdf[1])
+    if (!route) {
+      res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+      return
+    }
+    if (!route.isActive) {
+      res.writeHead(409).end(JSON.stringify({ success: false, error: 'この経路は停止しています' }))
+      return
+    }
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="qr-${route.refCode}.pdf"`)
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(QR_PRINT_PDF_SAMPLE)
+    return
+  }
+
   if (method !== 'GET') {
     const formWriteRequest = (
       (method === 'POST' && (url.pathname === '/api/forms/drafts'
@@ -3929,6 +4190,51 @@ const server = createServer((req, res) => {
     )
     if (formWriteRequest) {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
+    // J-1・N 撮影用。動画の準備の段と開催回の定員の保存を見本で返す。
+    if (
+      (method === 'POST' && /^\/api\/webinars\/[^/]+\/video-asset\/advance$/.test(url.pathname)) ||
+      (method === 'PUT' && /^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(url.pathname))
+    ) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (/video-asset\/advance$/.test(url.pathname)) {
+          const stage = typeof body.stage === 'string' ? body.stage : mockVideoAsset?.stage ?? 'uploaded'
+          const labels = {
+            uploaded: '受け付け', inspecting: '検査', converting: '変換',
+            packaging: '配信の形', thumbnail: '表紙', ready: '準備完了', failed: '失敗',
+          }
+          mockVideoAsset = mockVideoAsset
+            ? { ...mockVideoAsset, stage, stageLabel: labels[stage] ?? stage }
+            : {
+              id: 'video-asset-1', stage, stageLabel: labels[stage] ?? stage, provider: 'r2_hls',
+              durationSeconds: 0, errorCode: null, expiresAt: null, purgedAt: null,
+              createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+            }
+          res.writeHead(200).end(JSON.stringify({ success: true, data: { asset: mockVideoAsset } }))
+          return
+        }
+        const capacity = body.capacity === undefined || body.capacity === null
+          ? null
+          : Math.floor(Number(body.capacity))
+        mockSessionCapacity = Number.isInteger(capacity) && capacity >= 1 ? capacity : null
+        const startAt = Number(url.pathname.split('/').pop())
+        const reservedCount = 3
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: {
+            session: {
+              sessionStartAt: startAt, capacity: mockSessionCapacity, reservedCount,
+              state: mockSessionCapacity !== null && reservedCount >= mockSessionCapacity ? 'full' : 'open',
+              remaining: mockSessionCapacity === null ? null : Math.max(0, mockSessionCapacity - reservedCount),
+            },
+          },
+        }))
+      })
       return
     }
     if (/^\/api\/(mileage\/(rules|rewards|adjustments)|action-scores\/rules)/.test(url.pathname)) {
@@ -3952,6 +4258,27 @@ const server = createServer((req, res) => {
       req.on('end', () => {
         let body = {}
         try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        // R25: 回答フォームの箱も見本で作れるようにする（本物と同じ器）。
+        if (body.kind === 'form') {
+          if (!body.accountId || !String(body.name ?? '').trim()) {
+            res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダの内容を確認してください' }))
+            return
+          }
+          const folder = {
+            id: `form-folder-${formFolders.length + 1}`,
+            kind: 'form',
+            accountId: body.accountId,
+            name: String(body.name).trim(),
+            parentId: null,
+            displayOrder: formFolders.length,
+            color: body.color ?? null,
+            createdAt: '2026-09-27T00:00:00.000Z',
+            updatedAt: '2026-09-27T00:00:00.000Z',
+          }
+          formFolders = [...formFolders, folder]
+          res.writeHead(201).end(JSON.stringify({ success: true, data: folder }))
+          return
+        }
         if (body.kind !== 'webinar') {
           res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
           return
@@ -3978,7 +4305,47 @@ const server = createServer((req, res) => {
       return
     }
     const webinarFolderPath = /^\/api\/folders\/([^/]+)$/.exec(url.pathname)
-    if (method === 'PATCH' && webinarFolderPath) {
+    // R25: webinar の箱と回答フォームの箱で見本を分ける。IDだけでは
+    // 種類が分からないため、先にどちら側の箱かを見てから振り分ける。
+    // R37 撮影用。登録メディア・共通情報のフォルダ名変更・削除もここで受け、
+    // 本番口と同じ形（PATCH は更新後、DELETE は data: null）で返す。
+    // ウェビナー・回答フォームの箱は後の口へ通す。
+    const webinarFolderId = webinarFolderPath ? decodeURIComponent(webinarFolderPath[1]) : null
+    const isWebinarFolder = webinarFolderId !== null && webinarFolders.some((folder) => folder.id === webinarFolderId)
+    // R25: 回答フォームの箱は後の口（formFolderPath）へ通す。
+    const isFormFolder = webinarFolderId !== null && formFolders.some((folder) => folder.id === webinarFolderId)
+    if ((method === 'PATCH' || method === 'DELETE') && webinarFolderPath && !isWebinarFolder && !isFormFolder) {
+      const mediaCommonId = decodeURIComponent(webinarFolderPath[1])
+      const target = mediaFolders.find((item) => item.id === mediaCommonId)
+        ?? commonVarFolders.find((item) => item.id === mediaCommonId)
+      if (!target) {
+        res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+        return
+      }
+      if (method === 'DELETE') {
+        mediaFolders = mediaFolders.filter((item) => item.id !== mediaCommonId)
+        commonVarFolders = commonVarFolders.filter((item) => item.id !== mediaCommonId)
+        res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+        return
+      }
+      let mediaCommonRaw = ''
+      req.on('data', (chunk) => { mediaCommonRaw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(mediaCommonRaw || '{}') } catch { body = {} }
+        const name = String(body.name ?? '').trim()
+        if (!name) {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダ名を入力してください' }))
+          return
+        }
+        target.name = name
+        target.updatedAt = '2026-09-27T10:00:00.000Z'
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { ...target } }))
+      })
+      return
+    }
+    // R25: ウェビナーの箱だけここで直す。回答フォームの箱は後の口へ通す。
+    if (method === 'PATCH' && webinarFolderPath && isWebinarFolder) {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })
       req.on('end', () => {
@@ -4002,7 +4369,7 @@ const server = createServer((req, res) => {
       })
       return
     }
-    if (method === 'DELETE' && webinarFolderPath) {
+    if (method === 'DELETE' && webinarFolderPath && isWebinarFolder) {
       const id = decodeURIComponent(webinarFolderPath[1])
       const accountId = url.searchParams.get('account_id')
       const folder = webinarFolders.find((item) => item.id === id && item.accountId === accountId)
@@ -4012,6 +4379,48 @@ const server = createServer((req, res) => {
       }
       webinarFolders = webinarFolders.filter((item) => item.id !== id)
       res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
+    // R25: 回答フォームの箱の直し・消し・並べ替えの見本（本物と同じ器）。
+    const formFolderPath = /^\/api\/folders\/([^/]+)(\/swap-order)?$/.exec(url.pathname)
+    if (method === 'PATCH' && formFolderPath && !formFolderPath[2]) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const id = decodeURIComponent(formFolderPath[1])
+        const index = formFolders.findIndex((folder) => folder.id === id)
+        if (index < 0) {
+          res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+          return
+        }
+        const folder = {
+          ...formFolders[index],
+          ...(typeof body.name === 'string' && body.name.trim() ? { name: body.name.trim() } : {}),
+          ...('color' in body ? { color: body.color ?? null } : {}),
+          updatedAt: '2026-09-27T00:01:00.000Z',
+        }
+        formFolders = formFolders.map((item, itemIndex) => itemIndex === index ? folder : item)
+        res.writeHead(200).end(JSON.stringify({ success: true, data: folder }))
+      })
+      return
+    }
+    if (method === 'DELETE' && formFolderPath && !formFolderPath[2]) {
+      const id = decodeURIComponent(formFolderPath[1])
+      // 中身（フォーム）は消さず、箱だけ消す。本物と同じく未分類に戻る。
+      formFolders = formFolders.filter((item) => item.id !== id)
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
+    if (method === 'POST' && formFolderPath && formFolderPath[2] === '/swap-order') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { swapped: [decodeURIComponent(formFolderPath[1]), body.withId ?? null] } }))
+      })
       return
     }
     if (method === 'POST' && url.pathname === '/api/conversions/definitions/preview') {
@@ -4532,6 +4941,69 @@ const server = createServer((req, res) => {
         return
       }
       res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    // K-1・O-1: 公開の進みと公開前の確認の見本（本物と同じ器）。
+    const richMenuProgress = /^\/api\/rich-menu-groups\/([^/]+)\/publish-progress$/.exec(url.pathname)
+    if (method === 'GET' && richMenuProgress) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        run: { id: 'visual-qa-run', mode: 'publish', status: 'failed', startedAt: '2026-09-27T10:00:00+09:00', completedAt: '2026-09-27T10:01:00+09:00' },
+        steps: [
+          { key: 'image', label: '画像をLINEに上げる', status: 'done' },
+          { key: 'menu', label: 'メニューを作る', status: 'done' },
+          { key: 'assign', label: '友だちに割り当てる', status: 'failed' },
+          { key: 'cleanup', label: '前のメニューを片付ける', status: 'pending' },
+        ],
+        message: '割り当てに失敗したので、作ったメニューをLINEから消し、前のメニューのままにしました。もう一度公開できます。',
+      } }))
+      return
+    }
+    const richMenuPrecheck = /^\/api\/rich-menu-groups\/([^/]+)\/prepublish-check$/.exec(url.pathname)
+    if (method === 'GET' && richMenuPrecheck) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        fingerprint: 'visual-qa-fp',
+        pageCount: 2,
+        maxPages: 10,
+        selfCheck: { ok: true, message: '自前の検査を通りました。' },
+        deviceConfirmed: false,
+        deviceConfirmedAt: null,
+        versionNumber: null,
+      } }))
+      return
+    }
+    const richMenuValidate = /^\/api\/rich-menu-groups\/([^/]+)\/validate$/.exec(url.pathname)
+    if (method === 'POST' && richMenuValidate) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        checks: [
+          { key: 'self', ok: true, message: '自前の検査を通りました。' },
+          { key: 'line', ok: true, message: 'LINEの検査を通りました。' },
+        ],
+      } }))
+      return
+    }
+    const richMenuDevice = /^\/api\/rich-menu-groups\/([^/]+)\/device-confirm$/.exec(url.pathname)
+    if (method === 'POST' && richMenuDevice) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        confirmedAt: '2026-09-27T10:00:00+09:00', fingerprint: 'visual-qa-fp',
+      } }))
+      return
+    }
+    // K-2: 照合の見本。ずれの種類ごとの直し方（fix）つき。
+    const richMenuReconcile = /^\/api\/rich-menu-groups\/([^/]+)\/reconcile$/.exec(url.pathname)
+    if (method === 'POST' && richMenuReconcile) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let dryRun = true
+        try { dryRun = JSON.parse(raw || '{}').dryRun !== false } catch { dryRun = true }
+        const diffs = [
+          { kind: 'external_only', detail: 'LINEにだけあるメニュー「別で作ったメニュー」（rm-external-1）があります', richMenuId: 'rm-external-1', fix: { label: 'こちらに取り込む', action: 'import-external' } },
+          { kind: 'default_mismatch', detail: 'LINEの全員既定がこのメニューを指していません（現在: rm-other-9）', richMenuId: 'rm-other-9', fix: { label: 'こちらに合わせる', action: 'relink-default' } },
+        ]
+        res.writeHead(200).end(JSON.stringify({ success: true, data: dryRun
+          ? { dryRun: true, diffs }
+          : { dryRun: false, diffs, applied: 1, failed: [], unapplied: [{ diff: diffs[0], reason: '取り込みは「外部メニューの取り込み」画面で運用者が行います' }], runId: 'visual-qa-reconcile-run' } }))
+      })
       return
     }
     const richMenuWriteAction = /^\/api\/rich-menu-groups\/([^/]+)\/(publish|unpublish|schedule|apply-to-tag)$/.exec(url.pathname)

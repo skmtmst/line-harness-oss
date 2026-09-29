@@ -143,8 +143,56 @@ describe('GET /api/nen/pets（★V6 37-3 マイペット）', () => {
     expect(paged.body.data).toMatchObject({ page: 2, pageSize: 2, total: 3 });
     expect(paged.body.data.items.map((p: any) => p.name)).toEqual(['タロウ']);
     const all = await get(`/api/nen/pets?accountId=${ACCOUNT}&pageSize=all`);
-    expect(all.body.data.pageSize).toBe(3000);
+    expect(all.body.data.pageSize).toBe(3);
     expect(all.body.data.items).toHaveLength(3);
+  });
+
+  it('表示中の主食（既定フードへのフォールバック）で絞り込める。未設定は解決後も商品が無い子だけ（監査 R58）', async () => {
+    // モモとタロウは主食未設定だが、一覧には既定の「鹿肉ミンチ」が出る。
+    // かつては保存値だけを見て絞り込んでいたため、この2頭がどの絞り込みにも出なかった。
+    const mince = await get(`/api/nen/pets?accountId=${ACCOUNT}&product=prod-mince`);
+    expect(mince.body.data.items.map((p: any) => p.name).sort()).toEqual(['タロウ', 'モモ']);
+
+    const none = await get(`/api/nen/pets?accountId=${ACCOUNT}&product=none`);
+    expect(none.body.data.items).toHaveLength(0);
+
+    // 主食そのものを消すと、表示「（未設定）」の子だけが残る。
+    sql.exec(`DELETE FROM nen_feeding_products`);
+    const noneAfterDelete = await get(`/api/nen/pets?accountId=${ACCOUNT}&product=none`);
+    expect(noneAfterDelete.body.data.items.map((p: any) => p.name).sort()).toEqual(['タロウ', 'ハナ', 'モモ']);
+  });
+
+  it('3,000頭を超えるペットも検索・件数・全件出力に含まれる（監査 R60）', async () => {
+    const insert = sql.prepare(`INSERT INTO nen_pet_profiles (id, friend_id, name, animal_type, created_at, updated_at)
+      VALUES (?, 'friend-a', ?, 'dog', '2026-09-01', '2026-09-01')`);
+    for (let i = 0; i < 3000; i++) insert.run(`pet-bulk-${i}`, `まとめ${i}`);
+    insert.run('pet-bulk-last', 'おしまいの子');
+
+    const { body } = await get(`/api/nen/pets?accountId=${ACCOUNT}&q=おしまい`);
+    expect(body.data.items.map((p: any) => p.name)).toEqual(['おしまいの子']);
+
+    const all = await get(`/api/nen/pets?accountId=${ACCOUNT}&pageSize=all`);
+    expect(all.body.data.total).toBe(3004);
+    expect(all.body.data.items).toHaveLength(3004);
+    expect(all.body.data.kpis.total).toBe(3004);
+  });
+
+  it('体重の更新は「測った日」で判断する。プロフィールの編集日では動かない（監査 R57）', async () => {
+    // 体重を測った日は古いまま、名前などの編集でプロフィールだけが
+    // 最近更新された状態を再現する。かつては更新日を見ていたため
+    // 名前の直しで「未更新」が外れてしまっていた。
+    sql.exec(`UPDATE nen_pet_profiles SET weight_updated_at = '${stamp(120)}', updated_at = '${stamp(1)}' WHERE id = 'pet-momo'`);
+
+    const { body } = await get(`/api/nen/pets?accountId=${ACCOUNT}`);
+    const momo = body.data.items.find((p: any) => p.name === 'モモ');
+    expect(momo.weightUpdatedAt.slice(0, 10)).toBe(day(120));
+    expect(momo.weightStale).toBe(true);
+    expect(body.data.kpis.staleWeight).toBe(2);
+
+    const fresh = await get(`/api/nen/pets?accountId=${ACCOUNT}&weight=fresh`);
+    expect(fresh.body.data.items.map((p: any) => p.name)).toEqual(['ハナ']);
+    const stale = await get(`/api/nen/pets?accountId=${ACCOUNT}&weight=stale`);
+    expect(stale.body.data.items.map((p: any) => p.name).sort()).toEqual(['タロウ', 'モモ']);
   });
 
   it('accountId 無しは 400、別テナントのアカウントは 403', async () => {

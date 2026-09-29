@@ -2,9 +2,12 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Chip from '@/components/shared/chip'
 import LinePreview from '@/components/shared/line-preview'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import SelectField from '@/components/shared/select-field'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
 import Stepper from '@/components/shared/stepper'
 import Notice from '@/components/shared/notice'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -50,7 +53,7 @@ export type RichMenuCreateValue = {
 }
 
 export const STORE_NEW_MENU_INTENTS: RichMenuAreaIntent[] = [
-  'url', 'text', 'template', 'form', 'tel', 'postback',
+  'url', 'text', 'template', 'form', 'tel', 'postback', 'datetime', 'clipboard',
 ]
 
 /**
@@ -103,14 +106,19 @@ const TEMPLATE_LABELS: Record<string, string> = {
 export function RichMenuTemplatePreview({ template }: { template: RichMenuTemplate }) {
   const dims = SIZE_DIMENSIONS[template.size]
   const inset = dims.width * 0.006
+  /*
+   * 面の記号（A・B…）は面の位置を示すため、座標は変えない。
+   * 大きさだけ実表示に合わせた px 指定にする。SVG 内の単位のまま
+   * （200px超）書くと、計算上の大きな文字として読まれる。
+   */
   return (
     <svg viewBox={`0 0 ${dims.width} ${dims.height}`} className="border-hairline bg-canvas-sunken w-full rounded border" role="img" aria-label={`${template.label} の面の分けかた`}>
       {template.areas.length === 0 ? (
-        <text x={dims.width / 2} y={dims.height / 2} textAnchor="middle" dominantBaseline="central" fontSize={dims.height / 7} style={{ fill: 'var(--color-ink-faint)' }}>自由に配置</text>
+        <text x={dims.width / 2} y={dims.height / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(10px, 0.85vw, 16px)', fill: 'var(--color-ink-faint)' }}>自由に配置</text>
       ) : template.areas.map((area, index) => (
         <g key={index}>
           <rect x={area.x + inset} y={area.y + inset} width={Math.max(0, area.w - inset * 2)} height={Math.max(0, area.h - inset * 2)} rx={dims.width * 0.008} strokeWidth={dims.width * 0.004} style={{ fill: 'var(--color-accent-soft)', stroke: 'var(--color-accent)' }} />
-          <text x={area.x + area.w / 2} y={area.y + area.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={dims.height / 8} style={{ fill: 'var(--color-ink-secondary)', fontWeight: 700 }}>{String.fromCharCode(65 + index)}</text>
+          <text x={area.x + area.w / 2} y={area.y + area.h / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(9px, 0.75vw, 14px)', fill: 'var(--color-ink-secondary)', fontWeight: 700 }}>{String.fromCharCode(65 + index)}</text>
         </g>
       ))}
     </svg>
@@ -236,17 +244,22 @@ export default function RichMenuCreateForm({
       {compatibilityError || validationError ? <Notice tone="danger" className="mt-4">{compatibilityError ?? validationError}</Notice> : null}
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-4">
         <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">
+          {/*
+            m18s: 3欄は均等（2/2/2）に割る。フォルダの選択欄は決まった幅
+            （176px）を持つため、1/6幅では隣の入力欄へはみ出して枠線が隠れる。
+            選択欄は欄いっぱい（size="full"）にし、1152pxでも重ならない。
+          */}
           <div className="grid gap-3 lg:grid-cols-6">
-            <div className="lg:col-span-3">
+            <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-name">メニュー名<RequiredBadge /></label>
               <input id="rich-menu-name" value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} aria-required="true" aria-invalid={Boolean(nameError)} aria-describedby={nameError ? 'rich-menu-name-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
               {nameError ? <p id="rich-menu-name-error" role="alert" className="text-danger mt-1 text-xs">{nameError}</p> : <p className="text-ink-faint mt-1 text-xs">管理画面での識別用です。友だちには表示されません。</p>}
             </div>
-            <div className="lg:col-span-1">
+            <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-folder">フォルダ</label>
-              <SelectField id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(event) => patch({ folderId: event.target.value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              <Select id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(value) => patch({ folderId: value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} size="full" />
             </div>
-            <div className="lg:col-span-2">
+            <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-chat-bar-text">トーク画面下の文言</label>
               <input id="rich-menu-chat-bar-text" value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} aria-required="true" aria-invalid={Boolean(chatBarTextError)} aria-describedby={chatBarTextError ? 'rich-menu-chat-bar-text-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
               {chatBarTextError ? <p id="rich-menu-chat-bar-text-error" role="alert" className="text-danger mt-1 text-xs">{chatBarTextError}</p> : <p className="text-ink-faint mt-1 text-xs">14文字以内。メニューを開く前にトーク画面下に表示されます。</p>}
@@ -269,9 +282,9 @@ export default function RichMenuCreateForm({
           <div>
             <span className="text-ink-secondary mb-2 block text-sm font-medium">面の分けかた</span>
             <p className="text-ink-faint mb-3 text-xs">押せるところをいくつに分けるか。あとから編集画面で区切り直せます。</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-              {shownTemplates.map((item) => <label key={item.key} className={`rounded-control border p-2 transition-colors ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${value.templateKey === item.key ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><input type="radio" name="template" value={item.key} checked={value.templateKey === item.key} disabled={locked} onChange={(event) => selectTemplate(event.target.value)} className="sr-only" /><RichMenuTemplatePreview template={item} /><div className="text-ink mt-1 text-center text-xs font-medium">{TEMPLATE_LABELS[item.key] ?? item.label}</div></label>)}
-            </div>
+            <RadioCardGroup legend="面の分けかた" className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+              {shownTemplates.map((item) => <RadioCard key={item.key} name="template" value={item.key} checked={value.templateKey === item.key} disabled={locked} onChange={(selected) => selectTemplate(selected)} title={TEMPLATE_LABELS[item.key] ?? item.label} note={<RichMenuTemplatePreview template={item} />} />)}
+            </RadioCardGroup>
           </div>
 
           {/*
@@ -285,29 +298,38 @@ export default function RichMenuCreateForm({
               {value.tabCount > 0 ? (
                 <div>
                   <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-default-page">最初に見せるページ</label>
-                  <SelectField
+                  <Select
                     id="rich-menu-default-page"
                     aria-label="最初に見せるページ"
                     value={String(value.defaultPageIndex)}
                     disabled={locked}
-                    onChange={(event) => patch({ defaultPageIndex: Number(event.target.value) })}
+                    onChange={(value) => patch({ defaultPageIndex: Number(value) })}
                     options={createPages.map((page) => ({ value: page.id, label: page.name }))}
                   />
                   <p className="text-ink-faint mt-1 text-xs">タブを切り替えていない人が最初に見るページです。</p>
                 </div>
               ) : null}
               <div>
-                <span className="text-ink-secondary mb-1 block text-sm font-medium">出す相手</span>
-                <div className="space-y-2">
-                  <label className="flex items-start gap-2 text-sm">
-                    <input type="radio" name="create-audience" className="mt-1" checked={!value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: false })} />
-                    <span><span className="text-ink font-medium">すべての友だち</span><span className="text-ink-faint block text-xs">ほかの出し分けに当てはまらなかった人へ出ます</span></span>
-                  </label>
-                  <label className="flex items-start gap-2 text-sm">
-                    <input type="radio" name="create-audience" className="mt-1" checked={value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: true, isDefaultForAll: false })} />
-                    <span><span className="text-ink font-medium">条件に当てはまる友だちだけ</span><span className="text-ink-faint block text-xs">当てはまらない人には、これより下のメニューが出ます</span></span>
-                  </label>
-                </div>
+                <RadioCardGroup legend="出す相手" legendVisible className="grid gap-2 sm:grid-cols-2">
+                  <RadioCard
+                    name="create-audience"
+                    value="all"
+                    checked={!value.targetingEnabled}
+                    disabled={locked}
+                    onChange={() => patch({ targetingEnabled: false })}
+                    title="すべての友だち"
+                    note="ほかの出し分けに当てはまらなかった人へ出ます"
+                  />
+                  <RadioCard
+                    name="create-audience"
+                    value="targeted"
+                    checked={value.targetingEnabled}
+                    disabled={locked}
+                    onChange={() => patch({ targetingEnabled: true, isDefaultForAll: false })}
+                    title="条件に当てはまる友だちだけ"
+                    note="当てはまらない人には、これより下のメニューが出ます"
+                  />
+                </RadioCardGroup>
               </div>
             </div>
 
@@ -343,23 +365,17 @@ export default function RichMenuCreateForm({
               </div>
             ) : null}
 
-            <label className={`flex items-start gap-2 text-sm ${value.targetingEnabled ? 'opacity-50' : ''}`}>
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={value.isDefaultForAll}
-                disabled={locked || value.targetingEnabled}
-                onChange={(event) => patch({ isDefaultForAll: event.target.checked })}
-              />
-              <span>
-                <span className="text-ink font-medium">公開したら「すべての友だち」の既定メニューにする</span>
-                <span className="text-ink-faint block text-xs">
-                  {value.targetingEnabled
-                    ? '出し分けを選んだメニューは全員の既定にはできません。'
-                    : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
-                </span>
-              </span>
-            </label>
+            <Checkbox
+              className={value.targetingEnabled ? 'opacity-50' : ''}
+              checked={value.isDefaultForAll}
+              disabled={locked || value.targetingEnabled}
+              onCheckedChange={(checked) => patch({ isDefaultForAll: checked })}
+              description={value.targetingEnabled
+                ? '出し分けを選んだメニューは全員の既定にはできません。'
+                : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
+            >
+              公開したら「すべての友だち」の既定メニューにする
+            </Checkbox>
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -369,8 +385,8 @@ export default function RichMenuCreateForm({
 
           <section className="border-hairline bg-canvas-sunken rounded-card border p-4">
             <h2 className="text-ink mb-3 text-sm font-bold">押した面ごとの動き</h2>
-            <div className="space-y-2">{currentAreas.map((area, index) => <div key={area.id}><div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs"><strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong><span className="text-ink-secondary">{isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}</span><button type="button" disabled={locked} onClick={() => openAreaEditor(index)} className={`ml-auto font-semibold ${isAreaActionConfigured(area) ? 'text-action' : 'text-danger'}`}>{isAreaActionConfigured(area) ? '設定を変更する' : 'アクションを設定する'}</button></div>{editingAreaIndex === index && editingArea ? <div className="border-hairline bg-canvas mt-2 rounded-control border p-4"><AreaProperties area={editingArea} pages={createPages} tags={tags} templates={templates} forms={forms} trackedLinks={trackedLinks} taps={null} showManagementDetails={false} allowedIntents={allowedIntents} onUpdate={(areaPatch) => setEditingArea((current) => current ? { ...current, ...areaPatch } : current)} /><div className="mt-4 flex justify-end gap-2"><Button type="button" onClick={() => { setEditingAreaIndex(null); setEditingArea(null) }}>キャンセル</Button><Button type="button" variant="primary" onClick={saveEditingArea}>この面の設定を保存</Button></div></div> : null}</div>)}</div>
-            <p className={`mt-3 text-xs font-semibold ${unsetLabels.length > 0 ? 'text-danger' : 'text-success'}`}>{currentAreas.length === 0 ? '面を追加し、公開前にそれぞれのアクションを設定してください。' : unsetLabels.length > 0 ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。` : 'すべての面にアクションが設定されています。'}</p>
+            <div className="space-y-2">{currentAreas.map((area, index) => <div key={area.id}><div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs"><strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong><span className="text-ink-secondary">{isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}</span>{isAreaActionConfigured(area) ? null : <Chip tone="neutral">未設定</Chip>}<button type="button" disabled={locked} onClick={() => openAreaEditor(index)} className="ml-auto font-semibold text-action">{isAreaActionConfigured(area) ? '設定を変更する' : '設定する'}</button></div>{editingAreaIndex === index && editingArea ? <div className="border-hairline bg-canvas mt-2 rounded-control border p-4"><AreaProperties area={editingArea} pages={createPages} tags={tags} templates={templates} forms={forms} trackedLinks={trackedLinks} taps={null} showManagementDetails={false} allowedIntents={allowedIntents} onUpdate={(areaPatch) => setEditingArea((current) => current ? { ...current, ...areaPatch } : current)} /><div className="mt-4 flex justify-end gap-2"><Button type="button" onClick={() => { setEditingAreaIndex(null); setEditingArea(null) }}>キャンセル</Button><Button type="button" variant="primary" onClick={saveEditingArea}>この面の設定を保存</Button></div></div> : null}</div>)}</div>
+            <p className={`mt-3 text-xs font-semibold ${unsetLabels.length > 0 ? 'text-warning' : 'text-success'}`}>{currentAreas.length === 0 ? '面を追加し、公開前にそれぞれのアクションを設定してください。' : unsetLabels.length > 0 ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。` : 'すべての面にアクションが設定されています。'}</p>
           </section>
         </div>
 

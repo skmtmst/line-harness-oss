@@ -1,24 +1,32 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import PageHeader from '@/components/shared/page-header'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
+  type AnalyticsReportRun,
   type AnalyticsReportSchedule,
   type AnalyticsReportScheduleOptions,
   type AnalyticsReportSection,
 } from '@/lib/api'
+import {
+  deliveryChannelLabel,
+  deliveryStatusLabel,
+  runErrorLabel,
+  runStateLabel,
+} from '../../report-run-state'
 
 const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail: string; unavailable?: string }> = [
   { id: 'friends', title: '友だちの増減', detail: '増えた・減った・残っている割合' },
@@ -52,7 +60,7 @@ const ALERT_RULE_DEFS: Array<{
   {
     id: 'block_rate', metric: 'block_rate', operator: 'greater_than',
     name: 'ブロック増の条件',
-    lead: 'ブロックが ', tail: ' % をこえたら、その場で知らせる',
+    lead: 'ブロックが ', tail: ' % をこえたら、レポートに含めて知らせる',
     detail: '配信の事故に早く気づけます。',
     threshold: '0.5', minimumSample: '20', step: '0.1',
     thresholdLabel: 'ブロック率のしきい値（%）', sampleLabel: 'ブロック条件の判定に必要な最低件数',
@@ -60,14 +68,14 @@ const ALERT_RULE_DEFS: Array<{
   {
     id: 'friend_adds', metric: 'friend_adds', operator: 'decrease_percent',
     name: '友だち減少の条件',
-    lead: '友だちが前の週より ', tail: ' % 減ったら、その場で知らせる',
+    lead: '友だちが前の週より ', tail: ' % 減ったら、レポートに含めて知らせる',
     threshold: '20', minimumSample: '20', step: '1',
     thresholdLabel: '友だち減少のしきい値（%）', sampleLabel: '友だち減少条件の判定に必要な最低件数',
   },
   {
     id: 'conversions', metric: 'conversions', operator: 'zero_streak_days',
     name: '成果0件がつづく条件',
-    lead: '成果が0件の日が ', tail: ' 日つづいたら、その場で知らせる',
+    lead: '成果が0件の日が ', tail: ' 日つづいたら、レポートに含めて知らせる',
     detail: '計測が壊れていることに気づけます。',
     threshold: '3', minimumSample: '20', step: '1',
     thresholdLabel: '成果0件がつづく日数のしきい値', sampleLabel: '成果0件条件の判定に必要な最低件数',
@@ -80,8 +88,103 @@ function defaultAlertDrafts(enabled: boolean): Record<string, AlertRuleDraft> {
 
 const ROLE_LABEL = { owner: '統括', admin: '管理者', staff: '運用担当' } as const
 
+/*
+ * メールアドレスの形の検査。裏側（apps/worker/src/routes/analytics.ts の
+ * isEmail）と同じ式で、同じ行を同じ理由で止める。以前は画面で止めずに
+ * 裏側が黙って落としていたので、1件でも不備があれば送信しない。
+ */
+function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254
+}
+
+/*
+ * R454: 1回送信の結果を見る画面。しまうと一覧から消えるため、
+ * 依頼ID（この画面のURL）から失敗理由・宛先別結果へ到達させる。
+ * 全部失敗の確定分だけ、ここから送り直せる。
+ */
+function OneTimeResultView({ accountId, schedule, runs, canManage, onRetryDone }: {
+  accountId: string
+  schedule: AnalyticsReportSchedule
+  runs: AnalyticsReportRun[]
+  canManage: boolean
+  onRetryDone: () => void
+}) {
+  usePageTitle('1回送信の結果')
+  const [retrying, setRetrying] = useState(false)
+  const [retryError, setRetryError] = useState('')
+  const latest = runs[0] ?? null
+  const sentAny = runs.some((run) => run.deliveryResults.some((item) => item.status === 'sent'))
+  const canRetry = canManage && latest !== null && latest.state !== 'running' && !sentAny
+
+  const retry = async () => {
+    if (!canRetry || retrying) return
+    setRetrying(true)
+    setRetryError('')
+    try {
+      const response = await api.analytics.reportSchedules.retry(accountId, schedule.id)
+      if (!response.success) throw new Error(response.error)
+      notifyToast('送り直しを受け付けました。結果はこの画面で確認できます。')
+      onRetryDone()
+    } catch (caught) {
+      setRetryError(caught instanceof Error ? caught.message : '送り直しを受け付けられませんでした')
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  return (
+    <div className="text-ink mx-auto flex max-w-screen-2xl flex-col gap-4 pb-24" data-design-node="URqOA">
+      <PageHeader
+        breadcrumb={[{ label: '分析', href: '/analytics' }, { label: '1回送信の結果' }]}
+        title="1回送信の結果"
+        description=""
+      />
+      <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
+        <h2 className="truncate text-lg font-semibold" title={schedule.name}>{schedule.name}</h2>
+        {!latest && (
+          <p className="text-ink-secondary mt-2 text-sm">まだ送信されていません。送信が終わるとここに結果が出ます。</p>
+        )}
+        {latest && (
+          <div className="mt-3 grid gap-2 text-sm">
+            <p className="text-ink-secondary">結果: <strong className="text-ink">{runStateLabel(latest.state)}</strong></p>
+            {runErrorLabel(latest.errorCode, latest.state) && (
+              <Notice tone="info" message={runErrorLabel(latest.errorCode, latest.state) ?? ''} />
+            )}
+            <ul className="grid list-none gap-2 p-0">
+              {latest.deliveryResults.map((item, index) => (
+                <li key={index} className="border-hairline rounded-control border px-3 py-2 text-xs">
+                  <span className="font-semibold">{deliveryChannelLabel(item.channel)}</span>
+                  {' ／ '}{item.recipient}
+                  {' ／ '}{deliveryStatusLabel(item.status)}
+                  {item.reason && <span className="text-ink-secondary">（{item.reason}）</span>}
+                </li>
+              ))}
+              {latest.deliveryResults.length === 0 && (
+                <li className="text-ink-secondary text-xs">宛先別の結果はまだありません。</li>
+              )}
+            </ul>
+            {sentAny && (
+              <p className="text-ink-secondary text-xs">一部は届いているため、送り直しはできません。</p>
+            )}
+          </div>
+        )}
+        {retryError && <Notice tone="danger" message={retryError} onClose={() => setRetryError('')} className="mt-3" />}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={onRetryDone}>もう一度確認</Button>
+          {canRetry && (
+            <Button disabled={retrying} onClick={() => void retry()}>
+              {retrying ? '送り直しています' : '届いていない分を送り直す'}
+            </Button>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function AnalyticsReportFormPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const editId = searchParams.get('id')
   usePageTitle(editId ? '定期レポートを直す' : '定期レポートをつくる')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -105,6 +208,11 @@ function AnalyticsReportFormPage() {
   // 相手へ数字の入ったレポートが送られる。受信者の自動チェックもしない。
   const [staffIds, setStaffIds] = useState<string[]>([])
   const [emails, setEmails] = useState<string[]>([])
+  // R453: 通知方法は独立した選択にする。新規は従来どおり
+  // （管理画面のお知らせあり・メールは宛先ありのみ・LINEなし）。
+  // 編集時は保存済みの通知方法をそのまま読み込む。
+  const [dashboardEnabled, setDashboardEnabled] = useState(true)
+  const [emailEnabled, setEmailEnabled] = useState(false)
   const [lineEnabled, setLineEnabled] = useState(false)
   const [alertsEnabled, setAlertsEnabled] = useState(true)
   // 知らせの決めごとは件の条件ごとに on/off と数値を持つ。固定表示だったものを
@@ -123,6 +231,8 @@ function AnalyticsReportFormPage() {
 
   // 読み直し用の数え直し。入力の状態には触らない(点検#508軽8)。
   const [reloadSeq, setReloadSeq] = useState(0)
+  // R454: 1回送信の履歴（しまった依頼も依頼IDで結果へ到達させる）。
+  const [oneTime, setOneTime] = useState<{ schedule: AnalyticsReportSchedule; runs: AnalyticsReportRun[] } | null>(null)
 
   useEffect(() => {
     let active = true
@@ -133,46 +243,65 @@ function AnalyticsReportFormPage() {
     // PUT してしまう。取り直すたびに編集状態も初期化する。
     setEditing(null)
     setEditMissing(false)
+    setOneTime(null)
     if (!selectedAccountId) {
       setLoading(false)
       return () => { active = false }
     }
-    void api.analytics.reportSchedules.list(selectedAccountId).then((response) => {
+    void api.analytics.reportSchedules.list(selectedAccountId).then(async (response) => {
       if (!active) return
       if (!response.success) {
         setError(response.error || '定期レポートの設定を読み込めませんでした')
-      } else {
-        setOptions(response.data.options)
-        if (editId) {
-          const schedule = response.data.items.find((item) => item.id === editId)
-          if (!schedule) {
-            setEditMissing(true)
-          } else {
-            setEditing(schedule)
-            setName(schedule.name)
-            setSections(schedule.sections)
-            setSavedAnalysisIds(schedule.savedAnalysisIds)
-            setCadence(schedule.cadence)
-            setWeekday(String(schedule.weekday ?? 1))
-            setMonthDay(String(schedule.monthDay ?? 1))
-            setSendTime(schedule.sendTime)
-            setPeriodDays(String(schedule.periodDays))
-            setStaffIds(schedule.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string))
-            setEmails(schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => item.email as string))
-            setLineEnabled(schedule.channels.includes('line'))
-            setAlertsEnabled(schedule.alertRules.length > 0)
-            // 保存済みの決めごとを雛形へ戻す。画面に無い種類は別棚へ避けて、
-            // 保存するときにそのまま付け直す(編集するたびに消えないように)。
-            const drafts = defaultAlertDrafts(false)
-            const extras: AnalyticsReportSchedule['alertRules'] = []
-            for (const rule of schedule.alertRules) {
-              const def = ALERT_RULE_DEFS.find((item) => item.metric === rule.metric && item.operator === rule.operator)
-              if (def) drafts[def.id] = { enabled: true, threshold: String(rule.threshold), minimumSample: String(rule.minimumSample) }
-              else extras.push(rule)
-            }
-            setAlertDrafts(drafts)
-            setExtraAlertRules(extras)
+        setLoading(false)
+        return
+      }
+      setOptions(response.data.options)
+      if (editId) {
+        const schedule = response.data.items.find((item) => item.id === editId)
+        if (schedule && !schedule.isOneTime) {
+          setEditing(schedule)
+          setName(schedule.name)
+          setSections(schedule.sections)
+          setSavedAnalysisIds(schedule.savedAnalysisIds)
+          setCadence(schedule.cadence)
+          setWeekday(String(schedule.weekday ?? 1))
+          setMonthDay(String(schedule.monthDay ?? 1))
+          setSendTime(schedule.sendTime)
+          setPeriodDays(String(schedule.periodDays))
+          setStaffIds(schedule.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string))
+          setEmails(schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => item.email as string))
+          // R453: 保存済みの通知方法をそのまま読み込む。宛先の有無から
+          // 組み直さない（変えない保存で通知方法が変わる原因）。
+          setDashboardEnabled(schedule.channels.includes('dashboard'))
+          setEmailEnabled(schedule.channels.includes('email'))
+          setLineEnabled(schedule.channels.includes('line'))
+          setAlertsEnabled(schedule.alertRules.length > 0)
+          // 保存済みの決めごとを雛形へ戻す。画面に無い種類は別棚へ避けて、
+          // 保存するときにそのまま付け直す(編集するたびに消えないように)。
+          const drafts = defaultAlertDrafts(false)
+          const extras: AnalyticsReportSchedule['alertRules'] = []
+          for (const rule of schedule.alertRules) {
+            const def = ALERT_RULE_DEFS.find((item) => item.metric === rule.metric && item.operator === rule.operator)
+            if (def) drafts[def.id] = { enabled: true, threshold: String(rule.threshold), minimumSample: String(rule.minimumSample) }
+            else extras.push(rule)
           }
+          setAlertDrafts(drafts)
+          setExtraAlertRules(extras)
+          setLoading(false)
+          return
+        }
+        // R454: 一覧に無い・1回送信の依頼は履歴の口で引く。
+        // しまった1回送信もここで結果へ到達させる。
+        try {
+          const detail = await api.analytics.reportSchedules.runs(selectedAccountId, editId)
+          if (!active) return
+          if (detail.success && detail.data.schedule.isOneTime) {
+            setOneTime(detail.data)
+          } else {
+            setEditMissing(true)
+          }
+        } catch {
+          if (active) setEditMissing(true)
         }
       }
       setLoading(false)
@@ -192,11 +321,47 @@ function AnalyticsReportFormPage() {
 
   // 宛先が0件のときは作れない。裏側も「受け取る人を選んでください」で止める。
   const hasRecipient = staffIds.length > 0 || emails.some((item) => item.trim() !== '')
+  // R228: 形が合わない宛先行をその場で示す。空行は送信前に外すので対象外。
+  const invalidEmails = emails.map((item) => {
+    const trimmed = item.trim()
+    return trimmed !== '' && !isEmail(trimmed) ? trimmed : null
+  })
+  const hasInvalidEmail = invalidEmails.some(Boolean)
+
+  // R455: 保存応答が遅れて戻ったとき、別の依頼・別アカウントへ移って
+  // いたらその応答を捨てる。応答のたびに「いま見ている対象」と比べる。
+  const accountRef = useRef(selectedAccountId)
+  accountRef.current = selectedAccountId
+  const editIdRef = useRef(editId)
+  editIdRef.current = editId
 
   const submit = async (sendOnce: boolean) => {
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
     if (!name.trim()) {
       setError('レポートの名前を入力してください')
+      return
+    }
+    if (hasInvalidEmail) {
+      setError('メールアドレスの形が正しくない宛先があります。該当の行を直すか消してください。')
+      return
+    }
+    // R453: 通知方法は選んだとおりに送る。1つも選ばれていない・
+    // 受け取れる宛先が無い組み合わせはここで止める（裏側と同じ文）。
+    if (!dashboardEnabled && !emailEnabled && !lineEnabled) {
+      setError('通知方法を1つ以上選んでください')
+      return
+    }
+    const emailRecipients = emails.map((item) => item.trim()).filter(Boolean)
+    const staffById = new Map(options.recipients.map((item) => [item.id, item]))
+    const emailCapable = emailRecipients.length > 0
+      || staffIds.some((id) => staffById.get(id)?.email)
+    if (emailEnabled && !emailCapable) {
+      setError('メールを受け取れる宛先がありません')
+      return
+    }
+    const lineCapable = staffIds.some((id) => staffById.get(id)?.lineLinked)
+    if (lineEnabled && !lineCapable) {
+      setError('LINE連携済みの宛先がありません')
       return
     }
     // 画面の数値を裏側が受け取れる形へ直す。変な数はここで止める
@@ -222,7 +387,11 @@ function AnalyticsReportFormPage() {
     }
     setSaving(true)
     setError('')
-    const emailRecipients = emails.map((item) => item.trim()).filter(Boolean)
+    // R455: この保存が「どの依頼・どのアカウントへ向けたものか」を
+    // 応答時に比べる。移っていたら編集先・文・保存中表示を変えない。
+    const wantAccount = selectedAccountId
+    const wantEditId = editId
+    const sameTarget = () => accountRef.current === wantAccount && editIdRef.current === wantEditId
     const recipients = [
       ...options.recipients.filter((item) => staffIds.includes(item.id)).map((item) => ({
         kind: 'staff' as const, staffId: item.id, label: item.name,
@@ -234,7 +403,13 @@ function AnalyticsReportFormPage() {
       weekday: cadence === 'weekly' ? Number(weekday) : null,
       monthDay: cadence === 'monthly' ? Number(monthDay) : null,
       sendTime, timeZone: options.timeZone, periodDays: Number(periodDays), recipients,
-      channels: ['dashboard', ...(emailRecipients.length ? ['email' as const] : []), ...(lineEnabled ? ['line' as const] : [])] as AnalyticsReportSchedule['channels'],
+      // R453: 選んだ通知方法をそのまま送る。宛先の有無からの組み直しや
+      // dashboard の必須追加はしない（変えない保存で変わる原因）。
+      channels: [
+        ...(dashboardEnabled ? ['dashboard' as const] : []),
+        ...(emailEnabled ? ['email' as const] : []),
+        ...(lineEnabled ? ['line' as const] : []),
+      ] as AnalyticsReportSchedule['channels'],
       alertRules: parsedAlertRules,
     }
     try {
@@ -242,6 +417,7 @@ function AnalyticsReportFormPage() {
         const response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
           ...payload, expectedUpdatedAt: editing.updatedAt,
         })
+        if (!sameTarget()) return
         if (!response.success) throw new Error(response.error)
         setEditing(response.data)
         notifyToast(response.data.status === 'paused'
@@ -251,13 +427,28 @@ function AnalyticsReportFormPage() {
         const response = await api.analytics.reportSchedules.create(selectedAccountId, {
           ...payload, sendOnce,
         })
+        if (!sameTarget()) return
         if (!response.success) throw new Error(response.error)
-        notifyToast(sendOnce ? '1回だけ送る依頼を受け付けました。送信結果は運用状態に残ります。' : `${nextLabel}から届く定期レポートを作りました。`)
+        /*
+          R76。作ったあとも新規のまま残すと、時刻を直してもう一度押したときに
+          更新ではなく別の定期配信が増える。作りたての編集画面へ移せば、
+          次の保存は更新（PUT）になる。
+          R454: 1回だけ送る場合も、その依頼の結果画面へ移す。
+          一覧からは消えるため、結果の行き先をここで渡す。
+        */
+        if (sendOnce) {
+          notifyToast('1回だけ送る依頼を受け付けました。結果はこの画面で確認できます。')
+          router.push(`/analytics/reports/new?id=${response.data.id}`)
+        } else {
+          notifyToast(`${nextLabel}から届く定期レポートを作りました。`)
+          router.push(`/analytics/reports/new?id=${response.data.id}`)
+        }
       }
     } catch (caught) {
+      if (!sameTarget()) return
       setError(caught instanceof Error ? caught.message : editing ? '定期レポートを更新できませんでした' : '定期レポートを作れませんでした')
     } finally {
-      setSaving(false)
+      if (sameTarget()) setSaving(false)
     }
   }
 
@@ -265,6 +456,18 @@ function AnalyticsReportFormPage() {
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="上のバーで、レポートを作るLINE公式アカウントを選んでください。" />
   // 一覧の取得失敗を「見つかりません」へ化けさせない。一時障害はやり直せる画面を先に出す。
   if (error && !options) return <ListState kind="error" title="定期レポートを表示できませんでした" description={error} onRetry={() => setReloadSeq((n) => n + 1)} />
+  // R454: 1回送信の依頼は結果の表示にする（しまうと一覧から消えるため）。
+  if (oneTime && selectedAccountId) {
+    return (
+      <OneTimeResultView
+        accountId={selectedAccountId}
+        schedule={oneTime.schedule}
+        runs={oneTime.runs}
+        canManage={canManage}
+        onRetryDone={() => setReloadSeq((n) => n + 1)}
+      />
+    )
+  }
   if (editMissing || (editing === null && editId)) return <ListState kind="error" title="定期レポートが見つかりませんでした" description="一覧から選び直してください。" />
   if (editing?.isOneTime) return <ListState kind="empty" title="1回だけ送る依頼は変更できません" description="同じ内容が必要なときは、新しく作ってください。" />
   if (!options || options.recipients.length === 0) return (
@@ -314,14 +517,9 @@ function AnalyticsReportFormPage() {
                 // ものは外せる向きだけ残す(点検のN-284)。
                 const locked = Boolean(choice.unavailable) && !checked
                 return (
-                  <label className={`flex items-start gap-3 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`} key={choice.id}>
-                    <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={checked} disabled={locked} onChange={() => toggleSection(choice.id)} />
-                    <span className="grid gap-1">
-                      <strong className="text-sm">{choice.title}</strong>
-                      <small className="text-ink-secondary text-xs font-normal">{choice.detail}</small>
-                      {choice.unavailable && <small className="text-ink-faint text-xs font-normal">{choice.unavailable}</small>}
-                    </span>
-                  </label>
+                  <Checkbox key={choice.id} checked={checked} disabled={locked} onCheckedChange={() => toggleSection(choice.id)} description={<>{choice.detail}{choice.unavailable && <>（{choice.unavailable}）</>}</>}>
+                    <strong>{choice.title}</strong>
+                  </Checkbox>
                 )
               })}
             </div>
@@ -333,15 +531,14 @@ function AnalyticsReportFormPage() {
               <p className="text-ink-secondary mb-4 mt-1 text-sm">チェックした分析の最新の結果を、レポートに添えます。無くても作れます。</p>
               <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
                 {options.savedAnalyses.map((item) => (
-                  <label className="flex cursor-pointer items-start gap-3" key={item.id}>
-                    <input
-                      className="accent-accent mt-0.5 size-5"
-                      type="checkbox"
-                      checked={savedAnalysisIds.includes(item.id)}
-                      onChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])}
-                    />
-                    <span className="grid gap-1"><strong className="text-sm">{item.name}</strong><small className="text-ink-secondary text-xs font-normal">{item.kind === 'cross' ? 'クロス分析' : 'ファネル'}</small></span>
-                  </label>
+                  <Checkbox
+                    key={item.id}
+                    checked={savedAnalysisIds.includes(item.id)}
+                    onCheckedChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])}
+                    description={item.kind === 'cross' ? 'クロス分析' : 'ファネル'}
+                  >
+                    <strong>{item.name}</strong>
+                  </Checkbox>
                 ))}
               </div>
             </section>
@@ -349,21 +546,37 @@ function AnalyticsReportFormPage() {
 
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="mb-4 text-lg font-semibold">いつ送りますか</h2>
+            {/* R229: 標準幅(176px)固定にすると、中間幅で隣の欄に重なる。列の幅に合わせる。 */}
             <div className="grid items-end gap-4 md:grid-cols-4">
-              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">間かく<SelectField value={cadence} onChange={(event) => setCadence(event.target.value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} /></label>
+              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">間かく<Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></label>
               {cadence === 'weekly' ? (
-                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">曜日<SelectField value={weekday} onChange={(event) => setWeekday(event.target.value)} options={['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'].map((label, value) => ({ value: String(value), label }))} /></label>
+                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">曜日<Select aria-label="送る曜日" value={weekday} onChange={(value) => setWeekday(value)} options={['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'].map((label, value) => ({ value: String(value), label }))} size="full" /></label>
               ) : (
-                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">日<SelectField value={monthDay} onChange={(event) => setMonthDay(event.target.value)} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} /></label>
+                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">日<Select aria-label="送る日" value={monthDay} onChange={(value) => setMonthDay(value)} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></label>
               )}
               <span className="text-ink-secondary grid gap-2 text-xs font-semibold">時刻<TimeField value={sendTime} onChange={setSendTime} aria-label="送る時刻" /></span>
-              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">集計する期間<SelectField value={periodDays} onChange={(event) => setPeriodDays(event.target.value)} options={[{ value: '7', label: '前の7日間' }, { value: '30', label: '前の30日間' }, { value: '90', label: '前の90日間' }]} /></label>
+              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">集計する期間<Select aria-label="集計する期間" value={periodDays} onChange={(value) => setPeriodDays(value)} options={[{ value: '7', label: '前の7日間' }, { value: '30', label: '前の30日間' }, { value: '90', label: '前の90日間' }]} size="full" /></label>
             </div>
             <p className="text-ink-secondary mb-0 mt-4 text-xs">時刻は {options.timeZone} で計算します。</p>
           </section>
 
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="mb-4 text-lg font-semibold">だれに送りますか</h2>
+            {(() => {
+              // R449: 保存後に受け取れなくなった担当者を編集画面で知らせる。
+              // 候補に出ない人を黙って外さない。
+              if (!editing || !options) return null
+              const invalid = editing.recipients.filter((item) => item.kind === 'staff' && item.staffId
+                && !options.recipients.some((person) => person.id === item.staffId))
+              if (invalid.length === 0) return null
+              return (
+                <Notice
+                  tone="warn"
+                  message={`前に選んでいた${invalid.map((item) => `「${item.label}」`).join('・')}は、いまは受け取れません（利用停止・閲覧範囲外の可能性があります）。このまま保存すると宛先から外れます。`}
+                  className="mb-4"
+                />
+              )
+            })()}
             {/*
              * #975 U064: 長い氏名・役割を細いチップに押し込まない。
              * 390pxでも誰を選んだか分かるよう、1人1行の行リストにする。
@@ -372,57 +585,86 @@ function AnalyticsReportFormPage() {
               {options.recipients.map((person) => {
                 const checked = staffIds.includes(person.id)
                 return (
-                  <li key={person.id}>
-                    <label className={`flex min-h-11 cursor-pointer items-start gap-3 px-4 py-2.5 ${checked ? 'bg-accent-soft' : ''}`}>
-                      <input className="accent-accent mt-1 size-4 shrink-0" type="checkbox" checked={checked} onChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])} />
-                      <span className="min-w-0">
-                        <strong className="text-ink block truncate text-sm" title={person.name}>{person.name}</strong>
-                        <span className="text-ink-secondary block text-xs">ログインユーザー ／ {ROLE_LABEL[person.role]}</span>
-                      </span>
-                    </label>
+                  <li key={person.id} className={`min-h-11 px-4 py-2.5 ${checked ? 'bg-accent-soft' : ''}`}>
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])}
+                      description={<span className="text-ink-secondary">ログインユーザー ／ {ROLE_LABEL[person.role]}</span>}
+                    >
+                      <strong className="block truncate text-sm" title={person.name}>{person.name}</strong>
+                    </Checkbox>
                   </li>
                 )
               })}
-              {emails.map((email, index) => (
-                <li key={index}>
-                  <label className="flex min-h-11 items-center gap-3 px-4 py-2.5">
-                    <span className="text-ink-secondary shrink-0 text-xs font-semibold">メールだけ</span>
-                    <input
-                      className="text-ink min-w-0 flex-1 bg-transparent text-sm outline-none"
-                      type="email"
-                      value={email}
-                      onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
-                      placeholder="report@example.com"
-                    />
-                  </label>
-                </li>
-              ))}
+              {emails.map((email, index) => {
+                const invalid = invalidEmails[index]
+                return (
+                  <li key={index} className="px-4 py-2.5">
+                    <div className="flex min-h-11 items-center gap-3">
+                      <span className="text-ink-secondary shrink-0 text-xs font-semibold">メールだけ</span>
+                      <input
+                        className="text-ink min-w-0 flex-1 bg-transparent text-sm outline-none"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                        placeholder="report@example.com"
+                        aria-label={`宛先のメールアドレス ${index + 1}行目`}
+                        aria-invalid={invalid ? true : undefined}
+                      />
+                      <button
+                        type="button"
+                        className="text-ink-faint hover:text-ink-secondary shrink-0 text-xs"
+                        onClick={() => setEmails((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        aria-label={`${index + 1}行目の宛先を消す`}
+                      >
+                        消す
+                      </button>
+                    </div>
+                    {invalid && (
+                      <p className="text-danger mt-1 text-xs" role="alert">
+                        「{invalid}」はメールアドレスの形になっていません。この宛先だけ外れないよう、直すか消してください。
+                      </p>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
             <div className="mt-2"><Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>宛先を足す</Button></div>
             {!hasRecipient && <p className="text-ink-secondary mt-3 text-xs">受け取る人を1人以上選んでください。選ぶまで作れません。</p>}
-            <label className="border-hairline mt-5 flex items-start gap-3 border-t pt-4">
-              <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={lineEnabled} onChange={(event) => setLineEnabled(event.target.checked)} />
-              <span className="grid gap-1"><strong className="text-sm">LINEでも同じ内容を送る</strong><small className="text-ink-secondary text-xs font-normal">ログインユーザーのLINEに、要点だけを短くまとめて送ります。</small></span>
-            </label>
+            {hasInvalidEmail && <p className="text-danger mt-3 text-xs">形が正しくない宛先があるため、いまのままでは作れません。</p>}
+            {/*
+              R453: 通知方法は3つとも独立した選択にする。担当者の宛先を
+              選んでもメールが外れないし、指定しなかった管理画面の
+              お知らせも勝手に付かない。未変更の保存はそのまま残る。
+            */}
+            <div className="border-hairline mt-5 grid gap-3 border-t pt-4" role="group" aria-label="通知方法">
+              <Checkbox checked={dashboardEnabled} onCheckedChange={setDashboardEnabled} description="運用状態のお知らせに残します。">
+                <strong>管理画面のお知らせにも出す</strong>
+              </Checkbox>
+              <Checkbox checked={emailEnabled} onCheckedChange={setEmailEnabled} description="宛先のメールアドレスへ送ります。担当者のメールもここで送ります。">
+                <strong>メールでも送る</strong>
+              </Checkbox>
+              <Checkbox checked={lineEnabled} onCheckedChange={setLineEnabled} description="ログインユーザーのLINEに、要点だけを短くまとめて送ります。">
+                <strong>LINEでも同じ内容を送る</strong>
+              </Checkbox>
+            </div>
           </section>
 
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="text-lg font-semibold">知らせの決めごと</h2>
-            <p className="text-ink-secondary mb-4 mt-1 text-sm">数字がふだんと大きくちがうときだけ、待たずに知らせます。</p>
-            <label className="mb-3 flex items-center gap-2 text-sm font-semibold"><input className="accent-accent size-5" type="checkbox" checked={alertsEnabled} onChange={(event) => setAlertsEnabled(event.target.checked)} />大きな変化を知らせる</label>
+            <p className="text-ink-secondary mb-4 mt-1 text-sm">レポートを作るときに前の期間と比べ、条件に合えばレポートに含めて知らせます。</p>
+            <Checkbox className="mb-3" checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>
             <ul className="grid list-none gap-3 p-0">
               {ALERT_RULE_DEFS.map((def) => {
                 const draft = alertDrafts[def.id]
                 const fieldsDisabled = !alertsEnabled || !draft.enabled
                 return (
                   <li className="flex items-start gap-2 text-xs" key={def.id}>
-                    <input
-                      type="checkbox"
-                      className="accent-accent size-4 shrink-0"
+                    <Checkbox
                       checked={draft.enabled}
                       disabled={!alertsEnabled}
                       aria-label={`${def.name}を使う`}
-                      onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: event.target.checked } }))}
+                      onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}
                     />
                     <span className="grid gap-1">
                       <strong>
@@ -482,11 +724,17 @@ function AnalyticsReportFormPage() {
         </aside>
       </div>
 
+      {/*
+        m22c: 下の3つの操作は1440pxで1行に収める。試し送りは言葉を短くし
+        （今すぐ1回だけ送る）、キャンセルは隣のボタンと同じ高さ40にそろえる。
+        行の中で高さが違うと、同じ1行でも上端がずれて2行に見える
+        （見た目の自動点検 k=5）。
+      */}
       <StickyBar
         status={editing
           ? <>「{editing.name}」を直しています。保存すると、次の{nextLabel}から新しい内容で届きます。</>
           : <>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>}
-        actions={<><Link className="text-ink-secondary p-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(true)}>いますぐ1回だけ送ってみる</Button>}<Button disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
+        actions={<><Link className="text-ink-secondary inline-flex h-10 items-center px-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
       />
     </div>
   )

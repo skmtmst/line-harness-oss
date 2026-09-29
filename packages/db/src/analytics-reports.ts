@@ -72,12 +72,69 @@ export async function getAnalyticsReportSchedules(db: D1Database, lineAccountId:
   return result.results.map(serialize);
 }
 
+/**
+ * 直近にしまった1回送信の一覧（R454）。
+ *
+ * 1回送信は送信後に archived になるため通常の一覧に出ない。
+ * 失敗に気づけるよう、直近分だけ依頼と最新履歴を返す。
+ */
+export async function getRecentOneTimeAnalyticsReportRuns(
+  db: D1Database, lineAccountId: string, limit = 5,
+): Promise<Array<{ schedule: AnalyticsReportSchedule; lastRun: AnalyticsReportRun | null }>> {
+  const rows = await db.prepare(
+    `SELECT * FROM analytics_report_schedules
+      WHERE line_account_id = ? AND status = 'archived' AND is_one_time = 1
+      ORDER BY updated_at DESC, id DESC LIMIT ?`,
+  ).bind(lineAccountId, limit).all<ScheduleRow>();
+  const items: Array<{ schedule: AnalyticsReportSchedule; lastRun: AnalyticsReportRun | null }> = [];
+  for (const row of rows.results) {
+    const schedule = serialize(row);
+    const runs = await getAnalyticsReportRuns(db, {
+      scheduleId: schedule.id, lineAccountId, limit: 1,
+    });
+    items.push({ schedule, lastRun: runs[0] ?? null });
+  }
+  return items;
+}
+
 export async function getAnalyticsReportSchedule(db: D1Database, id: string, lineAccountId: string) {
   const row = await db.prepare(
     `SELECT * FROM analytics_report_schedules
       WHERE id = ? AND line_account_id = ? AND status != 'archived'`,
   ).bind(id, lineAccountId).first<ScheduleRow>();
   return row ? serialize(row) : null;
+}
+
+/**
+ * しまった依頼も含めて1件引く（R454）。
+ *
+ * 1回送信の依頼は送信後に archived になる。一覧・詳細から消えるが、
+ * 失敗理由と宛先別結果を確認・再試行できるよう履歴の入口にする。
+ * 別アカウントのIDは返さない。
+ */
+export async function getAnalyticsReportScheduleIncludingArchived(
+  db: D1Database, id: string, lineAccountId: string,
+): Promise<AnalyticsReportSchedule | null> {
+  const row = await db.prepare(
+    `SELECT * FROM analytics_report_schedules WHERE id = ? AND line_account_id = ?`,
+  ).bind(id, lineAccountId).first<ScheduleRow>();
+  return row ? serialize(row) : null;
+}
+
+/**
+ * 失敗した1回送信をもう一度送れる状態へ戻す（R454）。
+ *
+ * 一部でも届いたものは送り直さない（重複を防ぐ）。呼び出し側で
+ * 最新履歴の宛先別結果を確かめてから使う。
+ */
+export async function requeueOneTimeAnalyticsReportSchedule(db: D1Database, input: {
+  id: string; lineAccountId: string; now: string;
+}): Promise<'requeued' | 'missing'> {
+  const result = await db.prepare(
+    `UPDATE analytics_report_schedules SET status = 'active', next_run_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status = 'archived' AND is_one_time = 1`,
+  ).bind(input.now, input.now, input.id, input.lineAccountId).run();
+  return Number(result.meta.changes ?? 0) ? 'requeued' : 'missing';
 }
 
 export async function updateAnalyticsReportSchedule(db: D1Database, input: {
@@ -163,6 +220,93 @@ export async function claimDueAnalyticsReportSchedules(db: D1Database, now: stri
       ORDER BY next_run_at ASC LIMIT ?`,
   ).bind(now, limit).all<ScheduleRow>();
   return rows.results.map(serialize);
+}
+
+export type AnalyticsReportRunState = 'running' | 'available' | 'partial' | 'unavailable' | 'failed';
+
+export interface AnalyticsReportRun {
+  id: string;
+  scheduleId: string;
+  lineAccountId: string;
+  scheduledFor: string;
+  periodFrom: string;
+  periodTo: string;
+  timeZone: string;
+  dataCutoffAt: string;
+  state: AnalyticsReportRunState;
+  result: unknown;
+  deliveryResults: unknown[];
+  errorCode: string | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+type RunRow = {
+  id: string; schedule_id: string; line_account_id: string; scheduled_for: string;
+  period_from: string; period_to: string; time_zone: string; data_cutoff_at: string;
+  state: AnalyticsReportRunState; result_json: string; delivery_results_json: string;
+  error_code: string | null; started_at: string; completed_at: string | null;
+};
+
+function serializeRun(row: RunRow): AnalyticsReportRun {
+  return {
+    id: row.id, scheduleId: row.schedule_id, lineAccountId: row.line_account_id,
+    scheduledFor: row.scheduled_for, periodFrom: row.period_from, periodTo: row.period_to,
+    timeZone: row.time_zone, dataCutoffAt: row.data_cutoff_at, state: row.state,
+    result: parseJson(row.result_json), deliveryResults: parseJson(row.delivery_results_json),
+    errorCode: row.error_code, startedAt: row.started_at, completedAt: row.completed_at,
+  };
+}
+
+/**
+ * 同じ予定時刻の実行記録を1件引く（R450）。
+ *
+ * 次回予定の更新だけ失敗すると、完了済みのrunが残ったまま予定が
+ * 古い時刻に止まる。begin は UNIQUE で null を返し続けるので、
+ * ここで完了済みかどうかを見分けて予定の補修に使う。
+ */
+export async function getAnalyticsReportRun(db: D1Database, input: {
+  scheduleId: string; scheduledFor: string;
+}): Promise<AnalyticsReportRun | null> {
+  const row = await db.prepare(
+    `SELECT * FROM analytics_report_runs WHERE schedule_id = ? AND scheduled_for = ?`,
+  ).bind(input.scheduleId, input.scheduledFor).first<RunRow>();
+  return row ? serializeRun(row) : null;
+}
+
+/**
+ * 1件の定期レポートの実行履歴を新しい順に返す（R454）。
+ *
+ * 1回送信の失敗は一覧から消える（archived のため）。依頼IDから
+ * 結果へ到達できるよう、履歴は保存失敗時も残す。
+ */
+export async function getAnalyticsReportRuns(db: D1Database, input: {
+  scheduleId: string; lineAccountId: string; limit?: number;
+}): Promise<AnalyticsReportRun[]> {
+  const result = await db.prepare(
+    `SELECT * FROM analytics_report_runs
+      WHERE schedule_id = ? AND line_account_id = ?
+      ORDER BY scheduled_for DESC, started_at DESC LIMIT ?`,
+  ).bind(input.scheduleId, input.lineAccountId, input.limit ?? 20).all<RunRow>();
+  return result.results.map(serializeRun);
+}
+
+/**
+ * 取り残された実行中（running）の記録を回収する（R450）。
+ *
+ * Worker が送信の途中で止まると running 行が残り、同じ予定時刻の
+ * begin がずっと null になる。開始から一定時間を過ぎたものだけを
+ * 「中断」とみなして failed にし、次回以降の実行を止めない。
+ * 送達が不明な経路は delivery_results_json を空にせず残す。
+ * 正常に動いている同時実行（開始直後の running）は触らない。
+ */
+export async function reclaimStaleAnalyticsReportRuns(db: D1Database, cutoff: string): Promise<number> {
+  const result = await db.prepare(
+    `UPDATE analytics_report_runs
+        SET state = 'failed', error_code = 'worker_interrupted', completed_at = ?
+      WHERE state = 'running' AND started_at < ?`,
+  ).bind(cutoff, cutoff).run();
+  return Number(result.meta.changes ?? 0);
 }
 
 export async function beginAnalyticsReportRun(db: D1Database, input: {

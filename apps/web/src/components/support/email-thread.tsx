@@ -8,6 +8,8 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import TemplatePicker from '@/components/chats/template-picker'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
 
 /**
  * メールの往復。受信箱（/chats）の中央ペインで使う。
@@ -612,31 +614,29 @@ export default function EmailThread({
               ラベルは1行で保ち、収まらないときは行ごと次へ落とす。
             */}
             <span className="text-ink-faint whitespace-nowrap">対応</span>
-            <select
+            <Select
+              aria-label="対応"
               value={detail.thread.status}
-              onChange={(e) => void updateStatus(e.target.value as ThreadStatus)}
-              className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
-            >
-              <option value="unread">未対応</option>
-              <option value="in_progress">対応中</option>
-              <option value="on_hold">保留</option>
-              <option value="resolved">対応済み</option>
-            </select>
+              onChange={(value) => void updateStatus(value as ThreadStatus)}
+              options={[
+                { value: 'unread', label: '未対応' },
+                { value: 'in_progress', label: '対応中' },
+                { value: 'on_hold', label: '保留' },
+                { value: 'resolved', label: '対応済み' },
+              ]}
+            />
           </label>
           <label className="flex items-center gap-1.5 text-xs">
             <span className="text-ink-faint whitespace-nowrap">担当</span>
-            <select
+            <Select
+              aria-label="担当"
               value={detail.thread.assigned_staff_id ?? ''}
-              onChange={(e) => void updateAssignee(e.target.value || null)}
-              className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
-            >
-              <option value="">未割り当て</option>
-              {operators.map(op => (
-                <option key={op.id} value={op.id}>
-                  {op.name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => void updateAssignee(value || null)}
+              options={[
+                { value: '', label: '未割り当て' },
+                ...operators.map((op) => ({ value: op.id, label: op.name })),
+              ]}
+            />
           </label>
           {!customerInfoOpen && onOpenCustomerInfo && (
             <button
@@ -740,16 +740,17 @@ export default function EmailThread({
         {showComposerOptions && (
           <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
             <span className="text-ink-secondary">送信キー</span>
-            {(
-              [
-                { value: 'enter', label: 'Enter で送信' },
-                { value: 'shift-enter', label: 'Shift + Enter で送信' },
-              ] as const
-            ).map(opt => (
-              <label key={opt.value} className="inline-flex cursor-pointer items-center gap-1.5 select-none">
-                <input
-                  type="radio"
+            <RadioCardGroup legend="送信キー" className="flex flex-wrap gap-2">
+              {(
+                [
+                  { value: 'enter', label: 'Enter で送信' },
+                  { value: 'shift-enter', label: 'Shift + Enter で送信' },
+                ] as const
+              ).map(opt => (
+                <RadioCard
+                  key={opt.value}
                   name="mail-send-mode"
+                  value={opt.value}
                   checked={sendMode === opt.value}
                   onChange={() => {
                     setSendMode(opt.value)
@@ -760,10 +761,10 @@ export default function EmailThread({
                       /* 保存できないブラウザはこの画面のあいだだけ効く */
                     }
                   }}
+                  title={opt.label}
                 />
-                <span className="text-ink-secondary">{opt.label}</span>
-              </label>
-            ))}
+              ))}
+            </RadioCardGroup>
             <span className="text-ink-faint">Ctrl / Command + Enter でも送れます</span>
           </div>
         )}

@@ -28,6 +28,7 @@ import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from '
 import { broadcastDetailCsv } from './broadcast-detail-export'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
+import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 function BroadcastDetailInner() {
@@ -151,7 +152,11 @@ function BroadcastDetailInner() {
           detail.data.targetType !== 'all' && detail.data.targetType !== 'multi-account-dedup'
         if (needsAudienceNames) {
           setAudienceNameState('loading')
-          void Promise.allSettled([api.tags.list(), api.scenarios.list()])
+          // R23横展開: この配信のアカウントの候補だけで名前を解決する。
+          void Promise.allSettled([
+            api.tags.list({ accountId: selectedAccountId }),
+            api.scenarios.list({ accountId: selectedAccountId }),
+          ])
             .then(([tagsRes, scenariosRes]) => {
               if (!active) return
               const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null
@@ -434,9 +439,19 @@ function BroadcastDetailInner() {
             二者承認（設計 A-2）。配信の題の横に承認待ちの札を出す。
             題自体は枠の見出しに出るので、ここでは札と並べるだけにする。
           */}
+          {/*
+            監査 R207: 保存した下書きを同じIDで編集し続けられる。
+            同じ設定で作り直す（複製）は別名・宛先未引継ぎなので、
+            直す操作の代わりにならない。送信済み・送信中には出さない。
+          */}
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-ink text-base font-bold">{broadcast.title}</p>
+            <p className="text-ink min-w-0 flex-1 text-base font-bold">{broadcast.title}</p>
             <ApprovalBadge status={broadcast.approvalStatus} />
+            {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
+              <Button href={`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`}>
+                編集を続ける
+              </Button>
+            )}
           </div>
           {/*
             二者承認（設計 A-2・A-3）。承認待ちの帯と、承認する人の操作。
@@ -691,10 +706,18 @@ function BroadcastDetailInner() {
             <p className="text-ink text-sm font-semibold">送った内容</p>
             <p className="text-ink-faint mt-0.5 text-xs">実際に届いた形</p>
             <p className="text-ink-faint mb-2 mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
+            {/*
+              監査 R211: 本文の生出しをやめ、種別ごとの見え方にする。
+              位置情報は見出し・住所・緯度経度、ボタンは1通目の下に出る。
+            */}
             <div className="bg-canvas-sunken rounded-card p-3">
-              <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-                {broadcast.messageContent}
-              </p>
+              <BroadcastMessagePreview
+                bubbles={broadcast.messageBubbles}
+                messageType={broadcast.messageType}
+                messageContent={broadcast.messageContent}
+                buttons={broadcast.messageOptions?.buttons}
+                unsentNote
+              />
             </div>
           </section>
 
@@ -874,10 +897,12 @@ function SentResult({
             <h2 className="text-ink text-base font-bold">メッセージプレビュー</h2>
             <p className="text-ink-faint mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
             <div className="bg-info mt-3 min-h-48 rounded-card p-4">
-              <p className="text-ink bg-canvas rounded-control px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{broadcast.messageContent}</p>
-              {broadcast.messageOptions?.buttons?.map((button) => (
-                <p key={`${button.label}-${button.value}`} className="text-action bg-canvas mt-2 truncate rounded-control px-3 py-2 text-center text-xs font-bold" title={button.value}>{button.label}</p>
-              ))}
+              <BroadcastMessagePreview
+                bubbles={broadcast.messageBubbles}
+                messageType={broadcast.messageType}
+                messageContent={broadcast.messageContent}
+                buttons={broadcast.messageOptions?.buttons}
+              />
             </div>
           </section>
         </div>

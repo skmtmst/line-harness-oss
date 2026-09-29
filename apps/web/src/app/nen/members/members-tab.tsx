@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
@@ -37,15 +37,24 @@ export default function MembersTab({
   const [pet, setPet] = useState<'any' | 'with' | 'without'>('any')
   const [sort, setSort] = useState<NenMemberSort>('annual_desc')
   const [page, setPage] = useState(1)
+  /*
+   * R56: アカウント切替で新旧2つの読み込みが走り、遅い旧応答が
+   * 新しい一覧を上書きしていた。世代番号で古い応答は捨てる
+   * （友だち明細と同じ形）。
+   */
+  const requestRef = useRef(0)
 
   const load = useCallback(async () => {
+    const request = ++requestRef.current
     setStatus('loading')
     try {
       const res = await nenRanksApi.members(accountId, { q: query, rank, pet, sort, page })
+      if (request !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
       setData(res.data)
       setStatus('ready')
     } catch (caught) {
+      if (request !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
   }, [accountId, query, rank, pet, sort, page])
@@ -169,7 +178,11 @@ function MemberRow({ member, rankOrder }: { member: NenMemberRow; rankOrder: str
   const initial = (member.name || '?').slice(0, 1)
   return (
     <Tr>
-      <Td>
+      {/*
+        m18s: 幅を固定しない列はペットの1列だけにする。見出しだけでなく
+        行の側にも同じ幅を持たせ、どの行も同じ列幅で合うようにする。
+      */}
+      <Td className="w-72">
         <span className="flex items-center gap-3">
           {member.pictureUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- LINEのCDN画像
@@ -183,18 +196,18 @@ function MemberRow({ member, rankOrder }: { member: NenMemberRow; rankOrder: str
           </span>
         </span>
       </Td>
-      <Td><RankChip rankKey={member.rankKey} name={member.rankName} rankOrder={rankOrder} /></Td>
-      <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{yen(member.annualMilesYen)}</span></Td>
-      <Td align="right"><span className="text-label tabular-nums text-ink-secondary">{yen(member.lifetimeMilesYen)}</span></Td>
-      <Td align="right"><span className="text-label tabular-nums text-ink">{member.mileBalance.toLocaleString('ja-JP')}</span></Td>
+      <Td className="w-28"><RankChip rankKey={member.rankKey} name={member.rankName} rankOrder={rankOrder} /></Td>
+      <Td align="right" className="w-32"><span className="text-label font-semibold tabular-nums text-ink">{yen(member.annualMilesYen)}</span></Td>
+      <Td align="right" className="w-32"><span className="text-label tabular-nums text-ink-secondary">{yen(member.lifetimeMilesYen)}</span></Td>
+      <Td align="right" className="w-28"><span className="text-label tabular-nums text-ink">{member.mileBalance.toLocaleString('ja-JP')}</span></Td>
       <Td>
         <span className="block truncate text-label text-ink-secondary" title={member.petNames ?? ''}>
           {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : '—'}
         </span>
       </Td>
-      <Td className="cq-hide-below-1120"><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
-      <Td className="cq-hide-below-1010" align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
-      <Td align="right" className="bg-canvas sticky right-0">
+      <Td className="cq-hide-below-1120 w-28"><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
+      <Td className="cq-hide-below-1010 w-24" align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
+      <Td align="right" className="bg-canvas sticky right-0 w-16">
         <Link href={`/friends/detail?id=${encodeURIComponent(member.friendId)}`} className="text-label font-semibold text-action">詳細</Link>
       </Td>
     </Tr>

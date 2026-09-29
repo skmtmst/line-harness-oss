@@ -199,7 +199,8 @@ export type IncomingWebhookDetail = IncomingWebhook & {
     displayName: string
   }>
   actionExecution: {
-    state: 'connected' | 'not_configured'
+    // R404: 保存済みの未対応種類があるときは needs_attention と理由が返る。
+    state: 'connected' | 'not_configured' | 'needs_attention'
     reason: string | null
   }
   latestSample: {
@@ -355,6 +356,8 @@ export type AuditEventSummary = {
   changed: number
   logins: number
   suspiciousLogins: number
+  /** 「気になるもの」タブと同じ条件（失敗・要確認）の件数。タブの件数は一覧と同じ分類で数える（監査 R69）。 */
+  attention: number
 }
 
 export type FriendProfileCandidateOption = {
@@ -906,6 +909,9 @@ export type OperationHealthCheckKey =
   | 'webhook'
   | 'dispatch_jobs'
   | 'friend_change'
+  | 'monitoring_heartbeat'
+  | 'infra_canary'
+  | 'credential_expiry'
 
 export type OperationHealthResult = {
   id: string
@@ -1210,6 +1216,68 @@ export type AffiliateOffer = {
   createdAt: string
 }
 
+/** 案件の決まりの版 (#823)。保存するたびに増え、前の版は変わらない。 */
+export type OfferVersion = {
+  id: string
+  offerId: string
+  versionNumber: number
+  rewardAmount: number
+  rewardMiles: number
+  windowDays: number
+  capTotal: number | null
+  capMonthlyPerAffiliate: number | null
+  receptionFrom: string | null
+  receptionTo: string | null
+  effectiveFrom: string | null
+  createdAt: string
+}
+
+/** 今の決まりと上限の残り (#823)。空は「上限なし」。 */
+export type OfferCapStatus = {
+  version: OfferVersion | null
+  capped: boolean
+  capTotal: number | null
+  totalUsed: number
+  totalRemaining: number | null
+  capMonthlyPerAffiliate: number | null
+  monthlyUsed: number
+  monthlyRemaining: number | null
+}
+
+/** 付け方の判断の理由。画面には人の言葉で出す。#823 */
+export type AttributionSkipReason =
+  | 'out_of_window'
+  | 'self_referral'
+  | 'inactive_link'
+  | 'inactive_affiliate'
+  | 'other_account'
+  | 'reception_closed'
+  | 'capped_total'
+  | 'capped_monthly'
+
+/** 成果の付け方の記録 (#823)。候補1件ずつの結果を持つ。 */
+export type AttributionDecisionView = {
+  conversionEventId: string
+  affiliateId: string | null
+  refCode: string | null
+  offerId: string | null
+  offerVersionId: string | null
+  reason: string
+  windowDays: number
+  candidates: Array<{
+    affiliateId: string
+    affiliateName: string
+    refCode: string
+    touchedAt: string
+    offerId: string | null
+    offerName: string | null
+    chosen: boolean
+    skipReason: AttributionSkipReason | null
+    windowDays: number
+  }>
+  createdAt: string
+}
+
 /** Approval queue row as returned by /api/conversions/approvals */
 export type ConversionApprovalItem = {
   eventId: string
@@ -1391,6 +1459,9 @@ export type MeasurementSite = {
   rejectedCount: number
   lastRejectedHost: string | null
   lastRejectedAt: string | null
+  /** 計測を止めた日時と理由。動いているサイトは null。 */
+  stoppedAt: string | null
+  stoppedReason: string | null
 }
 
 /** #819: 成果1件の取消・取消の取消の履歴行。 */
@@ -1431,6 +1502,7 @@ export type ConversionDefinitionReport = {
   previousRange: { from: string; to: string; timeZone: 'Asia/Tokyo' }
   kpis: {
     recordedCount: number
+    recordedValue: number
     reversedCount: number | null
     netCount: number
     netValue: number
@@ -1552,7 +1624,12 @@ export type AffiliateAccountSettlementPreview = {
     affiliateId: string
     affiliateName: string
     code: string
+    /** 今回払う額。取消の差し引き後。 */
     amount: number
+    /** 差し引き前の報酬額。 */
+    grossAmount: number
+    /** 今回差し引く取消額。無いときは 0。 */
+    deduction: number
     conversionCount: number
     /** 管理画面へ口座番号を返さず、登録の有無だけを扱う。 */
     bankProfileRegistered: boolean
@@ -1573,7 +1650,46 @@ export type AffiliateAccountSettlementPreview = {
       rewardAmount: number
     }>
   }
+  /**
+   * 期間の始まりより前に承認され、まだ締められていない繰越分(R44)。
+   * 古いWorkerでは付かないので、画面側は未設定でも動くこと。
+   */
+  carriedOver?: {
+    count: number
+    amount: number
+  }
+  /**
+   * R288: 今回差し引く取消額の合計と、引ききれず次回へ繰り越す分。
+   * 古いWorkerでは付かないので、画面側は未設定でも動くこと。
+   */
+  totalDeduction?: number
+  carriedDeduction?: {
+    count: number
+    amount: number
+  }
   previewVersion: string
+}
+
+/** R43: 締め済み台帳の再開情報（明細発行・CSV準備の続きに使う）。 */
+export type AffiliateSettlementResume = {
+  settlementId: string
+  state: string
+  version: number
+  closedAt: string | null
+  totalAmount: number
+  conversionCount: number
+  periodFrom: string
+  periodTo: string
+  affiliates: Array<{
+    affiliateId: string
+    affiliateName: string
+    code: string
+    amount: number
+    conversionCount: number
+    statementIssued: boolean
+    bankProfileRegistered: boolean
+  }>
+  batch: { id: string; state: string; lineCount: number } | null
 }
 
 export type AffiliateAccountSettlementResult = {
@@ -1960,6 +2076,8 @@ export type AnalyticsReactionsOverview = AnalyticsEnvelope<{
     sentAt: string
     targetPeople: AnalyticsMetric<number>
     delivered: AnalyticsMetric<number>
+    /** シナリオの送信通数。届いた人数ではないので「到達」欄には出さない（監査R225） */
+    sentMessages: AnalyticsMetric<number>
     opened: AnalyticsMetric<number>
     lineClicked: AnalyticsMetric<number>
     outcomes: AnalyticsMetric<number>
@@ -2205,6 +2323,33 @@ export type AnalyticsReportSchedule = {
   createdAt: string
   updatedAt: string
 }
+// R454: 定期レポートの実行履歴（失敗理由・宛先別結果）。
+export type AnalyticsReportDelivery = {
+  channel: string
+  recipient: string
+  status: 'sent' | 'failed' | 'skipped'
+  reason?: string
+}
+export type AnalyticsReportRun = {
+  id: string
+  scheduleId: string
+  lineAccountId: string
+  scheduledFor: string
+  periodFrom: string
+  periodTo: string
+  timeZone: string
+  dataCutoffAt: string
+  state: 'running' | 'available' | 'partial' | 'unavailable' | 'failed'
+  result: unknown
+  deliveryResults: AnalyticsReportDelivery[]
+  errorCode: string | null
+  startedAt: string
+  completedAt: string | null
+}
+export type RecentOneTimeReport = {
+  schedule: AnalyticsReportSchedule
+  lastRun: AnalyticsReportRun | null
+}
 export type AnalyticsReportScheduleOptions = {
   timeZone: string
   savedAnalyses: Array<{ id: string; name: string; kind: 'cross' | 'funnel' }>
@@ -2382,13 +2527,19 @@ export class ApiError extends Error {
   readonly code: string | undefined
   /** 409などで画面を最新状態へ描き直すための機械データ。利用者へ直接表示しない。 */
   readonly data: unknown
+  /**
+   * 追跡番号（incidentId / requestId）。失敗の問い合わせに使う番号で、
+   * 画面は「（追跡番号 …）」として添える（要件 v6-34 §9-1）。
+   */
+  readonly trackingId: string | undefined
 
-  constructor(status: number, message?: string, code?: string, data?: unknown) {
+  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.data = data
+    this.trackingId = trackingId
   }
 }
 
@@ -2538,6 +2689,25 @@ function isSessionLostExempt(code: string | undefined): boolean {
 }
 
 /** エラー本文の `data` だけを機械処理用に保持する。本文の文言は表示契約と分ける。 */
+/**
+ * 失敗応答の追跡番号を取り出す。
+ *
+ * `incidentId`（未処理エラーは index.ts が毎回採番する）と
+ * `requestId`（共通基盤 §10 の応答形式）の両方を見る。
+ * 無い応答では何も返さない——画面は追跡番号を添えないだけ。
+ */
+export function extractApiErrorTrackingId(raw: string): string | undefined {
+  if (!raw) return undefined
+  try {
+    const body = JSON.parse(raw) as { incidentId?: unknown; requestId?: unknown }
+    if (typeof body.incidentId === 'string' && body.incidentId) return body.incidentId
+    if (typeof body.requestId === 'string' && body.requestId) return body.requestId
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function extractApiErrorData(raw: string): unknown {
   if (!raw) return undefined
   try {
@@ -2644,14 +2814,16 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
       res.status === 409 || res.status === 429 || res.status === 502
         ? extractApiErrorData(raw)
         : undefined,
+      extractApiErrorTrackingId(raw),
     )
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
-async function fetchApiBlob(path: string): Promise<Blob> {
+async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
   const res = await fetch(`${API_URL}${path}`, {
+    method: init?.method ?? 'GET',
     credentials: 'include',
     headers: adminSessionHeaders(),
   })
@@ -2668,6 +2840,8 @@ async function fetchApiBlob(path: string): Promise<Blob> {
       res.status,
       extractApiErrorMessage(raw, res.status),
       code,
+      undefined,
+      extractApiErrorTrackingId(raw),
     )
   }
   return res.blob()
@@ -2701,6 +2875,8 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
       res.status,
       extractApiErrorMessage(raw, res.status),
       code,
+      undefined,
+      extractApiErrorTrackingId(raw),
     )
   }
   const disposition = res.headers.get('Content-Disposition') ?? ''
@@ -2771,6 +2947,11 @@ export type FriendListParams = {
   /** 行動スコアの現在値。片方だけでも指定できる。 */
   scoreMin?: number
   scoreMax?: number
+  /**
+   * R300: `true` で「点数がついている人」だけ（未採点の0点を除く）。
+   * 行動スコア一覧の帯の引き継ぎ用。一覧・検索・配信の対象定義をそろえる。
+   */
+  scoredOnly?: boolean
 }
 
 export type FriendWithTags = Friend & { tags: Tag[] }
@@ -2865,7 +3046,8 @@ export type MileageHistoryItem = {
   entryType: 'grant' | 'reversal' | 'spend' | 'expiration' | 'adjustment'
   status: 'pending' | 'available' | 'void'
   amount: number
-  reason: string
+  /** 権限の外側のアカウントの記録では null。見分けには restricted を使う。 */
+  reason: string | null
   source: string
   sourceEventId: string | null
   sourceReferenceId: string | null
@@ -2874,6 +3056,13 @@ export type MileageHistoryItem = {
   executedByStaffName: string | null
   balanceAfter?: number
   occurredAt: string
+  /** この記録が属するLINEアカウント。分からないときは null。 */
+  lineAccountId?: string | null
+  /** true の行は見ている人の権限外アカウントの記録で、理由・実行者・元イベントは伏せてある。 */
+  restricted?: boolean
+  /** 手動調整につけた友だち通知の状態。通知なし・権限外の行は null。 */
+  notificationStatus?: string | null
+  notificationErrorCode?: string | null
 }
 export type MileageSelfInsights = {
   accountCount: number
@@ -2904,6 +3093,46 @@ export type MileageAdjustmentResult = {
     attemptCount: number
     errorCode: string | null
   } | null
+}
+
+/*
+ * R: 高額調整の承認依頼。境界以上の調整は実行せず依頼票として残り、
+ * 依頼した人とは別のオーナーが承認した時点で台帳へ記録される。
+ */
+export type MileageAdjustmentApprovalRequest = {
+  id: string
+  line_account_id: string
+  friend_id: string
+  friend_display_name?: string | null
+  direction: 'increase' | 'decrease'
+  amount: number
+  reason_category: string
+  reason: string
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  requested_by_staff_id: string
+  requested_by_staff_name: string
+  decided_by_staff_name: string | null
+  decided_at: string | null
+  decision_reason: string | null
+  created_at: string
+}
+
+/** 境界以上の調整を頼んだときの返事。台帳にはまだ書かれていない。 */
+export type MileageAdjustmentApprovalResult = {
+  approvalRequired: true
+  approvalThreshold: number
+  request: MileageAdjustmentApprovalRequest
+}
+
+/** 決めごとの事前テスト（実際には付与しない） */
+export type MileageEarningRuleTestResult = {
+  matchedEvents: number
+  matchedFriends: number
+  estimatedTotalMiles: number
+  maxPerFriend: number
+  overlappingRuleNames: string[]
+  initialStatus: 'available' | 'pending'
+  expirationExampleAt: string | null
 }
 /*
  * マイルの使い道（`/api/mileage/rewards`）。#772 で口が入った。
@@ -3089,6 +3318,9 @@ export type MileageAdminHistoryItem = {
   mode: 'automatic' | 'manual'
   executedByStaffName: string | null
   lineAccountName: string
+  lineAccountId?: string | null
+  notificationStatus?: string | null
+  notificationErrorCode?: string | null
   balanceAfter: number
   occurredAt: string
 }
@@ -3123,7 +3355,10 @@ export type MileageFriendV6 = {
   monthChange: number
   available: number
   pending: number
+  /** 30日以内に期限を迎える分。期限つきロットが無いときは null（0 とは別物）。 */
   expiringMiles30d: number | null
+  /** いちばん近い失効日。期限つきロットがあれば 30 日より先でも入る。 */
+  nextExpiringAt: string | null
   lifetimeEarned: number
   spent: number
   lastChangedAt: string | null
@@ -3140,6 +3375,8 @@ export type MileageFriendsV6Overview = {
     monthChange: number
     rankCounts: Array<{ rewardId: string; rankName: string; requiredMiles: number; friendCount: number }>
     expiringMiles30d: number | null
+    /** 一覧の中でいちばん近い失効日。期限つきロットがなければ null。 */
+    nextExpiringAt: string | null
   }
   items: MileageFriendV6[]
   pagination: { total: number; limit: number; offset: number }
@@ -3188,7 +3425,7 @@ export type MileageEarningRuleV6 = {
   draftUpdatedAt: string
   /** N-231 案1: いま公開中の版。null は未公開。 */
   publishedVersion: number | null
-  metrics30d: { eligible: number; granted: number; excluded: number }
+  metrics30d: { eligible: number; granted: number; grantedMiles: number; excluded: number }
 }
 
 export type MileageEarningRulesV6Overview = {
@@ -3512,6 +3749,11 @@ export type ReminderDeliveryRunsResponse = {
     lifecycleStatus: 'draft' | 'published' | 'stopped'
     /** 公開版の停止条件。公開版が無いときは null（未取得と区別する）。 */
     stopConditions: ReminderStopConditions | null
+    /**
+     * 公開版があるか（R146 監査）。無い下書きは「停止中」ではなく
+     * 「下書き」と出し、再開はさせない。
+     */
+    hasPublishedVersion: boolean
   }
   summary: {
     sent: number
@@ -3665,7 +3907,11 @@ export type RichMenuAreaPayload = {
   boundsY: number
   boundsWidth: number
   boundsHeight: number
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  /**
+   * O: datetimepicker・clipboard も送れる（受け口が intent から DB へ落とす）。
+   * intent が真実で、actionType は容れ物。
+   */
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
   actionData: Record<string, unknown>
   intent?: RichMenuAreaIntent | null
   /** 管理用のボタン名。 */
@@ -4116,6 +4362,35 @@ export type DashboardPreferenceResponse = {
   version: number
   cards: unknown
   updatedAt: string | null
+}
+
+/** M (今後の予定): 7日分の束ね。種類ごとの一覧への行き先を持つ。 */
+export type DashboardUpcomingItem = {
+  kind: 'broadcast' | 'reminder' | 'booking'
+  id: string
+  title: string
+  startsAt: string
+  href: string
+}
+
+export type DashboardUpcoming = {
+  items: DashboardUpcomingItem[]
+  asOf: string
+  rangeDays: number
+}
+
+/** L (#824 数字の出どころ): 出どころ別の失敗の数。台帳の件数と一致する。 */
+export type DeliveryFailureOrigin = {
+  source: string | null
+  failures: number
+  latestFailedAt: string | null
+  sampleDeliveryIds: string[]
+}
+
+export type DeliveryFailureOrigins = {
+  total: number
+  asOf: string | null
+  origins: DeliveryFailureOrigin[]
 }
 
 export type EcCommerceOverview = {
@@ -4841,10 +5116,43 @@ export type NenPhotoPublicationRecord = {
 }
 
 /** GET /api/nen-members/photos/:id の応答本体。 */
+/**
+ * #817: 同じ中身の写真で、すでに採用されて報酬が付いた前の投稿。
+ * 詳細口が返す。無ければ null。
+ */
+export type NenPhotoDuplicate = {
+  photoId: string
+  imageUrl: string
+  petName: string
+  createdAt: string
+  awardedPoints: number
+}
+
+/** #817: 採用する時点で使っている報酬の決まり（版の写し）。 */
+export type PhotoRewardPolicyInfo = {
+  versionNumber: number
+  policyKey: string
+  points: number
+}
+
 export type NenPhotoDetail = Record<string, unknown> & {
   history?: NenPhotoReviewHistoryEntry[]
   reward?: NenPhotoRewardState | null
   publication?: NenPhotoPublicationRecord | null
+  duplicate?: NenPhotoDuplicate | null
+  rewardPolicy?: PhotoRewardPolicyInfo | null
+}
+
+/** #817: 報酬の決まりの版の1行。 */
+export type PhotoRewardPolicyVersion = {
+  versionNumber: number
+  policyKey: string
+  points: number
+  summary: string
+  effectiveFrom: string | null
+  createdBy: string | null
+  createdAt: string
+  status: 'in_use' | 'reserved' | 'past'
 }
 
 /**
@@ -5003,7 +5311,7 @@ export interface GettingStartedStep {
   href: string | null
   reason: string | null
   /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
-  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' }>
+  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>
 }
 
 /** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */
@@ -5277,11 +5585,16 @@ export type FriendAddRunList = {
   total: number
   nextCursor: string | null
   summary: {
-    totalRuns: number
+    /** 直近28日に追加された人数（同じ人の再追加は1人）。 */
+    recentFriends: number
+    /** 直近28日の追加記録の件数（同じ人の再追加も数える）。 */
+    recentEvents: number
     cumulativeDeliveries: number
     scenarioStarts: number
     averageSendTimeMs: number | null
     failed: number
+    /** 実際に送った記録の最新日時。1件も送っていなければ null。 */
+    lastDeliveryAt: string | null
     staffHandoffs: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
   }
 }
@@ -5799,6 +6112,7 @@ export const api = {
       if (params?.visibility) query.visibility = params.visibility
       if (params?.scoreMin !== undefined) query.scoreMin = String(params.scoreMin)
       if (params?.scoreMax !== undefined) query.scoreMax = String(params.scoreMax)
+      if (params?.scoredOnly) query.scoredOnly = '1'
       for (const [k, v] of Object.entries(params?.metadata ?? {})) {
         if (k && v) query[`metadata.${k}`] = v
       }
@@ -6130,7 +6444,8 @@ export const api = {
       type: FriendFieldType
       folderId?: string | null
       options?: string[] | null
-      defaultValue?: string | null
+      /* R139: 複数選択の既定値は選択肢名の配列で渡す（サーバーがIDへ直す）。 */
+      defaultValue?: string | string[] | null
       ecFieldPath?: string | null
       ecIsMaster?: boolean
       isPersonal?: boolean
@@ -6148,19 +6463,26 @@ export const api = {
       id: string,
       accountId: string,
       data: Partial<
-        Pick<
-          FriendField,
-          | 'name'
-          | 'folderId'
-          | 'defaultValue'
-          | 'isPersonal'
-          | 'isStarred'
-          | 'displayOrder'
-          | 'ecFieldPath'
-          | 'ecIsMaster'
-          | 'version'
+        Omit<
+          Pick<
+            FriendField,
+            | 'name'
+            | 'folderId'
+            | 'defaultValue'
+            | 'isPersonal'
+            | 'isStarred'
+            | 'displayOrder'
+            | 'ecFieldPath'
+            | 'ecIsMaster'
+            | 'version'
+          >,
+          'defaultValue'
         >
-      > & { options?: string[] | null },
+      > & {
+        options?: string[] | null
+        /* R139: 複数選択の既定値は選択肢名の配列で渡す（サーバーがIDへ直す）。 */
+        defaultValue?: string | string[] | null
+      },
     ) =>
       fetchApi<ApiResponse<FriendField>>(`/api/friend-fields/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
@@ -6312,7 +6634,8 @@ export const api = {
     archive: (
       markId: string,
       accountId: string,
-      data: { replacementMarkId: string; impactRevision: string; expectedVersion: number },
+      /* R180: 0人のときは置換先なし（null）で保管できる。 */
+      data: { replacementMarkId: string | null; impactRevision: string; expectedVersion: number },
       idempotencyKey: string,
     ) => fetchApi<ApiResponse<{
       archived: true
@@ -6474,7 +6797,7 @@ export const api = {
   analytics: {
     reportSchedules: {
       list: (accountId: string) =>
-        fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; options: AnalyticsReportScheduleOptions }>>(
+        fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; recentOneTime?: RecentOneTimeReport[]; options: AnalyticsReportScheduleOptions }>>(
           `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         ),
       create: (accountId: string, data: Omit<
@@ -6498,6 +6821,15 @@ export const api = {
         `/api/analytics/report-schedules/${encodeURIComponent(id)}/status?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
+      // R454: しまった1回送信も依頼IDで履歴を引く・送り直す。
+      runs: (accountId: string, id: string) =>
+        fetchApi<ApiResponse<{ schedule: AnalyticsReportSchedule; runs: AnalyticsReportRun[] }>>(
+          `/api/analytics/report-schedules/${encodeURIComponent(id)}/runs?account_id=${encodeURIComponent(accountId)}`,
+        ),
+      retry: (accountId: string, id: string) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}/retry?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({}) },
+      ),
     },
     friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<ApiResponse<AnalyticsFriendsOverview>>(
@@ -6517,13 +6849,14 @@ export const api = {
       ),
     urlClicksOverview: (
       accountId: string,
-      params?: { from?: string; to?: string; limit?: number },
+      params?: { from?: string; to?: string; limit?: number; query?: string },
     ) => {
       const query = new URLSearchParams()
       query.set('account_id', accountId)
       if (params?.from) query.set('from', params.from)
       if (params?.to) query.set('to', params.to)
       if (params?.limit) query.set('limit', String(params.limit))
+      if (params?.query) query.set('query', params.query)
       return fetchApi<ApiResponse<AnalyticsUrlClicksOverview>>(
         `/api/analytics/url-clicks?${query.toString()}`,
       )
@@ -6792,6 +7125,10 @@ export const api = {
       category?: 'auth' | 'business'
       result?: 'success' | 'denied' | 'failed'
       attention?: boolean
+      /** 集計タブと同じ分類での絞り込み（監査 R69）。 */
+      group?: 'deleted' | 'sent' | 'changed' | 'login' | 'attention'
+      /** ページ分割もこの順序で行う（監査 R68）。 */
+      sort?: 'asc' | 'desc'
       actorId?: string
       action?: string
       query?: string
@@ -6805,6 +7142,8 @@ export const api = {
       if (params?.category) q.set('category', params.category)
       if (params?.result) q.set('result', params.result)
       if (params?.attention !== undefined) q.set('attention', String(params.attention))
+      if (params?.group) q.set('group', params.group)
+      if (params?.sort) q.set('sort', params.sort)
       if (params?.actorId) q.set('actorId', params.actorId)
       if (params?.action) q.set('action', params.action)
       if (params?.query) q.set('query', params.query)
@@ -6870,6 +7209,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ name, accountId }),
       }),
+    /**
+     * R230: フォーム全体を別IDの下書きとして複製する。質問・分岐・デザイン・
+     * 受付設定を引き継ぎ、回答・公開状態・集計は引き継がない。複製は受付停止。
+     */
+    duplicate: (id: string, accountId: string, name?: string) =>
+      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>(
+        `/api/forms/${id}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ name: name?.trim() ? name.trim() : undefined }) },
+      ),
     update: (
       id: string,
       accountId: string,
@@ -6910,6 +7258,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ expectedContentRevision }),
       }),
+    /**
+     * P（公開前の試し）：試し合言葉を発行する。生の合言葉はこの応答でしか返らない。
+     * 有効期限は24時間。試しの回答は集計に入らず、回答後の動作も動かない。
+     */
+    issueTestToken: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ token: string; expiresAt: string }>>(
+        `/api/forms/${id}/test-token?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({}) },
+      ),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<FormDeleteImpact>>(
         `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,
@@ -7003,6 +7360,17 @@ export const api = {
       fetchApi<ApiResponse<{ id: string }>>(
         `/api/measurement-sites/${encodeURIComponent(id)}`,
         { method: 'PATCH', body: JSON.stringify(data) },
+      ),
+    // 計測を止める・再開する。止めるときは理由が必須で、履歴は残る。
+    stop: (id: string, reason: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/measurement-sites/${encodeURIComponent(id)}/stop`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+      ),
+    resume: (id: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/measurement-sites/${encodeURIComponent(id)}/resume`,
+        { method: 'POST', body: JSON.stringify({}) },
       ),
   },
   funnels: {
@@ -7188,10 +7556,11 @@ export const api = {
   },
   /** 危険なファイルの検査。確かめ終わるまで中身は出さない。 */
   fileScan: {
-    list: (accountId: string, params?: { status?: string; limit?: number; offset?: number }) => {
+    list: (accountId: string, params?: { status?: string; q?: string; limit?: number; offset?: number }) => {
       const q = new URLSearchParams()
       q.set('accountId', accountId)
       if (params?.status) q.set('status', params.status)
+      if (params?.q) q.set('q', params.q)
       if (params?.limit) q.set('limit', String(params.limit))
       if (params?.offset) q.set('offset', String(params.offset))
       return fetchApi<ApiResponse<{ items: FileScanItem[]; total: number; limit: number; offset: number }>>(
@@ -7265,8 +7634,20 @@ export const api = {
       validUntil?: string | null
       fallbackValue?: string | null
       expiryBehavior?: 'stop' | 'fallback'
+      /** Q: 下書きとして作るとき 'draft'。省略は使用中で公開。 */
+      status?: 'draft' | 'active'
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    /** Q: 状態の切替（公開・止める・再開）。理由が必須。 */
+    setStatus: (id: string, accountId: string, data: {
+      to: 'active' | 'stopped'
+      changeReason: string
+      expectedVersion?: number
+    }) =>
+      fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}/status?accountId=${encodeURIComponent(accountId)}`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -7301,8 +7682,12 @@ export const api = {
       }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDeleteImpact>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
-    delete: (id: string, accountId: string) =>
-      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
+    // Q: 消す理由が必須。版履歴に残る。
+    delete: (id: string, accountId: string, reason: string) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}&reason=${encodeURIComponent(reason)}`,
+        { method: 'DELETE' },
+      ),
     replacementCandidates: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarReplacementCandidates>>(`/api/common-vars/${id}/replace`, {
         method: 'POST',
@@ -7316,7 +7701,7 @@ export const api = {
     replace: (
       id: string,
       accountId: string,
-      input: { replacementId: string; expectedVersion: number; expectedRevision: string },
+      input: { replacementId: string; expectedVersion: number; expectedRevision: string; changeReason: string },
     ) => fetchApi<ApiResponse<CommonVarReplacementResult>>(`/api/common-vars/${id}/replace`, {
       method: 'POST',
       body: JSON.stringify({ accountId, ...input, apply: true }),
@@ -7479,6 +7864,14 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE' }),
+    /**
+     * R250: このシナリオを終了後の移動先にしているシナリオの一覧。
+     * 削除の確認窓で「どのシナリオの設定が変わるか」を見せる。
+     */
+    moveReferrers: (id: string) =>
+      fetchApi<ApiResponse<{ items: Array<{ id: string; name: string }>; total: number }>>(
+        `/api/scenarios/${id}/move-referrers`,
+      ),
     addStep: (
       id: string,
       data: {
@@ -7545,6 +7938,12 @@ export const api = {
           deliveryAtLabel: string
           messageType: string
           messageContent: string
+          /** 下書きの通は送られない（R212）。 */
+          isDraft?: boolean
+          /** R237: 公開版・通の控えのどれか。 */
+          contentSource?: 'template' | 'step' | 'step-fallback'
+          /** R237: 控えに落ちた理由。 */
+          fallbackReason?: 'missing' | 'unpublished' | 'other_account' | null
         }>
       }>>(`/api/scenarios/${id}/preview${q}`, { signal })
     },
@@ -8408,11 +8807,11 @@ export const api = {
     generations: {
       get: (id: string) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}`),
-      /** 1回で1枚作る。画面が枚数ぶん繰り返す。 */
-      run: (id: string) =>
+      /** 1回で1枚作る。画面が枚数ぶん繰り返す。切り抜き位置は用途寸法への整形に使う。 */
+      run: (id: string, input?: { gravity?: string }) =>
         fetchApi<ApiResponse<BannerRunResult>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/run`, {
           method: 'POST',
-          body: JSON.stringify({}),
+          body: JSON.stringify(input ?? {}),
         }),
       cancel: (id: string) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/cancel`, {
@@ -8459,10 +8858,33 @@ export const api = {
         doneCount: number
         total: number
         allDone: boolean
+        /** 進捗帯を閉じたか（本人単位）。**完了判定には使わない。** */
+        dismissed: boolean
       }>>(`/api/getting-started${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`),
+    /** 進捗帯を閉じる。**閉じた日時は帯を出さないためだけの記憶。** */
+    dismiss: () =>
+      fetchApi<ApiResponse<{ dismissed: boolean }>>('/api/getting-started/dismiss', {
+        method: 'POST',
+      }),
   },
   /** レシピ。台帳 #134。 */
   recipes: {
+    /**
+     * 組織レシピを作る（owner/admin）。**静的な見本を置くだけ**で、
+     * ここでは定義を作らない。
+     */
+    create: (input: {
+      name: string
+      purpose: string
+      createsSummary: string
+      accountId: string
+      requiredFeatures?: string[]
+      items?: Array<{ kind: string; name: string; note: string }> | null
+    }) =>
+      fetchApi<ApiResponse<Recipe>>('/api/recipes', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
     list: (accountId?: string) =>
       fetchApi<ApiResponse<Recipe[]>>(
         `/api/recipes${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
@@ -8523,6 +8945,22 @@ export const api = {
         '/api/manual-links/check',
         { method: 'POST' },
       ),
+  },
+  /**
+   * 失敗文面の対応表。設計 ★V6 34（要件 v6-34 §9）。
+   *
+   * **起動時に一度取って版ごとキャッシュする**（`lib/error-messages.ts`）。
+   * 表に無いコードは汎用文面と追跡番号に落とす——原文を出さない。
+   */
+  errorMessages: {
+    list: () =>
+      fetchApi<ApiResponse<Array<{
+        code: string
+        message: string
+        nextAction: { kind: 'navigate' | 'retry' | 'contact_admin' | 'none'; target: string | null }
+        source: string
+        version: number
+      }>>>('/api/error-messages'),
   },
   /**
    * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
@@ -9186,6 +9624,13 @@ export const api = {
     ) => fetchApi<ApiResponse<AffiliateAccountSettlementPreview>>(
       `/api/affiliate-settlements/preview?${new URLSearchParams({ lineAccountId, ...period })}`,
     ),
+    /** R43: この期間に締め済みの台帳があれば、明細発行・CSV準備を再開するための情報を返す。 */
+    settlementCurrent: (
+      lineAccountId: string,
+      period: { periodFrom: string; periodTo: string },
+    ) => fetchApi<ApiResponse<AffiliateSettlementResume | null>>(
+      `/api/affiliate-settlements/current?${new URLSearchParams({ lineAccountId, ...period })}`,
+    ),
     closeSettlement: (
       data: {
         lineAccountId: string
@@ -9258,6 +9703,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
+        draftMessageContent: string | null;
         folderId: string | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
@@ -9320,6 +9767,8 @@ export const api = {
           tapCount: number;
           monthlySendCount: number | null;
           totalSendCount: number | null;
+          /** R194: 最新の下書き本文（管理一覧用）。公開版だけのときは null。 */
+          draftMessageContent: string | null;
           hasDraft: boolean;
           publishedVersion: number;
           publishedAt: string | null;
@@ -9358,6 +9807,8 @@ export const api = {
           trackedLinks: Array<{ id: string; name: string }>;
           /** 467: 一斉配信の参照（送った時の版のまま）。 */
           broadcasts: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null; referenceMode: 'fixed' | 'latest' }>;
+          /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。 */
+          reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>;
         };
         createdAt: string;
         updatedAt: string;
@@ -9446,6 +9897,8 @@ export const api = {
         trackedLinks: Array<{ id: string; name: string }>;
         /** 467: 一斉配信の参照（送った時の版のまま）。 */
         broadcasts: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null; referenceMode: 'fixed' | 'latest' }>;
+        /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。 */
+        reminderEnrollments: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>;
       }>>(`/api/templates/${id}/usages`),
     /**
      * 466: 版の履歴。新しい版から返る。status は in_use / reserved / past。
@@ -9993,6 +10446,18 @@ export const api = {
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/organization-overview${suffix}`)
     },
+    /** M (今後の予定): 7日分の束ね。読むだけ。 */
+    upcoming: (accountId: string, days = 7) =>
+      fetchApi<ApiResponse<DashboardUpcoming>>(
+        `/api/dashboard/upcoming?account_id=${encodeURIComponent(accountId)}&days=${encodeURIComponent(String(days))}`,
+      ),
+    /** L (#824 数字の出どころ): 出どころ別の失敗の数。 */
+    deliveryFailureOrigins: (accountId: string, since?: string) => {
+      const query = new URLSearchParams()
+      query.set('account_id', accountId)
+      if (since) query.set('since', since)
+      return fetchApi<ApiResponse<DeliveryFailureOrigins>>(`/api/dashboard/delivery-failure-origins?${query}`)
+    },
     preferences: {
       get: (accountId: string) => fetchApi<ApiResponse<DashboardPreferenceResponse>>(
         `/api/dashboard/preferences?account_id=${encodeURIComponent(accountId)}`,
@@ -10335,7 +10800,7 @@ export const api = {
         method: 'POST',
       }),
     /** 新しい rules 契約でテスト実行し、本番データは変更しない。 */
-    test: (accountId: string, ruleId: string) =>
+    test: (accountId: string, ruleId: string, input?: { routeId?: string | null; expectedAt?: string | null; friendId?: string | null }) =>
       fetchApi<ApiResponse<{
         stateChanged: false
         ruleId: string
@@ -10359,7 +10824,13 @@ export const api = {
         }
       }>('/api/friend-add-rules/test', {
         method: 'POST',
-        body: JSON.stringify({ accountId, ruleId }),
+        body: JSON.stringify({
+          accountId,
+          ruleId,
+          routeId: input?.routeId ?? null,
+          expectedAt: input?.expectedAt ?? null,
+          friendId: input?.friendId ?? null,
+        }),
       }),
     publish: (accountId: string, ruleId: string, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ id: string; versionNumber: number; publishedAt: string }>>(
@@ -10436,7 +10907,11 @@ export const api = {
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}/enabled?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify({ isEnabled }),
       }),
-    testSend: (data: { campaignKey: string; accountId: string; friendId: string }) =>
+    testSend: (data: {
+      campaignKey: string; accountId: string; friendId: string
+      /** 編集中の下書き。渡した項目だけ保存済み設定に重ねて試送する（本配信設定は変わらない）。 */
+      draft?: { title?: string; bodyText?: string; buttonLabel?: string; buttonUrl?: string; imageUrl?: string }
+    }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/test-send', { method: 'POST', body: JSON.stringify(data) }),
     jobs: (accountId: string) => fetchApi<ApiResponse<Array<{
       id: string; campaignKey: string; label: string; friendName: string | null
@@ -10604,16 +11079,54 @@ export const api = {
       // 差戻し画面の2つの約束（#931 N-312）。省略時は従来どおり案内あり・印なし。
       resubmitInvite?: boolean
       watchSubmitter?: boolean
+      // #817: 重複のときの「報酬なしで採用」。点数を付けずに採用だけ残す。
+      withoutReward?: boolean
     }, idempotencyKey: string) => fetchApi<ApiResponse<{
       awardedPoints: number
       pointBalance: number | null
       pointSync: string
       notificationStatus: 'sent' | 'failed'
+      // #817: 点数を付けなかった理由。重複の二重報酬止め・選んだ報酬なし。
+      rewardSkipped?: 'duplicate' | 'requested' | null
     }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, {
       method: 'PUT',
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(data),
     }),
+    /**
+     * #817: 報酬の決まりの版。保存するたびに版を1つ足し、前の版は変えない。
+     * 確認キーは自動で振る。
+     */
+    photoRewardPolicyVersions: () => fetchApi<ApiResponse<PhotoRewardPolicyVersion[]>>(
+      '/api/nen-members/photo-reward-policy/versions',
+    ),
+    createPhotoRewardPolicyVersion: (data: {
+      points: number
+      summary?: string
+      effectiveFrom?: string | null
+      expectedVersion?: number
+    }) => fetchApi<ApiResponse<{
+      created: boolean
+      version: Omit<PhotoRewardPolicyVersion, 'status' | 'createdBy'>
+    }>>(
+      '/api/nen-members/photo-reward-policy/versions',
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify(data),
+      },
+    ),
+    revertPhotoRewardPolicyVersion: (data: { versionNumber: number }) => fetchApi<ApiResponse<{
+      created: boolean
+      version: Omit<PhotoRewardPolicyVersion, 'status' | 'createdBy'>
+    }>>(
+      '/api/nen-members/photo-reward-policy/revert',
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify(data),
+      },
+    ),
     retryPhotoReviewNotification: (id: string, accountId: string, idempotencyKey: string) => fetchApi<ApiResponse<{
       notificationStatus: 'sent' | 'failed'
       resent?: boolean
@@ -10799,17 +11312,28 @@ export const api = {
     /**
      * `expectedVersionId` を渡すと楽観ロックになる——画面を開いたときの
      * 版とずれていれば409。別タブでの先勝ち保存を古い内容で上書きしない。
+     * R148 監査：通常保存は版IDを付け替えないため、保存のたびに変わる
+     * `expectedUpdatedAt`（開いたときの版時刻）も合わせて送る。
      */
-    saveDraft: (id: string, settings: ReminderDraftSettings, options: { expectedVersionId?: string } = {}) =>
+    saveDraft: (id: string, settings: ReminderDraftSettings, options: { expectedVersionId?: string; expectedUpdatedAt?: string } = {}) =>
       fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`, {
         method: 'PUT',
         body: JSON.stringify(options.expectedVersionId
-          ? { ...settings, expectedVersionId: options.expectedVersionId }
+          ? { ...settings, expectedVersionId: options.expectedVersionId, ...(options.expectedUpdatedAt ? { expectedUpdatedAt: options.expectedUpdatedAt } : {}) }
           : settings),
       }),
     validateDraft: (id: string) =>
       fetchApi<ApiResponse<ReminderValidationResult>>(`/api/reminders/${id}/validate`, {
         method: 'POST',
+      }),
+    /**
+     * 未保存の条件で人数を数え直す (R15)。条件を送らなければ保存済みの
+     * まま数える。顔ぶれ (先頭20人) も同じ条件で切って返す。
+     */
+    audience: (id: string, condition?: unknown) =>
+      fetchApi<ApiResponse<{ matched: number; excluded: number; sample: Array<{ id: string; displayName: string }> }>>(`/api/reminders/${id}/audience`, {
+        method: 'POST',
+        body: JSON.stringify(condition === undefined ? {} : { condition }),
       }),
     previewDraft: (id: string, targetDate?: string) =>
       fetchApi<ApiResponse<ReminderPreviewResult>>(`/api/reminders/${id}/preview`, {
@@ -11171,7 +11695,7 @@ export const api = {
       sourceReferenceId?: string
       expiresAt?: string
       notifyFriend?: boolean
-    }, idempotencyKey: string) => fetchApi<ApiResponse<MileageAdjustmentResult>>('/api/mileage/adjustments', {
+    }, idempotencyKey: string) => fetchApi<ApiResponse<MileageAdjustmentResult | MileageAdjustmentApprovalResult>>('/api/mileage/adjustments', {
       method: 'POST',
       headers: {
         'Idempotency-Key': idempotencyKey,
@@ -11179,6 +11703,53 @@ export const api = {
       },
       body: JSON.stringify(data),
     }),
+    adjustmentApprovals: (accountId: string, status?: 'pending' | 'approved' | 'rejected' | 'cancelled') =>
+      fetchApi<ApiResponse<MileageAdjustmentApprovalRequest[]>>(
+        `/api/mileage/adjustment-approvals?accountId=${encodeURIComponent(accountId)}${status ? `&status=${status}` : ''}`,
+      ),
+    approveAdjustment: (requestId: string, accountId: string) =>
+      fetchApi<ApiResponse<{ request: MileageAdjustmentApprovalRequest; entryId: string }>>(
+        `/api/mileage/adjustment-approvals/${encodeURIComponent(requestId)}/approve`,
+        { method: 'POST', body: JSON.stringify({ accountId }) },
+      ),
+    rejectAdjustment: (requestId: string, accountId: string, reason?: string) =>
+      fetchApi<ApiResponse<{ request: MileageAdjustmentApprovalRequest }>>(
+        `/api/mileage/adjustment-approvals/${encodeURIComponent(requestId)}/reject`,
+        { method: 'POST', body: JSON.stringify({ accountId, reason }) },
+      ),
+    cancelAdjustment: (requestId: string, accountId: string) =>
+      fetchApi<ApiResponse<{ request: MileageAdjustmentApprovalRequest }>>(
+        `/api/mileage/adjustment-approvals/${encodeURIComponent(requestId)}/cancel`,
+        { method: 'POST', body: JSON.stringify({ accountId }) },
+      ),
+    confirmMileageEntry: (entryId: string, data: { accountId: string; reason: string }) =>
+      fetchApi<ApiResponse<{ entry: unknown; alreadyConfirmed: boolean }>>(
+        `/api/mileage/entries/${encodeURIComponent(entryId)}/confirm`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    voidMileageEntry: (entryId: string, data: { accountId: string; reason: string }) =>
+      fetchApi<ApiResponse<{ entry: unknown; reversalEntryId: string }>>(
+        `/api/mileage/entries/${encodeURIComponent(entryId)}/void`,
+        {
+          method: 'POST',
+          headers: { 'X-Confirm-Irreversible': 'mileage-entry-void' },
+          body: JSON.stringify(data),
+        },
+      ),
+    /*
+     * R380/R381: 残高は動かさず、調整につけた友だち通知だけを再送する。
+     * 送り済みなら何もしない（サーバ側で二度送らない）。
+     */
+    retryMileageNotification: (entryId: string, data: { accountId: string }) =>
+      fetchApi<ApiResponse<{ notification: MileageAdjustmentResult['notification'] }>>(
+        `/api/mileage/entries/${encodeURIComponent(entryId)}/notification-retry`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    testEarningRule: (accountId: string, draft: unknown) =>
+      fetchApi<ApiResponse<MileageEarningRuleTestResult>>('/api/mileage/earning-rules/test', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, draft }),
+      }),
     rules: () => fetchApi<ApiResponse<MileageRule[]>>('/api/mileage/rules'),
     createRule: (data: {
       name: string
@@ -11323,10 +11894,15 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
-      /* 人が見つからなかった届物の箱(#939 N-367)。 */
-      unmatched: (id: string, lineAccountId: string, status?: 'pending' | 'resolved' | 'dismissed') =>
-        fetchApi<ApiResponse<IncomingWebhookUnmatchedItem[]>>(
-          `/api/webhooks/incoming/${encodeURIComponent(id)}/unmatched?lineAccountId=${encodeURIComponent(lineAccountId)}${status ? `&status=${status}` : ''}`,
+      /* 人が見つからなかった届物の箱(#939 N-367)。R401: 50件超えは limit/offset で辿る。 */
+      unmatched: (
+        id: string,
+        lineAccountId: string,
+        status?: 'pending' | 'resolved' | 'dismissed',
+        paging?: { limit?: number; offset?: number },
+      ) =>
+        fetchApi<ApiResponse<IncomingWebhookUnmatchedItem[]> & { total?: number }>(
+          `/api/webhooks/incoming/${encodeURIComponent(id)}/unmatched?lineAccountId=${encodeURIComponent(lineAccountId)}${status ? `&status=${status}` : ''}${paging?.limit ? `&limit=${paging.limit}` : ''}${paging?.offset ? `&offset=${paging.offset}` : ''}`,
         ),
       resolveUnmatched: (id: string, lineAccountId: string, data: { action: 'dismiss' } | { action: 'link'; friendId: string }) =>
         fetchApi<ApiResponse<{ id: string; status: string }>>(
@@ -11437,7 +12013,7 @@ export const api = {
     },
     /* #838 第2段: Google Sheets への直接書き出し。接続はOAuthの別画面へ飛ばす。 */
     googleSheets: {
-      connection: (lineAccountId: string) =>
+      connection: (lineAccountId: string, request?: { signal?: AbortSignal }) =>
         fetchApi<ApiResponse<{
           connection: GoogleSheetsConnection
           oauthConfigured: boolean
@@ -11445,10 +12021,12 @@ export const api = {
           canManage: boolean
         }>>(
           `/api/integrations/google-sheets/connection?account_id=${encodeURIComponent(lineAccountId)}`,
+          request,
         ),
-      runs: (lineAccountId: string) =>
+      runs: (lineAccountId: string, request?: { signal?: AbortSignal }) =>
         fetchApi<ApiResponse<{ runs: GoogleSheetsSyncRun[] }>>(
           `/api/integrations/google-sheets/runs?account_id=${encodeURIComponent(lineAccountId)}`,
+          request,
         ),
       connectStart: (lineAccountId: string) =>
         fetchApi<ApiResponse<{ authorizeUrl: string; mode: 'connect' | 'reconnect' }>>(
@@ -11943,13 +12521,59 @@ export const api = {
     reconcile: (groupId: string, dryRun: boolean) =>
       fetchApi<ApiResponse<{
         dryRun: boolean;
-        diffs: Array<{ kind: string; detail: string; pageId?: string; richMenuId?: string }>;
+        diffs: Array<{
+          kind: string; detail: string; pageId?: string; richMenuId?: string;
+          /** K-2: ずれの種類ごとの直し方（1つ）。 */
+          fix: { label: string; action: string };
+        }>;
         applied?: number;
         failed?: Array<{ diff: { kind: string; detail: string }; error: string }>;
+        /** K-2: 自動で直さない分（取り込み候補）。運用者が画面で直す。 */
+        unapplied?: Array<{ diff: { kind: string; detail: string }; reason: string }>;
+        runId?: string;
       }>>(`/api/rich-menu-groups/${groupId}/reconcile`, {
         method: 'POST',
         body: JSON.stringify({ dryRun }),
       }),
+
+    /** K-1: 最新の公開実行の4段（画像・メニュー・割り当て・片付け）。 */
+    publishProgress: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        run: {
+          id: string; mode: string; status: string;
+          startedAt: string; completedAt: string | null;
+        } | null;
+        steps: Array<{
+          key: string; label: string;
+          status: 'done' | 'failed' | 'running' | 'pending' | 'skipped';
+        }>;
+        message: string | null;
+      }>>(`/api/rich-menu-groups/${groupId}/publish-progress`),
+
+    /** O-1: 公開前の確認（自前検査・実機・版）。LINE検査は別口で通す。 */
+    prepublishCheck: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        fingerprint: string;
+        pageCount: number;
+        maxPages: number;
+        selfCheck: { ok: boolean; message: string };
+        deviceConfirmed: boolean;
+        deviceConfirmedAt: string | null;
+        versionNumber: number | null;
+      }>>(`/api/rich-menu-groups/${groupId}/prepublish-check`),
+
+    /** O-1: 公開する形のままLINEの検査APIに通す。下書きもLINEも変えない。 */
+    validatePublish: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        checks: Array<{ key: 'self' | 'line'; ok: boolean; message: string }>;
+      }>>(`/api/rich-menu-groups/${groupId}/validate`, { method: 'POST' }),
+
+    /** O-1: 実機で見た記録。今の下書きにひもづく。 */
+    confirmDevice: (groupId: string) =>
+      fetchApi<ApiResponse<{ confirmedAt: string; fingerprint: string }>>(
+        `/api/rich-menu-groups/${groupId}/device-confirm`,
+        { method: 'POST' },
+      ),
 
     /** N-154: メニュー全体を別IDの下書きとして複製する。 */
     duplicate: (groupId: string, idempotencyKey: string, input?: { name?: string }) =>
@@ -12145,6 +12769,9 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
+    /** M (止めた経路のQR): 印刷用PDFをサーバーで作る。止めた経路は409。 */
+    qrPdf: (id: string): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST' }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
     /** クリックがどこから来ているか。utm_source > 参照元のホスト > 直接アクセス */
@@ -12249,6 +12876,11 @@ export const api = {
       description?: string | null
       rewardAmount?: number
       rewardMiles?: number
+      windowDays?: number
+      capTotal?: number | null
+      capMonthlyPerAffiliate?: number | null
+      receptionFrom?: string | null
+      receptionTo?: string | null
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
@@ -12266,6 +12898,11 @@ export const api = {
       description: string | null
       rewardAmount: number
       rewardMiles: number
+      windowDays: number
+      capTotal: number | null
+      capMonthlyPerAffiliate: number | null
+      receptionFrom: string | null
+      receptionTo: string | null
       lineAccountId: string | null
       tagId: string | null
       scenarioId: string | null
@@ -12275,6 +12912,34 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    /** 決まりの版の履歴（新しい順）。#823 */
+    versions: (id: string) =>
+      fetchApi<{ success: boolean; data: OfferVersion[] }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/versions`,
+      ),
+    /** 今の決まりと上限の残り。#823 */
+    capStatus: (id: string, affiliateId?: string) => {
+      const qs = affiliateId ? `?affiliateId=${encodeURIComponent(affiliateId)}` : ''
+      return fetchApi<{ success: boolean; data: OfferCapStatus }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/cap-status${qs}`,
+      )
+    },
+    /** 決まりの新しい版を保存する。前の版は変わらない。#823 */
+    createVersion: (id: string, data: {
+      rewardAmount?: number
+      rewardMiles?: number
+      windowDays?: number
+      capTotal?: number | null
+      capMonthlyPerAffiliate?: number | null
+      receptionFrom?: string | null
+      receptionTo?: string | null
+      effectiveFrom?: string | null
+      idempotencyKey?: string
+    }) =>
+      fetchApi<{ success: boolean; data: OfferVersion }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/versions`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
   },
   conversionApprovals: {
     list: (params?: { status?: 'pending' | 'approved' | 'rejected'; limit?: number; offset?: number }) => {
@@ -12306,6 +12971,11 @@ export const api = {
       }; error?: string }>(
         '/api/conversions/approvals/bulk',
         { method: 'POST', body: JSON.stringify({ items }) },
+      ),
+    /** どの紹介に成果を付けたかの記録。無い昔の成果は success:false。#823 */
+    attribution: (eventId: string) =>
+      fetchApi<{ success: boolean; data: AttributionDecisionView; error?: string }>(
+        `/api/conversions/events/${encodeURIComponent(eventId)}/attribution`,
       ),
   },
   /**
@@ -12547,6 +13217,11 @@ export const api = {
         total: number
         page: number
         limit: number
+        summary: {
+          sentLast30Days: number
+          pendingLast30Days: number
+          failedLast30Days: number
+        }
         sort: Array<{ field: string; direction: 'asc' | 'desc' }>
       }>>(`/api/ad-platforms/logs?${query.toString()}`)
     },
@@ -12590,6 +13265,18 @@ export const api = {
           lastRunAt: string | null
           lastError: string | null
         }>
+        /** R275: 手入力の記録は1行ずつ返す。取消済みも履歴として出す。 */
+        manualEntries?: Array<{
+          id: string
+          sourceLabel: string
+          day: string
+          amountMinor: number
+          currency: string
+          entryRouteId: string | null
+          cancelledAt: string | null
+          cancelReason: string | null
+          createdAt: string
+        }>
       }>>(`/api/ad-costs${suffix}`)
     },
     create: (data: {
@@ -12604,6 +13291,12 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    // R275: 手入力で間違えて入れた費用を集計から外す。行は残り、理由が必須。
+    cancel: (id: string, reason: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/ad-costs/${encodeURIComponent(id)}/cancel`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+      ),
   },
   uploads: {
     /**
@@ -12675,6 +13368,27 @@ export interface BookingMenuResourceAssignment {
   quantity: number;
   isActive: boolean;
   warning: 'resource_inactive' | 'capacity_exceeded' | null;
+}
+
+/** T: 予約メニューの版。いちばん新しい版だけ status が in_use。 */
+export interface BookingMenuVersion {
+  version_number: number;
+  title: string;
+  status: 'in_use' | 'past';
+  summary: string;
+  author: string | null;
+  at: string;
+  lines: string[];
+}
+
+/** T: 予約の写し。予約した時点の内容（値段・時間）。無い予約は null。 */
+export interface BookingMenuSnapshot {
+  version: number;
+  name: string;
+  durationMinutes: number;
+  bufferAfterMinutes: number;
+  basePrice: number;
+  priceMode: string;
 }
 
 export interface BookingException {
@@ -12947,6 +13661,8 @@ export interface BookingSlotCheckResult {
   bookable: boolean;
   reasons: BookingSlotBlockReason[];
   per_staff: BookingSlotCheckStaff[];
+  /** R314: 判定に実際に使った枠間隔（分）。無い応答では刻み幅を書かない文言にする。 */
+  slotGranularityMinutes?: number;
 }
 
 export interface ProxyBookingResult {
@@ -12991,6 +13707,16 @@ export interface BookingHistorySummary {
   staffName: string;
 }
 
+/**
+ * R320: 前回来店の申し送りの元予約。過去の来店完了だけを指す。
+ * 日時・状態と一緒に表示し、元予約への入口にする。
+ */
+export interface BookingHandoverRef {
+  id: string;
+  startsAt: string;
+  status: string;
+}
+
 export interface BookingCustomerContext {
   id: string;
   friendId: string | null;
@@ -13001,6 +13727,7 @@ export interface BookingCustomerContext {
   tags: Array<{ id: string; name: string }>;
   mileageBalance: number | null;
   previousHandover: string | null;
+  previousHandoverBooking: BookingHandoverRef | null;
   recentBookings: BookingHistorySummary[];
 }
 
@@ -13045,6 +13772,8 @@ export interface BookingAdminDetail {
   notificationPolicy: BookingNotificationPolicy;
   menuName: string;
   staffName: string;
+  /** T: 予約の写し。写しが無い予約（490 より前）は null。 */
+  menuSnapshot?: BookingMenuSnapshot | null;
   customer: {
     friendId: string | null;
     bookingCustomerId: string | null;
@@ -13056,7 +13785,10 @@ export interface BookingAdminDetail {
     mileageBalance: number | null;
   };
   previousHandover: string | null;
+  previousHandoverBooking: BookingHandoverRef | null;
   history: BookingHistorySummary[];
+  /** R321: 同じ顧客の予約総数（この予約を除く）。history は直近10件だけ。 */
+  historyTotal: number;
   reminders: Array<{
     id: string;
     kind: string;
@@ -13251,7 +13983,7 @@ export const bookingApi = {
     ),
   getAvailability: (
     accountId: string,
-    params: { menuId: string; staffId?: string; from: string; to: string; excludeBookingId?: string },
+    params: { menuId: string; staffId?: string; from: string; to: string; excludeBookingId?: string; applyStoreRules?: boolean },
   ) => {
     const query = new URLSearchParams({
       account_id: accountId,
@@ -13261,6 +13993,8 @@ export const bookingApi = {
     });
     if (params.staffId) query.set('staff_id', params.staffId);
     if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
+    // (b): お客様の画面の見本だけ店舗ルールで判定する。付けない呼び出しは従来どおり。
+    if (params.applyStoreRules) query.set('apply_store_rules', '1');
     return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
   },
   /**
@@ -13348,6 +14082,22 @@ export const bookingApi = {
       method: 'PUT',
       body: JSON.stringify({ ...body, expectedVersion }),
     }),
+  /** T: 版の履歴。新しい順。いちばん新しい版だけ status が in_use。 */
+  listMenuVersions: (accountId: string, id: string) =>
+    fetchApi<{ versions: BookingMenuVersion[] }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions`, accountId),
+    ),
+  /** T: 版の中身。比べる画面に行の一覧で返す。 */
+  getMenuVersion: (accountId: string, id: string, version: number) =>
+    fetchApi<{ version: BookingMenuVersion }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions/${version}`, accountId),
+    ),
+  /** T: この版に戻す。昔の版は変えず、その中身で新しい版を作る。 */
+  revertMenuVersion: (accountId: string, id: string, version: number, expectedVersion: number) =>
+    fetchApi<{ ok: true; version: number }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions/${version}/revert`, accountId),
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ),
   saveMenuResources: (
     accountId: string,
     id: string,
@@ -13609,6 +14359,13 @@ export const bookingApi = {
        */
       todayActiveTotal?: number
       weekTotal: number
+      /**
+       * 表示タブ（今日・今週・今月）の数。取消・拒否・期限切れを除いた
+       * 有効な予約だけ（カレンダーと同じ基準）。段階配備中の旧Workerでは未返却。
+       */
+      todayTabTotal?: number
+      weekTabTotal?: number
+      monthTabTotal?: number
       byMenu: Array<{ name: string; total: number }>
     }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))
   },
@@ -13644,6 +14401,8 @@ export interface EventListItem {
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
   is_published: number;
+  /** U: 保存する状態（下書き・公開中・一時停止・終了・中止）。旧応答には無いため optional。 */
+  lifecycle_status?: EventLifecycleStatus | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -13687,6 +14446,8 @@ export interface EventDetail {
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
   is_published: number;
+  /** U: 保存する状態。旧応答には無いため optional。 */
+  lifecycle_status?: EventLifecycleStatus | null;
   sort_order: number;
   confirmation_message_extra: string | null;
   reminder_message_extra: string | null;
@@ -13819,11 +14580,29 @@ export interface EventBookingSummary {
   totalCapacity: number | null;
 }
 
+/**
+ * イベント一覧の全体集計（R79/R80）。ページ切りとは別に、絞り込み条件に合う
+ * 全イベントの「今後の開催枠」だけを数えたもの。Worker の
+ * summarizeFutureEventSlots が作る。
+ */
+export interface EventListSummary {
+  upcoming_slots: number;
+  upcoming_active: number;
+  upcoming_capacity: number | null;
+  fill_rate: number | null;
+  nearly_full: number;
+  low_applications: number;
+  nearest_upcoming_starts_at: string | null;
+  nearest_low_starts_at: string | null;
+}
+
 type EventListResponse<T> = {
   items: T[];
   total: number;
   limit: number;
   sort: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  /** 全体集計。古い応答には無いため optional。無いときはページ内の行で数える。 */
+  summary?: EventListSummary;
 };
 
 export interface EventWaitlistItem {
@@ -13914,6 +14693,61 @@ export interface EventOccurrenceApplicants {
 export type EventWaitlistPromotionResult =
   | { kind: 'promoted'; occurrenceVersion: number; promoted: { waitlistId: string; friendId: string; partySize: number; status: 'offered'; offeredAt: string; expiresAt: string } }
   | { kind: 'noop'; occurrenceVersion: number; promoted: null; reason: string };
+
+/**
+ * U: イベントの保存する状態（v6-29 §11-2）。
+ * 「満席」「申込が少ない」は保存せず、開催回・定員・日時からの計算で札を出す。
+ */
+export type EventLifecycleStatus = 'draft' | 'published' | 'paused' | 'ended' | 'cancelled';
+
+export interface EventSlotChange {
+  slot_id: string;
+  starts_at?: string;
+  ends_at?: string;
+  capacity?: number | null;
+  is_active?: number;
+}
+
+export interface EventChangeImpact {
+  slot_id: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number | null;
+  confirmed_seats: number;
+  waiting_seats: number;
+  pending_reminders: number;
+  errors: string[];
+  notices: string[];
+}
+
+export interface EventChangePreview {
+  event_id: string;
+  impacts: EventChangeImpact[];
+  event_notices: string[];
+  blocked: boolean;
+  total_confirmed: number;
+  total_waiting: number;
+  total_pending_reminders: number;
+}
+
+export interface EventChangeApplyResult {
+  success: boolean;
+  deduplicated?: boolean;
+  version?: number;
+  log_id: string;
+  affected_confirmed?: number;
+  affected_waiting?: number;
+  notified?: number;
+}
+
+export interface EventLifecycleResult {
+  success: boolean;
+  deduplicated?: boolean;
+  unchanged?: boolean;
+  lifecycle_status: EventLifecycleStatus;
+  version: number;
+  log_id?: string;
+}
 
 export const eventsApi = {
   listEvents: (
@@ -14015,7 +14849,7 @@ export const eventsApi = {
       { method: 'DELETE' },
     ),
 
-  /** キャンセル待ち。自動では繰り上げない。誰を通すかは運用の判断。 */
+  /** キャンセル待ち。空きが出たら先頭へ自動で案内し、本人の承諾で確定する。手動の案内もできる。 */
   listWaitlist: (accountId: string, eventId: string) =>
     fetchApi<{ waitlist: EventWaitlistItem[] }>(
       withAccount(`/api/events/admin/events/${eventId}/waitlist`, accountId),
@@ -14039,11 +14873,67 @@ export const eventsApi = {
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicant-broadcasts/preview`, accountId),
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ).then((response) => response.data),
-  promoteOccurrenceWaitlist: (accountId: string, occurrenceId: string, expectedVersion: number) =>
+  promoteOccurrenceWaitlist: (accountId: string, occurrenceId: string, expectedVersion: number, reason: string) =>
     fetchApi<{ success: true; data: EventWaitlistPromotionResult }>(
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/promote`, accountId),
-      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+      { method: 'POST', body: JSON.stringify({ expectedVersion, reason }) },
     ).then((response) => response.data),
+  /** U: 待ち順の手動変更。理由が必須。 */
+  reorderOccurrenceWaitlist: (
+    accountId: string,
+    occurrenceId: string,
+    body: { ordered_ids: string[]; expectedVersion?: number; reason: string },
+  ) =>
+    fetchApi<{ success: true; occurrence_version: number; order: string[]; log_id: string }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/reorder`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 飛ばし（最後尾へ回す）。理由が必須。行は消さない。 */
+  skipOccurrenceWaitlist: (
+    accountId: string,
+    occurrenceId: string,
+    body: { waitlist_id: string; expectedVersion?: number; reason: string },
+  ) =>
+    fetchApi<{ success: true; occurrence_version: number; waitlist_id: string; log_id: string }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/skip`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 状態の切替（下書き・公開中・一時停止・終了・中止）。 */
+  setEventLifecycle: (
+    accountId: string,
+    eventId: string,
+    body: { to: EventLifecycleStatus; reason?: string; idempotency_key?: string },
+  ) =>
+    fetchApi<EventLifecycleResult>(
+      withAccount(`/api/events/admin/events/${eventId}/lifecycle`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 変更の事前表示（読み取り専用）。 */
+  previewEventChange: (
+    accountId: string,
+    eventId: string,
+    body: { slot_changes: EventSlotChange[]; event_changes?: { venue_name?: string | null; venue_url?: string | null } },
+  ) =>
+    fetchApi<EventChangePreview>(
+      withAccount(`/api/events/admin/events/${eventId}/change-review`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 変更確認の適用。 */
+  applyEventChange: (
+    accountId: string,
+    eventId: string,
+    body: {
+      expected_version: number;
+      change_reason?: string;
+      idempotency_key: string;
+      slot_changes: EventSlotChange[];
+      event_changes?: { venue_name?: string | null; venue_url?: string | null };
+    },
+  ) =>
+    fetchApi<EventChangeApplyResult>(
+      withAccount(`/api/events/admin/events/${eventId}/change-review/apply`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   listBookings: (
     accountId: string,
     eventId: string,
@@ -14161,14 +15051,39 @@ export type WebinarNotificationSettings = {
   startEnabled: boolean
   missedEnabled: boolean
   missedTime: string
+  /** 見逃し配信の期限（開催からの日数。1〜30、既定7）。N。 */
+  missedWindowDays: number
   completedEnabled: boolean
   updatedAt: string
 }
 
 export type WebinarNotificationSettingsInput = Omit<
   WebinarNotificationSettings,
-  'webinarId' | 'version' | 'updatedAt'
->
+  'webinarId' | 'version' | 'updatedAt' | 'missedWindowDays'
+> & {
+  missedWindowDays?: number
+}
+
+export type WebinarVideoAsset = {
+  id: string
+  stage: 'uploaded' | 'inspecting' | 'converting' | 'packaging' | 'thumbnail' | 'ready' | 'failed'
+  stageLabel: string
+  provider: string
+  durationSeconds: number
+  errorCode: string | null
+  expiresAt: string | null
+  purgedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type WebinarSessionCapacity = {
+  sessionStartAt: number
+  capacity: number | null
+  reservedCount: number
+  state: 'open' | 'full' | 'closed'
+  remaining: number | null
+}
 
 export type WebinarSkipReasonCount = {
   /** 記録された理由の符号。古い行では null のことがある。 */
@@ -14258,6 +15173,18 @@ export type WebinarAnalytics = {
   dropoff: Array<{ bucketStart: number; viewers: number }>
   viewSegments?: Array<{ startSeconds: number; endSeconds: number; viewers: number }>
   measurement?: { state: 'available' | 'unavailable'; reason: string | null }
+  /** J-1「どこまで見られたか」の線と3つの数字の材料。 */
+  retention: {
+    bucketSeconds: number
+    started: number
+    points: Array<{ atSeconds: number; viewers: number }>
+  }
+  /** 有効な区間の合計30秒以上の人数。 */
+  startedViewers: number
+  /** 異常として除外した heartbeat の件数。 */
+  heartbeatRejects: number
+  /** 申し込みボタンが出た時刻（秒）。CTAが無ければ null。 */
+  ctaAtSeconds: number | null
   formFunnel: {
     ctaImpressions: number
     ctaClicks: number
@@ -14510,6 +15437,22 @@ export const webinarApi = {
       }),
     }),
   analytics: (id: string) => fetchApi<{ data: WebinarAnalytics }>(`/api/webinars/${id}/analytics`),
+  videoAsset: (id: string) => fetchApi<{ data: { asset: WebinarVideoAsset | null } }>(
+    `/api/webinars/${id}/video-asset`,
+  ),
+  advanceVideoAsset: (
+    id: string,
+    input: { stage: WebinarVideoAsset['stage']; errorCode?: string | null; durationSeconds?: number | null },
+  ) => fetchApi<{ data: { asset: WebinarVideoAsset } }>(`/api/webinars/${id}/video-asset/advance`, {
+    method: 'POST', body: JSON.stringify(input),
+  }),
+  webinarSession: (id: string, startAt: number) => fetchApi<{ data: { session: WebinarSessionCapacity | null } }>(
+    `/api/webinars/${id}/sessions/${startAt}`,
+  ),
+  setSessionCapacity: (id: string, startAt: number, capacity: number | null) =>
+    fetchApi<{ data: { session: WebinarSessionCapacity } }>(`/api/webinars/${id}/sessions/${startAt}`, {
+      method: 'PUT', body: JSON.stringify({ capacity }),
+    }),
   participants: (id: string, cursor?: string, limit?: number, filter?: WebinarParticipantClassification) => fetchApi<{ data: WebinarParticipantPage }>(
     `/api/webinars/${id}/participants${cursor || limit || filter ? `?${[
       cursor ? `cursor=${encodeURIComponent(cursor)}` : '',

@@ -13,6 +13,8 @@ import { ActionCell, DataTable, TableHeadRow, TableStateRow, Td, Th } from '@/co
 import TargetMissing from '@/components/shared/target-missing'
 import VersionCompare from '@/components/shared/version-compare'
 import VersionHistory, { type HistoryVersion } from '@/components/shared/version-history'
+import FlexPreviewComponent from '@/components/flex-preview'
+import { validateFlexContent } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { templateDeleteDescription } from '../template-delete-message'
@@ -27,6 +29,8 @@ interface Usage {
   trackedLinks: Array<{ id: string; name: string }>
   /** 467: 一斉配信の参照（送った時の版のまま）。来ない古い応答では空扱い。 */
   broadcasts?: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null }>
+  /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。来ない古い応答では空扱い。 */
+  reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>
 }
 
 interface TemplateVersionItem {
@@ -49,6 +53,13 @@ function broadcastStatusText(status: string): string {
   if (status === 'sending') return '送信中'
   if (status === 'sent') return '送信済み'
   return '下書き'
+}
+
+/** R347: 旧版に固定された登録の状態の札。取消ずみは再開すると送り直す。 */
+function enrollmentStatusText(status: string): string {
+  if (status === 'active') return '送信待ち'
+  if (status === 'cancelled') return '取消ずみ'
+  return status
 }
 
 function TemplateDetailInner() {
@@ -183,6 +194,7 @@ function TemplateDetailInner() {
   }, [id, reload])
 
   const broadcastRefs = usage?.broadcasts ?? []
+  const enrollmentRefs = usage?.reminderEnrollments ?? []
   const usageCount = usage
     ? usage.autoReplies.length
       + usage.automations.length
@@ -191,6 +203,7 @@ function TemplateDetailInner() {
       + usage.richMenuAreas.length
       + usage.trackedLinks.length
       + broadcastRefs.length
+      + enrollmentRefs.length
     : 0
   // 予約済み・送信中の配信で使うものは消せない（API も 409 で止める）。
   const blockingBroadcasts = broadcastRefs.filter(
@@ -327,6 +340,15 @@ function TemplateDetailInner() {
       href: u.status === 'scheduled'
         ? `/broadcasts/reserved?id=${u.broadcastId}`
         : `/broadcasts/detail?id=${u.broadcastId}`,
+    })),
+    // R347: 旧公開版に固定された登録は版と状態を出す。消すと本文が控えに変わる。
+    ...enrollmentRefs.map((u) => ({
+      key: `reminder-enrollment-${u.enrollmentId}`,
+      kind: 'リマインダ',
+      name: u.reminderName,
+      version: versionText(u.versionNumber),
+      status: enrollmentStatusText(u.enrollmentStatus),
+      href: `/reminders/detail?id=${u.reminderId}`,
     })),
   ]
 
@@ -489,12 +511,41 @@ function TemplateDetailInner() {
             <section className="bg-canvas rounded-card border-hairline border p-4">
               <p className="text-ink text-sm font-semibold">届き方</p>
               <p className="text-ink-faint mt-0.5 mb-2 text-xs">お客様の画面での見え方です。</p>
-              <div className="bg-canvas-sunken rounded-card p-3">
-                <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-                <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-                  {body}
-                </p>
-              </div>
+              {/*
+                R249: カード型は編集と同じカード表示にする。本文の
+                生表示では壊れたカードが「作れた」ように見える。
+                形式が壊れている間は誤りを名指しし、直し先へ案内する。
+              */}
+              {template.messageType === 'flex' ? (
+                (() => {
+                  const flexError = validateFlexContent('flex', body)
+                  if (flexError) {
+                    return (
+                      <div role="alert" className="bg-canvas-sunken rounded-card p-3">
+                        <p className="text-danger text-xs font-semibold">{flexError}</p>
+                        <p className="text-ink-secondary mt-1 text-xs">
+                          このままでは公開できません。
+                          {canMutateTemplates ? (
+                            <Link href={`/templates/edit?id=${id}`} className="text-action underline">再編集で直してください。</Link>
+                          ) : 'オーナー・管理者に再編集を依頼してください。'}
+                        </p>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div className="bg-canvas-sunken rounded-card p-3">
+                      <FlexPreviewComponent content={body} />
+                    </div>
+                  )
+                })()
+              ) : (
+                <div className="bg-canvas-sunken rounded-card p-3">
+                  <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
+                  <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                    {body}
+                  </p>
+                </div>
+              )}
             </section>
 
             <section className="bg-canvas rounded-card border-hairline border p-4">

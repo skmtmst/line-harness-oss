@@ -142,6 +142,9 @@ describe('POST /api/ad-costs', () => {
       });
     expect((await post({ amountMinor: -1 })).status).toBe(400);
     expect((await post({ amountMinor: 1.5 })).status).toBe(400);
+    expect((await post({ amountMinor: '' })).status).toBe(400);
+    expect((await post({ amountMinor: '   ' })).status).toBe(400);
+    expect((await post({ amountMinor: 0 })).status).toBe(201);
     expect((await post({ day: '09/20' })).status).toBe(400);
     expect((await post({ currency: 'YENX' })).status).toBe(400);
     expect((await post({ sourceLabel: '' })).status).toBe(400);
@@ -158,6 +161,75 @@ describe('POST /api/ad-costs', () => {
       }),
     });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/ad-costs/:id/cancel (R275)', () => {
+  function seedEntries(testDb: SqliteD1): void {
+    testDb.raw.prepare(
+      `INSERT INTO ad_cost_entries
+         (id, line_account_id, ad_platform_id, entry_route_id, source_label, day,
+          amount_minor, currency, source, imported_at, created_at, updated_at)
+       VALUES ('e-manual', 'a1', NULL, NULL, 'チラシ', '2026-09-20', 8000, 'JPY', 'manual', NULL, ?, ?),
+              ('e-import', 'a1', 'p1', NULL, 'Meta広告', '2026-09-20', 3000, 'JPY', 'import', ?, ?, ?),
+              ('e-other', 'b1', 'pb', NULL, 'Meta広告', '2026-09-20', 100, 'JPY', 'import', ?, ?, ?)`,
+    ).run(NOW, NOW, NOW, NOW, NOW, NOW, NOW, NOW);
+  }
+
+  function cancel(
+    testDb: SqliteD1,
+    id: string,
+    by = staff('owner-1', 'tenant-1'),
+    body: Record<string, unknown> = { reason: '日付を間違えた' },
+  ) {
+    return req(app(by), testDb, `/api/ad-costs/${id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('手入力の費用を取消すると集計から外れ、取消理由が履歴に残る', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    seedEntries(testDb);
+
+    const res = await cancel(testDb, 'e-manual');
+    expect(res.status).toBe(200);
+
+    const list = await req(app(staff('owner-1', 'tenant-1')), testDb, '/api/ad-costs?accountId=a1&from=2026-09-01&to=2026-09-30');
+    const body = await list.json() as {
+      data: {
+        rows: Array<{ sourceLabel: string }>;
+        manualEntries: Array<{ id: string; cancelledAt: string | null; cancelReason: string | null }>;
+      };
+    };
+    // 集計行には取消した「チラシ」が出ない
+    expect(body.data.rows.map((row) => row.sourceLabel)).toEqual(['Meta広告']);
+    // 履歴側には行と理由が残る
+    const cancelled = body.data.manualEntries.find((entry) => entry.id === 'e-manual')!;
+    expect(cancelled.cancelledAt).toBeTruthy();
+    expect(cancelled.cancelReason).toBe('日付を間違えた');
+  });
+
+  it('取消済みをもう一度取消す・取込分を取消す・理由なしは受け付けない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    seedEntries(testDb);
+
+    await cancel(testDb, 'e-manual');
+    expect((await cancel(testDb, 'e-manual')).status).toBe(409);
+    expect((await cancel(testDb, 'e-import')).status).toBe(409);
+    expect((await cancel(testDb, 'e-manual', staff('owner-1', 'tenant-1'), {})).status).toBe(400);
+    expect((await cancel(testDb, 'missing')) .status).toBe(404);
+  });
+
+  it('別統括の記録は取消せず、係員は取消せない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    seedEntries(testDb);
+    expect((await cancel(testDb, 'e-other')).status).toBe(404);
+    expect((await cancel(testDb, 'e-manual', staff('staff-1', 'tenant-1', 'staff'))).status).toBe(403);
   });
 });
 

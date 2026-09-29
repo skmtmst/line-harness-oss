@@ -7,8 +7,9 @@ import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import LinePreview from '@/components/shared/line-preview'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
@@ -355,8 +356,13 @@ function CarouselEditorInner() {
       return next
     })
 
-  const anyImage = panels.some((p) => p.thumbnailImageUrl.trim())
-  const textMax = anyImage ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
+  /*
+   * パネルごとの本文上限。タイトルか画像があるパネルは60文字、両方無ければ
+   * 120文字（LINE の決まり）。画面全体で1つの上限にすると、タイトルありで
+   * 61文字が通って保存時に弾かれる。
+   */
+  const textMaxFor = (panel: Panel) =>
+    panel.title.trim() || panel.thumbnailImageUrl.trim() ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
 
   const save = async () => {
     /*
@@ -496,10 +502,10 @@ function CarouselEditorInner() {
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
               <label className="text-ink-faint">
                 置き場：
-                <SelectField
+                <Select
                   aria-label="置き場"
                   value={folderId ?? ''}
-                  onChange={(e) => setFolderId(e.target.value || null)}
+                  onChange={(value) => setFolderId(value || null)}
                   options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                 />
               </label>
@@ -591,7 +597,7 @@ function CarouselEditorInner() {
                 />
               </Field>
 
-              <Field label="パネルタイトル" htmlFor={`cr-panel-${i}-title`} note={`${TITLE_MAX}文字まで`}>
+              <Field label="パネルタイトル" htmlFor={`cr-panel-${i}-title`} note={`${TITLE_MAX}文字まで。タイトルは全部のパネルに入れるか、全部空にしてください。`}>
                 <input
                   id={`cr-panel-${i}-title`}
                   type="text"
@@ -611,9 +617,9 @@ function CarouselEditorInner() {
                 htmlFor={`cr-panel-${i}-text`}
                 required
                 note={
-                  anyImage
-                    ? `画像があるため${TEXT_MAX_WITH_IMAGE}文字までです。`
-                    : `${TEXT_MAX_WITHOUT_IMAGE}文字まで（画像を入れると${TEXT_MAX_WITH_IMAGE}文字になります）。`
+                  panel.title.trim() || panel.thumbnailImageUrl.trim()
+                    ? `タイトルか画像があるため${TEXT_MAX_WITH_IMAGE}文字までです。`
+                    : `${TEXT_MAX_WITHOUT_IMAGE}文字まで（タイトルか画像を入れると${TEXT_MAX_WITH_IMAGE}文字になります）。`
                 }
               >
                 <textarea
@@ -625,16 +631,16 @@ function CarouselEditorInner() {
                 />
                 <p
                   className={`mt-1 text-xs tabular-nums ${
-                    [...panel.text].length > textMax ? 'text-danger' : 'text-ink-faint'
+                    [...panel.text].length > textMaxFor(panel) ? 'text-danger' : 'text-ink-faint'
                   }`}
                 >
-                  {[...panel.text].length} / {textMax}
+                  {[...panel.text].length} / {textMaxFor(panel)}
                 </p>
               </Field>
 
               <div>
                 <p className="text-ink-secondary mb-2 text-sm font-medium">
-                  このパネルの選択肢（最大{MAX_ACTIONS}つ）
+                  このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）
                 </p>
                 {panel.actions.map((action, ai) => (
                   <div key={ai} className="border-hairline mb-2 rounded-lg border p-3">
@@ -751,33 +757,23 @@ function CarouselEditorInner() {
                 出るので数えられません。
               </p>
             </div>
-            <div className="space-y-1">
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="radio"
-                  name="tap-limit"
-                  checked={tapLimitMode === 'none'}
-                  onChange={() => setTapLimitMode('none')}
-                  className="mt-0.5"
-                />
-                <span className="text-sm">何度でも押せる</span>
-              </label>
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="radio"
-                  name="tap-limit"
-                  checked={tapLimitMode === 'once'}
-                  onChange={() => setTapLimitMode('once')}
-                  className="mt-0.5"
-                />
-                <span className="text-sm">
-                  1人につき1回だけ
-                  <span className="text-ink-faint block text-[11px]">
-                    このカルーセル全体で1回です。どのボタンを押しても、次からは動きません。
-                  </span>
-                </span>
-              </label>
-            </div>
+            <RadioCardGroup legend="押せる回数">
+              <RadioCard
+                name="tap-limit"
+                value="none"
+                checked={tapLimitMode === 'none'}
+                onChange={() => setTapLimitMode('none')}
+                title="何度でも押せる"
+              />
+              <RadioCard
+                name="tap-limit"
+                value="once"
+                checked={tapLimitMode === 'once'}
+                onChange={() => setTapLimitMode('once')}
+                title="1人につき1回だけ"
+                note="このカルーセル全体で1回です。どのボタンを押しても、次からは動きません。"
+              />
+            </RadioCardGroup>
 
             {tapLimitMode === 'once' && (
               <Field

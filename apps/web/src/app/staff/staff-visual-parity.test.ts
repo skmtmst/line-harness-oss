@@ -59,7 +59,8 @@ describe('V6 30 ログインユーザーの画面契約', () => {
   })
 
   it('一覧は1440pxで横スクロールさせない7列の固定表にする', () => {
-    expect(staffSource).toContain('w-full table-fixed text-sm')
+    // 表は共通の DataTable（中で w-full table-fixed を持つ）。
+    expect(staffSource).toContain('<DataTable')
     expect(staffSource).toContain('colSpan={7}')
     expect(staffSource).not.toContain('min-w-[1180px]')
   })

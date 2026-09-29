@@ -2,17 +2,18 @@
 
 import DateField from '@/components/shared/date-field'
 import DateTimeField from '@/components/shared/date-time-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
-import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED } from '@/lib/common-vars'
+import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED, isSecretLikeVarValue } from '@/lib/common-vars'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import RadioCard from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -170,6 +171,9 @@ function NewCommonVarInner() {
   const [fallbackValue, setFallbackValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /** R36: 直し方は欄のすぐ下にも出す。全体の失敗文だけではどの欄か分からない。 */
+  const [valueFieldError, setValueFieldError] = useState('')
+  const [fallbackFieldError, setFallbackFieldError] = useState('')
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
   const longValueRef = useRef<HTMLTextAreaElement>(null)
@@ -216,6 +220,10 @@ function NewCommonVarInner() {
     if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [secretWarningFields])
 
+  // 直したら欄の下の文言は消す。残ると直ったのに怒られているように見える。
+  useEffect(() => { setValueFieldError('') }, [value, type])
+  useEffect(() => { setFallbackFieldError('') }, [fallbackValue, type])
+
   /*
    * 入力中に画面の外へ出る操作を止める（VAR-01 監査）。リッチメニュー・
    * ウェビナーと同じ `useUnsavedGuard`＋確認ダイアログの形で、一覧リンク・
@@ -235,7 +243,7 @@ function NewCommonVarInner() {
   // 種別は内部stateからのみ選ぶが、見つからないときは先頭へ倒す（非null断言を使わない）。
   const spec = TYPES.find((t) => t.key === type) ?? TYPES[0]
 
-  const save = async (allowSensitive = false) => {
+  const save = async (allowSensitive = false, asDraft = false) => {
     if (saving) return
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください')
@@ -258,9 +266,11 @@ function NewCommonVarInner() {
     }
     // VAR-06: 空欄不可の種別（真偽・年月日・日時）や形式違いは、APIを呼ぶ
     // 前に理由を出して値の欄へ戻す。400を一律の失敗文へ置き換えない。
+    // 理由は欄のすぐ下にも出す（R36）。
     const valueError = commonVarValueError(type, value)
     if (valueError) {
       setError(valueError)
+      setValueFieldError(valueError)
       focusField('cv-value')
       return
     }
@@ -277,9 +287,25 @@ function NewCommonVarInner() {
       const fallbackError = commonVarValueError(type, fallbackValue, '代替値')
       if (fallbackError) {
         setError(fallbackError)
+        setFallbackFieldError(fallbackError)
         focusField('cv-fallback-value')
         return
       }
+    }
+    // Q: 鍵の形・長い乱数はサーバでも422で止まる。確認を通しても保存できない
+    // ものはここで止め、理由を欄のすぐ下へ出す。
+    const secretField = isSecretLikeVarValue(value)
+      ? 'cv-value'
+      : expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)
+        ? 'cv-fallback-value'
+        : null
+    if (secretField) {
+      const message = '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください'
+      setError(message)
+      if (secretField === 'cv-value') setValueFieldError(message)
+      else setFallbackFieldError(message)
+      focusField(secretField)
+      return
     }
     const sensitiveFields = sensitiveFieldLabels(value, memo)
     if (sensitiveFields.length > 0 && !allowSensitive) {
@@ -303,11 +329,16 @@ function NewCommonVarInner() {
         validUntil: validUntil || null,
         expiryBehavior,
         fallbackValue: expiryBehavior === 'fallback' ? fallbackValue : null,
+        status: asDraft ? 'draft' as const : 'active' as const,
       }
       const res = await api.commonVars.create(payload)
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
+        // 口で止まった理由も欄のすぐ下に映す（R36）。
+        const target = focusTargetForReason(res.error)
+        if (target === 'cv-value') setValueFieldError(res.error)
+        else if (target === 'cv-fallback-value') setFallbackFieldError(res.error)
         return
       }
       router.push('/contents/vars')
@@ -322,6 +353,8 @@ function NewCommonVarInner() {
         if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
           const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
           if (target) focusField(target)
+          if (target === 'cv-value') setValueFieldError(e.message)
+          else if (target === 'cv-fallback-value') setFallbackFieldError(e.message)
         }
       }
     } finally {
@@ -391,10 +424,11 @@ function NewCommonVarInner() {
             <label htmlFor="cv-folder" className="text-ink-secondary mb-1 block text-sm font-medium">
               フォルダ
             </label>
-            <SelectField
+            <Select
+              aria-label="フォルダ"
               id="cv-folder"
               value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
+              onChange={(value) => setFolderId(value)}
               options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
             />
           </div>
@@ -415,19 +449,13 @@ function NewCommonVarInner() {
           </div>
           <div>
             <label htmlFor="cv-expiry-behavior" className="text-ink-secondary mb-1 block text-xs font-medium">期間外の動作</label>
-            <SelectField id="cv-expiry-behavior" value={expiryBehavior} onChange={(e) => setExpiryBehavior(e.target.value as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} className="w-full" />
+            <Select size="full" aria-label="期間外の動作" id="cv-expiry-behavior" value={expiryBehavior} onChange={(value) => setExpiryBehavior(value as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
           </div>
           {expiryBehavior === 'fallback' && (
             <div>
               <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
               {type === 'boolean' ? (
-                <SelectField
-                  id="cv-fallback-value"
-                  value={fallbackValue}
-                  onChange={(e) => setFallbackValue(e.target.value)}
-                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
-                  className="w-full"
-                />
+                <Select size="full" aria-label="代替値" id="cv-fallback-value" value={fallbackValue} onChange={(value) => setFallbackValue(value)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
               ) : type === 'date' ? (
                 <DateField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
               ) : type === 'datetime' ? (
@@ -441,6 +469,7 @@ function NewCommonVarInner() {
                   className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
                 />
               )}
+              {fallbackFieldError ? <p className="text-danger mt-1 text-xs">{fallbackFieldError}</p> : null}
             </div>
           )}
         </fieldset>
@@ -483,36 +512,28 @@ function NewCommonVarInner() {
           </legend>
           <div className="max-w-xl space-y-2">
             {TYPES.map((t) => (
-              <label
+              <RadioCard
                 key={t.key}
-                className={`rounded-control flex cursor-pointer items-center gap-3 border p-3 transition-colors ${
-                  type === t.key
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-hairline hover:bg-canvas-sunken'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="cv-type"
-                  value={t.key}
-                  checked={type === t.key}
-                  onChange={() => {
-                    setType(t.key)
-                    setValue('')
-                  }}
-                  className="accent-accent-deep"
-                />
-                <span
-                  className="bg-canvas border-hairline text-ink-secondary flex h-8 w-11 shrink-0 items-center justify-center rounded border text-xs"
-                  aria-hidden="true"
-                >
-                  {t.mark}
-                </span>
-                <span className="min-w-0">
-                  <span className="text-ink block text-sm font-medium">{t.label}</span>
-                  <span className="text-ink-faint block text-xs">{t.note}</span>
-                </span>
-              </label>
+                name="cv-type"
+                value={t.key}
+                checked={type === t.key}
+                onChange={() => {
+                  setType(t.key)
+                  setValue('')
+                }}
+                title={t.label}
+                note={
+                  <>
+                    <span
+                      className="bg-canvas border-hairline text-ink-secondary mr-2 inline-flex h-8 w-11 items-center justify-center rounded border text-xs"
+                      aria-hidden="true"
+                    >
+                      {t.mark}
+                    </span>
+                    {t.note}
+                  </>
+                }
+              />
             ))}
           </div>
         </fieldset>
@@ -521,7 +542,7 @@ function NewCommonVarInner() {
           <label htmlFor="cv-value" className="text-ink-secondary mb-1 block text-sm font-medium">
             値 {COMMON_VAR_VALUE_REQUIRED.has(type) && <span className="text-danger">*</span>}
           </label>
-          {type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full max-w-md" /> : type === 'long_text' ? <textarea
+          {type === 'boolean' ? <Select size="full" aria-label="値" id="cv-value" value={value} onChange={(value) => { setValue(value); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="max-w-md" /> : type === 'long_text' ? <textarea
             ref={longValueRef}
             id="cv-value"
             maxLength={10000}
@@ -554,6 +575,7 @@ function NewCommonVarInner() {
             placeholder={spec.placeholder}
             className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
           />}
+          {valueFieldError ? <p className="text-danger mt-1 max-w-md text-xs">{valueFieldError}</p> : null}
           {type !== 'number' && type !== 'boolean' && (
             <p className="text-ink-faint mt-1 max-w-md text-right text-xs tabular-nums">
               {value.length}/{type === 'long_text' ? 10000 : VALUE_MAX}
@@ -630,6 +652,10 @@ function NewCommonVarInner() {
         actions={(
           <>
             <Button href="/contents/vars">共通情報一覧へ戻る</Button>
+            {/* Q: まだ配信へ出したくないものは下書きで残せる。下書きは差し込みに使われない。 */}
+            <Button type="button" disabled={saving} onClick={() => void save(false, true)}>
+              下書きとして保存
+            </Button>
             <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
               {saving ? '登録中…' : '登録'}
             </Button>
@@ -637,7 +663,7 @@ function NewCommonVarInner() {
         )}
       />
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、入力した共通情報は失われます。保存せずに移動しますか？"

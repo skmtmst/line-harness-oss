@@ -229,6 +229,19 @@ function positiveInteger(value: unknown, label: string, optional = false): numbe
   return parsed;
 }
 
+/*
+ * 在庫だけは 0 が意味を持つ（品切れ）。空欄は無制限、0 は品切れ、
+ * 正の整数は上限。画面の案内と交換判定（0 なら常に在庫切れ）と揃える。
+ */
+function nonNegativeInteger(value: unknown, label: string): number | null {
+  if (value == null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new MileageRewardError('invalid_number', `${label}は0以上の整数で入力してください`);
+  }
+  return parsed;
+}
+
 function optionalDate(value: unknown, label: string): string | null {
   if (value == null || value === '') return null;
   if (typeof value !== 'string' || Number.isNaN(new Date(value).getTime())) {
@@ -309,7 +322,7 @@ export function validateMileageRewardDraft(value: MileageRewardDraftInput): Requ
     imageUrl: optionalText(value.imageUrl, '画像URL', 2000),
     rewardKind,
     requiredMiles: positiveInteger(value.requiredMiles, '必要マイル')!,
-    stockLimit: positiveInteger(value.stockLimit, '在庫数', true),
+    stockLimit: nonNegativeInteger(value.stockLimit, '在庫数'),
     perFriendLimit: positiveInteger(value.perFriendLimit, '1人あたりの交換上限', true),
     startsAt,
     endsAt,
@@ -484,12 +497,18 @@ export async function getMileageRewardRedemptionCounts(
   ).bind(input.friendId, input.lineAccountId).first<{ id: string; user_id: string | null }>();
   if (!friend) throw new MileageRewardError('friend_not_found', '友だち情報を確認できませんでした', 404);
   const beneficiaryKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
+  /*
+   * R388: 交換済みの表示も上限と同じ本人キー集合で数える。統合後に
+   * 「交換できる」と出して上限で止める食い違いを出さない。
+   */
+  const limitKeys = await collectBeneficiaryKeysForLimit(db, input.friendId, friend.user_id, beneficiaryKey);
+  const limitPlaceholders = limitKeys.map(() => '?').join(', ');
   const rows = await db.prepare(
     `SELECT reward_id, reward_version_id, COUNT(*) AS count
        FROM mileage_redemptions
-      WHERE line_account_id = ? AND beneficiary_key = ? AND status != 'refunded'
+      WHERE line_account_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'
       GROUP BY reward_id, reward_version_id`,
-  ).bind(input.lineAccountId, beneficiaryKey).all<{
+  ).bind(input.lineAccountId, ...limitKeys).all<{
     reward_id: string;
     reward_version_id: string;
     count: number;
@@ -779,7 +798,7 @@ export async function getMileageRedemption(
   return row ? mapRedemption(row) : null;
 }
 
-export type MileageRedemptionListStatus = MileageRedemptionStatus | 'all';
+export type MileageRedemptionListStatus = MileageRedemptionStatus | 'all' | 'needs_attention';
 
 export interface MileageRedemptionListItem extends MileageRewardRedemption {
   rewardName: string;
@@ -804,10 +823,16 @@ export async function listMileageRedemptions(
 }> {
   const limit = Math.min(100, Math.max(1, Math.floor(input.limit)));
   const offset = Math.max(0, Math.floor(input.offset));
-  const status = input.status ?? 'delivery_failed';
-  const statusClause = status === 'all' ? '' : 'AND r.status = ?';
+  const status = input.status ?? 'needs_attention';
+  // R364: 既定は「要対応」（届かなかった交換＋送ったか分からない交換）。
+  // `delivering` のままの照合待ちを既定の一覧から消さない。
+  const statusClause = status === 'all'
+    ? ''
+    : status === 'needs_attention'
+      ? `AND r.status IN ('delivery_failed', 'delivering')`
+      : 'AND r.status = ?';
   const binds: unknown[] = [input.lineAccountId];
-  if (status !== 'all') binds.push(status);
+  if (status !== 'all' && status !== 'needs_attention') binds.push(status);
   const totalRow = await db.prepare(
     `SELECT COUNT(*) AS count FROM mileage_redemptions r
       WHERE r.line_account_id = ? ${statusClause}`,
@@ -824,6 +849,35 @@ export async function listMileageRedemptions(
     items: rows.results.map((row) => ({ ...mapRedemption(row), rewardName: row.reward_name })),
     pagination: { total: totalRow?.count ?? 0, limit, offset },
   };
+}
+
+/*
+ * R388: 一人一回の上限を数える識別キーの集め方。現在のキーに加え、
+ * - この友だち自身の友だちキー（統合前はこのキーで交換していた）
+ * - 今同じ本人に結び付く友だちの友だちキー（統合相手の交換も一人分）
+ * - これらの友だちが結び付いたことのある本人キー（解除・移行後も引き継ぐ）
+ * をまとめる。export は試験から規則を確かめるため。
+ */
+export async function collectBeneficiaryKeysForLimit(
+  db: D1Database,
+  friendId: string,
+  currentUserId: string | null,
+  currentKey: string,
+): Promise<string[]> {
+  const keys = new Set<string>([currentKey, `friend:${friendId}`]);
+  const coLinked = currentUserId
+    ? (await db.prepare(`SELECT id FROM friends WHERE user_id = ?`)
+      .bind(currentUserId).all<{ id: string }>()).results.map((row) => row.id)
+    : [];
+  const friendIds = [...new Set([friendId, ...coLinked])];
+  for (const id of friendIds) keys.add(`friend:${id}`);
+  const placeholders = friendIds.map(() => '?').join(', ');
+  const history = await db.prepare(
+    `SELECT DISTINCT user_id FROM friend_identity_links
+      WHERE friend_id IN (${placeholders}) AND user_id IS NOT NULL`,
+  ).bind(...friendIds).all<{ user_id: string }>();
+  for (const row of history.results) keys.add(`user:${row.user_id}`);
+  return [...keys];
 }
 
 export async function reserveMileageRewardRedemption(
@@ -860,6 +914,16 @@ export async function reserveMileageRewardRedemption(
   ).bind(input.friendId, input.lineAccountId).first<{ id: string; user_id: string | null }>();
   if (!friend) throw new MileageRewardError('friend_not_found', '友だち情報を確認できませんでした', 404);
   const beneficiaryKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
+  /*
+   * R388: 確定文と事後確認も事前確認と同じキー集合で数える。確認だけ広げると
+   * 同時実行の隙間で抜けるため、INSERT時の条件と対にしておく。
+   * perFriendLimit が無い特典では現在のキーだけ（余計な読みを足さない）。
+   */
+  let limitKeys = [beneficiaryKey];
+  if (version.perFriendLimit) {
+    limitKeys = await collectBeneficiaryKeysForLimit(db, input.friendId, friend.user_id, beneficiaryKey);
+  }
+  const limitPlaceholders = limitKeys.map(() => '?').join(', ');
   const wallet = await db.prepare(
     `SELECT beneficiary_key, beneficiary_user_id, beneficiary_friend_id, available, version
        FROM mileage_wallets WHERE program_id = ? AND beneficiary_key = ?`,
@@ -868,10 +932,20 @@ export async function reserveMileageRewardRedemption(
     throw new MileageRewardError('insufficient_miles', '交換に必要なマイルが足りません', 409);
   }
   if (version.perFriendLimit) {
+    /*
+     * R388: 一人一回は現在の本人識別だけでなく、統合・解除・移行の前後で
+     * 同じ友だちが名乗った識別キーすべてで数える。現在のキー・友だちキー・
+     * 同じ本人に結び付く友だちのキー・結び付き履歴の本人キーをまとめる。
+     * 規則:
+     * - 異なる本人（結び付きの無い別キー）は別々に数える。
+     * - 返却済み（refunded）は数えない。
+     * - 誤統合の訂正で外れた後は別々に数えるが、統合期間中の本人キーでの
+     *   交換は共有のまま残る（履歴は消さない）。
+     */
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
-        WHERE reward_id = ? AND beneficiary_key = ? AND status != 'refunded'`,
-    ).bind(reward.id, beneficiaryKey).first<{ count: number }>();
+        WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
+    ).bind(reward.id, ...limitKeys).first<{ count: number }>();
     if ((count?.count ?? 0) >= version.perFriendLimit) {
       throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
     }
@@ -910,6 +984,22 @@ export async function reserveMileageRewardRedemption(
     remaining -= amount;
   }
   if (remaining > 0) {
+    // m22u R360: 残高はあるのに内訳が足りない主因は期限切れ。期限切れの
+    // ロットが不足分を説明できるときは「足りません」として案内し、
+    // 内訳エラー（確認できませんでした）にはしない。
+    const expiredHeld = await db.prepare(
+      `SELECT COALESCE(SUM(remaining_amount), 0) AS expired_remaining
+         FROM mileage_grant_lots
+        WHERE program_id = ? AND beneficiary_key = ? AND status = 'available'
+          AND remaining_amount > 0 AND expires_at IS NOT NULL AND expires_at <= ?`,
+    ).bind(reward.programId, beneficiaryKey, now).first<{ expired_remaining: number }>();
+    if (Number(expiredHeld?.expired_remaining ?? 0) > 0) {
+      throw new MileageRewardError(
+        'insufficient_miles',
+        '期限切れのマイルは使えないため、交換に必要なマイルが足りません',
+        409,
+      );
+    }
     throw new MileageRewardError('mileage_lots_unavailable', '交換できるマイルの内訳を確認できませんでした', 409);
   }
 
@@ -939,7 +1029,8 @@ export async function reserveMileageRewardRedemption(
           ) < ?)
           AND (? IS NULL OR (
             SELECT COUNT(*) FROM mileage_redemptions person_limit
-             WHERE person_limit.reward_id = ? AND person_limit.beneficiary_key = ?
+             WHERE person_limit.reward_id = ?
+               AND person_limit.beneficiary_key IN (${limitPlaceholders})
                AND person_limit.status != 'refunded'
           ) < ?)`,
     ).bind(
@@ -950,7 +1041,7 @@ export async function reserveMileageRewardRedemption(
       reward.programId, input.idempotencyKey,
       code?.id ?? null, code?.id ?? null,
       version.stockLimit, version.id, version.stockLimit,
-      version.perFriendLimit, reward.id, beneficiaryKey, version.perFriendLimit,
+      version.perFriendLimit, reward.id, ...limitKeys, version.perFriendLimit,
     ),
     db.prepare(
       `INSERT INTO mileage_ledger
@@ -1031,8 +1122,8 @@ export async function reserveMileageRewardRedemption(
     if (version.perFriendLimit != null) {
       const currentCount = await db.prepare(
         `SELECT COUNT(*) AS count FROM mileage_redemptions
-          WHERE reward_id = ? AND beneficiary_key = ? AND status != 'refunded'`,
-      ).bind(reward.id, beneficiaryKey).first<{ count: number }>();
+          WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
+      ).bind(reward.id, ...limitKeys).first<{ count: number }>();
       if ((currentCount?.count ?? 0) >= version.perFriendLimit) {
         throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
       }
@@ -1093,16 +1184,64 @@ export async function recordMileageRedemptionAttempt(
   return (await getMileageRedemption(db, current.id))!;
 }
 
+/**
+ * R362: 返却の勝者決め。自動返却と再試行が重なっても、残高・内訳の
+ * 書き換えは1回だけにする。`batch` の中の条件付き更新だけでは、
+ * 状態の更新が0件でもロット復元が走り、二重に戻る。
+ *
+ * 手順は次の順番に固定する。
+ *
+ * 1. 状態だけを条件付きで `refunded` へ進める（勝者決め）。
+ *    取れなかった走者は残高も内訳も触らない。
+ * 2. 勝者だけが台帳・ロット・コード解放を1つの batch で書く。
+ * 3. すでに `refunded` の行への再呼び出しは、台帳が無ければ
+ *    書き足して再開できる（中断後の再開）。ロットは戻さない。
+ * 4. `succeeded` へ移った交換への遅い返却は 409 で止める。
+ */
 export async function refundMileageRewardRedemption(
   db: D1Database,
   input: { redemptionId: string; reason: string },
 ): Promise<MileageRewardRedemption> {
   const current = await getMileageRedemption(db, input.redemptionId);
   if (!current) throw new MileageRewardError('not_found', '交換履歴が見つかりません', 404);
-  if (current.status === 'refunded') return current;
   if (current.status === 'succeeded') {
     throw new MileageRewardError('already_delivered', 'すでに特典を渡した交換は返金できません', 409);
   }
+  if (current.status === 'refunded') {
+    await completeRefundWrites(db, current, input.reason);
+    return (await getMileageRedemption(db, current.id))!;
+  }
+  const now = new Date().toISOString();
+  const claimed = await db.prepare(
+    `UPDATE mileage_redemptions
+        SET status = 'refunded', refunded_at = ?, next_retry_at = NULL, updated_at = ?
+      WHERE id = ? AND status NOT IN ('succeeded', 'refunded')`,
+  ).bind(now, now, current.id).run();
+  if ((claimed.meta?.changes ?? 0) !== 1) {
+    const latest = await getMileageRedemption(db, current.id);
+    if (latest?.status === 'succeeded') {
+      throw new MileageRewardError('already_delivered', 'すでに特典を渡した交換は返金できません', 409);
+    }
+    if (latest?.status === 'refunded') {
+      await completeRefundWrites(db, latest, input.reason);
+      return (await getMileageRedemption(db, current.id))!;
+    }
+    throw new MileageRewardError('refund_source_missing', '戻すマイルの記録を確認できませんでした', 409);
+  }
+  await completeRefundWrites(db, current, input.reason);
+  return (await getMileageRedemption(db, current.id))!;
+}
+
+/**
+ * 勝者だけが呼ぶ、台帳・ロット・コード解放の書き込み。
+ * 台帳の冪等キーで二重書き込みを防ぐ。ロット復元は台帳が
+ * 初めて書かれたときだけ行う（再開時は戻さない）。
+ */
+async function completeRefundWrites(
+  db: D1Database,
+  current: MileageRewardRedemption,
+  reason: string,
+): Promise<void> {
   const reward = await db.prepare(
     `SELECT v.required_miles FROM mileage_reward_versions v WHERE v.id = ?`,
   ).bind(current.rewardVersionId).first<{ required_miles: number }>();
@@ -1120,29 +1259,29 @@ export async function refundMileageRewardRedemption(
   }
   const now = new Date().toISOString();
   const ledgerId = crypto.randomUUID();
+  const inserted = await db.prepare(
+    `INSERT OR IGNORE INTO mileage_ledger
+       (id, program_id, beneficiary_user_id, beneficiary_friend_id,
+        entry_type, amount, status, source, source_event_id, reason,
+        idempotency_key, occurred_at, created_at, metadata)
+     VALUES (?, ?, ?, ?, 'reversal', ?, 'available', 'mileage_reward_refund', ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    ledgerId, current.programId, current.beneficiaryUserId, current.beneficiaryFriendId,
+    reward.required_miles, current.id, requiredText(reason, '戻す理由', 500),
+    `mileage-redemption-refund:${current.id}`, now, now,
+    JSON.stringify({ redemptionId: current.id, spendLedgerId: current.spendLedgerEntryId }),
+  ).run();
+  // 台帳が既にある再開時は、ロットを戻さない（二重に戻さない）。
+  if ((inserted.meta?.changes ?? 0) !== 1) return;
   await db.batch([
-    db.prepare(
-      `INSERT OR IGNORE INTO mileage_ledger
-         (id, program_id, beneficiary_user_id, beneficiary_friend_id,
-          entry_type, amount, status, source, source_event_id, reason,
-          idempotency_key, occurred_at, created_at, metadata)
-       VALUES (?, ?, ?, ?, 'reversal', ?, 'available', 'mileage_reward_refund', ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      ledgerId, current.programId, current.beneficiaryUserId, current.beneficiaryFriendId,
-      reward.required_miles, current.id, requiredText(input.reason, '戻す理由', 500),
-      `mileage-redemption-refund:${current.id}`, now, now,
-      JSON.stringify({ redemptionId: current.id, spendLedgerId: current.spendLedgerEntryId }),
-    ),
-    db.prepare(
-      `UPDATE mileage_redemptions
-          SET status = 'refunded', refunded_at = ?, next_retry_at = NULL, updated_at = ?
-        WHERE id = ? AND status NOT IN ('succeeded', 'refunded')`,
-    ).bind(now, now, current.id),
     ...allocations.results.map((allocation) => db.prepare(
+      // m22u R359: 返却は有効なロットだけへ戻す。成果の取消で無効化した
+      // ロット(void)へは戻さない（取り消した付与が交換で復活しないように）。
       `UPDATE mileage_grant_lots
           SET remaining_amount = remaining_amount + ?,
               status = 'available'
-        WHERE ledger_entry_id = ? AND beneficiary_key = ?`,
+        WHERE ledger_entry_id = ? AND beneficiary_key = ?
+          AND status IN ('available', 'exhausted')`,
     ).bind(allocation.amount, allocation.grant_lot_id, current.beneficiaryKey)),
     ...(current.rewardCodeId
       ? [db.prepare(
@@ -1152,7 +1291,6 @@ export async function refundMileageRewardRedemption(
       ).bind(current.rewardCodeId, current.id)]
       : []),
   ]);
-  return (await getMileageRedemption(db, current.id))!;
 }
 
 export type MileageRedemptionStepStatus = 'started' | 'sent';
@@ -1199,7 +1337,32 @@ export class MileageRedemptionConfirmError extends Error {
  * (旧持ち主の再送は禁止)。古い走者の遅い確定は owner と fence が
  * 合わずに拒否される(取り違え防止の fence)。
  */
-export type RedemptionStepClaim = 'send' | 'sent' | 'reconcile' | 'busy';
+export type RedemptionStepClaim = 'send' | 'sent' | 'reconcile' | 'busy' | 'expired';
+
+/**
+ * R344: LINE 再試行キーの有効期限（24時間。公式仕様による）。
+ * 最初の送信からこの時間を過ぎた手順は、同じキーで送り直さない。
+ * 期限を過ぎると LINE 側の重複防止が切れ、同じキーが新規受付されるため。
+ * リマインダ側の `LINE_RETRY_KEY_VALIDITY_MS` と同じ考え方。
+ */
+export const MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * R361: 渡し終えた手順があるか。部分成功の交換は全額返却しない。
+ * `sent` の行が1つでもあれば、一部の特典は相手に渡っている。
+ */
+export async function hasSentRedemptionSteps(
+  db: D1Database,
+  redemptionId: string,
+): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT 1 AS ok FROM mileage_redemption_step_deliveries
+      WHERE redemption_id = ? AND status = 'sent' LIMIT 1`,
+  ).bind(redemptionId).first<{ ok: number }>();
+  return row != null;
+}
+
+
 
 export interface RedemptionStepLease {
   redemptionId: string;
@@ -1209,6 +1372,12 @@ export interface RedemptionStepLease {
   fenceToken: string;
   leaseExpiresAt: string;
   now: string;
+  /**
+   * R344: 再試行キーの期限切れ境界（ISO時刻）。この時刻より前に
+   * 作られた手順（＝最初の送信から24時間超）は、同じキーで送り直さない。
+   * 省略時は期限を見ない。
+   */
+  retryKeyExpiresAt?: string | null;
 }
 
 interface RedemptionStepRow {
@@ -1217,6 +1386,7 @@ interface RedemptionStepRow {
   leaseExpiresAt: string | null;
   idempotencyKey: string;
   needsReconcile: number;
+  createdAt: string;
 }
 
 async function selectRedemptionStep(
@@ -1228,7 +1398,8 @@ async function selectRedemptionStep(
     `SELECT status, owner,
             lease_expires_at AS leaseExpiresAt,
             idempotency_key AS idempotencyKey,
-            needs_reconcile AS needsReconcile
+            needs_reconcile AS needsReconcile,
+            created_at AS createdAt
        FROM mileage_redemption_step_deliveries
       WHERE redemption_id = ? AND step_key = ?`,
   ).bind(redemptionId, stepKey).first<RedemptionStepRow>();
@@ -1265,6 +1436,14 @@ export async function claimRedemptionStep(
     }
   }
   if (existing.status === 'sent') return 'sent';
+  /*
+   * R344: 最初の送信から24時間を過ぎた手順は、同じキーで送り直さない。
+   * 期限を過ぎると LINE 側の重複防止が切れ、同じキーが新規受付されて
+   * 二重に届く。照合待ちとして残し、人が確かめる。
+   */
+  if (input.retryKeyExpiresAt != null && existing.createdAt <= input.retryKeyExpiresAt) {
+    return 'expired';
+  }
   // 証言がある行は、誰も送り直さないし勝手に確定もしない。照合待ち。
   if (existing.needsReconcile === 1) return 'reconcile';
   const leaseLive = existing.leaseExpiresAt !== null && existing.leaseExpiresAt > input.now;
@@ -1293,6 +1472,48 @@ export async function claimRedemptionStep(
             attempt_count = attempt_count + 1, updated_at = ?
       WHERE redemption_id = ? AND step_key = ?
         AND status = 'started' AND needs_reconcile = 0
+        AND (lease_expires_at IS NULL OR lease_expires_at <= ?)`,
+  ).bind(
+    input.owner, input.leaseExpiresAt, input.fenceToken, input.now,
+    input.redemptionId, input.stepKey, input.now,
+  ).run();
+  return (taken.meta?.changes ?? 0) === 1 ? 'send' : 'busy';
+}
+
+/**
+ * R364: 照合待ちの手順の回復引き継ぎ。送ったか確かめられない行を、
+ * 送り直しても安全な手順だけ、期限内にもう一度だけ実行する。
+ *
+ * 返すのは次の4つのどれか。
+ *
+ * - 'send' … 貸出を取り直した。同じ冪等キーで実行してよい。
+ * - 'sent' … その間に確定していた。送らない。
+ * - 'reconcile' … 照合待ちのまま。送らない（期限切れ・Webhookなど）。
+ * - 'busy' … 別の走者の貸出が生きている。送らずに待つ。
+ *
+ * 送り直し自体の安全は呼び出し側が手順の種類で判断する
+ * （Webhookは外部で二重に届くので回復しない）。
+ * 期限切れはここでも見る（`claimRedemptionStep` と同じ境界）。
+ */
+export async function claimRedemptionStepForRecovery(
+  db: D1Database,
+  input: RedemptionStepLease,
+): Promise<RedemptionStepClaim> {
+  const existing = await selectRedemptionStep(db, input.redemptionId, input.stepKey);
+  if (!existing) throw new MileageRedemptionConfirmError();
+  if (existing.status === 'sent') return 'sent';
+  if (existing.needsReconcile !== 1) return 'busy';
+  if (input.retryKeyExpiresAt != null && existing.createdAt <= input.retryKeyExpiresAt) {
+    return 'expired';
+  }
+  const leaseLive = existing.leaseExpiresAt !== null && existing.leaseExpiresAt > input.now;
+  if (leaseLive) return 'busy';
+  const taken = await db.prepare(
+    `UPDATE mileage_redemption_step_deliveries
+        SET owner = ?, lease_expires_at = ?, generation = generation + 1,
+            fence_token = ?, attempt_count = attempt_count + 1, updated_at = ?
+      WHERE redemption_id = ? AND step_key = ?
+        AND status = 'started' AND needs_reconcile = 1
         AND (lease_expires_at IS NULL OR lease_expires_at <= ?)`,
   ).bind(
     input.owner, input.leaseExpiresAt, input.fenceToken, input.now,

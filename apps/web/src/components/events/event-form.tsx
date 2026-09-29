@@ -12,15 +12,20 @@ import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
+import Checkbox from '@/components/shared/checkbox'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 import DateField from '@/components/shared/date-field'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
@@ -83,6 +88,17 @@ export function formatJpSlotRange(startsAt: string, endsAt: string): string {
   return `${start} 〜 ${sameDay ? end.slice(-5) : end}`
 }
 
+/**
+ * 保存・読込の応答を draft の形へ戻す（R82）。
+ *
+ * Worker は質問の定義を questions_json の文字列で返す。ほぐさず
+ * `setDraft` すると questions が消え、次の保存で questions:null を送って
+ * 定義ごと消してしまう。読み込み時と同じほぐし方を保存後にも使う。
+ */
+export function toEventDraft(row: EventDetail): EventDetail {
+  return { ...row, questions: parseEventQuestions(row.questions_json) }
+}
+
 export default function EventForm({ accountId, eventId }: EventFormProps) {
   const router = useRouter()
   const { selectedAccount, accounts } = useAccount()
@@ -118,10 +134,11 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
   // 公開対象のプルダウンに出すタグ。新規作成のときも要るので、
   // イベントの読み込みとは分けて取る。
+  // R23横展開: 候補はこのイベントのアカウントだけ。切替で取り直す。
   useEffect(() => {
     let cancelled = false
     void api.tags
-      .list()
+      .list(accountId ? { accountId } : undefined)
       .then((res) => {
         if (!cancelled && res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
       })
@@ -131,7 +148,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     let cancelled = false
@@ -148,7 +165,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         if (cancelled) return
         // Worker は質問定義を questions_json の文字列で返す。フォームは
         // 配列で触るので、ここでほぐしてから draft に載せる。
-        setDraft({ ...ev, questions: parseEventQuestions(ev.questions_json) })
+        setDraft(toEventDraft(ev))
         setSlots(slotsRes.items)
       } catch (e) {
         // 生の `API error: 404` を主文にしない。消えたものと通信の失敗を言い分ける。
@@ -230,7 +247,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       }
       if (eventId) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
-        setDraft(updated)
+        // 応答は questions_json の文字列で返る。ほぐさず載せると次の保存で
+        // questions:null を送り、質問を消してしまう（R82）。
+        setDraft(toEventDraft(updated))
         notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
@@ -571,15 +590,13 @@ function OverviewTab({
           placeholder="開催趣旨、注意事項、持ち物などを記載..."
           className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
         />
-        <label className="flex items-center gap-2 mt-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={draft.description_centered === 1}
-            onChange={(e) => update('description_centered', e.target.checked ? 1 : 0)}
-            className="rounded border-hairline"
-          />
+        <Checkbox
+          className="mt-2"
+          checked={draft.description_centered === 1}
+          onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
+        >
           詳細を中央揃えで表示
-        </label>
+        </Checkbox>
       </div>
       <div className="border-t border-hairline pt-5">
         <div className="text-sm font-medium text-ink mb-1">申し込みのときに聞くこと</div>
@@ -596,22 +613,23 @@ function OverviewTab({
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           1 人あたり予約回数
         </label>
-        <select
-          value={draft.max_bookings_per_friend ?? 'unlimited'}
-          onChange={(e) =>
+        <Select
+          aria-label="1 人あたり予約回数"
+          value={draft.max_bookings_per_friend == null ? 'unlimited' : String(draft.max_bookings_per_friend)}
+          onChange={(value) =>
             update(
               'max_bookings_per_friend',
-              e.target.value === 'unlimited' ? null : Number(e.target.value),
+              value === 'unlimited' ? null : Number(value),
             )
           }
-          className="border border-hairline rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="unlimited">制限なし</option>
-          <option value="1">1 回まで</option>
-          <option value="2">2 回まで</option>
-          <option value="3">3 回まで</option>
-          <option value="5">5 回まで</option>
-        </select>
+          options={[
+            { value: 'unlimited', label: '制限なし' },
+            { value: '1', label: '1 回まで' },
+            { value: '2', label: '2 回まで' },
+            { value: '3', label: '3 回まで' },
+            { value: '5', label: '5 回まで' },
+          ]}
+        />
       </div>
 
       {/* 公開対象 */}
@@ -665,32 +683,26 @@ function OverviewTab({
               const isCurrent = a.id === currentAccountId
               const checked = accountIds.includes(a.id) || isCurrent
               return (
-                <label
+                <Checkbox
                   key={a.id}
-                  className={`flex items-center gap-2 p-2 border border-gray-200 rounded-lg ${isCurrent ? 'opacity-90 bg-gray-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
-                  title={isCurrent ? '現在ログイン中のアカウントは必須です' : undefined}
+                  className={`flex w-full gap-2 rounded-lg border border-hairline p-2 ${isCurrent ? 'opacity-90 bg-canvas-sunken cursor-not-allowed' : 'cursor-pointer hover:bg-canvas-sunken'}`}
+                  checked={checked}
+                  disabled={isCurrent}
+                  onCheckedChange={(next) => {
+                    if (isCurrent) return
+                    update('account_ids', (next
+                      ? [...accountIds, a.id]
+                      : accountIds.filter((x) => x !== a.id)) as unknown as EventDetail['account_ids'])
+                  }}
+                  description={isCurrent ? '今のアカウント・必須' : undefined}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={isCurrent}
-                    onChange={(e) => {
-                      if (isCurrent) return
-                      const next = e.target.checked
-                        ? [...accountIds, a.id]
-                        : accountIds.filter((x) => x !== a.id)
-                      update('account_ids', next as unknown as EventDetail['account_ids'])
-                    }}
-                    className="rounded border-hairline"
-                  />
-                  <span className="text-sm">
+                  <span title={isCurrent ? '現在ログイン中のアカウントは必須です' : undefined}>
                     {a.country ? a.country + ' ' : ''}{a.name}
-                    {isCurrent && <span className="ml-1 text-[10px] text-gray-500">（今のアカウント・必須）</span>}
                   </span>
-                </label>
+                </Checkbox>
               )
             })}
-            <div className="text-xs text-gray-500 mt-1">{accountIds.length} 件選択中</div>
+            <div className="text-ink-faint mt-1 text-xs">{accountIds.length} 件選択中</div>
           </div>
         )}
       </div>
@@ -849,26 +861,25 @@ function SlotsTab({
           予約枠がありません。「＋ 枠を追加」または「一括追加」から作成してください。
         </div>
       ) : (
-        <div className="overflow-x-auto border border-hairline rounded-lg">
-          <table className="w-full text-sm">
-            <thead className="bg-canvas-sunken text-gray-600">
-              <tr>
-                <th className="text-left px-3 py-2 font-medium">日時</th>
-                <th className="text-left px-3 py-2 font-medium">定員</th>
-                <th className="text-left px-3 py-2 font-medium">予約数</th>
-                <th className="text-left px-3 py-2 font-medium">状態</th>
-                <th className="text-right px-3 py-2 font-medium">操作</th>
-              </tr>
+        <DataTable>
+            <thead>
+              <TableHeadRow>
+                <Th style={{ width: '30%' }}>日時</Th>
+                <Th style={{ width: '14%' }}>定員</Th>
+                <Th style={{ width: '14%' }}>予約数</Th>
+                <Th style={{ width: '16%' }}>状態</Th>
+                <Th style={{ width: '26%' }} align="right">操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody>
               {slots.map((s) => (
-                <tr key={s.id} className="border-t border-hairline">
-                  <td className="px-3 py-2 text-gray-800">
+                <Tr key={s.id}>
+                  <Td>
                     {formatJpSlotRange(s.starts_at, s.ends_at)}
-                  </td>
-                  <td className="px-3 py-2 text-gray-700">{s.capacity ?? '無制限'}</td>
-                  <td className="px-3 py-2 text-gray-700">{s.active_count ?? 0}</td>
-                  <td className="px-3 py-2">
+                  </Td>
+                  <Td>{s.capacity ?? '無制限'}</Td>
+                  <Td>{s.active_count ?? 0}</Td>
+                  <Td>
                     <button
                       onClick={() => toggleActive(s)}
                       disabled={busy}
@@ -878,8 +889,8 @@ function SlotsTab({
                     >
                       {s.is_active === 1 ? '有効' : '停止'}
                     </button>
-                  </td>
-                  <td className="px-3 py-2 text-right">
+                  </Td>
+                  <ActionCell>
                     <div className="flex items-center justify-end gap-3">
                       <button
                         onClick={() => setEditSlotTarget(s)}
@@ -892,17 +903,16 @@ function SlotsTab({
                         onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
                         disabled={busy || (s.active_count ?? 0) > 0}
                         title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
-                        className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
+                        className="text-xs text-danger hover:underline disabled:opacity-30 disabled:no-underline"
                       >
                         削除
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </ActionCell>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       )}
 
       {showAdd && (
@@ -1010,6 +1020,8 @@ function AddSlotDialog({
   const [capacity, setCapacity] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
+  const panelRef = useOverlayFocus(true, onClose, busy)
 
   async function submit() {
     setBusy(true)
@@ -1030,7 +1042,7 @@ function AddSlotDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を追加" className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="text-lg font-bold text-ink">予約枠を追加</h3>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -1146,13 +1158,16 @@ function EditSlotDialog({
     }
   }
 
+  // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
+  const panelRef = useOverlayFocus(true, onClose, busy)
+
   // 新しい部品はデザイントークンで書く（このファイルの古い生色クラスを増やさない）。
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}
     >
-      <div className="bg-canvas rounded-card mx-4 w-full max-w-md p-6 shadow-xl">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を編集" className="bg-canvas rounded-card mx-4 w-full max-w-md p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="text-ink text-lg font-bold">予約枠を編集</h3>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -1219,7 +1234,13 @@ function EditSlotDialog({
   )
 }
 
-function BulkSlotDialog({
+/*
+ * R84: 予約枠の一括追加の窓は共通 Dialog を使う。
+ * 以前は手作りの fixed  overlay で、入力欄が増えると窓が画面より高くなり、
+ * 閉じる・生成・キャンセルが画面外へ出た。Escape でも閉じなかった。
+ * 共通 Dialog は overlay のスクロール・Escape・フォーカス閉じ込めを持つ。
+ */
+export function BulkSlotDialog({
   onClose,
   onSubmit,
 }: {
@@ -1260,15 +1281,16 @@ function BulkSlotDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-lg font-bold text-ink">予約枠の一括追加</h3>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        {err && <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded-lg mb-3 text-sm">{err}</div>}
+    <Dialog
+      open
+      title="予約枠の一括追加"
+      onCancel={onClose}
+      onConfirm={() => void submit()}
+      confirmLabel="生成"
+      cancelLabel="キャンセル"
+      busy={busy}
+      error={err ?? undefined}
+    >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label>
@@ -1282,11 +1304,13 @@ function BulkSlotDialog({
           </div>
           <div>
             <span className="text-sm font-medium text-gray-700 block mb-1.5">曜日</span>
-            <div className="flex gap-1.5">
+            {/* R218: 色だけでなく aria-pressed で選択状態を読み上げに伝える。 */}
+            <div className="flex gap-1.5" role="group" aria-label="枠を作る曜日">
               {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
                 <button
                   key={i}
                   type="button"
+                  aria-pressed={weekdays.includes(i)}
                   onClick={() => toggleWeekday(i)}
                   className={`flex-1 px-2 py-2 text-sm border rounded-lg ${
                     weekdays.includes(i)
@@ -1346,20 +1370,7 @@ function BulkSlotDialog({
             />
           </label>
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <Button onClick={onClose}>
-            キャンセル
-          </Button>
-          <button
-            onClick={submit}
-            disabled={busy}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            生成
-          </button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -1376,23 +1387,26 @@ function PublishTab({
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   tags: Array<{ id: string; name: string }>
 }) {
+  // R23横展開(m18hと同じ形): 新しい候補にない公開対象タグは外して知らせる。
+  const [tagPruned, setTagPruned] = useState(false)
+  useEffect(() => {
+    if (tags.length === 0 || draft.visible_tag_id == null) return
+    if (!tags.some((t) => t.id === draft.visible_tag_id)) {
+      update('visible_tag_id', null)
+      setTagPruned(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags])
   return (
     <div className="space-y-5">
-      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.requires_approval === 1}
-          onChange={(e) => update('requires_approval', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-hairline"
-        />
-        <div>
-          <div className="text-sm font-medium text-ink">承認制</div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />
-            OFF: 定員空きがあれば即時確定
-          </div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-lg border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.requires_approval === 1}
+        onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
+        description={<>ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />OFF: 定員空きがあれば即時確定</>}
+      >
+        承認制
+      </Checkbox>
 
       <Field
         label="承認の期限"
@@ -1410,41 +1424,34 @@ function PublishTab({
         />
       </Field>
 
-      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.waitlist_enabled === 1}
-          onChange={(e) => update('waitlist_enabled', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-hairline"
-        />
-        <div>
-          <div className="text-sm font-medium text-ink">キャンセル待ちを受ける</div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            ON: 定員に達したあとも申込を受け、待ちとして記録する<br />
-            OFF: 定員に達したら締め切る<br />
-            待ちの人は予約の件数に入りません。空きが出ても自動では繰り上げず、
-            誰を通すかは一覧から運営が決めます。
-          </div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-lg border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.waitlist_enabled === 1}
+        onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+        description={<>ON: 定員に達したあとも申込を受け、待ちとして記録する<br />OFF: 定員に達したら締め切る<br />待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。</>}
+      >
+        キャンセル待ちを受ける
+      </Checkbox>
 
       <div>
+        {tagPruned ? (
+          <Notice
+            tone="warn"
+            message="選んでいたタグは、今のアカウントにないため外しました。選び直してください。"
+            onClose={() => setTagPruned(false)}
+            className="mb-2"
+          />
+        ) : null}
         <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-gray-700">
           公開対象
         </label>
-        <select
+        <Select
+          aria-label="公開対象"
           id="ev-visible-tag"
           value={draft.visible_tag_id ?? ''}
-          onChange={(e) => update('visible_tag_id', e.target.value === '' ? null : e.target.value)}
-          className="rounded-lg border border-hairline px-3 py-2 text-sm"
-        >
-          <option value="">友だち全員</option>
-          {tags.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} を持つ人だけ
-            </option>
-          ))}
-        </select>
+          onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
+          options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ value: t.id, label: `${t.name} を持つ人だけ` }))]}
+        />
         <p className="mt-1 text-xs text-gray-500">
           絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。
           URL を直接開いても表示されません。
@@ -1460,23 +1467,18 @@ function PublishTab({
           保存値が選択肢に無いときは「保存済み：…」として出し、
           先頭項目を選んだように見せない・別値へ無断変換しない。
         */}
-        <select
+        <Select
+          aria-label="申込の締め切り"
           id="ev-entry-cutoff"
           value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
-          onChange={(e) =>
-            update('entry_cutoff_hours_before', parseDeadlineSelect(e.target.value))
+          onChange={(value) =>
+            update('entry_cutoff_hours_before', parseDeadlineSelect(value))
           }
-          className="rounded-lg border border-hairline px-3 py-2 text-sm"
-        >
-          {deadlineOptionsWithSaved(
+          options={deadlineOptionsWithSaved(
             EVENT_ENTRY_CUTOFF_OPTIONS,
             draft.entry_cutoff_hours_before,
-          ).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          )}
+        />
       </div>
 
       <div>
@@ -1487,55 +1489,47 @@ function PublishTab({
           EVENT-03: 保存値の意味は作成画面・Worker と同じ。
           null=不可、0=開始直前まで、正数=開始N時間前。
         */}
-        <select
+        <Select
+          aria-label="キャンセル期限（友だち側）"
           value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
-          onChange={(e) =>
-            update('cancel_deadline_hours_before', parseDeadlineSelect(e.target.value))
+          onChange={(value) =>
+            update('cancel_deadline_hours_before', parseDeadlineSelect(value))
           }
-          className="border border-hairline rounded-lg px-3 py-2 text-sm"
-        >
-          {deadlineOptionsWithSaved(
+          options={deadlineOptionsWithSaved(
             EVENT_CANCEL_DEADLINE_OPTIONS,
             draft.cancel_deadline_hours_before,
-          ).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          )}
+        />
       </div>
 
-      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.reminder_day_before_enabled === 1}
-          onChange={(e) => update('reminder_day_before_enabled', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-hairline"
-        />
-        <div>
-          <div className="text-sm font-medium text-ink">前日リマインダ</div>
-          <div className="text-xs text-gray-500 mt-0.5">前日 18:00 JST に LINE で通知</div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-lg border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.reminder_day_before_enabled === 1}
+        onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+        description="前日 18:00 JST に LINE で通知"
+      >
+        前日リマインダ
+      </Checkbox>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="text-ink mb-1.5 block text-sm font-medium">
           開始 N 時間前リマインダ
         </label>
-        <select
-          value={draft.reminder_hours_before ?? 'off'}
-          onChange={(e) =>
-            update('reminder_hours_before', e.target.value === 'off' ? null : Number(e.target.value))
+        <Select
+          aria-label="開始 N 時間前リマインダ"
+          value={draft.reminder_hours_before == null ? 'off' : String(draft.reminder_hours_before)}
+          onChange={(value) =>
+            update('reminder_hours_before', value === 'off' ? null : Number(value))
           }
-          className="border border-hairline rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="off">送信しない</option>
-          <option value="1">1 時間前</option>
-          <option value="2">2 時間前</option>
-          <option value="3">3 時間前</option>
-          <option value="6">6 時間前</option>
-          <option value="24">24 時間前</option>
-        </select>
+          options={[
+            { value: 'off', label: '送信しない' },
+            { value: '1', label: '1 時間前' },
+            { value: '2', label: '2 時間前' },
+            { value: '3', label: '3 時間前' },
+            { value: '6', label: '6 時間前' },
+            { value: '24', label: '24 時間前' },
+          ]}
+        />
       </div>
 
       {/* 予約者向けカスタムメッセージ追記 */}
@@ -1588,32 +1582,29 @@ function PublishTab({
 
       <div>
         <div className="text-sm font-medium text-gray-700 mb-2">公開状態</div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => update('is_published', 0)}
-            className={`p-3 border-2 rounded-lg text-left transition-colors ${
-              draft.is_published === 0
-                ? 'border-gray-700 bg-gray-50'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            }`}
-          >
-            <div className="text-sm font-bold text-ink">下書き</div>
-            <div className="text-xs text-gray-600 mt-0.5">友だちには見えない</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => update('is_published', 1)}
-            className={`p-3 border-2 rounded-lg text-left transition-colors ${
-              draft.is_published === 1
-                ? 'border-green-500 bg-green-50'
-                : 'border-gray-200 bg-white hover:border-green-300'
-            }`}
-          >
-            <div className="text-sm font-bold text-ink">公開する</div>
-            <div className="text-xs text-gray-600 mt-0.5">予約 URL が有効になる</div>
-          </button>
-        </div>
+        {/*
+          R218: 下書き/公開は二者択一なので、素のボタンではなく
+          共通の RadioCard（本物の input[type=radio]）にする。
+          読み上げとキーボードで選択状態が伝わる。
+        */}
+        <RadioCardGroup legend="公開状態" className="grid grid-cols-2 gap-2">
+          <RadioCard
+            name="event-publish-state"
+            value="draft"
+            checked={draft.is_published === 0}
+            onChange={() => update('is_published', 0)}
+            title="下書き"
+            note="友だちには見えない"
+          />
+          <RadioCard
+            name="event-publish-state"
+            value="published"
+            checked={draft.is_published === 1}
+            onChange={() => update('is_published', 1)}
+            title="公開する"
+            note="予約 URL が有効になる"
+          />
+        </RadioCardGroup>
         <p className="text-xs text-gray-500 mt-2">
           {draft.is_published === 1
             ? '✓ 保存後、友だちに「予約 URL」を案内できます。'

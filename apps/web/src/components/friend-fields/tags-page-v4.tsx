@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2, X } from 'lucide-react'
@@ -12,12 +12,15 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
+import MultiSelect from '@/components/shared/multi-select'
 import { RowActions } from '@/components/shared/row-actions'
+import Disclosure from '@/components/shared/disclosure'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
@@ -93,42 +96,6 @@ function TrashIcon() {
   )
 }
 
-/**
- * フォルダの選び直し。設計 `SgpDb` は「色の丸 ＋ 名前 ＋ ▾」の小さな札で、
- * 素の `select` ではない。見た目は札が持ち、操作と読み上げは `select` が持つ。
- */
-function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; groups: TagGroup[]; onItemsChange: (update: (current: Tag[]) => Tag[]) => void; onError: (message: string) => void }) {
-  const group = groups.find((item) => item.id === tag.groupId)
-  return (
-    <span className="relative inline-flex h-7 items-center gap-1.5 rounded-mini border border-hairline bg-canvas px-2" title={group?.name ?? '未分類'}>
-      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#c3c8c4' }} />
-      <span className="truncate text-caption font-semibold text-ink">{group?.name ?? '未分類'}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-ink-faint"><path d="m6 9 6 6 6-6" /></svg>
-      <select
-        aria-label={`${tag.name} のフォルダ`}
-        value={tag.groupId ?? ''}
-        onChange={async (event) => {
-          const groupId = event.target.value || null
-          try {
-            const result = await api.tags.setGroup(tag.id, groupId)
-            if (!result.success) throw new Error(result.error)
-            /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
-            onItemsChange((current) => current.map((item) => item.id === tag.id ? { ...item, groupId } : item))
-          } catch (reason) {
-            /* 失敗は再読込で隠さず、理由を出す。 */
-            onError(reason instanceof ApiError ? reason.message : 'フォルダを変更できませんでした')
-          }
-        }}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-      >
-        <option value="">未分類</option>
-        {groups
-          .filter((item) => item.accountId === tag.lineAccountId)
-          .map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select>
-    </span>
-  )
-}
 
 /**
  * 連動の札。設計 `B9QCB3`（緑）／`IoiWQ`（黄）／`Ws7fo`（灰）。
@@ -318,9 +285,14 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
   const [menuError, setMenuError] = useState('')
   const [deleteGroup, setDeleteGroup] = useState<TagGroup | null>(null)
   const rows = [
-    { id: '', name: 'すべて', count: items.length, color: '#06c755' },
-    ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length, color: group.color ?? '#8b938d' })),
-    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length, color: '#c3c8c4' },
+    /*
+     * 「すべて」の中身は一覧の総数と同じ数。フォルダの内訳（各フォルダ・
+     * 未分類の数）だけを出し、総数は一覧の上の「1–20 / N件」だけにする
+     * （同じ数を重ねて出さない。#946 の「絞り込み後の件数は一覧の側」）。
+     */
+    { id: '', name: 'すべて', count: null, color: '#06c755' },
+    ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length as number | null, color: group.color ?? '#8b938d' })),
+    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length as number | null, color: '#c3c8c4' },
   ]
   const move = async (group: TagGroup, direction: -1 | 1) => {
     const index = groups.findIndex((item) => item.id === group.id)
@@ -362,7 +334,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span>{row.count !== null ? <span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span> : null}</button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -521,6 +493,8 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
     自前で組むと毎回どれかが抜ける。実際、背景が裏で動いていた。
   */
   const dialogRef = useOverlayFocus(true, onCancel, false)
+  /* R138: 確認窓の名前として見出しを読ませる（共通 Dialog と同じ作法）。 */
+  const titleId = useId()
 
   const blocked = impactStatus !== 'ready' || !impact || !accountId || saving
   const blockedReason = impactStatus === 'loading'
@@ -531,7 +505,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
           <X aria-hidden="true" className="h-5 w-5" />
         </button>
@@ -541,8 +515,9 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
             <TrashIcon />
           </span>
           <div className="mt-5 min-w-0">
-            <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
-            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。</p>
+            {/* R190: 実行するのは保管（アーカイブ）。削除と書くと消えたように読める。 */}
+            <h2 id={titleId} className="text-xl font-bold text-ink">「{tag.name}」を保管しますか？</h2>
+            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。</p>
           </div>
         </div>
 
@@ -561,9 +536,9 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {impactStatus === 'ready' && impact && !impact.canDelete && (
           <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm text-danger">
             {impact.referenceCounts.affiliateOffers > 0 ? (
-              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは削除できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p></>
+              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは保管できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。保管しても、過去のマイル履歴と配信ログは残ります。</p></>
             ) : (
-              <><p className="font-bold">有効な参照があるタグは、完全に削除できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
+              <><p className="font-bold">有効な参照があるタグは保管できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
             )}
           </div>
         )}
@@ -573,7 +548,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
           <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" />
         </label>
-        {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
+        {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
           <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
@@ -598,15 +573,15 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
                  * 起きたか分からない」に見える（#708 の裁定）。
                  */
                 if (reason instanceof ApiError && reason.code === 'already_archived') {
-                  onArchived('このタグはすでに整理されています。')
+                  onArchived('このタグはすでに保管済みです。')
                   return
                 }
-                setSaveError('アーカイブできませんでした。影響を読み直して、もう一度お試しください。')
+                setSaveError('保管できませんでした。影響を読み直して、もう一度お試しください。')
                 setSaving(false)
               }
             }}
             className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
-          >{saving ? '削除中…' : 'このタグを削除する'}</button>
+          >{saving ? '保管中…' : 'このタグを保管する'}</button>
         </div>
       </section>
     </div>
@@ -629,7 +604,8 @@ export default function TagsPageV4({
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
   const [status, setStatus] = useState<LoadStatus>(fixture ? 'ready' : 'loading')
-  // 操作の失敗（並び替え・★・フォルダ）。**読み込みの失敗とは別物**なので混ぜない。
+  // 操作の失敗（並び替え・★）。**読み込みの失敗とは別物**なので混ぜない。
+  // フォルダの変更は一覧では行わない（編集画面の「所属フォルダ」で行う）。
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('')
@@ -898,20 +874,20 @@ export default function TagsPageV4({
           // #981 A04-02: 一覧・フォルダ帯と同じアカウント範囲で数える
           // （シナリオの NEXT-26 と同じ）。未選択＝全アカウント表示は未指定。
           accountId={accountId ?? undefined}
-          titles={['タグ数', '付与済み友だち', '今月の付与', '整理候補']}
+          titles={['未使用', '付与済み友だち', '今月の付与', '整理候補']}
           build={(stats) => [
             {
-              title: 'タグ数',
+              title: '未使用',
               /*
-               * `stats.tags.total` はテナント全体の件数で、選択中の
-               * アカウント範囲を見ない（/api/list-stats の tags.total は
-               * スコープ無しの COUNT(*)）。フォルダ帯の「すべて」と同じ
-               * 母集団にそろえるため、一覧そのものの件数を使う（#981）。
-               * 未取得は `—`、0件は `0件`。
+               * タグの総数は一覧の上の「1–20 / N件」だけに出す。ここに
+               * 「タグ数 101件」を並べると同じ数が1画面に重なっていた。
+               * 空いた枠は、総数の内訳として出していた「未使用」の数へ。
+               * （`stats.tags.unused` は使わない。絞り込み・使用先と同じ
+               * 数え方に寄せる。未取得は `—`、0件は `0件`。）
                */
-              value: ready ? items.length : null,
+              value: unusedCount,
               unit: '件',
-              detail: `未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`,
+              detail: '友だち0人・参照0件',
             },
             { title: '付与済み友だち', value: stats.tags.taggedFriends, unit: '人', detail: '1つ以上付与' },
             { title: '今月の付与', value: stats.tags.assignedThisMonth, unit: '回', detail: '手動・自動' },
@@ -940,18 +916,28 @@ export default function TagsPageV4({
             同じ絞り込みをセレクトで受け、帯は「開く」まで畳んでおく。
           */}
           <div className="xl:hidden">
-            <select
+            <Select
               aria-label="フォルダで絞る"
               value={folder}
-              onChange={(event) => setFolder(event.target.value)}
-              className="v6-select h-10 w-full rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
-            >
-              <option value="">フォルダ：すべて（{ready ? items.length : '—'}件）</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>{group.name}</option>
-              ))}
-              <option value={UNGROUPED}>未分類</option>
-            </select>
+              onChange={setFolder}
+              options={[
+                // 「すべて」の後ろの総数は一覧の件数と同じもの。一覧の上の
+                // 「1–20 / N件」だけに出し、ここでは重ねない（#946）。
+                { value: '', label: 'フォルダ：すべて' },
+                ...groups.map((group) => ({ value: group.id, label: group.name })),
+                { value: UNGROUPED, label: '未分類' },
+              ]}
+              size="full"
+            />
+            {/*
+              R165: 1280px未満でもフォルダの名前変更・色・削除へ到達できる。
+              以前は操作のある帯が非表示で開く口も無く、作ったフォルダを
+              直せなかった。絞り込みは上のセレクトのまま、同じ管理操作を
+              開閉できる帯で出す（中身は PC と同じ `FolderList`）。
+            */}
+            <Disclosure title="フォルダを管理" hint={ready ? `${groups.length}件` : '—'} size="compact" className="mt-2">
+              <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
+            </Disclosure>
           </div>
           <div className="hidden xl:block">
             <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
@@ -965,28 +951,40 @@ export default function TagsPageV4({
               search={{ placeholder: 'タグ名・用途で検索', value: query, onChange: setQuery }}
               filters={
                 <>
-                  <select aria-label="使用状態で絞り込む" value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
-                  <select aria-label="付与元で絞り込む" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select h-10 min-w-38 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-                  {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
-                  <span className="text-ink-faint text-xs">よく使う</span>
-                  {QUICK_FILTERS.map(([key, label]) => {
-                    const on = quick.includes(key)
-                    return (
-                      <FilterChip
-                        key={key}
-                        selected={on}
-                        onChange={(next) => setQuick((current) => next ? [...current, key] : current.filter((k) => k !== key))}
-                      >
-                        {label}
-                      </FilterChip>
-                    )
-                  })}
-                </>
-              }
-              trailing={
-                <>
-                  <select aria-label="表示件数" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select h-10 min-w-32 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
-                  <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                  {/* 素の select は置かない（#640）。選び口は共通 Select。幅は部品の既定（176px）。 */}
+                  <Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} />
+                  <Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} />
+                  {/*
+                    設計 `UOmne` の「よく使う」5つ。**重ねて絞れるのは変えない。**
+                    札を6つ並べると1440pxでも絞り込みが2行になり、件数が
+                    3行目へ落ちていた。1つの選び口（共通 MultiSelect）にまとめ、
+                    2行目を1行に収める。開いたまま重ねて選べ、「N件選択中」と
+                    「すべて外す」は部品が持つ。
+                  */}
+                  <span className="w-44 shrink-0">
+                    <MultiSelect
+                      aria-label="よく使う絞り込み"
+                      className="w-full"
+                      maxChips={1}
+                      onChange={setQuick}
+                      options={QUICK_FILTERS.map(([value, label]) => ({ value, label }))}
+                      placeholder="よく使う"
+                      values={quick}
+                    />
+                  </span>
+                  {/*
+                    件数と表示件数は絞り込みと同じ折り返しの流れの末尾に置く
+                    （m21o）。`trailing` の別枠にすると、絞り込みがあふれた幅
+                    （1440px・1152px）で件数だけの行ができてしまう。末尾の
+                    `ml-auto` で行の右端へ寄せ、札と行を共にする。選ぶ欄は
+                    ほかの欄と同じく幅96・短い文字（`20件`）にそろえる。
+                  */}
+                  <span className="ml-auto flex shrink-0 items-center gap-2">
+                    <span className="w-24">
+                      <Select aria-label="表示件数" className="w-full" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} size="page-size" />
+                    </span>
+                    <span className="whitespace-nowrap text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                  </span>
                 </>
               }
             />
@@ -1003,7 +1001,7 @@ export default function TagsPageV4({
               */}
               {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「付け方」を畳む。
                   「付け方」は行の操作ではない補助情報で、編集画面で読める。 */}
-              <div className="overflow-x-auto @container">
+              <div className="hidden overflow-x-auto @container md:block">
               {/*
                 960px以上は表。それ未満は縦に重ねたカードへ（#1014 ATTR-20）。
                 #636: 最小幅は 880→800px。1440pxではフォルダ欄を引いた表の
@@ -1011,23 +1009,30 @@ export default function TagsPageV4({
                 常時出ていた。800pxなら1440pxに収まり、それより狭い幅では
                 従来どおり表の内側だけが横へ動く。
               */}
-              <table className="hidden w-full min-w-[712px] table-fixed text-sm @[830px]:min-w-[800px] md:table">
-                {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
-                <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
-                  <tr>
-                    {/* 先頭の選択列と末尾の操作列は外側の余白をそろえる。操作列は中身の幅で固定する。 */}
-                    <th className="w-11 px-3 py-3" />
-                    <th className="w-[22%] px-3 py-3 text-left">タグ</th>
-                    <th className="w-[11%] px-3 py-3 text-left">フォルダ</th>
-                    <th className="w-[7%] whitespace-nowrap px-3 py-3 text-left">人数</th>
-                    <th className="cq-hide-below-830 w-[11%] whitespace-nowrap px-3 py-3 text-left">付け方</th>
-                    <th className="w-[17%] whitespace-nowrap px-3 py-3 text-left" title="マイル・アクションとの連動">連動</th>
-                    <th className="px-3 py-3 text-left">使用先</th>
-                    <th className="w-[6%] px-3 py-3 text-left">表示</th>
+              <DataTable>
+                {/* 設計 `HrwyW` の見出し。「表示」は★。 */}
+                <thead>
+                  <TableHeadRow>
+                    {/*
+                      列幅の取り直し（m21o Second）。固定幅の合計 308px＋
+                      割合54%にし、残りは「使用先」が吸う（auto）。割合だけの
+                      取り方だと固定2列（44＋64）が枠に上乗せされ、1440pxで
+                      44pxの横送りが出ていた。操作列は中身（編集＋…）に合わせ
+                      128pxへ広げる（枠付きボタンのため64pxでは切れる）。
+                      短い列は固定にして詰め、使用先は狭めても title で読める。
+                    */}
+                    <Th style={{ width: 44 }}><span className="sr-only">並び替え</span></Th>
+                    <Th style={{ width: '20%' }}>タグ</Th>
+                    <Th style={{ width: '10%' }}>フォルダ</Th>
+                    <Th style={{ width: 80 }} className="whitespace-nowrap">人数</Th>
+                    <Th style={{ width: '11%' }} className="cq-hide-below-830 whitespace-nowrap">付け方</Th>
+                    <Th style={{ width: '13%' }} className="whitespace-nowrap" title="マイル・アクションとの連動">連動</Th>
+                    <Th>使用先</Th>
+                    <Th style={{ width: 56 }}>表示</Th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。中身はゴミ箱1つなので w-16 で足りる。 */}
-                    <th className="bg-canvas-sunken sticky right-0 w-16 whitespace-nowrap px-3 py-3 text-left">操作</th>
-                  </tr>
+                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。操作列は中身（編集＋…）に合わせ128px（m21o・m22bで64pxのはみ出しを解消）。 */}
+                    <Th style={{ width: 128 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-hairline">
                   {/*
@@ -1052,7 +1057,7 @@ export default function TagsPageV4({
                     const group = groups.find((item) => item.id === tag.groupId)
                     const chips = linkChips(tag)
                     return (
-                      <tr key={tag.id} className="group cursor-pointer hover:bg-canvas-sunken" tabIndex={0} onClick={() => router.push(`/tags/edit?id=${tag.id}`)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter') { event.preventDefault(); router.push(`/tags/edit?id=${tag.id}`) } }}>
+                      <Tr key={tag.id} interactive className="group cursor-pointer" tabIndex={0} onClick={() => router.push(`/tags/edit?id=${tag.id}`)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter') { event.preventDefault(); router.push(`/tags/edit?id=${tag.id}`) } }}>
                         {/*
                           行を押したら編集へ（一覧の決まり）。名前は黒文字の太字。
                           並び替え・フォルダ選択・星・削除は行の移動を起こさない。
@@ -1062,17 +1067,17 @@ export default function TagsPageV4({
                           「並び替え」ボタンで出し入れしない。押す前は
                           並び替えられることに気づけないため。
                         */}
-                        <td
+                        <Td
                           draggable
                           onClick={(event) => event.stopPropagation()}
                           onDragStart={() => setDragId(tag.id)}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={() => void move(tag.id)}
-                          className="cursor-grab px-3 py-3 text-center text-hairline"
+                          className="cursor-grab text-center text-hairline"
                         >
                           <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
-                        </td>
-                        <td className="px-3 py-3">
+                        </Td>
+                        <Td>
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
                             {/* 名前は黒文字の太字。押すと編集へ行く（編集ボタンは置かない）。 */}
@@ -1088,13 +1093,17 @@ export default function TagsPageV4({
                           </div>
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
-                        </td>
-                        <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
-                          <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
-                        </td>
-                        <td className="px-3 py-3 text-label tabular-nums">{tag.friendCount ?? 0}人</td>
-                        <td className="cq-hide-below-830 truncate px-3 py-3 text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</td>
-                        <td className="px-3 py-3">
+                        </Td>
+                        {/*
+                          フォルダは文字だけ（m21o）。行ごとの選び直し欄は
+                          幅176pxで列（11%）に収まらず隣の「付け方」へ重なって
+                          いた。変更は行を押して開く編集画面の「所属フォルダ」で
+                          行う。長い名前は省略し、全文は重ねて読める。
+                        */}
+                        <Td className="truncate text-label text-ink" title={group?.name ?? '未分類'}>{group?.name ?? '未分類'}</Td>
+                        <Td className="text-label tabular-nums">{tag.friendCount ?? 0}人</Td>
+                        <Td className="cq-hide-below-830 truncate text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</Td>
+                        <Td>
                           <div className="flex flex-wrap gap-1.5">
                             {chips.length === 0
                               ? <span className="text-xs text-ink-faint">—</span>
@@ -1102,9 +1111,9 @@ export default function TagsPageV4({
                                   <span key={chip.label} className={`rounded-mini px-[7px] py-[2px] text-micro font-semibold ${chip.tone}`}>{chip.label}</span>
                                 ))}
                           </div>
-                        </td>
-                        <td className="truncate px-3 py-3 text-label text-ink" title={usageLabel(tag)}>{usageLabel(tag)}</td>
-                        <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
+                        </Td>
+                        <Td className="truncate text-label text-ink" title={usageLabel(tag)}>{usageLabel(tag)}</Td>
+                        <Td onClick={(event) => event.stopPropagation()}>
                           {/* 設計 `zMlMX`。押すと友だち一覧への表示を切り替える。 */}
                           <button
                             type="button"
@@ -1115,29 +1124,32 @@ export default function TagsPageV4({
                           >
                             <StarIcon filled={Boolean(tag.isStarred)} />
                           </button>
-                        </td>
-                        <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3" onClick={(event) => event.stopPropagation()}>
+                        </Td>
+                        <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
                           {/*
                             ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
                             削除はメニューの中の危ない操作へ。赤いゴミ箱だけの
                             ボタンは行に直に置かない（設計 `E2NC4` の見た目指定は
                             使いやすさの直しのため外す。確認窓の動きは残す）。
                           */}
+                          <span onClick={(event) => event.stopPropagation()}>
                           <RowActions
                             subjectName={tag.name}
                             edit={{ href: `/tags/edit?id=${tag.id}` }}
-                            destructiveItem={{
-                              id: 'delete',
-                              label: '削除する',
+                            /* R190: 保管済みに戻す口は無いため、同じ確認を繰り返さない。 */
+                            destructiveItem={tag.status === 'archived' ? undefined : {
+                              id: 'archive',
+                              label: '保管する',
                               onSelect: () => setDeleteTarget(tag),
                             }}
                           />
-                        </td>
-                      </tr>
+                          </span>
+                        </ActionCell>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
+              </DataTable>
               </div>
               {/*
                 960px未満は縦に重ねたカード（#1014 ATTR-20）。
@@ -1181,7 +1193,8 @@ export default function TagsPageV4({
                                 </p>
                               ) : null}
                               <p className="mt-1 text-xs text-ink-secondary">{tag.friendCount ?? 0}人・{usageLabel(tag)}</p>
-                              <div className="mt-2" onClick={(event) => event.stopPropagation()}><FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} /></div>
+                              {/* フォルダは文字だけ（m21o）。表と同じく、変更は編集画面で行う。 */}
+                              <p className="mt-1 text-xs text-ink-secondary">フォルダ：{group?.name ?? '未分類'}</p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2 pt-1">
                               <button
@@ -1197,9 +1210,9 @@ export default function TagsPageV4({
                                 <RowActions
                                   subjectName={tag.name}
                                   edit={{ href: `/tags/edit?id=${tag.id}` }}
-                                  destructiveItem={{
-                                    id: 'delete',
-                                    label: '削除する',
+                                  destructiveItem={tag.status === 'archived' ? undefined : {
+                                    id: 'archive',
+                                    label: '保管する',
                                     onSelect: () => setDeleteTarget(tag),
                                   }}
                                 />

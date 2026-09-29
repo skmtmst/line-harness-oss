@@ -151,6 +151,8 @@ describe('リマインダ実行記録', () => {
       message: 'LINEへの送信に一時的に失敗しました。自動で再試行します。',
       retryAt: '2026-08-28T09:05:00.000Z',
       now: '2026-08-28T09:00:01.000Z',
+      // R340: 持ち主の貸出期限が合うときだけ失敗を記録する。
+      expectedLeaseExpiresAt: run!.lease_expires_at,
     })
 
     expect(await claim('2026-08-28T09:04:59.000Z')).toBeNull()
@@ -166,6 +168,7 @@ describe('リマインダ実行記録', () => {
       message: '送信内容または宛先を確認してください。',
       retryAt: null,
       now: '2026-08-28T09:05:01.000Z',
+      expectedLeaseExpiresAt: automaticRetry!.lease_expires_at,
     })
     sqlite.prepare(
       `UPDATE friend_reminders SET status = 'completed' WHERE id = 'enrollment-1'`,
@@ -178,7 +181,8 @@ describe('リマインダ実行記録', () => {
       now: '2026-08-28T09:06:00.000Z',
     })
     expect(scheduled?.kind).toBe('scheduled')
-    expect(scheduled?.run.line_retry_key).not.toBe(oldRetryKey)
+    // R342: 手動再試行でも同じ通知には同じ X-Line-Retry-Key を使い回す。
+    expect(scheduled?.run.line_retry_key).toBe(oldRetryKey)
     expect(sqlite.prepare(
       `SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`,
     ).get()).toEqual({ status: 'active' })
@@ -199,6 +203,7 @@ describe('リマインダ実行記録', () => {
       message: '送信内容または宛先を確認してください。',
       retryAt: null,
       now: '2026-08-28T09:00:01.000Z',
+      expectedLeaseExpiresAt: run!.lease_expires_at,
     })
     sqlite.prepare(
       `UPDATE friend_reminders SET status = 'cancelled' WHERE id = 'enrollment-1'`,
@@ -228,6 +233,7 @@ describe('リマインダ実行記録', () => {
         lineRequestId: 'line-request-1',
         messageLogId: 'message-log-1',
         now: '2026-08-28T09:00:02.000Z',
+        expectedLeaseExpiresAt: run!.lease_expires_at,
       }),
     ])
     await completeReminderIfDone(db, 'enrollment-1', 'reminder-1')
@@ -268,6 +274,7 @@ describe('リマインダ実行記録', () => {
       message: '再試行待ちです。',
       retryAt: '2026-08-28T09:05:00.000Z',
       now: '2026-08-28T09:00:01.000Z',
+      expectedLeaseExpiresAt: run!.lease_expires_at,
     })
 
     await deleteReminder(db, 'reminder-1')

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import OpsPageHeader from '@/components/ops/ops-page-header'
-import { formatDate, formatDateTime, planLabel, tenantDetailHref, tenantStatusChip, opsCall } from '@/components/ops/ops-ui'
+import { formatDate, formatDateTime, planLabel, planStatusChip, tenantDetailHref, tenantUseStatusChip, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
@@ -66,7 +66,9 @@ export default function OpsTenantsPage() {
     if (!filter) return true
     if (filter === 'trialing') return row.plan_status === 'trialing'
     if (filter === 'past_due') return row.plan_status === 'past_due'
-    if (filter === 'active') return row.status === 'active' && row.plan_status !== 'trialing'
+    // 「契約中」＝請求契約が生きているもの（active＋決済失敗）。請求が解約・
+    // 課金対象外のものは入れない（監査 R153）。決済失敗は行の札で分かる。
+    if (filter === 'active') return row.plan_status === 'active' || row.plan_status === 'past_due'
     return row.status === filter
   })
 
@@ -95,7 +97,7 @@ export default function OpsTenantsPage() {
       <OpsPageHeader title="契約先アカウント" />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="" help="トライアルを除きます" loading={loading && !summary} />
+        <KpiCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="" help="請求が生きている契約先（決済失敗を含む）" loading={loading && !summary} />
         <KpiCard variant="v6" title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail="期限切れ前に案内" loading={loading && !summary} />
         <KpiCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="" help="運営が止めた契約先です" badge={summary?.suspended ? '確認' : undefined} badgeTone="warning" loading={loading && !summary} />
         <KpiCard variant="v6" title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail="Stripe で支払いが止まっている" badge={summary?.pastDue ? '要対応' : undefined} badgeTone="danger" loading={loading && !summary} />
@@ -168,7 +170,7 @@ export default function OpsTenantsPage() {
               {/* 列幅は画面が決める（部品は幅を持たない）。1,440px 幅で操作列まで収まるよう、日付系は狭く。 */}
               <Th>統括名</Th>
               <Th className="w-28">プラン</Th>
-              <Th className="w-24">状態</Th>
+              <Th className="w-40">利用 / 請求</Th>
               <Th className="w-28">契約日</Th>
               <Th className="w-28">期限</Th>
               <Th className="w-16" align="right">店舗</Th>
@@ -187,7 +189,7 @@ export default function OpsTenantsPage() {
                   <span className="mt-1 block truncate text-caption text-ink-faint">{row.featurePacks.length ? row.featurePacks.join('・') : ' '}</span>
                 </Td>
                 <Td><span className="text-label text-ink-secondary">{planLabel(row.plan_key)}</span></Td>
-                <Td>{tenantStatusChip(row.status, row.plan_status)}</Td>
+                <Td><span className="inline-flex flex-wrap items-center gap-1">{tenantUseStatusChip(row.status)}{planStatusChip(row.plan_status)}</span></Td>
                 <Td><span className="text-caption text-ink-secondary">{formatDate(row.created_at)}</span></Td>
                 <Td>
                   {row.trial_ends_at

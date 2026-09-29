@@ -3,7 +3,8 @@
 import { X } from 'lucide-react'
 import DateField from '@/components/shared/date-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -17,12 +18,13 @@ import type {
 import { api, ApiError, type CommonVarDetail } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import FeatureGate from '@/components/feature-gate'
-import { VAR_TYPE_LABELS, commonVarValueError, formatStamp } from '@/lib/common-vars'
+import { VAR_TYPE_LABELS, commonVarValueError, formatStamp, isSecretLikeVarValue, COMMON_VAR_STATE_LABELS } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
 import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -90,13 +92,37 @@ function EditCommonVarInner() {
   const [folderId, setFolderId] = useState('')
   const [value, setValue] = useState('')
   const [memo, setMemo] = useState('')
+  // Q: 変える理由は必須。履歴を見た人が「なぜ変えたか」を追えるようにする。
+  const [changeReason, setChangeReason] = useState('')
+  const [reasonFieldError, setReasonFieldError] = useState('')
+  // Q: 状態の切替（公開・止める・再開）。窓を開いている間だけ理由欄を出す。
+  const [statusAction, setStatusAction] = useState<'stop' | 'resume' | 'publish' | null>(null)
+  const [statusReason, setStatusReason] = useState('')
+  const [statusBusy, setStatusBusy] = useState(false)
+  const [statusError, setStatusError] = useState('')
   const [validFrom, setValidFrom] = useState('')
   const [validUntil, setValidUntil] = useState('')
   const [expiryBehavior, setExpiryBehavior] = useState<'stop' | 'fallback'>('stop')
   const [fallbackValue, setFallbackValue] = useState('')
+  /** R36: 直し方は欄のすぐ下にも出す。全体の失敗文だけではどの欄か分からない。 */
+  const [valueFieldError, setValueFieldError] = useState('')
+  const [fallbackFieldError, setFallbackFieldError] = useState('')
+  const [scheduleFieldError, setScheduleFieldError] = useState('')
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
+  // スケジュール設定の窓も共通の約束へ: Escapeで閉じる・Tabは窓の中・
+  // 閉じたら起点へ戻す。背景クリックの閉じるはこのまま残す。
+  const draftPanelRef = useOverlayFocus(!!draft, () => setDraft(null))
+  /** 予約を全部消す確認窓。チェックを外したときに開く。 */
+  const [clearSchedulesOpen, setClearSchedulesOpen] = useState(false)
+  const [clearSchedulesBusy, setClearSchedulesBusy] = useState(false)
+  const [clearSchedulesError, setClearSchedulesError] = useState('')
+
+  // 直したら欄の下の文言は消す。残ると直ったのに怒られているように見える。
+  useEffect(() => { setValueFieldError('') }, [value])
+  useEffect(() => { setFallbackFieldError('') }, [fallbackValue])
+  useEffect(() => { setScheduleFieldError('') }, [draft?.value])
 
   /**
    * 変える前の影響確認（設計 `uNBlA`）。
@@ -274,9 +300,11 @@ function EditCommonVarInner() {
       return
     }
     // VAR-06: 新規画面と同じ型検査を保存前に行い、理由を出して欄へ戻す。
+    // 理由は欄のすぐ下にも出す（R36）。
     const valueError = commonVarValueError(item.type, value)
     if (valueError) {
       setError(valueError)
+      setValueFieldError(valueError)
       document.getElementById('cv-value')?.focus()
       return
     }
@@ -293,9 +321,34 @@ function EditCommonVarInner() {
       const fallbackError = commonVarValueError(item.type, fallbackValue, '代替値')
       if (fallbackError) {
         setError(fallbackError)
+        setFallbackFieldError(fallbackError)
         document.getElementById('cv-fallback-value')?.focus()
         return
       }
+    }
+    // Q: 鍵の形・長い乱数はサーバでも422で止まる。確認を通しても
+    // 保存できないものはここで止め、理由を欄のすぐ下へ出す。
+    if (isSecretLikeVarValue(value)) {
+      const message = '鍵やトークンのような秘密の値は共通情報に保存できません'
+      setError(message)
+      setValueFieldError(message)
+      document.getElementById('cv-value')?.focus()
+      return
+    }
+    if (expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)) {
+      const message = '鍵やトークンのような秘密の値は代替値にも保存できません'
+      setError(message)
+      setFallbackFieldError(message)
+      document.getElementById('cv-fallback-value')?.focus()
+      return
+    }
+    // Q: 変える理由は必須。理由なしの保存は口が400で止める。
+    if (!changeReason.trim()) {
+      const message = '変える理由を入力してください'
+      setError(message)
+      setReasonFieldError(message)
+      document.getElementById('cv-change-reason')?.focus()
+      return
     }
     setSaving(true)
     setError('')
@@ -320,6 +373,7 @@ function EditCommonVarInner() {
         memo,
         folderId: folderId || null,
         expectedVersion: item.version,
+        changeReason: changeReason.trim(),
         impactProof: preview.data.impactProof,
         validFrom: validFrom || null,
         validUntil: validUntil || null,
@@ -329,9 +383,14 @@ function EditCommonVarInner() {
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
+        // 口で止まった理由も欄のすぐ下に映す（R36）。
+        if (res.error.includes('代替値')) setFallbackFieldError(res.error)
+        else if (res.error.includes('値')) setValueFieldError(res.error)
         return
       }
       setSaved(true)
+      // 理由はその保存のものだけ。次の変更は新しい理由を書く。
+      setChangeReason('')
       setShowImpactReview(false)
       void load()
     } catch (e) {
@@ -365,6 +424,8 @@ function EditCommonVarInner() {
    * ものを消すことになる。切り替わったら窓は消さず、選び直してもらう。
    */
   const [deleteTarget, setDeleteTarget] = useState<{ item: CommonVar; accountId: string } | null>(null)
+  // Q: 消した理由は版履歴に残すので必須。
+  const [deleteReason, setDeleteReason] = useState('')
   const [deletePhase, setDeletePhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [deleteImpact, setDeleteImpact] = useState<CommonVarDeleteImpact | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -401,7 +462,7 @@ function EditCommonVarInner() {
    * 「保存せずに移動」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
-    <ConfirmDialog
+    <ConfirmDialog primaryAction="cancel"
       open={leaveTarget !== null}
       title="保存していない変更があります"
       description="このまま移動すると、共通情報への変更は失われます。保存せずに移動しますか？"
@@ -418,6 +479,7 @@ function EditCommonVarInner() {
     setDeleteTarget(target)
     setDeleteImpact(null)
     setDeleteError('')
+    setDeleteReason('')
     setDeletePhase('loading')
     try {
       const res = await api.commonVars.deleteImpact(target.item.id, target.accountId)
@@ -438,6 +500,7 @@ function EditCommonVarInner() {
     setDeleteTarget(null)
     setDeleteImpact(null)
     setDeleteError('')
+    setDeleteReason('')
     setDeletePhase('loading')
   }
 
@@ -448,7 +511,7 @@ function EditCommonVarInner() {
     setDeleting(true)
     setDeleteError('')
     try {
-      const res = await api.commonVars.delete(deleteTarget.item.id, deleteTarget.accountId)
+      const res = await api.commonVars.delete(deleteTarget.item.id, deleteTarget.accountId, deleteReason.trim())
       // 失敗を握りつぶさない。返事を見ずに一覧へ戻すと、消えていないのに
       // 消えたように見える。
       if (!res.success) throw new Error(res.error)
@@ -484,6 +547,7 @@ function EditCommonVarInner() {
     const scheduleValueError = commonVarValueError(item.type, draft.value, '更新後の値')
     if (scheduleValueError) {
       setError(scheduleValueError)
+      setScheduleFieldError(scheduleValueError)
       return
     }
     setError('')
@@ -494,10 +558,16 @@ function EditCommonVarInner() {
       })
       if (!res.success) {
         setError(res.error)
+        if (res.error.includes('更新後の値') || res.error.includes('種別')) {
+          setScheduleFieldError(res.error)
+        }
         return
       }
       setDraft(null)
-      void load()
+      // `load()` だと名前・値・期間の入力欄まで保存済みの値へ戻る。
+      // 予約の追加は本体の保存と別物なので、保存済みの写しだけを取り直し
+      // 打ち込んだ内容は残す（refreshBaseline と同じ考え方）。
+      await refreshBaseline(item.id, selectedAccountId)
     } catch (e) {
       // サーバの生文言（500の'Internal server error'など）は出さない。
       setError(scheduleErrorText(e))
@@ -509,9 +579,72 @@ function EditCommonVarInner() {
     setError('')
     try {
       await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
-      void load()
+      // 予定の削除でも入力中の名前・値・期間は消さない。予定一覧だけ
+      // 取り直す（refreshBaseline）。
+      await refreshBaseline(item.id, selectedAccountId)
     } catch {
       setError('予約の削除に失敗しました。通信を確かめて、もう一度お試しください。')
+    }
+  }
+
+  /*
+    「自動で文字を変える」のチェックを外す操作。予定が1件でもあると
+    チェックが付いたまま見えるので、外した＝全部消す、に揃える。
+    いきなり消さず確認窓を出すのは、予定は時刻で値を書き換える
+    重い設定だから。窓で「すべて消す」を選んだときだけ消す。
+  */
+  const clearSchedules = async () => {
+    if (!item || !selectedAccountId) return
+    setClearSchedulesBusy(true)
+    setClearSchedulesError('')
+    try {
+      for (const schedule of schedules) {
+        await api.commonVars.deleteSchedule(item.id, schedule.id, selectedAccountId)
+      }
+      setClearSchedulesOpen(false)
+      await refreshBaseline(item.id, selectedAccountId)
+    } catch {
+      setClearSchedulesError('消せなかった予定があります。通信を確かめて、もう一度お試しください。')
+    } finally {
+      setClearSchedulesBusy(false)
+    }
+  }
+
+  /**
+   * Q: 状態の切替。公開・止める・再開は理由が必須。
+   * 止めると差し込みへ答えられなくなり、使っている配信は止まって
+   * 運用者へ知らせる（空文字を送らない決まり）。
+   */
+  const applyStatus = async () => {
+    if (!item || !selectedAccountId || !statusAction) return
+    const reason = statusReason.trim()
+    if (!reason) {
+      setStatusError('変える理由を入力してください')
+      return
+    }
+    setStatusBusy(true)
+    setStatusError('')
+    try {
+      const res = await api.commonVars.setStatus(item.id, selectedAccountId, {
+        to: statusAction === 'stop' ? 'stopped' : 'active',
+        changeReason: reason,
+        expectedVersion: item.version,
+      })
+      if (!res.success) {
+        setStatusError(res.error)
+        return
+      }
+      setStatusAction(null)
+      setStatusReason('')
+      await load()
+    } catch (e) {
+      setStatusError(
+        e instanceof ApiError && e.status === 409
+          ? '別の担当者が先に更新しました。最新内容を読み直してください。'
+          : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
+      )
+    } finally {
+      setStatusBusy(false)
     }
   }
 
@@ -599,6 +732,67 @@ function EditCommonVarInner() {
         <>
           <div className="grid gap-4 xl:grid-cols-3" data-design-node="gBtaK">
             <div className="space-y-4 xl:col-span-2">
+              {/* Q: いまの状態と切替。止めると差し込みに答えられなくなる。 */}
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-ink-secondary text-sm font-medium">状態</p>
+                  <span className="rounded-control bg-canvas-sunken px-2 py-0.5 text-xs font-semibold">
+                    {COMMON_VAR_STATE_LABELS[item.state ?? item.status ?? 'active'] ?? '使用中'}
+                  </span>
+                  {(item.state ?? 'active') === 'expired' && (
+                    <span className="text-status-warning text-xs">期限を延ばすと再び使えます</span>
+                  )}
+                  <span className="ml-auto">
+                    {(item.status ?? 'active') === 'active' && (
+                      <Button type="button" onClick={() => { setStatusAction('stop'); setStatusReason(''); setStatusError('') }}>
+                        止める
+                      </Button>
+                    )}
+                    {item.status === 'stopped' && (
+                      <Button type="button" onClick={() => { setStatusAction('resume'); setStatusReason(''); setStatusError('') }}>
+                        再開する
+                      </Button>
+                    )}
+                    {item.status === 'draft' && (
+                      <Button type="button" variant="primary" onClick={() => { setStatusAction('publish'); setStatusReason(''); setStatusError('') }}>
+                        公開する
+                      </Button>
+                    )}
+                  </span>
+                </div>
+                {(item.status ?? 'active') === 'draft' && (
+                  <p className="text-ink-faint mt-2 text-xs">下書きは差し込みに使われません。公開すると配信で使えるようになります。</p>
+                )}
+                {item.status === 'stopped' && (
+                  <p className="text-ink-faint mt-2 text-xs">止めている間、この共通情報を使う配信は止まります。</p>
+                )}
+                {statusAction && (
+                  <div className="border-hairline mt-3 space-y-2 border-t pt-3">
+                    <label htmlFor="cv-status-reason" className="text-ink-secondary block text-sm font-medium">
+                      {statusAction === 'stop' ? '止める理由' : statusAction === 'resume' ? '再開する理由' : '公開する理由'}
+                      <RequiredBadge />
+                    </label>
+                    <input
+                      id="cv-status-reason"
+                      type="text"
+                      value={statusReason}
+                      onChange={(event) => { setStatusError(''); setStatusReason(event.target.value) }}
+                      maxLength={200}
+                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                      placeholder={statusAction === 'stop' ? '例：キャンペーンが終わったため' : '例：新しい期間の案内を始めるため'}
+                    />
+                    {statusError ? <p className="text-danger text-xs">{statusError}</p> : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="primary" disabled={statusBusy} onClick={() => void applyStatus()}>
+                        {statusBusy ? '変更中…' : statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
+                      </Button>
+                      <Button type="button" disabled={statusBusy} onClick={() => setStatusAction(null)}>
+                        やめる
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </section>
               <section className="bg-canvas rounded-card border-hairline space-y-5 border p-5">
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
@@ -624,10 +818,11 @@ function EditCommonVarInner() {
                   </div>
                   <div>
                     <label htmlFor="cv-folder" className="text-ink-secondary mb-1 block text-sm font-medium">フォルダ</label>
-                    <SelectField
+                    <Select
+                      aria-label="フォルダ"
                       id="cv-folder"
                       value={folderId}
-                      onChange={(e) => { setSaved(false); setFolderId(e.target.value) }}
+                      onChange={(value) => { setSaved(false); setFolderId(value) }}
                       options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                     />
                   </div>
@@ -638,7 +833,7 @@ function EditCommonVarInner() {
                     <label htmlFor="cv-value" className="text-ink-secondary text-sm font-medium">差し込まれる文字</label>
                     <span className="text-ink-faint text-xs tabular-nums">{value.length} / {item.type === 'long_text' ? 10000 : 200}</span>
                   </div>
-                  {item.type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full" /> : (item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : (item.type as string) === 'date' ? <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : (item.type as string) === 'datetime' ? <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : <input
+                  {item.type === 'boolean' ? <Select size="full" aria-label="差し込まれる文字" id="cv-value" value={value} onChange={(value) => { setSaved(false); setValue(value) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /> : (item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : (item.type as string) === 'date' ? <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : (item.type as string) === 'datetime' ? <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : <input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
                     maxLength={item.type === 'number' ? undefined : 200}
@@ -646,6 +841,7 @@ function EditCommonVarInner() {
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className="border-hairline rounded-control w-full border px-3 py-3 text-sm"
                   />}
+                  {valueFieldError ? <p className="text-danger mt-1 text-xs">{valueFieldError}</p> : null}
                 </div>
 
                 {/*
@@ -684,6 +880,24 @@ function EditCommonVarInner() {
                   />
                 </div>
 
+                {/* Q: 変える理由は必須。履歴へ残り、後から見た人が意図を追える。 */}
+                <div>
+                  <label htmlFor="cv-change-reason" className="text-ink-secondary mb-1 block text-sm font-medium">
+                    変える理由<RequiredBadge />
+                  </label>
+                  <input
+                    id="cv-change-reason"
+                    type="text"
+                    value={changeReason}
+                    onChange={(event) => { setSaved(false); setReasonFieldError(''); setChangeReason(event.target.value) }}
+                    maxLength={200}
+                    required
+                    className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                    placeholder="例：住所が変わったため"
+                  />
+                  {reasonFieldError ? <p className="text-danger mt-1 text-xs">{reasonFieldError}</p> : null}
+                </div>
+
                 <fieldset className="border-hairline rounded-control space-y-3 border p-4">
                   <legend className="text-ink-secondary px-1 text-sm font-medium">配信で使える期間</legend>
                   <p className="text-ink-faint text-xs">予約配信は送信を始める時刻で判定します。空欄なら期間を制限しません。</p>
@@ -699,16 +913,17 @@ function EditCommonVarInner() {
                   </div>
                   <div>
                     <label htmlFor="cv-expiry-behavior" className="text-ink-secondary mb-1 block text-xs font-medium">期間外の動作</label>
-                    <SelectField id="cv-expiry-behavior" value={expiryBehavior} onChange={(e) => { setSaved(false); setExpiryBehavior(e.target.value as 'stop' | 'fallback') }} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
+                    <Select aria-label="期間外の動作" id="cv-expiry-behavior" value={expiryBehavior} onChange={(value) => { setSaved(false); setExpiryBehavior(value as 'stop' | 'fallback') }} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
                   </div>
                   {expiryBehavior === 'fallback' && (
                     <div>
                       <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
                       {item.type === 'boolean' ? (
-                        <SelectField
+                        <Select
+                          aria-label="代替値"
                           id="cv-fallback-value"
                           value={fallbackValue}
-                          onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
+                          onChange={(value) => { setSaved(false); setFallbackValue(value) }}
                           options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
                         />
                       ) : (item.type as string) === 'date' ? (
@@ -724,6 +939,7 @@ function EditCommonVarInner() {
                           className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                         />
                       )}
+                      {fallbackFieldError ? <p className="text-danger mt-1 text-xs">{fallbackFieldError}</p> : null}
                     </div>
                   )}
                 </fieldset>
@@ -734,25 +950,26 @@ function EditCommonVarInner() {
               </section>
 
               <section className="bg-canvas rounded-card border-hairline border p-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={schedules.length > 0}
-                    onChange={() => {
-                      if (schedules.length === 0) {
+                <Checkbox
+                  checked={schedules.length > 0 || draft !== null}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      if (schedules.length === 0 && draft === null) {
                         const now = jstNowLocalInput()
                         setDraft({ date: now.date, time: '00:00', value })
                       }
-                    }}
-                    className="mt-1 accent-green-500"
-                  />
-                  <span>
-                    <span className="text-ink block text-sm font-semibold">この日を過ぎたら、自動で文字を変える</span>
-                    <span className="text-ink-faint mt-1 block text-xs">
-                      期間が終わったら出したくない案内や、次の値へ切り替えるときに使います。
-                    </span>
-                  </span>
-                </label>
+                    } else if (draft !== null) {
+                      // 登録前の入力中なら、窓を畳むだけで済む。
+                      setDraft(null)
+                    } else {
+                      // 登録済みの予定は時刻に値を書き換える設定。
+                      // 外す＝全部消すなので、確認を挟む。
+                      setClearSchedulesError('')
+                      setClearSchedulesOpen(true)
+                    }
+                  }}
+                  description="期間が終わったら出したくない案内や、次の値へ切り替えるときに使います。"
+                >この日を過ぎたら、自動で文字を変える</Checkbox>
                 {schedules.map((schedule) => (
                   <div key={schedule.id} className="border-hairline mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs">
                     <span className="text-ink-secondary">
@@ -1003,7 +1220,7 @@ function EditCommonVarInner() {
             if (e.target === e.currentTarget) setDraft(null)
           }}
         >
-          <div className="rounded-card bg-canvas w-full max-w-md space-y-4 p-6 shadow-xl">
+          <div ref={draftPanelRef} className="rounded-card bg-canvas w-full max-w-md space-y-4 p-6 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <p className="text-ink text-sm font-semibold">スケジュール設定</p>
               <button type="button" onClick={() => setDraft(null)} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -1038,13 +1255,7 @@ function EditCommonVarInner() {
                 更新後の値
               </label>
               {item?.type === 'boolean' ? (
-                <SelectField
-                  id="sc-value"
-                  value={draft.value}
-                  onChange={(e) => setDraft({ ...draft, value: e.target.value })}
-                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
-                  className="w-full"
-                />
+                <Select size="full" aria-label="更新後の値" id="sc-value" value={draft.value} onChange={(value) => setDraft({ ...draft, value: value })} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
               ) : (item?.type as string) === 'date' ? (
                 <DateField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} />
               ) : (item?.type as string) === 'datetime' ? (
@@ -1058,6 +1269,7 @@ function EditCommonVarInner() {
                   className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                 />
               )}
+              {scheduleFieldError ? <p className="text-danger mt-1 text-xs">{scheduleFieldError}</p> : null}
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -1102,6 +1314,7 @@ function EditCommonVarInner() {
         */
         onConfirm={
           deleteAccountSwitched || deletePhase !== 'ready' || !deleteImpact?.canDelete
+            || !deleteReason.trim()
             ? undefined
             : () => void remove()
         }
@@ -1149,10 +1362,35 @@ function EditCommonVarInner() {
                 と書いてある場所は、これから空欄で送られます。
               </p>
               <p className="text-ink-secondary">・残ること: すでに送ったものは変わりません。</p>
+              {/* Q: 消した理由は版履歴に残る。理由が無いと確認ボタンを出さない。 */}
+              <label className="block">
+                <span className="text-ink-secondary font-semibold">
+                  消した理由 <span className="text-danger">必須</span>
+                </span>
+                <input
+                  value={deleteReason}
+                  onChange={(event) => setDeleteReason(event.target.value)}
+                  placeholder="例: 店舗情報の変更のため"
+                  className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+                />
+              </label>
             </>
           ) : null}
         </div>
       </ConfirmDialog>
+
+      {/* チェックを外す＝登録済みの予定を全部消す、の確認。 */}
+      <ConfirmDialog
+        open={clearSchedulesOpen}
+        title="更新の予定をすべて消しますか？"
+        description="予定の時刻に値が変わる設定をすべて取り消します。いま入力中の内容はそのまま残ります。"
+        confirmLabel="すべて消す"
+        destructive
+        busy={clearSchedulesBusy}
+        error={clearSchedulesError || undefined}
+        onConfirm={clearSchedulesBusy ? undefined : () => void clearSchedules()}
+        onCancel={() => { if (!clearSchedulesBusy) setClearSchedulesOpen(false) }}
+      />
 
       {leaveConfirmDialog}
     </div>

@@ -424,7 +424,22 @@ describe('getConversionApprovalNotifyInfo', () => {
       .run();
 
     const info = await getConversionApprovalNotifyInfo(db, 'ce-1');
-    expect(info).toEqual({ affiliateId: 'aff-1', offerName: '案件A', rewardAmount: 5000 });
+    expect(info).toEqual({
+      affiliateId: 'aff-1', offerName: '案件A', rewardAmount: 5000, notifyOnConversion: false,
+    });
+  });
+
+  test('notify_on_conversion=1 の紹介者は notifyOnConversion=true を返す', async () => {
+    sqlite.prepare(`UPDATE affiliates SET notify_on_conversion = 1 WHERE id = 'aff-1'`).run();
+    sqlite
+      .prepare(
+        `INSERT INTO conversion_events (id, conversion_point_id, friend_id, created_at, affiliate_id, approval_status)
+         VALUES ('ce-on', 'cp-1', 'f-1', '2024-01-01T00:00:00.000', 'aff-1', 'approved')`,
+      )
+      .run();
+
+    const info = await getConversionApprovalNotifyInfo(db, 'ce-on');
+    expect(info?.notifyOnConversion).toBe(true);
   });
 
   test('offer-less (generic link) attribution → null offer name, 0 reward', async () => {
@@ -442,7 +457,9 @@ describe('getConversionApprovalNotifyInfo', () => {
       .run();
 
     const info = await getConversionApprovalNotifyInfo(db, 'ce-2');
-    expect(info).toEqual({ affiliateId: 'aff-1', offerName: null, rewardAmount: 0 });
+    expect(info).toEqual({
+      affiliateId: 'aff-1', offerName: null, rewardAmount: 0, notifyOnConversion: false,
+    });
   });
 
   test('returns null for a non-attributed (affiliate_id NULL) event', async () => {

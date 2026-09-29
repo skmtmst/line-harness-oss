@@ -12,7 +12,7 @@ import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 // #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
@@ -24,6 +24,7 @@ import {
   type EventBookingItem,
   type EventBookingSummary,
   type EventDetail,
+  type EventOccurrenceApplicant,
   type EventOccurrenceApplicants,
   type EventSlot,
 } from '@/lib/api'
@@ -134,6 +135,9 @@ function OccurrenceApplicantsPanel({
   onPromote,
   onExportCsv,
   csvBusy,
+  onMoveWaiting,
+  onSkipWaiting,
+  waitlistBusy,
 }: {
   data: EventOccurrenceApplicants
   promoting: boolean
@@ -145,6 +149,10 @@ function OccurrenceApplicantsPanel({
    */
   onExportCsv: () => void
   csvBusy: boolean
+  /** U: 待ち順の手動変更・飛ばし。理由は呼び出し側の確認窓で聞く。 */
+  onMoveWaiting: (id: string, direction: -1 | 1) => void
+  onSkipWaiting: (applicant: EventOccurrenceApplicant) => void
+  waitlistBusy: boolean
 }) {
   const waitlistRows = data.applicants.filter((applicant) => applicant.source === 'waitlist')
   const waitingRows = waitlistRows.filter((applicant) => applicant.status === 'waiting')
@@ -237,6 +245,33 @@ function OccurrenceApplicantsPanel({
                     </Td>
                     <ActionCell>
                       {/* #641: 行操作は枠つきボタンにそろえる */}
+                      {applicant.source === 'waitlist' && applicant.status === 'waiting' && (
+                        <span className="mr-2 inline-flex items-center gap-1">
+                          <Button
+                            variant="secondary"
+                            onClick={() => onMoveWaiting(applicant.id, -1)}
+                            disabled={waitlistBusy || waitlistRank <= 1}
+                            aria-label={`${applicant.displayName ?? '待機中の方'}を1つ上へ`}
+                          >
+                            上へ
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => onMoveWaiting(applicant.id, 1)}
+                            disabled={waitlistBusy || waitlistRank >= waitingRows.length}
+                            aria-label={`${applicant.displayName ?? '待機中の方'}を1つ下へ`}
+                          >
+                            下へ
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => onSkipWaiting(applicant)}
+                            disabled={waitlistBusy}
+                          >
+                            見送る
+                          </Button>
+                        </span>
+                      )}
                       <Button
                         href={`/chats?friend=${encodeURIComponent(applicant.friendId)}`}
                         variant="secondary"
@@ -344,6 +379,18 @@ function BookingsInner() {
   const [occurrenceStatus, setOccurrenceStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [promotingWaitlist, setPromotingWaitlist] = useState(false)
   const [occurrenceActionError, setOccurrenceActionError] = useState('')
+  /*
+   * U: 待ちの手動操作（繰上げ・順番の変更・飛ばし）の確認窓。
+   * 描画中の切替判定より前で持つ（後だと触る前に読んで落ちる）。
+   */
+  const [waitlistDialog, setWaitlistDialog] = useState<
+    | { kind: 'promote' }
+    | { kind: 'reorder'; orderedIds: string[]; description: string }
+    | { kind: 'skip'; waitlistId: string; name: string }
+    | null
+  >(null)
+  const [waitlistReason, setWaitlistReason] = useState('')
+  const [waitlistOpError, setWaitlistOpError] = useState('')
   /* TECH-03: 申込者CSVの書出し中。失敗は occurrenceActionError へ出す。 */
   const [csvBusy, setCsvBusy] = useState(false)
   const [broadcastMessage, setBroadcastMessage] = useState('')
@@ -422,6 +469,9 @@ function BookingsInner() {
   if (occurrenceOperationScope !== scope) {
     setOccurrenceOperationScope(scope)
     setPromotingWaitlist(false)
+    setWaitlistDialog(null)
+    setWaitlistReason('')
+    setWaitlistOpError('')
     setOccurrenceActionError('')
     setBroadcastBusy(false)
     setBroadcastConfirmOpen(false)
@@ -798,23 +848,77 @@ function BookingsInner() {
     }
   }
 
-  async function promoteWaitlist() {
+  /*
+   * U: 待ちの手動操作（繰上げ・順番の変更・飛ばし）は理由が必須。
+   * 理由は変更の記録に残る。確認窓で聞いてから1回だけ送る。
+   */
+  function openWaitlistDialog(operation: NonNullable<typeof waitlistDialog>) {
+    setWaitlistReason('')
+    setWaitlistOpError('')
+    setWaitlistDialog(operation)
+  }
+
+  function moveWaiting(id: string, direction: -1 | 1) {
+    const applicants = occurrenceApplicants
+    if (!applicants || promotingWaitlist) return
+    const waiting = applicants.applicants.filter(
+      (applicant) => applicant.source === 'waitlist' && applicant.status === 'waiting',
+    )
+    const index = waiting.findIndex((applicant) => applicant.id === id)
+    const other = waiting[index + direction]
+    const current = waiting[index]
+    if (!current || !other) return
+    const orderedIds = waiting.map((applicant) => applicant.id)
+    const [moved] = orderedIds.splice(index, 1)
+    orderedIds.splice(index + direction, 0, moved as string)
+    const first = direction === -1 ? current : other
+    const second = direction === -1 ? other : current
+    openWaitlistDialog({
+      kind: 'reorder',
+      orderedIds,
+      description: `「${first.displayName ?? '待機中の方'}」と「${second.displayName ?? '待機中の方'}」の順番を入れ替えます。`,
+    })
+  }
+
+  async function runWaitlistOperation() {
     const accountId = selectedAccountId
     const occurrence = occurrenceApplicants?.occurrence
-    if (!accountId || !occurrence || promotingWaitlist) return
+    const operation = waitlistDialog
+    if (!accountId || !occurrence || !operation || promotingWaitlist) return
+    const trimmed = waitlistReason.trim()
+    if (trimmed === '') return
     const startedScope = scope
     setPromotingWaitlist(true)
+    setWaitlistOpError('')
     setOccurrenceActionError('')
     try {
-      await eventsApi.promoteOccurrenceWaitlist(accountId, occurrence.id, occurrence.version)
+      if (operation.kind === 'promote') {
+        await eventsApi.promoteOccurrenceWaitlist(accountId, occurrence.id, occurrence.version, trimmed)
+      } else if (operation.kind === 'reorder') {
+        await eventsApi.reorderOccurrenceWaitlist(accountId, occurrence.id, {
+          ordered_ids: operation.orderedIds,
+          expectedVersion: occurrence.version,
+          reason: trimmed,
+        })
+      } else {
+        await eventsApi.skipOccurrenceWaitlist(accountId, occurrence.id, {
+          waitlist_id: operation.waitlistId,
+          expectedVersion: occurrence.version,
+          reason: trimmed,
+        })
+      }
       if (scopeRef.current !== startedScope) return
       await refreshOccurrenceApplicants()
+      if (scopeRef.current === startedScope) {
+        setWaitlistDialog(null)
+        setWaitlistReason('')
+      }
     } catch {
       if (scopeRef.current !== startedScope) return
       /* 409を含め、再読込して最新の順位・期限を先に見せる。 */
       await refreshOccurrenceApplicants()
       if (scopeRef.current === startedScope) {
-        setOccurrenceActionError('案内を更新できませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を読み直してから、もう一度お試しください。')
+        setWaitlistOpError('変えられませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を確かめてから、もう一度お試しください。')
       }
     } finally {
       if (scopeRef.current === startedScope) setPromotingWaitlist(false)
@@ -999,10 +1103,10 @@ function BookingsInner() {
           {occurrenceSlots.length > 0 && (
             <label className="text-ink-secondary grid gap-1 text-xs font-medium">
               開催回
-              <SelectField
+              <Select
                 aria-label="開催回を選ぶ"
                 value={selectedOccurrenceId}
-                onChange={(event) => setSelectedOccurrenceId(event.target.value)}
+                onChange={(value) => setSelectedOccurrenceId(value)}
                 options={occurrenceSlots.map((slot) => ({ value: slot.id, label: formatJp(slot.starts_at, '日時未取得') }))}
               />
             </label>
@@ -1025,9 +1129,16 @@ function BookingsInner() {
               data={occurrenceApplicants}
               promoting={promotingWaitlist}
               error={occurrenceActionError}
-              onPromote={() => void promoteWaitlist()}
+              onPromote={() => openWaitlistDialog({ kind: 'promote' })}
               onExportCsv={() => void exportApplicantsCsv()}
               csvBusy={csvBusy}
+              onMoveWaiting={moveWaiting}
+              onSkipWaiting={(applicant) => openWaitlistDialog({
+                kind: 'skip',
+                waitlistId: applicant.id,
+                name: applicant.displayName ?? '待機中の方',
+              })}
+              waitlistBusy={promotingWaitlist}
             />
             {canManageApplicantBroadcast && (
               <>
@@ -1322,6 +1433,61 @@ function BookingsInner() {
                 押したあとにLINEアカウントが切り替わりました。この窓を閉じて、いまのアカウントの一覧から選び直してください。
               </p>
             )}
+          </div>
+        )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={waitlistDialog !== null}
+        title={
+          waitlistDialog?.kind === 'promote'
+            ? '次の方へ案内しますか？'
+            : waitlistDialog?.kind === 'reorder'
+              ? '待ち順を変えますか？'
+              : '今回は見送りますか？'
+        }
+        description={
+          waitlistDialog?.kind === 'promote'
+            ? '先頭の方へ期限付きの案内を送ります。期限までに返事がなければ次の方へ進みます。'
+            : waitlistDialog?.kind === 'reorder'
+              ? waitlistDialog.description
+              : `「${waitlistDialog?.kind === 'skip' ? waitlistDialog.name : ''}」を最後尾へ回します。行は消さず、次回の案内では後回しになります。`
+        }
+        confirmLabel={
+          waitlistDialog?.kind === 'promote'
+            ? '案内する'
+            : waitlistDialog?.kind === 'reorder'
+              ? '順番を変える'
+              : '見送る'
+        }
+        cancelLabel="やめる"
+        busy={promotingWaitlist}
+        error={waitlistOpError}
+        /* 理由が必須。空のまま送らせない（確認ボタンを出さない）。 */
+        onConfirm={waitlistReason.trim() === '' ? undefined : () => void runWaitlistOperation()}
+        onCancel={() => {
+          if (promotingWaitlist) return
+          setWaitlistDialog(null)
+          setWaitlistReason('')
+          setWaitlistOpError('')
+        }}
+      >
+        {waitlistDialog && (
+          <div className="text-ink-secondary space-y-2 text-sm">
+            <label className="block">
+              <span className="text-ink-faint text-xs">理由（必須）</span>
+              <textarea
+                value={waitlistReason}
+                onChange={(event) => setWaitlistReason(event.target.value)}
+                rows={2}
+                placeholder="例：空きが出たため順番どおり案内します"
+                aria-label="操作の理由"
+                className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+              />
+            </label>
+            <p className="text-ink-faint text-xs">
+              この理由は変更の記録に残ります。友だちには送りません。
+            </p>
           </div>
         )}
       </ConfirmDialog>

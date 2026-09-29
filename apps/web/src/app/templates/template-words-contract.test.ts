@@ -31,7 +31,7 @@ describe('種類の呼び方', () => {
     /* 一覧の上の札と、作る画面の選び口。どちらも運用の言葉にする。 */
     expect(PAGE).toContain("{ key: 'multiple', label: '複数通' },")
     expect(PAGE).toContain("{ key: 'variables', label: '差し込みあり' },")
-    /* 選び口は共通の `SelectField` へ寄せたので、options で並ぶ。 */
+    /* 選び口は共通の `Select` へ寄せたので、options で並ぶ。 */
     expect(PAGE).toContain("{ value: \"flex\", label: \"カード型\" }")
     expect(PAGE, '失敗の文に内部の語が出ている').not.toContain('Flex JSON parse 失敗')
   })
@@ -80,7 +80,8 @@ describe('V6の作成画面', () => {
 
   it('カルーセルをパネルとして最大10枚まで扱う', () => {
     expect(CAROUSEL_PAGE).toContain('const MAX_COLUMNS = 10')
-    expect(CAROUSEL_PAGE).toContain('このパネルの選択肢（最大{MAX_ACTIONS}つ）')
+    // 選択肢の上限は直書きせず MAX_ACTIONS。数は全部のパネルでそろえる決まりも添える。
+    expect(CAROUSEL_PAGE).toContain('このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）')
     expect(CAROUSEL_PAGE).toContain('画像は横1024 × 縦678pxを推奨')
     // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(CAROUSEL_PAGE).toContain('<LinePreview')

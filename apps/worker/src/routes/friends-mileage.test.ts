@@ -99,7 +99,7 @@ describe('GET /api/friends/:id/mileage', () => {
     expect(dbMocks.getMileageHistoryForFriend).toHaveBeenCalledWith(
       env.DB,
       'friend-1',
-      { limit: 3 },
+      { limit: 3, visibleAccountIds: ['account-1'] },
     );
     expect(dbMocks.getMileageConnectedAccountsForFriend).toHaveBeenCalledWith(
       env.DB, 'friend-1', ['account-1'],
@@ -123,7 +123,7 @@ describe('GET /api/friends/:id/mileage', () => {
     expect(dbMocks.getMileageHistoryForFriend).toHaveBeenCalledWith(
       env.DB,
       'friend-1',
-      { limit: 100 },
+      { limit: 100, visibleAccountIds: ['account-1'] },
     );
   });
 

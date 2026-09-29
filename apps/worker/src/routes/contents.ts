@@ -9,8 +9,9 @@ import {
   archiveMedia,
   restoreMedia,
   getMediaUsages,
-  getMediaDeleteImpact,
   getMediaDeleteImpactSnapshot,
+  isMissingTableError,
+  getStaffNameMap,
   getMediaReplacementPlan,
   applyMediaReplacementPlan,
   getMediaStorageQuota,
@@ -59,6 +60,10 @@ import {
   COMMON_VAR_TYPES,
   normalizeCommonVarValue,
   normalizeCommonVarValidityAt,
+  isSecretLikeValue,
+  setCommonVarStatus,
+  CommonVarReasonRequiredError,
+  CommonVarStatusTransitionError,
   type Media,
   type MediaKind,
   type CommonVar,
@@ -244,7 +249,24 @@ function hasMediaSignature(bytes: Uint8Array, mimeType: string): boolean {
  * `liveUrl` はライブ参照用の公開URL。メディアIDだけを含み、
  * 配信時にその時点の最新版へ解決される。
  */
-function serializeMedia(row: Media, workerUrl: string) {
+/**
+ * 入れた人の表示名を添える（R35）。
+ *
+ * `uploaded_by` は内部ID（UUID）のまま残し、画面には `uploadedByName`
+ * を出す。退職・削除済みで引けないときは null（画面が「削除された
+ * 担当者」と出す）。`env-owner`（環境の API キー）は staff 表に無いため、
+ * 認証と同じ呼び名 'Owner' を添える。
+ */
+async function uploaderNameMap(
+  db: D1Database,
+  rows: Array<{ uploaded_by?: string | null }>,
+): Promise<Map<string, string>> {
+  const names = await getStaffNameMap(db, rows.map((row) => row.uploaded_by));
+  names.set('env-owner', 'Owner');
+  return names;
+}
+
+function serializeMedia(row: Media, workerUrl: string, uploaderNames?: Map<string, string>) {
   return {
     id: row.id,
     lineAccountId: row.line_account_id,
@@ -259,6 +281,7 @@ function serializeMedia(row: Media, workerUrl: string) {
     url: row.public_url ?? `${workerUrl}/images/${row.r2_key}`,
     liveUrl: `${workerUrl}/media/${row.id}/content`,
     uploadedBy: row.uploaded_by,
+    uploadedByName: row.uploaded_by ? (uploaderNames?.get(row.uploaded_by) ?? null) : null,
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? null,
     archivedBy: row.archived_by ?? null,
@@ -871,9 +894,10 @@ contents.get('/api/media', async (c) => {
       countMedia(c.env.DB, filters),
     ]);
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    const names = await uploaderNameMap(c.env.DB, items);
     return c.json({
       success: true,
-      data: { items: items.map((m) => serializeMedia(m, workerUrl)), total, limit, offset },
+      data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
     });
   } catch (err) {
     console.error('GET /api/media error:', err);
@@ -901,9 +925,10 @@ contents.get('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
       ? folder.name
       : null;
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    const names = await uploaderNameMap(c.env.DB, [media]);
     return c.json({
       success: true,
-      data: { item: serializeMedia(media, workerUrl), folderName },
+      data: { item: serializeMedia(media, workerUrl, names), folderName },
     });
   } catch (err) {
     console.error('GET /api/media/:id error:', err);
@@ -1207,7 +1232,8 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         ...(usageExpiresAt !== undefined ? { usageExpiresAt } : {}),
         ...(usageConsentNote !== undefined ? { usageConsentNote } : {}),
       });
-      return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
+      const names = await uploaderNameMap(c.env.DB, [media!]);
+      return c.json({ success: true, data: serializeMedia(media!, workerUrl, names) });
     }
 
     /*
@@ -1254,10 +1280,11 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         console.error('usage rescan after reference switch failed:', scanError);
       }
       const fresh = await getMediaById(c.env.DB, id, accountId);
+      const names = await uploaderNameMap(c.env.DB, [fresh ?? existing]);
       return c.json({
         success: true,
         data: {
-          ...serializeMedia(fresh ?? existing, workerUrl),
+          ...serializeMedia(fresh ?? existing, workerUrl, names),
           usageReference: {
             refKind,
             refId,
@@ -1332,7 +1359,8 @@ async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: str
   if (result.status === 'not_found') return c.json({ success: false, error: 'Not found' }, 404);
   if (result.status === 'archived' || result.status === 'restored') {
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    return c.json({ success: true, data: serializeMedia(result.media, workerUrl) });
+    const names = await uploaderNameMap(c.env.DB, [result.media]);
+    return c.json({ success: true, data: serializeMedia(result.media, workerUrl, names) });
   }
   return c.json({
     success: false,
@@ -1370,7 +1398,7 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     const existing = await getMediaById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const checkedAt = jstNow();
-    await scanSingleMediaUsage(c.env.DB, checkedAt, {
+    const scan = await scanSingleMediaUsage(c.env.DB, checkedAt, {
       id: existing.id,
       r2_key: existing.r2_key,
     });
@@ -1378,11 +1406,34 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
     const { impact, usages } = snapshot;
     /*
+      R34: 版の表が無い環境では版の一覧が読めない。全体を503にせず、
+      版なしで続けて「未確認」として返す。
+    */
+    let versions: Awaited<ReturnType<typeof getMediaVersionList>> = [];
+    let versionsReady = true;
+    try {
+      versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
+    } catch (err) {
+      if (!isMissingTableError(err)) throw err;
+      console.error('GET /api/media/:id/delete-impact versions skipped:', err);
+      versionsReady = false;
+    }
+    /*
+      R34: 読み残しがあるときは「どこでも使っていない」にしない。
+      usageCount 0 でも未確認として返し、削除も止める（canDelete false）。
+      確かめられないものは消させない。
+    */
+    const verified = versionsReady && (scan.skippedTables ?? []).length === 0;
+    const verifiedImpact = verified ? impact : {
+      ...impact,
+      canDelete: false,
+      recommendedAction: 'review_references' as const,
+    };
+    /*
       使用先ごとの参照モード（ライブ参照・固定する版）と、切替に使う
       版の一覧も一緒に返す。references と usages は同じsnapshotから
       作られているので、index対応中に別走査の行が混ざらない。
     */
-    const versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
     const states = await getMediaUsageReferenceStates(c.env.DB, {
       media: existing,
       usages,
@@ -1393,8 +1444,9 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     return c.json({
       success: true,
       data: {
-        ...impact,
-        references: impact.references.map((reference, index) => ({
+        ...verifiedImpact,
+        verified,
+        references: verifiedImpact.references.map((reference, index) => ({
           ...reference,
           refKind: usages[index]?.ref_kind ?? null,
           refId: usages[index]?.ref_id ?? null,
@@ -1570,20 +1622,35 @@ contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const checkedAt = jstNow();
-    await scanSingleMediaUsage(c.env.DB, checkedAt, {
+    const scan = await scanSingleMediaUsage(c.env.DB, checkedAt, {
       id: existing.id,
       r2_key: existing.r2_key,
     });
-    const impact = await getMediaDeleteImpact(c.env.DB, id, accountId, checkedAt);
-    if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
+    const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, id, accountId, checkedAt);
+    if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
+    // R34: 読み残しがあるときは使われていないと断定できない。確かめられ
+    // ないものは消させない（ fail-closed ）。読み直しを促す409で返す。
+    const verified = (scan.skippedTables ?? []).length === 0;
+    const impact = verified ? snapshot.impact : {
+      ...snapshot.impact,
+      canDelete: false,
+      recommendedAction: 'review_references' as const,
+    };
     if (!impact.canDelete) {
       return c.json(
-        {
-          success: false,
-          error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
-          code: 'media_delete_blocked',
-          data: impact,
-        },
+        verified
+          ? {
+            success: false,
+            error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
+            code: 'media_delete_blocked',
+            data: { ...impact, verified },
+          }
+          : {
+            success: false,
+            error: '使用先を確かめられなかったため削除できません。使用先を読み直してから、もう一度お試しください。',
+            code: 'media_delete_unverified',
+            data: { ...impact, verified },
+          },
         409,
       );
     }
@@ -1628,6 +1695,16 @@ function serializeVar(row: CommonVar) {
     expiryBehavior: row.expiry_behavior ?? 'stop',
     version: Number(row.version ?? 1),
     archivedAt: row.archived_at ?? null,
+    // Q: 「期限切れ」は時刻からその都度計算する。画面は state を見るだけでよい。
+    status: row.status ?? 'active',
+    stoppedAt: row.stopped_at ?? null,
+    state: row.status === 'stopped'
+      ? 'stopped'
+      : row.status === 'draft'
+        ? 'draft'
+        : row.valid_until !== null && Date.parse(row.valid_until) <= Date.now()
+          ? 'expired'
+          : 'active',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     nextSchedule: row.next_effective_from
@@ -2087,12 +2164,15 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
     }
     if (value === null) {
-      // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受ける（VAR-03）。
+      // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受け（VAR-03）、
+      // URL型は http/https のURLだけを受ける（R36）。
       return c.json({
         success: false,
         error: type === 'image'
           ? '画像には https:// からはじまるURLを入力してください'
-          : '種別に合う値を入力してください',
+          : type === 'url'
+            ? 'URLの値は http:// または https:// からはじまる形で入力してください'
+            : '種別に合う値を入力してください',
       }, 400);
     }
     if (memo.length > 1000) {
@@ -2104,6 +2184,18 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       : normalizeCommonVarValue(type, validity.fallbackValue);
     if (validity.fallbackValue !== null && fallbackValue === null) {
       return c.json({ success: false, error: '代替値は種別に合う値を入力してください' }, 400);
+    }
+    // Q: 鍵やトークンのような秘密の値は共通情報に置かせない。
+    if (isSecretLikeValue(value) || (fallbackValue !== null && isSecretLikeValue(fallbackValue))) {
+      return c.json({
+        success: false,
+        code: 'secret_value_not_allowed',
+        error: '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください',
+      }, 422);
+    }
+    const statusRaw = body.status === undefined ? 'active' : String(body.status);
+    if (statusRaw !== 'active' && statusRaw !== 'draft') {
+      return c.json({ success: false, error: '状態は「下書き」か「使用中」で登録してください' }, 400);
     }
 
     const created = await createCommonVar(c.env.DB, {
@@ -2119,6 +2211,7 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       validUntil: validity.validUntil.value,
       fallbackValue,
       expiryBehavior: validity.expiryBehavior,
+      status: statusRaw as 'draft' | 'active',
     });
     return c.json({ success: true, data: serializeVar(created) }, 201);
   } catch (err) {
@@ -2180,12 +2273,30 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
         success: false,
         error: existing.type === 'image'
           ? '画像には https:// からはじまるURLを入力してください'
-          : '種別に合う値を入力してください',
+          : existing.type === 'url'
+            ? 'URLの値は http:// または https:// からはじまる形で入力してください'
+            : '種別に合う値を入力してください',
       }, 400);
     }
     const patchMemo = body.memo === undefined ? undefined : String(body.memo);
     if (patchMemo !== undefined && patchMemo.length > 1000) {
       return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
+    }
+    // Q: 変える理由は必須。後から履歴を見た人が「なぜ変えたか」を追えるようにする。
+    const changeReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
+    if (!changeReason) {
+      return c.json({
+        success: false,
+        code: 'change_reason_required',
+        error: '変える理由を入力してください',
+      }, 400);
+    }
+    if (patchValue !== undefined && isSecretLikeValue(patchValue)) {
+      return c.json({
+        success: false,
+        code: 'secret_value_not_allowed',
+        error: '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください',
+      }, 422);
     }
     const validity = parseCommonVarValidity(body, existing);
     const normalizedFallback = validity.fallbackValue === null
@@ -2193,6 +2304,13 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
       : normalizeCommonVarValue(existing.type as CommonVarType, validity.fallbackValue);
     if (validity.fallbackValue !== null && normalizedFallback === null) {
       return c.json({ success: false, error: '代替値は種別に合う値を入力してください' }, 400);
+    }
+    if (normalizedFallback !== null && isSecretLikeValue(normalizedFallback)) {
+      return c.json({
+        success: false,
+        code: 'secret_value_not_allowed',
+        error: '鍵やトークンのような秘密の値は代替値にも保存できません',
+      }, 422);
     }
     // N-185: 影響確認なしの保存を止める。確認値は対象ID・版・使用先集合の写し。
     // 形の検査は先に済ませているため、ここからは確認値だけを見る。
@@ -2234,7 +2352,7 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
       memo: patchMemo,
       expectedVersion,
       actorId: c.get('staff').id,
-      changeReason: typeof body.changeReason === 'string' ? body.changeReason : undefined,
+      changeReason,
       ...(validity.validFrom.present ? { validFrom: validity.validFrom.value } : {}),
       ...(validity.validUntil.present ? { validUntil: validity.validUntil.value } : {}),
       ...(validity.fallbackPresent ? { fallbackValue: normalizedFallback } : {}),
@@ -2245,6 +2363,9 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
   } catch (err) {
     if (err instanceof RequestBodyError) {
       return c.json({ success: false, error: err.message }, err.status);
+    }
+    if (err instanceof CommonVarReasonRequiredError) {
+      return c.json({ success: false, code: 'change_reason_required', error: '変える理由を入力してください' }, 400);
     }
     if (err instanceof CommonVarFolderError) {
       return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
@@ -2258,6 +2379,64 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
       }, 409);
     }
     console.error('PATCH /api/common-vars/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// Q: 状態の切替。下書き→使用中（公開）、使用中→止めた、止めた→使用中（再開）。
+// 値の変更ではないので影響確認は求めないが、状態を変える操作なので理由は必須。
+contents.post('/api/common-vars/:id/status', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const body = await c.req.json<Record<string, unknown>>();
+    const to = String(body.to ?? '');
+    if (to !== 'active' && to !== 'stopped') {
+      return c.json({ success: false, error: '状態は「使用中」か「止めた」のどちらかにしてください' }, 400);
+    }
+    const changeReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
+    if (!changeReason) {
+      return c.json({
+        success: false,
+        code: 'change_reason_required',
+        error: '変える理由を入力してください',
+      }, 400);
+    }
+    const expectedVersion = body.expectedVersion === undefined
+      ? undefined
+      : Number(body.expectedVersion);
+    const updated = await setCommonVarStatus(c.env.DB, id, accountId, {
+      to,
+      changeReason,
+      expectedVersion,
+      actorId: c.get('staff').id,
+    });
+    if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: serializeVar(updated) });
+  } catch (err) {
+    if (err instanceof CommonVarStatusTransitionError) {
+      return c.json({
+        success: false,
+        code: 'invalid_status_transition',
+        error: `今の状態（${err.from === 'draft' ? '下書き' : err.from === 'active' ? '使用中' : '止めた'}）からはその操作ができません`,
+      }, 422);
+    }
+    if (err instanceof CommonVarReasonRequiredError) {
+      return c.json({ success: false, code: 'change_reason_required', error: '変える理由を入力してください' }, 400);
+    }
+    if (err instanceof CommonVarVersionConflictError) {
+      return c.json({
+        success: false,
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        code: 'common_var_version_conflict',
+        currentVersion: err.currentVersion,
+      }, 409);
+    }
+    console.error('POST /api/common-vars/:id/status error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2408,7 +2587,15 @@ contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), asy
         data: preview,
       }, 409);
     }
-    const result = await applyCommonVarReplacementPlan(c.env.DB, plan, c.get('staff').id);
+    // Q: 差し替えて保管するときも、やった人の理由を版履歴に残す。
+    const replaceReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
+    if (!replaceReason) {
+      return c.json(
+        { success: false, error: '変えた・消した理由を入力してください', code: 'common_var_reason_required' },
+        400,
+      );
+    }
+    const result = await applyCommonVarReplacementPlan(c.env.DB, plan, c.get('staff').id, replaceReason);
     let remainingUsageCount: number | null = null;
     try {
       const remaining = await getCommonVarUsageImpact(c.env.DB, source.var_key, accountId);
@@ -2455,6 +2642,14 @@ contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c)
     }
     const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    // Q: 消すときも理由が必須。版履歴に残すので空欄や自動入力は受けない。
+    const deleteReason = c.req.query('reason')?.trim() ?? '';
+    if (!deleteReason) {
+      return c.json(
+        { success: false, error: '消した理由を入力してください', code: 'common_var_reason_required' },
+        400,
+      );
+    }
     const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
     const deleteImpact = serializeCommonVarDeleteImpact(existing, impact);
     if (!deleteImpact.canDelete) {
@@ -2468,7 +2663,7 @@ contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c)
         409,
       );
     }
-    await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id);
+    await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id, deleteReason);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/common-vars/:id error:', err);
@@ -2536,6 +2731,14 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
         { success: false, error: '更新後の値は種別に合う値を入力してください' },
         400,
       );
+    }
+    // Q: 予約で入る値も秘密の値は受け付けない（登録・編集と同じ口）。
+    if (isSecretLikeValue(normalizedScheduled)) {
+      return c.json({
+        success: false,
+        code: 'secret_value_not_allowed',
+        error: '鍵やトークンのような秘密の値は共通情報に保存できません',
+      }, 422);
     }
 
     const created = await createCommonVarSchedule(c.env.DB, {

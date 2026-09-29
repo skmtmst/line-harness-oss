@@ -143,11 +143,17 @@ describe('取れた0と、取れていないものを混ぜない', () => {
 
 describe('V6 案件一覧（GH8VL）のKPIの帯', () => {
   it('設計どおり、案件数・最多成果・平均報酬・動き未設定を並べる', () => {
-    for (const title of ['紹介できる案件', 'いちばん成果が出た案件', '1件あたりの平均報酬', '動きが未設定の案件']) {
+    for (const title of ['紹介できる案件', 'いちばん成果が出た案件', '平均報酬額', '動きが未設定の案件']) {
       expect(KPI_BAND).toContain(`title="${title}"`)
     }
     expect(OFFERS_TAB).toContain('offerStats')
     expect(OFFERS_TAB).toContain('introducerIds')
+  })
+
+  it('m22d: 「1件あたり」は単位の意味なので見出しの「？」へ移す。件数の重なりを増やさない', () => {
+    // 見出しに「1件」を出さない（「停止・終了 1件」「動きが未設定 1件」と重なるため）。
+    expect(KPI_BAND).not.toContain('title="1件あたりの平均報酬"')
+    expect(KPI_BAND).toContain('help="成果1件あたりの平均です"')
   })
 
   it('公開中の案件は読み込んだ行から数えるので、状態を付けない', () => {

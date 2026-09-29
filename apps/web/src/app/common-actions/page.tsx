@@ -6,6 +6,7 @@ import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -13,8 +14,11 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import { useManualHref } from '@/lib/use-manual-href'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -38,6 +42,8 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
 
 export default function CommonActionsPage() {
   const canManage = useCanManageCommonActions()
+  /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
+  const manualHref = useManualHref('/common-actions')
   // /common-actions はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
   usePageTitle('共通アクション')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -159,7 +165,7 @@ export default function CommonActionsPage() {
         description=""
         actions={(
           <>
-            <Button href="/support">マニュアル</Button>
+            {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}
           </>
         )}
       />
@@ -195,8 +201,13 @@ export default function CommonActionsPage() {
         <KpiCard variant="v6" title="古い版のまま" value={loading || error ? null : totals.outdatedItems} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={!error && totals.outdatedItems > 0 ? '要確認' : undefined} badgeTone="warning" />
       </div>
 
+      {/*
+        監査 R122: 「直すとすべてに効く」は実動作と違う。公開しても利用先は
+        いまの版のまま動き、使う場所ごとに新版へ切り替えたときだけ効く
+        （「版と利用先」画面で確認・切り替え）。作成画面の説明と揃える。
+      */}
       <NoteBar>
-        ここを直すと、呼び出している機能すべてに効きます。動いている途中のものは、始まったときの版のまま最後まで進みます。
+        直した内容は、公開したあと使う場所ごとに新しい版へ切り替えたときだけ効きます。動いている途中のものは、始まったときの版のまま最後まで進みます。
       </NoteBar>
 
       {/*
@@ -221,19 +232,21 @@ export default function CommonActionsPage() {
           loading: loading && query !== deferredQuery,
         }}
         filters={
-          <div className="flex flex-wrap gap-2" aria-label="状態で絞り込む">
-            {FILTERS.map((option) => (
-              <label
-                key={option.value}
-                className={filter === option.value
-                  ? 'bg-success-bg text-success rounded-pill border border-success px-3 py-1.5 text-xs font-semibold'
-                  : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
-              >
-                <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => { setFilter(option.value); setPage(1) }} />
-                {option.label}{(() => { const count = filterCount(option.value); return count == null ? '' : ` ${count}` })()}
-              </label>
-            ))}
-          </div>
+          <RadioCardGroup legend="状態で絞り込む" className="flex flex-wrap gap-2">
+            {FILTERS.map((option) => {
+              const count = filterCount(option.value)
+              return (
+                <RadioCard
+                  key={option.value}
+                  name="common-action-filter"
+                  value={option.value}
+                  checked={filter === option.value}
+                  onChange={() => { setFilter(option.value); setPage(1) }}
+                  title={`${option.label}${count == null ? '' : ` ${count}`}`}
+                />
+              )
+            })}
+          </RadioCardGroup>
         }
         trailing={
           <Button
@@ -295,7 +308,7 @@ export default function CommonActionsPage() {
                   </Td>
                   <ActionCell>
                     {/* #641: 「中身を見る」＋「その他（…）」の形にそろえる。残りはメニューへ集約。 */}
-                    <div className="relative inline-flex items-center justify-end gap-1.5">
+                    <div className="relative flex w-full items-center justify-end gap-1.5">
                     <Button
                       href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`}
                       variant="secondary"
@@ -351,14 +364,8 @@ export default function CommonActionsPage() {
       )}
       {!loading && !error && items.length > 0 ? (
         <div className="border-hairline flex items-center justify-between border-x border-b bg-canvas px-4 py-3 text-xs text-ink-faint">
-          <span>{total}件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
-          <div className="flex items-center gap-3" aria-label="ページ送り">
-            <button type="button" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">前へ</button>
-            {Array.from({ length: Math.ceil(total / PAGE_SIZE) }, (_, index) => index + 1).map((pageNumber) => (
-              <button key={pageNumber} type="button" aria-current={pageNumber === page ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={`inline-flex min-h-6 min-w-6 items-center justify-center ${pageNumber === page ? 'text-action font-bold' : 'text-ink-faint'}`}>{pageNumber}</button>
-            ))}
-            <button type="button" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">次へ</button>
-          </div>
+          <ListRange total={total} first={(page - 1) * PAGE_SIZE + 1} last={Math.min(page * PAGE_SIZE, total)} />
+          <Pagination page={page} pageCount={Math.ceil(total / PAGE_SIZE)} onPageChange={setPage} />
         </div>
       ) : null}
     </div>

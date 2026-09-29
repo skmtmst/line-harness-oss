@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle, MousePointerClick, Pencil, Plus, RefreshCw, ShoppingBag, Trash2, UserPlus, WalletCards } from 'lucide-react'
+import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle, MousePointerClick, Pencil, Plus, RefreshCw, ShoppingBag, UserPlus, WalletCards } from 'lucide-react'
 import { EC_EVENT_LABELS, EC_EVENT_TYPES } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
@@ -13,6 +13,7 @@ import { Field, TextInput } from '@/components/shared/form-controls'
 import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { notifyToast } from '@/components/shared/toast'
 import Toggle from '@/components/shared/toggle'
@@ -29,6 +30,7 @@ import {
   type ActionScoreRuleTestResult,
 } from '@/lib/api'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
+import { validateRuleName, validateTestScore } from './score-rules-validation'
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
@@ -114,7 +116,10 @@ function cloneBundle(config: ActionScoreRuleConfiguration): ActionScoreRuleBundl
  */
 function fieldError(error: unknown) {
   if (error instanceof ApiError) {
-    if (error.status === 400) return error.message
+    // R130: 422の本文はWorkerが付けた日本語の検証文だけ（`lib/api.ts`の
+    // BODY_MESSAGE_STATUSESで監査済み）。400と同じくそのまま出す。
+    // 落とすと入力ミスが「時間をおいてもう一度」に化けて直し方が分からない。
+    if (error.status === 400 || error.status === 422) return error.message
     if (error.status === 403) return 'スコアのルールを変更する権限がありません。'
     if (error.status === 404) return '対象のLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境ではスコアのルールを変更できません。'
@@ -143,10 +148,29 @@ export default function ActionScoreRulesPage() {
   const [canEdit, setCanEdit] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [editRuleIndex, setEditRuleIndex] = useState<number | null>(null)
+  // ほかの一覧と同じく、削除は「…」の中へ入れ、押した先で確認を出す。
+  const [deleteRuleIndex, setDeleteRuleIndex] = useState<number | null>(null)
+  /*
+   * R129: 編集窓の入力は仮状態（`editDraft`）にだけ書き、「設定を反映」で
+   * 親の一覧へ渡す。閉じる・Escapeは仮状態を捨てるだけ。入力のたび親を
+   * 変えていたため、反映せず閉じたつもりの変更が残ってしまっていた。
+   */
+  const [editDraft, setEditDraft] = useState<ActionScoreRule | null>(null)
   const [testOpen, setTestOpen] = useState(false)
   const [testScore, setTestScore] = useState('30')
   const [testEvent, setTestEvent] = useState<string>(EVENT_OPTIONS[0].value)
   const [testResult, setTestResult] = useState<ActionScoreRuleTestResult | null>(null)
+  /*
+   * R301: 試算後に点数・行動を変えたら古い成功結果を残さない。入力のたび
+   * 結果を消し、要求ごとの番号で遅れて届いた古い応答も新しい入力へ
+   * 表示しない（入力を変えると番号が進み、古い応答は捨てられる）。
+   */
+  const testRunRef = useRef(0)
+  // R303: 空の表示名で「設定を反映」したときの理由。欄の下で見せる。
+  const [editError, setEditError] = useState('')
+  // R130: 試算の入力ミスは窓の外ではなく窓の中・欄の下で見せる。
+  const [testError, setTestError] = useState('')
+  const [testScoreError, setTestScoreError] = useState('')
   /*
    * N-235: 帯の分けかたを変えたとき「何人がどの帯へ入るか」を先に数える
    * 読み取り専用の試算。公開版も友だちの点数も動かさない。
@@ -213,6 +237,38 @@ export default function ActionScoreRulesPage() {
     setBundle((current) => current ? { ...current, bands: { ...current.bands, ...updates } } : current)
   }
 
+  const updateEditDraft = (updates: Partial<ActionScoreRule>) => {
+    setEditDraft((current) => current ? {
+      ...current,
+      ...updates,
+      frequency: updates.frequency ? { ...updates.frequency } : current.frequency,
+    } : current)
+  }
+
+  const closeEditor = () => {
+    setEditRuleIndex(null)
+    setEditDraft(null)
+    setEditError('')
+  }
+
+  /*
+   * R303: 空・空白の表示名では一覧へ追加せず、編集窓を維持して欄の下に
+   * 理由を出す。新規追加も既存の編集も同じ条件で検証し、直してから反映する。
+   */
+  const applyEditor = () => {
+    if (editRuleIndex === null || !editDraft) {
+      closeEditor()
+      return
+    }
+    const checked = validateRuleName(editDraft.name)
+    if (!checked.ok) {
+      setEditError(checked.error)
+      return
+    }
+    updateRule(editRuleIndex, { ...editDraft, name: checked.value })
+    closeEditor()
+  }
+
   /*
    * 編集中の分けかたで、いまの友だちの点数がどの帯へ分かれるかだけ数える。
    * 書き込みは一切しない（`POST /api/action-scores/bands/preview` は読み取り専用）。
@@ -240,22 +296,24 @@ export default function ActionScoreRulesPage() {
     if (!bundle) return
     const id = `rule-${crypto.randomUUID()}`
     const nextIndex = bundle.rules.length
+    const created: ActionScoreRule = {
+      id,
+      name: '新しいルール',
+      eventType: 'message_received',
+      source: 'line_webhook',
+      operation: 'delta',
+      value: 1,
+      frequency: { kind: 'per_day', limit: 1 },
+      sameSourceEventOnce: true,
+      validFrom: null,
+      validUntil: null,
+      enabled: true,
+    }
     setBundle({
       ...bundle,
-      rules: [...bundle.rules, {
-        id,
-        name: '新しいルール',
-        eventType: 'message_received',
-        source: 'line_webhook',
-        operation: 'delta',
-        value: 1,
-        frequency: { kind: 'per_day', limit: 1 },
-        sameSourceEventOnce: true,
-        validFrom: null,
-        validUntil: null,
-        enabled: true,
-      }],
+      rules: [...bundle.rules, created],
     })
+    setEditDraft({ ...created, frequency: { ...created.frequency } })
     setEditRuleIndex(nextIndex)
   }
 
@@ -342,22 +400,38 @@ export default function ActionScoreRulesPage() {
     if (!selectedAccountId || !bundle) return
     const accountAtRequest = selectedAccountId
     const [eventType, source] = testEvent.split('|')
+    // R302: 空欄・空白だけは必須エラーにし、0として送らない。
+    const checked = validateTestScore(testScore, bundle.bands)
+    if (!checked.ok) {
+      setTestScoreError(checked.error)
+      return
+    }
+    const runId = ++testRunRef.current
     setBusy(true)
-    setActionError('')
+    setTestError('')
+    setTestScoreError('')
     setTestResult(null)
     try {
       const response = await api.actionScores.testRules({
         accountId: accountAtRequest,
         configuration: bundle,
-        currentScore: Number(testScore),
+        currentScore: checked.value,
         eventType,
         source: source || null,
       })
       if (accountAtRequest !== latestAccountRef.current) return
+      // R301: 待っている間に点数・行動が変わったら、この応答は古いので捨てる。
+      if (testRunRef.current !== runId) return
       if (!response.success) throw new Error(response.error)
       setTestResult(response.data)
     } catch (error) {
-      setActionError(fieldError(error))
+      // R130: 点数の範囲ミスは欄の下で上限とともに説明し、窓の中に留める。
+      // 窓の外の帯へ出すと通信障害に見えて直し方が分からない。
+      if (error instanceof ApiError && (error.status === 400 || error.status === 422)) {
+        setTestScoreError(`テストする点数は${bundle.bands.min}〜${bundle.bands.max}の整数で入力してください`)
+      } else {
+        setTestError(fieldError(error))
+      }
     } finally {
       setBusy(false)
     }
@@ -409,14 +483,30 @@ export default function ActionScoreRulesPage() {
                      * 文字が #7d8590（3.54:1）まで落ちて読めない。
                      */
                     <div key={rule.id} className="grid min-h-10 grid-cols-12 items-center gap-x-3 gap-y-1 rounded-control px-3 py-2" style={{ background: rule.enabled ? 'var(--color-surface-pearl)' : 'var(--color-canvas-sunken)' }}>
-                      <button type="button" disabled={!canEdit} className="col-span-12 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default sm:col-span-6" aria-label={`${rule.name}を編集`} onClick={() => setEditRuleIndex(index)}>
+                      <button type="button" disabled={!canEdit} className="col-span-12 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default sm:col-span-6" aria-label={`${rule.name}を編集`} onClick={() => { setEditDraft({ ...rule, frequency: { ...rule.frequency } }); setEditRuleIndex(index) }}>
                         <span style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-ink-secondary)' }}><RuleIcon eventType={rule.eventType} /></span>
                         <span className="truncate" title={rule.name}>{rule.name}</span>
                         {canEdit ? <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" /> : null}
                       </button>
                       <span className="col-span-2 text-left text-sm font-bold text-ink sm:text-right">{rulePointLabel(rule)}</span>
                       <span className="col-span-9 text-xs text-ink-secondary sm:col-span-3">{ruleFrequencyLabel(rule)}</span>
-                      {canEdit ? <button type="button" className="col-span-1 justify-self-end rounded-control p-2 text-danger hover:bg-status-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-danger" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
+                      {/*
+                        * ほかの一覧と同じく、削除は行の赤いゴミ箱ではなく
+                        * 「…」の中の「削除する」へ入れる。押した先で確認を
+                        * 出し、間違って消さない（LAY-18）。
+                        */}
+                      {canEdit ? (
+                        <span className="col-span-1 justify-self-end">
+                          <RowActions
+                            subjectName={rule.name}
+                            destructiveItem={{
+                              id: 'delete',
+                              label: '削除する',
+                              onSelect: () => setDeleteRuleIndex(index),
+                            }}
+                          />
+                        </span>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -491,12 +581,13 @@ export default function ActionScoreRulesPage() {
         open={testOpen}
         title="1人でスコアのルールを試す"
         description="友だちの点数や履歴は変えません。"
-        onCancel={() => !busy && setTestOpen(false)}
+        error={testError || undefined}
+        onCancel={() => { if (!busy) { setTestOpen(false); setTestError(''); setTestScoreError('') } }}
         footer={<div className="flex justify-end gap-2"><Button variant="primary" onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button></div>}
       >
         <div className="grid gap-3">
-          <Field label="テスト前の点数" htmlFor="test-score"><TextInput id="test-score" type="number" value={testScore} onChange={(event) => setTestScore(event.target.value)} /></Field>
-          <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={setTestEvent} options={[...EVENT_OPTIONS]} size="full" /></Field>
+          <Field label="テスト前の点数" htmlFor="test-score" note={`${bundle?.bands.min ?? 0}〜${bundle?.bands.max ?? 100}の整数で入力`} error={testScoreError || undefined}><TextInput id="test-score" type="number" value={testScore} invalid={Boolean(testScoreError)} onChange={(event) => { setTestScore(event.target.value); setTestScoreError(''); setTestResult(null); testRunRef.current += 1 }} /></Field>
+          <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={(value) => { setTestEvent(value); setTestError(''); setTestResult(null); testRunRef.current += 1 }} options={[...EVENT_OPTIONS]} size="full" /></Field>
           {testResult ? (
             <Notice tone="success">
               <p className="text-xs font-semibold">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
@@ -506,35 +597,35 @@ export default function ActionScoreRulesPage() {
         </div>
       </Dialog>
 
-      {bundle && editRuleIndex !== null && bundle.rules[editRuleIndex] ? (() => {
-        const rule = bundle.rules[editRuleIndex]
+      {bundle && editRuleIndex !== null && editDraft ? (() => {
+        const rule = editDraft
         return (
           <Dialog
             open
             title="できごとの設定を直す"
-            description="保存するまでは、友だちの点数や履歴は変わりません。"
-            onCancel={() => setEditRuleIndex(null)}
-            footer={<div className="flex justify-end"><Button variant="primary" onClick={() => setEditRuleIndex(null)}>設定を反映</Button></div>}
+            description="「設定を反映」を押すまで、一覧の内容は変わりません。閉じただけでは入力は残りません。"
+            onCancel={() => closeEditor()}
+            footer={<div className="flex justify-end"><Button variant="primary" onClick={() => applyEditor()}>設定を反映</Button></div>}
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Field label="表示名" htmlFor="rule-name"><TextInput id="rule-name" value={rule.name} onChange={(event) => updateRule(editRuleIndex, { name: event.target.value })} /></Field></div>
+              <div className="sm:col-span-2"><Field label="表示名" htmlFor="rule-name" error={editError || undefined}><TextInput id="rule-name" value={rule.name} invalid={Boolean(editError)} onChange={(event) => { updateEditDraft({ name: event.target.value }); setEditError('') }} /></Field></div>
               <div className="sm:col-span-2"><Field label="きっかけ"><Select aria-label={`${rule.name}のきっかけ`} value={eventValue(rule)} onChange={(value) => {
                 const [eventType, source] = value.split('|')
                 const name = EVENT_OPTIONS.find((option) => option.value === value)?.label ?? rule.name
-                updateRule(editRuleIndex, { eventType, source: source || null, name })
+                updateEditDraft({ eventType, source: source || null, name })
               }} options={[...EVENT_OPTIONS]} size="full" /></Field></div>
-              <Field label="点数の変え方"><Select aria-label={`${rule.name}の点数の変え方`} value={operationValue(rule)} onChange={(value) => updateRule(editRuleIndex, value === 'set-zero'
+              <Field label="点数の変え方"><Select aria-label={`${rule.name}の点数の変え方`} value={operationValue(rule)} onChange={(value) => updateEditDraft(value === 'set-zero'
                 ? { operation: 'set', value: 0 }
                 : { operation: 'delta', value: value === 'subtract' ? -Math.max(1, Math.abs(rule.value)) : Math.max(1, Math.abs(rule.value)) })} options={[{ value: 'add', label: '増やす' }, { value: 'subtract', label: '減らす' }, { value: 'set-zero', label: '0にする' }]} size="full" /></Field>
               <Field label="点数" htmlFor="rule-score"><TextInput id="rule-score" type="number" min={rule.operation === 'set' ? 0 : 1} value={Math.abs(rule.value)} disabled={rule.operation === 'set'} onChange={(event) => {
                 const amount = Math.abs(Number(event.target.value))
-                updateRule(editRuleIndex, { value: operationValue(rule) === 'subtract' ? -amount : amount })
+                updateEditDraft({ value: operationValue(rule) === 'subtract' ? -amount : amount })
               }} /></Field>
-              <Field label="回数"><Select aria-label={`${rule.name}の回数制限`} value={rule.frequency.kind} onChange={(value) => updateRule(editRuleIndex, { frequency: { kind: value as ActionScoreFrequencyKind, limit: 1 } })} options={FREQUENCY_OPTIONS} size="full" /></Field>
-              <Field label="上限回数" htmlFor="rule-limit"><TextInput id="rule-limit" type="number" min={1} max={1000} value={rule.frequency.limit} disabled={!['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind)} onChange={(event) => updateRule(editRuleIndex, { frequency: { ...rule.frequency, limit: Number(event.target.value) } })} /></Field>
-              <Field label="開始日時" htmlFor="rule-start"><DateTimeField id="rule-start" value={localDateTime(rule.validFrom)} onChange={(v) => updateRule(editRuleIndex, { validFrom: utcDateTime(v) })} /></Field>
-              <Field label="終了日時" htmlFor="rule-end"><DateTimeField id="rule-end" value={localDateTime(rule.validUntil)} onChange={(v) => updateRule(editRuleIndex, { validUntil: utcDateTime(v) })} /></Field>
-              <div className="sm:col-span-2"><Toggle checked={rule.enabled} label="このできごとを動かす" onChange={(enabled) => updateRule(editRuleIndex, { enabled })} /></div>
+              <Field label="回数"><Select aria-label={`${rule.name}の回数制限`} value={rule.frequency.kind} onChange={(value) => updateEditDraft({ frequency: { kind: value as ActionScoreFrequencyKind, limit: 1 } })} options={FREQUENCY_OPTIONS} size="full" /></Field>
+              <Field label="上限回数" htmlFor="rule-limit"><TextInput id="rule-limit" type="number" min={1} max={1000} value={rule.frequency.limit} disabled={!['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind)} onChange={(event) => updateEditDraft({ frequency: { ...rule.frequency, limit: Number(event.target.value) } })} /></Field>
+              <Field label="開始日時" htmlFor="rule-start"><DateTimeField id="rule-start" value={localDateTime(rule.validFrom)} onChange={(v) => updateEditDraft({ validFrom: utcDateTime(v) })} /></Field>
+              <Field label="終了日時" htmlFor="rule-end"><DateTimeField id="rule-end" value={localDateTime(rule.validUntil)} onChange={(v) => updateEditDraft({ validUntil: utcDateTime(v) })} /></Field>
+              <div className="sm:col-span-2"><Toggle checked={rule.enabled} label="このできごとを動かす" onChange={(enabled) => updateEditDraft({ enabled })} /></div>
             </div>
           </Dialog>
         )
@@ -562,6 +653,18 @@ export default function ActionScoreRulesPage() {
         error={actionError}
         onCancel={() => !busy && setConfirmAction(null)}
         onConfirm={() => void stop()}
+      />
+      <ConfirmDialog
+        open={deleteRuleIndex !== null}
+        title={`「${deleteRuleIndex !== null ? bundle?.rules[deleteRuleIndex]?.name ?? '' : ''}」を削除しますか？`}
+        description="下書きから消えます。公開中の版と友だちの点数は変わりません。「下書きに保存」を押すまで確定しません。"
+        confirmLabel="削除する"
+        destructive
+        onCancel={() => setDeleteRuleIndex(null)}
+        onConfirm={() => {
+          if (deleteRuleIndex !== null) removeRule(deleteRuleIndex)
+          setDeleteRuleIndex(null)
+        }}
       />
     </div>
   )

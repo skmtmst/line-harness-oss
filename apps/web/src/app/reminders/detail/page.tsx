@@ -220,6 +220,10 @@ function ReminderRunsInner() {
     }
   }
 
+  // R146 監査：公開版の無い下書きは「停止中」ではなく「下書き」。再開は
+  // 公開の経路に統一し、この画面からは出さない。
+  const isUnpublishedDraft = data ? !data.reminder.hasPublishedVersion : false
+
   const setReminderActive = async (isActive: boolean) => {
     if (!data || data.reminder.isActive === isActive) return
     setActionMessage('')
@@ -231,10 +235,13 @@ function ReminderRunsInner() {
         reminder: { ...current.reminder, isActive },
       } : current)
       setActionMessage(isActive ? 'リマインダを再開しました。' : 'リマインダを一時停止しました。')
-    } catch {
-      setActionMessage(isActive
-        ? '再開できませんでした。状態を読み直してからお試しください。'
-        : '一時停止できませんでした。状態を読み直してからお試しください。')
+    } catch (caught) {
+      // R146 監査：API も未公開の再開を 409 で止める。その文面をそのまま出す。
+      setActionMessage(caught instanceof ApiError && caught.status === 409
+        ? caught.message
+        : isActive
+          ? '再開できませんでした。状態を読み直してからお試しください。'
+          : '一時停止できませんでした。状態を読み直してからお試しください。')
     }
   }
 
@@ -429,7 +436,7 @@ function ReminderRunsInner() {
           <Card overflow="hidden">
             <CardHeader title="稼働状況" />
             <dl className={styles.sideBody}>
-              <Fact label="状態" value={data ? (data.reminder.isActive ? '稼働中' : '停止中') : '—'} />
+              <Fact label="状態" value={data ? (isUnpublishedDraft ? '下書き' : data.reminder.isActive ? '稼働中' : '停止中') : '—'} />
               <Fact label="対象者" value={data ? `${data.summary.targetCount.toLocaleString('ja-JP')}人` : '—'} />
               <Fact label="次回送信" value={data ? formatJst(data.summary.nextScheduledAt) : '—'} />
               <Fact label="停止予定" value={data ? (data.reminder.lifecycleStatus === 'stopped' ? '停止済み' : data.reminder.stopConditions === null ? '未設定' : reminderStopSummary(data.reminder.stopConditions)) : '—'} />
@@ -455,10 +462,14 @@ function ReminderRunsInner() {
       </div>
 
       <ReminderFooter
-        status={loading ? '読み込み中' : error ? '状態を取得できません' : data?.reminder.isActive ? '稼働中' : '停止中'}
+        status={loading ? '読み込み中' : error ? '状態を取得できません' : !data ? '—' : isUnpublishedDraft ? '下書き' : data.reminder.isActive ? '稼働中' : '停止中'}
         secondary={data ? data.reminder.isActive
           ? { label: 'リマインダを一時停止', onClick: () => void setReminderActive(false) }
-          : { label: 'リマインダを再開', onClick: () => void setReminderActive(true) } : undefined}
+          // R146 監査：未公開の下書きには再開を出さない。有効化は公開の
+          // 経路（設定の編集→公開）に統一する。
+          : isUnpublishedDraft
+            ? undefined
+            : { label: 'リマインダを再開', onClick: () => void setReminderActive(true) } : undefined}
         primary="リマインダの設定を編集"
         onPrimary={() => { router.push(`/reminders/edit?id=${reminderId}`) }}
       />

@@ -2,31 +2,69 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { FriendField, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import DefaultValueInput from '@/components/friend-fields/default-value-input'
 
 const NEEDS_OPTIONS = new Set(['select', 'multi_select'])
 const FILE_TYPES = new Set(['image', 'pdf'])
 
+function isLockedField(field: FriendField): boolean {
+  return field.isInherited === true
+}
+
+/*
+ * R182: 保存済みの既定値はID（複数選択はIDの配列のJSON）で入っている。
+ * 画面は選択肢名で持つため、読み込み時と同じ戻し方で「保存済みの
+ * 選択肢名」を作り、未保存の判定に使う。IDのまま比べると、単一選択は
+ * 開いた瞬間に未保存扱いになり、複数選択は変えても未保存にならない。
+ */
+function storedDefaultLabels(field: FriendField): { single: string; multi: string[] } {
+  const stored = field.defaultValue ?? ''
+  const labels = field.options ?? []
+  const definitions = field.optionDefinitions ?? null
+  const toLabel = (entry: string): string | null =>
+    definitions?.find((item) => item.id === entry)?.label
+    ?? (labels.includes(entry) ? entry : null)
+  if (field.type === 'multi_select') {
+    let entries: string[] = []
+    try {
+      const parsed: unknown = JSON.parse(stored)
+      if (Array.isArray(parsed)) entries = parsed.map(String)
+    } catch { entries = [] }
+    return { single: '', multi: entries.map(toLabel).filter((item): item is string => item !== null) }
+  }
+  if (field.type === 'select' && stored) return { single: toLabel(stored) ?? '', multi: [] }
+  return { single: stored, multi: [] }
+}
+
+function sameLabels(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const sortedA = [...a].sort()
+  const sortedB = [...b].sort()
+  return sortedA.every((item, index) => item === sortedB[index])
+}
+
 function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (next: boolean) => void; label: string; hint: string; disabled?: boolean }) {
   return (
-    <label className={`flex items-start justify-between gap-4 py-2 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
-      <span><span className="block text-sm font-semibold text-ink">{label}</span><span className="block text-xs text-ink-faint">{hint}</span></span>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} className="mt-1 h-4 w-4 accent-accent" />
-    </label>
+    <Checkbox checked={checked} onCheckedChange={onChange} disabled={disabled} description={hint} className="py-2">{label}</Checkbox>
   )
 }
 
@@ -47,6 +85,8 @@ function EditFriendFieldForm() {
   const [name, setName] = useState('')
   const [options, setOptions] = useState('')
   const [defaultValue, setDefaultValue] = useState('')
+  /* R139: 複数選択の既定値（選択肢名の配列）。 */
+  const [defaultOptions, setDefaultOptions] = useState<string[]>([])
   const [isPersonal, setIsPersonal] = useState(false)
   const [isStarred, setIsStarred] = useState(false)
   const [ecIsMaster, setEcIsMaster] = useState(false)
@@ -76,7 +116,12 @@ function EditFriendFieldForm() {
       setField(found)
       setName(found.name)
       setOptions((found.options ?? []).join('\n'))
-      setDefaultValue(found.defaultValue ?? '')
+      /* R139: 保存済みの既定値は選択肢名へ戻して持つ（IDのまま見せない）。 */
+      {
+        const stored = storedDefaultLabels(found)
+        setDefaultOptions(stored.multi)
+        setDefaultValue(stored.single)
+      }
       setIsPersonal(found.isPersonal)
       setIsStarred(found.isStarred)
       setEcIsMaster(found.ecIsMaster)
@@ -98,18 +143,54 @@ function EditFriendFieldForm() {
 
   const optionList = useMemo(() => options.split('\n').map((value) => value.trim()).filter(Boolean), [options])
 
+  /*
+   * R176 監査：名称・既定値を変えたまま一覧へ移ると、確認なく入力が
+   * 消える（新規には番兵がある）。読み込んだ項目との差を未保存とし、
+   * 離れる操作では確認を出す。保存の成功後は別画面へ送るため、
+   * 確認が出ることはない。
+   */
+  /* R182: 既定値は保存済みの選択肢名と比べる（IDのまま比べない）。 */
+  const storedDefaults = field ? storedDefaultLabels(field) : null
+  const dirty = field !== null && storedDefaults !== null && !isLockedField(field) && (
+    name !== field.name
+    || options !== (field.options ?? []).join('\n')
+    || defaultValue !== storedDefaults.single
+    || !sameLabels(defaultOptions, storedDefaults.multi)
+    || isPersonal !== field.isPersonal
+    || isStarred !== field.isStarred
+    || ecIsMaster !== field.ecIsMaster
+    || ecFieldPath !== (field.ecFieldPath ?? '')
+    || folderId !== (field.folderId ?? '')
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+
   const save = async () => {
     if (saving || !field || !selectedAccountId) return
     if (!name.trim()) return setError('項目名を入力してください')
     if (NEEDS_OPTIONS.has(field.type) && optionList.length === 0) return setError('選択肢を1つ以上入力してください')
     if (ecIsMaster && !ecFieldPath.trim()) return setError('EC側の項目名を入力してください')
+    /* R139: 選択肢から外れた既定値は送る前に止める（新規作成と同じ文）。 */
+    if (field.type === 'multi_select') {
+      const missing = defaultOptions.filter((item) => !optionList.includes(item))
+      if (missing.length > 0) return setError(`既定値の「${missing[0]}」は選択肢にありません。選択肢か既定値を直してください`)
+    }
+    if (field.type === 'select' && defaultValue && !optionList.includes(defaultValue)) {
+      return setError(`既定値の「${defaultValue}」は選択肢にありません。選択肢か既定値を直してください`)
+    }
     setSaving(true); setError('')
     try {
       const res = await api.friendFields.update(field.id, selectedAccountId, {
         name: name.trim(),
         folderId: folderId || null,
         options: NEEDS_OPTIONS.has(field.type) ? optionList : null,
-        defaultValue: FILE_TYPES.has(field.type) ? null : defaultValue.trim() || null,
+        /* R139: 複数選択は選択肢名の配列で渡す。文字列では422になる。 */
+        defaultValue: FILE_TYPES.has(field.type)
+          ? null
+          : field.type === 'multi_select'
+            ? (defaultOptions.length > 0 ? defaultOptions : null)
+            : field.type === 'select'
+              ? (defaultValue || null)
+              : defaultValue.trim() || null,
         isPersonal,
         isStarred,
         ecIsMaster,
@@ -166,9 +247,13 @@ function EditFriendFieldForm() {
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      {/* R177: 長い項目名で戻りが右へ押し出されていた。パンくずを縮め、戻り先は残す。 */}
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。 */}
       <div className="flex items-center justify-between gap-4">
-        <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: field.name }]} />
-        <Button href="/tags?tab=fields">友だち情報欄へ</Button>
+        <div className="min-w-0 flex-1">
+          <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: field.name }]} />
+        </div>
+        <Link href="/tags?tab=fields" className="text-status-info shrink-0 text-label font-semibold hover:underline">友だち情報欄へ</Link>
       </div>
 
       {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
@@ -205,7 +290,7 @@ function EditFriendFieldForm() {
               </Field>
             ) : null}
             <Field label="フォルダ" htmlFor="ff-folder" note="フォルダは友だち詳細のタブになります。">
-              <SelectField id="ff-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} disabled={locked} aria-label="友だち情報欄のフォルダ" className="v6-select w-full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              <Select id="ff-folder" value={folderId} onChange={(value) => setFolderId(value)} disabled={locked} aria-label="友だち情報欄のフォルダ" size="full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             </Field>
             {/* IDEA-04: 印だけならタグ・対応状態なら対応マークという分類の違いを、編集の場所でも確認できるようにする。 */}
             <AttributeKindGuide current="field" />
@@ -220,7 +305,19 @@ function EditFriendFieldForm() {
               htmlFor="ff-default"
               note={FILE_TYPES.has(field.type) ? '画像・PDFはファイルとして保存し、本文へ文字として差し込みません。' : '友だち情報が空欄のとき、この値が代わりに送信されます。'}
             >
-              <TextInput id="ff-default" value={FILE_TYPES.has(field.type) ? '' : defaultValue} onChange={(event) => setDefaultValue(event.target.value)} disabled={locked || FILE_TYPES.has(field.type)} placeholder={FILE_TYPES.has(field.type) ? '画像・PDFには設定できません' : '未設定'} />
+              {/* R139: 複数選択は登録済みの選択肢から複数選ぶ。単一選択は一覧から1つ選ぶ。 */}
+              <DefaultValueInput
+                mode={FILE_TYPES.has(field.type) ? 'file' : field.type === 'multi_select' ? 'multi' : field.type === 'select' ? 'single' : field.type === 'textarea' ? 'longtext' : 'text'}
+                options={optionList}
+                textValue={defaultValue}
+                onTextChange={setDefaultValue}
+                singleValue={defaultValue}
+                onSingleChange={setDefaultValue}
+                multiValue={defaultOptions}
+                onMultiChange={setDefaultOptions}
+                disabled={locked}
+                inputId="ff-default"
+              />
             </Field>
             <div className="mt-4 divide-y divide-hairline">
               <Toggle checked={isStarred} onChange={setIsStarred} disabled={locked} label="友だち一覧に表示" hint="よく見る項目だけを列に追加" />
@@ -253,6 +350,8 @@ function EditFriendFieldForm() {
         status={locked ? '共通項目は編集できません' : saving ? '保存しています' : '変更内容を確認して保存してください'}
         actions={<><Button href="/tags?tab=fields">キャンセル</Button><Button type="button" variant="primary" disabled={saving || locked} onClick={() => void save()}>{saving ? '保存中…' : '変更を保存'}</Button></>}
       />
+      {/* R176 監査：名称・既定値などの書きかけがある間の離脱確認。 */}
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、項目への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

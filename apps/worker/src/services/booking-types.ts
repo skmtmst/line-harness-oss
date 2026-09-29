@@ -113,6 +113,9 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
 };
 
 export const SLOT_GRANULARITY_MINUTES = 30;
+
+/** 予約枠の間隔の候補（分）。店舗設定・DB CHECK と同じ顔ぶれ。 */
+export const SLOT_GRANULARITY_CHOICES = [5, 10, 15, 30, 60] as const;
 export const REQUEST_TTL_HOURS = 24;
 export const IDEMPOTENCY_TTL_MINUTES = 5;
 export const REMINDER_MAX_RETRY = 3;

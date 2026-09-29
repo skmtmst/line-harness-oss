@@ -1,8 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard from '@/components/shared/radio-card'
+import Notice from '@/components/shared/notice'
 import CreatePage, { AsideCard, Field, inputClass } from '@/components/shared/create-page'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -37,6 +42,9 @@ const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
       { value: 'staff_assigned', label: '担当が割り当てられた' },
       { value: 'manual_reply_sent', label: '個別返信を送った' },
       { value: 'cv_fire', label: '成果地点が起きた' },
+      // R150: 見本から選べるように、実際に発火する出来事をそろえる。
+      { value: 'form_submitted', label: 'フォームが送られた' },
+      { value: 'booking_created', label: '予約が入った' },
     ],
   },
   {
@@ -47,22 +55,64 @@ const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
 ]
 
 /** 送信Webhookを作る唯一のフォーム。一覧の追加導線もこの画面へ集約する。 */
-export default function NewWebhookPage() {
+function NewWebhookForm() {
   const { selectedAccountId } = useAccount()
+  const searchParams = useSearchParams()
+  /*
+   * R150: 見本の「送り先を作る」は /webhooks/new?event=<種類> で開く。
+   * 実在する購読対象だけを初期選択にし、来た値がカタログに無ければ
+   * 従来どおり「すべてのイベントを送る」を選んだ状態にする。
+   */
+  const presetEvent = searchParams.get('event')
+  const presetValid = Boolean(
+    presetEvent
+      && WEBHOOK_EVENT_GROUPS.some((group) => group.events.some((event) => event.value === presetEvent)),
+  )
+  const presetLabel = presetValid
+    ? WEBHOOK_EVENT_GROUPS.flatMap((group) => group.events).find((event) => event.value === presetEvent)?.label
+    : null
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   /* #975 U067: CSV手入力ではなく「すべて」かチェック選択で決める。 */
-  const [sendAllEvents, setSendAllEvents] = useState(true)
-  const [selectedEvents, setSelectedEvents] = useState<string[]>([])
+  const [sendAllEvents, setSendAllEvents] = useState(!presetValid)
+  const [selectedEvents, setSelectedEvents] = useState<string[]>(presetValid ? [presetEvent!] : [])
   /* 受信Webhookごとの発火 `incoming_webhook.<種類>` は種類IDで指定する詳細設定。 */
   const [incomingSources, setIncomingSources] = useState('')
   const [secret, setSecret] = useState(generateSecret)
   const [maxRetries, setMaxRetries] = useState('0')
   const { gate, prompt: stepUpPrompt } = useStepUpGate()
+  /*
+   * 送り先の作成は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
+   * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const toggleEvent = (value: string) => {
     setSelectedEvents((current) =>
       current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
+    )
+  }
+
+  if (staffRole !== null && staffRole !== 'owner') {
+    return (
+      <div className="flex flex-col gap-4">
+        <Notice tone="info">
+          送り先の作成は統括だけができます。必要なときは統括に頼んでください。
+        </Notice>
+        <div>
+          <Button variant="secondary" href="/webhooks">外部連携の一覧へ戻る</Button>
+        </div>
+      </div>
     )
   }
 
@@ -118,7 +168,13 @@ export default function NewWebhookPage() {
         } catch (caught) {
           // 秘密の値の登録は大事な操作。本人確認を求められたらその場で窓を立て、
           // 確認が済んだgrantを付けて同じ保存をやり直す（V-1）。
-          if (!isStepUpRequired(caught)) throw caught
+          // 作成は統括だけ。権限不足は生の `API error: 403` ではなく依頼の案内にする（R32）。
+          if (!isStepUpRequired(caught)) {
+            if (caught instanceof ApiError && caught.status === 403) {
+              throw new Error('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+            }
+            throw caught
+          }
           const token = await gate('webhook.secret', 'Webhookを登録する')
           if (!token) throw caught
           res = await create(token)
@@ -156,26 +212,27 @@ export default function NewWebhookPage() {
         <legend className="text-ink-secondary text-xs font-bold">
           送るイベント<RequiredBadge />
         </legend>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="送るイベントの決め方">
-          <label className="border-hairline flex min-h-9 cursor-pointer items-center gap-2 rounded-control border px-3 py-2 text-sm font-semibold text-ink">
-            <input
-              type="radio"
-              name="wh-event-mode"
-              checked={sendAllEvents}
-              onChange={() => setSendAllEvents(true)}
-            />
-            すべてのイベントを送る
-          </label>
-          <label className="border-hairline flex min-h-9 cursor-pointer items-center gap-2 rounded-control border px-3 py-2 text-sm font-semibold text-ink">
-            <input
-              type="radio"
-              name="wh-event-mode"
-              checked={!sendAllEvents}
-              onChange={() => setSendAllEvents(false)}
-            />
-            送るイベントを選ぶ
-          </label>
+        <div className="flex flex-wrap gap-2">
+          <RadioCard
+            name="wh-event-mode"
+            value="all"
+            checked={sendAllEvents}
+            onChange={() => setSendAllEvents(true)}
+            title="すべてのイベントを送る"
+          />
+          <RadioCard
+            name="wh-event-mode"
+            value="selected"
+            checked={!sendAllEvents}
+            onChange={() => setSendAllEvents(false)}
+            title="送るイベントを選ぶ"
+          />
         </div>
+        {presetLabel ? (
+          <p className="text-ink-secondary mt-2 text-xs">
+            見本「{presetLabel}」の条件を選んだ状態で開いています。すべてのイベントへ変えるときは上の選択を押してください。
+          </p>
+        ) : null}
         {!sendAllEvents && (
           <div className="space-y-3">
             {WEBHOOK_EVENT_GROUPS.map((group) => (
@@ -184,18 +241,11 @@ export default function NewWebhookPage() {
                 <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
                   {group.events.map((event) => (
                     <li key={event.value}>
-                      <label className="border-hairline hover:bg-canvas-sunken flex cursor-pointer items-start gap-2 rounded-control border px-3 py-2">
-                        <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={selectedEvents.includes(event.value)}
-                          onChange={() => toggleEvent(event.value)}
-                        />
-                        <span className="min-w-0">
-                          <span className="text-ink block text-sm font-semibold">{event.label}</span>
-                          <span className="text-ink-faint block font-mono text-micro">{event.value}</span>
-                        </span>
-                      </label>
+                      <Checkbox
+                        checked={selectedEvents.includes(event.value)}
+                        onCheckedChange={() => toggleEvent(event.value)}
+                        description={event.value}
+                      >{event.label}</Checkbox>
                     </li>
                   ))}
                 </ul>
@@ -270,5 +320,14 @@ export default function NewWebhookPage() {
       </Field>
       {stepUpPrompt}
     </CreatePage>
+  )
+}
+
+export default function NewWebhookPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <NewWebhookForm />
+    </Suspense>
   )
 }

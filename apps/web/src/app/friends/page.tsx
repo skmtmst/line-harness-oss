@@ -31,6 +31,7 @@ import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { FRIENDS_MERGED_TABS } from './friends-tabs'
 import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
+import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 /*
   検索行の副操作は設計 `PhxG6` で高さ38px。共通Buttonは36pxなので当てない
@@ -63,7 +64,7 @@ function FriendsPageInner({
   onNotice: (notice: Notice) => void
   onExportReady: (exporter: (() => void) | null) => void
 }) {
-  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   /*
     保存した検索・対応マークは任意機能。オフのaccountではAPIを呼ばず、
     入口も出さない（呼ぶと 403 で画面全体が共通ゲートへ切り替わる）。
@@ -74,10 +75,30 @@ function FriendsPageInner({
   const savedSearchEnabled = featureVisibility.enabled('saved_searches')
   /* 一括操作はオーナーと管理者だけ。個別操作の権限を越えるため。 */
   const [bulkOpen, setBulkOpen] = useState(false)
+  /*
+   * R115: できるかは入り直した本人の役割（`api.staff.me()`）で決める。
+   * 選んでいるLINEアカウントの「役割メモ」（`selectedAccount.role`）は
+   * 自由記述のメモで、ログイン担当者の権限ではない。そちらで判定すると、
+   * 権限のある管理者が一括操作を始められなくなる。
+   * 確認が終わるまで（staffRole === null）は押し口も理由も出さない。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
   const searchParams = useSearchParams()
   const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
   const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
   const hasScoreRange = scoreMin !== undefined || scoreMax !== undefined
+  // R300: 行動スコアの帯からの引き継ぎは「点数がついている人」だけ。未採点の0点を除く。
+  const scoredOnly = searchParams.get('scoredOnly') === '1'
   const audienceId = searchParams.get('audienceId')?.trim() || ''
   const directSavedSearchId = searchParams.get('savedSearch')
   const [friends, setFriends] = useState<FriendListItem[]>([])
@@ -198,13 +219,14 @@ function FriendsPageInner({
         attentionOnly,
         scoreMin,
         scoreMax,
+        scoredOnly,
         audienceId,
         advanced,
       }),
-    [searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, scoreMin, scoreMax, audienceId, advanced],
+    [searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, scoreMin, scoreMax, scoredOnly, audienceId, advanced],
   )
   const broadcastHandoffHref =
-    broadcastHandoff.kind === 'ready' && canRunBulk(selectedAccount?.role)
+    broadcastHandoff.kind === 'ready' && canRunBulk(staffRole)
       ? `/broadcasts/new?condition=${encodeURIComponent(JSON.stringify(broadcastHandoff.condition))}`
       : null
 
@@ -224,7 +246,8 @@ function FriendsPageInner({
     const requestedAccountId = selectedAccountId
     try {
       const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
-        api.tags.list(),
+        // R23横展開: タグ候補も今のアカウントだけ（絞り込みの選択肢混入防止）。
+        api.tags.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
         // 友だち詳細の対応編集と同じ名簿を共有する。保存の可否はサーバ側。
         loadOperators(),
         api.scenarios.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
@@ -293,6 +316,7 @@ function FriendsPageInner({
         metadata: attentionOnly ? { __attention: '1' } : undefined,
         scoreMin,
         scoreMax,
+        scoredOnly: scoredOnly || undefined,
       })
       if (requestId !== loadRequestRef.current) return
       const context = loadContextRef.current
@@ -319,20 +343,44 @@ function FriendsPageInner({
       setTotal(0)
       setLoadStatus('error')
     }
-  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => void loadMarks(), [loadMarks])
   useEffect(() => setPage(1), [selectedAccountId])
   useEffect(() => {
     // 保存した検索がオフのaccountでは ?savedSearch= 直URLも適用しない。
-    if (!directSavedSearchId || !savedSearchEnabled) return
+    if (!directSavedSearchId || !savedSearchEnabled || !selectedAccountId) return
+    /*
+     * R187: 直URLでも保存した並び順・表示件数を使う。IDだけ渡すと
+     * 新しい順・20件に戻り、検索ダイアログからの適用と食い違う。
+     * 取れなければIDだけの適用に倒し、一覧自体は止めない。
+     */
+    let cancelled = false
+    const accountId = selectedAccountId
+    const savedId = directSavedSearchId
     setAdvanced({
-      params: { savedSearchId: directSavedSearchId },
+      params: { savedSearchId: savedId },
       summary: ['保存した検索を適用中'],
     })
     setPage(1)
-  }, [directSavedSearchId, savedSearchEnabled])
+    void api.savedSearches.detail(savedId, accountId).then((res) => {
+      if (cancelled || !res.success) return
+      const params = savedSearchParams(savedId, res.data.conditions)
+      setAdvanced({
+        params,
+        summary: [`対象：${res.data.name}`, ...savedSearchSummary(res.data.conditions, allTags)],
+        editorState: conditionsToEditorState(res.data.conditions),
+      })
+      if (params.sort) setSortMode(params.sort)
+      if (params.limit && PAGE_SIZE_OPTIONS.includes(Number(params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])) {
+        setPageSize(Number(params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])
+      }
+      setPage(1)
+    }).catch(() => {})
+    return () => { cancelled = true }
+    /* タグ名の解決に使うため、タグ一覧の到着後にも要約を作り直す。 */
+  }, [directSavedSearchId, savedSearchEnabled, selectedAccountId, allTags])
   useEffect(() => {
     // 復元を評価するまでは読まない。既定条件で一度読んでから
     // 保存条件で読み直すと、一瞬別の一覧が見えて条件を2回取る。
@@ -418,6 +466,7 @@ function FriendsPageInner({
             行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
             {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
             {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
+            {scoredOnly ? '（点数がついている人のみ）' : ''}
           </span>
           <Link href="/friends" className="font-semibold text-action hover:underline">この条件を外す</Link>
         </div>
@@ -593,7 +642,7 @@ function FriendsPageInner({
           <div className="flex flex-wrap items-center gap-2">
             <strong className="text-sm text-ink">{selectedIds.size}人を選択中</strong>
             <span className="text-xs text-ink-secondary">対象を確認してから操作を選んでください</span>
-            {selectedIds.size > 1 && canRunBulk(selectedAccount?.role) ? (
+            {selectedIds.size > 1 && canRunBulk(staffRole) ? (
               <Button
                 variant="primary"
                 className="ml-auto"
@@ -603,14 +652,14 @@ function FriendsPageInner({
                 操作を選ぶ
               </Button>
             ) : null}
-            {selectedIds.size > 1 && !canRunBulk(selectedAccount?.role) ? (
+            {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
               /* 権限が無いときは押し口を出さない。理由だけ書く。 */
               <span className="text-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
             ) : null}
           </div>
           {selectedIds.size === 1 ? (
             <div className="mt-2">
-              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} onDone={loadFriends} />
+              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
             </div>
           ) : null}
         </section>

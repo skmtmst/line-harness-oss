@@ -2,11 +2,14 @@ import Checkbox from '@/components/shared/checkbox'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ListPlus } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { MoveReferrersNotice } from './scenario-dialogs'
+import StatusChip from '@/components/shared/status-chip'
+import ListState from '@/components/shared/list-state'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
@@ -55,6 +58,14 @@ interface ScenarioListProps {
   onReorder?: (ids: string[]) => void
   loading?: boolean
   onCreate?: () => void
+  /**
+   * R173: 検索・絞り込みの結果が0件のとき真にする。元データ0件の
+   * 「まだありません」と分け、「条件に合うものがありません」と
+   * 条件を外す口を出す（共通 ListState の `filtered`）。
+   */
+  isFiltered?: boolean
+  /** 絞り込みを外す。`isFiltered` のときだけ使う。 */
+  onClearFilter?: () => void
 }
 
 /**
@@ -84,6 +95,8 @@ export default function ScenarioList({
   onReorder,
   loading,
   onCreate,
+  isFiltered = false,
+  onClearFilter,
 }: ScenarioListProps) {
   const router = useRouter()
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
@@ -308,6 +321,8 @@ export default function ScenarioList({
     >
       {deleteTarget && (
         <div className="text-ink-secondary space-y-2 text-sm">
+          {/* R250: 終了後の移動先にされていると、削除で参照元の設定が変わる。件数が取れたときだけ出す。 */}
+          <MoveReferrersNotice scenarioId={deleteTarget.id} />
           <p>
             購読中 {(deleteTarget.subscriberCount ?? 0).toLocaleString('ja-JP')}人 ／ 通数{' '}
             {deleteTarget.stepCount === undefined
@@ -359,40 +374,53 @@ export default function ScenarioList({
     >
       <label className="block">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">移動先のフォルダ</span>
-        <select
+        <Select
+          aria-label="移動先のフォルダ"
+          size="full"
           value={moveDraft}
-          onChange={(event) => setMoveDraft(event.target.value)}
+          onChange={(value) => setMoveDraft(value)}
           disabled={moving}
-          className="v6-select h-9 w-full rounded-control border border-hairline bg-canvas pl-3 text-sm font-semibold text-ink"
-        >
-          <option value="">未分類</option>
-          {folders.map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: '未分類' },
+            ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+          ]}
+        />
       </label>
     </ConfirmDialog>
   )
 
   if (scenarios.length === 0) {
+    // R173: 絞り込みの結果0件は、元データ0件と分ける。作る口ではなく
+    // 条件を外す口を出す（保存済みが消えたと誤読されるため）。
+    if (isFiltered) {
+      return (
+        <>
+          <ListState
+            kind="empty"
+            emptyPreset="filtered"
+            action={onClearFilter ? (
+              <Button variant="secondary" onClick={onClearFilter}>
+                条件をクリア
+              </Button>
+            ) : undefined}
+          />
+          {moveDialog}
+          {confirmDialog}
+        </>
+      )
+    }
     return (
       <>
-        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-          <ListPlus aria-hidden className="text-ink-faint mx-auto" size={24} />
-          <p className="text-ink mt-3 text-sm font-bold">まだシナリオがありません</p>
-          <p className="text-ink-faint mt-1 text-xs">1つ作ると、順番に届く配信をここで管理できます。</p>
-          {onCreate ? (
-            <Button
-              variant="primary"
-              onClick={onCreate}
-              className="mt-3"
-            >
+        <ListState
+          kind="empty"
+          title="まだシナリオがありません"
+          description="1つ作ると、順番に届く配信をここで管理できます。"
+          action={onCreate ? (
+            <Button variant="primary" onClick={onCreate}>
               ＋ シナリオを作る
             </Button>
-          ) : null}
-        </div>
+          ) : undefined}
+        />
         {moveDialog}
         {confirmDialog}
       </>
@@ -596,27 +624,24 @@ export default function ScenarioList({
                   {/*
                     0人のとき、作っただけでは配信されないことに気づけない。
                     始め方への導線をその場に出す。
+                    m21p: 「購読 / 読了」列は w-28（112px）で、7文字の
+                    「配信を始める方法」は「配信を始め…」と途中で切れていた。
+                    全文は title で読めるようにし、見える文字は6文字の
+                    「配信の始め方」にして省略自体を出さない。
                   */}
                   {s.subscriberCount === 0 && (
                     <Link
                       href={`/scenarios/detail?id=${s.id}`}
                       title="配信を始める方法"
-                      className="text-info mt-0.5 block truncate text-xs font-normal hover:underline"
+                      className="text-info mt-0.5 block truncate text-xs font-normal whitespace-nowrap hover:underline"
                     >
-                      配信を始める方法
+                      配信の始め方
                     </Link>
                   )}
                 </td>
-                {/* 列が狭いと「配信可」が「配信 / 可」の2行になる。
-                    札の中で折り返させない。 */}
+                {/* 状態の札は共通の StatusChip（設計 B）。札の中で折り返させない。 */}
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <span
-                    className={`rounded-pill inline-block px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${
-                      s.isActive ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
-                    }`}
-                  >
-                    {s.isActive ? '配信可' : '停止中'}
-                  </span>
+                  <StatusChip status={s.isActive ? 'running' : 'paused'} />
                 </td>
                 {/*
                   操作は「編集」＋「その他（…）」の2口だけ（NEXT-25）。

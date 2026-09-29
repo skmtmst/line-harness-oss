@@ -2,11 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Circle } from 'lucide-react'
 import { api, type SaveSupportMarkAutomationRule, type SupportMarkAutomationEvent, type SupportMarkListItem } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
+import Checkbox from '@/components/shared/checkbox'
 import Card from '@/components/shared/card'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import SupportMarkRulesPanel from './support-mark-rules-panel'
@@ -52,7 +57,22 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const [ruleProtectionMinutes, setRuleProtectionMinutes] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * R176 監査：名前・色を変えたまま一覧へ移ると、確認なく入力が消える。
+   * 読み込んだ（新規は作りたての）姿との差を未保存とし、離れる操作では
+   * 確認を出す。保存の成功後は別画面へ送るため、確認が出ることはない。
+   */
+  const [baseline, setBaseline] = useState<{ name: string; color: string; displayOrder: number; isDefault: boolean } | null>(null)
   const selected = useMemo(() => items.find((mark) => mark.id === markId), [items, markId])
+  const dirty = baseline !== null && (
+    name !== baseline.name
+    || color !== baseline.color
+    || displayOrder !== baseline.displayOrder
+    || isDefault !== baseline.isDefault
+    // 新規の自動変更ルールは「作る」と押した時点で書きかけ。
+    || (!editing && (createRule || ruleEvent !== 'staff_assigned' || ruleActive !== true || ruleProtectionMinutes !== 0))
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   /* IDEA-04: 同名のマークがすでにあるとき、保存する前に知らせる（自分自身は外す）。 */
   const nameDuplicates = useMemo(() => findDuplicateNames(items, name, markId ?? null), [items, name, markId])
   const currentUsages = selected ? [
@@ -86,10 +106,14 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           setColor(current.color)
           setDisplayOrder(current.displayOrder)
           setIsDefault(current.isDefault)
+          setBaseline({ name: current.name, color: current.color, displayOrder: current.displayOrder, isDefault: current.isDefault })
         } else if (editing) {
           setError('対応マークが見つかりません')
         } else {
+          // 新規は作りたての姿（名前「要確認」・先頭の色・末尾の順番）を
+          // 「保存済み」とし、触った分だけ未保存にする。
           setDisplayOrder(rows.length)
+          setBaseline({ name: '要確認', color: COLORS[0].value, displayOrder: rows.length, isDefault: false })
         }
       })
       .catch(() => setError('対応マークを読み込めませんでした'))
@@ -122,9 +146,10 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
   return (
     <div data-design-node="GMvBd">
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。ボタン枠のままでは分類案内の行き先リンクとずれる（自動点検 k=10）。 */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '対応マーク', href: '/tags?tab=marks' }, { label: editing ? 'マークを編集' : 'マークを作る' }]} />
-        <Button href="/tags?tab=marks">対応マークへ</Button>
+        <Link href="/tags?tab=marks" className="text-status-info shrink-0 text-label font-semibold hover:underline">対応マークへ</Link>
       </div>
 
       {error ? <Notice tone="danger" className="mb-4">{error}</Notice> : null}
@@ -156,10 +181,11 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
             狭い幅でチェック欄がカードの外へ切れる。
           */}
           <div className="border-t border-hairline pt-4">
-            <label className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-6 w-6 shrink-0 accent-accent-deep" />
-              新しい友だちに最初から付ける
-            </label>
+            <Checkbox
+              checked={isDefault}
+              disabled={selected?.isDefault}
+              onCheckedChange={setIsDefault}
+            >新しい友だちに最初から付ける</Checkbox>
             <p className="mt-1 text-xs font-normal leading-relaxed text-ink-faint">最初から付けるマークは1つだけ選べます</p>
           </div>
           {/* IDEA-04: 対応の状態管理なら対応マーク・印だけならタグ・値を持たせるなら情報欄という違いを、作る場所で確認できるようにする。 */}
@@ -189,25 +215,38 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
               <div className="mt-3 rounded-control border border-hairline p-3 text-sm">
                 <label className="block text-xs font-semibold text-ink-secondary">
                   きっかけ
-                  <select aria-label="きっかけ" value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info">
-                    {EVENT_LABELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                  </select>
+                  <Select
+                    aria-label="きっかけ"
+                    value={ruleEvent}
+                    onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)}
+                    options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))}
+                    size="full"
+                    className="mt-1"
+                  />
                 </label>
                 <p aria-hidden="true" className="my-1 text-center text-ink-faint">↓</p>
                 <p className="min-w-0 break-words rounded-control bg-surface-soft px-3 py-2.5 font-semibold text-ink">「{name || 'このマーク'}」に変更</p>
                 <label className="mt-3 block text-xs font-semibold text-ink-secondary">
                   手動で変更した直後の保護
-                  <select aria-label="手動変更の保護時間" value={String(ruleProtectionMinutes)} onChange={(event) => setRuleProtectionMinutes(Number(event.target.value))} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info">
-                    <option value="0">保護しない（次のきっかけですぐ変更）</option>
-                    <option value="30">30分は手動の変更を守る</option>
-                    <option value="60">1時間は手動の変更を守る</option>
-                    <option value="1440">1日は手動の変更を守る</option>
-                  </select>
+                  <Select
+                    aria-label="手動変更の保護時間"
+                    value={String(ruleProtectionMinutes)}
+                    onChange={(value) => setRuleProtectionMinutes(Number(value))}
+                    options={[
+                      { value: '0', label: '保護しない（次のきっかけですぐ変更）' },
+                      { value: '30', label: '30分は手動の変更を守る' },
+                      { value: '60', label: '1時間は手動の変更を守る' },
+                      { value: '1440', label: '1日は手動の変更を守る' },
+                    ]}
+                    size="full"
+                    className="mt-1"
+                  />
                 </label>
-                <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink">
-                  <input type="checkbox" checked={ruleActive} onChange={(event) => setRuleActive(event.target.checked)} className="h-6 w-6 shrink-0 accent-accent-deep" />
-                  このルールを有効にして登録する
-                </label>
+                <Checkbox
+                  checked={ruleActive}
+                  onCheckedChange={setRuleActive}
+                  className="mt-3"
+                >このルールを有効にして登録する</Checkbox>
                 <div className="mt-3 flex justify-end">
                   <Button type="button" onClick={() => setCreateRule(false)}>ルールを外す</Button>
                 </div>
@@ -234,6 +273,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         status={editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください'}
         actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saving || !name.trim() || (editing && !selected)} onClick={() => void save()}>{saving ? '保存中…' : editing ? '変更を保存' : '対応マークを作る'}</Button></>}
       />
+      {/* R176 監査：名前・色などの書きかけがある間の離脱確認。 */}
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、マークへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

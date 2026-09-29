@@ -58,7 +58,7 @@ describe('統括 バナー生成', () => {
 
   it('生成は「条件を登録 → 1枚ずつ run」を繰り返し、失敗したら止めて理由を出す', () => {
     expect(projectPage).toContain('api.hqBanners.projects.createGeneration(')
-    expect(projectPage).toContain('api.hqBanners.generations.run(current.id)')
+    expect(projectPage).toContain('api.hqBanners.generations.run(current.id, { gravity: crop })')
     expect(projectPage).toContain('if (res.data.finished) break')
     expect(projectPage).toContain('setGenerationError(message)')
     expect(projectPage).toContain('api.hqBanners.generations.cancel(running.id)')

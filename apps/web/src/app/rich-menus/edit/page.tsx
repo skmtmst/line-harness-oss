@@ -1,7 +1,9 @@
 'use client'
 
 import DateTimeField from '@/components/shared/date-time-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -32,6 +34,8 @@ import {
 } from './publish-plan-draft'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { PublishHistorySection } from './publish-history'
+import { PublishProgressSection } from './publish-progress-section'
+import { PrepublishCheckSection } from './prepublish-check-section'
 import { TestApplySection } from './test-apply-section'
 
 /**
@@ -484,7 +488,7 @@ function Editor({
    * 「保存せずに移動」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
-    <ConfirmDialog
+    <ConfirmDialog primaryAction="cancel"
       open={leaveTarget !== null}
       title="保存していない変更があります"
       description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
@@ -601,8 +605,10 @@ function Editor({
     let cancelled = false
     void (async () => {
       const [tagRes, tplRes, formRes, linkRes, folderRes] = await Promise.allSettled([
-        api.tags.list(),
-        api.templates.list(),
+        // R23: このメニューのアカウントのタグだけを候補にする（別アカウントの同名混入防止）。
+        api.tags.list(group?.accountId ? { accountId: group.accountId } : undefined),
+        // m18r: テンプレートもこのメニューのアカウントだけ（流入リンク #914 と同じ形）。
+        api.templates.list(undefined, group?.accountId ?? undefined),
         group?.accountId
           ? api.forms.list(group.accountId)
           : Promise.resolve({ success: true as const, data: [] }),
@@ -763,7 +769,13 @@ function Editor({
     } catch (e) {
       // WRITE-01: 権限不足・所属違い・機能オフの理由が見えるようにする。
       // 内部文（API error: 5xx 等）は画面へ出さない。
-      setError(describeSaveFailure(e))
+      // R205: Worker が英語で返す既知の検証文は日本語へ写す。
+      const raw = e instanceof Error ? e.message : ''
+      setError(
+        /targetingPriority/.test(raw)
+          ? '出す順番は1以上の整数で入力してください。小数は使えません。'
+          : describeSaveFailure(e),
+      )
     } finally {
       setSaving(false)
     }
@@ -791,16 +803,35 @@ function Editor({
       if (!res.success) throw new Error(res.error ?? 'publish failed')
       publishAttempt.current.succeed()
       setConfirmKind(null)
-      setNotice('LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「友だちに表示」を実行してください。')
+      /*
+       * R204: 公開＝LINEへの登録。実際に友だちの画面が変わるのは
+       * 「全員の既定」にしている場合だけなので、設定に合わせて言い分ける。
+       * メニュー項目の名前（一覧の「表示先」）は実際の表記にそろえる。
+       */
+      setNotice(
+        isDefaultForAll
+          ? 'LINEへの登録が終わり、すべての友だちの既定メニューになりました。'
+          : targetingEnabled
+            ? 'LINEへの登録が終わりました。条件に当てはまる人の画面には、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+            : 'LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「表示先」から操作してください。',
+      )
       // 「いますぐ出す」で使い切った公開入力の下書きは残さない。
       resetPublishPlan()
       await reload()
-    } catch {
+    } catch (e) {
       // 生のAPIエラーは出さない。運用者が次にすることだけを窓に書く。
+      // R203: ただし入力検査の日本語メッセージ（「ページ…の『…』: URLの形が…」）
+      // は直し方が書いてあるので、そのまま見せる。
+      const raw = e instanceof Error ? e.message : ''
+      const isValidationMessage = /[ぁ-んァ-ヶ一-龠]/u.test(raw) && raw !== 'publish failed'
       setConfirmError(
-        draftSaved
-          ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
-          : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
+        /targetingPriority/.test(raw)
+          ? '出す順番は1以上の整数で入力してください。小数は使えません。'
+          : isValidationMessage
+            ? raw
+            : draftSaved
+              ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
+              : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
       )
     } finally {
       setPublishing(false)
@@ -885,6 +916,13 @@ function Editor({
       await persistDraft()
       const res = await api.richMenuGroups.duplicate(group.id, crypto.randomUUID())
       if (!res.success) throw new Error(res.error ?? '複製できませんでした')
+      /*
+       * R232: 画面遷移しても確認窓の状態は残る（同じページでクエリだけ変わる）。
+       * 閉じてから移る。残ったままだと「コピーをさらに複製する？」に見えて、
+       * もう一度押すと不要なコピーが増える。
+       */
+      setConfirmKind(null)
+      setNotice(`「${group.name}」の下書きを複製しました。この画面はコピーの編集です。`)
       router.push(`/rich-menus/edit?id=${res.data.id}`)
     } catch (e) {
       setConfirmError(e instanceof Error && e.message !== '複製できませんでした'
@@ -1055,6 +1093,8 @@ function Editor({
         onTargetingCondition={setTargetingCondition}
         onRefresh={() => void reloadTargetPreview()}
         onSave={() => void handleSave()}
+        saveError={error}
+        saveNotice={notice}
         readOnly={aggregateOnly}
       />
       {leaveConfirmDialog}
@@ -1075,6 +1115,10 @@ function Editor({
         onPublishChange={updatePublishPlan}
         conditionEmpty={conditionEmpty}
         previewUnsaved={previewUnsaved}
+        isDefaultForAll={isDefaultForAll}
+        targetingEnabled={targetingEnabled}
+        saveError={error}
+        saveNotice={notice}
         onSave={() => void handleSave()}
         onPublishNow={() => void handlePublish()}
         onSchedule={scheduleSubmit}
@@ -1251,9 +1295,10 @@ function Editor({
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
-              <SelectField
+              <Select
+                aria-label="フォルダ"
                 value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
+                onChange={(value) => setFolderId(value)}
                 options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.id, label: f.name }))]}
               />
             </label>
@@ -1353,21 +1398,13 @@ function Editor({
               </p>
             </div>
 
-            <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={targetingEnabled}
-                onChange={(e) => setTargetingEnabled(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span className="text-sm">
-                条件で出し分ける
-                <span className="text-ink-faint block text-[11px]">
-                  切ると、このメニューは条件で配られなくなります。すでに見えている人からは
-                  すぐには消えません。
-                </span>
-              </span>
-            </label>
+            <Checkbox
+              checked={targetingEnabled}
+              onCheckedChange={setTargetingEnabled}
+              description="切ると、このメニューは条件で配られなくなります。すでに見えている人からはすぐには消えません。"
+            >
+              条件で出し分ける
+            </Checkbox>
 
             {targetingEnabled && (
               <>
@@ -1683,14 +1720,13 @@ function Editor({
 
       <StickyBar actions={(
         <div className="flex items-center gap-2">
-          <label className="mr-2 flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={preview}
-              onChange={(e) => setPreview(e.target.checked)}
-            />
+          <Checkbox
+            className="mr-2"
+            checked={preview}
+            onCheckedChange={setPreview}
+          >
             プレビュー
-          </label>
+          </Checkbox>
           <button
             onClick={handleSave}
             disabled={saving || publishing || unpublishing || busy}
@@ -1779,6 +1815,8 @@ function TargetingStep({
   onTargetingCondition,
   onRefresh,
   onSave,
+  saveError = null,
+  saveNotice = '',
   readOnly = false,
 }: {
   group: Group
@@ -1799,6 +1837,9 @@ function TargetingStep({
   onTargetingCondition: (value: SegmentCondition | null) => void
   onRefresh: () => void
   onSave: () => void
+  /** R205: 下書き保存の結果。この画面だけだと失敗が見えなかった。 */
+  saveError?: string | null
+  saveNotice?: string
   /** N-156: staffは集計だけ見る。条件の編集は owner/admin の仕事。 */
   readOnly?: boolean
 }) {
@@ -1833,19 +1874,34 @@ function TargetingStep({
     <div data-design-node="kQ1bs" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={2} groupId={group.id} />
+      {/* R205: 下書き保存の結果はどの工程でも同じ位置に出す。 */}
+      {saveNotice ? <Notice tone="success" message={saveNotice} className="mb-4" /> : null}
+      {saveError ? <Notice tone="danger" message={saveError} className="mb-4" /> : null}
 
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className={`rounded-card border p-4 ${readOnly ? 'opacity-70' : 'cursor-pointer'} ${!targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={!targetingEnabled} disabled={readOnly} onChange={() => onTargetingEnabled(false)} />すべての友だち</span>
-              <span className="text-ink-faint mt-2 block text-xs leading-5">ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります</span>
-            </label>
-            <label className={`rounded-card border p-4 ${readOnly ? 'opacity-70' : 'cursor-pointer'} ${targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={targetingEnabled} disabled={readOnly} onChange={() => onTargetingEnabled(true)} />条件に当てはまる友だちだけ</span>
-              <span className="text-ink-faint mt-2 block text-xs leading-5">当てはまらない人には、これより下のメニューが出ます</span>
-            </label>
+          <div className="mt-4">
+            <RadioCardGroup legend="出す相手の選択" className="grid gap-3 sm:grid-cols-2">
+              <RadioCard
+                name="audience"
+                value="all"
+                checked={!targetingEnabled}
+                disabled={readOnly}
+                onChange={() => onTargetingEnabled(false)}
+                title="すべての友だち"
+                note="ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります"
+              />
+              <RadioCard
+                name="audience"
+                value="targeted"
+                checked={targetingEnabled}
+                disabled={readOnly}
+                onChange={() => onTargetingEnabled(true)}
+                title="条件に当てはまる友だちだけ"
+                note="当てはまらない人には、これより下のメニューが出ます"
+              />
+            </RadioCardGroup>
           </div>
 
           {targetingEnabled ? (
@@ -1859,7 +1915,9 @@ function TargetingStep({
             <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
             <div>
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
-              <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
+              <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} step={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
+              {/* R205: 小数はサーバで弾かれる。欄の近くに制限を書く。 */}
+              <p className="text-ink-faint mt-1 text-[11px]">1以上の整数（小数は使えません）</p>
             </div>
             <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
@@ -1901,6 +1959,10 @@ function PublishStep({
   onPublishChange,
   conditionEmpty = false,
   previewUnsaved = false,
+  isDefaultForAll = false,
+  targetingEnabled = false,
+  saveError = null,
+  saveNotice = '',
   onSave,
   onPublishNow,
   onSchedule,
@@ -1923,6 +1985,12 @@ function PublishStep({
   conditionEmpty?: boolean
   /** 人数がまだ保存していない条件で数えられているとき true。 */
   previewUnsaved?: boolean
+  /** R204: 実際の公開効果の説明に使う、編集中（まだ保存前も含む）の対象設定。 */
+  isDefaultForAll?: boolean
+  targetingEnabled?: boolean
+  /** R205: 下書き保存の結果をこのステップでも出す。 */
+  saveError?: string | null
+  saveNotice?: string
   onSave: () => void
   onPublishNow: () => void
   onSchedule: (input: RichMenuScheduleInput) => Promise<void>
@@ -2025,26 +2093,36 @@ function PublishStep({
     <div data-design-node="UMiJ9" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={3} groupId={group.id} />
+      {/* R205: 下書き保存の結果はどの工程でも同じ位置に出す。 */}
+      {saveNotice ? <Notice tone="success" message={saveNotice} className="mb-4" /> : null}
+      {saveError ? <Notice tone="danger" message={saveError} className="mb-4" /> : null}
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <h2 className="text-ink text-base font-bold">いつ出すか</h2>
-          <div className="mt-4 space-y-3">
-            {[
-              ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
-              ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
-              ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
-            ].map(([value, label, note]) => (
-              <label key={value} className={`rounded-card flex cursor-pointer gap-3 border p-4 ${mode === value ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-                <input type="radio" name="publish-mode" checked={mode === value} onChange={() => onPublishChange({ mode: value as PublishPlanInput['mode'] })} />
-                <span><strong className="text-ink block text-sm">{label}</strong><span className="text-ink-faint mt-1 block text-xs">{note}</span></span>
-              </label>
-            ))}
+          <div className="mt-4">
+            <RadioCardGroup legend="公開時期の選択" className="grid gap-3">
+              {[
+                ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
+                ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
+                ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
+              ].map(([value, label, note]) => (
+                <RadioCard
+                  key={value}
+                  name="publish-mode"
+                  value={value}
+                  checked={mode === value}
+                  onChange={(next) => onPublishChange({ mode: next as PublishPlanInput['mode'] })}
+                  title={label}
+                  note={note}
+                />
+              ))}
+            </RadioCardGroup>
           </div>
           {mode !== 'now' ? (
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
               <span className="text-ink-secondary text-xs font-semibold">出しはじめ<DateTimeField aria-label="出しはじめ" value={startsAt} onChange={(v) => onPublishChange({ startsAt: v })} className="mt-1" /></span>
               {mode === 'period' ? <span className="text-ink-secondary text-xs font-semibold">出しおわり<DateTimeField aria-label="出しおわり" value={endsAt} onChange={(v) => onPublishChange({ endsAt: v })} className="mt-1" /></span> : null}
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => onPublishChange({ restoreGroupId: event.target.value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<Select aria-label="終わったらどうする" value={restoreGroupId} onChange={(value) => onPublishChange({ restoreGroupId: value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
             </div>
           ) : null}
 
@@ -2056,8 +2134,8 @@ function PublishStep({
               ) : (
                 <li className="text-success">✓ 誰に出すかが決まっています（<MetricValue metric={preview?.matched} />{previewUnsaved ? '・未保存の条件で計算' : ''}）</li>
               )}
-              <li className={imageReady ? 'text-success' : 'text-danger'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
-              <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-danger'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
+              <li className={imageReady ? 'text-success' : 'text-warning'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
+              <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-warning'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
               {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
             </ul>
           </div>
@@ -2065,9 +2143,28 @@ function PublishStep({
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
-          <Notice tone="info"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2 text-xs">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />} のトーク画面のメニューが入れ替わります。</p><p className="mt-2 text-xs">LINEへの反映は数分かかることがあります。</p></Notice>
+          {/*
+            R204: 「公開」は LINE への登録。全員の画面が変わるのは
+            isDefaultForAll（全員の既定）のときだけ。条件で出し分ける設定は、
+            その人の出来事（友だち追加・タグ付け）が起きたときに順次切り替わる。
+            どちらでもない公開は登録だけで、表示は一覧の「表示先」から行う。
+          */}
+          <Notice tone="info"><h2 className="text-sm font-bold">公開すると何が変わるか</h2>
+            {isDefaultForAll ? (
+              <p className="mt-2 text-xs">このアカウントの既定メニューになります。個別に別のメニューを指定されている人以外の、すべての友だちのトーク画面に出ます。</p>
+            ) : targetingEnabled && conditionEmpty ? (
+              <p className="mt-2 text-xs">出す条件が空のため、公開しても今は誰の画面にも出ません。前の工程で条件を決めるか、一覧の「表示先」から出す相手を選んでください。</p>
+            ) : targetingEnabled ? (
+              <p className="mt-2 text-xs">LINEに登録されます。条件にいま当てはまる <MetricValue metric={preview?.effective} /> のメニューは、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次切り替わります。すぐ全員に出るわけではありません。</p>
+            ) : (
+              <p className="mt-2 text-xs">LINEへの登録だけでは、友だちのトーク画面は変わりません。公開のあと、一覧の「表示先」で出す相手を決めてください。</p>
+            )}
+            <p className="mt-2 text-xs">LINEへの反映は数分かかることがあります。</p>
+          </Notice>
           {/* N-152: 全員へ出す前に、自分のLINEだけで見え方を確かめる。 */}
           {canOperate ? <TestApplySection groupId={group.id} /> : null}
+          {/* O-1: 公開の前の確認。プレビューだけでは公開できない。 */}
+          {canOperate ? <PrepublishCheckSection groupId={group.id} /> : null}
         </aside>
       </div>
       <section aria-label="公開予約の一覧" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
@@ -2108,6 +2205,8 @@ function PublishStep({
           </ul>
         )) : null}
       </section>
+      {/* K-1: 公開の進み。失敗した段だけ「失敗」にし、もう一度公開できる。 */}
+      {canOperate ? <PublishProgressSection groupId={group.id} onRetry={submit} /> : null}
       {/* N-151: 公開の履歴・失敗だけの再試行・LINEとの照合修復。 */}
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}

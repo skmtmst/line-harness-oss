@@ -240,9 +240,12 @@ export async function countFoldersByKind(db: D1Database): Promise<Record<string,
  * - `friend_field`: scope 表（`friend_field_scopes`）基準が正しいことは確定しているが
  *   （#730 調査）、現時点では件数の利用先が無い。利用画面を作る時に接続する。
  *   テナント全体の無条件集計は採らない（他テナント混入のため）（#730 裁定）。
- * - `automation` / `entry_route` / `mileage_rule` / `form`: `folder_id` 列を
+ * - `automation` / `entry_route` / `mileage_rule`: `folder_id` 列を
  *   持つテーブルが存在せず、どの画面からも `kind` 指定で呼ばれていない
  *   （汎用フォルダ機構が未使用の種別）
+ * - `form`: `forms.folder_id` はある（migration 395）が、所属先は
+ *   `form_accounts` の結合で決まるため、この表の単一列の数え方では
+ *   母集団がずれる。件数が要るときは一覧と同じ結合で数える別口にする。
  *
  * `webinar` はここには含めない。`getWebinarFolderCounts`（`webinars.ts`）が
  * 既にアカウント境界込みで実装済みで、呼び出し側（`GET /api/folders`）が

@@ -1,5 +1,6 @@
 import HelpTip from '@/components/shared/help-tip'
 import type { DashboardOverview } from '@/lib/api'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 /**
  * 友だち数の推移。
@@ -48,51 +49,51 @@ export default function FriendTrendTable({
   const allEstimated = rows.every((row) => row.estimated)
   return (
     <div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm font-normal">
+      <DataTable className="rounded-none border-0">
           <thead>
-            <tr className="text-ink-faint border-hairline border-b text-left text-xs">
-              <th className="px-5 py-2 font-medium whitespace-nowrap">
+            <TableHeadRow>
+              <Th style={{ width: '22%' }} className="whitespace-nowrap">
                 <span className="inline-flex items-center gap-1">
                   日付
                   <HelpTip label="日付の推定値の説明">
                     {allEstimated ? ALL_ESTIMATED_NOTE : ESTIMATED_NOTE}
                   </HelpTip>
                 </span>
-              </th>
-              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">前日比</th>
-              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">登録</th>
-              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">ブロック</th>
-              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">有効友だち</th>
-            </tr>
+              </Th>
+              <Th style={{ width: '14%' }} align="right" className="whitespace-nowrap">前日比</Th>
+              <Th style={{ width: '16%' }} align="right" className="whitespace-nowrap">登録</Th>
+              <Th style={{ width: '16%' }} align="right" className="whitespace-nowrap">ブロック</Th>
+              <Th style={{ width: '32%' }} align="right" className="whitespace-nowrap">有効友だち</Th>
+            </TableHeadRow>
           </thead>
-          <tbody className="divide-hairline divide-y">
+          <tbody>
             {rows.map((row, i) => {
               // 前日比は、1つ後ろ（＝前日）との差。最終行は比べる相手がいない。
               const previous = rows[i + 1]
               const diff = previous ? row.active - previous.active : null
               return (
-                <tr key={row.date} className="text-ink-secondary">
-                  <td className="px-5 py-2.5 whitespace-nowrap">
-                    {formatDate(row.date)}
-                    {row.estimated && !allEstimated ? (
-                      <span className="text-ink-faint ml-1.5 text-nano">推定</span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {diff === null ? '—' : diff === 0 ? '0' : diff > 0 ? `+${diff}` : diff}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{row.added}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{row.blocked}</td>
-                  <td className="px-3 py-2.5 text-right font-medium tabular-nums">
-                    {row.active.toLocaleString('ja-JP')}
-                  </td>
-                </tr>
+                <Tr key={row.date} className="text-ink-secondary">
+                  <Td className="whitespace-nowrap">
+                    <span>
+                      {formatDate(row.date)}
+                      {row.estimated && !allEstimated ? (
+                        <span className="text-ink-faint ml-1.5 text-nano">推定</span>
+                      ) : null}
+                    </span>
+                  </Td>
+                  <Td align="right" className="tabular-nums">
+                    <span>{diff === null ? '—' : diff === 0 ? '0' : diff > 0 ? `+${diff}` : diff}</span>
+                  </Td>
+                  <Td align="right" className="tabular-nums"><span>{row.added}</span></Td>
+                  <Td align="right" className="tabular-nums"><span>{row.blocked}</span></Td>
+                  <Td align="right" className="font-medium tabular-nums">
+                    <span>{row.active.toLocaleString('ja-JP')}</span>
+                  </Td>
+                </Tr>
               )
             })}
           </tbody>
-        </table>
-      </div>
+      </DataTable>
 
     </div>
   )

@@ -8,7 +8,9 @@ import {
   recordAnonymousConversionDay,
   recordDomainRejection,
   recordSiteConsentDecision,
+  resumeMeasurementSite,
   siteAllowsHost,
+  stopMeasurementSite,
   trackConversion,
   updateMeasurementSiteDomains,
 } from '@line-crm/db';
@@ -65,6 +67,10 @@ webMeasurement.post('/api/public/web-conversions', async (c) => {
     const site = await getMeasurementSite(c.env.DB, siteId);
     if (!site) return c.body(null, 204, corsHeaders());
 
+    // R275: 停止中のサイトは成果を受け付けない。許可外ドメインとも別扱いで、
+    // 拒否の集計にも入れない(届いた事実自体を残さない)。
+    if (site.stopped_at !== null) return c.body(null, 204, corsHeaders());
+
     // 計測対象の機能が止まっているアカウントでは何も受け付けない。
     if (!(await accountFeatureIsEnabled(c.env.DB, site.line_account_id, 'affiliates'))) {
       return c.body(null, 204, corsHeaders());
@@ -95,7 +101,11 @@ webMeasurement.post('/api/public/web-conversions', async (c) => {
       return c.body(null, 204, corsHeaders());
     }
 
-    const path = typeof body.path === 'string' && body.path.startsWith('/') ? body.path.split('?')[0] : '/';
+    // R282: パラメータ（?以降）とページ内位置（#以降）は判定に使わない。
+    // 照合自体も getUrlReachConversionPoints 側で同じ形へ直して比べる。
+    const path = typeof body.path === 'string' && body.path.startsWith('/')
+      ? body.path.split('?')[0].split('#')[0] || '/'
+      : '/';
     const fullUrl = `https://${host}${path}`;
 
     // url_reach 地点のうち、対象URLの前方一致に合うものを数える。
@@ -185,6 +195,8 @@ webMeasurement.get(
           rejectedCount: s.rejectedTotal,
           lastRejectedHost: s.lastRejectedHost,
           lastRejectedAt: s.lastRejectedAt,
+          stoppedAt: s.stopped_at,
+          stoppedReason: s.stopped_reason,
         })),
       });
     } catch (err) {
@@ -263,5 +275,68 @@ webMeasurement.patch('/api/measurement-sites/:id', requireRole('owner', 'admin')
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+/**
+ * R275: サイトの計測を止める・再開する。
+ *
+ * 停止は「閉鎖・誤登録」の運用整理。行は消さず、いつ・なぜ止めたかを残す。
+ * 止めたサイトへの成果は公開口が受け付けず、既に数えた記録は変わらない。
+ * 間違えて止めたときは再開で戻せる。
+ */
+async function changeSiteStopState(c: Context<Env>, id: string, stop: boolean): Promise<Response> {
+  const site = await getMeasurementSite(c.env.DB, id);
+  if (!site) return c.json({ success: false, error: '対象が見つかりません' }, 404);
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!scope.allowedAccountIds.includes(site.line_account_id)) {
+    return c.json({ success: false, error: '対象が見つかりません' }, 404);
+  }
+
+  if (!stop) {
+    const result = await resumeMeasurementSite(c.env.DB, site.id);
+    if (result === 'not_stopped') {
+      return c.json({ success: false, error: 'このサイトは停止していません' }, 409);
+    }
+    auditLog(c, 'measurement_site.resume', { kind: 'measurement_site', id: site.id }, { lineAccountId: site.line_account_id });
+    return c.json({ success: true, data: { id: site.id } });
+  }
+
+  const body = await c.req.json<{ reason?: unknown }>().catch(() => ({}) as { reason?: unknown });
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  if (!reason || reason.length > 200) {
+    return c.json({ success: false, error: '停止する理由を200字以内で入れてください' }, 400);
+  }
+  const result = await stopMeasurementSite(c.env.DB, site.id, reason);
+  if (result === 'already_stopped') {
+    return c.json({ success: false, error: 'このサイトはすでに停止しています' }, 409);
+  }
+  auditLog(c, 'measurement_site.stop', { kind: 'measurement_site', id: site.id }, { lineAccountId: site.line_account_id });
+  return c.json({ success: true, data: { id: site.id } });
+}
+
+webMeasurement.post(
+  '/api/measurement-sites/:id/stop',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      return await changeSiteStopState(c, c.req.param('id'), true);
+    } catch (err) {
+      console.error('POST /api/measurement-sites/:id/stop error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+webMeasurement.post(
+  '/api/measurement-sites/:id/resume',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      return await changeSiteStopState(c, c.req.param('id'), false);
+    } catch (err) {
+      console.error('POST /api/measurement-sites/:id/resume error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 export { webMeasurement };

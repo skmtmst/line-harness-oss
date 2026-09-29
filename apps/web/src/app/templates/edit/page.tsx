@@ -1,12 +1,12 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { type Folder } from '@line-crm/shared'
+import { type Folder, validateFlexContent } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -180,6 +180,13 @@ function validateTemplateSave(input: TemplateSaveInput): string | null {
   if (!input.templateId && !input.selectedAccountId) return '上のバーでLINE公式アカウントを選んでください'
   if (!input.name.trim()) return '名前を入力してください'
   if (!input.messageContent.trim()) return '本文を入力してください'
+  /*
+   * R249: カード型はバブルかカルーセルのJSONでないと保存しない。
+   * 通常文のまま保存できると「作れた」と誤認する。保存口も
+   * 同じ判定で断るが、ここで先に止めると往復しない。
+   */
+  const flexError = validateFlexContent(input.messageType, input.messageContent)
+  if (flexError) return flexError
   return null
 }
 
@@ -291,6 +298,13 @@ function templateUsageEntries(usedBy: TemplateUsedBy): Array<{
       href: `/reminders/edit?id=${usage.reminderId}`,
       label: `リマインダ「${usage.reminderName}」`,
     })),
+    // R347: 旧公開版に固定された登録も本文は今のテンプレートを読むため、
+    // 変更の影響先に出す。消すのではなく版と状態を添える。
+    ...(usedBy.reminderEnrollments ?? []).map((usage) => ({
+      key: `reminder-enrollment-${usage.enrollmentId}`,
+      href: `/reminders/detail?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」第${usage.versionNumber}版（${usage.enrollmentStatus === 'cancelled' ? '取消ずみ' : '送信待ち'}）`,
+    })),
     ...usedBy.richMenuAreas.map((usage) => ({
       key: `rich-menu-${usage.areaId}`,
       href: `/rich-menus/edit?id=${usage.groupId}`,
@@ -311,7 +325,7 @@ function templateUsageEntries(usedBy: TemplateUsedBy): Array<{
  * 保存の手前に出す。出さないと、自動応答やシナリオで使われている
  * 本文が予告なしに差し替わる。
  */
-function TemplateUsageNotice({ usedBy }: { usedBy: TemplateUsedBy }) {
+function TemplateUsageNotice({ usedBy, published }: { usedBy: TemplateUsedBy; published: boolean }) {
   const entries = templateUsageEntries(usedBy)
   return (
     <section
@@ -327,8 +341,15 @@ function TemplateUsageNotice({ usedBy }: { usedBy: TemplateUsedBy }) {
         </p>
       ) : (
         <>
+          {/*
+            R237: 保存は下書きの保存で、利用先へは公開した内容だけが届く。
+            「保存するとそのまま使われる」と書くと、未公開のまま利用先が
+            変わると誤解する。公開の場所（一覧の詳細パネル）も名指しする。
+          */}
           <p className="text-ink-secondary mt-1 text-xs">
-            保存すると、次の利用先へ新しい内容がそのまま使われます。内容を確認してから保存してください。
+            {published
+              ? '保存は下書きの保存です。利用先へ反映するには、一覧の詳細パネルから公開してください。内容を確認してから保存してください。'
+              : 'このテンプレートはまだ公開していません。保存しただけでは利用先へ反映されません。一覧の詳細パネルから公開すると、利用先へ新しい内容が使われます。'}
           </p>
           <ul className="mt-2 space-y-1 text-xs">
             {entries.map((entry) => (
@@ -369,6 +390,8 @@ interface TemplateEditorState {
   requestedId: string | null
   status: TemplateLoadStatus
   templateAccountId: string | null
+  /** R237: 公開版の版番号。未公開は0。保存と公開の説明を分けるために持つ。 */
+  publishedVersion: number | null
   draft: TemplateDraft
   /**
    * 詳細口が返した利用先（IDEA-11）。未取得は null。
@@ -382,6 +405,7 @@ function newTemplateEditorState(templateId: string | null, visual: boolean): Tem
     requestedId: templateId,
     status: templateId ? 'loading' : 'idle',
     templateAccountId: null,
+    publishedVersion: null,
     usedBy: null,
     draft: {
       name: visual ? '定期便 初回のご案内' : '',
@@ -534,6 +558,8 @@ function TemplateEditInner() {
           templateAccountId: res.data.accountId ?? null,
           // 利用先も同じ応答に入っている。保存の手前に出す分も一緒に持つ。
           usedBy: res.data.usedBy ?? null,
+          // R237: 公開・未公開で利用先への反映説明を分ける。
+          publishedVersion: res.data.publishedVersion ?? null,
           draft: {
             name: res.data.name,
             category: res.data.category ?? '',
@@ -629,7 +655,7 @@ function TemplateEditInner() {
                 <input id="tp-name" type="text" value={name} onChange={(event) => updateDraft({ name: event.target.value })} className={inputClass} />
               </Field>
               <Field label="置き場" htmlFor="tp-folder" note="一覧のフォルダ分けと絞り込みに使います。">
-                <SelectField id="tp-folder" value={folderId ?? ''} onChange={(event) => updateDraft({ folderId: event.target.value || null })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+                <Select aria-label="置き場" id="tp-folder" value={folderId ?? ''} onChange={(value) => updateDraft({ folderId: value || null })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
               </Field>
             </>
           )}
@@ -643,7 +669,10 @@ function TemplateEditInner() {
                 新規作成（id なし）や未取得では出さない。
               */}
               {id && editor.status === 'ready' && editor.usedBy ? (
-                <TemplateUsageNotice usedBy={editor.usedBy} />
+                <TemplateUsageNotice
+                  usedBy={editor.usedBy}
+                  published={(editor.publishedVersion ?? 0) >= 1}
+                />
               ) : null}
               {(loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error) && <p className="text-danger text-sm">{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p>}
               {saveGuard && !loadFailed && !accountMismatch && <p role="status" className="text-ink-secondary text-sm">{saveGuard}</p>}

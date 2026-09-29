@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
+import { validateFlexContent } from '@line-crm/shared'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InlineActionList, { useActionOptions } from './inline-action-list'
 import {
   applyMatchType,
   emptyKeywordRule,
+  exactAllMismatchNotice,
   initialMatchType,
   readKeywordRules,
   readInlineActions,
@@ -21,8 +23,12 @@ import {
   type HolidayRuleValue,
   type InlineAction,
 } from './draft-fields'
+import Notice from '@/components/shared/notice'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
@@ -325,6 +331,11 @@ export default function EditDialog({
     readKeywordRules(draft),
   )
   const [weekdays, setWeekdays] = useState<number[]>(draft.responseWeekdays ?? [])
+  /*
+   * R252: 最後の曜日を外そうとしたときに欄の下で出す理由。
+   * 選び直したら消える（残り続けると次の操作の説明に見える）。
+   */
+  const [weekdayNotice, setWeekdayNotice] = useState<string | null>(null)
   const [holidayRule, setHolidayRule] = useState<HolidayRuleValue>(
     (draft.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
   )
@@ -402,19 +413,27 @@ export default function EditDialog({
       setError('キーワードを入力してください')
       return
     }
+    /*
+     * R200: 「連投を防ぐ」は送る前に欄の名前と許容範囲で止める。
+     * 保存口も同じ文言で断るが、ここで先に止めると往復しない。
+     */
+    if (cooldown.trim() !== '') {
+      const cooldownValue = Number(cooldown)
+      if (!Number.isInteger(cooldownValue) || cooldownValue < 0 || cooldownValue > 10080) {
+        setError('「連投を防ぐ」は0〜10080の整数（分）で入力してください')
+        return
+      }
+    }
     if (mode === 'template' && !templateId) { setError('テンプレートを選んでください'); return }
     if (mode === 'inline-text' && !responseContent.trim()) {
       setError('内容を入力してください'); return
     }
     if (mode === 'inline-flex') {
       if (!responseContent.trim()) { setError('カードの内容を入力してください'); return }
-      try {
-        JSON.parse(responseContent)
-      } catch {
-        // カード形式なのにJSONでない本文を保存すると、送信側がテキストへ落として
-        // そのまま送ってしまう。ここで止める。
-        setError('カードの内容をJSON形式で入力してください'); return
-      }
+      // R201: JSONとして読めるだけでは足りない。`{}` のような構造のない内容は
+      // 送信時に落ちるだけなので、保存の側で止める（保存口も同じ判定）。
+      const flexError = validateFlexContent('flex', responseContent)
+      if (flexError) { setError(flexError); return }
     }
     if (mode === 'inline-image' && !readLineImageContent(responseContent)) {
       // テキストのまま画像形式で保存させない（画像選択部品がJSONを書く）。
@@ -657,7 +676,7 @@ export default function EditDialog({
           <section className="space-y-4">
             {!page && <div>
               <h2 className="text-ink text-lg font-bold">基本設定</h2>
-              <p className="text-ink-faint mt-1 text-xs">ルール名・フォルダ・優先順位を設定します。</p>
+              <p className="text-ink-faint mt-1 text-xs">ルール名・フォルダを決めます。動く順番は一覧で上下を入れ替えて決めます。</p>
             </div>}
 
             <div className={page ? 'grid items-start gap-3 xl:grid-cols-4' : ''}>
@@ -683,33 +702,37 @@ export default function EditDialog({
                 フォルダ
               </label>
               <div className="mt-1 flex items-center gap-2">
-                <select
+                <Select
                   id="auto-reply-folder"
+                  aria-label="フォルダ"
                   value={folderId}
-                  onChange={(e) => setFolderId(e.target.value)}
+                  onChange={setFolderId}
                   disabled={foldersLoadState !== 'ready'}
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-                >
-                  <option value="">
-                    {foldersLoadState === 'loading'
-                      ? 'フォルダを読み込み中'
-                      : foldersLoadState === 'error'
-                        ? 'フォルダを読み込めませんでした'
-                        : '未分類'}
-                  </option>
-                  {folderId && !folders.some((folder) => folder.id === folderId) && (
-                    <option value={folderId}>
-                      {foldersLoadState === 'ready'
-                        ? '現在のフォルダ（一覧にありません）'
-                        : '現在のフォルダ（名前を確認できません）'}
-                    </option>
-                  )}
-                  {folders.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    {
+                      value: '',
+                      label:
+                        foldersLoadState === 'loading'
+                          ? 'フォルダを読み込み中'
+                          : foldersLoadState === 'error'
+                            ? 'フォルダを読み込めませんでした'
+                            : '未分類',
+                    },
+                    ...(folderId && !folders.some((folder) => folder.id === folderId)
+                      ? [
+                          {
+                            value: folderId,
+                            label:
+                              foldersLoadState === 'ready'
+                                ? '現在のフォルダ（一覧にありません）'
+                                : '現在のフォルダ（名前を確認できません）',
+                          },
+                        ]
+                      : []),
+                    ...folders.map((f) => ({ value: f.id, label: f.name })),
+                  ]}
+                  size="full"
+                />
                 {foldersLoadState === 'error' && (
                   <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>
                     再読み込み
@@ -727,6 +750,7 @@ export default function EditDialog({
                 R28: 順番は数字で打たせず、一覧の並びで決める。ここでは
                 実際の判定順（Worker と同じ・上から1つだけ動く）での位置と、
                 先に当たるかもしれないルールだけ出す。
+                m15c の共通 Select への1本化はフォルダ欄で活かす。
               */}
               <div className="block">
                 <span className="text-ink-secondary text-xs">動く順番</span>
@@ -918,6 +942,15 @@ export default function EditDialog({
               「すべて」は絞り込みに使います。「予約」と「キャンセル」の両方が入った文にだけ
               返す、という形です。片方だけの問い合わせには返しません。
             </p>
+            {/*
+              R257: 異なる文言の完全一致をすべて必須にすると不成立になる。
+              条件を勝手に変えず、理由だけを知らせて保存は止めない。
+            */}
+            {exactAllMismatchNotice(keywordRules, keywordMatchMode) ? (
+              <Notice tone="warn" className="mb-3">
+                {exactAllMismatchNotice(keywordRules, keywordMatchMode)}
+              </Notice>
+            ) : null}
 
             <label className="text-ink-secondary mb-1 block text-xs">一致のしかた</label>
             <div className="flex gap-2">
@@ -944,6 +977,27 @@ export default function EditDialog({
             <div>
               <p className="text-ink-faint mb-1.5 text-xs">応答する曜日</p>
               <div className="flex flex-wrap gap-1.5">
+                {/*
+                  R252: 「すべての曜日」は押す操作として明示する。
+                  空（何も選ばない）＝全曜日、という暗黙の読み替えを
+                  見た目に載せないと、最後の1つを外したときに全曜日へ
+                  広がって見える。
+                */}
+                <button
+                  type="button"
+                  aria-pressed={weekdays.length === 0}
+                  onClick={() => {
+                    setWeekdays([])
+                    setWeekdayNotice(null)
+                  }}
+                  className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
+                    weekdays.length === 0
+                      ? 'border-accent bg-accent-soft text-ink font-bold'
+                      : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                  }`}
+                >
+                  すべての曜日
+                </button>
                 {WEEKDAY_LABELS.map((label, day) => {
                   const on = weekdays.length === 0 || weekdays.includes(day)
                   return (
@@ -956,12 +1010,27 @@ export default function EditDialog({
                         // 「その曜日だけ」にする（全部入りから1つ外す、ではない）。
                         if (weekdays.length === 0) {
                           setWeekdays([day])
+                          setWeekdayNotice(null)
                           return
                         }
-                        const next = weekdays.includes(day)
-                          ? weekdays.filter((d) => d !== day)
-                          : [...weekdays, day].sort((a, b) => a - b)
-                        setWeekdays(next)
+                        if (weekdays.includes(day)) {
+                          /*
+                           * 最後の1つは外さない。外すと空＝全曜日になり、
+                           * 減らすつもりの操作で対象が広がる（R252）。
+                           * 受信元の選択（最後の1つは残す）と同じ扱い。
+                           */
+                          if (weekdays.length === 1) {
+                            setWeekdayNotice(
+                              '曜日は1つ以上必要です。すべてにする場合は「すべての曜日」を押してください。',
+                            )
+                            return
+                          }
+                          setWeekdays(weekdays.filter((d) => d !== day))
+                          setWeekdayNotice(null)
+                          return
+                        }
+                        setWeekdays([...weekdays, day].sort((a, b) => a - b))
+                        setWeekdayNotice(null)
                       }}
                       className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
                         on
@@ -979,27 +1048,27 @@ export default function EditDialog({
                   ? 'すべての曜日で応答します。'
                   : `${weekdays.map((d) => WEEKDAY_LABELS[d]).join('・')}曜だけ応答します。`}
               </p>
+              {weekdayNotice ? (
+                <p role="status" className="text-ink-secondary mt-1 text-[11px]">
+                  {weekdayNotice}
+                </p>
+              ) : null}
             </div>
 
             {!page && <div>
-              <p className="text-ink-faint mb-1.5 text-xs">祝日</p>
-              <div className="space-y-1">
+              <RadioCardGroup legend="祝日">
                 {HOLIDAY_RULE_LABELS.map((option) => (
-                  <label key={option.value} className="flex cursor-pointer items-start gap-2">
-                    <input
-                      type="radio"
-                      name="ar-holiday"
-                      checked={holidayRule === option.value}
-                      onChange={() => setHolidayRule(option.value)}
-                      className="mt-0.5"
-                    />
-                    <span className="text-sm">
-                      {option.label}
-                      <span className="text-ink-faint block text-[11px]">{option.hint}</span>
-                    </span>
-                  </label>
+                  <RadioCard
+                    key={option.value}
+                    name="ar-holiday"
+                    value={option.value}
+                    checked={holidayRule === option.value}
+                    onChange={() => setHolidayRule(option.value)}
+                    title={option.label}
+                    note={option.hint}
+                  />
                 ))}
-              </div>
+              </RadioCardGroup>
             </div>}
 
             <div className="flex flex-wrap items-end gap-3">
@@ -1058,6 +1127,9 @@ export default function EditDialog({
                     <button
                       key={key}
                       type="button"
+                      // R254: 選・不選を読み上げで区別できるようにする。
+                      // 曜日・一致のしかたの切り替えと同じ押した状態。
+                      aria-pressed={on}
                       onClick={() =>
                         setMessageKinds((prev) => {
                           // 何も選んでいない状態は「全部」を意味する。そこから
@@ -1091,17 +1163,16 @@ export default function EditDialog({
                   {([['line', 'LINE'], ['email', 'メール']] as const).map(([source, label]) => {
                     const checked = receiveSources.includes(source)
                     return (
-                      <label key={source} className="border-hairline rounded-control flex items-center gap-2 border px-3 py-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => setReceiveSources((current) => {
-                            if (checked) return current.length === 1 ? current : current.filter((item) => item !== source)
-                            return [...current, source]
-                          })}
-                        />
+                      <Checkbox
+                        key={source}
+                        checked={checked}
+                        onCheckedChange={() => setReceiveSources((current) => {
+                          if (checked) return current.length === 1 ? current : current.filter((item) => item !== source)
+                          return [...current, source]
+                        })}
+                      >
                         {label}
-                      </label>
+                      </Checkbox>
                     )
                   })}
                 </div>
@@ -1126,53 +1197,32 @@ export default function EditDialog({
               </div>
             )}
 
-            {!page && <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={skipWhenOperatorActive}
-                onChange={(e) => setSkipWhenOperatorActive(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
-              />
-              <span className="text-ink-secondary text-xs">
-                担当者が対応中のトークでは返さない
-                <span className="text-ink-faint block text-[11px]">
-                  「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。
-                  未対応のまま放置されているトークには返します。
-                  予約・支払いなどの自動通知は別の送信経路なので止まりません。
-                </span>
-              </span>
-            </label>}
+            {!page && <Checkbox
+              checked={skipWhenOperatorActive}
+              onCheckedChange={setSkipWhenOperatorActive}
+              description="「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。未対応のまま放置されているトークには返します。予約・支払いなどの自動通知は別の送信経路なので止まりません。"
+            >
+              担当者が対応中のトークでは返さない
+            </Checkbox>}
 
             {!page && <div>
-              <p className="text-ink-faint mb-1.5 text-xs">応答する回数</p>
-              <div className="space-y-1">
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="radio"
-                    name="ar-once"
-                    checked={!oncePerFriend}
-                    onChange={() => setOncePerFriend(false)}
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm">何度でも応答する</span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="radio"
-                    name="ar-once"
-                    checked={oncePerFriend}
-                    onChange={() => setOncePerFriend(true)}
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm">
-                    1人につき1回だけ応答する
-                    <span className="text-ink-faint block text-[11px]">
-                      このルールで一度応答した人には、以後どのキーワードでも応答しません。
-                      上の「連投を防ぐ」は時間をあけるだけですが、こちらは二度と応答しません。
-                    </span>
-                  </span>
-                </label>
-              </div>
+              <RadioCardGroup legend="応答する回数">
+                <RadioCard
+                  name="ar-once"
+                  value="many"
+                  checked={!oncePerFriend}
+                  onChange={() => setOncePerFriend(false)}
+                  title="何度でも応答する"
+                />
+                <RadioCard
+                  name="ar-once"
+                  value="once"
+                  checked={oncePerFriend}
+                  onChange={() => setOncePerFriend(true)}
+                  title="1人につき1回だけ応答する"
+                  note="このルールで一度応答した人には、以後どのキーワードでも応答しません。上の「連投を防ぐ」は時間をあけるだけですが、こちらは二度と応答しません。"
+                />
+              </RadioCardGroup>
             </div>}
 
             <div>
@@ -1256,35 +1306,23 @@ export default function EditDialog({
           {mode === 'template' && (
             <div className={page ? 'rounded-card border-hairline space-y-3 border bg-canvas-sunken p-3' : ''}>
               <label htmlFor="auto-reply-template" className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
-              <select
+              {/*
+                共通の選び欄は束見出しを持てないため、種類を名前の頭に付けて
+                1列に並べる（カード／テキスト／画像の区別は残す）。
+              */}
+              <Select
                 id="auto-reply-template"
+                aria-label="テンプレート"
                 value={templateId ?? ''}
-                onChange={(e) => setTemplateId(e.target.value || null)}
-                className="border-hairline rounded-control focus:ring-accent w-full border bg-canvas px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              >
-                <option value="">-- 選択 --</option>
-                {flexTemplates.length > 0 && (
-                  <optgroup label="カード">
-                    {flexTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {textTemplates.length > 0 && (
-                  <optgroup label="テキスト">
-                    {textTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {imageTemplates.length > 0 && (
-                  <optgroup label="画像">
-                    {imageTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+                onChange={(value) => setTemplateId(value || null)}
+                options={[
+                  { value: '', label: '-- 選択 --' },
+                  ...flexTemplates.map((t) => ({ value: t.id, label: `カード：${t.name}` })),
+                  ...textTemplates.map((t) => ({ value: t.id, label: `テキスト：${t.name}` })),
+                  ...imageTemplates.map((t) => ({ value: t.id, label: `画像：${t.name}` })),
+                ]}
+                size="full"
+              />
               {templates.length === 0 && (
                 <p className="text-warning mt-1 text-xs">
                   テンプレートがありません。<a href="/templates" className="underline">/templates</a> で作成してください。
@@ -1409,17 +1447,19 @@ export default function EditDialog({
             <div className="border-hairline grid gap-3 rounded-card border p-4 md:grid-cols-2">
               <label className="block">
                 <span className="text-ink-secondary text-xs">返信を待つ時間</span>
-                <select
+                <Select
+                  aria-label="返信を待つ時間"
                   value={replyDelaySeconds}
-                  onChange={(event) => setReplyDelaySeconds(event.target.value)}
-                  className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
-                >
-                  <option value="0">すぐに返信</option>
-                  <option value="10">10秒後</option>
-                  <option value="30">30秒後</option>
-                  <option value="60">1分後</option>
-                  <option value="300">5分後</option>
-                </select>
+                  onChange={setReplyDelaySeconds}
+                  options={[
+                    { value: '0', label: 'すぐに返信' },
+                    { value: '10', label: '10秒後' },
+                    { value: '30', label: '30秒後' },
+                    { value: '60', label: '1分後' },
+                    { value: '300', label: '5分後' },
+                  ]}
+                  size="full"
+                />
               </label>
               <label className="block">
                 <span className="text-ink-secondary text-xs">同じ人への連続返信</span>
@@ -1448,36 +1488,24 @@ export default function EditDialog({
                 </div>
               </div>
               <div className="md:col-span-2">
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={skipWhenOperatorActive}
-                    onChange={(event) => setSkipWhenOperatorActive(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
-                  />
-                  <span className="text-ink-secondary text-xs">
-                    担当者が対応中のトークでは返さない
-                    <span className="text-ink-faint block text-xs">
-                      「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。
-                      未対応のまま放置されているトークには返します。
-                      予約・支払いなどの自動通知は別の送信経路なので止まりません。
-                    </span>
-                  </span>
-                </label>
+                <Checkbox
+                  checked={skipWhenOperatorActive}
+                  onCheckedChange={setSkipWhenOperatorActive}
+                  description="「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。未対応のまま放置されているトークには返します。予約・支払いなどの自動通知は別の送信経路なので止まりません。"
+                >
+                  担当者が対応中のトークでは返さない
+                </Checkbox>
               </div>
             </div>
           )}
 
           {draft.id ? (
-            <label className="inline-flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
-              />
-              <span className="text-ink-secondary text-xs">この応答をオンにする</span>
-            </label>
+            <Checkbox
+              checked={isActive}
+              onCheckedChange={setIsActive}
+            >
+              この応答をオンにする
+            </Checkbox>
           ) : (
             // AUTOREPLY-08: 新しい応答は止まった状態で保存される。
             // 有効化は一覧の「再開」や公開前の確認から、別の操作で行う。

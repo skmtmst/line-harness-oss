@@ -98,7 +98,8 @@ describe('V6 自動応答一覧の契約', () => {
   it('URL編集は5段と設定内容・LINEプレビューを持つページ表示にする', () => {
     expect(EDIT_PAGE).toContain('<EditDialog')
     expect(EDIT_PAGE).toContain('page')
-    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認']) {
+    // R28・監査の直し：窓の中の順番は「優先順位」ではなく「動く順番」（一覧の上下で決める）。
+    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '動く順番', '確認']) {
       expect(EDITOR).toContain(word)
     }
     // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
@@ -162,7 +163,8 @@ describe('V6 自動応答一覧の契約', () => {
     expect(EDITOR).toContain('対応中が解除されるとあらためて動きます')
     expect(EDITOR).toContain('予約・支払いなどの自動通知は別の送信経路なので止まりません')
     // ページ表示（5段の編集画面）でも抑止設定を変えられる。
-    expect(EDITOR).toContain('setSkipWhenOperatorActive(event.target.checked)')
+    // m20j: 共通 Checkbox（onCheckedChange）へ寄せたため、素の event 式ではなく setter の配線を見る。
+    expect(EDITOR).toContain('setSkipWhenOperatorActive')
   })
 
   it('有効化完了の一時停止と複製を実口へ接続する（NEXT-20）', () => {

@@ -44,6 +44,23 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => useControllableAccount() }))
 vi.mock('./staff-detail', () => ({ default: () => <div>担当者別</div> }))
+
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の勤務時間の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
     status: number
@@ -132,6 +149,7 @@ async function pickTimeByLabel(label: string, hhmm: string) {
   fireEvent.click([...picker.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
 }
 import StaffShiftsPage from './page'
+import { slotReasonLabel } from './slot-reason'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -331,6 +349,24 @@ describe('店舗営業時間の編集', () => {
     await waitFor(() => expect(fixture.getSettings.mock.calls.length).toBeGreaterThanOrEqual(2))
   })
 
+  test('R161: 曜日を変えたまま別画面へ移ると確認を出し、編集継続で入力が残る', async () => {
+    await renderEditor()
+    fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を受け付ける' }))
+    await screen.findByLabelText('月曜日 1件目の開始')
+    fireEvent.click(screen.getByRole('link', { name: /予約管理/ }))
+    await screen.findByText('保存していない変更があります')
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
+    expect((screen.getByRole('checkbox', { name: '月曜日を受け付ける' }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  test('R161: 変えていなければ離脱確認を出さない', async () => {
+    await renderEditor()
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
   test('保存待ち中にaccountを切り替えたら旧accountの応答を親画面へ反映しない', async () => {
     let resolveSave!: (value: unknown) => void
     fixture.saveSettings.mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve }))
@@ -349,6 +385,22 @@ describe('店舗営業時間の編集', () => {
     expect(fixture.getSettings.mock.calls.filter(([id]) => id === 'account-b')).toHaveLength(1)
     expect(screen.queryByText('営業時間を保存しました。')).toBeNull()
     expect(screen.getByText(/まだ週全体の営業時間を保存していません/)).toBeTruthy()
+  })
+})
+
+describe('R314/(b) 刻みの理由文と見本の判定', () => {
+  test('R314: 刻みの理由は判定の幅を添え、無いときは幅を書かない', () => {
+    expect(slotReasonLabel('not_on_grid', 15)).toBe('開始時刻が受付の刻み（15分）に合っていません')
+    expect(slotReasonLabel('not_on_grid')).toBe('開始時刻が受付の刻みに合っていません')
+    expect(slotReasonLabel('past_cutoff', 15)).toBe('受付の締め切り（何時間前まで取れるか）を過ぎています')
+  })
+
+  test('(b): 見本は店舗ルール付きで空きを取る', async () => {
+    await renderEditor()
+    await waitFor(() => { expect(fixture.getAvailability).toHaveBeenCalled() })
+    const last = fixture.getAvailability.mock.calls.at(-1) as [string, Record<string, unknown>]
+    expect(last[0]).toBe('account-a')
+    expect(last[1]).toEqual(expect.objectContaining({ applyStoreRules: true }))
   })
 })
 
@@ -396,6 +448,92 @@ describe('予約設備の編集', () => {
     expect((await screen.findByLabelText('個室Aの設備名') as HTMLInputElement).disabled).toBe(true)
     expect(screen.queryByRole('button', { name: '設備を保存' })).toBeNull()
     expect(screen.getAllByText(/閲覧のみです/).length).toBeGreaterThan(0)
+  })
+
+  test('R312: 書きかけがある停止は破棄確認を挟み、戻れば送らない', async () => {
+    fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
+    await renderEditor()
+    const name = await screen.findByLabelText('個室Aの設備名') as HTMLInputElement
+    fireEvent.change(name, { target: { value: '書きかけ' } })
+    fireEvent.change(screen.getByLabelText('個室Aの受付上限'), { target: { value: '9' } })
+    fireEvent.click(screen.getByRole('button', { name: '受付を停止' }))
+
+    // 送らずに破棄か継続を選ばせる。
+    await screen.findByText('名前・種類・上限の編集中の内容は保存されません。受付の状態だけ変わります。')
+    expect(fixture.updateResource).not.toHaveBeenCalled()
+
+    // 編集に戻れば何も送らず、下書きは残る。
+    fireEvent.click(screen.getByRole('button', { name: '編集に戻る' }))
+    await waitFor(() => expect(screen.queryByText('名前・種類・上限の編集中の内容は保存されません。受付の状態だけ変わります。')).toBeNull())
+    expect(fixture.updateResource).not.toHaveBeenCalled()
+    expect(name.value).toBe('書きかけ')
+    expect((screen.getByLabelText('個室Aの受付上限') as HTMLInputElement).value).toBe('9')
+  })
+
+  test('R312: 破棄して停止を選ぶと状態だけ送る', async () => {
+    fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
+    await renderEditor()
+    fireEvent.change(await screen.findByLabelText('個室Aの設備名'), { target: { value: '書きかけ' } })
+    fireEvent.click(screen.getByRole('button', { name: '受付を停止' }))
+    await screen.findByText('名前・種類・上限の編集中の内容は保存されません。受付の状態だけ変わります。')
+
+    fireEvent.click(screen.getByRole('button', { name: '破棄して停止' }))
+    await waitFor(() => expect(fixture.updateResource).toHaveBeenCalledTimes(1))
+    // 状態だけ送る。編集中の値は送らない。
+    expect(fixture.updateResource).toHaveBeenLastCalledWith('account-a', 'resource-a', {
+      expectedVersion: 1, isActive: false,
+    })
+  })
+
+  test('R312: 下書きが不正でも保存済み設備の停止は進む', async () => {
+    fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
+    await renderEditor()
+    // 名前を空にすると保存は通らないが、停止は進む。
+    fireEvent.change(await screen.findByLabelText('個室Aの設備名'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: '受付を停止' }))
+    await screen.findByText('名前・種類・上限の編集中の内容は保存されません。受付の状態だけ変わります。')
+
+    fireEvent.click(screen.getByRole('button', { name: '破棄して停止' }))
+    await waitFor(() => expect(fixture.updateResource).toHaveBeenCalledTimes(1))
+    expect(fixture.updateResource).toHaveBeenLastCalledWith('account-a', 'resource-a', {
+      expectedVersion: 1, isActive: false,
+    })
+  })
+
+  test('R312: 書きかけがなければ確認なく停止する', async () => {
+    fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
+    await renderEditor()
+    fireEvent.click(await screen.findByRole('button', { name: '受付を停止' }))
+
+    await waitFor(() => expect(fixture.updateResource).toHaveBeenCalledTimes(1))
+    expect(fixture.updateResource).toHaveBeenLastCalledWith('account-a', 'resource-a', {
+      expectedVersion: 1, isActive: false,
+    })
+    expect(screen.queryByText('名前・種類・上限の編集中の内容は保存されません。受付の状態だけ変わります。')).toBeNull()
+  })
+
+  test('R313: 削除は確認窓を挟み、やめるでは残る', async () => {
+    fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
+    await renderEditor()
+    await screen.findByLabelText('個室Aの設備名')
+
+    // 押しただけでは送らない。対象と取り消しの道を確認できる。
+    fireEvent.click(screen.getByRole('button', { name: '設備を削除' }))
+    await screen.findByText('削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。')
+    expect(fixture.deleteResource).not.toHaveBeenCalled()
+
+    // やめるでは残る。
+    fireEvent.click(screen.getByRole('button', { name: 'やめる' }))
+    await waitFor(() => expect(screen.queryByText('削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。')).toBeNull())
+    expect(fixture.deleteResource).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('個室Aの設備名')).toBeTruthy()
+
+    // 確定して初めて送る。
+    fireEvent.click(screen.getByRole('button', { name: '設備を削除' }))
+    await screen.findByText('削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。')
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    await waitFor(() => expect(fixture.deleteResource).toHaveBeenCalledTimes(1))
+    expect(fixture.deleteResource).toHaveBeenCalledWith('account-a', 'resource-a', 1)
   })
 
   test('account切替直後は旧設備を新accountとして描画せず、旧保存応答も捨てる', async () => {
@@ -516,6 +654,16 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     await screen.findByText('年末休業')
     expect(screen.queryByRole('button', { name: '修正する' })).toBeNull()
     expect(screen.queryByRole('button', { name: '削除する' })).toBeNull()
+  })
+
+  test('R161: 休業日の修正欄を開いたまま別画面へ移ると確認を出す', async () => {
+    await renderWithException()
+    fireEvent.click(screen.getByRole('button', { name: '修正する' }))
+    await screen.findByLabelText('休業日の理由')
+    fireEvent.click(screen.getByRole('link', { name: /予約管理/ }))
+    await screen.findByText('保存していない変更があります')
+    expect(screen.getByRole('button', { name: '保存せずに移動' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '編集を続ける' })).toBeTruthy()
   })
 })
 

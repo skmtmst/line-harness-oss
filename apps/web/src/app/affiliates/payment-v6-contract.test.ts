@@ -32,8 +32,9 @@ describe('V6 支払いの追記台帳契約', () => {
     expect(API).toContain("purpose: 'affiliate.payout.export'")
     expect(PAYMENT).toContain("process.env.NEXT_PUBLIC_API_URL ?? ''")
     expect(PAYMENT).toContain('statementKeysRef.current.get(item.affiliateId)')
-    expect(PAYMENT).toContain('Promise.allSettled(preview.affiliates.map')
-    expect(PAYMENT).toContain('}, payoutKey)')
+    // R43: 締め直後はプレビュー、再開時は台帳の内訳から対象を取る。
+    expect(PAYMENT).toContain('Promise.allSettled(statementTargets.map')
+    expect(PAYMENT).toContain('}, key)')
     expect(PAYMENT).toContain('exportKey,')
   })
 
@@ -64,10 +65,12 @@ describe('V6 支払いの追記台帳契約', () => {
       NEXT-22: 明細作成とLINE通知は createStatement 1本の処理で分けられない。
       連動する2つのチェックは1つへまとめ、飾りのチェックマークは実状態に
       連動させる（OFFでもONに見える表示を残さない）。
+      m21u: 素の input＋飾りアイコンを共通の Checkbox へ置き換えた。
+      見た目は共通部品が実状態に連動させる。
     */
     expect(DIALOGS).toContain('支払明細を作成して、この方のLINEに知らせる')
-    expect((DIALOGS.match(/type="checkbox"/g) ?? []).length).toBe(1)
-    expect(DIALOGS).toContain('{issueStatement ? <Check size={12} /> : null}')
+    expect(DIALOGS).not.toContain('type="checkbox"')
+    expect(DIALOGS).not.toContain('{issueStatement ? <Check size={12} /> : null}')
     expect(DIALOGS).toContain('支払いは確定しましたが、支払明細とLINE通知を作れませんでした')
     /*
       NEXT-23: プレビューが返さない却下件数・除外金額を固定値で補わない。
@@ -103,7 +106,8 @@ describe('V6 支払いの追記台帳契約', () => {
   })
 
   it('振込用CSVは合言葉が空のまま送らない（#554 点検#505中8）', () => {
-    expect(PAYMENT).toContain('if (!payoutKey)')
-    expect(PAYMENT).toContain('disabled={!closed || operationBusy || !payoutKey}')
+    // 合言葉は締め直後だけでなく再開時にも必要なため、無ければ払い出す。
+    expect(PAYMENT).toContain('payoutKey || crypto.randomUUID()')
+    expect(PAYMENT).toContain('disabled={!closed || operationBusy || Boolean(resumed?.batch)}')
   })
 })

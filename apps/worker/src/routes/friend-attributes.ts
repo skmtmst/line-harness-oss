@@ -700,16 +700,22 @@ friendAttributes.post(
         return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
       }
       const body = await c.req.json<Record<string, unknown>>();
-      const replacementMarkId = typeof body.replacementMarkId === 'string'
+      const replacementRaw = typeof body.replacementMarkId === 'string'
         ? body.replacementMarkId.trim()
         : '';
+      /*
+       * R180: 使っている友だちが0人のときは置換先なしで保管できる。
+       * 空の置換先はここでは null へ倒し、0人かどうかの判定は
+       * `archiveSupportMarkWithReplacement` が最新の実値で行う。
+       */
+      const replacementMarkId = replacementRaw === '' ? null : replacementRaw;
       const impactRevision = typeof body.impactRevision === 'string'
         ? body.impactRevision.trim()
         : '';
       const expectedVersion = Number(body.expectedVersion);
-      if (!replacementMarkId || !impactRevision
+      if (!impactRevision
         || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: '置換先・確認版・現在版を指定してください' }, 400);
+        return c.json({ success: false, error: '確認版・現在版を指定してください' }, 400);
       }
       const result = await archiveSupportMarkWithReplacement(c.env.DB, scope, {
         markId: c.req.param('id'),
@@ -719,7 +725,9 @@ friendAttributes.post(
         idempotencyKey,
         actorId: c.get('staff').id,
       });
-      const replacement = await getSupportMarkById(c.env.DB, replacementMarkId, scope);
+      const replacement = replacementMarkId === null
+        ? null
+        : await getSupportMarkById(c.env.DB, replacementMarkId, scope);
       return c.json({
         success: true,
         data: {
@@ -1487,13 +1495,13 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
 
-    const accountId = body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template'
+    const accountId = body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template' || body.kind === 'form'
       ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
       : '';
     // テンプレートのフォルダはアカウント単位（N-147）。accountId なしで作れるのは
     // 全アカウントを見られる人だけ（タグと同じ決まり）。画面は必ず選択中の
-    // アカウントを送る。
-    if ((body.kind === 'tag' || body.kind === 'template') && !accountId) {
+    // アカウントを送る。回答フォームの箱（R25）も同じく選択中のアカウントに付ける。
+    if ((body.kind === 'tag' || body.kind === 'template' || body.kind === 'form') && !accountId) {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'account_id_required' }, 400);
     }

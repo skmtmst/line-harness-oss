@@ -8,6 +8,7 @@ import {
   getAffiliatePayoutBatchExport,
   getAffiliatePayoutDownload,
   getAffiliateStatementReplay,
+  getClosedAccountSettlement,
   markAffiliatePayoutExported,
   prepareAffiliateStatement,
   previewAffiliateAccountSettlement,
@@ -73,12 +74,19 @@ function csvCell(value: string | number): string {
 
 function simplePdf(snapshot: {
   affiliateCode: string; periodFrom: string; periodTo: string; totalAmount: number; currency: string;
+  grossAmount?: number; deductionAmount?: number;
 }): Uint8Array {
   const ascii = (value: string) => value.replace(/[^\x20-\x7E]/g, '?').replace(/[()\\]/g, '\\$&');
+  const deduction = snapshot.deductionAmount ?? 0;
   const lines = [
     'Affiliate payment statement',
     `Affiliate: ${ascii(snapshot.affiliateCode)}`,
     `Period: ${ascii(snapshot.periodFrom)} - ${ascii(snapshot.periodTo)}`,
+    // R288: 取消の差し引きがあるときだけ内訳を分けて出す。
+    ...(deduction > 0 ? [
+      `Gross: ${snapshot.currency} ${snapshot.grossAmount ?? snapshot.totalAmount + deduction}`,
+      `Adjustment: -${snapshot.currency} ${deduction}`,
+    ] : []),
     `Amount: ${snapshot.currency} ${snapshot.totalAmount}`,
   ];
   const stream = `BT /F1 14 Tf 72 760 Td ${lines.map((line, index) => `${index ? '0 -24 Td ' : ''}(${line}) Tj`).join(' ')} ET`;
@@ -123,6 +131,35 @@ affiliatePayouts.get(
     } catch (error) {
       console.error('GET /api/affiliate-settlements/preview error:', error);
       return c.json({ success: false, error: '締め対象を確認できませんでした' }, 500);
+    }
+  },
+);
+
+/*
+ * R43: 締めたあと画面を離れても、明細発行・CSV準備を再開できるよう、
+ * 期間で締め済み台帳を引き直す口。締め直しではなく既存台帳の読み出し。
+ */
+affiliatePayouts.get(
+  '/api/affiliate-settlements/current',
+  affiliatePermission('affiliate.report.view'),
+  async (c) => {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    const periodFrom = c.req.query('periodFrom');
+    const periodTo = c.req.query('periodTo');
+    if (!lineAccountId || !validIso(periodFrom) || !validIso(periodTo) || Date.parse(periodFrom) > Date.parse(periodTo)) {
+      return c.json({ success: false, error: '対象アカウントと正しい締め期間を指定してください' }, 400);
+    }
+    if (!await accountVisible(c, lineAccountId)) {
+      return c.json({ success: false, error: '締め対象が見つかりません' }, 404);
+    }
+    try {
+      const data = await getClosedAccountSettlement(c.env.DB, {
+        tenantId: tenantId(c), lineAccountId, periodFrom, periodTo,
+      });
+      return c.json({ success: true, data });
+    } catch (error) {
+      console.error('GET /api/affiliate-settlements/current error:', error);
+      return c.json({ success: false, error: '締め済みの記録を確認できませんでした' }, 500);
     }
   },
 );

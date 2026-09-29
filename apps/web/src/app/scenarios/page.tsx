@@ -21,9 +21,13 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
@@ -66,6 +70,8 @@ function StartScenarioDialog({
 }) {
   const { selectedAccountId, accounts } = useAccount()
   const lineAccountId = scenario.lineAccountId ?? selectedAccountId
+  // 開始の実行中は×と同じくEscapeでも閉じない。
+  const panelRef = useOverlayFocus(true, onCancel, busy)
   const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
   const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   /*
@@ -228,11 +234,16 @@ function StartScenarioDialog({
         : triggers
             .map((t) => describeStartTrigger(t, t.tagId ? tagNameById[t.tagId] ?? null : null))
             .join('、')
+  /*
+   * R250: 移動先が空の「次のシナリオへ移動」は保存できない設定。
+   * 取得の失敗と、選ばれていないこととを書き分ける。
+   */
+  const moveTargetSummary = !scenario.onCompleteScenarioId
+    ? '（移動先が選ばれていません）'
+    : `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
   const completeSummary =
     ON_COMPLETE_LABEL[completeMode] +
-    (completeMode === 'move'
-      ? `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
-      : '') +
+    (completeMode === 'move' ? moveTargetSummary : '') +
     (completeActionCount === null
       ? ''
       : completeActionCount > 0
@@ -241,7 +252,7 @@ function StartScenarioDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }} role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
-      <div className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
+      <div ref={panelRef} className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
         <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
           <div>
             <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
@@ -258,7 +269,7 @@ function StartScenarioDialog({
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">シナリオ</dt><dd className="text-ink text-right font-medium">{scenario.name}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">LINEアカウント</dt><dd className="text-ink text-right font-medium">{accountLabel}</dd></div>
-              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `予約中 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerSummary}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">配信ステップ</dt><dd className="text-ink text-right font-medium">{simulation ? `${simulation.steps.length}通` : scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">{completeSummary}</dd></div>
@@ -295,9 +306,9 @@ function StartScenarioDialog({
 
         <Notice tone="warn" className="mx-6 mb-5">
           <p className="text-sm font-bold">開始後に起きること</p>
-          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
+          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・稼働中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
         </Notice>
-        <label className={`mx-6 mb-4 flex items-center gap-2 text-sm font-medium ${preflightLoading ? 'opacity-60' : ''}`}><input type="checkbox" checked={confirmed} disabled={preflightState !== 'ready'} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
+        <Checkbox checked={confirmed} disabled={preflightState !== 'ready'} onCheckedChange={setConfirmed} className="mx-6 mb-4">対象人数・内容・送信枠を確認しました</Checkbox>
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
@@ -453,6 +464,19 @@ export default function ScenariosPage() {
   const handleCreate = () => {
     router.push('/scenarios/mode')
   }
+
+  /**
+   * R173: 絞り込み0件の1枚から条件を外す。検索語（送信用の確定値も
+   * 含む）と3つの絞り込み・フォルダをまとめて戻す。
+   */
+  const clearScenarioFilters = () => {
+    setNameQuery('')
+    setServerQuery('')
+    setStoppedOnly(false)
+    setCreatedThisMonthOnly(false)
+    setFolderFilter('')
+  }
+  const scenarioFilterActive = Boolean(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter)
 
   /**
    * 掴んで入れ替えた並びを保存する。
@@ -628,13 +652,19 @@ export default function ScenariosPage() {
   }
 
   return (
-    <div>
-      <Notice tone="info" className="mb-4" data-design="Head">
+    <div className="flex flex-col gap-4">
+      {/*
+        m21p: 一覧の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの
+        mb/mt は付けない（一斉配信の一覧と同じ値・同じ形）。
+      */}
+      <Notice tone="info" data-design="Head">
         作成しただけでは配信されません。開始条件を設定すると配信が始まります。
       </Notice>
       {/*
         SCENARIO-16: 下線だけの span は押せない。3手順の説明は
         開閉欄へ移し、帯は1〜2文だけにする。
+        m21p: ★V7 の順は「説明の開閉 → 数のカード → ＋作る → 一覧」。
+        開閉欄はここの1つだけにする（数のカードの下の2つ目は置かない）。
       */}
       <Disclosure size="compact" title="配信を始める方法" hint="3手順">
         <ol className="list-decimal space-y-1 pl-5 text-sm">
@@ -665,7 +695,7 @@ export default function ScenariosPage() {
               unit: '件',
               detail: `稼働中 ${s.scenarios.active}${sharedScenarioCount > 0 ? `・共通 ${sharedScenarioCount}件を含む` : ''}`,
             },
-            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在配信中・重複を含む' },
+            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在稼働中・重複を含む' },
             {
               title: '読了済',
               value: s.scenarios.completed,
@@ -682,19 +712,6 @@ export default function ScenariosPage() {
         ]}
       />
       </div>
-
-      {/*
-        ★V7 `Xn1Mz`：上からの順は「数のカード → 説明の開閉 → ＋作る」。
-        SCENARIO-16: 下線だけの span は押せない。3手順の説明は
-        開閉欄へ移し、帯は1〜2文だけにする。
-      */}
-      <Disclosure size="compact" title="配信を始める方法" hint="3手順" className="mb-4">
-        <ol className="list-decimal space-y-1 pl-5 text-sm">
-          <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
-          <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
-          <li>この一覧に戻り、行の「その他 → 再開する」から配信を開始します。</li>
-        </ol>
-      </Disclosure>
 
       {folderDialogOpen && (
         <FolderAddDialog
@@ -745,8 +762,11 @@ export default function ScenariosPage() {
         </div>
       ) : null}
 
-      {/* 一覧本体（設計 `Body`）。 */}
-      <div data-design="Body">
+      {/*
+        m21p: 作成ボタンは一覧本体の外へ出す。ボタンと下のフォルダの枠の
+        間は親の gap-4 で空ける（一斉配信の Head と同じ形）。Body の中に
+        置くと親の余白が効かず、枠にくっついて見える。
+      */}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
@@ -755,6 +775,8 @@ export default function ScenariosPage() {
           ＋ シナリオを作る
         </Button>
       </div>
+      {/* 一覧本体（設計 `Body`）。 */}
+      <div data-design="Body">
       {/*
         設計はフォルダを左の縦パネルに置く。シナリオはフォルダを持って
         いないので（列が無い）、いまは「すべて」だけ。分類できるように
@@ -776,7 +798,11 @@ export default function ScenariosPage() {
         </details>
         <div className="hidden lg:block">{folderPanel}</div>
 
-        <div>
+        {/*
+          m21p: 一覧列の縦の間隔も親の gap-4 にそろえる。行ごとの
+          mb/mt は付けない（一斉配信の一覧列と同じ形）。
+        */}
+        <div className="flex flex-col gap-4">
       {/*
         ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み。
         よく使う絞り込み。数え方が決まっているのは「停止中のみ」だけ。
@@ -828,13 +854,13 @@ export default function ScenariosPage() {
         絞り込んでいないときは一致＝全体なので、この行は出さない。
       */}
       {(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter) && scenarioList.loaded && (
-        <p className="text-ink-faint mb-3 text-xs tabular-nums">
+        <p className="text-ink-faint text-xs tabular-nums">
           条件に一致したシナリオ：{scenarioList.total.toLocaleString('ja-JP')}件
         </p>
       )}
 
       {actionError && (
-        <Notice tone="danger" message={actionError} className="mb-4" />
+        <Notice tone="danger" message={actionError} />
       )}
 
       {scenarioList.loading && scenarios.length === 0 ? (
@@ -849,6 +875,8 @@ export default function ScenariosPage() {
       ) : (
         <ScenarioList
           scenarios={scenarios}
+          isFiltered={scenarioFilterActive}
+          onClearFilter={clearScenarioFilters}
           onReorder={handleReorder}
           folders={folders}
           onMoveFolders={handleMoveFolders}
@@ -858,14 +886,13 @@ export default function ScenariosPage() {
         />
       )}
       {scenarioList.pageCount > 1 ? (
-        <div className="flex items-center justify-end gap-3 text-sm">
-          <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
-            前へ
-          </Button>
-          <span className="text-ink-secondary">{scenarioList.page} / {scenarioList.pageCount}ページ</span>
-          <Button disabled={scenarioList.page >= scenarioList.pageCount || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page + 1)}>
-            次へ
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <ListRange
+            total={scenarioList.total}
+            first={(scenarioList.page - 1) * scenarioList.limit + 1}
+            last={Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)}
+          />
+          <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
         </div>
       ) : null}
         </div>

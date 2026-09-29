@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useEffect, useState } from 'react'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
@@ -9,6 +9,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
@@ -349,12 +350,12 @@ function PoolAccountList({
       )}
       {candidates.length > 0 && (
         <div className="mt-2">
-          <SelectField
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) {
-                void onAdd(e.target.value)
-                e.target.value = ''
+          <Select
+            aria-label="追加するアカウント"
+            value=""
+            onChange={(value) => {
+              if (value) {
+                void onAdd(value)
               }
             }}
             options={[{ value: '', label: '＋ アカウントを追加' }, ...candidates.map((a) => ({ value: a.id, label: a.name }))]}
@@ -394,6 +395,9 @@ function CreatePoolModal({
   const [activeAccountId, setActiveAccountId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  // 共通ダイアログと同じ約束: 開いたら窓の中へフォーカス・Tabは窓の中・
+  // Escapeで閉じる・閉じたら起点へ戻す・背面はスクロールしない。
+  const panelRef = useOverlayFocus(true, onClose)
 
   const onSubmit = async () => {
     if (!slug || !name || !activeAccountId) return
@@ -414,9 +418,15 @@ function CreatePoolModal({
 
   return (
     <div className="bg-scrim fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-pool-title"
+        className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6"
+      >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-medium">新規プール</h2>
+          <h2 id="create-pool-title" className="text-lg font-medium">新規プール</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
@@ -436,9 +446,10 @@ function CreatePoolModal({
           placeholder="表示名 (例: ブランドA)"
           className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
         />
-        <SelectField
+        <Select
+          aria-label="最初の所属アカウント"
           value={activeAccountId}
-          onChange={(e) => setActiveAccountId(e.target.value)}
+          onChange={(value) => setActiveAccountId(value)}
           options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
         />
         <div className="border-hairline flex justify-end gap-2 border-t pt-2">
