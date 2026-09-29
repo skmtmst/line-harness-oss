@@ -69,7 +69,8 @@ describe('#673 A. カード・パネルの立体感', () => {
 
   it('モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む', () => {
     // components/shared/ は変更できないため、globals.css の属性規定で上書きする。
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-float\)/)
+    // ★V7: ダイアログは最前面（段3）の影 `--shadow-overlay`。
+    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-overlay\)/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--shadow-card\)/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\] \.shadow-lg\s*\{[^}]*var\(--shadow-float\)/)
   })
