@@ -132,6 +132,9 @@ beforeEach(() => {
     { id: 'account-9', name: '他社', is_active: 1, channel_access_token: 'token-9' },
   ];
   testDb = createTestD1();
+  // 統括ゲート（飲食店機能パック）。このAPI群自体を検証するファイルなので
+  // 既定の統括には常にパックを付けておく。
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
   googleCalls = [];
   googleHandler = () => jsonResponse({}, 404);
   vi.stubGlobal(
@@ -161,6 +164,13 @@ beforeEach(() => {
 });
 
 describe('Googleビジネス：設定（接続）', () => {
+  it('統括に飲食店機能パックが無いと、環境が有効でも404にする', async () => {
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = '[]' WHERE id = ?`).run(TENANT);
+    seedStore();
+    const response = await call('/api/restaurant-test/google/connection?account_id=account-2');
+    expect(response.status).toBe(404);
+  });
+
   it('店舗未登録のLINEアカウントは1店舗として初期化し、接続画面を表示できる', async () => {
     testDb.raw
       .prepare(

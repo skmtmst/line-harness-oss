@@ -557,6 +557,34 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(sessionRows()).toEqual([]);
   });
 
+  /*
+   * 招待の扱いはメール＋パスワードのログイン（auth-email.ts）とそろえる。
+   * 自分の招待が保留中なら、互換判定で入れる立場でも止めて登録を完了させる。
+   */
+  it('自分の招待が保留中なら、既定の統括のオーナーでもnext=opsで止める', async () => {
+    seedStaff('invited-owner', { role: 'owner' });
+    seedPlatformAdmin('invited-owner', 'invited');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-invited' WHERE id = 'invited-owner'`).run();
+    lineFetchMock('U-invited');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).toBe('https://admin.example.com/ops/login?error=not_authorized');
+    expect(sessionRows()).toEqual([]);
+  });
+
+  /*
+   * 他人の招待が保留中なだけで互換判定まで閉じると、運営マスターが0人のまま
+   * 誰も入れなくなる（画面から復旧できない）。
+   */
+  it('他人の招待が保留中でも、既定の統括のオーナーはnext=opsで進める', async () => {
+    seedStaff('compat-owner', { role: 'owner' });
+    seedStaff('someone-else', { role: 'staff' });
+    seedPlatformAdmin('someone-else', 'invited');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-compat' WHERE id = 'compat-owner'`).run();
+    lineFetchMock('U-compat');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).not.toBe('https://admin.example.com/ops/login?error=not_authorized');
+  });
+
   it('invite Cookie無しでは既存staffのLINE連携を変更しない', async () => {
     seedStaff('existing', { role: 'staff' });
     seedPlatformAdmin('existing');

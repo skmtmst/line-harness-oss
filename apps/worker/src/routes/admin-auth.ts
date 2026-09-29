@@ -269,10 +269,19 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     // LINE ユーザーだけを通す。契約先の権限者や、契約者専用 LINE の友だちでは入れない。
     // platform_admins が空の間だけ、既定の統括のオーナーを互換で通す（初期登録のため）。
     if (next === 'ops') {
-      const admin = await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff));
-      // 2要素認証待ちの人は通す（画面が設定へ案内する）。招待中のままの人はメールのリンクから
-      const pending = admin ? null : await getPlatformAdminRecord(c.env.DB, staff.id);
-      if (!admin && !(pending?.is_active === 1 && pending.activation_state === 'awaiting_totp')) {
+      /*
+       * 自分自身の招待が保留中なら、互換判定で入れる立場（既定の統括のオーナー）
+       * でも止める。メールのリンクから登録を完了させる（auth-email.ts と同じ）。
+       * 他人の招待が保留中なだけの場合は互換判定を残す（誰も入れなくなるのを防ぐ）。
+       */
+      const pending = await getPlatformAdminRecord(c.env.DB, staff.id);
+      const invited = pending?.is_active === 1 && pending.activation_state === 'invited';
+      // 2要素認証待ちの人は通す（画面が設定へ案内する）。
+      const awaitingTotp = pending?.is_active === 1 && pending.activation_state === 'awaiting_totp';
+      if (invited) {
+        return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+      }
+      if (!awaitingTotp && !(await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff)))) {
         return c.redirect(adminLoginUrl(c, 'not_authorized', next));
       }
     }
