@@ -47,13 +47,23 @@ export const STATE_TEXT = {
 } as const
 
 /**
+ * 数として出せる値か（D021）。
+ *
+ * 未取得（null・undefined）・数でない値・NaN・無限大は出せない。
+ * **0 は出せる。** 数えて0だったことは、取れなかったことと違う。
+ */
+export function isCountableValue(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+/**
  * 数字を出すか、`—` と理由を出すかを決める。
  *
  * `value` が数でないとき（未取得・null・NaN）は `—`。
  * **0 は 0 のまま出す。** 数えて0だったことは、取れなかったことと違う。
  */
 export function countOrDash(value: number | null | undefined, unit = ''): string {
-  return typeof value === 'number' && Number.isFinite(value)
+  return isCountableValue(value)
     ? `${value.toLocaleString('ja-JP')}${unit}`
     : NOT_AVAILABLE
 }

@@ -26,6 +26,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
@@ -385,11 +386,15 @@ export default function ScenariosPage() {
    * 数えていたため「KPI12件・すべて11・未分類12」が混在していた。
    */
   const loadFolders = useCallback(async () => {
-    const accountId = selectedAccountId
-    const res = await api.folders.list('scenario', accountId ?? undefined)
-    if (activeAccountRef.current !== accountId) return
-    if (res.success) setFolders(res.data)
-    setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
+    try {
+      const accountId = selectedAccountId
+      const res = await api.folders.list('scenario', accountId ?? undefined)
+      if (activeAccountRef.current !== accountId) return
+      if (res.success) setFolders(res.data)
+      setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
+    } catch {
+      // m23m: 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
+    }
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -869,7 +874,10 @@ export default function ScenariosPage() {
         <ListState
           kind="error"
           title="表示できませんでした"
-          description="登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。"
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は「登録したものは消えていない」と言い続ける。
+          description={isForbiddenOrRateLimited(scenarioList.error) ? undefined : '登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。'}
+          error={scenarioList.error ?? undefined}
           onRetry={() => void loadScenarios()}
         />
       ) : (
