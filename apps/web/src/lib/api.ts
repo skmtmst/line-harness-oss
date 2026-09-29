@@ -11146,9 +11146,17 @@ export const api = {
       `/api/nen-campaigns/columns/import?lineAccountId=${encodeURIComponent(accountId)}`,
       { method: 'POST' },
     ),
-    duplicateColumn: (id: string, accountId: string) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }>>(
+    /*
+     * M506: 複製の要求キー。同じコラムのやり直しは同じキーで送り、
+     * サーバは同じ複製を返す（`replayed`）。別の複製は別のキーで呼ぶ。
+     */
+    duplicateColumn: (id: string, accountId: string, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }> & { replayed?: boolean }>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/duplicate`,
-      { method: 'POST', body: JSON.stringify({ accountId }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+        ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
+      },
     ),
     testColumn: (id: string, accountId: string, friendId: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/test-send`,

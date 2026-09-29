@@ -255,6 +255,8 @@ export type NenOverviewProps = {
   savingColumnId: string | null
   onDeliverColumn: (column: NenColumn, scheduledAt?: string) => void
   onDuplicateColumn: (column: NenColumn) => void
+  /** 複製中のコラムID。ボタンを押せなくする（M506）。 */
+  duplicatingColumnId?: string | null
   onTestColumn: (column: NenColumn) => void
   // 送った履歴
   onShowDelivery: (id: string) => void
@@ -306,6 +308,7 @@ export function NenOverview({
   savingColumnId,
   onDeliverColumn,
   onDuplicateColumn,
+  duplicatingColumnId,
   onTestColumn,
   onShowDelivery,
   onRetryDelivery,
@@ -375,6 +378,7 @@ export function NenOverview({
           savingColumnId={savingColumnId}
           onDeliver={onDeliverColumn}
           onDuplicate={onDuplicateColumn}
+          duplicatingColumnId={duplicatingColumnId}
           onTest={onTestColumn}
           columnEnabled={columnSetting?.isEnabled ?? true}
           columnSetting={columnSetting}
@@ -710,6 +714,7 @@ function ColumnsPanel({
   savingColumnId,
   onDeliver,
   onDuplicate,
+  duplicatingColumnId,
   onTest,
   columnEnabled,
   columnSetting,
@@ -741,6 +746,7 @@ function ColumnsPanel({
   savingColumnId: string | null
   onDeliver: (column: NenColumn, scheduledAt?: string) => void
   onDuplicate: (column: NenColumn) => void
+  duplicatingColumnId?: string | null
   onTest: (column: NenColumn) => void
   columnEnabled: boolean
   /** コラム配信の決めごと（nen_campaign_settings の 'column' 行）。停止・再開の制御に使う。 */
@@ -975,7 +981,8 @@ function ColumnsPanel({
             </p>
             {selected ? (
               <div className="flex flex-wrap gap-2">
-                <Button type="button" size="field" onClick={() => onDuplicate(selected)}>同じ形で書く</Button>
+                {/* M506: 複製中は押せなくし、二重押しで2本作らせない。 */}
+                <Button type="button" size="field" disabled={duplicatingColumnId === selected.id} onClick={() => onDuplicate(selected)}>{duplicatingColumnId === selected.id ? '複製しています' : '同じ形で書く'}</Button>
                 <Button href="/nen-campaigns/columns/new" size="field">コラムを書く</Button>
               </div>
             ) : null}
