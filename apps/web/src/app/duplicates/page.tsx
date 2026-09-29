@@ -11,6 +11,7 @@ import { TableStateRow } from '@/components/shared/table'
 import { api } from '@/lib/api'
 import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import DuplicatesStatsNotice from './duplicates-stats-notice'
 
 interface PerAccountStat {
   accountId: string
@@ -63,6 +64,9 @@ export default function DuplicatesPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  // R598: 集計だけ失敗しても候補一覧は残す。集計欄の失敗表示に使うため、
+  // 捕まえた失敗をそのまま残す（403は権限の案内・再試行なしに言い分ける）。
+  const [statsFailure, setStatsFailure] = useState<unknown>(null)
   const [candidates, setCandidates] = useState<IdentityCandidateListItem[]>([])
   const [candidateTotal, setCandidateTotal] = useState(0)
   const [statusCounts, setStatusCounts] = useState<Partial<Record<IdentityCandidateStatus, number>>>({})
@@ -74,6 +78,8 @@ export default function DuplicatesPage() {
   const [page, setPage] = useState(1)
   const [candidatesLoading, setCandidatesLoading] = useState(false)
   const [candidateError, setCandidateError] = useState('')
+  // 表の中の失敗表示（403の言い分けつき）に渡すため、捕まえた失敗を残す。
+  const [candidateFailure, setCandidateFailure] = useState<unknown>(null)
   /*
    * FRIEND-12: 状態切替で先行した要求の応答が後から届いても採用しない。
    * 番号の新しい要求だけを採用し、検索キー（状態・検索語・ページ）も
@@ -101,12 +107,16 @@ export default function DuplicatesPage() {
       if (req !== statsReqRef.current) return
       if (statsRes.success) {
         setData(statsRes.data)
+        setStatsFailure(null)
         setError('')
       } else {
+        // success:false には状態が付かないので汎用（再試行あり）扱いにする。
+        setStatsFailure(new Error('集計の取得に失敗しました'))
         setError('読み込めませんでした')
       }
-    } catch {
+    } catch (err) {
       if (req !== statsReqRef.current) return
+      setStatsFailure(err)
       setError('読み込めませんでした')
     } finally {
       if (req === statsReqRef.current) {
@@ -138,17 +148,20 @@ export default function DuplicatesPage() {
         setCandidateTotal(res.data.total)
         setStatusCounts(res.data.statusCounts ?? {})
         setLowConfidenceCount(res.data.lowConfidenceCount ?? 0)
+        setCandidateFailure(null)
       } else {
         // FRIEND-12: 失敗を「新しい条件の0件」と誤認させない。
         setCandidates([])
         setCandidateTotal(0)
         setCandidateError('候補一覧を読み込めませんでした')
+        setCandidateFailure(new Error('候補一覧の取得に失敗しました'))
       }
-    } catch {
+    } catch (err) {
       if (req !== candidatesReqRef.current || candidatesKeyRef.current !== key) return
       setCandidates([])
       setCandidateTotal(0)
       setCandidateError('候補一覧を読み込めませんでした')
+      setCandidateFailure(err)
     } finally {
       if (req === candidatesReqRef.current) setCandidatesLoading(false)
     }
@@ -205,13 +218,20 @@ export default function DuplicatesPage() {
       */}
       {loading && !data ? (
         <ListState kind="loading" title="重複候補を読み込んでいます" />
-      ) : !data ? (
-        <ListState
-          kind="error"
-          title="読み込めませんでした"
-          description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
-          onRetry={() => load()}
-        />
+      ) : !data && !candidatesLoading && candidates.length === 0 && candidateError ? (
+        <>
+          {/*
+            集計も候補一覧も両方読めなかったときだけ、1枚の失敗にする。
+            どちらか一方が残っていれば下の枝でページを残し、
+            失敗はその場所（集計欄・表の中）で出す（R598）。
+          */}
+          <ListState
+            kind="error"
+            title="読み込めませんでした"
+            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            onRetry={() => load()}
+          />
+        </>
       ) : (
         <>
           {/* When a refresh fails but we still have a previous snapshot, show
@@ -221,12 +241,18 @@ export default function DuplicatesPage() {
           {/*
             ★V7 `x63W5x`：補助の失敗（取り直しだけ落ちた）は、その場所に
             小さく1行だけ。素の Tailwind 黄色はやめ、読み直す口をつける。
+            R598: 集計が無くても（!data）候補一覧は残し、集計の失敗は
+            集計欄の1行で伝えて再試行する。
           */}
-          {error && (
-            <p className="text-ink-secondary text-xs" role="status">
-              再計算できませんでした。表示中の数字は前回の集計です。
-              <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => load()}>もう一度</button>
-            </p>
+          {!data ? (
+            <DuplicatesStatsNotice failure={statsFailure} onRetry={() => load()} />
+          ) : (
+            error && (
+              <p className="text-ink-secondary text-xs" role="status">
+                再計算できませんでした。表示中の数字は前回の集計です。
+                <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => load()}>もう一度</button>
+              </p>
+            )
           )}
           {/*
             #1005: 独自カードをやめて共通 KpiCard の3段（見出し・数値・短い状態）に
@@ -255,14 +281,29 @@ export default function DuplicatesPage() {
               detail="配信実績の接続を待っています"
               description="配信前プレビューの実績を接続したあと、重複分を除いた削減の見込みをここに表示します。"
             />
-            <KpiCard
-              title="1配信あたりの無駄"
-              value={null}
-              unit=""
-              valueText={`¥${fmt.format(data.wastedPerBroadcastYen)}`}
-              detail={`¥${fmt.format(data.msgUnitYen)}/通の見積り`}
-              description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
-            />
+            {/*
+              R598: 集計が無いときは数値を「—」にし、3段目に読み込めなかった
+              旨を出す（KpiCard の取得失敗の約束）。再試行の口は集計欄の
+              1行に寄せ、同じ失敗の口を2つ出さない。
+            */}
+            {data ? (
+              <KpiCard
+                title="1配信あたりの無駄"
+                value={null}
+                unit=""
+                valueText={`¥${fmt.format(data.wastedPerBroadcastYen)}`}
+                detail={`¥${fmt.format(data.msgUnitYen)}/通の見積り`}
+                description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
+              />
+            ) : (
+              <KpiCard
+                title="1配信あたりの無駄"
+                value={null}
+                unit=""
+                detail="読み込めませんでした"
+                description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
+              />
+            )}
             <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(lowConfidenceCount)}組`} detail="" help="名前・画像だけの候補です" />
           </section>
 
@@ -284,7 +325,7 @@ export default function DuplicatesPage() {
               />
             </div>
             <div className="flex items-center gap-3">
-              {data.computedAt && (
+              {data?.computedAt && (
                 <span className="text-xs text-ink-faint">
                   {formatRelative(data.computedAt)}に計算
                 </span>
@@ -317,6 +358,7 @@ export default function DuplicatesPage() {
                     title={candidateError}
                     onRetry={() => void loadCandidates()}
                     retryLabel="再試行"
+                    error={candidateFailure ?? undefined}
                   />
                 ) : candidatesLoading && candidates.length === 0 ? (
                   // FRIEND-12: 応答待ちを「0件」と見せない。
@@ -376,6 +418,12 @@ export default function DuplicatesPage() {
             </div>
           </section>
 
+          {/*
+            R598: 集計が無いときは内訳とマトリックスを出さない（母数が無いため）。
+            候補一覧（上の表）は集計なしでも残す。
+          */}
+          {data ? (
+          <>
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント別ブレイクダウン</h2>
             <p className="mt-1 text-xs text-ink-faint">どのアカウントに重複が偏っているかを見ます。</p>
@@ -487,6 +535,8 @@ export default function DuplicatesPage() {
             </section>
             )
           })()}
+          </>
+          ) : null}
         </>
       )}
     </div>
