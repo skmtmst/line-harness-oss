@@ -309,6 +309,29 @@ function stripeExpandableId(value: unknown): string | null {
   return null;
 }
 
+/**
+ * charge.refunded の Charge に invoice が直接付かず payment_intent だけの場合の解決。
+ * Stripe Billing の請求書払いなら PaymentIntent.invoice に請求書IDが入っているため、
+ * それを1回だけ問い合わせて確認する。取得できなければ対象外（EC-CUBEなど）として扱う。
+ */
+async function resolveRefundedInvoiceId(c: Context<Env>, object: Record<string, unknown>): Promise<string | null> {
+  const direct = stripeExpandableId(object.invoice);
+  if (direct) return direct;
+  const paymentIntentId = stripeExpandableId(object.payment_intent);
+  if (!paymentIntentId || !stripeReady(c)) return null;
+  try {
+    const paymentIntent = await stripeApi.retrievePaymentIntent(c.env, paymentIntentId);
+    return typeof paymentIntent.invoice === 'string' ? paymentIntent.invoice : null;
+  } catch (error) {
+    console.warn(JSON.stringify({
+      message: 'billing webhook: payment_intent lookup failed',
+      paymentIntentId,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return null;
+  }
+}
+
 async function findTenantForEvent(c: Context<Env>, object: Record<string, unknown>): Promise<TenantBilling | null> {
   const metadata = (object.metadata ?? {}) as Record<string, string>;
   const byMeta = metadata.tenant_id ?? (typeof object.client_reference_id === 'string' ? object.client_reference_id : null);
@@ -345,7 +368,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
   try {
     const object = event.data.object;
     const refundedInvoiceId = event.type === 'charge.refunded'
-      ? stripeExpandableId(object.invoice)
+      ? await resolveRefundedInvoiceId(c, object)
       : undefined;
     const tenant = await findTenantForEvent(c, object);
     const first = await recordBillingEvent(c.env.DB, { id: event.id, type: event.type, tenantId: tenant?.id ?? null, summary: event.type });
