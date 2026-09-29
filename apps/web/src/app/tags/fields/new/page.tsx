@@ -66,7 +66,8 @@ function NewFriendFieldForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => { void api.folders.list('friend_field').then((res) => { if (res.success) setFolders(res.data) }) }, [])
+  // m23m: 置き場が取れなくても項目は作れる。取れない失敗で画面を落とさない。
+  useEffect(() => { void api.folders.list('friend_field').then((res) => { if (res.success) setFolders(res.data) }).catch(() => {}) }, [])
   useEffect(() => {
     if (!selectedAccountId) return
     let cancelled = false
