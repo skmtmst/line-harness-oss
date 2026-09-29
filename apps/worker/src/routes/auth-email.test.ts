@@ -323,6 +323,21 @@ describe('メール＋パスワードのログイン', () => {
     expect(await json(res)).toMatchObject({ code: 'ops_invite_pending', error: expect.stringContaining('招待メール') });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get()).toEqual({ n: 0 });
   });
+
+  /*
+   * 誰も自己登録しないまま他人を招待すると、以前は互換判定まで閉じてしまい
+   * 運営マスターが 0 人のまま誰も入れなくなっていた（招待メールが失効すると
+   * 再送も運営権限を要求するため画面から復旧できない）。
+   */
+  it('他人の招待が保留中でも、既定の統括のオーナーは互換判定で入れる', async () => {
+    await seedOwner();
+    testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key) VALUES ('invitee', '招待された人', 'owner', 'invitee-key')`).run();
+    testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('invitee', 1, 'invited')`).run();
+    const res = await call('POST', '/api/auth/password/login', {
+      email: 'owner@example.com', password: 'Abcdefg1', next: 'ops',
+    }, { env: { TOTP_ENCRYPTION_KEY: 'k' } });
+    expect(res.status).toBe(200);
+  });
 });
 
 describe('パスワード再設定（36-6）', () => {
