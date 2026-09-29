@@ -165,6 +165,15 @@ describe('GET /api/auto-reply-runs', () => {
     expect(mocks.listAutoReplyEvaluationRuns).not.toHaveBeenCalled();
   });
 
+  it('R530: 再実行はstaffに403を返す（読み取りは既存の試験どおりstaffに許す）', async () => {
+    const retry = await app().request('/api/auto-reply-runs/evaluation-1/retry', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    }, { DB: db } as Env['Bindings']);
+    expect(retry.status).toBe(403);
+  });
+
   it('選択したルールを条件で見送り、後続ルールが動いても成功とは表示しない', async () => {
     mocks.listAutoReplyEvaluationRuns.mockResolvedValueOnce({
       total: 1,
