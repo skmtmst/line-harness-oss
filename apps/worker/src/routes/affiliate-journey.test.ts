@@ -6,12 +6,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const dbMocks = {
   // eager module-load deps (mirror other route tests)
   getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
+  getAccountSetting: vi.fn().mockResolvedValue(null),
+  getVersionedAccountSetting: vi.fn().mockResolvedValue({
+    version: 1,
+    data: { features: { affiliates: true } },
+  }),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
   // affiliate route deps
   getAffiliateById: vi.fn(),
   getAffiliateReportV2: vi.fn(),
+  getFriendById: vi.fn(),
   getFriendJourney: vi.fn(),
   getAffiliateJourneys: vi.fn(),
 };
@@ -29,10 +36,12 @@ const env = {
 // These routes sit behind authMiddleware. getStaffByApiKey is mocked to return
 // undefined, so the env API_KEY owner fallback authenticates the Bearer token.
 function call(path: string, init?: RequestInit) {
+  const separator = path.includes('?') ? '&' : '?';
+  const scopedPath = `${path}${separator}accountId=account-1`;
   const headers = new Headers(init?.headers);
   headers.set('Authorization', `Bearer ${API_KEY}`);
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, { ...init, headers }),
+    new Request(`https://worker.example.com${scopedPath}`, { ...init, headers }),
     env,
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
   );
@@ -40,7 +49,12 @@ function call(path: string, init?: RequestInit) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([
+    { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
+  ]);
+  dbMocks.getFriendById.mockImplementation(async (_db: unknown, id: string) => (
+    id === 'friend-1' ? { id, line_account_id: 'account-1' } : null
+  ));
 });
 
 describe('GET /api/friends/:id/journey', () => {
@@ -62,12 +76,11 @@ describe('GET /api/friends/:id/journey', () => {
     expect(dbMocks.getFriendJourney).toHaveBeenCalledWith(env.DB, 'friend-1');
   });
 
-  it('returns empty events for an unknown friend', async () => {
+  it('returns 404 for an unknown or out-of-scope friend', async () => {
     dbMocks.getFriendJourney.mockResolvedValue([]);
     const res = await call('/api/friends/ghost/journey');
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: { events: unknown[] } };
-    expect(body.data.events).toEqual([]);
+    expect(res.status).toBe(404);
+    expect(dbMocks.getFriendJourney).not.toHaveBeenCalled();
   });
 });
 
@@ -119,6 +132,7 @@ describe('GET /api/affiliates/:id/report (v2)', () => {
       duplicateFlags: [],
     };
     dbMocks.getAffiliateReportV2.mockResolvedValue(report);
+    dbMocks.getAffiliateById.mockResolvedValue({ id: 'aff-A', line_account_id: 'account-1' });
 
     const res = await call('/api/affiliates/aff-A/report');
     expect(res.status).toBe(200);

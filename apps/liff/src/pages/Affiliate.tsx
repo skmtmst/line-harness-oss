@@ -1,5 +1,14 @@
 import liff from '@line/liff';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
+import HelpTip from '../components/HelpTip.js';
+import Button from '../components/ui/Button.js';
+import Card from '../components/ui/Card.js';
+import Badge from '../components/ui/Badge.js';
+import PageHeader from '../components/ui/PageHeader.js';
+import Icon from '../components/ui/Icon.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -31,6 +40,13 @@ interface OfferData {
   description: string | null;
   rewardAmount: number;
   rewardMiles: number;
+  windowDays: number | null;
+  receptionFrom: string | null;
+  receptionTo: string | null;
+  /** 上限に達して受付が止まっているか。(PR823) */
+  halted: boolean;
+  totalRemaining: number | null;
+  monthlyRemaining: number | null;
   enrolled: boolean;
   refCode: string | null;
   url: string | null;
@@ -216,7 +232,7 @@ async function copyText(text: string): Promise<boolean> {
   return false;
 }
 
-function CopyButton({ url, urlRef }: { url: string; urlRef: React.RefObject<HTMLInputElement | null> }) {
+function CopyButton({ url, urlRef }: { url: string; urlRef: RefObject<HTMLInputElement | null> }) {
   const [copied, setCopied] = useState(false);
   const [manualCopy, setManualCopy] = useState(false);
 
@@ -241,12 +257,17 @@ function CopyButton({ url, urlRef }: { url: string; urlRef: React.RefObject<HTML
 
   return (
     <>
-      <button onClick={handleCopy} className="af-copy-btn">
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink"
+      >
+        <Icon name="copy" className="h-3.5 w-3.5" />
         {copied ? 'コピー済み' : 'コピー'}
       </button>
       {manualCopy && (
         <div className="w-full space-y-1">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ink-secondary">
             自動コピーできませんでした。下のURLを選択してコピーしてください。
           </p>
           <input
@@ -255,7 +276,7 @@ function CopyButton({ url, urlRef }: { url: string; urlRef: React.RefObject<HTML
             readOnly
             value={url}
             onFocus={(e) => e.currentTarget.select()}
-            className="af-input text-xs"
+            className="w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs text-ink"
           />
         </div>
       )}
@@ -294,35 +315,49 @@ function mileageSourceLabel(source: string): string {
   return labels[source] ?? source;
 }
 
+/**
+ * 貯まったマイル (6-a の上の黒いカード)。
+ * 使えるマイル・確定待ち・内訳4つ・合算の注記を出す。
+ */
 function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   const { mileage, insights } = wallet;
   return (
-    <section className="af-mileage-card space-y-5">
+    <section aria-label="貯まったマイル" className="rounded-2xl bg-night p-5 text-white">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold opacity-80">{mileage.programName}</p>
-          <p className="mt-1 text-4xl font-bold tracking-tight">
-            {mileage.available.toLocaleString()}
-            <span className="ml-1 text-sm font-semibold opacity-80">mile</span>
-          </p>
-          <p className="mt-1 text-xs opacity-75">現在利用できるマイル</p>
-        </div>
+        <p className="text-xs font-semibold text-white/70">使えるマイル</p>
         {mileage.pending > 0 && (
-          <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-bold whitespace-nowrap">
             確定待ち {mileage.pending.toLocaleString()}
+            <HelpTip label="確定待ちの説明" align="right">条件の確定を待っているマイルです。</HelpTip>
           </span>
         )}
       </div>
+      <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">
+        {mileage.available.toLocaleString()}
+        <span className="ml-1 text-sm font-semibold text-white/70">マイル</span>
+      </p>
 
-      <div className="af-mileage-grid">
-        <div><span>累計獲得</span><strong>{mileage.lifetimeEarned.toLocaleString()}</strong></div>
-        <div><span>紹介で獲得</span><strong>{insights.referralMiles.toLocaleString()}</strong></div>
-        <div><span>利用済み</span><strong>{mileage.spent.toLocaleString()}</strong></div>
-        <div><span>良質な紹介</span><strong>{insights.qualityReferralCount.toLocaleString()}人</strong></div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-xl bg-white/10 p-3">
+          <p className="text-xs text-white/70">これまでに得た</p>
+          <p className="mt-0.5 text-lg font-bold tabular-nums">{mileage.lifetimeEarned.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl bg-white/10 p-3">
+          <p className="text-xs text-white/70">紹介で得た</p>
+          <p className="mt-0.5 text-lg font-bold tabular-nums">{insights.referralMiles.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl bg-white/10 p-3">
+          <p className="text-xs text-white/70">使った</p>
+          <p className="mt-0.5 text-lg font-bold tabular-nums">{mileage.spent.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl bg-white/10 p-3">
+          <p className="text-xs text-white/70">良質な紹介</p>
+          <p className="mt-0.5 text-lg font-bold tabular-nums">{insights.qualityReferralCount.toLocaleString()}人</p>
+        </div>
       </div>
 
       {insights.accountCount > 1 && (
-        <p className="af-wallet-scope-note">
+        <p className="mt-3 text-xs leading-relaxed text-white/70">
           {insights.accountCount}個のLINE公式アカウントで貯めたマイルを合算しています
         </p>
       )}
@@ -330,142 +365,160 @@ function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   );
 }
 
-function MileageHistoryAccordion({ wallet }: { wallet: MileageWalletData }) {
-  const { history, insights } = wallet;
+/** 1つの取り組みの行。まだの分は行き先へのボタンも出す (動きを残す)。 */
+function OpportunityCta({ item, secondary = false }: { item: MileageOpportunity; secondary?: boolean }) {
   return (
-    <details className="af-card af-history-accordion">
-      <summary className="af-history-summary">
-        <div className="min-w-0">
-          <h2 className="text-sm font-bold text-gray-900">マイル履歴</h2>
-          <p className="text-[11px] text-gray-400 mt-0.5">行動後、定期集計で反映されます</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="af-badge" style={{ background: '#fff7ed', color: '#b45309' }}>
-            {insights.rewardedActions.toLocaleString()}回獲得
-          </span>
-          <span className="af-history-chevron" aria-hidden="true" />
-        </div>
-      </summary>
-
-      <div className="af-history-content">
-        {history.length === 0 ? (
-          <div className="af-mileage-empty">
-            LINEやウェビナーで行動すると、ここにマイル履歴が表示されます
-          </div>
-        ) : (
-          <div className="af-history-list">
-            {history.map((item) => (
-              <div key={item.id} className={`af-history-row ${item.status === 'void' ? 'is-void' : ''}`}>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-gray-800 truncate">{item.reason}</div>
-                  <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
-                    <span>{mileageSourceLabel(item.source)}</span>
-                    <span>{formatMileageDate(item.occurredAt)}</span>
-                    {item.status === 'pending' && <span className="af-history-pending">確定待ち</span>}
-                    {item.status === 'void' && <span>取消</span>}
-                  </div>
-                </div>
-                <strong className={`af-history-amount ${item.amount < 0 ? 'is-minus' : ''}`}>
-                  {item.amount > 0 ? '+' : ''}{item.amount.toLocaleString()}
-                  <small> mile</small>
-                </strong>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </details>
+    <a
+      href={item.url}
+      className={
+        secondary
+          ? 'mt-3 block rounded-lg border border-hairline bg-canvas py-2.5 text-center text-sm font-bold text-ink'
+          : 'mt-3 block rounded-lg bg-accent-deep py-3 text-center text-sm font-bold text-white'
+      }
+    >
+      {item.ctaLabel}
+    </a>
   );
 }
 
+/**
+ * 今、マイルを増やせます＋LINEアカウント登録マイル (6-a の下)。
+ * ウェビナーの取り組み (進み具合・行き先) と、
+ * アカウントごとの登録の様子 (登録済み・確定待ち) を出す。
+ */
 function MileageOpportunities({ items }: { items: MileageOpportunity[] }) {
   if (items.length === 0) return null;
 
   const accountItems = items.filter((item) => item.type === 'friend_add');
   const webinarItems = items.filter((item) => item.type === 'webinar');
-  const registeredCount = accountItems.filter((item) => item.completed).length;
 
   return (
     <div className="space-y-5">
-      {accountItems.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-end justify-between gap-3 px-1">
-            <div>
-              <h2 className="text-sm font-bold text-gray-900">LINEアカウント登録マイル</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">4アカウントの登録状況とマイル反映状況</p>
-            </div>
-            <span className="af-opportunity-live">{registeredCount}/{accountItems.length} 登録済み</span>
-          </div>
-          {accountItems.map((item) => (
-            <article key={item.id} className={`af-opportunity-card ${item.completed ? 'is-completed' : ''}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="af-opportunity-kind">LINE ACCOUNT</span>
-                  <h3 className="mt-2 text-sm font-bold leading-relaxed text-gray-900">{item.title}</h3>
+      {webinarItems.length > 0 && (
+        <section aria-label="今、マイルを増やせます" className="space-y-3">
+          <h2 className="px-1 text-sm font-bold text-ink">今、マイルを増やせます</h2>
+          <Card className="divide-y divide-hairline px-4 py-1">
+            {webinarItems.map((item) => (
+              <div key={item.id} className="py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="min-w-0 flex-1 truncate text-sm font-bold text-ink" title={item.title}>
+                    {item.title}
+                  </h3>
+                  <span className="shrink-0 rounded-full bg-ok-bg px-2.5 py-1 text-xs font-bold whitespace-nowrap text-ok-ink tabular-nums">
+                    +{item.rewardMiles.toLocaleString()} マイル
+                  </span>
                 </div>
-                <span className="af-opportunity-reward">
-                  {item.completed
-                    ? item.mileageStatus === 'credited'
-                      ? `加算済み +${(item.creditedMiles ?? item.rewardMiles).toLocaleString()}`
-                      : item.mileageStatus === 'pending'
-                        ? '確定待ち'
-                        : '登録済み'
-                    : `+${item.rewardMiles.toLocaleString()}`}
-                </span>
+                {item.description && (
+                  <p className="mt-1 text-xs leading-relaxed text-ink-faint">{item.description}</p>
+                )}
+                {item.progressPercent > 0 && (
+                  <div className="mt-2">
+                    <div className="mb-1 flex justify-between text-xs text-ink-faint tabular-nums">
+                      <span>現在の視聴進捗</span>
+                      <span>{item.progressPercent}%</span>
+                    </div>
+                    <div
+                      className="h-1.5 overflow-hidden rounded-full bg-ground"
+                      role="progressbar"
+                      aria-valuenow={item.progressPercent}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${item.title}の視聴進捗`}
+                    >
+                      <span className="block h-full rounded-full bg-accent-deep" style={{ width: `${item.progressPercent}%` }} />
+                    </div>
+                  </div>
+                )}
+                <OpportunityCta item={item} secondary />
               </div>
-              <p className="mt-2 text-xs font-semibold text-amber-800">{item.description}</p>
-              {item.completed ? (
-                <div className="af-opportunity-completed"><span aria-hidden="true">✓</span> 登録済み</div>
-              ) : (
-                <a href={item.url} className="af-opportunity-btn">
-                  {item.ctaLabel}<span aria-hidden="true"> →</span>
-                </a>
-              )}
-            </article>
-          ))}
+            ))}
+          </Card>
         </section>
       )}
 
-      {webinarItems.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-end justify-between gap-3 px-1">
-            <div>
-              <h2 className="text-sm font-bold text-gray-900">今、マイルを増やせます</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">あなたの未達成アクション</p>
-            </div>
-            <span className="af-opportunity-live">獲得チャンス</span>
-          </div>
-          {webinarItems.map((item) => (
-            <article key={item.id} className="af-opportunity-card">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="af-opportunity-kind">WEBINAR MISSION</span>
-                  <h3 className="mt-2 text-sm font-bold leading-relaxed text-gray-900">{item.title}</h3>
-                </div>
-                <span className="af-opportunity-reward">最大 +{item.rewardMiles.toLocaleString()}</span>
+      {accountItems.length > 0 && (
+        <section aria-label="LINEアカウント登録マイル" className="space-y-3">
+          <h2 className="px-1 text-sm font-bold text-ink">LINEアカウント登録マイル</h2>
+          <Card className="divide-y divide-hairline px-4 py-1">
+            {accountItems.map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 py-3">
+                <h3 className="min-w-0 flex-1 truncate text-sm text-ink" title={item.title}>
+                  {item.title}
+                </h3>
+                {item.completed ? (
+                  item.mileageStatus === 'credited' ? (
+                    <Badge tone="confirmed">
+                      {`加算済み +${(item.creditedMiles ?? item.rewardMiles).toLocaleString()}`}
+                    </Badge>
+                  ) : item.mileageStatus === 'pending' ? (
+                    <Badge tone="pending">確定待ち</Badge>
+                  ) : (
+                    <Badge tone="confirmed">登録済み</Badge>
+                  )
+                ) : (
+                  <a
+                    href={item.url}
+                    className="shrink-0 rounded-full bg-ok-bg px-2.5 py-1 text-xs font-bold whitespace-nowrap text-ok-ink tabular-nums"
+                  >
+                    +{item.rewardMiles.toLocaleString()} マイル
+                  </a>
+                )}
               </div>
-              <p className="mt-2 text-xs font-semibold text-amber-800">{item.description}</p>
-              {item.progressPercent > 0 && (
-                <div className="mt-3">
-                  <div className="mb-1 flex justify-between text-[10px] text-gray-400">
-                    <span>現在の視聴進捗</span><span>{item.progressPercent}%</span>
-                  </div>
-                  <div className="af-opportunity-progress">
-                    <span style={{ width: `${item.progressPercent}%` }} />
-                  </div>
-                </div>
-              )}
-              <a href={item.url} className="af-opportunity-btn">
-                {item.ctaLabel}<span aria-hidden="true"> →</span>
-              </a>
-            </article>
-          ))}
+            ))}
+          </Card>
         </section>
       )}
     </div>
   );
 }
 
+/** マイル履歴 (6-a の下。開いた一覧で出す)。 */
+function MileageHistory({ wallet }: { wallet: MileageWalletData }) {
+  const { history } = wallet;
+  return (
+    <section aria-label="マイル履歴" className="space-y-3">
+      <div className="px-1">
+        <h2 className="flex items-center gap-1 text-sm font-bold text-ink">
+          マイル履歴
+          <HelpTip label="マイル履歴の説明">行動後、定期集計で反映されます。確定待ちは条件の確定待ち、取消は取り消されたものです。</HelpTip>
+        </h2>
+        <p className="mt-0.5 text-xs text-ink-faint">行動のあと、決まった時間にまとめて反映されます</p>
+      </div>
+      <Card className="px-4 py-1">
+        {history.length === 0 ? (
+          <p className="py-6 text-center text-xs leading-relaxed text-ink-faint">
+            LINEやウェビナーで行動すると、ここにマイル履歴が表示されます
+          </p>
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {history.map((item) => (
+              <li key={item.id} className={`flex items-center justify-between gap-3 py-3 ${item.status === 'void' ? 'opacity-50' : ''}`}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-ink" title={item.reason}>
+                    {item.reason}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+                    <span>{formatMileageDate(item.occurredAt)}</span>
+                    <span>{mileageSourceLabel(item.source)}</span>
+                    {item.status === 'pending' && <Badge tone="pending">確定待ち</Badge>}
+                    {item.status === 'void' && <span>取消</span>}
+                  </p>
+                </div>
+                <p
+                  className={`shrink-0 text-sm font-bold whitespace-nowrap tabular-nums ${item.amount < 0 ? 'text-ink' : 'text-ok-ink'}`}
+                >
+                  {item.amount > 0 ? `+${item.amount.toLocaleString()}` : item.amount.toLocaleString()}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </section>
+  );
+}
+
+/** 紹介の成果 (6-b の上)。3つの数と、追加マイルの対象の注記。 */
 function ReferralSummary({ links }: { links: AffiliateLinkData[] }) {
   const totals = links.reduce(
     (sum, link) => ({
@@ -477,55 +530,62 @@ function ReferralSummary({ links }: { links: AffiliateLinkData[] }) {
   );
 
   return (
-    <section className="af-card">
-      <div className="mb-3">
-        <h2 className="text-sm font-bold text-gray-900">紹介の成果</h2>
-        <p className="text-[11px] text-gray-400 mt-0.5">
+    <section aria-label="紹介の成果" className="space-y-3">
+      <div className="px-1">
+        <h2 className="text-sm font-bold text-ink">紹介の成果</h2>
+        <p className="mt-0.5 text-xs text-ink-faint">
           紹介した友だちが予約・視聴・購入へ進むと、追加マイルの対象になります
         </p>
       </div>
-      <div className="af-referral-grid">
-        <div><strong>{totals.clicks.toLocaleString()}</strong><span>クリック</span></div>
-        <div><strong>{totals.friendAdds.toLocaleString()}</strong><span>友だち追加</span></div>
-        <div><strong>{totals.approved.toLocaleString()}</strong><span>承認成果</span></div>
-      </div>
+      <Card className="grid grid-cols-3 gap-2 p-3">
+        <div className="rounded-lg bg-ground px-2 py-3 text-center">
+          <p className="text-lg font-bold text-ink tabular-nums">{totals.clicks.toLocaleString()}</p>
+          <p className="mt-0.5 text-xs whitespace-nowrap text-ink-faint">開いた</p>
+        </div>
+        <div className="rounded-lg bg-ground px-2 py-3 text-center">
+          <p className="text-lg font-bold text-ink tabular-nums">{totals.friendAdds.toLocaleString()}</p>
+          <p className="mt-0.5 text-xs whitespace-nowrap text-ink-faint">友だち追加</p>
+        </div>
+        <div className="rounded-lg bg-ground px-2 py-3 text-center">
+          <p className="text-lg font-bold text-ink tabular-nums">{totals.approved.toLocaleString()}</p>
+          <p className="mt-0.5 text-xs whitespace-nowrap text-ink-faint">成果になった</p>
+        </div>
+      </Card>
     </section>
   );
 }
 
 /**
- * One issued link inside an offer card (or the "その他のリンク" section).
- * Shows the label, URL, copy button, and the per-link performance counters.
+ * 1本の紹介リンク (案件の中・その他のリンク)。
+ * 名前・URL・写しボタン・そのリンクの成果の数を出す。
  */
 function LinkRow({ link }: { link: AffiliateLinkData }) {
   const urlRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="af-link-row space-y-2">
-      <div className="flex items-start justify-between gap-2 flex-wrap">
+    <div className="rounded-lg bg-ground p-3">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          {link.label ? (
-            <div className="text-sm font-semibold text-gray-800">{link.label}</div>
-          ) : (
-            <div className="text-sm font-semibold text-gray-500">リンク</div>
-          )}
-          <div className="text-xs text-gray-400 break-all mt-0.5">{link.url}</div>
+          <p className="flex items-center gap-1 truncate text-sm font-bold text-ink" title={link.label ?? 'リンク'}>
+            <Icon name="link" className="h-3.5 w-3.5 shrink-0 text-ink-faint" />
+            {link.label ?? 'リンク'}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-ink-faint" title={link.url}>
+            {link.url}
+          </p>
         </div>
         <CopyButton url={link.url} urlRef={urlRef} />
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-        <span>クリック <strong className="af-line-green-text">{link.clickCount}</strong></span>
-        <span>友だち追加 <strong className="af-line-green-text">{link.friendAdds}</strong></span>
-        <span>CV承認済み <strong className="af-line-green-text">{link.conversionsApproved}</strong></span>
-        <span className="text-gray-400">審査中 {link.conversionsPending}</span>
-      </div>
+      <p className="mt-2 text-xs whitespace-nowrap text-ink-faint tabular-nums">
+        開いた {link.clickCount}・友だち追加 {link.friendAdds}・成果 {link.conversionsApproved}・審査中 {link.conversionsPending}
+      </p>
     </div>
   );
 }
 
 /**
- * Inline "この案件用のリンクを追加" form. Rendered inside an enrolled offer card
- * so the user's mental model is「案件があって、案件に対してリンクを作る」.
+ * 「SNSごとのリンクを発行」の小さな書き足し欄。
+ * 案件のカードの中に置き、案件に対してリンクを作る。
  */
 function AddOfferLinkForm({
   offerId,
@@ -551,21 +611,22 @@ function AddOfferLinkForm({
       setLabel('');
       setOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      logFailure('affiliate-add-link', e);
+      setError(SUBMIT_FAILED_MESSAGE);
     } finally {
       setBusy(false);
     }
   }
 
   if (atLimit) {
-    return <div className="text-xs text-red-600">リンクの上限（20本）に達しています</div>;
+    return <p className="text-xs font-bold text-danger">リンクの上限（20本）に達しています</p>;
   }
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="af-secondary-btn">
-        ＋ この案件用のリンクを追加
-      </button>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        ＋ SNSごとのリンクを発行
+      </Button>
     );
   }
 
@@ -576,21 +637,24 @@ function AddOfferLinkForm({
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="例: X用、Instagram用"
-        className="af-input"
+        className="w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-ink"
         disabled={busy}
       />
-      {error && <div className="text-xs text-red-600">{error}</div>}
+      {error && <p className="text-xs font-bold text-danger">{error}</p>}
       <div className="flex gap-2">
-        <button onClick={handleAdd} disabled={busy} className="af-primary-btn">
-          {busy ? '発行中…' : 'リンクを発行'}
-        </button>
+        <div className="flex-1">
+          <Button variant="primary" onClick={handleAdd} disabled={busy}>
+            {busy ? '発行中…' : 'リンクを発行'}
+          </Button>
+        </div>
         <button
+          type="button"
           onClick={() => {
             setOpen(false);
             setError(null);
           }}
           disabled={busy}
-          className="shrink-0 px-4 rounded-xl text-sm text-gray-500"
+          className="shrink-0 px-4 text-sm text-ink-faint disabled:opacity-50"
         >
           やめる
         </button>
@@ -600,19 +664,21 @@ function AddOfferLinkForm({
 }
 
 /**
- * An offer card. Enrolled offers show their scoped links + the add-link form.
- * Unenrolled offers show the pitch (description + reward) and a 参加する CTA.
+ * 1つの案件のカード。入っている案件はその案件のリンクと書き足し欄、
+ * まだの案件は売り文句 (説明・報酬) と参加ボタンを出す。
  */
 function OfferCard({
   offer,
   offerLinks,
   atLimit,
+  totalLinks,
   onEnrolled,
   onLinkAdded,
 }: {
   offer: OfferData;
   offerLinks: AffiliateLinkData[];
   atLimit: boolean;
+  totalLinks: number;
   onEnrolled: (link: AffiliateLinkData) => void;
   onLinkAdded: (link: AffiliateLinkData) => void;
 }) {
@@ -629,7 +695,11 @@ function OfferCard({
       const link = await postEnrollOffer(offer.id);
       onEnrolled(link);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      logFailure('affiliate-enroll', e);
+      // 上限で止まった受付だけ、サーバーの文言をそのまま出す(PR823)。
+      // それ以外の失敗は定型文にする(技術的な文言を出さない)。
+      const message = e instanceof Error ? e.message : ''
+      setError(message.includes('上限に達したため終了') ? message : SUBMIT_FAILED_MESSAGE);
     } finally {
       setBusy(false);
       enrollCalledRef.current = false;
@@ -637,46 +707,51 @@ function OfferCard({
   }
 
   return (
-    <div className="af-card space-y-3">
+    <Card className="space-y-3 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-bold text-gray-900">{offer.name}</div>
+          <h3 className="truncate text-sm font-bold text-ink" title={offer.name}>
+            {offer.name}
+          </h3>
           {offer.description && (
-            <p className="text-xs text-gray-500 mt-1 leading-relaxed">{offer.description}</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-faint">{offer.description}</p>
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="af-badge" style={{ background: '#ecfdf5', color: '#06c755' }}>
-            {rewardText(offer.rewardAmount)}
-          </span>
-          {offer.rewardMiles > 0 && (
-            <span className="af-badge" style={{ background: '#fff7ed', color: '#d97706' }}>
-              +{offer.rewardMiles.toLocaleString()} mile
-            </span>
-          )}
-        </div>
+        <p className="shrink-0 text-xs font-bold whitespace-nowrap text-ok-ink tabular-nums">
+          {rewardText(offer.rewardAmount)}
+          {offer.rewardMiles > 0 && ` +${offer.rewardMiles.toLocaleString()}マイル`}
+        </p>
       </div>
+
+      {offer.halted ? (
+        <p className="text-xs font-bold text-danger">受付は終了しました（上限に達したため）</p>
+      ) : offer.totalRemaining != null && offer.totalRemaining > 0 ? (
+        <p className="text-xs text-ink-faint tabular-nums">上限まであと{offer.totalRemaining}件</p>
+      ) : null}
 
       {offer.enrolled ? (
         <div className="space-y-2">
           {offerLinks.length > 0 ? (
             offerLinks.map((l) => <LinkRow key={l.refCode} link={l} />)
           ) : (
-            <div className="text-xs text-gray-400 py-1">
+            <p className="py-1 text-xs text-ink-faint">
               リンクを追加すると紹介を始められます
-            </div>
+            </p>
           )}
           <AddOfferLinkForm offerId={offer.id} atLimit={atLimit} onAdded={onLinkAdded} />
+          <p className="text-xs text-ink-faint tabular-nums">
+            リンクは20本まで作れます（いま{totalLinks}本）
+          </p>
         </div>
       ) : (
         <>
-          {error && <div className="text-xs text-red-600">{error}</div>}
-          <button onClick={handleEnroll} disabled={busy} className="af-primary-btn">
+          {error && <p className="text-xs font-bold text-danger">{error}</p>}
+          <Button variant="primary" onClick={handleEnroll} disabled={busy}>
             {busy ? '参加中…' : 'この案件に参加する'}
-          </button>
+          </Button>
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -701,7 +776,8 @@ export default function Affiliate() {
         setState({ phase: 'not_registered' });
       }
     } catch (e) {
-      setState({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+      logFailure('affiliate-load', e);
+      setState({ phase: 'error', message: LOAD_FAILED_MESSAGE });
     }
   }, []);
 
@@ -718,7 +794,8 @@ export default function Affiliate() {
       const offers = await fetchOffers().catch(() => []);
       setState({ phase: 'registered', affiliate: data.affiliate, links: data.links, offers });
     } catch (e) {
-      setState({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+      logFailure('affiliate-register', e);
+      setState({ phase: 'error', message: LOAD_FAILED_MESSAGE });
     } finally {
       // Release on both success and failure: success repaints to the registered
       // view (button gone), failure repaints to the error view whose retry path
@@ -730,47 +807,55 @@ export default function Affiliate() {
 
   if (state.phase === 'loading') {
     return (
-      <div className="af-fade-in flex flex-col items-center justify-center py-20 text-gray-500">
-        <div className="af-spinner mb-3" />
-        <span className="text-sm">読み込み中...</span>
+      <div className="min-h-screen bg-ground">
+        <div className="mx-auto w-full max-w-md px-4 pt-4">
+          <LoadingView />
+        </div>
       </div>
     );
   }
 
   if (state.phase === 'error') {
     return (
-      <div className="af-fade-in max-w-md mx-auto p-4">
-        <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{state.message}</div>
-        <button onClick={loadMe} className="mt-3 text-sm af-line-green-text font-semibold underline">
-          再読み込み
-        </button>
+      <div className="min-h-screen bg-ground">
+        <div className="mx-auto w-full max-w-md px-4 pt-4">
+          <LoadErrorView message={state.message} onRetry={() => void loadMe()} />
+        </div>
       </div>
     );
   }
 
   if (state.phase === 'not_registered') {
     return (
-      <div className="af-fade-in max-w-md mx-auto p-4 space-y-4">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900">マイル・紹介</h1>
-          <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-            貯まったマイルを確認し、紹介リンクからさらにマイルを増やせます。
-          </p>
-        </div>
-        {wallet && <MileageSummaryCard wallet={wallet} />}
-        {wallet && <MileageOpportunities items={wallet.opportunities} />}
-        <div className="af-card space-y-3">
+      <div className="min-h-screen bg-ground">
+        <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-2 pb-12">
           <div>
-            <h2 className="text-sm font-bold text-gray-900">紹介リンクを使う</h2>
-            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-              無料登録すると、案件ごと・SNSごとの紹介リンクを発行できます。
+            <PageHeader title="マイル・紹介" />
+            <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+              貯まったマイルを確かめ、紹介リンクからさらに増やせます
             </p>
           </div>
-          <button onClick={handleRegister} disabled={registerBusy} className="af-primary-btn">
-            {registerBusy ? '登録中…' : 'はじめる'}
-          </button>
+          {wallet && <MileageSummaryCard wallet={wallet} />}
+          {wallet && <MileageOpportunities items={wallet.opportunities} />}
+          <Card className="space-y-3 p-4 text-center">
+            <span
+              className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-ok-bg text-ok-ink"
+              aria-hidden="true"
+            >
+              <Icon name="share-2" className="h-7 w-7" />
+            </span>
+            <div>
+              <h2 className="text-sm font-bold text-ink">紹介リンクを使う</h2>
+              <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+                無料で登録すると、案件ごと・SNSごとの紹介リンクを作れます。紹介した友だちが予約や購入へ進むと、マイルが増えます。
+              </p>
+            </div>
+            <Button variant="primary" onClick={handleRegister} disabled={registerBusy}>
+              {registerBusy ? '登録中…' : 'はじめる（無料）'}
+            </Button>
+          </Card>
+          {wallet && <MileageHistory wallet={wallet} />}
         </div>
-        {wallet && <MileageHistoryAccordion wallet={wallet} />}
       </div>
     );
   }
@@ -816,78 +901,79 @@ export default function Affiliate() {
     });
   }
 
+  // 並びは 6-mile.png のとおり「貯まった → 増やす → 紹介の成果」。
   return (
-    <div className="af-fade-in max-w-md mx-auto p-4 pb-12 space-y-5" style={{ background: '#f7f8fa', minHeight: '100vh' }}>
-      <div>
-        <h1 className="text-lg font-bold text-gray-900">マイル・紹介</h1>
-        <p className="text-xs text-gray-500 mt-1">あなたの活動と紹介成果をまとめて確認できます</p>
-      </div>
-
-      {wallet && <MileageSummaryCard wallet={wallet} />}
-
-      {wallet && <MileageOpportunities items={wallet.opportunities} />}
-
-      <ReferralSummary links={links} />
-
-      {/* 参加中の案件 — 案件ごとにリンクをまとめる */}
-      {enrolledOffers.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
-            参加中の案件
-          </h2>
-          {enrolledOffers.map((offer) => (
-            <OfferCard
-              key={offer.id}
-              offer={offer}
-              offerLinks={linksByOffer.get(offer.id) ?? []}
-              atLimit={atLimit}
-              onEnrolled={handleOfferEnrolled}
-              onLinkAdded={handleLinkAdded}
-            />
-          ))}
-        </section>
-      )}
-
-      {/* 参加できる案件 */}
-      {availableOffers.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
-            参加できる案件
-          </h2>
-          {availableOffers.map((offer) => (
-            <OfferCard
-              key={offer.id}
-              offer={offer}
-              offerLinks={[]}
-              atLimit={atLimit}
-              onEnrolled={handleOfferEnrolled}
-              onLinkAdded={handleLinkAdded}
-            />
-          ))}
-        </section>
-      )}
-
-      {/* その他のリンク — 案件に紐づかない既存の汎用リンクのみ表示（新規発行 UI なし） */}
-      {genericLinks.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
-            その他のリンク
-          </h2>
-          <div className="af-card space-y-2">
-            {genericLinks.map((link) => (
-              <LinkRow key={link.refCode} link={link} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {offers.length === 0 && genericLinks.length === 0 && (
-        <div className="af-card text-center text-sm text-gray-500">
-          現在参加できる案件はありません
+    <div className="min-h-screen bg-ground">
+      <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-2 pb-12">
+        <div>
+          <PageHeader title="マイル・紹介" />
+          <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+            貯まったマイルと、紹介の成果をまとめて見られます
+          </p>
         </div>
-      )}
 
-      {wallet && <MileageHistoryAccordion wallet={wallet} />}
+        {wallet && <MileageSummaryCard wallet={wallet} />}
+
+        {wallet && <MileageOpportunities items={wallet.opportunities} />}
+
+        {wallet && <MileageHistory wallet={wallet} />}
+
+        <ReferralSummary links={links} />
+
+        {enrolledOffers.length > 0 && (
+          <section aria-label="参加中の案件" className="space-y-3">
+            <h2 className="px-1 text-xs font-semibold text-ink-faint">参加中の案件</h2>
+            {enrolledOffers.map((offer) => (
+              <OfferCard
+                key={offer.id}
+                offer={offer}
+                offerLinks={linksByOffer.get(offer.id) ?? []}
+                atLimit={atLimit}
+                totalLinks={links.length}
+                onEnrolled={handleOfferEnrolled}
+                onLinkAdded={handleLinkAdded}
+              />
+            ))}
+          </section>
+        )}
+
+        {availableOffers.length > 0 && (
+          <section aria-label="参加できる案件" className="space-y-3">
+            <h2 className="px-1 text-xs font-semibold text-ink-faint">参加できる案件</h2>
+            {availableOffers.map((offer) => (
+              <OfferCard
+                key={offer.id}
+                offer={offer}
+                offerLinks={[]}
+                atLimit={atLimit}
+                totalLinks={links.length}
+                onEnrolled={handleOfferEnrolled}
+                onLinkAdded={handleLinkAdded}
+              />
+            ))}
+          </section>
+        )}
+
+        {genericLinks.length > 0 && (
+          <section aria-label="その他のリンク" className="space-y-3">
+            <div className="px-1">
+              <h2 className="px-1 text-xs font-semibold text-ink-faint">その他のリンク</h2>
+              <p className="mt-0.5 px-1 text-xs text-ink-faint">案件に結びつかない、前から使っているリンク</p>
+            </div>
+            <Card className="space-y-2 p-3">
+              {genericLinks.map((link) => (
+                <LinkRow key={link.refCode} link={link} />
+              ))}
+            </Card>
+          </section>
+        )}
+
+        {offers.length === 0 && genericLinks.length === 0 && (
+          <Card className="p-4 text-center text-sm text-ink-faint">
+            現在参加できる案件はありません
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
+
 const MAX_LINKS_PER_MESSAGE = 50;
 
 export interface AnalyticsUrlExposureQueueResult {
@@ -126,19 +128,25 @@ export async function processPendingAnalyticsUrlExposures(
 ): Promise<AnalyticsUrlExposureQueueResult> {
   const limit = Math.min(250, Math.max(1, options.limit ?? 100));
   const now = options.now ?? new Date().toISOString();
+  // 停滞回収も機能オフ中のアカウントには当てない。OFF中は status も
+  // processing_started_at も updated_at も動かさず、再オンで回収する。
   await db.prepare(
     `UPDATE analytics_url_exposure_queue
         SET status = 'pending', processing_started_at = NULL, updated_at = ?
       WHERE status = 'processing'
-        AND julianday(processing_started_at) < julianday(?, '-10 minutes')`,
+        AND julianday(processing_started_at) < julianday(?, '-10 minutes')
+        AND NOT ${accountFeatureOffExclusionSql('analytics_url_exposure_queue.line_account_id', 'analytics')}`,
   ).bind(now, now).run();
 
+  // 機能オフ中の行は LIMIT を数える前に外す。後で弾くと、オフの古い行が
+  // 先頭を占めたままON中の他アカウントが永久に回らない。
   const due = await db.prepare(
     `SELECT message_id, line_account_id
        FROM analytics_url_exposure_queue
       WHERE status IN ('pending','failed')
         AND attempts < 5
         AND julianday(available_at) <= julianday(?)
+        AND NOT ${accountFeatureOffExclusionSql('analytics_url_exposure_queue.line_account_id', 'analytics')}
       ORDER BY created_at, message_id
       LIMIT ?`,
   ).bind(now, limit).all<{ message_id: string; line_account_id: string }>();
@@ -147,6 +155,11 @@ export async function processPendingAnalyticsUrlExposures(
     claimed: 0, processed: 0, failed: 0, exposures: 0,
   };
   for (const item of due.results) {
+    // 機能オフ中はclaim(状態更新)も計測もしない。pendingのまま残し、
+    // 再オンで再開する。
+    if (!await isAccountFeatureEnabled(db, item.line_account_id, 'analytics')) {
+      continue;
+    }
     const claim = await db.prepare(
       `UPDATE analytics_url_exposure_queue
           SET status = 'processing', attempts = attempts + 1,

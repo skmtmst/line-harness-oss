@@ -1,18 +1,23 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
-  getUsers,
+  getUsersForAccess,
   getUserById,
+  getUserByIdForAccess,
   createUser,
   updateUser,
-  deleteUser,
+  archiveUser,
+  getUserRelationCounts,
   linkFriendToUser,
   getUserFriends,
-  getUserByEmail,
-  getUserByPhone,
+  getUserByEmailForAccess,
+  getUserByPhoneForAccess,
+  getFriendById,
 } from '@line-crm/db';
-import type { User as DbUser } from '@line-crm/db';
+import type { User as DbUser, UserAccessScope } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const users = new Hono<Env>();
 
@@ -23,15 +28,31 @@ function serializeUser(row: DbUser) {
     phone: row.phone,
     externalId: row.external_id,
     displayName: row.display_name,
+    status: row.status,
+    archivedAt: row.archived_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
+async function userAccessScope(c: Context<Env>): Promise<UserAccessScope> {
+  const staff = c.get('staff') as Env['Variables']['staff'];
+  const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
+  return {
+    tenantId: staff?.tenantId ?? DEFAULT_TENANT_ID,
+    allowedAccountIds: accountScope.allowedAccountIds,
+    includeUnlinked: !accountScope.isAccountScoped,
+  };
+}
+
+async function visibleUser(c: Context<Env>, id: string): Promise<DbUser | null> {
+  return getUserByIdForAccess(c.env.DB, id, await userAccessScope(c));
+}
+
 // GET /api/users - list all
 users.get('/api/users', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const items = await getUsers(c.env.DB);
+    const items = await getUsersForAccess(c.env.DB, await userAccessScope(c));
     return c.json({ success: true, data: items.map(serializeUser) });
   } catch (err) {
     console.error('GET /api/users error:', err);
@@ -40,10 +61,10 @@ users.get('/api/users', requireRole('owner', 'admin', 'staff'), async (c) => {
 });
 
 // GET /api/users/:id - get single
-users.get('/api/users/:id', async (c) => {
+users.get('/api/users/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const id = c.req.param('id');
-    const user = await getUserById(c.env.DB, id);
+    const user = await visibleUser(c, id);
     if (!user) {
       return c.json({ success: false, error: 'User not found' }, 404);
     }
@@ -64,7 +85,16 @@ users.post('/api/users', requireRole('owner', 'admin'), async (c) => {
       displayName?: string | null;
     }>();
 
-    const user = await createUser(c.env.DB, body);
+    const scope = await userAccessScope(c);
+    if (!scope.includeUnlinked) {
+      return c.json({ success: false, error: 'An account-scoped user cannot create an unlinked user' }, 403);
+    }
+    const staff = c.get('staff');
+    const user = await createUser(c.env.DB, {
+      ...body,
+      tenantId: scope.tenantId,
+      createdBy: staff?.id ?? null,
+    });
     return c.json({ success: true, data: serializeUser(user) }, 201);
   } catch (err) {
     console.error('POST /api/users error:', err);
@@ -76,6 +106,9 @@ users.post('/api/users', requireRole('owner', 'admin'), async (c) => {
 users.put('/api/users/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    if (!await visibleUser(c, id)) {
+      return c.json({ success: false, error: 'User not found' }, 404);
+    }
     const body = await c.req.json<{
       email?: string | null;
       phone?: string | null;
@@ -100,10 +133,37 @@ users.put('/api/users/:id', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-// DELETE /api/users/:id - delete
+// DELETE /api/users/:id - archive (never physically delete)
+//
+// 結びついた友だち・名寄せがある利用者を消すと、履歴・監査・支払の記録が
+// 誰のものか分からなくなる。関連があるときは 409 で止め、通常は行を残した
+// まま退避（archive）にする。退避済みは一覧・詳細に出さない。
 users.delete('/api/users/:id', requireRole('owner'), async (c) => {
   try {
-    await deleteUser(c.env.DB, c.req.param('id'));
+    const id = c.req.param('id');
+    const user = await visibleUser(c, id);
+    if (!user) {
+      // 退避済みは見えないが、削除のやり直しは成功扱いにする。
+      const staff = c.get('staff');
+      const gone = await getUserById(c.env.DB, id);
+      if (gone && gone.status === 'archived'
+        && (gone.tenant_id ?? DEFAULT_TENANT_ID) === (staff?.tenantId ?? DEFAULT_TENANT_ID)) {
+        return c.json({ success: true, data: null });
+      }
+      return c.json({ success: false, error: 'User not found' }, 404);
+    }
+    if (user.status === 'archived') {
+      return c.json({ success: true, data: null });
+    }
+    const relations = await getUserRelationCounts(c.env.DB, id);
+    if (relations.friends > 0 || relations.activeLinks > 0) {
+      return c.json({
+        success: false,
+        error: 'この利用者には結びついた友だちがあるため削除できません。結びつきを外してからやり直してください',
+        relations,
+      }, 409);
+    }
+    await archiveUser(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/users/:id error:', err);
@@ -121,7 +181,31 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: 'friendId is required' }, 400);
     }
 
-    await linkFriendToUser(c.env.DB, body.friendId, userId);
+    if (!await visibleUser(c, userId)) {
+      return c.json({ success: false, error: 'User not found' }, 404);
+    }
+    const friend = await getFriendById(c.env.DB, body.friendId);
+    if (!friend || !await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [friend.line_account_id],
+    )) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+
+    /*
+     * R394: 同時に別の人が動かしたときは上書きせず409にする（変更0）。
+     * 最新の結び付きを読み直してからやり直す。
+     */
+    const linked = await linkFriendToUser(
+      c.env.DB, body.friendId, userId, { id: c.get('staff')?.id ?? null },
+    );
+    if (!linked) {
+      return c.json({
+        success: false,
+        error: '別の担当が先に結び付きを変更しました。最新の状態を読み直してください',
+      }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('POST /api/users/:id/link error:', err);
@@ -130,9 +214,12 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), async (c) => {
 });
 
 // GET /api/users/:id/accounts - get all linked friends/accounts
-users.get('/api/users/:id/accounts', async (c) => {
+users.get('/api/users/:id/accounts', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const userId = c.req.param('id');
+    if (!await visibleUser(c, userId)) {
+      return c.json({ success: false, error: 'User not found' }, 404);
+    }
     const friends = await getUserFriends(c.env.DB, userId);
     return c.json({
       success: true,
@@ -153,13 +240,14 @@ users.get('/api/users/:id/accounts', async (c) => {
 users.post('/api/users/match', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{ email?: string; phone?: string }>();
+    const scope = await userAccessScope(c);
     let user = null;
 
     if (body.email) {
-      user = await getUserByEmail(c.env.DB, body.email);
+      user = await getUserByEmailForAccess(c.env.DB, body.email, scope);
     }
     if (!user && body.phone) {
-      user = await getUserByPhone(c.env.DB, body.phone);
+      user = await getUserByPhoneForAccess(c.env.DB, body.phone, scope);
     }
 
     if (!user) {

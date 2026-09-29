@@ -7,7 +7,11 @@
  */
 
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
-import { addTagToFriend } from '@line-crm/db';
+import {
+  addTagToFriend,
+  findTagByNormalizedName,
+  normalizeTagNameForCleanup,
+} from '@line-crm/db';
 
 interface DuplicateTagConfig {
   /** Map of line_account_id → duplicate tag ID. */
@@ -48,9 +52,20 @@ async function ensureTags(
   if (Object.keys(tagNames).length === 0) return;
   const now = new Date(Date.now() + 9 * 60 * 60_000).toISOString().replace('Z', '+09:00');
   for (const [id, { name, color }] of Object.entries(tagNames)) {
+    const existing = await findTagByNormalizedName(db, name, null);
+    if (existing && existing.id !== id) {
+      throw new Error('duplicate tag configuration conflicts with an existing normalized name');
+    }
+    if (existing) continue;
     await db.prepare(
-      `INSERT OR IGNORE INTO tags (id, name, color, created_at) VALUES (?, ?, ?, ?)`
-    ).bind(id, name, color, now).run();
+      `INSERT OR IGNORE INTO tags
+         (id, name, normalized_name, color, line_account_id, created_at)
+       VALUES (?, ?, ?, ?, NULL, ?)`
+    ).bind(id, name, normalizeTagNameForCleanup(name), color, now).run();
+    const resolved = await findTagByNormalizedName(db, name, null);
+    if (!resolved || resolved.id !== id) {
+      throw new Error('duplicate tag configuration could not claim its normalized name');
+    }
   }
 }
 

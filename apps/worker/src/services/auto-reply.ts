@@ -1,11 +1,35 @@
 import type { LineClient } from '@line-crm/line-sdk';
-import { getTemplateById } from '@line-crm/db';
-import type { AutoReply, Friend } from '@line-crm/db';
+import { getSendPermissionForAccount } from './send-entitlements.js';
+import {
+  claimAutoReplyEvaluationForRetry,
+  claimPermanentFailedAutoReplyActionRuns,
+  ensureAutoReplyPublishedVersion,
+  finishAutoReplyActionRun,
+  getAutoReplyEvaluationById,
+  getTemplateById,
+  markAutoReplyEvaluationFinished,
+  markAutoReplyEvaluationMatched,
+  markAutoReplyEvaluationSkipped,
+  recordAutoReplyEvaluationDetail,
+  recomputeAutoReplyEvaluationFromActions,
+  reserveAutoReplyActionRun,
+  reserveAutoReplyEvaluation,
+  isOperationCapabilityStopped,
+} from '@line-crm/db';
+import type { AutoReply, AutoReplyEvaluationStatus, Friend } from '@line-crm/db';
 import { logOutgoingMessage } from './event-bus.js';
-import { shouldReply } from './auto-reply-conditions.js';
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js';
+import { evaluateAutoReplyConditions } from './auto-reply-conditions.js';
+import {
+  runActionRows,
+  type RunActionsResult,
+  type ScenarioActionRow,
+} from './scenario-actions.js';
 import { recordAutoReplyHit } from '@line-crm/db';
-import { resolveInterpolationExtra } from './interpolation-context.js';
+import {
+  resolveInterpolationExtra,
+  resolveSendInterpolationExtra,
+  type CommonVarSendSource,
+} from './interpolation-context.js';
 import {
   buildMessage,
   expandVariables,
@@ -161,7 +185,7 @@ export function matchesMessageKind(
  * auto_reply 行の content/type を resolve する。template_id が set なら templates
  * から取得、参照切れや NULL のときは inline response_content/response_type を使う。
  */
-async function resolveAutoReplyContent(
+export async function resolveAutoReplyContent(
   db: D1Database,
   rule: Pick<AutoReply, 'template_id' | 'response_type' | 'response_content'>,
 ): Promise<{ messageType: string; content: string }> {
@@ -175,6 +199,35 @@ async function resolveAutoReplyContent(
 }
 
 /**
+ * 送信せず、本番と同じ差し込み解決まで行った返信内容を返す。
+ * source を渡すと送信経路として扱い、消えた共通情報は空文字にせず
+ * CommonVarResolutionFailedError で止める（dry-run は渡さない）。
+ */
+export async function previewAutoReplyContent(
+  db: D1Database,
+  friend: Friend,
+  rule: AutoReply,
+  workerUrl?: string,
+  source?: CommonVarSendSource,
+): Promise<{ messageType: string; content: string }> {
+  const resolvedMeta = await resolveMetadata(db, friend);
+  const resolved = await resolveAutoReplyContent(db, rule);
+  const extra = source
+    ? await resolveSendInterpolationExtra(db, friend.id, resolved.content, source)
+    : await resolveInterpolationExtra(db, friend.id, resolved.content);
+  return {
+    messageType: resolved.messageType,
+    content: expandVariables(
+      resolved.content,
+      { ...friend, metadata: resolvedMeta },
+      workerUrl,
+      resolved.messageType,
+      extra,
+    ),
+  };
+}
+
+/**
  * `actions_json` を、アクション実行が受け取れる形に読む。
  *
  * 形はシナリオのアクション（scenario_actions の行）と同じにしてある。実行そのものを
@@ -183,7 +236,20 @@ async function resolveAutoReplyContent(
  * 読めない設定は空として扱う。ここで落とすと、キーワードに当たっても
  * 返信ごと止まる。アクションが動かないより、返信が来ないほうが困る。
  */
-export function parseAutoReplyActions(raw: string | null | undefined): ScenarioActionRow[] {
+/**
+ * 自動応答のアクション1件。失敗したら止めるか続けるかを1件ずつ持つ。
+ * 無指定・読めない値は `continue`（いまの動き）に倒す。
+ */
+export type AutoReplyActionRow = ScenarioActionRow & {
+  onFailure: 'stop' | 'continue';
+};
+
+export function readAutoReplyOnFailure(raw: unknown): 'stop' | 'continue' {
+  const value = typeof raw === 'string' ? raw : null;
+  return value === 'stop' ? 'stop' : 'continue';
+}
+
+export function parseAutoReplyActions(raw: string | null | undefined): AutoReplyActionRow[] {
   if (!raw) return [];
   let parsed: unknown;
   try {
@@ -194,7 +260,7 @@ export function parseAutoReplyActions(raw: string | null | undefined): ScenarioA
   }
   if (!Array.isArray(parsed)) return [];
 
-  return parsed.flatMap((item, index): ScenarioActionRow[] => {
+  return parsed.flatMap((item, index): AutoReplyActionRow[] => {
     if (!item || typeof item !== 'object') return [];
     const row = item as Record<string, unknown>;
     const actionType = row.actionType ?? row.action_type;
@@ -202,6 +268,7 @@ export function parseAutoReplyActions(raw: string | null | undefined): ScenarioA
     if (typeof actionType !== 'string' || config === undefined) return [];
     return [
       {
+        onFailure: readAutoReplyOnFailure(row.onFailure ?? row.on_failure),
         // 実行側は id をログにしか使わない。並び順が分かる値にしておく。
         id: `auto-reply-action-${index}`,
         // 自動応答はシナリオに属さない。'scenario' アクションで
@@ -232,6 +299,169 @@ export interface MatchAndReplyResult {
   replyTokenConsumed: boolean;
 }
 
+function normalizedInput(text: string): string {
+  return text.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+async function sha256(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** 履歴一覧へ生の個人情報を残さない。本文は messages_log で権限付き表示する。 */
+function maskedInputPreview(text: string): string {
+  const masked = text
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[メールアドレス]')
+    .replace(/(?:\+?81[-\s]?)?(?:0\d{1,4}[-\s]?\d{1,4}[-\s]?\d{3,4})/g, '[電話番号]')
+    .replace(/\b[A-Za-z0-9_-]{24,}\b/g, '[識別子]');
+  return [...masked].slice(0, 80).join('');
+}
+
+export function matchedKeywordLabel(rule: AutoReply, text: string): string {
+  if (rule.respond_to_all === 1) return 'すべてのメッセージ';
+  return resolveKeywordRules(rule)
+    .filter((keyword) => keywordRuleMatches(keyword, text))
+    .map((keyword) => keyword.keyword)
+    .join('・') || rule.keyword;
+}
+
+function addActionResult(total: RunActionsResult, current: RunActionsResult): void {
+  total.executed += current.executed;
+  total.skippedByCondition += current.skippedByCondition;
+  total.skippedByOnce += current.skippedByOnce;
+  total.failed += current.failed;
+  total.skippedIncomplete += current.skippedIncomplete;
+  total.scenarioTouched ||= current.scenarioTouched;
+}
+
+function emptyActionResult(): RunActionsResult {
+  return {
+    executed: 0,
+    skippedByCondition: 0,
+    skippedByOnce: 0,
+    failed: 0,
+    skippedIncomplete: 0,
+    scenarioTouched: false,
+  };
+}
+
+function actionResultStatus(result: RunActionsResult): 'succeeded' | 'skipped' | 'permanent_failed' {
+  if (result.failed > 0) return 'permanent_failed';
+  if (result.executed > 0) return 'succeeded';
+  return 'skipped';
+}
+
+function actionCounts(result: RunActionsResult): Record<string, number> {
+  return {
+    executed: result.executed,
+    skippedByCondition: result.skippedByCondition,
+    skippedByOnce: result.skippedByOnce,
+    failed: result.failed,
+    skippedIncomplete: result.skippedIncomplete,
+  };
+}
+
+function safeErrorCode(error: unknown): string {
+  if (error instanceof Error && error.name) return error.name.slice(0, 80);
+  return 'unknown_error';
+}
+
+export type AutoReplyCandidateReasonCode =
+  | 'message_kind_not_matched'
+  | 'keyword_not_matched'
+  | 'outside_active_window'
+  | 'weekday_not_allowed'
+  | 'operator_handling'
+  | 'already_replied_once'
+  | 'cooldown_active'
+  | 'friend_conditions_not_met'
+  | 'higher_priority_won';
+
+export interface AutoReplyCandidateEvaluation {
+  rule: AutoReply;
+  order: number;
+  result: 'not_matched' | 'skipped' | 'won';
+  reasonCodes: AutoReplyCandidateReasonCode[];
+}
+
+/** DBのORDER BYと同じ。下書きを混ぜる試験でも本番順を変えない。 */
+export function compareAutoReplyCandidates(a: AutoReply, b: AutoReply): number {
+  return Number(a.line_account_id === null) - Number(b.line_account_id === null)
+    || a.priority - b.priority
+    || a.respond_to_all - b.respond_to_all
+    || a.created_at.localeCompare(b.created_at);
+}
+
+/**
+ * 本番返信と試験画面が共有する評価器。送信・記録・状態更新は一切しない。
+ * 先に通った1件で止める順番も本番と同じにする。
+ *
+ * `continueAfterWinner` を付けるのは試験だけ。本番は最初に通った1件で
+ * 止めるが、試験では「当たるのに動かない」ルールも理由つきで全部返す。
+ * 勝った後に当たるルールは `higher_priority_won` の理由で skipped になる
+ * ——優先順位が実行を止めていることを説明できるようにするため。
+ */
+export async function evaluateAutoReplyCandidates(
+  db: D1Database,
+  candidates: AutoReply[],
+  input: {
+    friendId: string;
+    incomingText: string;
+    messageKind?: string;
+    now: Date;
+  },
+  opts?: { continueAfterWinner?: boolean },
+): Promise<AutoReplyCandidateEvaluation[]> {
+  const evaluations: AutoReplyCandidateEvaluation[] = [];
+  let winnerFound = false;
+  for (const [index, candidate] of candidates.entries()) {
+    if (!matchesMessageKind(candidate, input.messageKind)) {
+      evaluations.push({
+        rule: candidate,
+        order: index + 1,
+        result: 'not_matched',
+        reasonCodes: ['message_kind_not_matched'],
+      });
+      continue;
+    }
+    if (!keywordMatches(candidate, input.incomingText)) {
+      evaluations.push({
+        rule: candidate,
+        order: index + 1,
+        result: 'not_matched',
+        reasonCodes: ['keyword_not_matched'],
+      });
+      continue;
+    }
+    const condition = await evaluateAutoReplyConditions(db, candidate, input.friendId, input.now);
+    if (!condition.matches) {
+      evaluations.push({
+        rule: candidate,
+        order: index + 1,
+        result: 'skipped',
+        reasonCodes: condition.reasonCodes,
+      });
+      continue;
+    }
+    if (winnerFound) {
+      // 勝者が決まった後にも当たるルール。本番ではここまで見ないので、
+      // 「上のルールが先に動く」を実行されない理由として返す。
+      evaluations.push({
+        rule: candidate,
+        order: index + 1,
+        result: 'skipped',
+        reasonCodes: ['higher_priority_won'],
+      });
+      continue;
+    }
+    evaluations.push({ rule: candidate, order: index + 1, result: 'won', reasonCodes: [] });
+    winnerFound = true;
+    if (!opts?.continueAfterWinner) break;
+  }
+  return evaluations;
+}
+
 /**
  * incomingText を auto_replies (このアカウントのルール + グローバルルール) に
  * マッチさせ、最初にマッチしたルールで replyMessage を送って messages_log に
@@ -257,9 +487,59 @@ export async function matchAndReply(
     logContext?: string;
     /** 受け取ったメッセージの種別。省略時は text として扱う */
     messageKind?: string;
-  } = {},
+    /** LINE webhook の event ID。二重返信を防ぐため、省略不可。 */
+    incomingEventId: string;
+    /** 受信本文へ権限付きで辿るための messages_log ID。 */
+    incomingMessageLogId?: string | null;
+    /** LINE が付けた発生日時。 */
+    occurredAt: string;
+  },
 ): Promise<MatchAndReplyResult> {
-  const { lineAccountId = null, workerUrl, logContext } = opts;
+  const {
+    lineAccountId = null,
+    workerUrl,
+    logContext,
+    incomingEventId,
+    incomingMessageLogId = null,
+    occurredAt,
+  } = opts;
+
+  // 台帳を確保できない状態で返信すると、Webhook再送時の二重実行を止められない。
+  // 返信より先に必ず受信イベントを1行だけ確保する。
+  const reservation = await reserveAutoReplyEvaluation(db, {
+    incomingEventId,
+    incomingMessageLogId,
+    lineAccountId,
+    friendId: friend.id,
+    messageKind: opts.messageKind ?? 'text',
+    normalizedTextHash: await sha256(normalizedInput(incomingText)),
+    inputPreviewMasked: maskedInputPreview(incomingText),
+    occurredAt,
+  });
+  if (!reservation.created) {
+    // 同じイベントは再評価も再送もしない。進行中も下流の自動返信へ渡さない。
+    if (reservation.row.status === 'skipped') {
+      return { matched: false, replyTokenConsumed: false };
+    }
+    return { matched: true, replyTokenConsumed: true };
+  }
+  const evaluationId = reservation.row.id;
+
+  // 課金の状態（トライアル終了・解約）で配信が止まっている統括は自動応答も返さない。
+  // 受信そのものは受信箱に残る（運用者が手で返せる）。台帳には理由を残す。
+  const permission = await getSendPermissionForAccount(db, lineAccountId ?? friend.line_account_id ?? null);
+  if (!permission.allowed) {
+    await markAutoReplyEvaluationSkipped(db, evaluationId, 'billing_blocked');
+    return { matched: false, replyTokenConsumed: false };
+  }
+
+  // 緊急停止 (#1050): auto_reply_dispatch が止まっている統括は返さない。
+  // replyToken は持ち越せないので追い送りはせず、台帳へ理由を残す。
+  // 受信そのものは受信箱に残る（運用者が手で返せる）。
+  if (await isOperationCapabilityStopped(db, lineAccountId ?? friend.line_account_id ?? null, 'auto_reply_dispatch')) {
+    await markAutoReplyEvaluationSkipped(db, evaluationId, 'emergency_stopped');
+    return { matched: false, replyTokenConsumed: false };
+  }
 
   // グローバルルール (line_account_id IS NULL) + このアカウントのルール。
   // lineAccountId が null のときは `= NULL` が偽になるのでグローバルのみ残る。
@@ -279,76 +559,150 @@ export async function matchAndReply(
    */
   const autoReplies = await db
     .prepare(
-      `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)
-        ORDER BY priority ASC, respond_to_all ASC, created_at ASC`,
+      `SELECT * FROM auto_replies WHERE is_active = 1 AND deleted_at IS NULL
+        AND (line_account_id IS NULL OR line_account_id = ?)
+        ORDER BY CASE WHEN line_account_id = ? THEN 0 ELSE 1 END,
+                 priority ASC, respond_to_all ASC, created_at ASC`,
     )
-    .bind(lineAccountId)
+    .bind(lineAccountId, lineAccountId)
     .all<AutoReply>();
 
   // キーワードが合っても、時間帯・連投抑制・有人対応で返さないことがある。
   // 合ったものを1件だけ見るのではなく、条件まで通る最初の1件を探す。
   // 「営業時間内はAで返し、時間外はBで返す」を2行で書けるようにするため。
-  const now = new Date();
+  const now = new Date(occurredAt);
+  const candidateEvaluations = await evaluateAutoReplyCandidates(db, autoReplies.results, {
+    friendId: friend.id,
+    incomingText,
+    messageKind: opts.messageKind,
+    now,
+  });
   let rule: AutoReply | undefined;
-  for (const candidate of autoReplies.results) {
-    if (!matchesMessageKind(candidate, opts.messageKind)) continue;
-    if (!keywordMatches(candidate, incomingText)) continue;
-    if (await shouldReply(db, candidate, friend.id, now)) {
-      rule = candidate;
-      break;
+  let ruleVersionId = '';
+  for (const evaluation of candidateEvaluations) {
+    const version = await ensureAutoReplyPublishedVersion(db, evaluation.rule);
+    await recordAutoReplyEvaluationDetail(db, {
+      evaluationId,
+      autoReplyId: evaluation.rule.id,
+      ruleVersionId: version.id,
+      order: evaluation.order,
+      result: evaluation.result,
+      reasonCodes: evaluation.reasonCodes,
+    });
+    if (evaluation.result === 'won') {
+      rule = evaluation.rule;
+      ruleVersionId = version.id;
     }
   }
-  if (!rule) return { matched: false, replyTokenConsumed: false };
-
-  // 当たった記録。一覧のヒット数と「1人につき1回だけ」の判定がこれを見る。
-  // 返信より先に残すのは、返信に失敗しても当たった事実は変わらないため。
-  try {
-    await recordAutoReplyHit(db, {
-      autoReplyId: rule.id,
-      friendId: friend.id,
-      lineAccountId,
-      matchedKeyword: rule.keyword,
-    });
-  } catch (err) {
-    console.error('[auto-reply] failed to record hit', err);
+  if (!rule) {
+    await markAutoReplyEvaluationSkipped(db, evaluationId, 'no_matching_rule');
+    return { matched: false, replyTokenConsumed: false };
   }
+
+  const matchedKeyword = matchedKeywordLabel(rule, incomingText);
+  await markAutoReplyEvaluationMatched(db, {
+    evaluationId,
+    autoReplyId: rule.id,
+    versionId: ruleVersionId,
+    matchedKeyword,
+  });
 
   // 設定されたアクション（タグ付け・友だち情報・対応マーク・シナリオ・共通情報）を
   // 並べた順に実行する。返信より先に動かすのは、「タグを付けてから、そのタグで
   // 差し込む文面を作る」書き方ができるようにするため。
   const actions = parseAutoReplyActions(rule.actions_json);
+  const actionSummary = emptyActionResult();
   if (actions.length > 0) {
-    try {
-      await runActionRows(db, actions, friend.id);
-    } catch (err) {
-      // アクションが転んでも返信は返す。何も返らないほうが困る。
-      console.error('[auto-reply] failed to run actions', err);
+    for (const action of actions) {
+      const reserved = await reserveAutoReplyActionRun(db, {
+        evaluationId,
+        actionStableId: action.id,
+        actionType: action.action_type,
+        actionSnapshot: JSON.stringify(action),
+        idempotencyKey: `${incomingEventId}:${action.id}`,
+      });
+      if (!reserved.acquired) continue;
+      // 「失敗したら止める」の指定があるアクションが失敗したら、後続は
+      // 実行しない。無指定は `continue`（いまの動き）に倒してある。
+      let actionFailed = false;
+      try {
+        const result = await runActionRows(db, [action], friend.id);
+        addActionResult(actionSummary, result);
+        actionFailed = result.failed > 0;
+        try {
+          await finishAutoReplyActionRun(db, {
+            id: reserved.id,
+            status: actionResultStatus(result),
+            errorCode: result.failed > 0 ? 'action_failed' : null,
+            result: { ...result },
+          });
+        } catch (finishError) {
+          // 動作は済んだのに完了の記録だけ書けなかった。ここで
+          // permanent_failed を書くと、成功した動作が「もう一度実行」の
+          // 対象になり二度動いてしまう。行は claimed のまま残す。
+          console.error('[auto-reply] failed to write action run outcome', finishError);
+        }
+      } catch (err) {
+        actionSummary.failed += 1;
+        actionFailed = true;
+        try {
+          await finishAutoReplyActionRun(db, {
+            id: reserved.id,
+            status: 'permanent_failed',
+            errorCode: safeErrorCode(err),
+          });
+        } catch (finishError) {
+          console.error('[auto-reply] failed to mark action run failed', finishError);
+        }
+        console.error('[auto-reply] failed to run action', err);
+      }
+      if (actionFailed && action.onFailure === 'stop') break;
     }
   }
 
-  if (rule.response_type === 'silent') return { matched: true, replyTokenConsumed: false };
+  if (rule.response_type === 'silent') {
+    const allActionsSucceeded = actions.length > 0
+      && actionSummary.executed === actions.length
+      && actionSummary.failed === 0
+      && actionSummary.skippedByCondition === 0
+      && actionSummary.skippedByOnce === 0
+      && actionSummary.skippedIncomplete === 0;
+    await markAutoReplyEvaluationFinished(db, {
+      evaluationId,
+      status: allActionsSucceeded ? 'completed' : 'partial_failed',
+      replyStatus: 'not_attempted',
+      actionSummary: actionCounts(actionSummary),
+      errorCode: allActionsSucceeded ? null : actions.length === 0 ? 'silent_without_actions' : 'action_incomplete',
+    });
+    if (allActionsSucceeded) {
+      await recordAutoReplyHit(db, {
+        autoReplyId: rule.id,
+        friendId: friend.id,
+        lineAccountId,
+        matchedKeyword,
+      });
+    }
+    return { matched: true, replyTokenConsumed: false };
+  }
 
   let replyTokenConsumed = false;
+  let lineRequestId: string | null = null;
+  let messageLogId: string | null = null;
+  let replyError: unknown = null;
   try {
-    const resolvedMeta = await resolveMetadata(db, friend);
-    const resolved = await resolveAutoReplyContent(db, rule);
-    const extra = await resolveInterpolationExtra(db, friend.id, resolved.content);
-    const expandedContent = expandVariables(
-      resolved.content,
-      { ...friend, metadata: resolvedMeta },
-      workerUrl,
-      resolved.messageType,
-      extra,
-    );
-    const replyMsg = buildMessage(resolved.messageType, expandedContent);
-    await lineClient.replyMessage(replyToken, [replyMsg]);
+    const resolved = await previewAutoReplyContent(db, friend, rule, workerUrl, {
+      kind: 'auto_reply', id: rule.id,
+    });
+    const replyMsg = buildMessage(resolved.messageType, resolved.content);
+    const response = await lineClient.replyMessageWithRequestId(replyToken, [replyMsg]);
     replyTokenConsumed = true;
+    lineRequestId = response.requestId;
 
     // 送信ログ（replyMessage = 無料）— derive content from the built reply
     // message so any cleanEmptyNodes / parse-failure fallback is reflected
     // in the dashboard.
     const replyPayload = messageToLogPayload(replyMsg);
-    await logOutgoingMessage(db, {
+    messageLogId = await logOutgoingMessage(db, {
       friendId: friend.id,
       messageType: replyPayload.messageType,
       content: replyPayload.content,
@@ -357,8 +711,221 @@ export async function matchAndReply(
       lineAccountId,
     });
   } catch (err) {
+    replyError = err;
     console.error(`Failed to send auto-reply${logContext ? ` (${logContext})` : ''}`, err);
   }
 
+  if (replyTokenConsumed) {
+    await markAutoReplyEvaluationFinished(db, {
+      evaluationId,
+      status: actionSummary.failed > 0 ? 'partial_failed' : 'completed',
+      replyStatus: 'accepted',
+      lineRequestId,
+      messageLogId,
+      actionSummary: actionCounts(actionSummary),
+      errorCode: actionSummary.failed > 0 ? 'action_failed' : null,
+    });
+    try {
+      await recordAutoReplyHit(db, {
+        autoReplyId: rule.id,
+        friendId: friend.id,
+        lineAccountId,
+        matchedKeyword,
+      });
+    } catch (error) {
+      // LINEへの返信は既に成功している。集計の失敗を「返信失敗」へ書き換えない。
+      console.error('[auto-reply] failed to record successful hit', error);
+    }
+  } else {
+    await markAutoReplyEvaluationFinished(db, {
+      evaluationId,
+      status: actionSummary.executed > 0 ? 'partial_failed' : 'reply_failed',
+      replyStatus: 'failed',
+      lineRequestId,
+      messageLogId,
+      actionSummary: actionCounts(actionSummary),
+      errorCode: safeErrorCode(replyError),
+    });
+  }
+
   return { matched: true, replyTokenConsumed };
+}
+
+const RETRY_ACTION_TYPES = new Set<ScenarioActionRow['action_type']>([
+  'tag',
+  'friend_field',
+  'support_mark',
+  'scenario',
+  'common_var',
+  'send_message',
+  'send_template',
+  'reminder',
+  'event_booking',
+]);
+const RETRY_ACTION_HOOKS = new Set<ScenarioActionRow['hook']>([
+  'step_sent',
+  'scenario_completed',
+  'choice_selected',
+]);
+
+/**
+ * 保存済みの action_snapshot を ScenarioActionRow として厳しく読む。
+ *
+ * 形が違う写しは実行しない。読めない写しを `runActionRows` へ流すと、
+ * 未知の action_type などが例外になって失敗扱いされる——その場合も
+ * 副作用は起きないが、「何が壊れていたか」を台帳へ区別して残せるよう
+ * ここで弾く。
+ */
+export function parseAutoReplyActionSnapshot(raw: string): ScenarioActionRow | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const row = parsed as Record<string, unknown>;
+  if (typeof row.id !== 'string' || row.id === '') return null;
+  if (typeof row.scenario_id !== 'string') return null;
+  if (typeof row.hook !== 'string' || !RETRY_ACTION_HOOKS.has(row.hook as ScenarioActionRow['hook'])) {
+    return null;
+  }
+  if (row.step_id !== null && typeof row.step_id !== 'string') return null;
+  if (row.choice_index !== null && !Number.isInteger(row.choice_index)) return null;
+  if (!Number.isInteger(row.sort_order)) return null;
+  if (typeof row.action_type !== 'string'
+    || !RETRY_ACTION_TYPES.has(row.action_type as ScenarioActionRow['action_type'])) {
+    return null;
+  }
+  if (typeof row.config_json !== 'string') return null;
+  try {
+    JSON.parse(row.config_json);
+  } catch {
+    return null;
+  }
+  if (row.condition_json !== null && typeof row.condition_json !== 'string') return null;
+  if (!Number.isInteger(row.repeat_on_refire)) return null;
+  if (row.fires_key !== undefined && typeof row.fires_key !== 'string') return null;
+  return {
+    id: row.id,
+    scenario_id: row.scenario_id,
+    hook: row.hook as ScenarioActionRow['hook'],
+    step_id: row.step_id,
+    choice_index: row.choice_index as number | null,
+    sort_order: row.sort_order as number,
+    action_type: row.action_type as ScenarioActionRow['action_type'],
+    config_json: row.config_json,
+    condition_json: row.condition_json,
+    repeat_on_refire: row.repeat_on_refire as number,
+    ...(typeof row.fires_key === 'string' ? { fires_key: row.fires_key } : {}),
+  };
+}
+
+export class AutoReplyActionRetryError extends Error {
+  constructor(
+    readonly code: 'not_found' | 'not_retryable',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AutoReplyActionRetryError';
+  }
+}
+
+export interface AutoReplyActionRetryOutcome {
+  /** 確保して処理した行数。壊れた写しは動作せず permanent_failed へ戻る。 */
+  retriedCount: number;
+  /** 再計算した評価の状態。 */
+  status: AutoReplyEvaluationStatus;
+}
+
+/**
+ * permanent_failed の処理行だけを、保存済みの写しでやり直す（N-081）。
+ *
+ * - LINE の返信トークン/API、受信イベント、matchAndReply には一切触れない。
+ * - 現在のルール定義は読み直さない。予約時に固定した action_snapshot だけを動かす。
+ * - 確保は条件付き UPDATE。同時に呼ばれても1回だけ副作用が起きる。
+ * - 動作が成功したあと完了記録だけ失敗した場合は claimed のまま残す。
+ *   permanent_failed へ戻すと再実行対象になり、成功した動作を二重に動かす。
+ */
+export async function retryAutoReplyActionRuns(
+  db: D1Database,
+  input: {
+    evaluationId: string;
+    allowedAccountIds: string[];
+    canSeeUnassigned: boolean;
+  },
+): Promise<AutoReplyActionRetryOutcome> {
+  const evaluation = await getAutoReplyEvaluationById(db, input.evaluationId);
+  const visible = evaluation && (evaluation.line_account_id == null
+    ? input.canSeeUnassigned
+    : input.allowedAccountIds.includes(evaluation.line_account_id));
+  if (!evaluation || !visible) {
+    throw new AutoReplyActionRetryError('not_found', '実行結果が見つかりません');
+  }
+
+  // 入口は評価側の条件付きUPDATE。終了済みで失敗行が残る評価だけ
+  // actions_running へ進められるので、同時に来た2本はここで1本に絞られる。
+  // canRetry と同じ条件——終了済み（completed 等）や見送りの評価は通さない。
+  const admitted = await claimAutoReplyEvaluationForRetry(db, evaluation.id);
+  if (!admitted) {
+    throw new AutoReplyActionRetryError(
+      'not_retryable',
+      '処理中または完了済みのため、もう一度実行できません',
+    );
+  }
+  // 失敗行の確保は1文のUPDATE。入口を通ったあと別の再実行が先に全行を
+  // 取った場合だけ0件になる——その側が最後に再計算するので409だけ返す。
+  const claimed = await claimPermanentFailedAutoReplyActionRuns(db, evaluation.id);
+  if (claimed.length === 0) {
+    throw new AutoReplyActionRetryError(
+      'not_retryable',
+      '処理中または完了済みのため、もう一度実行できません',
+    );
+  }
+
+  let retriedCount = 0;
+  for (const run of claimed) {
+    const action = parseAutoReplyActionSnapshot(run.action_snapshot);
+    if (!action) {
+      await finishAutoReplyActionRun(db, {
+        id: run.id,
+        status: 'permanent_failed',
+        errorCode: 'invalid_action_snapshot',
+      });
+      continue;
+    }
+    let result: RunActionsResult;
+    try {
+      result = await runActionRows(db, [action], evaluation.friend_id);
+    } catch (error) {
+      // 動作そのものが失敗した。失敗のまま戻し、また直せる状態にする。
+      try {
+        await finishAutoReplyActionRun(db, {
+          id: run.id,
+          status: 'permanent_failed',
+          errorCode: safeErrorCode(error),
+        });
+      } catch (finishError) {
+        console.error('[auto-reply] retry: failed to mark action run failed', finishError);
+      }
+      continue;
+    }
+    try {
+      await finishAutoReplyActionRun(db, {
+        id: run.id,
+        status: actionResultStatus(result),
+        errorCode: result.failed > 0 ? 'action_failed' : null,
+        result: { ...result },
+      });
+    } catch (finishError) {
+      // 動作は済んだのに完了の記録だけ書けなかった。行は claimed のまま
+      // 残す——permanent_failed へ戻すと、成功した動作がもう一度動く。
+      console.error('[auto-reply] retry: failed to write action run outcome', finishError);
+      continue;
+    }
+    retriedCount += 1;
+  }
+
+  const outcome = await recomputeAutoReplyEvaluationFromActions(db, evaluation.id);
+  return { retriedCount, status: outcome?.status ?? evaluation.status };
 }

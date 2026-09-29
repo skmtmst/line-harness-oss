@@ -12,10 +12,37 @@ const switcherSource = readFileSync(join(directory, '../../components/accounts/a
 const editModalSource = readFileSync(join(directory, '../../components/accounts/account-edit-modal.tsx'), 'utf8')
 
 describe('D-3 店舗追加・一覧の統括集約', () => {
-  it('旧アカウントURLを消さず、一覧と追加の正本へ転送する', () => {
-    // 既存ブックマークを壊さず、同じ操作ができる入口を1つに限定する。
-    expect(accountsSource).toContain("redirect('/hq')")
-    expect(setupSource).toContain("redirect('/restaurant-test/stores/new')")
+  it('LINEアカウントの設定と登録は /accounts に置く（どこへも転送しない）', () => {
+    /*
+      2026-09-04: 転送を2つともやめた。**統括の店舗管理と、LINE公式アカウントの
+      設定は別のもの**。**店舗を作ることと、アカウントを登録することも別**
+      （要件 `v6-33-account-settings` §5-3）。
+      `/hq` は統括向けの店舗管理として、店舗ウィザードは飲食店向けの入口として残す。
+    */
+    expect(accountsSource).not.toContain("redirect('/hq')")
+    expect(accountsSource).toContain('data-design-node="QT91v"')
+    expect(setupSource).not.toContain("redirect('/restaurant-test/stores/new')")
+    expect(setupSource).toContain('data-design-node="b2NGxk"')
+  })
+
+  it('新設計の4項目入力・自動接続と5つの正本ノードを使う', () => {
+    for (const value of [
+      '`${workerBase}/auth/callback`',
+      'api.lineAccounts.connectCheck',
+      'api.lineAccounts.connect',
+      'api.lineAccounts.stepFollowerImport',
+      'data-design-node="a8qMXX"',
+      'data-design-node="oeVQQ"',
+      'data-design-node="YEHCR"',
+      'data-design-node="K1zHyx"',
+      "'VPh1U'",
+      "'t3Mlu'",
+    ]) {
+      expect(setupSource).toContain(value)
+    }
+    expect(setupSource).not.toContain('channel-access-token')
+    expect(setupSource).not.toContain('id="liff-id"')
+    expect(setupSource).not.toContain('account-timezone')
   })
 
   it('追加先の店舗ウィザードは利用規約を先頭にした5ステップを維持する', () => {
@@ -32,12 +59,14 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     expect(wizardSource).toContain('type="password"')
   })
 
-  it('旧画面から外した階層編集部品はデータ削除をせず残す', () => {
-    for (const label of ['未設定のLINEアカウント', 'LINEアカウント階層をドラッグ＆ドロップで編集', '未保存の変更', '構成を保存']) {
+  it('階層編集部品を一覧の操作から開き、保存APIへつなぐ', () => {
+    // R191: 移動先メニュー（キーボード・クリックの代替経路）が増えたので、
+    // 見出しは「ドラッグ＆ドロップで編集」とは言わず「編集」に留める。
+    for (const label of ['未設定のLINEアカウント', 'LINEアカウント階層を編集', '未保存の変更', '構成を保存']) {
       expect(orderingSource).toContain(label)
     }
     expect(orderingSource).toContain('api.lineAccounts.updateHierarchy')
-    expect(accountsSource).not.toContain('<AccountOrdering />')
+    expect(accountsSource).toContain('{orderingOpen && <AccountOrdering />}')
   })
 
   it('共通アカウント切替部品は確認後に管理対象を切り替える', () => {

@@ -1,10 +1,19 @@
 'use client'
 
+import { X } from 'lucide-react'
+import Select from '@/components/shared/select'
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
+import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 
 export default function PoolsPage() {
   usePageTitle('プール管理')
@@ -13,15 +22,35 @@ export default function PoolsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  // どこも無効と確定したときは口を発行せず、この案内を直接出す。
+  // 403 の応答自体が console error になるため、取ってから切り替えるのでは遅い。
+  const [featureOff, setFeatureOff] = useState(false)
 
   const load = async () => {
     setLoading(true)
     setError('')
-    const [poolsRes, accRes] = await Promise.all([api.pools.list(), api.lineAccounts.list()])
-    if (poolsRes.success) setPools(poolsRes.data)
-    else setError('プール一覧の取得に失敗しました')
-    if (accRes.success) setAccounts(accRes.data)
-    setLoading(false)
+    setFeatureOff(false)
+    // 有効な場所が1つも無ければ GET /api/traffic-pools を発行しない（#703）。
+    // 判定と取得の隙間で切られたときは従来どおり共通ゲートが案内へ切り替える。
+    if (!(await isPoolsFeatureAvailable())) {
+      setPools([])
+      setFeatureOff(true)
+      setLoading(false)
+      return
+    }
+    try {
+      const [poolsRes, accRes] = await Promise.all([api.pools.list(), api.lineAccounts.list()])
+      if (poolsRes.success) setPools(poolsRes.data)
+      else setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
+      if (accRes.success) setAccounts(accRes.data)
+    } catch (err) {
+      // FEATURE_DISABLED は共通ゲートが案内へ切り替える。それ以外だけここで伝える。
+      if (!(err instanceof ApiError && err.code === 'FEATURE_DISABLED')) {
+        setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -33,38 +62,68 @@ export default function PoolsPage() {
     a.slug === 'main' ? -1 : b.slug === 'main' ? 1 : a.name.localeCompare(b.name),
   )
 
-  return (
-    <div>
-      <Header
-        description="LINE 公式アカウントの分散先を管理します。アカウントが 1 つでも『メインプール』として表示されます。"
-      />
-
-      <div className="flex justify-between items-center mb-4">
-        <span className="text-sm text-gray-500">{pools.length} プール</span>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-        >
-          + 新規プール
-        </button>
+  // 無効と確定したときは管理UIを出さず、共通ゲートと同じ案内だけ出す。
+  if (featureOff) {
+    return (
+      <div>
+        <FeatureDisabledScreen featureId="multi_store_hierarchy" />
       </div>
+    )
+  }
 
-      {error && (
-        <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm mb-4">
-          {error}
-        </div>
-      )}
+  // 読み込み済み・失敗なし・0件のときは空状態だけ出す。件数と右上の
+  // 作成口を残すと、同じ緑ボタンが2つ・同じ0が2か所に重複する。
+  const isEmpty = !loading && !error && sortedPools.length === 0
 
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          読み込み中...
-        </div>
+  return (
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      {isEmpty ? (
+        <section className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="まだプールがありません"
+            description="プールは、来たお客様を振り分けるLINEアカウントをまとめる入れ物です。"
+            action={
+              <Button variant="primary" onClick={() => setShowCreate(true)}>
+                ＋ プールをつくる
+              </Button>
+            }
+          />
+        </section>
       ) : (
-        <div className="space-y-3">
-          {sortedPools.map((pool) => (
-            <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
-          ))}
-        </div>
+        <>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-ink-secondary">{pools.length} プール</span>
+            <Button variant="primary" onClick={() => setShowCreate(true)}>
+              ＋ プールをつくる
+            </Button>
+          </div>
+
+          {loading && pools.length === 0 ? (
+            <ListState kind="loading" />
+          ) : error && pools.length === 0 ? (
+            <ListState
+              kind="error"
+              title="プール一覧を表示できませんでした"
+              description="プール一覧の取得に失敗しました。もう一度読み込んでください。"
+              onRetry={() => { void load() }}
+            />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {error ? (
+                <Notice
+                  tone="danger"
+                  message={error}
+                  action={<button type="button" onClick={() => { void load() }} className="shrink-0 font-medium underline">もう一度読み込む</button>}
+                />
+              ) : null}
+              {sortedPools.map((pool) => (
+                <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {showCreate && (
@@ -103,39 +162,57 @@ function PoolCard({
       // clipboard requires secure context — silent fallback
     }
   }
+  /**
+   * 削除の確認。ブラウザの `confirm()` は「プール「x」を削除しますか?」と
+   * しか言えず、公開URLが止まることも、記録が残ることも読めない。失敗は
+   * `alert` で生のAPIエラーを出していた。共通の窓へ移した（設計 `H2S1T4`）。
+   */
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   const onDelete = async () => {
-    if (isMain) return
-    if (!confirm(`プール「${pool.name}」を削除しますか?`)) return
-    const res = await api.pools.delete(pool.id)
-    if (res.success) onChange()
-    else alert(res.error ?? '削除に失敗しました')
+    // 押している間は受け付けない。二度押しの2回目は404になり、
+    // 消えているのに「削除できませんでした」と出る。
+    if (isMain || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const res = await api.pools.delete(pool.id)
+      if (!res.success) throw new Error(res.error)
+      setConfirmOpen(false)
+      onChange()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('このプールを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded p-4">
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h3 className="font-medium">
-            {pool.name}
+    <div className="bg-canvas border-hairline rounded-card border p-4">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 font-medium">
+            <span className="min-w-0 truncate" title={pool.name}>{pool.name}</span>
             {isMain && (
-              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+              <StatusBadge tone="info" size="compact">
                 既定
-              </span>
+              </StatusBadge>
             )}
           </h3>
-          <p className="text-xs text-gray-500 font-mono">{pool.slug}</p>
+          <p className="text-xs text-ink-faint font-mono truncate" title={pool.slug}>{pool.slug}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onCopy}
-            className="text-xs px-2 py-1 border border-gray-200 rounded hover:bg-gray-50"
-          >
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="secondary" onClick={onCopy}>
             {copied ? '✓ コピー済' : '公開 URL コピー'}
-          </button>
+          </Button>
           {!isMain && (
             <button
-              onClick={onDelete}
-              className="text-xs px-2 py-1 text-red-600 hover:bg-red-50 rounded"
+              type="button"
+              onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
+              className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
             >
               削除
             </button>
@@ -143,6 +220,22 @@ function PoolCard({
         </div>
       </div>
       <PoolAccountList poolId={pool.id} accounts={accounts} onChange={onChange} />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`プール「${pool.name}」を削除しますか？`}
+        description={`公開URL ${publicUrl} は使えなくなり、これから来たお客様はどのアカウントにも振り分けられません。所属していたLINEアカウントと、これまでの流入の記録は残ります。この操作は取り消せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void onDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setConfirmOpen(false)
+          setDeleteError('')
+        }}
+      />
     </div>
   )
 }
@@ -157,33 +250,70 @@ function PoolAccountList({
   onChange: () => void
 }) {
   const [members, setMembers] = useState<PoolAccount[]>([])
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState('')
+  const [listError, setListError] = useState('')
 
+  /**
+   * 読み直しの失敗は握りつぶさない。一覧が空のままだと「所属なし」と
+   * 読み違えるので、取れなかったことを行の下へ出す。
+   */
   const reload = async () => {
-    const res = await api.pools.accounts.list(poolId)
-    if (res.success) setMembers(res.data)
+    try {
+      const res = await api.pools.accounts.list(poolId)
+      if (res.success) {
+        setMembers(res.data)
+        setListError('')
+      } else {
+        setListError('所属アカウントを読み込めませんでした。もう一度お試しください。')
+      }
+    } catch {
+      setListError('所属アカウントを読み込めませんでした。もう一度お試しください。')
+    }
   }
 
+  // useEffect の戻り値はcleanup関数だけ。async関数をそのまま返すと
+  // ReactがPromiseをcleanupとして扱い、拒否も拾えないので void で包む。
   useEffect(() => {
-    reload()
+    void reload()
   }, [poolId])
 
   const memberAccountIds = new Set(members.map((m) => m.lineAccountId))
   const candidates = accounts.filter((a) => !memberAccountIds.has(a.id))
 
   const onAdd = async (lineAccountId: string) => {
-    const res = await api.pools.accounts.add(poolId, lineAccountId)
-    if (res.success) {
+    try {
+      const res = await api.pools.accounts.add(poolId, lineAccountId)
+      if (!res.success) throw new Error(res.error)
       await reload()
       onChange()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、運用の言葉で出す。
+      setListError('このアカウントをプールに追加できませんでした。もう一度お試しください。')
     }
   }
 
-  const onRemove = async (poolAccountId: string) => {
-    if (!confirm('このアカウントをプールから外しますか?')) return
-    const res = await api.pools.accounts.remove(poolId, poolAccountId)
-    if (res.success) {
+  /**
+   * 外す確認。あとから入れ直せるので `destructive` は付けない。
+   * 消えない操作まで赤くすると、本当に消える操作の赤が効かなくなる。
+   */
+  const onRemove = async () => {
+    // 押している間は受け付けない。
+    if (!removeTarget || removing) return
+    setRemoving(true)
+    setRemoveError('')
+    try {
+      const res = await api.pools.accounts.remove(poolId, removeTarget.id)
+      if (!res.success) throw new Error(res.error)
+      setRemoveTarget(null)
       await reload()
       onChange()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setRemoveError('このアカウントをプールから外せませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -195,43 +325,58 @@ function PoolAccountList({
           return (
             <li
               key={m.id}
-              className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded"
+              className="bg-canvas-sunken rounded-mini flex items-center justify-between gap-2 px-2 py-1"
             >
-              <span>{acc?.name ?? m.lineAccountId}</span>
+              <span className="min-w-0 truncate" title={acc?.name ?? m.lineAccountId}>{acc?.name ?? m.lineAccountId}</span>
               <button
-                onClick={() => onRemove(m.id)}
-                className="text-xs text-red-600 hover:underline"
+                type="button"
+                onClick={() => {
+                  setRemoveError('')
+                  setRemoveTarget({ id: m.id, name: acc?.name ?? m.lineAccountId })
+                }}
+                className="text-danger shrink-0 text-xs hover:underline"
               >
                 外す
               </button>
             </li>
           )
         })}
-        {members.length === 0 && (
-          <li className="text-xs text-gray-400">所属アカウントなし</li>
+        {members.length === 0 && !listError && (
+          <li className="text-xs text-ink-faint">所属アカウントなし</li>
         )}
       </ul>
+      {listError && (
+        <p className="text-danger mt-1 text-xs">{listError}</p>
+      )}
       {candidates.length > 0 && (
         <div className="mt-2">
-          <select
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) {
-                onAdd(e.target.value)
-                e.target.value = ''
+          <Select
+            aria-label="追加するアカウント"
+            value=""
+            onChange={(value) => {
+              if (value) {
+                void onAdd(value)
               }
             }}
-            className="text-xs border border-gray-200 rounded px-2 py-1"
-          >
-            <option value="">＋ アカウントを追加</option>
-            {candidates.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: '＋ アカウントを追加' }, ...candidates.map((a) => ({ value: a.id, label: a.name }))]}
+          />
         </div>
       )}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={`「${removeTarget?.name ?? ''}」をこのプールから外しますか？`}
+        description="これから来たお客様は、このアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。外したあとで、同じアカウントを入れ直せます。"
+        confirmLabel="外す"
+        busy={removing}
+        error={removeError}
+        onConfirm={() => void onRemove()}
+        onCancel={() => {
+          if (removing) return
+          setRemoveTarget(null)
+          setRemoveError('')
+        }}
+      />
     </div>
   )
 }
@@ -250,61 +395,75 @@ function CreatePoolModal({
   const [activeAccountId, setActiveAccountId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  // 共通ダイアログと同じ約束: 開いたら窓の中へフォーカス・Tabは窓の中・
+  // Escapeで閉じる・閉じたら起点へ戻す・背面はスクロールしない。
+  const panelRef = useOverlayFocus(true, onClose)
 
   const onSubmit = async () => {
     if (!slug || !name || !activeAccountId) return
     setSubmitting(true)
     setError('')
-    const res = await api.pools.create({ slug, name, activeAccountId })
-    setSubmitting(false)
-    if (res.success) onCreated()
-    else setError(res.error ?? '作成に失敗しました')
+    try {
+      const res = await api.pools.create({ slug, name, activeAccountId })
+      if (res.success) onCreated()
+      else setError(res.error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (err) {
+      // 400系はAPIの理由（slug重複など）、403・5xxは運用の言葉へ写す（WRITE-01）。
+      setError(describeSaveFailure(err))
+    } finally {
+      // 失敗時に「作成中…」のまま固まらないよう、必ず戻す。
+      setSubmitting(false)
+    }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-md p-6 space-y-3">
-        <h2 className="text-lg font-medium">新規プール</h2>
+    <div className="bg-scrim fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-pool-title"
+        className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="create-pool-title" className="text-lg font-medium">新規プール</h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         {error && (
-          <div className="p-2 rounded bg-red-50 border border-red-200 text-red-700 text-xs">
-            {error}
-          </div>
+          <Notice tone="danger" message={error} />
         )}
         <input
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
           placeholder="slug (例: brand-a)"
-          className="w-full border border-gray-200 rounded px-3 py-2 text-sm font-mono"
+          className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 font-mono text-sm"
         />
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="表示名 (例: ブランドA)"
-          className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
+          className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
         />
-        <select
+        <Select
+          aria-label="最初の所属アカウント"
           value={activeAccountId}
-          onChange={(e) => setActiveAccountId(e.target.value)}
-          className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
-        >
-          <option value="">最初の所属アカウントを選択</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-          <button onClick={onClose} className="text-sm px-3 py-1.5 text-gray-600">
+          onChange={(value) => setActiveAccountId(value)}
+          options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+        />
+        <div className="border-hairline flex justify-end gap-2 border-t pt-2">
+          <Button variant="secondary" onClick={onClose}>
             キャンセル
-          </button>
-          <button
-            onClick={onSubmit}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => { void onSubmit() }}
             disabled={submitting || !slug || !name || !activeAccountId}
-            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50"
+            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:brightness-90 disabled:opacity-50"
           >
             {submitting ? '作成中…' : '作成'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

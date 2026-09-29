@@ -1,3 +1,4 @@
+@layer components {
 .root {
   position: relative;
   min-width: 0;
@@ -19,7 +20,8 @@
   box-sizing: border-box;
   display: flex;
   width: 100%;
-  height: 42px;
+  /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
+  height: 40px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -28,14 +30,16 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: inherit;
-  font-size: var(--text-label);
+  /* #976 U079: 選択欄の文字も入力欄と同じ14px */
+  font-size: var(--text-body);
   font-weight: 600;
   cursor: pointer;
 }
 
 .trigger:focus-visible,
 .option:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 .closedTrigger {
@@ -97,10 +101,22 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: inherit;
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 500;
   text-align: left;
   cursor: pointer;
+}
+
+/* #976 U079/U083: タッチ端末は文字16px・高さ44px（入力欄と同じ規定）。 */
+@media (pointer: coarse) {
+  .trigger {
+    height: 44px;
+    font-size: var(--text-lead);
+  }
+
+  .option {
+    font-size: var(--text-lead);
+  }
 }
 
 .option:hover,
@@ -139,9 +155,13 @@
   background: var(--color-canvas);
 }
 
+/*
+ * 選んでいる行。**白文字が乗るので `$accent-deep`。**
+ * `$accent`(#06c755) に白文字は 2.26:1 で読めない。枠は緑のまま。
+ */
 .checked {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
@@ -154,4 +174,5 @@
   margin-top: 4px;
   color: var(--color-danger);
   font-size: var(--text-caption);
+}
 }

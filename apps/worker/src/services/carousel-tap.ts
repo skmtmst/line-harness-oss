@@ -82,12 +82,20 @@ export async function handleCarouselTap(
       const text = template.carousel_tap_limit_text?.trim();
       if (text && options.replyToken) {
         try {
-          await lineClient.replyMessage(options.replyToken, [{ type: 'text', text }]);
+          // 制限メッセージにも {{var.*}} を書ける。消えた共通情報は
+          // fail-closed で止め、解決できるものは送信時点の値へ置き換える。
+          const { expandSendCommonVars } = await import('./interpolation-context.js');
+          const expanded = await expandSendCommonVars(
+            db, text,
+            { kind: 'carousel_tap', id: tap.templateId },
+            { lineAccountId, friendId: friend.id },
+          );
+          await lineClient.replyMessage(options.replyToken, [{ type: 'text', text: expanded }]);
           replyTokenConsumed = true;
           await logOutgoingMessage(db, {
             friendId: friend.id,
             messageType: 'text',
-            content: text,
+            content: expanded,
             deliveryType: 'reply',
             source: 'carousel',
             lineAccountId,

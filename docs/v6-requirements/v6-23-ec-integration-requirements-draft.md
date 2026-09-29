@@ -35,6 +35,8 @@ V6の「メールアドレスか電話番号で結びつけています」は正
 
 ## 2. Lステップとの差
 
+この機能が実行するアクション(タグ、友だち情報、シナリオ、LINE送信、通知、外部Webhook、リッチメニュー、マイル、コンバージョン、予約操作)は、[25 接続契約](./v6-25-automation-action-contract.md)のカタログ名・入力・安全条件と、共通基盤 §6-2 の再試行既定に従う。25 の実行エンジンを経由しない直接実行でも、同じ冪等キーと実行台帳の状態名を使う。
+
 Lステップはwebhook、流入経路、conversion、tag、scenarioを組み合わせてECの結果をLINE施策へ使える。V6はconnector状態、raw event、顧客照合、注文・定期便snapshot、返金による調整、関連actionを一つの運用台帳にする。
 
 V6が上回る条件:
@@ -98,7 +100,7 @@ received → verified → normalized → identity_pending/ready
 - normalized schema version、adapter version、occurred_at、received_atを保持
 - event順序逆転を想定し、external object version/updated_atで古いsnapshotを上書きしない
 - providerへ2xxを早く返し、重い処理はQueueへ
-- claim lease、next retry、exponential backoff＋jitter、dead letter
+- claim lease、next retry、exponential backoff＋jitter、dead letter。回数・間隔は共通基盤（`v6-shared-platform-requirements.md`）§6-2の既定に従う
 - event一件のLINE、tag、conversion、mileage、snapshotを別action executionとして追う
 - 一つ失敗しても他を成功扱いにでき、全体はpartial failedと表示
 
@@ -207,11 +209,12 @@ event処理済みとLINE送信成功を同じstatusにしない。V6一覧の「
 
 ## 12. 権限・監査
 
-- ec.view、ec.pii、ec.identity_link
-- ec.connector_manage、ec.secret_rotate
-- ec.retry、ec.pause
-- ec.subscription_campaign
-- ec.export
+- `ec.event.view`、`ec.customer.read_pii`、`ec.identity.link`
+- `ec.connector.manage`、`ec.secret.rotate`
+- `ec.action.retry`、`ec.connector.pause`
+- `ec.subscription.campaign`
+- `ec.event.export`
+- 命名は共通基盤（`v6-shared-platform-requirements.md` §3）の`domain.resource.action`に従う。
 
 接続停止、secret表示/rotation、identity確定、過去event再処理、返金調整、bulk配信は重要操作として監査する。secret全値は再表示しない。connector設定変更は二者承認を選択可能にする。
 
@@ -255,7 +258,9 @@ V6の「ふつうは1分以内」はSLOとして定義し、例: 95%を5分以�
 
 ## 16. 完了条件
 
-- V6 4画面の主操作・状態・遷移が動く
+- V6 4画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - connector/shop/accountごとのsecret・scope境界testが通る
 - LINE IDなしeventを受け、未照合queueへ安全に出せる
 - 確定identity linkと人の判断履歴を再現できる
@@ -265,7 +270,7 @@ V6の「ふつうは1分以内」はSLOとして定義し、例: 95%を5分以�
 - 定期便riskに根拠・rule version・鮮度を表示し、個人開封を使わない
 - event順序逆転、retry、connector停止、secret rotationをtest
 - 1440/1920で横スクロールなし
-- V6実Nodeと同幅画像比較を添付
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
 ## 17. 実装順
 

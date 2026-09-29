@@ -1,7 +1,10 @@
 'use client'
 
-import React, { useEffect, useId, useState, type ReactNode } from 'react'
+import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
+import Button from './button'
+import IconButton from './icon-button'
 import { useOverlayFocus } from './overlay-utils'
 import styles from './dialog.module.css'
 
@@ -29,6 +32,16 @@ export type DialogProps = {
   modal?: boolean
   /** 画面固有のPencil Node。未指定なら共通部品のNodeだけを持つ。 */
   designNode?: string
+  /** ConfirmDialog の構造。重要操作でも説明を赤帯へ入れない。 */
+  confirmation?: boolean
+  /** 本文を持たない短い確認窓。 */
+  compact?: boolean
+  /**
+   * 主にする操作。`'confirm'`（既定）は実行が主、`'cancel'` は取消が主。
+   * 未保存の離脱確認のように「残る方」を主の緑にし、離れる方を枠線にするとき
+   * `'cancel'` を渡す。×と背景は取消と同じ動きのまま変えない。
+   */
+  primaryAction?: 'confirm' | 'cancel'
 }
 
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
@@ -49,11 +62,33 @@ export default function Dialog({
   confirmIcon,
   modal = true,
   designNode,
+  confirmation = false,
+  compact = false,
+  primaryAction = 'confirm',
 }: DialogProps) {
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
-  const panelRef = useOverlayFocus(open && modal, onCancel, busy)
+  /*
+   * open=true で初回マウントした場合、最初の描画は通常DOMで、effect後に
+   * portal へ移る。フォーカス制御は portal の準備ができてから始める
+   * （DEEP-15）。useOverlayFocus 側もイベント時に ref.current を読むため、
+   * 常時マウントから開く場合も同じ経路で正しい面を掴む。
+   */
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useOverlayFocus(
+    open && modal && mounted,
+    onCancel,
+    busy,
+    // 主が取消の窓は、開いた直後の標的を主のボタンへ寄せる。Enter を押しても
+    // 残る方が動く向きにする（×と背景は従来どおり取消）。
+    primaryAction === 'cancel' ? () => cancelRef.current : undefined,
+  )
+  const confirmationSizeClass = confirmation && compact
+    ? tone === 'destructive'
+      ? styles.destructiveConfirmation
+      : styles.compactConfirmation
+    : ''
 
   useEffect(() => setMounted(true), [])
   if (!open) return null
@@ -76,7 +111,7 @@ export default function Dialog({
   const panel = (
     <div
       ref={panelRef}
-      className={`${styles.panel} ${styles.standardPanel}`}
+      className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
       role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
       aria-modal={modal || undefined}
       aria-labelledby={titleId}
@@ -86,26 +121,52 @@ export default function Dialog({
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
-      {tone === 'destructive' ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+      <div className={styles.headerRow}>
+        <div className={styles.headerContent}>
+          {tone === 'destructive' && !confirmation ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+        </div>
+        {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
+        <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={onCancel} disabled={busy}>
+          <X aria-hidden="true" size={18} />
+        </IconButton>
+      </div>
       {children ? <div className={styles.content}>{children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      {footer ?? (
+      {footer ?? (onConfirm ? (
+        /*
+         * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
+         * 使う（#976 U077/U083/U084）。ここで赤や緑を自前で持つと、コントラストが
+         * 画面ごとにずれる。横幅の指定だけ `.designButton` で足す。
+         * 実行ボタンの無い参照窓では「キャンセル」を出さない。閉じ方は右上の×
+         * に一本化する（UI-25）。
+         */
         <div className={styles.actions}>
-          <button type="button" className={`${styles.button} ${styles.designButton} ${styles.cancel}`} onClick={onCancel} disabled={busy}>{cancelLabel}</button>
-          {onConfirm ? (
-            <button type="button" className={`${styles.button} ${styles.designButton} ${tone === 'destructive' ? styles.danger : styles.confirm}`} onClick={onConfirm} disabled={busy}>
-              {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
-              {busy ? '処理中…' : confirmLabel}
-            </button>
-          ) : null}
+          <Button
+            variant={primaryAction === 'cancel' ? 'primary' : undefined}
+            className={styles.designButton}
+            ref={primaryAction === 'cancel' ? cancelRef : undefined}
+            onClick={onCancel}
+            disabled={busy}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
+            className={styles.designButton}
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
+            {busy ? '処理中…' : confirmLabel}
+          </Button>
         </div>
-      )}
+      ) : null)}
     </div>
   )
 
   if (!modal) return panel
   const overlay = (
-    <div className={styles.overlay} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
     }}>
       {panel}

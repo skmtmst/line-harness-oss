@@ -18,6 +18,16 @@ export interface FriendScoreRow {
   score_change: number;
   reason: string | null;
   created_at: string;
+  /** V6列。旧行は NULL のままなので、表示側は欠損を許容する。 */
+  event_type: string | null;
+  source: string | null;
+  rule_key: string | null;
+  operation: 'delta' | 'set' | 'manual_adjustment' | null;
+  score_before: number | null;
+  score_after: number | null;
+  occurred_at: string | null;
+  executed_by_staff_id: string | null;
+  executed_by_staff_name: string | null;
 }
 
 export type ActionScoreBand = 'high' | 'normal' | 'low';
@@ -283,12 +293,29 @@ export async function deleteScoringRule(db: D1Database, id: string): Promise<voi
 /** スコアイベントを記録し、friendsテーブルのスコアキャッシュを更新 */
 export async function addScore(
   db: D1Database,
-  input: { friendId: string; scoringRuleId?: string; scoreChange: number; reason?: string },
+  input: {
+    friendId: string;
+    scoringRuleId?: string;
+    scoreChange: number;
+    reason?: string;
+    /** 手で動かした記録には実行者を残す。自動の出来事は渡さない。 */
+    executedByStaffId?: string | null;
+    executedByStaffName?: string | null;
+  },
 ): Promise<void> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO friend_scores (id, friend_id, scoring_rule_id, score_change, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.friendId, input.scoringRuleId ?? null, input.scoreChange, input.reason ?? null, now).run();
+  await db.prepare(`INSERT INTO friend_scores (id, friend_id, scoring_rule_id, score_change, reason, created_at, executed_by_staff_id, executed_by_staff_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(
+      id,
+      input.friendId,
+      input.scoringRuleId ?? null,
+      input.scoreChange,
+      input.reason ?? null,
+      now,
+      input.executedByStaffId ?? null,
+      input.executedByStaffName ?? null,
+    ).run();
 
   // スコアキャッシュを更新
   await db.prepare(`UPDATE friends SET score = score + ?, updated_at = ? WHERE id = ?`)
@@ -301,9 +328,14 @@ export async function getFriendScore(db: D1Database, friendId: string): Promise<
   return row?.score ?? 0;
 }
 
-/** 友だちのスコア履歴を取得 */
+/** 友だちのスコア履歴を取得。増減の根拠（何が・いつ・誰が）まで返す。 */
 export async function getFriendScoreHistory(db: D1Database, friendId: string): Promise<FriendScoreRow[]> {
-  const result = await db.prepare(`SELECT * FROM friend_scores WHERE friend_id = ? ORDER BY created_at DESC`)
+  const result = await db.prepare(
+    `SELECT id, friend_id, scoring_rule_id, score_change, reason, created_at,
+            event_type, source, rule_key, operation, score_before, score_after,
+            occurred_at, executed_by_staff_id, executed_by_staff_name
+       FROM friend_scores WHERE friend_id = ? ORDER BY created_at DESC`,
+  )
     .bind(friendId).all<FriendScoreRow>();
   return result.results;
 }
@@ -316,10 +348,24 @@ export async function getActiveRulesByEvent(db: D1Database, eventType: string): 
 }
 
 /** イベント発生時にスコアリングルールを適用 */
-export async function applyScoring(db: D1Database, friendId: string, eventType: string): Promise<number> {
+export async function applyScoring(db: D1Database, friendId: string, eventType: string, sourceEventId?: string): Promise<number> {
   const rules = await getActiveRulesByEvent(db, eventType);
   let totalChange = 0;
   for (const rule of rules) {
+    if (sourceEventId) {
+      const id = JSON.stringify(['incoming-score', sourceEventId, friendId, rule.id]);
+      const now = jstNow();
+      // D1 batch is atomic: a crash cannot leave the journal and cached total apart.
+      await db.batch([
+        db.prepare(`UPDATE friends SET score=score+?,updated_at=? WHERE id=?
+          AND NOT EXISTS (SELECT 1 FROM friend_scores WHERE id=?)`).bind(rule.score_value, now, friendId, id),
+        db.prepare(`INSERT OR IGNORE INTO friend_scores
+          (id,friend_id,scoring_rule_id,score_change,reason,created_at) VALUES (?,?,?,?,?,?)`)
+          .bind(id, friendId, rule.id, rule.score_value, `${eventType} → ${rule.name}`, now),
+      ]);
+      totalChange += rule.score_value;
+      continue;
+    }
     await addScore(db, {
       friendId,
       scoringRuleId: rule.id,

@@ -3,12 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Send, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
+import ActionScoreAdjustmentDialog from './action-score-adjustment-dialog'
+import ActionScoreHistoryDialog from './action-score-history-dialog'
 import {
   api,
   type ActionScoreBand,
@@ -16,7 +20,8 @@ import {
   type ActionScoreOverview,
   type ActionScoreSort,
 } from '@/lib/api'
-import { formatMileageDate } from './mileage-display'
+import { csvCell } from '@/lib/presentation'
+import { actionScoreReasonLabel, formatMileageDate, formatMileageNumber } from './mileage-display'
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 
@@ -26,21 +31,25 @@ const BAND_LABELS: Record<ActionScoreBand, string> = {
   low: '低い',
 }
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('ja-JP').format(value)
-}
-
+/**
+ * 数を出す。**数でないものを `NaN` と書かない。**
+ *
+ * 固定データの点数が入っていないとき、表の「いまの点数」に `NaN` が並んでいた。
+ * `Intl.NumberFormat` は `undefined` を渡すと `NaN` を返す。
+ * 取れていないものは `—` と書き、0 とも言い分ける。
+ */
 function ScoreBand({ band }: { band: ActionScoreBand }) {
-  if (band === 'high') return <span className="rounded-full bg-v6-accent-soft px-2.5 py-1 text-xs font-semibold text-v6-accent-hover">{BAND_LABELS[band]}</span>
-  if (band === 'normal') return <span className="rounded-full bg-v6-warning-bg px-2.5 py-1 text-xs font-semibold text-v6-warning">{BAND_LABELS[band]}</span>
-  return <span className="rounded-full bg-v6-surface-strong px-2.5 py-1 text-xs font-semibold text-v6-ink-secondary">{BAND_LABELS[band]}</span>
+  if (band === 'high') return <span className="whitespace-nowrap rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-deep">{BAND_LABELS[band]}</span>
+  if (band === 'normal') return <span className="whitespace-nowrap rounded-full bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
+  return <span className="whitespace-nowrap rounded-full bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
 }
 
-function ScoreChange({ value }: { value: number }) {
-  const label = `${value > 0 ? '+' : ''}${formatNumber(value)}`
-  if (value > 0) return <span className="font-semibold text-v6-accent-hover">{label}</span>
-  if (value < 0) return <span className="font-semibold text-v6-danger">{label}</span>
-  return <span className="font-semibold text-v6-ink-faint">{label}</span>
+function ScoreChange({ value }: { value: number | null | undefined }) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return <span className="font-semibold text-ink-faint">—</span>
+  const label = `${value > 0 ? '+' : ''}${formatMileageNumber(value)}`
+  if (value > 0) return <span className="font-semibold text-accent-deep">{label}</span>
+  if (value < 0) return <span className="font-semibold text-danger">{label}</span>
+  return <span className="font-semibold text-ink-faint">{label}</span>
 }
 
 function scoreRange(filter: ActionScoreFilter, summary: ActionScoreOverview['summary'] | undefined) {
@@ -58,28 +67,33 @@ function scoreRangeQuery(filter: ActionScoreFilter, summary: ActionScoreOverview
   const query = new URLSearchParams()
   if (range.min !== null) query.set('scoreMin', String(range.min))
   if (range.max !== null) query.set('scoreMax', String(range.max))
+  /*
+   * R300: 帯は「点数がついている人」だけを数えている。友だち検索と配信へも
+   * 同じ条件を引き継ぎ、未採点の0点まで拾わないようにする。
+   */
+  query.set('scoredOnly', '1')
   return query.toString()
 }
 
-function safeReason(reason: string | null) {
-  if (!reason) return '点数が変わった理由は未取得'
-  const labels: Record<string, string> = {
-    message_received: 'メッセージ返信',
-    link_clicked: '配信URLクリック',
-    form_submitted: '回答フォーム回答',
-    booking_created: '予約',
-    purchase_completed: '購入',
-    friend_blocked: 'ブロック',
-  }
-  const [source, detail] = reason.split('→').map((part) => part.trim())
-  if (labels[source]) return detail || labels[source]
-  if (/^[a-z0-9_.-]+$/i.test(reason)) return '反応の記録'
-  return reason
+const safeReason = actionScoreReasonLabel
+
+function scoreValue(item: ActionScoreOverview['items'][number]) {
+  return item.currentScore
+}
+
+function scoreChangedAt(item: ActionScoreOverview['items'][number]) {
+  return item.lastChangedAt
+}
+
+function scoreReason(item: ActionScoreOverview['items'][number]) {
+  return item.lastReason
 }
 
 export default function ActionScoreTab({ accountId }: { accountId: string }) {
   const latestAccountRef = useRef(accountId)
-  latestAccountRef.current = accountId
+  useEffect(() => {
+    latestAccountRef.current = accountId
+  }, [accountId])
   const [overview, setOverview] = useState<ActionScoreOverview | null>(null)
   const [filter, setFilter] = useState<ActionScoreFilter>('all')
   const [sort, setSort] = useState<ActionScoreSort>('score_desc')
@@ -89,6 +103,28 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+   * 点数を手で直す操作はowner/adminだけに出す（N-235）。
+   * 操作権限はWorker側でも同じ条件で落とす。ここでは出し分けだけをする。
+   */
+  const [canAdjust, setCanAdjust] = useState(false)
+  const [adjustTarget, setAdjustTarget] = useState<ActionScoreOverview['items'][number] | null>(null)
+  /*
+   * IDEA-17: 点数が変わった根拠を1人分たどる明細窓。
+   * 一覧の「最後の反応」だけでは履歴全体は追えないため。
+   */
+  const [historyTarget, setHistoryTarget] = useState<ActionScoreOverview['items'][number] | null>(null)
+
+  useEffect(() => {
+    let current = true
+    void api.staff.me().then((response) => {
+      if (!current || !response.success) return
+      setCanAdjust(response.data.role === 'owner' || response.data.role === 'admin')
+    }).catch(() => {
+      if (current) setCanAdjust(false)
+    })
+    return () => { current = false }
+  }, [])
 
   const load = useCallback(async () => {
     const accountAtRequest = accountId
@@ -139,14 +175,14 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
     if (!overview?.items.length) return
     const rows = overview.items.map((item) => [
       item.displayName,
-      item.currentScore,
+      scoreValue(item) ?? '',
       BAND_LABELS[item.band],
       item.change30d,
-      safeReason(item.lastReason),
-      formatMileageDate(item.lastChangedAt),
+      safeReason(scoreReason(item)),
+      formatMileageDate(scoreChangedAt(item)),
     ])
-    const csv = [['友だち', 'いまの点数', '層', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+    const csv = [['友だち', 'いまの点数', '帯', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
+      .map((row) => row.map((value) => csvCell(value)).join(','))
       .join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
@@ -158,31 +194,38 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
   return (
     <section data-design-node="z3PB2" className="space-y-3.5">
-      <div className="rounded-v6-control border border-v6-warning/25 bg-v6-warning-bg px-4 py-3 text-xs text-v6-ink-secondary">
-        <strong className="text-v6-ink">スコアはマイルではありません。</strong>
-        顧客には表示されず、反応の目安として配信や対応の優先順位に使います。顧客の価値を表すものではありません。
-      </div>
+      <Notice tone="warn">
+        {/*
+          設計 `z3PB2` の文そのまま。**「顧客には表示されず」だけでは足りない。**
+          「マイルが減るのでは」と聞かれたときに答えられる形にする——
+          交換できないこと、残高が動かないことを先に言う。
+        */}
+        <strong>スコアはマイルではありません。</strong>
+        お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
+        反応の目安として、配信や対応の順番を決めるために使います。
+      </Notice>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="選択中のLINEアカウント" />
-        <SummaryCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="よく反応している層" />
-        <SummaryCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="反応が続いている層" />
-        <SummaryCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="直近の反応が少ない層" />
+        <KpiCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="" help="選択中のLINEアカウントの人数です" />
+        <KpiCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="" help="よく反応している帯です" />
+        <KpiCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="" help="反応が続いている帯です" />
+        <KpiCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="" help="直近の反応が少ない帯です" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {friendsHref ? <Button href={friendsHref}><Users className="h-4 w-4" aria-hidden="true" />この層の友だちを見る</Button> : null}
-          {broadcastHref ? <Button href={broadcastHref}><Send className="h-4 w-4" aria-hidden="true" />この層に配信する</Button> : null}
-          {filter === 'all' ? <span className="text-xs text-v6-ink-faint">高い・ふつう・低いの層を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
-          {filter === 'decreased' ? <span className="text-xs text-v6-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
+          {friendsHref ? <Button href={friendsHref}><Users className="h-4 w-4" aria-hidden="true" />この帯の人を見る</Button> : null}
+          {broadcastHref ? <Button href={broadcastHref}><Send className="h-4 w-4" aria-hidden="true" />この帯に配信する</Button> : null}
+          {filter === 'all' ? <span className="text-xs text-ink-faint">高い・ふつう・低いの帯を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
+          {filter === 'high' || filter === 'normal' || filter === 'low' ? <span className="text-xs text-ink-faint">この帯の条件（点数がついている人のみ）を引き継ぎます。友だち名の検索は引き継ぎません。</span> : null}
+          {filter === 'decreased' ? <span className="text-xs text-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
         </div>
         <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
-          <Download className="h-4 w-4" aria-hidden="true" />行動スコアをCSVで書き出す
+          <Download className="h-4 w-4" aria-hidden="true" />この頁の行動スコアをCSVで書き出す
         </Button>
       </div>
 
-      <div className="rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
+      <div className="rounded-card border border-hairline bg-canvas shadow-card">
         <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
           <SearchField
             aria-label="友だち名で検索"
@@ -211,15 +254,14 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
         <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
           {filters.map((item) => (
-            <Button
+            <FilterChip
               key={item.key}
-              type="button"
-              aria-pressed={filter === item.key}
-              onClick={() => { setPage(1); setFilter(item.key) }}
-              variant={filter === item.key ? 'primary' : 'secondary'}
+              selected={filter === item.key}
+              onChange={() => { setPage(1); setFilter(item.key) }}
+              count={item.count === undefined ? '—' : formatMileageNumber(item.count)}
             >
-              {item.label} {item.count === undefined ? '—' : formatNumber(item.count)}
-            </Button>
+              {item.label}
+            </FilterChip>
           ))}
           <Select
             aria-label="並び順"
@@ -239,16 +281,16 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
         {loading ? (
           <ListState kind="loading" title="行動スコアを読み込んでいます" description="友だちの現在点と30日間の変化を集計しています。" />
         ) : error ? (
-          <ListState kind="error" title="行動スコアを表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void load()}>行動スコアを再読み込み</Button>} />
+          <ListState kind="error" title="行動スコアを表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} />
         ) : !overview?.items.length ? (
-          <ListState kind="empty" title="条件に合う友だちがいません" description="層または検索条件を変えてください。" />
+          <ListState kind="empty" title="条件に合う友だちがいません" description="帯または検索条件を変えてください。" />
         ) : (
           <DataTable>
-              <thead className="bg-v6-surface text-left text-xs text-v6-ink-faint">
+              <thead className="bg-surface-pearl text-left text-xs text-ink-faint">
                 <TableHeadRow>
                   <Th className="w-1/4">友だち</Th>
                   <Th className="w-1/12" align="right">いまの点数</Th>
-                  <Th className="w-1/12">層</Th>
+                  <Th className="w-1/12">帯</Th>
                   <Th className="w-1/6" align="right">30日間の変化</Th>
                   <Th className="w-1/4">最後の反応</Th>
                   <Th className="w-1/6" align="right">操作</Th>
@@ -259,18 +301,24 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                   <Tr key={item.friendId}>
                     <Td>
                       <div className="flex min-w-0 items-center gap-2.5">
-                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-v6-accent-soft text-xs font-bold text-v6-accent">{item.displayName.slice(0, 1)}</div>}
-                        <span className="truncate text-sm font-semibold text-v6-ink" title={item.displayName}>{item.displayName}</span>
+                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent-deep">{item.displayName.slice(0, 1)}</div>}
+                        <span className="truncate text-sm font-semibold text-ink" title={item.displayName}>{item.displayName}</span>
                       </div>
                     </Td>
-                    <Td align="right"><strong>{formatNumber(item.currentScore)}</strong></Td>
+                    <Td align="right"><strong>{formatMileageNumber(scoreValue(item))}</strong></Td>
                     <Td><ScoreBand band={item.band} /></Td>
                     <Td align="right"><ScoreChange value={item.change30d} /></Td>
                     <Td>
-                      <p className="truncate text-xs text-v6-ink-secondary" title={safeReason(item.lastReason)}>{safeReason(item.lastReason)}</p>
-                      <p className="mt-0.5 text-xs text-v6-ink-faint">{formatMileageDate(item.lastChangedAt)}</p>
+                      <p className="truncate text-xs text-ink-secondary" title={safeReason(scoreReason(item))}>{safeReason(scoreReason(item))}</p>
+                      <p className="mt-0.5 text-xs text-ink-faint">{formatMileageDate(scoreChangedAt(item))}</p>
                     </Td>
-                    <ActionCell><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>友だちの詳細を見る</Button></ActionCell>
+                    <ActionCell>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button onClick={() => setHistoryTarget(item)}>点数の変化を見る</Button>
+                        {canAdjust ? <Button onClick={() => setAdjustTarget(item)}>点数を直す</Button> : null}
+                        <Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>この人を見る</Button>
+                      </div>
+                    </ActionCell>
                   </Tr>
                 ))}
               </tbody>
@@ -279,11 +327,31 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
         {!loading && !error && total > 0 ? (
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
-            <span className="text-xs text-v6-ink-faint">{formatNumber((page - 1) * pageSize + 1)}〜{formatNumber(Math.min(page * pageSize, total))}件 / 全{formatNumber(total)}件</span>
+            <span className="text-xs text-ink-faint">{formatMileageNumber((page - 1) * pageSize + 1)}〜{formatMileageNumber(Math.min(page * pageSize, total))}件 / 全{formatMileageNumber(total)}件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>
         ) : null}
       </div>
+      {adjustTarget ? (
+        <ActionScoreAdjustmentDialog
+          open={adjustTarget !== null}
+          accountId={accountId}
+          friendId={adjustTarget.friendId}
+          friendName={adjustTarget.displayName}
+          currentScore={scoreValue(adjustTarget)}
+          onCancel={() => setAdjustTarget(null)}
+          onCompleted={async () => { await load() }}
+        />
+      ) : null}
+      {historyTarget ? (
+        <ActionScoreHistoryDialog
+          open={historyTarget !== null}
+          friendId={historyTarget.friendId}
+          friendName={historyTarget.displayName}
+          currentScore={scoreValue(historyTarget)}
+          onCancel={() => setHistoryTarget(null)}
+        />
+      ) : null}
     </section>
   )
 }

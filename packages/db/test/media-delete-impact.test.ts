@@ -3,10 +3,14 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getMediaDeleteImpact } from '../src/media.js';
+import {
+  applyMediaReplacementPlan,
+  getMediaDeleteImpact,
+  getMediaReplacementPlan,
+} from '../src/media.js';
 
 function asD1(sqlite: Database.Database): D1Database {
-  return {
+  const d1 = {
     prepare(query: string) {
       const prepared = () => sqlite.prepare(query);
       return {
@@ -26,7 +30,13 @@ function asD1(sqlite: Database.Database): D1Database {
         },
       };
     },
+    async batch(statements: D1PreparedStatement[]) {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
   } as unknown as D1Database;
+  return d1;
 }
 
 function insertAccount(sqlite: Database.Database, id: string) {
@@ -58,7 +68,11 @@ describe('getMediaDeleteImpact', () => {
       `INSERT INTO media
          (id, line_account_id, kind, filename, mime_type, size_bytes, r2_key, created_at)
        VALUES ('media-1', 'account-1', 'image', '案内.png', 'image/png', 100,
-               'media/guide.png', '2026-08-31T09:00:00.000')`,
+               'media/guide.png', '2026-08-31T09:00:00.000'),
+              ('media-2', 'account-1', 'image', '新案内.png', 'image/png', 100,
+               'media/new-guide.png', '2026-08-31T09:01:00.000'),
+              ('media-video', 'account-1', 'video', '動画.mp4', 'video/mp4', 100,
+               'media/movie.mp4', '2026-08-31T09:02:00.000')`,
     ).run();
     db = asD1(sqlite);
   });
@@ -74,6 +88,8 @@ describe('getMediaDeleteImpact', () => {
       references: [],
       checkedAt: '2026-08-31T10:00:00.000',
       lastScannedAt: null,
+      // R34: 0件と確定した = 読み切れた（verified）。読み残しは別試験で守る。
+      verified: true,
       canDelete: true,
       recommendedAction: 'delete',
     });
@@ -181,5 +197,197 @@ describe('getMediaDeleteImpact', () => {
     await expect(
       getMediaDeleteImpact(db, 'media-1', 'account-2', '2026-08-31T10:00:00.000'),
     ).resolves.toBeNull();
+  });
+
+  test('同じアカウント・同じ種類の使用先だけを差し替えられる', async () => {
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-1', '案内', 'image', '{"url":"media/guide.png"}', 'account-1')`,
+    ).run();
+    insertUsage(sqlite, 'template', 'template-1');
+    const plan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-2', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    expect(plan?.impact).toMatchObject({
+      usageCount: 1,
+      replaceableCount: 1,
+      blockers: [],
+      canReplace: true,
+    });
+    const applied = await applyMediaReplacementPlan(db, plan!, 'account-1');
+    expect(applied).toMatchObject({
+      changedRows: 1,
+      appliedUsageCount: 1,
+      skippedUsageCount: 0,
+      mode: 'all',
+    });
+    expect(sqlite.prepare(`SELECT message_content FROM templates WHERE id = 'template-1'`).get())
+      .toEqual({ message_content: '{"url":"media/new-guide.png"}' });
+    expect(sqlite.prepare(`SELECT media_id FROM media_usages`).all())
+      .toEqual([{ media_id: 'media-2' }]);
+  });
+
+  test('置換不能な使用先を種類・件数・理由付きで残し、置換可能な箇所だけ部分実行できる', async () => {
+    // 置換可能: 同じアカウントのテンプレート
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-1', '案内', 'image', '{"url":"media/guide.png"}', 'account-1')`,
+    ).run();
+    // 置換不可: ウェビナー動画（配信用一式）と、別アカウントのテンプレート
+    sqlite.prepare(
+      `INSERT INTO webinars (id, account_id, title, slug, video_prefix, created_at, updated_at)
+       VALUES ('webinar-1', 'account-1', '講座', 'guide', 'media/guide.png',
+               '2026-08-31T09:00:00.000', '2026-08-31T09:00:00.000')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('other-template', '別店舗の案内', 'image', 'media/guide.png', 'account-2')`,
+    ).run();
+    insertUsage(sqlite, 'template', 'template-1');
+    insertUsage(sqlite, 'webinar', 'webinar-1');
+    insertUsage(sqlite, 'template', 'other-template');
+
+    const plan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-2', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    // 全件一括は止まるが、置換可能な1件だけの実行は選べる。
+    // 未対応は種類・件数・理由が参照ごとに明示される。
+    expect(plan?.impact).toMatchObject({
+      usageCount: 3,
+      replaceableCount: 1,
+      blockedCount: 2,
+      blockedByKind: { webinar: 1, template: 1 },
+      canReplace: false,
+      canPartiallyReplace: true,
+    });
+    expect(plan?.impact.references).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'webinar', blocker: 'unsupported_reference', reason: expect.any(String) }),
+      expect.objectContaining({ kind: 'template', blocker: 'unavailable_reference', reason: expect.any(String) }),
+    ]));
+    // 全件実行は拒否される。
+    await expect(applyMediaReplacementPlan(db, plan!, 'account-1'))
+      .rejects.toThrow('media_replacement_blocked');
+
+    const applied = await applyMediaReplacementPlan(
+      db, plan!, 'account-1', { scope: 'replaceable' },
+    );
+    expect(applied).toMatchObject({
+      changedRows: 1,
+      appliedUsageCount: 1,
+      skippedUsageCount: 2,
+      mode: 'partial',
+    });
+    // 置換可能なテンプレートだけ替わり、置換不可の本文は元のまま。
+    expect(sqlite.prepare(`SELECT message_content FROM templates WHERE id = 'template-1'`).get())
+      .toEqual({ message_content: '{"url":"media/new-guide.png"}' });
+    expect(sqlite.prepare(`SELECT video_prefix FROM webinars WHERE id = 'webinar-1'`).get())
+      .toEqual({ video_prefix: 'media/guide.png' });
+    // アカウント境界: 別アカウントの本文は絶対に触らない。
+    expect(sqlite.prepare(`SELECT message_content FROM templates WHERE id = 'other-template'`).get())
+      .toEqual({ message_content: 'media/guide.png' });
+    // 台帳も対象だけが付け替わり、置換不可分は元メディアを指し続ける。
+    expect(sqlite.prepare(
+      `SELECT ref_kind, ref_id, media_id FROM media_usages ORDER BY ref_kind, ref_id`,
+    ).all()).toEqual([
+      { ref_kind: 'template', ref_id: 'other-template', media_id: 'media-1' },
+      { ref_kind: 'template', ref_id: 'template-1', media_id: 'media-2' },
+      { ref_kind: 'webinar', ref_id: 'webinar-1', media_id: 'media-1' },
+    ]);
+  });
+
+  test('部分実行は冪等で、差し替え元・先の組み合わせが不正なら部分実行も止める', async () => {
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-1', '案内', 'image', '{"url":"media/guide.png"}', 'account-1')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO webinars (id, account_id, title, slug, video_prefix, created_at, updated_at)
+       VALUES ('webinar-1', 'account-1', '講座', 'guide', 'media/guide.png',
+               '2026-08-31T09:00:00.000', '2026-08-31T09:00:00.000')`,
+    ).run();
+    insertUsage(sqlite, 'template', 'template-1');
+    insertUsage(sqlite, 'webinar', 'webinar-1');
+
+    const plan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-2', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    await applyMediaReplacementPlan(db, plan!, 'account-1', { scope: 'replaceable' });
+    // 同じ計画の再試行: 対象行は既に付け替わっているため本文も台帳も変わらず、
+    // 二重に書き換えたり残存分を消したりしない。
+    const retried = await applyMediaReplacementPlan(db, plan!, 'account-1', { scope: 'replaceable' });
+    expect(retried.changedRows).toBe(0);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM media_usages WHERE media_id = 'media-1'`).get())
+      .toEqual({ c: 1 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM media_usages WHERE media_id = 'media-2'`).get())
+      .toEqual({ c: 1 });
+
+    // 種類違いは「一部だけ替える」こともできない。
+    const kindPlan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-video', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    expect(kindPlan?.impact.canPartiallyReplace).toBe(false);
+    await expect(
+      applyMediaReplacementPlan(db, kindPlan!, 'account-1', { scope: 'replaceable' }),
+    ).rejects.toThrow('media_replacement_blocked');
+  });
+
+  test('置換可能な使用先が0件なら部分実行も止める', async () => {
+    sqlite.prepare(
+      `INSERT INTO webinars (id, account_id, title, slug, video_prefix, created_at, updated_at)
+       VALUES ('webinar-1', 'account-1', '講座', 'guide', 'media/guide.png',
+               '2026-08-31T09:00:00.000', '2026-08-31T09:00:00.000')`,
+    ).run();
+    insertUsage(sqlite, 'webinar', 'webinar-1');
+
+    const plan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-2', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    expect(plan?.impact).toMatchObject({
+      replaceableCount: 0,
+      blockedCount: 1,
+      canReplace: false,
+      canPartiallyReplace: false,
+    });
+    await expect(
+      applyMediaReplacementPlan(db, plan!, 'account-1', { scope: 'replaceable' }),
+    ).rejects.toThrow('media_replacement_blocked');
+  });
+
+  test('別種類・複数アカウント共有・ウェビナー動画は一括差し替えを止める', async () => {
+    sqlite.prepare(
+      `INSERT INTO broadcasts
+         (id, title, message_type, message_content, line_account_id, account_ids)
+       VALUES ('broadcast-1', '共有配信', 'image', 'media/guide.png', 'account-1',
+               '["account-1","account-2"]')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO webinars (id, account_id, title, slug, video_prefix, created_at, updated_at)
+       VALUES ('webinar-1', 'account-1', '講座', 'guide', 'media/guide.png',
+               '2026-08-31T09:00:00.000', '2026-08-31T09:00:00.000')`,
+    ).run();
+    insertUsage(sqlite, 'broadcast', 'broadcast-1');
+    insertUsage(sqlite, 'webinar', 'webinar-1');
+
+    const sharedPlan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-2', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    expect(sharedPlan?.impact).toMatchObject({
+      canReplace: false,
+      blockers: expect.arrayContaining(['shared_reference', 'unsupported_reference']),
+    });
+    await expect(applyMediaReplacementPlan(db, sharedPlan!, 'account-1'))
+      .rejects.toThrow('media_replacement_blocked');
+
+    const kindPlan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-video', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    expect(kindPlan?.impact.blockers).toContain('different_kind');
   });
 });

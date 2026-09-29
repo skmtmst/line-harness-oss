@@ -14,14 +14,18 @@ export interface TopBarAccount {
 export interface TopBarProps {
   title: string
   /**
-   * マニュアルの行き先。**空文字と null のときは押せなくする。**
+   * マニュアルの行き先。**空文字と null のときは、そもそも描かない。**
    * URLは Masato 確定待ちで、いまは `manual-links.ts` が全部空。
    * 空のまま Link にすると `/` へ飛んでしまい、開いた人が画面を見失う。
+   * 押せない札を「準備中」の吹き出し付きで置くのもやめた。出す＝使える
+   * （`docs/v6-common-rules.md` §5-5、§7-10）。
    */
   manualHref?: string | null
   accounts: TopBarAccount[]
   selectedAccountId: string
   onAccountChange: (accountId: string) => void
+  /** 統括配下ではアカウントを切り替えないため非表示にする。 */
+  showAccountSwitcher?: boolean
   roleLabel: string
   /**
    * 権限バッジを押したときの行き先。渡さなければ押せない印のまま。
@@ -46,6 +50,7 @@ export default function TopBar({
   accounts,
   selectedAccountId,
   onAccountChange,
+  showAccountSwitcher = true,
   roleLabel,
   onRoleClick,
   userName,
@@ -57,19 +62,19 @@ export default function TopBar({
     onAccountChange(event.target.value)
   }
   const current = accounts.find((account) => account.id === selectedAccountId)
-  const manualLabel = <><BookIcon /><span>マニュアル</span></>
 
   return (
     <header className={classes} data-design-node="cBSCb">
       <div className={styles.titleGroup}>
         <h1 className={styles.title} title={title}>{title}</h1>
         {manualHref
-          ? <Link href={manualHref} className={styles.manual}>{manualLabel}</Link>
-          : <span className={styles.manualDisabled} aria-disabled="true" title="マニュアルは準備中です">{manualLabel}</span>}
+          ? <Link href={manualHref} className={styles.manual}><BookIcon /><span>マニュアル</span></Link>
+          : null}
       </div>
 
       <div className={styles.actions}>
-        <label className={styles.accountField}>
+        {showAccountSwitcher ? <>
+          <label className={styles.accountField}>
           <span>LINEアカウント</span>
           {/*
             Pencil `cBSCb/xvrTI` は「印 ＋ 名前 ＋ ▾」の白い札。印は `select` の
@@ -79,7 +84,7 @@ export default function TopBar({
           */}
           <span className={styles.accountPill}>
             <span className={styles.accountMark} aria-hidden="true">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
-            <span className={styles.accountName}>{current?.label ?? ''}</span>
+            <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
             <ChevronIcon />
             <select
               className={styles.accountSelect}
@@ -87,14 +92,20 @@ export default function TopBar({
               onChange={handleAccountChange}
               aria-label="LINEアカウント"
             >
+              {/*
+                未選択を表す option。これが無いと value="" のとき、札の表示は空なのに
+                ブラウザは先頭の店舗を選んだと読み上げて食い違う（NEXT-07）。
+                「未選択へ戻る」は操作として意味を持たないので選べない形にする。
+              */}
+              <option value="" disabled>店舗を選択</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.label}</option>
               ))}
             </select>
           </span>
-        </label>
-
-        <span className={styles.separator} aria-hidden="true" />
+          </label>
+          <span className={styles.separator} aria-hidden="true" />
+        </> : null}
 
         <div className={styles.identity}>
           {onRoleClick

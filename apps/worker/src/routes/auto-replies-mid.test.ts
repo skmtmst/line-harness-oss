@@ -1,0 +1,463 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { Hono } from 'hono';
+import type { Env } from '../index.js';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { authMiddleware } from '../middleware/auth.js';
+import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { autoReplies } from './auto-replies.js';
+
+const admin: AuthenticatedStaff = {
+  id: 'env-owner',
+  name: '管理者',
+  role: 'admin',
+  readOnly: false,
+  tenantId: 'tenant-1',
+};
+
+const staff: AuthenticatedStaff = { ...admin, id: 'staff-1', role: 'staff' };
+
+function app(db: D1Database, currentStaff: AuthenticatedStaff = admin) {
+  const instance = new Hono<Env>();
+  instance.use('*', async (c, next) => {
+    c.set('staff', currentStaff);
+    await next();
+  });
+  instance.route('/', autoReplies);
+  return { instance, bindings: { DB: db, WORKER_URL: 'https://worker.test' } as Env['Bindings'] };
+}
+
+function authenticatedApp(db: D1Database) {
+  const instance = new Hono<Env>();
+  instance.use('*', authMiddleware);
+  instance.route('/', autoReplies);
+  const bindings = { DB: db, WORKER_URL: 'https://worker.test' } as Env['Bindings'];
+  return {
+    request: (path: string, token: string, init: RequestInit) => instance.request(path, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init.headers ?? {}),
+      },
+    }, bindings),
+  };
+}
+
+function settings(overrides: Record<string, unknown> = {}) {
+  return {
+    keyword: '予約',
+    matchType: 'contains',
+    responseType: 'text',
+    responseContent: '承りました',
+    templateId: null,
+    lineAccountId: 'account-1',
+    activeFrom: null,
+    activeUntil: null,
+    cooldownMinutes: null,
+    skipWhenOperatorActive: false,
+    priority: 1,
+    receiveSources: ['line'],
+    messageKinds: ['text'],
+    friendConditions: null,
+    actions: null,
+    responseWeekdays: null,
+    responseHolidayRule: null,
+    oncePerFriend: false,
+    keywords: null,
+    respondToAll: false,
+    name: '予約受付',
+    keywordMatchMode: 'any',
+    folderId: null,
+    internalMemo: null,
+    replyDelaySeconds: null,
+    unmatchedAction: null,
+    ...overrides,
+  };
+}
+
+function insertRule(raw: SqliteD1['raw'], id: string, keyword: string, priority: number) {
+  raw.prepare(
+    `INSERT INTO auto_replies
+       (id, keyword, match_type, response_content, line_account_id, is_active,
+        priority, message_kinds_json, name, current_draft_version_id, created_at)
+     VALUES (?, ?, 'contains', '返信', 'account-1', 1, ?, '["text"]', ?, ?, ?)`,
+  ).run(id, keyword, priority, `${keyword}受付`, `version-${id}`, `2026-09-01T00:00:0${priority}.000`);
+  raw.prepare(
+    `INSERT INTO auto_reply_versions
+       (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
+        status, created_at, updated_at)
+     VALUES (?, ?, 2, 'account-1', ?, 'draft', '2026-09-01T00:00:00.000', '2026-09-01T00:00:00.000')`,
+  ).run(`version-${id}`, id, JSON.stringify(settings({ keyword, priority, name: `${keyword}受付` })));
+}
+
+describe('点検・中: 自動応答の下書き確認・上限・ページ送り', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    testDb.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts
+         (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+       VALUES ('account-1', 'channel-1', '店舗1', '', '', 1, 'tenant-1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts
+         (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+       VALUES ('account-2', 'channel-2', '店舗2', '', '', 1, 'tenant-1')`,
+    ).run();
+    for (const [id, name, role, apiKey, permissionKeys, accountScope] of [
+      ['admin-1', '管理者', 'admin', 'admin-key', '[]', 'all'],
+      ['staff-allowed', 'テスト担当', 'staff', 'staff-key', '["/auto-replies"]', 'accounts'],
+      ['staff-denied', '権限なし', 'staff', 'no-permission-key', '[]', 'all'],
+      ['staff-other', '別店舗担当', 'staff', 'other-account-key', '["/auto-replies"]', 'accounts'],
+    ]) {
+      testDb.raw.prepare(
+        `INSERT INTO staff_members
+           (id, name, role, api_key, permission_keys, tenant_id, account_scope)
+         VALUES (?, ?, ?, ?, ?, 'tenant-1', ?)`,
+      ).run(id, name, role, apiKey, permissionKeys, accountScope);
+    }
+    testDb.raw.prepare(
+      `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
+       VALUES ('staff-allowed', 'account-1', '2026-09-01T00:00:00.000'),
+              ('staff-other', 'account-2', '2026-09-01T00:00:00.000')`,
+    ).run();
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1' });
+    insertRule(testDb.raw, 'rule-1', '予約', 1);
+    insertRule(testDb.raw, 'rule-2', '予約変更', 2);
+  });
+
+  it('中3: 当たり回数が数えられないときはhitsを付けず0で埋めない', async () => {
+    testDb.raw.exec('DROP TABLE auto_reply_hits');
+    const target = app(testDb.db);
+    const response = await target.instance.request('/api/auto-replies?accountId=account-1', {}, target.bindings);
+    const body = await response.json() as { data: Array<{ hits?: unknown }> };
+
+    expect(response.status).toBe(200);
+    expect(body.data.length).toBe(2);
+    expect(body.data.every((item) => item.hits === undefined)).toBe(true);
+  });
+
+  it('中3: 数えられるときはhitsが付く', async () => {
+    const target = app(testDb.db);
+    const response = await target.instance.request('/api/auto-replies?accountId=account-1', {}, target.bindings);
+    const body = await response.json() as { data: Array<{ hits?: unknown }> };
+
+    expect(response.status).toBe(200);
+    expect(body.data.every((item) => item.hits !== undefined)).toBe(true);
+  });
+
+  it.each([
+    ['validate', 'POST', '/api/auto-replies/rule-1/validate'],
+    ['conflicts', 'GET', '/api/auto-replies/rule-1/conflicts'],
+  ])('中5: 下書きの%sはstaffに403を返す', async (_label, method, path) => {
+    const target = app(testDb.db, staff);
+    const response = await target.instance.request(path, method === 'GET' ? { method } : {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ friendId: 'friend-1', incomingText: '予約' }),
+    }, target.bindings);
+
+    expect(response.status).toBe(403);
+  });
+
+  it('N-084: 公開前テストだけを権限とアカウント境界の内側のstaffへ許可する', async () => {
+    const target = authenticatedApp(testDb.db);
+    const runTest = (token: string) => target.request('/api/auto-replies/rule-1/test', token, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        friendId: 'friend-1',
+        incomingText: '予約したいです',
+        occurredAt: '2026-09-01T00:00:00.000Z',
+      }),
+    });
+
+    expect((await runTest('admin-key')).status).toBe(200);
+    const staffTest = await runTest('staff-key');
+    expect(staffTest.status).toBe(200);
+    expect(await staffTest.json()).toMatchObject({
+      success: true,
+      data: { draftWon: true, stateChanged: false },
+    });
+    expect((await runTest('no-permission-key')).status).toBe(403);
+    expect((await runTest('other-account-key')).status).toBe(404);
+    expect(testDb.raw.prepare(
+      `SELECT status, last_test_status, last_tested_by_staff_id
+         FROM auto_reply_versions WHERE id = 'version-rule-1'`,
+    ).get()).toEqual({
+      status: 'draft',
+      last_test_status: 'succeeded',
+      last_tested_by_staff_id: 'staff-allowed',
+    });
+
+    const staffMutation = (path: string, method: string, body: unknown) => target.request(
+      path,
+      'staff-key',
+      {
+        method,
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': 'staff-mutation-0001' },
+        body: JSON.stringify(body),
+      },
+    );
+    expect((await staffMutation('/api/auto-replies/drafts', 'POST', settings())).status).toBe(403);
+    expect((await staffMutation('/api/auto-replies/rule-1/draft', 'PUT', {
+      ...settings(), expectedVersion: 2,
+    })).status).toBe(403);
+    expect((await staffMutation('/api/auto-replies/rule-1/publish', 'POST', {})).status).toBe(403);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM auto_replies').get()).toEqual({ count: 2 });
+    expect(testDb.raw.prepare(
+      `SELECT current_draft_version_id, current_published_version_id
+         FROM auto_replies WHERE id = 'rule-1'`,
+    ).get()).toEqual({
+      current_draft_version_id: 'version-rule-1',
+      current_published_version_id: null,
+    });
+  });
+
+  it('中5: 下書きのvalidateはadminなら403にならない', async () => {
+    const target = app(testDb.db, admin);
+    const response = await target.instance.request('/api/auto-replies/rule-1/validate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    }, target.bindings);
+
+    expect(response.status).not.toBe(403);
+  });
+
+  it('中6: 下書き保存は言葉・本文・複数言葉の上限を超えたら400', async () => {
+    const target = app(testDb.db);
+    const put = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies/rule-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+
+    const longKeyword = await put(settings({ keyword: 'あ'.repeat(201) }));
+    expect(longKeyword.status).toBe(400);
+
+    const longContent = await put(settings({ responseContent: 'あ'.repeat(5001) }));
+    expect(longContent.status).toBe(400);
+
+    const manyKeywords = await put(settings({
+      keywords: Array.from({ length: 101 }, (_, i) => ({ keyword: `語${i}`, matchType: 'contains' })),
+    }));
+    expect(manyKeywords.status).toBe(400);
+
+    const longKeywordItem = await put(settings({
+      keywords: [{ keyword: 'あ'.repeat(201), matchType: 'contains' }],
+    }));
+    expect(longKeywordItem.status).toBe(400);
+
+    const bigConditions = await put(settings({ friendConditions: { note: 'あ'.repeat(20001) } }));
+    expect(bigConditions.status).toBe(400);
+  });
+
+  it('中6: 直接作成も言葉・本文の上限を超えたら400', async () => {
+    const target = app(testDb.db);
+    const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+
+    expect((await post({ keyword: 'あ'.repeat(201), lineAccountId: 'account-1', responseContent: 'ok' })).status).toBe(400);
+    expect((await post({ keyword: '予約', lineAccountId: 'account-1', responseContent: 'あ'.repeat(5001) })).status).toBe(400);
+  });
+
+  it('中7: page/limit付きは共通一覧契約の形で返し、無しは配列のまま', async () => {
+    const target = app(testDb.db);
+    const paged = await target.instance.request('/api/auto-replies?accountId=account-1&page=2&limit=1', {}, target.bindings);
+    const pagedBody = await paged.json() as {
+      data: { items: Array<{ id: string }>; total: number; limit: number; sort: unknown };
+    };
+
+    expect(paged.status).toBe(200);
+    expect(pagedBody.data.items).toHaveLength(1);
+    expect(pagedBody.data.total).toBe(2);
+    expect(pagedBody.data.limit).toBe(1);
+    expect(pagedBody.data.sort).toEqual([
+      { field: 'priority', direction: 'asc' },
+      { field: 'created_at', direction: 'asc' },
+    ]);
+
+    const legacy = await target.instance.request('/api/auto-replies?accountId=account-1', {}, target.bindings);
+    const legacyBody = await legacy.json() as { data: unknown };
+    expect(legacy.status).toBe(200);
+    expect(Array.isArray(legacyBody.data)).toBe(true);
+  });
+
+  it('中4: 直接更新はowner/adminだけが使え、一時停止に使える', async () => {
+    const asStaff = app(testDb.db, staff);
+    const denied = await asStaff.instance.request('/api/auto-replies/rule-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    }, asStaff.bindings);
+    expect(denied.status).toBe(403);
+
+    const target = app(testDb.db);
+    const response = await target.instance.request('/api/auto-replies/rule-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    }, target.bindings);
+    expect(response.status).toBe(200);
+  });
+
+  it('AUTOREPLY-08: 新規作成はOFFをDBまで保持し、再読込・一致評価でも動かない', async () => {
+    const target = app(testDb.db);
+    const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+
+    // オフ指定で作る → 作った時点で止まっている。
+    const created = await post({
+      keyword: '解約',
+      matchType: 'contains',
+      responseType: 'text',
+      responseContent: '承りました',
+      lineAccountId: 'account-1',
+      isActive: false,
+    });
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as { data: { id: string; isActive: boolean; lifecycleStatus: string } };
+    expect(createdBody.data.isActive).toBe(false);
+    expect(createdBody.data.lifecycleStatus).toBe('stopped');
+
+    const createdId = createdBody.data.id;
+    expect(
+      testDb.raw.prepare('SELECT is_active, lifecycle_status FROM auto_replies WHERE id = ?').get(createdId),
+    ).toEqual({ is_active: 0, lifecycle_status: 'stopped' });
+
+    // 再読込してもオフのまま戻る。
+    const reload = await target.instance.request(`/api/auto-replies/${createdId}`, {}, target.bindings);
+    const reloadBody = await reload.json() as { data: { isActive: boolean; lifecycleStatus: string } };
+    expect(reload.status).toBe(200);
+    expect(reloadBody.data.isActive).toBe(false);
+    expect(reloadBody.data.lifecycleStatus).toBe('stopped');
+
+    // 実行系が見るのは is_active = 1 の行だけ（services/auto-reply.ts の
+    // 応答評価と同じ条件）。一致する言葉を持っていても評価対象に出ない。
+    expect(
+      testDb.raw.prepare(
+        `SELECT id FROM auto_replies
+          WHERE is_active = 1 AND deleted_at IS NULL AND id = ?`,
+      ).get(createdId),
+    ).toBeUndefined();
+
+    // isActive を書かない作成も止まる。オフを忘れて動く形には戻さない。
+    const implicit = await post({
+      keyword: '予約確認',
+      responseContent: '承りました',
+      lineAccountId: 'account-1',
+    });
+    expect(implicit.status).toBe(201);
+    const implicitBody = await implicit.json() as { data: { isActive: boolean; lifecycleStatus: string } };
+    expect(implicitBody.data.isActive).toBe(false);
+    expect(implicitBody.data.lifecycleStatus).toBe('stopped');
+
+    // 明示的な true だけが有効なルールを作る（再開・公開と同じ意味の明示操作）。
+    const explicit = await post({
+      keyword: '延長',
+      responseContent: '承りました',
+      lineAccountId: 'account-1',
+      isActive: true,
+    });
+    expect(explicit.status).toBe(201);
+    const explicitBody = await explicit.json() as { data: { isActive: boolean; lifecycleStatus: string } };
+    expect(explicitBody.data.isActive).toBe(true);
+    expect(explicitBody.data.lifecycleStatus).toBe('published');
+
+    // isActive が真偽値でない入力は作らない。
+    expect((await post({
+      keyword: '料金', responseContent: '承りました', lineAccountId: 'account-1', isActive: 'yes',
+    })).status).toBe(400);
+  });
+
+  it('R200: 連投を防ぐの範囲外は3つの口すべて日本語で断る', async () => {
+    const target = app(testDb.db);
+    const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+    const base = {
+      keyword: '予約',
+      matchType: 'contains',
+      responseType: 'text',
+      responseContent: '承りました',
+      lineAccountId: 'account-1',
+    };
+
+    for (const cooldownMinutes of [-1, 1.5]) {
+      const res = await post({ ...base, cooldownMinutes });
+      expect(res.status).toBe(400);
+      const body = await res.json() as { error: string };
+      expect(body.error).toContain('連投を防ぐ');
+      expect(body.error).not.toContain('cooldownMinutes');
+    }
+
+    const put = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies/rule-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+    const updated = await put({ cooldownMinutes: -1 });
+    expect(updated.status).toBe(400);
+    expect((await updated.json() as { error: string }).error).toContain('連投を防ぐ');
+
+    const draft = await target.instance.request('/api/auto-replies/rule-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(settings({ cooldownMinutes: -1, expectedVersion: 2 })),
+    }, target.bindings);
+    expect(draft.status).toBe(400);
+    expect((await draft.json() as { error: string }).error).toContain('連投を防ぐ');
+
+    // 0〜10080の整数は通る（0は「抑制しない」として保存される）。
+    expect((await post({ ...base, keyword: '予約A', cooldownMinutes: 60 })).status).toBe(201);
+  });
+
+  it('R201: 構造のないカード内容は有効な設定として保存しない', async () => {
+    const target = app(testDb.db);
+    const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+    const base = {
+      keyword: '予約',
+      matchType: 'contains',
+      responseType: 'flex',
+      lineAccountId: 'account-1',
+    };
+
+    for (const responseContent of ['{}', '[]', 'null', '{"type":"text","text":"hi"}']) {
+      const res = await post({ ...base, keyword: `予約${responseContent.length}`, responseContent });
+      expect(res.status).toBe(400);
+      expect((await res.json() as { error: string }).error).toContain('バブルかカルーセル');
+    }
+
+    const good = await post({
+      ...base,
+      keyword: '予約カード',
+      responseContent: '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[]}}',
+    });
+    expect(good.status).toBe(201);
+
+    // 下書き保存口も同じ判定。
+    const draft = await target.instance.request('/api/auto-replies/rule-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(settings({
+        responseType: 'flex', responseContent: '{}', expectedVersion: 2,
+      })),
+    }, target.bindings);
+    expect(draft.status).toBe(400);
+    expect((await draft.json() as { error: string }).error).toContain('バブルかカルーセル');
+  });
+});

@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * フォルダを1つ足す窓。
+ * フォルダを1つ足す窓。Pencil V5 の `CsGTC`（共通 フォルダ 追加・編集・削除）。
  *
  * シナリオ・タグ・一斉配信・リマインダ…と、分類を持つ画面すべてで同じものを
  * 出す。画面ごとに書き写していたので、色の並びや「やめる／追加する」の
@@ -11,7 +11,9 @@
  */
 
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { api } from '@/lib/api'
+import type { Folder } from '@line-crm/shared'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
 export const FOLDER_COLORS = [
@@ -28,6 +30,18 @@ export const FOLDER_COLORS = [
 export interface FolderAddDialogProps {
   /** `folders.kind`。'broadcast' / 'scenario' など。 */
   kind: string
+  /**
+   * 直すフォルダ。渡すと**追加ではなく名前と色を直す窓**になる。
+   *
+   * 設計 `CzndJ` の「名前を変更」「色を変える」。窓を2つ作らないのは、
+   * 入れる項目が同じで、離すと文言や色の並びがまたずれるため。
+   */
+  folder?: Folder
+  /**
+   * フォルダの持ち主のLINE公式アカウント。アカウント単位の kind
+   * （template など）では必ず渡す。渡さないと共有（未所属）のフォルダになる。
+   */
+  accountId?: string | null
   /** 窓の下に出す一言。「消しても中身は未分類に残る」など。 */
   note?: string
   /** 例に出す名前。 */
@@ -39,13 +53,15 @@ export interface FolderAddDialogProps {
 
 export default function FolderAddDialog({
   kind,
+  folder,
+  accountId,
   note,
   placeholder = '例: 01_キャンペーン',
   onClose,
   onAdded,
 }: FolderAddDialogProps) {
-  const [name, setName] = useState('')
-  const [color, setColor] = useState(FOLDER_COLORS[0])
+  const [name, setName] = useState(folder?.name ?? '')
+  const [color, setColor] = useState(folder?.color ?? FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -55,7 +71,12 @@ export default function FolderAddDialog({
     setSaving(true)
     setError('')
     try {
-      const res = await api.folders.create({ kind, name: trimmed, color })
+      // `api.folders.update` の実体は部分更新をそのまま送る。変数にまとめて、
+      // 名前だけ直して選んだ色を捨てる以前の挙動へ戻さない。
+      const folderUpdates = { name: trimmed, color }
+      const res = folder
+        ? await api.folders.update(folder.id, folderUpdates, accountId ?? undefined)
+        : await api.folders.create({ kind, name: trimmed, color, accountId })
       if (!res.success) {
         setError(res.error)
         return
@@ -63,7 +84,7 @@ export default function FolderAddDialog({
       onAdded()
       onClose()
     } catch {
-      setError('フォルダを追加できませんでした')
+      setError(folder ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
     } finally {
       setSaving(false)
     }
@@ -71,8 +92,13 @@ export default function FolderAddDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-canvas rounded-card w-full max-w-md p-5 shadow-xl">
-        <h2 className="text-ink text-base font-bold">フォルダを追加</h2>
+      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-xl">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         {note && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{note}</p>}
 
         <label className="mt-4 block">
@@ -88,7 +114,7 @@ export default function FolderAddDialog({
               if (e.key === 'Enter' && name.trim()) void add()
             }}
             placeholder={placeholder}
-            className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
           />
         </label>
 
@@ -123,9 +149,9 @@ export default function FolderAddDialog({
             type="button"
             onClick={() => void add()}
             disabled={saving || !name.trim()}
-            className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+            className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
-            {saving ? '追加中…' : '追加する'}
+            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '変更を保存' : '追加する')}
           </button>
         </div>
       </div>

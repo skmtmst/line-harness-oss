@@ -16,6 +16,15 @@ name: Migrate D1
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: マイグレーション確認か、ステージング運用経路の確認か
+        type: choice
+        required: true
+        default: migrate
+        options:
+          - migrate
+          - verify-operational-path
+          - restore-booking-hours-20260922
       environment:
         description: どのデータベースに当てるか
         type: choice
@@ -32,12 +41,91 @@ on:
         options:
           - dry-run
           - apply
+      migration:
+        description: 指定した1件だけを対象にする場合のファイル名（空欄は未適用すべて）
+        type: string
+        required: false
+        default: ''
+      recovery_digest:
+        description: 営業時間復旧専用。dry-run の照合値を apply に指定
+        type: string
+        required: false
+        default: ''
+      recovery_confirmation:
+        description: 営業時間復旧専用。apply は RESTORE-20260922-TEST-HOURS と入力
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  restore-booking-hours-20260922:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.operation == 'restore-booking-hours-20260922' &&
+      inputs.environment == 'staging' &&
+      github.repository == 'skmtmst/line-harness-oss' &&
+      github.ref == 'refs/heads/codex/development'
+    environment: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: recovery-staging-booking-hours-20260922
+      cancel-in-progress: false
+    env:
+      RECOVERY_ENVIRONMENT: staging
+      RECOVERY_MODE: ${{ inputs.mode }}
+      RECOVERY_DIGEST: ${{ inputs.recovery_digest }}
+      RECOVERY_CONFIRMATION: ${{ inputs.recovery_confirmation }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify offline safety tests
+        run: pnpm exec vitest run scripts/recovery/booking-hours-20260922.test.ts
+      - name: Verify clean checkout and current development revision
+        run: |
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          recovery_remote_sha=$(git ls-remote origin refs/heads/codex/development | cut -f1)
+          test "$recovery_remote_sha" = "$GITHUB_SHA"
+      - name: Read-only preflight and backup
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RECOVERY_BACKUP: ${{ runner.temp }}/booking-hours-20260922-before.json
+        run: pnpm exec tsx scripts/recovery/booking-hours-20260922.ts capture
+      - name: Persist backup before any write
+        id: backup
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: booking-hours-20260922-before-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/booking-hours-20260922-before.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Restore only the approved interval and flag
+        if: inputs.mode == 'apply'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RECOVERY_ARTIFACT_ID: ${{ steps.backup.outputs.artifact-id }}
+          RECOVERY_BACKUP: ${{ runner.temp }}/booking-hours-20260922-before.json
+        run: |
+          test -z "$(git status --porcelain)"
+          recovery_remote_sha=$(git ls-remote origin refs/heads/codex/development | cut -f1)
+          test "$recovery_remote_sha" = "$GITHUB_SHA"
+          pnpm exec tsx scripts/recovery/booking-hours-20260922.ts apply
+
   migrate:
+    if: inputs.operation == 'migrate'
     environment:
       name: ${{ inputs.environment }}
     runs-on: ubuntu-latest
@@ -45,11 +133,11 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -98,9 +186,23 @@ jobs:
         id: pending
         env:
           DB_NAME: ${{ steps.db.outputs.name }}
+          TARGET_MIGRATION: ${{ inputs.migration }}
         run: |
-          pending_file="$RUNNER_TEMP/d1-pending-migrations.txt"
-          : > "$pending_file"
+          all_pending_file="$RUNNER_TEMP/d1-all-pending-migrations.txt"
+          apply_file="$RUNNER_TEMP/d1-pending-migrations.txt"
+          : > "$all_pending_file"
+          : > "$apply_file"
+
+          if [ -n "$TARGET_MIGRATION" ]; then
+            if ! printf '%s' "$TARGET_MIGRATION" | grep -Eq '^[0-9]{3,}_[A-Za-z0-9_-]+\.sql$'; then
+              echo "::error::migration にはマイグレーションのファイル名だけを指定してください"
+              exit 1
+            fi
+            if [ ! -f "packages/db/migrations/$TARGET_MIGRATION" ]; then
+              echo "::error::指定したマイグレーションが見つかりません: $TARGET_MIGRATION"
+              exit 1
+            fi
+          fi
 
           npx wrangler d1 execute "$DB_NAME" --remote --command \
             "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
@@ -113,27 +215,44 @@ jobs:
               console.log(rows.map((r) => r.name).join('\n'));
             ")
 
-          count=0
+          pending_count=0
           for f in $(ls packages/db/migrations/*.sql | sort); do
             name=$(basename "$f")
             if ! printf '%s\n' "$applied" | grep -qxF "$name"; then
-              printf '%s\n' "$f" >> "$pending_file"
-              count=$((count + 1))
+              printf '%s\n' "$f" >> "$all_pending_file"
+              pending_count=$((pending_count + 1))
             fi
           done
 
-          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ -n "$TARGET_MIGRATION" ]; then
+            target_path="packages/db/migrations/$TARGET_MIGRATION"
+            if grep -qxF "$target_path" "$all_pending_file"; then
+              printf '%s\n' "$target_path" > "$apply_file"
+            fi
+          else
+            cp "$all_pending_file" "$apply_file"
+          fi
+
+          apply_count=$(wc -l < "$apply_file" | tr -d ' ')
+          echo "count=$apply_count" >> "$GITHUB_OUTPUT"
           {
-            echo "## 未適用のマイグレーション: ${count} 件"
+            echo "## 未適用のマイグレーション: ${pending_count} 件"
             echo
             echo "対象: \`$DB_NAME\`"
             echo
-            if [ "$count" -gt 0 ]; then
+            if [ "$pending_count" -gt 0 ]; then
               echo '```'
-              sed 's#^packages/db/migrations/##' "$pending_file"
+              sed 's#^packages/db/migrations/##' "$all_pending_file"
               echo '```'
             else
               echo "すべて適用済みです。"
+            fi
+            echo
+            if [ -n "$TARGET_MIGRATION" ]; then
+              echo "今回の指定: \`$TARGET_MIGRATION\`"
+              echo "適用対象: ${apply_count} 件"
+            else
+              echo "今回の指定: 未適用すべて"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -207,3 +326,45 @@ jobs:
           else
             echo "$COUNT 件を当てました。上のサマリーに復元点が出ています。"
           fi
+
+  verify-operational-path:
+    if: inputs.operation == 'verify-operational-path' && inputs.environment == 'staging' && github.ref == 'refs/heads/codex/development'
+    environment:
+      name: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERIFY_ENVIRONMENT: staging
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify D1, delivery batches, and notification rules
+        run: |
+          set -o pipefail
+          pnpm tsx scripts/verify-staging-operational-path.ts \
+            | tee "$RUNNER_TEMP/staging-verification.json"
+
+      - name: Publish aggregate-only result
+        if: always()
+        run: |
+          {
+            echo '## ステージング運用経路の確認'
+            echo
+            if [ -s "$RUNNER_TEMP/staging-verification.json" ]; then
+              echo '```json'
+              tail -n 1 "$RUNNER_TEMP/staging-verification.json"
+              echo '```'
+            else
+              echo '検証結果を生成できませんでした。'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

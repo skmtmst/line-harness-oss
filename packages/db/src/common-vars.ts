@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { getAccountSetting, getVersionedAccountSetting } from './account-settings.js';
 
 /**
  * 共通情報。
@@ -8,8 +9,97 @@ import { jstNow } from './utils.js';
  * 探して回らなくてよくなる。
  */
 
-export const COMMON_VAR_TYPES = ['text', 'url', 'image', 'number'] as const;
+export const COMMON_VAR_TYPES = ['text', 'url', 'image', 'number', 'long_text', 'date', 'datetime', 'boolean'] as const;
 export type CommonVarType = (typeof COMMON_VAR_TYPES)[number];
+
+/** 値は文字列のまま差し込む。型ごとの表記だけをここで一意に整える。 */
+export function normalizeCommonVarValue(type: CommonVarType, value: string): string | null {
+  if (type === 'long_text') return value.length <= 10_000 ? value : null;
+  if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
+  /*
+   * 画像はLINEへ画像URLとして差し込まれる。URLでない文字列や https 以外の
+   * scheme は送信時に壊れるため、口で止める（VAR-03）。空は「空のまま」
+   * 運用があるため通す。要件のメディアID参照(v6-14 §5-2)へ移るまでは、
+   * 最小の形式検査として https URL だけを受ける。
+   */
+  if (type === 'image') {
+    if (value === '') return value;
+    return value.length <= 200 && /^https:\/\/\S+$/.test(value) ? value : null;
+  }
+  /*
+   * URL型はリンク先として差し込まれる。URLでない文章は配信・予約導線で
+   * 壊れるため、口で止める（R36）。画像と違い、社内・検証環境の http
+   * リンクも運用するため http/https の両方を受ける。空は「空のまま」
+   * 運用があるため通す。
+   */
+  if (type === 'url') {
+    if (value === '') return value;
+    return value.length <= 200 && /^https?:\/\/\S+$/.test(value) ? value : null;
+  }
+  if (type === 'date' || type === 'datetime') {
+    const match = type === 'date'
+      ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+      : /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+    if (!match) return null;
+    const [year, month, day, hour = '00', minute = '00'] = match.slice(1);
+    const at = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)));
+    return at.getUTCFullYear() === Number(year) && at.getUTCMonth() === Number(month) - 1
+      && at.getUTCDate() === Number(day) && at.getUTCHours() === Number(hour)
+      && at.getUTCMinutes() === Number(minute) ? value : null;
+  }
+  return value.length <= 200 ? value : null;
+}
+
+/*
+ * Q: 鍵の形・長い乱数は共通情報に保存させない。
+ * APIキーやトークンを本文差し込みへ置くと、配信・フォーム・公開画面の
+ * どこへでも漏れる。秘密情報は外部連携の保管場所へ入れる決まり。
+ *
+ * 見立ては2系統。有名な鍵の形（Stripe/AWS/Google/JWT/PEM/Slack）と、
+ * 空白を含まない長い乱数（32文字以上で英数字の混ざったもの）。電話番号や
+ * 営業時間のような普通の文はどちらにも当たらない。
+ */
+const SECRET_SHAPED_PATTERNS: readonly RegExp[] = [
+  /sk[-_](live|test|prod)?[-_]?[A-Za-z0-9]{10,}/i,
+  /AKIA[0-9A-Z]{16}/,
+  /AIza[0-9A-Za-z_-]{35}/,
+  /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /xox[baprs]-[0-9A-Za-z-]{10,}/,
+  /ya29\.[0-9A-Za-z_-]{10,}/,
+  // 32桁以上の16進数はチャネルシークレットやハッシュの形。
+  /^[0-9a-f]{32,}$/i,
+];
+
+export function isSecretLikeValue(value: string): boolean {
+  if (SECRET_SHAPED_PATTERNS.some((pattern) => pattern.test(value))) return true;
+  // URL はパスやクエリに英数字が混ざるだけで、鍵とは別物として扱う。
+  if (/^https?:\/\//i.test(value)) return false;
+  // 空白なしで32文字以上。全部が同じ字種（数字だけ・小文字だけの記念日等）なら
+  // 乱数とは言えないので、字種が3種以上混ざるものだけを鍵らしいと見る。
+  if (value.length < 32 || /\s/.test(value)) return false;
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/]
+    .filter((pattern) => pattern.test(value)).length;
+  return classes >= 3;
+}
+
+/** datetime-local は管理画面のJST入力として受け、DBでは比較可能なUTC ISOにそろえる。 */
+export function normalizeCommonVarValidityAt(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') return null;
+  const local = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (local) {
+    const [, year, month, day, hour, minute] = local;
+    const jstAsUtc = Date.UTC(
+      Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute),
+    );
+    const roundTrip = new Date(jstAsUtc).toISOString().slice(0, 16);
+    if (roundTrip !== value) return null;
+    return new Date(jstAsUtc - 9 * 60 * 60_000).toISOString();
+  }
+  const at = new Date(value);
+  return Number.isFinite(at.getTime()) ? at.toISOString() : null;
+}
 
 export interface CommonVar {
   id: string;
@@ -19,12 +109,166 @@ export interface CommonVar {
   var_key: string;
   type: string;
   value: string;
+  memo: string;
+  version: number;
+  updated_by: string | null;
+  archived_at: string | null;
+  replacement_run_id: string | null;
+  status: CommonVarStatus;
+  stopped_at: string | null;
+  expiry_notice_14_at: string | null;
+  expiry_notice_3_at: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  fallback_value: string | null;
+  expiry_behavior: CommonVarExpiryBehavior;
   created_at: string;
   updated_at: string;
   /** 一覧用。未反映の次回予約を一覧APIでまとめて返し、行ごとのAPI呼出を避ける。 */
   next_effective_from?: string | null;
   next_value?: string | null;
   pending_schedule_count?: number;
+  /** 一覧用。現在・過去を含め、差し込まれている場所の合計。 */
+  usage_count?: number;
+  usage_by_kind?: Record<CommonVarUsageKind, number>;
+}
+
+export type CommonVarExpiryBehavior = 'stop' | 'fallback';
+
+/**
+ * 共通情報の状態（Q）。「期限切れ」は列に持たず、有効終了と現在時刻から
+ * 表示のたびに計算する。止めた・下書きは差し込みに答えられない。
+ */
+export type CommonVarStatus = 'draft' | 'active' | 'stopped';
+
+export type CommonVarResolutionFailureReason =
+  | 'missing'
+  | 'not_started'
+  | 'expired'
+  | 'fallback_missing'
+  | 'invalid_window'
+  | 'stopped'
+  | 'draft';
+
+export interface CommonVarResolutionEntry {
+  id: string;
+  varKey: string;
+  version: number;
+  value: string;
+  source: 'primary' | 'fallback';
+}
+
+export type CommonVarResolution =
+  | { ok: true; values: Record<string, string>; entries: CommonVarResolutionEntry[] }
+  | { ok: false; failures: Array<{ varKey: string; reason: CommonVarResolutionFailureReason }> };
+
+/**
+ * 実行時刻を1つに固定して、本文が参照する共通情報だけを解決する。
+ *
+ * 有効期間は [valid_from, valid_until) の半開区間。終了時刻ちょうどは
+ * 期限切れとして扱う。呼び出し側は entries の id/version をsnapshotと一緒に
+ * 保存し、外部送信前に同じ版かをCAS確認する。
+ */
+export async function resolveCommonVarValuesAt(
+  db: D1Database,
+  lineAccountId: string,
+  varKeys: string[],
+  executionAt: string,
+): Promise<CommonVarResolution> {
+  const uniqueKeys = [...new Set(varKeys)];
+  if (uniqueKeys.length === 0) return { ok: true, values: {}, entries: [] };
+  const executionMs = Date.parse(executionAt);
+  if (!Number.isFinite(executionMs)) {
+    return {
+      ok: false,
+      failures: uniqueKeys.map((varKey) => ({ varKey, reason: 'invalid_window' })),
+    };
+  }
+  const rows = await db.prepare(
+    `SELECT id, var_key, value, fallback_value, valid_from, valid_until,
+            expiry_behavior, version, status
+       FROM common_vars
+      WHERE line_account_id = ? AND archived_at IS NULL`,
+  ).bind(lineAccountId).all<Pick<
+    CommonVar,
+    'id' | 'var_key' | 'value' | 'fallback_value' | 'valid_from' | 'valid_until' | 'expiry_behavior' | 'version' | 'status'
+  >>();
+  const byKey = new Map(rows.results.map((row) => [row.var_key, row]));
+  const values: Record<string, string> = {};
+  const entries: CommonVarResolutionEntry[] = [];
+  const failures: Array<{ varKey: string; reason: CommonVarResolutionFailureReason }> = [];
+
+  for (const varKey of uniqueKeys) {
+    const row = byKey.get(varKey);
+    if (!row) {
+      failures.push({ varKey, reason: 'missing' });
+      continue;
+    }
+    // 止めた・下書きは差し込みに答えられない。代替値も使わず、
+    // 配信を止めて運用者へ知らせる失敗にする（Q）。
+    if (row.status === 'stopped' || row.status === 'draft') {
+      failures.push({ varKey, reason: row.status });
+      continue;
+    }
+    const fromMs = row.valid_from === null ? null : Date.parse(row.valid_from);
+    const untilMs = row.valid_until === null ? null : Date.parse(row.valid_until);
+    const invalidWindow = (fromMs !== null && !Number.isFinite(fromMs))
+      || (untilMs !== null && !Number.isFinite(untilMs))
+      || (fromMs !== null && untilMs !== null && fromMs >= untilMs);
+    const before = !invalidWindow && fromMs !== null && executionMs < fromMs;
+    const expired = !invalidWindow && untilMs !== null && executionMs >= untilMs;
+    if (!invalidWindow && !before && !expired) {
+      // 制約導入前の旧行は value が NULL で残り得る。NULL を値として返すと
+      // 呼出し側の `vars[key] ?? ''` で空文字化して送られるため、
+      // 文字列でない値は missing 相当の失敗に倒す。
+      if (typeof row.value !== 'string') {
+        failures.push({ varKey, reason: 'missing' });
+        continue;
+      }
+      values[varKey] = row.value;
+      entries.push({
+        id: row.id,
+        varKey,
+        version: Number(row.version),
+        value: row.value,
+        source: 'primary',
+      });
+      continue;
+    }
+    if (row.expiry_behavior === 'fallback' && typeof row.fallback_value === 'string') {
+      values[varKey] = row.fallback_value;
+      entries.push({
+        id: row.id,
+        varKey,
+        version: Number(row.version),
+        value: row.fallback_value,
+        source: 'fallback',
+      });
+      continue;
+    }
+    failures.push({
+      varKey,
+      reason: invalidWindow
+        ? 'invalid_window'
+        : row.expiry_behavior === 'fallback'
+          ? 'fallback_missing'
+          : before ? 'not_started' : 'expired',
+    });
+  }
+  return failures.length > 0 ? { ok: false, failures } : { ok: true, values, entries };
+}
+
+export interface CommonVarVersion {
+  id: string;
+  common_var_id: string;
+  version_no: number;
+  name: string;
+  value: string;
+  memo: string;
+  change_reason: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  created_at: string;
 }
 
 export type CommonVarUsageKind =
@@ -40,10 +284,15 @@ export type CommonVarUsageKind =
 
 export interface CommonVarUsageImpact {
   total: number;
-  /** 過去に送り終わった配信を除き、削除すると現在の設定が壊れる件数。 */
+  /**
+   * 過去に送り終わった配信と、送信開始時の値で固定済みの配信中を除き、
+   * 削除すると現在の設定が壊れる件数。
+   */
   blockingTotal: number;
   /** 送信済みで、共通情報を削除しても過去の配信内容が変わらない件数。 */
   historicalTotal: number;
+  /** 配信中で、送信開始時に固定した値の写しがある件数。保存・削除で変わらない。 */
+  sendingFixedTotal: number;
   /** LINEアカウントへの所属が無く、名前や本文を安全に返せない古いフォーム。 */
   unscopedFormTotal: number;
   byKind: Record<CommonVarUsageKind, number>;
@@ -88,8 +337,14 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'broadcast',
+    // IDEA-14: 送信を始めた配信は、使う共通情報の値を送信開始時点の
+    // スナップショットで固定する（common-var-snapshot.ts）。固定済みのものは
+    // 共通情報を直してももう変わらないので、予約中とは別の状態名で返す。
+    // snapshot がまだ無い sending（開始直後の短い隙間・失敗からの再開待ち）は
+    // 再開時にいまの値を読むため、変わる側に残す。
     sql: `SELECT b.id AS source_id, NULL AS source_parent_id, b.title AS source_name,
-                 b.status AS source_status,
+                 CASE WHEN b.status = 'sending' AND b.common_var_snapshot IS NOT NULL
+                      THEN 'sending_fixed' ELSE b.status END AS source_status,
                  CASE WHEN instr(coalesce(b.message_content, ''), ?) > 0
                       THEN b.message_content ELSE coalesce(b.message_bubbles_json, '') END AS source_content,
                  CASE WHEN b.status = 'sent' THEN 1 ELSE 0 END AS is_historical
@@ -124,9 +379,21 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
            FROM scenario_actions sa JOIN scenarios s ON s.id = sa.scenario_id
            WHERE s.line_account_id = ? AND sa.action_type = 'common_var'
              AND json_extract(CASE WHEN json_valid(sa.config_json)
-                                   THEN sa.config_json ELSE 'null' END, '$.varKey') = ?`,
+                                   THEN sa.config_json ELSE 'null' END, '$.varKey') = ?
+           UNION ALL
+          -- N-186: 公開版スナップショットは編集中の下書きと別物。公開済み版から
+          -- 送られる通文は、版を固定した時点で写した内容で差し込まれるため、
+          -- 使用先として数える。下書き・廃止版は含めない。
+          SELECT v.id AS source_id, s.id AS source_parent_id,
+                 s.name || '・公開版v' || CAST(v.version_number AS TEXT) AS source_name,
+                 'published' AS source_status,
+                 v.steps_snapshot AS source_content, 0 AS is_historical
+            FROM scenario_versions v JOIN scenarios s ON s.id = v.scenario_id
+           WHERE s.line_account_id = ? AND v.status = 'published'
+             AND instr(coalesce(v.steps_snapshot, ''), ?) > 0`,
     values: (varKey, token, account) => [
       token, token, account, token, token, token, account, varKey,
+      account, token,
     ],
   },
   {
@@ -135,8 +402,18 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                  CASE WHEN r.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  rs.message_content AS source_content, 0 AS is_historical
             FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
-           WHERE r.line_account_id = ? AND instr(coalesce(rs.message_content, ''), ?) > 0`,
-    values: (_varKey, token, account) => [account, token],
+           WHERE r.line_account_id = ? AND instr(coalesce(rs.message_content, ''), ?) > 0
+           UNION ALL
+          -- N-186: 公開版スナップショットは編集中の下書きと別物。下書き・
+          -- 失効版は含めない。所属は親のLINEアカウントで絞る。
+          SELECT v.id AS source_id, r.id AS source_parent_id,
+                 r.name || '・公開版v' || CAST(v.version_number AS TEXT) AS source_name,
+                 'published' AS source_status,
+                 v.settings_snapshot AS source_content, 0 AS is_historical
+            FROM reminder_versions v JOIN reminders r ON r.id = v.reminder_id
+           WHERE r.line_account_id = ? AND v.status = 'published'
+             AND instr(coalesce(v.settings_snapshot, ''), ?) > 0`,
+    values: (_varKey, token, account) => [account, token, account, token],
   },
   {
     kind: 'auto_reply',
@@ -147,7 +424,7 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                       THEN ar.response_content ELSE coalesce(ar.actions_json, '') END AS source_content,
                  0 AS is_historical
             FROM auto_replies ar
-           WHERE ar.line_account_id = ?
+           WHERE ar.line_account_id = ? AND ar.deleted_at IS NULL
              AND (instr(coalesce(ar.response_content, ''), ?) > 0
                OR instr(coalesce(ar.actions_json, ''), ?) > 0
                OR EXISTS (
@@ -159,19 +436,34 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'form',
-    sql: `SELECT f.id AS source_id, NULL AS source_parent_id, f.name AS source_name,
-                 CASE WHEN f.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
-                 CASE WHEN instr(coalesce(f.on_submit_message_content, ''), ?) > 0
+    sql: `WITH target(token, account_id) AS (SELECT ?, ?)
+          SELECT f.id AS source_id, NULL AS source_parent_id, f.name AS source_name,
+                 CASE WHEN v.id IS NOT NULL AND (
+                            instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+                         OR instr(coalesce(v.fields, ''), target.token) > 0
+                         OR instr(coalesce(v.layout, ''), target.token) > 0)
+                      THEN 'published'
+                      WHEN f.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 CASE WHEN instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+                      THEN v.on_submit_message_content
+                      WHEN instr(coalesce(v.fields, ''), target.token) > 0 THEN v.fields
+                      WHEN instr(coalesce(v.layout, ''), target.token) > 0 THEN v.layout
+                      WHEN instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
                       THEN f.on_submit_message_content
-                      WHEN instr(coalesce(f.fields, ''), ?) > 0 THEN f.fields
+                      WHEN instr(coalesce(f.fields, ''), target.token) > 0 THEN f.fields
                       ELSE coalesce(f.layout, '') END AS source_content,
                  0 AS is_historical
             FROM forms f JOIN form_accounts fa ON fa.form_id = f.id
-           WHERE fa.line_account_id = ?
-             AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
-               OR instr(coalesce(f.fields, ''), ?) > 0
-               OR instr(coalesce(f.layout, ''), ?) > 0)`,
-    values: (_varKey, token, account) => [token, token, account, token, token, token],
+            LEFT JOIN form_versions v ON v.id = f.current_published_version_id
+            CROSS JOIN target
+           WHERE fa.line_account_id = target.account_id
+             AND (instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
+               OR instr(coalesce(f.fields, ''), target.token) > 0
+               OR instr(coalesce(f.layout, ''), target.token) > 0
+               OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+               OR instr(coalesce(v.fields, ''), target.token) > 0
+               OR instr(coalesce(v.layout, ''), target.token) > 0)`,
+    values: (_varKey, token, account) => [token, account],
   },
   {
     kind: 'automation',
@@ -246,6 +538,76 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
   },
 ];
 
+const COMMON_VAR_USAGE_SUMMARY_SQL = `SELECT
+  ${COMMON_VAR_USAGE_QUERIES.map((source) =>
+    `(SELECT COUNT(*) FROM (${source.sql})) AS ${source.kind}`).join(',\n  ')},
+  (SELECT COUNT(*) FROM forms f
+    LEFT JOIN form_versions v ON v.id = f.current_published_version_id
+    CROSS JOIN (SELECT ? AS token) target
+    WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
+      AND (instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
+        OR instr(coalesce(f.fields, ''), target.token) > 0
+        OR instr(coalesce(f.layout, ''), target.token) > 0
+        OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+        OR instr(coalesce(v.fields, ''), target.token) > 0
+        OR instr(coalesce(v.layout, ''), target.token) > 0)) AS unscoped_form`;
+
+export interface CommonVarUsageSummary {
+  total: number;
+  byKind: Record<CommonVarUsageKind, number>;
+}
+
+/**
+ * 一覧に出す使用先件数をまとめて数える。
+ *
+ * ブラウザから1行ずつ影響APIを呼ぶと、一覧表示だけで多数のHTTP往復が起きる。
+ * ここでは各キーの9種類の走査を1文へまとめ、D1のbatchも80件ずつに区切る。
+ */
+export async function getCommonVarUsageCounts(
+  db: D1Database,
+  varKeys: string[],
+  lineAccountId: string,
+): Promise<Map<string, number>> {
+  const summaries = await getCommonVarUsageSummaries(db, varKeys, lineAccountId);
+  return new Map([...summaries].map(([key, summary]) => [key, summary.total]));
+}
+
+/** 一覧1回で、合計だけでなくテンプレート・配信等の種類別件数も返す。 */
+export async function getCommonVarUsageSummaries(
+  db: D1Database,
+  varKeys: string[],
+  lineAccountId: string,
+): Promise<Map<string, CommonVarUsageSummary>> {
+  const uniqueKeys = [...new Set(varKeys)];
+  const summaries = new Map<string, CommonVarUsageSummary>();
+  const batchSize = 80;
+
+  for (let offset = 0; offset < uniqueKeys.length; offset += batchSize) {
+    const keys = uniqueKeys.slice(offset, offset + batchSize);
+    const statements = keys.map((varKey) => {
+      const token = `{{var.${varKey}}}`;
+      const values = COMMON_VAR_USAGE_QUERIES.flatMap((source) =>
+        source.values(varKey, token, lineAccountId));
+      return db.prepare(COMMON_VAR_USAGE_SUMMARY_SQL)
+        .bind(...values, token);
+    });
+    const results = await db.batch<Record<CommonVarUsageKind, number> & { unscoped_form: number }>(statements);
+    keys.forEach((varKey, index) => {
+      const row = results[index]?.results[0];
+      const byKind = Object.fromEntries(COMMON_VAR_USAGE_QUERIES.map(({ kind }) => [
+        kind,
+        Number(row?.[kind] ?? 0) + (kind === 'form' ? Number(row?.unscoped_form ?? 0) : 0),
+      ])) as Record<CommonVarUsageKind, number>;
+      summaries.set(varKey, {
+        total: Object.values(byKind).reduce((sum, count) => sum + count, 0),
+        byKind,
+      });
+    });
+  }
+
+  return summaries;
+}
+
 export interface CommonVarSchedule {
   id: string;
   var_id: string;
@@ -254,10 +616,34 @@ export interface CommonVarSchedule {
   applied_at: string | null;
 }
 
+/**
+ * 一覧の総件数。件数上限で切ったときに「絞り込み誘導」を出すために使う。
+ *
+ * 未取得を0件と見せない規則と同じく、切ったことを黙らない。
+ */
+export async function countCommonVars(
+  db: D1Database,
+  opts: { folderId?: string; ungrouped?: boolean; lineAccountId: string },
+): Promise<number> {
+  const row = opts.folderId
+    ? await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ?`)
+      .bind(opts.lineAccountId, opts.folderId).first<{ total: number }>()
+    : opts.ungrouped
+      ? await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id IS NULL`)
+        .bind(opts.lineAccountId).first<{ total: number }>()
+      : await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL`)
+        .bind(opts.lineAccountId).first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
+/** 一覧の1回の上限。件数に比例して使用先の走査が重くなるため、上限と絞り込み誘導で守る。 */
+export const COMMON_VARS_LIST_LIMIT = 200;
+
 export async function getCommonVars(
   db: D1Database,
-  opts: { folderId?: string; lineAccountId: string },
+  opts: { folderId?: string; lineAccountId: string; limit?: number },
 ): Promise<CommonVar[]> {
+  const limit = Math.max(1, Math.min(Math.floor(opts.limit ?? COMMON_VARS_LIST_LIMIT), COMMON_VARS_LIST_LIMIT));
   const overview = `,
     (SELECT s.effective_from FROM common_var_schedules s
       WHERE s.var_id = common_vars.id AND s.applied_at IS NULL
@@ -269,14 +655,14 @@ export async function getCommonVars(
       WHERE s.var_id = common_vars.id AND s.applied_at IS NULL) AS pending_schedule_count`;
   if (opts.folderId) {
     const result = await db
-      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND folder_id = ? ORDER BY name ASC`)
-      .bind(opts.lineAccountId, opts.folderId)
+      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ? ORDER BY name ASC LIMIT ?`)
+      .bind(opts.lineAccountId, opts.folderId, limit)
       .all<CommonVar>();
     return result.results;
   }
   const result = await db
-    .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? ORDER BY name ASC`)
-    .bind(opts.lineAccountId)
+    .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL ORDER BY name ASC LIMIT ?`)
+    .bind(opts.lineAccountId, limit)
     .all<CommonVar>();
   return result.results;
 }
@@ -310,11 +696,16 @@ export async function getCommonVarUsageImpact(
   // 確定できない。名前や本文は返さず、件数だけ残して削除を安全側に止める。
   const unscopedForms = await db.prepare(
     `SELECT COUNT(*) AS count FROM forms f
+      LEFT JOIN form_versions v ON v.id = f.current_published_version_id
+      CROSS JOIN (SELECT ? AS token) target
       WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
-        AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
-          OR instr(coalesce(f.fields, ''), ?) > 0
-          OR instr(coalesce(f.layout, ''), ?) > 0)`,
-  ).bind(token, token, token).first<{ count: number }>();
+        AND (instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
+          OR instr(coalesce(f.fields, ''), target.token) > 0
+          OR instr(coalesce(f.layout, ''), target.token) > 0
+          OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
+          OR instr(coalesce(v.fields, ''), target.token) > 0
+          OR instr(coalesce(v.layout, ''), target.token) > 0)`,
+  ).bind(token).first<{ count: number }>();
   const unscopedFormTotal = Number(unscopedForms?.count ?? 0);
   byKind.form += unscopedFormTotal;
 
@@ -322,11 +713,18 @@ export async function getCommonVarUsageImpact(
     (sum, item) => sum + (item.is_historical === 1 ? 1 : 0),
     0,
   );
+  // 送信開始時の値で固定済みの配信中は、値を変えても消してもその配信は
+  // 変わらない（写しを持つ）。変わる・壊れる件数には入れない。
+  const sendingFixedTotal = items.reduce(
+    (sum, item) => sum + (item.source_status === 'sending_fixed' ? 1 : 0),
+    0,
+  );
   const total = items.length + unscopedFormTotal;
   return {
     total,
-    blockingTotal: total - historicalTotal,
+    blockingTotal: total - historicalTotal - sendingFixedTotal,
     historicalTotal,
+    sendingFixedTotal,
     unscopedFormTotal,
     byKind,
     items,
@@ -338,8 +736,60 @@ export async function getCommonVarById(
   id: string,
   lineAccountId: string,
 ): Promise<CommonVar | null> {
+  return db.prepare(`SELECT * FROM common_vars WHERE id = ? AND line_account_id = ? AND archived_at IS NULL`)
+    .bind(id, lineAccountId).first<CommonVar>();
+}
+
+/** 履歴表示専用。更新・削除の判定には使わず、アーカイブ済みも参照できる。 */
+export async function getCommonVarByIdIncludingArchived(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<CommonVar | null> {
   return db.prepare(`SELECT * FROM common_vars WHERE id = ? AND line_account_id = ?`)
     .bind(id, lineAccountId).first<CommonVar>();
+}
+
+export class CommonVarVersionConflictError extends Error {
+  constructor(readonly currentVersion: number) {
+    super('Common variable version conflict');
+  }
+}
+
+export class CommonVarFolderError extends Error {
+  constructor() {
+    super('Common variable folder not found or wrong kind');
+  }
+}
+
+export class CommonVarKeyConflictError extends Error {
+  constructor() {
+    super('Common variable key already exists in this account');
+  }
+}
+
+export class CommonVarReasonRequiredError extends Error {
+  constructor() {
+    super('Common variable change reason is required');
+  }
+}
+
+export class CommonVarStatusTransitionError extends Error {
+  constructor(readonly from: string, readonly to: string) {
+    super(`Common variable cannot move from ${from} to ${to}`);
+  }
+}
+
+/**
+ * フォルダの存在と種別を確認する。
+ *
+ * 違う画面のフォルダIDを指定されると、絞り込み表示が想定外になる。
+ * 共通情報以外のフォルダ・存在しないフォルダは受け付けない。
+ */
+async function assertCommonVarFolder(db: D1Database, folderId: string): Promise<void> {
+  const row = await db.prepare(`SELECT id FROM folders WHERE id = ? AND kind = 'common_var'`)
+    .bind(folderId).first<{ id: string }>();
+  if (!row) throw new CommonVarFolderError();
 }
 
 export async function createCommonVar(
@@ -351,36 +801,148 @@ export async function createCommonVar(
     value?: string;
     type?: CommonVarType;
     folderId?: string | null;
+    memo?: string;
+    actorId?: string | null;
+    validFrom?: string | null;
+    validUntil?: string | null;
+    fallbackValue?: string | null;
+    expiryBehavior?: CommonVarExpiryBehavior;
+    /** 下書きとして作るとき 'draft'。省略は従来どおり 'active'（すぐ使える）。 */
+    status?: 'draft' | 'active';
   },
 ): Promise<CommonVar> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db
-    .prepare(
-      `INSERT INTO common_vars (id, line_account_id, folder_id, name, var_key, type, value, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      input.lineAccountId,
-      input.folderId ?? null,
-      input.name,
-      input.varKey,
-      input.type ?? 'text',
-      input.value ?? '',
-      now,
-      now,
-    )
-    .run();
+  const memo = input.memo ?? '';
+  const value = input.value ?? '';
+  const status = input.status ?? 'active';
+  if (input.folderId) await assertCommonVarFolder(db, input.folderId);
+  const duplicate = await db.prepare(
+    `SELECT id FROM common_vars
+      WHERE line_account_id = ? AND var_key = ?
+      LIMIT 1`,
+  ).bind(input.lineAccountId, input.varKey).first<{ id: string }>();
+  if (duplicate) throw new CommonVarKeyConflictError();
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO common_vars
+           (id, line_account_id, folder_id, name, var_key, type, value, memo, version,
+            updated_by, created_at, updated_at, valid_from, valid_until, fallback_value,
+            expiry_behavior, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        id, input.lineAccountId, input.folderId ?? null, input.name, input.varKey,
+        input.type ?? 'text', value, memo, input.actorId ?? null, now, now,
+        input.validFrom ?? null, input.validUntil ?? null, input.fallbackValue ?? null,
+        input.expiryBehavior ?? 'stop', status,
+      ),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), id, input.name, value, memo,
+        status === 'draft' ? '下書きとして作成' : '作成', input.actorId ?? null, now,
+      ),
+    ]);
+  } catch (error) {
+    if (error instanceof Error
+      && error.message.includes('UNIQUE constraint failed: common_vars.line_account_id, common_vars.var_key')) {
+      throw new CommonVarKeyConflictError();
+    }
+    throw error;
+  }
   return (await getCommonVarById(db, id, input.lineAccountId))!;
+}
+
+const EXPIRY_BEHAVIOR_LABELS: Record<CommonVarExpiryBehavior, string> = {
+  stop: '配信を止める',
+  fallback: '代替値を使う',
+};
+
+/** 履歴に残す期間表示。DBのUTC ISOを、画面と同じ日本時間の短い形に直す。 */
+function formatVarStampJst(value: string | null): string {
+  if (!value) return '制限なし';
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return value;
+  const jst = new Date(ms + 9 * 60 * 60_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${pad(jst.getUTCHours())}:${pad(jst.getUTCMinutes())}`;
+}
+
+function clipVarValue(value: string | null): string {
+  if (!value) return '（空）';
+  return value.length > 24 ? `${value.slice(0, 24)}…` : value;
+}
+
+/*
+ * 履歴（common_var_versions）には名前・値・メモ・理由の列しかない。
+ * 有効期間や代替値だけを変えた保存は「同じ値→同じ値」に見えて、
+ * 期間の変更がどこにも残らない。列を足すmigrationなしで追えるよう、
+ * 変わった項目と前後を理由の末尾へ併記する。値そのものは versions の
+ * value 列に残るので、ここでは期間・動作・置き場所などの内訳を書く。
+ */
+function describeCommonVarChanges(
+  existing: CommonVar,
+  input: {
+    folderId?: string | null;
+    validFrom?: string | null;
+    validUntil?: string | null;
+    fallbackValue?: string | null;
+    expiryBehavior?: CommonVarExpiryBehavior;
+  },
+): string {
+  // 名前・値・メモは版行の列に残るので併記しない。残らない項目だけ書く。
+  const changes: string[] = [];
+  if ('folderId' in input && (input.folderId ?? null) !== existing.folder_id) {
+    changes.push('置き場所');
+  }
+  if ('validFrom' in input && (input.validFrom ?? null) !== existing.valid_from) {
+    changes.push(`有効開始 ${formatVarStampJst(existing.valid_from)}→${formatVarStampJst(input.validFrom ?? null)}`);
+  }
+  if ('validUntil' in input && (input.validUntil ?? null) !== existing.valid_until) {
+    changes.push(`有効終了 ${formatVarStampJst(existing.valid_until)}→${formatVarStampJst(input.validUntil ?? null)}`);
+  }
+  if (input.expiryBehavior !== undefined && input.expiryBehavior !== existing.expiry_behavior) {
+    changes.push(
+      `期間外の動作「${EXPIRY_BEHAVIOR_LABELS[existing.expiry_behavior]}」→「${EXPIRY_BEHAVIOR_LABELS[input.expiryBehavior]}」`,
+    );
+  }
+  if ('fallbackValue' in input && (input.fallbackValue ?? null) !== existing.fallback_value) {
+    changes.push(`代替値「${clipVarValue(existing.fallback_value)}」→「${clipVarValue(input.fallbackValue ?? null)}」`);
+  }
+  return changes.join('・');
 }
 
 export async function updateCommonVar(
   db: D1Database,
   id: string,
   lineAccountId: string,
-  input: { name?: string; value?: string; folderId?: string | null },
+  input: {
+    name?: string;
+    value?: string;
+    memo?: string;
+    folderId?: string | null;
+    expectedVersion?: number;
+    actorId?: string | null;
+    changeReason?: string;
+    validFrom?: string | null;
+    validUntil?: string | null;
+    fallbackValue?: string | null;
+    expiryBehavior?: CommonVarExpiryBehavior;
+  },
 ): Promise<CommonVar | null> {
+  const existing = await getCommonVarById(db, id, lineAccountId);
+  if (!existing) return null;
+  if (input.expectedVersion !== undefined && input.expectedVersion !== existing.version) {
+    throw new CommonVarVersionConflictError(existing.version);
+  }
+  // Q: 変える理由は必須。「編集」のような自動補完だと、後から
+  // なぜ変えたか追えなくなる。予約適用のような内部呼出しは
+  // この関数を通さず、専用の履歴文言を直接書き込む。
+  const changeReason = input.changeReason?.trim();
+  if (!changeReason) throw new CommonVarReasonRequiredError();
   const sets: string[] = [];
   const values: unknown[] = [];
   if (input.name !== undefined) {
@@ -391,21 +953,477 @@ export async function updateCommonVar(
     sets.push('value = ?');
     values.push(input.value);
   }
+  if (input.memo !== undefined) {
+    sets.push('memo = ?');
+    values.push(input.memo);
+  }
   if ('folderId' in input) {
+    if (input.folderId) await assertCommonVarFolder(db, input.folderId);
     sets.push('folder_id = ?');
     values.push(input.folderId ?? null);
   }
+  if ('validFrom' in input) {
+    sets.push('valid_from = ?');
+    values.push(input.validFrom ?? null);
+  }
+  if ('validUntil' in input) {
+    sets.push('valid_until = ?');
+    values.push(input.validUntil ?? null);
+    // 期限を延ばした・直したときは、新しい期限へ向けて14日前・3日前の
+    // 知らせをやり直す（Q）。送った印だけ消し、値が変わらないときは触らない。
+    if ((input.validUntil ?? null) !== existing.valid_until) {
+      sets.push('expiry_notice_14_at = NULL', 'expiry_notice_3_at = NULL');
+    }
+  }
+  if ('fallbackValue' in input) {
+    sets.push('fallback_value = ?');
+    values.push(input.fallbackValue ?? null);
+  }
+  if (input.expiryBehavior !== undefined) {
+    sets.push('expiry_behavior = ?');
+    values.push(input.expiryBehavior);
+  }
   if (sets.length > 0) {
-    sets.push('updated_at = ?');
-    values.push(jstNow(), id);
-    values.push(lineAccountId);
-    await db.prepare(`UPDATE common_vars SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`).bind(...values).run();
+    const now = jstNow();
+    const nextVersion = existing.version + 1;
+    // 期間や代替値だけの変更が「同じ値→同じ値」に見えないよう、
+    // 変えた項目の内訳を理由へ併記する（describeCommonVarChanges）。
+    const changeDetail = describeCommonVarChanges(existing, input);
+    const storedReason = changeDetail ? `${changeReason}（変更: ${changeDetail}）` : changeReason;
+    sets.push('version = ?', 'updated_by = ?', 'updated_at = ?');
+    values.push(nextVersion, input.actorId ?? null, now, id, lineAccountId, existing.version);
+    const results = await db.batch([
+      db.prepare(
+        `UPDATE common_vars SET ${sets.join(', ')}
+          WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+      ).bind(...values),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), id, nextVersion,
+        input.name ?? existing.name,
+        input.value ?? existing.value,
+        input.memo ?? existing.memo,
+        storedReason,
+        input.actorId ?? null,
+        now,
+      ),
+    ]);
+    if (Number(results[0]?.meta.changes ?? 0) === 0) {
+      throw new CommonVarVersionConflictError(
+        (await getCommonVarById(db, id, lineAccountId))?.version ?? existing.version,
+      );
+    }
   }
   return getCommonVarById(db, id, lineAccountId);
 }
 
-export async function deleteCommonVar(db: D1Database, id: string, lineAccountId: string): Promise<void> {
-  await db.prepare(`DELETE FROM common_vars WHERE id = ? AND line_account_id = ?`).bind(id, lineAccountId).run();
+/**
+ * 状態の切替（Q）。下書き→使用中（公開）、使用中→止めた、止めた→使用中（再開）。
+ * 使用中へ戻る経路は使える状態を作るので理由を必須にし、止める経路は
+ * 「なぜ止めたか」を後から追えるよう同じく理由を必須にする。
+ * 版を1つ足して履歴に残す。既にアーカイブ済み・存在しないものは null。
+ */
+export async function setCommonVarStatus(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  input: {
+    to: 'active' | 'stopped';
+    actorId?: string | null;
+    changeReason?: string;
+    expectedVersion?: number;
+  },
+): Promise<CommonVar | null> {
+  const existing = await getCommonVarById(db, id, lineAccountId);
+  if (!existing) return null;
+  if (input.expectedVersion !== undefined && input.expectedVersion !== existing.version) {
+    throw new CommonVarVersionConflictError(existing.version);
+  }
+  const changeReason = input.changeReason?.trim();
+  if (!changeReason) throw new CommonVarReasonRequiredError();
+  const from = existing.status;
+  const allowed =
+    (input.to === 'active' && (from === 'draft' || from === 'stopped'))
+    || (input.to === 'stopped' && from === 'active');
+  if (!allowed) throw new CommonVarStatusTransitionError(from, input.to);
+  const now = jstNow();
+  const nextVersion = existing.version + 1;
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE common_vars
+          SET status = ?, stopped_at = ?, version = ?, updated_by = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+    ).bind(input.to, input.to === 'stopped' ? now : null, nextVersion,
+      input.actorId ?? null, now, id, lineAccountId, existing.version),
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), id, nextVersion,
+      existing.name, existing.value, existing.memo,
+      changeReason, input.actorId ?? null, now,
+    ),
+  ]);
+  if (Number(results[0]?.meta.changes ?? 0) === 0) {
+    throw new CommonVarVersionConflictError(
+      (await getCommonVarById(db, id, lineAccountId))?.version ?? existing.version,
+    );
+  }
+  return getCommonVarById(db, id, lineAccountId);
+}
+
+export interface CommonVarExpiryCandidate {
+  id: string;
+  line_account_id: string;
+  name: string;
+  var_key: string;
+  valid_until: string;
+  expiry_notice_14_at: string | null;
+  expiry_notice_3_at: string | null;
+}
+
+/**
+ * 期限14日前・3日前の知らせがまだの共通情報を拾う（Q）。
+ * 使用中で有効終了が未来のものだけ。止めた・下書き・アーカイブ済みは
+ * 送っても動かせないので対象にしない。
+ */
+export async function listCommonVarExpiryCandidates(
+  db: D1Database,
+  nowIso: string,
+): Promise<CommonVarExpiryCandidate[]> {
+  const in14Days = new Date(Date.parse(nowIso) + 14 * 24 * 3600_000).toISOString();
+  const result = await db.prepare(
+    `SELECT id, line_account_id, name, var_key, valid_until,
+            expiry_notice_14_at, expiry_notice_3_at
+       FROM common_vars
+      WHERE archived_at IS NULL
+        AND status = 'active'
+        AND valid_until IS NOT NULL
+        AND valid_until > ?
+        AND valid_until <= ?
+        AND (expiry_notice_14_at IS NULL OR expiry_notice_3_at IS NULL)`,
+  ).bind(nowIso, in14Days).all<CommonVarExpiryCandidate>();
+  return result.results;
+}
+
+/**
+ * 知らせを出した印を打つ。印がまだの行だけ更新するので、
+ * 同じ知らせを2回出す競合が起きても1回しか記録されない。
+ * 戻り値が0なら別の実行が先に印を打っている。
+ */
+export async function markCommonVarExpiryNotice(
+  db: D1Database,
+  id: string,
+  kind: '14d' | '3d',
+  sentAt: string,
+): Promise<boolean> {
+  const column = kind === '14d' ? 'expiry_notice_14_at' : 'expiry_notice_3_at';
+  const result = await db.prepare(
+    `UPDATE common_vars SET ${column} = ?
+      WHERE id = ? AND ${column} IS NULL`,
+  ).bind(sentAt, id).run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
+export async function getCommonVarVersions(
+  db: D1Database,
+  commonVarId: string,
+  lineAccountId: string,
+  limit = 20,
+): Promise<CommonVarVersion[]> {
+  const result = await db.prepare(
+    `SELECT v.*, sm.name AS actor_name
+       FROM common_var_versions v
+       JOIN common_vars cv ON cv.id = v.common_var_id
+       LEFT JOIN staff_members sm ON sm.id = v.actor_id
+      WHERE v.common_var_id = ? AND cv.line_account_id = ?
+      ORDER BY v.version_no DESC
+      LIMIT ?`,
+  ).bind(commonVarId, lineAccountId, Math.max(1, Math.min(limit, 100))).all<CommonVarVersion>();
+  return result.results;
+}
+
+export async function deleteCommonVar(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  actorId: string | null,
+  changeReason: string,
+): Promise<void> {
+  const existing = await getCommonVarById(db, id, lineAccountId);
+  if (!existing) return;
+  const reason = changeReason.trim();
+  if (!reason) throw new CommonVarReasonRequiredError();
+  const now = jstNow();
+  const nextVersion = existing.version + 1;
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE common_vars
+          SET archived_at = ?, version = ?, updated_by = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+    ).bind(now, nextVersion, actorId, now, id, lineAccountId, existing.version),
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at = ?
+        )`,
+    ).bind(
+      crypto.randomUUID(), id, nextVersion, existing.name, existing.value, existing.memo,
+      reason, actorId, now,
+      id, lineAccountId, nextVersion, now,
+    ),
+  ]);
+  if (Number(results[0]?.meta.changes ?? 0) === 0) {
+    throw new CommonVarVersionConflictError(
+      (await getCommonVarByIdIncludingArchived(db, id, lineAccountId))?.version ?? existing.version,
+    );
+  }
+}
+
+export interface CommonVarReplacementTarget {
+  table: string;
+  id: string;
+  kind: CommonVarUsageKind;
+  columns: Record<string, string>;
+  originalColumns: Record<string, string>;
+  fingerprint: string;
+}
+
+export interface CommonVarReplacementPlan {
+  source: CommonVar;
+  replacement: CommonVar;
+  targets: CommonVarReplacementTarget[];
+  usageTotal: number;
+  replaceableTotal: number;
+  blockedTotal: number;
+  historicalTotal: number;
+  unscopedFormTotal: number;
+}
+
+type ReplacementSource = {
+  table: string;
+  kind: CommonVarUsageKind;
+  columns: string[];
+  sql: string;
+};
+
+const COMMON_VAR_REPLACEMENT_SOURCES: ReplacementSource[] = [
+  { table: 'templates', kind: 'template', columns: ['message_content', 'question_json', 'carousel_actions_json'], sql: `SELECT id, message_content, question_json, carousel_actions_json FROM templates WHERE line_account_id = ?` },
+  { table: 'broadcasts', kind: 'broadcast', columns: ['message_content', 'message_bubbles_json'], sql: `SELECT id, message_content, message_bubbles_json FROM broadcasts WHERE status != 'sent' AND (line_account_id = ? OR EXISTS (SELECT 1 FROM json_each(coalesce(account_ids, '[]')) WHERE value = ?))` },
+  { table: 'scenario_steps', kind: 'scenario', columns: ['message_content', 'message_bubbles_json', 'question_json'], sql: `SELECT ss.id, ss.message_content, ss.message_bubbles_json, ss.question_json FROM scenario_steps ss JOIN scenarios s ON s.id = ss.scenario_id WHERE s.line_account_id = ?` },
+  { table: 'scenario_actions', kind: 'scenario', columns: ['config_json'], sql: `SELECT sa.id, sa.config_json FROM scenario_actions sa JOIN scenarios s ON s.id = sa.scenario_id WHERE s.line_account_id = ? AND sa.action_type = 'common_var'` },
+  { table: 'reminder_steps', kind: 'reminder', columns: ['message_content'], sql: `SELECT rs.id, rs.message_content FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id WHERE r.line_account_id = ?` },
+  { table: 'auto_replies', kind: 'auto_reply', columns: ['response_content', 'actions_json'], sql: `SELECT id, response_content, actions_json FROM auto_replies WHERE line_account_id = ? AND deleted_at IS NULL` },
+  { table: 'forms', kind: 'form', columns: ['on_submit_message_content', 'fields', 'layout'], sql: `SELECT DISTINCT f.id, f.on_submit_message_content, f.fields, f.layout, pv.on_submit_message_content AS published_on_submit_message_content, pv.fields AS published_fields, pv.layout AS published_layout FROM forms f JOIN form_accounts fa ON fa.form_id = f.id LEFT JOIN form_versions pv ON pv.id = f.current_published_version_id WHERE fa.line_account_id = ?` },
+  { table: 'automations', kind: 'automation', columns: ['conditions', 'actions'], sql: `SELECT id, conditions, actions FROM automations WHERE line_account_id = ?` },
+  { table: 'automation_versions', kind: 'automation', columns: ['trigger_config', 'condition_config', 'action_config'], sql: `SELECT v.id, v.trigger_config, v.condition_config, v.action_config FROM automation_versions v JOIN automation_definitions d ON d.id = v.automation_id WHERE d.line_account_id = ? AND v.id IN (d.current_draft_version_id, d.current_published_version_id)` },
+  { table: 'account_settings', kind: 'friend_add', columns: ['value'], sql: `SELECT id, value FROM account_settings WHERE line_account_id = ? AND key = 'friend_add_routing'` },
+  { table: 'common_action_versions', kind: 'common_action', columns: ['action_config'], sql: `SELECT v.id, v.action_config FROM common_action_versions v JOIN common_actions a ON a.id = v.common_action_id WHERE a.line_account_id = ? AND v.id IN (a.current_draft_version_id, a.current_published_version_id)` },
+];
+
+function replaceStructuredCommonVar(value: unknown, sourceKey: string, replacementKey: string): boolean {
+  let changed = false;
+  if (Array.isArray(value)) {
+    for (const item of value) changed = replaceStructuredCommonVar(item, sourceKey, replacementKey) || changed;
+    return changed;
+  }
+  if (!value || typeof value !== 'object') return false;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (key === 'varKey' && item === sourceKey) {
+      (value as Record<string, unknown>)[key] = replacementKey;
+      changed = true;
+    } else {
+      changed = replaceStructuredCommonVar(item, sourceKey, replacementKey) || changed;
+    }
+  }
+  return changed;
+}
+
+function replaceCommonVarText(text: string, sourceKey: string, replacementKey: string): string | null {
+  const sourceToken = `{{var.${sourceKey}}}`;
+  const replacementToken = `{{var.${replacementKey}}}`;
+  let next = text.replaceAll(sourceToken, replacementToken);
+  let structuredChanged = false;
+  try {
+    const parsed = JSON.parse(next) as unknown;
+    structuredChanged = replaceStructuredCommonVar(parsed, sourceKey, replacementKey);
+    if (structuredChanged) next = JSON.stringify(parsed);
+  } catch {
+    // 通常本文はJSONではない。厳密な従来トークンだけを置換する。
+  }
+  return next !== text || structuredChanged ? next : null;
+}
+
+function replacementQueryValues(source: ReplacementSource, accountId: string): string[] {
+  return source.table === 'broadcasts' ? [accountId, accountId] : [accountId];
+}
+
+export async function getCommonVarReplacementCandidates(
+  db: D1Database,
+  source: CommonVar,
+): Promise<CommonVar[]> {
+  const result = await db.prepare(
+    `SELECT * FROM common_vars
+      WHERE line_account_id = ? AND id != ? AND type = ? AND archived_at IS NULL
+      ORDER BY name ASC, id ASC`,
+  ).bind(source.line_account_id, source.id, source.type).all<CommonVar>();
+  return result.results;
+}
+
+export async function getCommonVarReplacementPlan(
+  db: D1Database,
+  source: CommonVar,
+  replacement: CommonVar,
+): Promise<CommonVarReplacementPlan> {
+  if (!source.line_account_id || source.line_account_id !== replacement.line_account_id
+    || source.type !== replacement.type || source.id === replacement.id) {
+    throw new Error('Incompatible common variable replacement');
+  }
+  const targets: CommonVarReplacementTarget[] = [];
+  for (const descriptor of COMMON_VAR_REPLACEMENT_SOURCES) {
+    const result = await db.prepare(descriptor.sql)
+      .bind(...replacementQueryValues(descriptor, source.line_account_id))
+      .all<Record<string, string | null>>();
+    for (const row of result.results) {
+      if (descriptor.table === 'forms' && [
+        row.published_on_submit_message_content,
+        row.published_fields,
+        row.published_layout,
+      ].some((value) => typeof value === 'string'
+        && replaceCommonVarText(value, source.var_key, replacement.var_key) !== null)) {
+        // 現在の公開版は不変。下書きだけ差し替えて元変数を消すと公開URLが壊れる。
+        continue;
+      }
+      const columns: Record<string, string> = {};
+      const originalColumns: Record<string, string> = {};
+      const before: string[] = [];
+      for (const column of descriptor.columns) {
+        const current = row[column];
+        if (typeof current !== 'string') continue;
+        const next = replaceCommonVarText(current, source.var_key, replacement.var_key);
+        if (next !== null) {
+          columns[column] = next;
+          originalColumns[column] = current;
+          before.push(`${column}:${current}`);
+        }
+      }
+      if (Object.keys(columns).length > 0) {
+        targets.push({
+          table: descriptor.table,
+          id: String(row.id),
+          kind: descriptor.kind,
+          columns,
+          originalColumns,
+          fingerprint: before.join('\n'),
+        });
+      }
+    }
+  }
+  const impact = await getCommonVarUsageImpact(db, source.var_key, source.line_account_id);
+  const blockedTotal = Math.max(0, impact.blockingTotal - targets.length);
+  return {
+    source,
+    replacement,
+    targets,
+    usageTotal: impact.total,
+    replaceableTotal: targets.length,
+    blockedTotal,
+    historicalTotal: impact.historicalTotal,
+    unscopedFormTotal: impact.unscopedFormTotal,
+  };
+}
+
+export async function applyCommonVarReplacementPlan(
+  db: D1Database,
+  plan: CommonVarReplacementPlan,
+  actorId: string | null,
+  changeReason: string,
+): Promise<{ runId: string; replacedUsageCount: number; archivedVersion: number }> {
+  const reason = changeReason.trim();
+  if (!reason) throw new CommonVarReasonRequiredError();
+  if (!plan.source.line_account_id || plan.blockedTotal > 0) {
+    throw new Error('Common variable replacement is blocked');
+  }
+  const now = jstNow();
+  const runId = crypto.randomUUID();
+  const archivedVersion = plan.source.version + 1;
+  const assertions = plan.targets.map((target) => {
+    const originals = Object.entries(target.originalColumns);
+    return db.prepare(
+      `SELECT CASE WHEN EXISTS (
+         SELECT 1 FROM ${target.table}
+          WHERE id = ? AND ${originals.map(([column]) => `${column} IS ?`).join(' AND ')}
+       ) THEN 1 ELSE json('') END AS unchanged`,
+    ).bind(target.id, ...originals.map(([, value]) => value));
+  });
+  const updates = plan.targets.map((target) => {
+    const entries = Object.entries(target.columns);
+    const originals = Object.entries(target.originalColumns);
+    return db.prepare(
+      `UPDATE ${target.table}
+          SET ${entries.map(([column]) => `${column} = ?`).join(', ')}
+        WHERE id = ? AND ${originals.map(([column]) => `${column} IS ?`).join(' AND ')}
+          AND EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND replacement_run_id = ? AND version = ?
+        )`,
+    ).bind(
+      ...entries.map(([, value]) => value), target.id,
+      ...originals.map(([, value]) => value),
+      plan.source.id, runId, archivedVersion,
+    );
+  });
+  const results = await db.batch([
+    ...assertions,
+    db.prepare(
+      `UPDATE common_vars
+          SET archived_at = ?, replacement_run_id = ?, version = ?, updated_by = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+    ).bind(
+      now, runId, archivedVersion, actorId, now, plan.source.id,
+      plan.source.line_account_id, plan.source.version,
+    ),
+    ...updates,
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND replacement_run_id = ? AND version = ?
+        )`,
+    ).bind(
+      crypto.randomUUID(), plan.source.id, archivedVersion, plan.source.name,
+      plan.source.value, plan.source.memo, `${reason}（「${plan.replacement.name}」へ差し替えてアーカイブ）`,
+      actorId, now, plan.source.id, runId, archivedVersion,
+    ),
+    db.prepare(
+      `INSERT INTO common_var_replacement_runs
+         (id, line_account_id, source_common_var_id, replacement_common_var_id,
+          source_version, expected_usage_count, replaced_usage_count, actor_id, status, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?
+        WHERE EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND replacement_run_id = ? AND version = ?
+        )`,
+    ).bind(
+      runId, plan.source.line_account_id, plan.source.id, plan.replacement.id,
+      plan.source.version, plan.replaceableTotal, plan.replaceableTotal, actorId, now,
+      plan.source.id, runId, archivedVersion,
+    ),
+  ]);
+  const archiveResult = results[assertions.length];
+  if (Number(archiveResult?.meta.changes ?? 0) === 0) {
+    throw new CommonVarVersionConflictError(plan.source.version);
+  }
+  return { runId, replacedUsageCount: plan.replaceableTotal, archivedVersion };
 }
 
 /** 差し込み用に key => value でまとめて返す。 */
@@ -415,7 +1433,7 @@ export async function getCommonVarMap(
 ): Promise<Record<string, string>> {
   if (!lineAccountId) return {};
   const result = await db
-    .prepare(`SELECT var_key, value FROM common_vars WHERE line_account_id = ?`)
+    .prepare(`SELECT var_key, value FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL`)
     .bind(lineAccountId)
     .all<{ var_key: string; value: string }>();
   const out: Record<string, string> = {};
@@ -471,29 +1489,114 @@ export async function deleteCommonVarSchedule(
  * 同じ変数に複数の予約が溜まっている場合は古い順に当て、最後のものが残る。
  * 途中を飛ばすと「一度も適用されなかった値」が残るので、順番に当てる。
  */
+/**
+ * このアカウントで共通情報が有効か。worker の accountFeatureIsEnabled と
+ * 同じ順序(一括設定→個別設定→初期値)で読む。正本は worker 側にあり、
+ * ここは dispatcher が db 層だけで止めるための最小複製。
+ */
+export async function isCommonVarsEnabled(db: D1Database, accountId: string): Promise<boolean> {
+  const bundle = await getVersionedAccountSetting<{ features?: Record<string, unknown> }>(
+    db,
+    accountId,
+    'feature.settings_bundle_v1',
+  );
+  const fromBundle = bundle?.data.features?.['common_vars'];
+  if (typeof fromBundle === 'boolean') return fromBundle;
+  const legacy = await getAccountSetting(db, accountId, 'feature.common_vars');
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy) as { enabled?: unknown };
+      if (typeof parsed.enabled === 'boolean') return parsed.enabled;
+    } catch {
+      // 壊れた値は初期値に倒す。
+    }
+  }
+  return true;
+}
+
 export async function applyDueCommonVarSchedules(
   db: D1Database,
   now: string,
+  limit = 1_000,
 ): Promise<number> {
+  const batchLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
+    : 1_000;
   const due = await db
     .prepare(
       `SELECT * FROM common_var_schedules
         WHERE applied_at IS NULL AND effective_from <= ?
-        ORDER BY effective_from ASC`,
+        ORDER BY effective_from ASC, id ASC
+        LIMIT ?`,
     )
-    .bind(now)
+    .bind(now, batchLimit)
     .all<CommonVarSchedule>();
   let applied = 0;
   for (const row of due.results) {
-    await db
-      .prepare(`UPDATE common_vars SET value = ?, updated_at = ? WHERE id = ?`)
-      .bind(row.value, jstNow(), row.var_id)
-      .run();
-    await db
-      .prepare(`UPDATE common_var_schedules SET applied_at = ? WHERE id = ?`)
-      .bind(jstNow(), row.id)
-      .run();
-    applied++;
+    // 適用のたびに版を1つ進め、履歴に1行残す。値・版・履歴・適用済み印を
+    // 同じ batch にして、途中で落ちたら「値だけ変わって記録なし」にしない。
+    // 版の一致を条件に入れるので、利用者の同時編集とぶつかった回は
+    // 何も書かず、次回の Cron で当て直す。
+    const current = await db
+      .prepare(
+        `SELECT name, value, memo, version, line_account_id FROM common_vars
+          WHERE id = ? AND archived_at IS NULL`,
+      )
+      .bind(row.var_id)
+      .first<{ name: string; value: string; memo: string | null; version: number; line_account_id: string | null }>();
+    // 機能オフ中は適用せず未適用のまま残す。再オンで再開する。
+    // 正本は services/feature-enforcement.ts の accountFeatureIsEnabled。
+    if (current?.line_account_id && !await isCommonVarsEnabled(db, current.line_account_id)) {
+      continue;
+    }
+    const stamp = jstNow();
+    if (!current) {
+      // 変数自体が無い(削除済み等)の予約は、繰り返し拾わないよう印だけ打つ。
+      await db
+        .prepare(`UPDATE common_var_schedules SET applied_at = ? WHERE id = ?`)
+        .bind(stamp, row.id)
+        .run();
+      applied++;
+      continue;
+    }
+    const nextVersion = current.version + 1;
+    const results = await db.batch([
+      // SELECT後からbatch開始までに画面保存が入っていたら、意図的にSQLエラーを
+      // 起こしてbatch全体を戻す。batch内は同一トランザクションなので、この確認後に
+      // 値・履歴・適用済み印が分かれることはない。
+      db.prepare(
+        `SELECT CASE WHEN EXISTS (
+           SELECT 1 FROM common_vars
+            WHERE id = ? AND version = ? AND archived_at IS NULL
+         ) THEN 1 ELSE json('') END AS version_is_current`,
+      ).bind(row.var_id, current.version),
+      db.prepare(
+        `UPDATE common_vars SET value = ?, version = ?, updated_by = NULL, updated_at = ?
+          WHERE id = ? AND version = ? AND archived_at IS NULL`,
+      ).bind(row.value, nextVersion, stamp, row.var_id, current.version),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(
+        crypto.randomUUID(), row.var_id, nextVersion,
+        current.name, row.value, current.memo ?? '',
+        '予約適用', null, stamp,
+        row.var_id, nextVersion,
+      ),
+      db.prepare(
+        `UPDATE common_var_schedules SET applied_at = ?
+          WHERE id = ? AND applied_at IS NULL AND EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(stamp, row.id, row.var_id, nextVersion),
+    ]);
+    if ((results[1].meta?.changes ?? 0) > 0) applied++;
   }
   return applied;
 }

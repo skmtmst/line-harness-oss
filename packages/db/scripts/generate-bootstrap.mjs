@@ -65,6 +65,10 @@ function buildBootstrapSql() {
           FROM sqlite_master
           WHERE sql IS NOT NULL
             AND name NOT LIKE 'sqlite_%'
+            -- _migrations は配備script が持つ「どこまで当てたか」の記録で、
+            -- アプリのスキーマではない。焼き込むと、これを作るマイグレーションの
+            -- 目印と見なされ、判定器が当たっていないものを partial と読む。
+            AND name <> '_migrations'
           ORDER BY
             CASE type
               WHEN 'table' THEN 0

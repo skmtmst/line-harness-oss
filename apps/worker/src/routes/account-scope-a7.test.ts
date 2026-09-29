@@ -101,7 +101,9 @@ describe('A-7 tenant scope', () => {
     const harness = app();
     expect((await harness.instance.request('/api/nen-members/photos?accountId=own-account')).status).toBe(200);
     expect(harness.sql[0].query).toContain('ps.line_account_id = ? AND f.line_account_id = ?');
-    expect(harness.sql[0].bindings).toEqual(['own-account', 'own-account']);
+    // 先頭はポイント手続き「手続き中」の回収閾値（PHOTO-06）。絞り込みの2値の
+    // あとは、続きを取るための枚数と開始位置（#666）。
+    expect(harness.sql[0].bindings).toEqual([expect.any(String), 'own-account', 'own-account', 200, 0]);
   });
 
   test.each([
@@ -117,7 +119,11 @@ describe('A-7 tenant scope', () => {
     mocks.canAccess.mockResolvedValue(false);
     const response = await app().instance.request(
       '/api/nen-members/photos/photo-1/review',
-      json('PUT', { accountId: 'other-account', status: 'rejected', reasonCode: 'quality' }),
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': 'scope-deny-1' },
+        body: JSON.stringify({ accountId: 'other-account', status: 'rejected', reasonCode: 'quality' }),
+      },
     );
     expect(response.status).toBe(403);
   });

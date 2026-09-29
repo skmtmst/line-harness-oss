@@ -12,9 +12,13 @@
  * 「送信できませんでした」と出すのは、利用者にとって嘘になる。
  */
 
+import type { Message } from '@line-crm/line-sdk';
 import {
   collectInputs,
+  formChoiceIsSelected,
   hasChoices,
+  isCalendarDateString,
+  isFormAnswerEmpty,
   validateAnswers,
   type FormAction,
   type FormChoice,
@@ -31,8 +35,10 @@ import {
   jstNow,
   removeTagFromFriend,
   setFriendFieldValue,
+  validateFriendFieldValue,
 } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { buildMessage } from './line-message.js';
 
 /** 回答1件。キーは入力ブロックの name。 */
 export type FormAnswers = Record<string, unknown>;
@@ -47,6 +53,12 @@ export interface FormGateInput {
   answers: FormAnswers;
   /** 判定の基準時刻。テストから固定できるようにしてある */
   now?: Date;
+  /**
+   * P（試し回答）：true のとき、1人1回・全体上限・選択肢定員を見ない。
+   * 試しは本物の枠を消費せず、本物の回答歴にも数えない。入力の形と
+   * 回答期限は本物と同じに見る。
+   */
+  isTest?: boolean;
 }
 
 /**
@@ -59,6 +71,7 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   const { db, formId, layout, friendId, submitCount, answers } = input;
   const options = layout.options ?? {};
   const now = input.now ?? new Date();
+  const isTest = input.isTest === true;
 
   // 回答期限
   if (options.deadline?.enabled && options.deadline.endsAt) {
@@ -68,8 +81,8 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
     }
   }
 
-  // 全体の受付上限
-  if (options.totalLimit?.enabled && typeof options.totalLimit.max === 'number') {
+  // 全体の受付上限（試しは枠を消費しないので見ない）
+  if (!isTest && options.totalLimit?.enabled && typeof options.totalLimit.max === 'number') {
     if (submitCount >= options.totalLimit.max) {
       return options.totalLimit.message || 'このフォームは受付を終了しました';
     }
@@ -79,19 +92,77 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   const invalid = validateAnswers(layout, answers);
   if (invalid) return invalid;
 
-  // 1人1回
-  if (options.oncePerFriend?.enabled) {
+  // 1人1回（試しは本物の回答歴に数えず、試し同士でも縛らない）
+  if (!isTest && options.oncePerFriend?.enabled) {
     const already = await countFormSubmissionsByFriend(db, formId, friendId);
     if (already > 0) {
       return options.oncePerFriend.message || 'このフォームは、お一人さま1回までです';
     }
   }
 
-  // 選択肢の定員
-  const full = await findFullChoice(db, formId, layout, answers);
-  if (full) return `「${full}」は定員に達しました`;
+  // 選択肢の定員（試しは枠を消費しないので見ない）
+  if (!isTest) {
+    const full = await findFullChoice(db, formId, layout, answers);
+    if (full) return `「${full}」は定員に達しました`;
+  }
 
   return null;
+}
+
+/** 全体上限・選択肢定員のうち、原子的に確保すべき1枠。 */
+export interface FormCapacitySlot {
+  /** `form_capacity_claims.slot_key`。全体は固定値、選択肢は `choice:ブロック名:ラベル`。 */
+  key: string;
+  limit: number;
+  /** 確保できなかったときに利用者へ見せる文言。 */
+  message: string;
+}
+
+/** 全体上限のキー。他のフォーム内容と衝突しない固定値。 */
+export const FORM_TOTAL_LIMIT_SLOT_KEY = '__total__';
+
+/**
+ * この回答が原子的に確保すべき枠を列挙する(N-167 / #751)。
+ *
+ * `checkFormGates` の全体上限・選択肢定員の判定は「数えてから比べる」
+ * だけで、同時に来た別の回答との間に隙間がある。ここで列挙した枠を
+ * `claimFormCapacitySlot` で1つずつ条件付き INSERT すれば、同時に来ても
+ * 定員ぶんしか勝てない。
+ *
+ * `checkFormGates` と同じ判定条件(enabled・limit の型)を使う。
+ * 対象が無ければ空配列を返す(ほとんどの回答はここに来ない)。
+ */
+export function collectCapacitySlots(layout: FormLayout, answers: FormAnswers): FormCapacitySlot[] {
+  const slots: FormCapacitySlot[] = [];
+  const options = layout.options ?? {};
+
+  if (options.totalLimit?.enabled && typeof options.totalLimit.max === 'number') {
+    slots.push({
+      key: FORM_TOTAL_LIMIT_SLOT_KEY,
+      limit: options.totalLimit.max,
+      message: options.totalLimit.message || 'このフォームは受付を終了しました',
+    });
+  }
+
+  for (const block of collectInputs(layout)) {
+    if (!hasChoices(block)) continue;
+    const limited = (block.choices ?? []).filter(
+      (c) => c.capacity?.enabled && typeof c.capacity.limit === 'number',
+    );
+    if (limited.length === 0) continue;
+
+    const selected = toLabels(answers[block.name]);
+    for (const choice of limited) {
+      if (!formChoiceIsSelected(block, choice, selected)) continue;
+      slots.push({
+        key: `choice:${block.name}:${choice.label}`,
+        limit: choice.capacity!.limit!,
+        message: `「${choice.label}」は定員に達しました`,
+      });
+    }
+  }
+
+  return slots;
 }
 
 /**
@@ -126,7 +197,7 @@ async function findFullChoice(
     if (limited.length === 0) continue;
 
     const selected = toLabels(answers[block.name]);
-    const target = limited.filter((c) => selected.includes(c.label));
+    const target = limited.filter((c) => formChoiceIsSelected(block, c, selected));
     if (target.length === 0) continue;
 
     const usage = await countChoiceUsage(db, formId, block.name);
@@ -154,18 +225,63 @@ function toText(value: unknown): string {
 // 送信後の処理
 // ---------------------------------------------------------------------------
 
-/** メッセージを送る手段。route 側から渡す。テストでは差し替える。 */
-export type PushText = (text: string) => Promise<void>;
+/**
+ * メッセージを送る手段。route 側から渡す。テストでは差し替える。
+ * stableSuffix は再開時の再送でも同じ値になる送信の識別子で、LINE の
+ * 再送キーに使い分ける(連番にすると再開時にずれて二重送信になる)。
+ */
+export type PushText = (text: string, stableSuffix: string) => Promise<void>;
+/** 組み立て済みのメッセージ(Flex等)を送る手段。pushText と同じ再送キー規則。 */
+export type PushMessage = (message: Message, stableSuffix: string) => Promise<void>;
 
 export interface FormEffectInput {
   db: D1Database;
   layout: FormLayout;
   friendId: string;
   answers: FormAnswers;
+  /** 解決失敗の台帳に残す出所（フォームID）。無いときは回答IDを使う */
+  formId?: string;
   /** タグ付与に伴うシナリオの即時配信で使う */
   push?: { defaultAccessToken: string; workerUrl?: string };
   /** テキスト送信・テンプレート送信で使う。無ければその動作は飛ばす */
   pushText?: PushText;
+  /**
+   * Flex などテキスト以外のメッセージ送信で使う。send_template で
+   * 非テキストのテンプレートが選ばれたとき、ここが無いと「送れない」を
+   * 失敗として記録する(黙って素通りしない)。
+   */
+  pushMessage?: PushMessage;
+  /**
+   * 回答送信の再開時に二重登録を避ける接頭辞。例: `form-submit:<answerId>`。
+   * 付けるとリマインダ登録に安定した sourceEventId を付けて重複を避ける。
+   */
+  idempotencyPrefix?: string;
+  /**
+   * 効果の実行前–完了の掛け金。再開時は終わった効果を飛ばし、終わった
+   * 効果だけを記録する(部分失敗の補完)。返さない・投げない hook は
+   * 効果を未完のままにしないこと。hook が投げた失敗は握らず、そのまま
+   * 呼び出し元へ返す(予約の所有者を失った合図など)。
+   */
+  skipEffect?: (effectId: string) => boolean;
+  onEffectComplete?: (
+    effectId: string,
+    stats: { attempted: number; succeeded: number; failed: number },
+  ) => Promise<void>;
+}
+
+export interface FormDestinationWriteStats {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+}
+
+export interface FormEffectResult {
+  destinationWrites: FormDestinationWriteStats;
+  /**
+   * 失敗して欠落した工程の名前。空ならすべて完了。
+   * route は空でないとき工程完了にせず、同じ送信の再送で補完する。
+   */
+  failedEffects: string[];
 }
 
 /**
@@ -173,43 +289,151 @@ export interface FormEffectInput {
  *
  * 途中で失敗しても後ろを続ける。1つの動作の失敗が、他の動作を巻き込んで
  * 全部落とすのが一番困る（タグは付いたのにシナリオが動かない、が
- * 分からなくなる）。
+ * 分からなくなる）。失敗した工程の名前は failedEffects に残す。
  */
-export async function applyFormLayoutEffects(input: FormEffectInput): Promise<void> {
+export async function applyFormLayoutEffects(input: FormEffectInput): Promise<FormEffectResult> {
   const { db, layout, friendId, answers } = input;
+  const destinationWrites: FormDestinationWriteStats = { attempted: 0, succeeded: 0, failed: 0 };
+  const failedEffects: string[] = [];
 
   for (const block of collectInputs(layout)) {
     const value = answers[block.name];
     if (value === undefined) continue;
 
-    await runSafely('destinations', () => writeDestinations(db, block, value, friendId));
+    await runEffectStep(input, failedEffects, destinationWrites, `destinations:${block.id}`, () => writeDestinations(
+      db,
+      block,
+      value,
+      friendId,
+      destinationWrites,
+    ));
 
     if (hasChoices(block)) {
-      await runSafely('choices', () => runChoiceEffects(input, block, value));
+      await runEffectStep(input, failedEffects, destinationWrites, `choices:${block.id}`, () =>
+        runChoiceEffects(input, block, value, destinationWrites, failedEffects));
     }
 
     if (block.type === 'date' && block.reminder?.reminderId) {
-      await runSafely('reminder', () =>
-        enrollFriendInReminder(db, {
-          friendId,
-          reminderId: block.reminder!.reminderId,
-          targetDate: toText(value),
-        }).then(() => undefined),
-      );
+      await runEffectStep(input, failedEffects, destinationWrites, `reminder:${block.id}`, () => {
+        // 未回答・暦に無い日付では予定を作らない。失敗ではなく「何もしない」
+        // で工程を終える(空のまま登録予定を作っても、届くものが無いため)。
+        const dateText = toText(value);
+        if (!isCalendarDateString(dateText)) return Promise.resolve();
+        // 同じリマインダを別の日付欄にも割り当てた場合、欄ごとに別の予定と
+        // して扱う(記録キーにブロックIDを含める)。欄をまたいだ重複除去はしない。
+        return enrollFormReminderOnce(input, block.reminder!.reminderId, dateText, `reminder:${block.id}`);
+      });
     }
   }
 
-  for (const action of layout.options?.afterActions ?? []) {
-    await runSafely('afterAction', () => runFormAction(input, action));
+  const afterActions = layout.options?.afterActions ?? [];
+  for (let index = 0; index < afterActions.length; index += 1) {
+    const action = afterActions[index];
+    await runEffectStep(input, failedEffects, destinationWrites, `afterAction:${index}`, () =>
+      runFormAction(input, action, destinationWrites, index, `afterAction:${index}`));
   }
+
+  return { destinationWrites, failedEffects };
 }
 
-async function runSafely(label: string, run: () => Promise<unknown>): Promise<void> {
+/**
+ * layout の後処理が進める内側の工程 id の一覧(N-168)。
+ *
+ * `applyFormLayoutEffects` は工程ごとに `layout:<id>` という記録を残す。
+ * 回答とレイアウトから「あるべき工程」をここで組み立て、予約(claim)の
+ * 記録に無いものが未完=失敗/中断の工程になる。実際に進める順番と同じ
+ * 順で返す。
+ */
+export function layoutEffectStepIds(layout: FormLayout, answers: FormAnswers): string[] {
+  const ids: string[] = [];
+  for (const block of collectInputs(layout)) {
+    if (answers[block.name] === undefined) continue;
+    ids.push(`destinations:${block.id}`);
+    if (hasChoices(block)) ids.push(`choices:${block.id}`);
+    if (block.type === 'date' && block.reminder?.reminderId) {
+      ids.push(`reminder:${block.id}`);
+    }
+  }
+  (layout.options?.afterActions ?? []).forEach((_, index) => ids.push(`afterAction:${index}`));
+  return ids;
+}
+
+/**
+ * 効果を1件実行する。再開時は終わった効果を飛ばし、終わった効果の集計
+ * だけを hook へ渡す。内側で握られた失敗(選択肢ごとの動作など)も、この
+ * 効果の未完として扱い、再送で補完できるようにする。hook の失敗だけは
+ * 握らず呼び出し元へ返す。
+ */
+async function runEffectStep(
+  input: FormEffectInput,
+  failed: string[],
+  stats: FormDestinationWriteStats,
+  effectId: string,
+  run: () => Promise<unknown>,
+): Promise<void> {
+  if (input.skipEffect?.(effectId)) return;
+  const beforeFailed = stats.failed;
+  const beforeInnerFailed = failed.length;
+  const before = { attempted: stats.attempted, succeeded: stats.succeeded, failed: stats.failed };
   try {
     await run();
   } catch (err) {
+    failed.push(effectId);
+    console.error(`form effect (${effectId}) failed:`, err);
+    return;
+  }
+  if (failed.length > beforeInnerFailed || stats.failed > beforeFailed) {
+    // 内側の動作が欠けたまま終わった。再開時に補完するため未完に残す。
+    if (!failed.includes(effectId)) failed.push(effectId);
+    console.error(`form effect (${effectId}) partial failure`);
+    return;
+  }
+  await input.onEffectComplete?.(effectId, {
+    attempted: stats.attempted - before.attempted,
+    succeeded: stats.succeeded - before.succeeded,
+    failed: stats.failed - before.failed,
+  });
+}
+
+async function runTracked(failed: string[], label: string, run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (err) {
+    failed.push(label);
     console.error(`form effect (${label}) failed:`, err);
   }
+}
+
+/**
+ * リマインダの登録。二重登録を避けるため、接頭辞があるときは安定した
+ * 登録元idを付けて既存を確認してから登録する(再開時の再実行に備える)。
+ */
+async function enrollFormReminderOnce(
+  input: FormEffectInput,
+  reminderId: string,
+  targetDate: string,
+  keySuffix?: string,
+): Promise<void> {
+  const { db, friendId } = input;
+  const sourceEventId = input.idempotencyPrefix
+    ? `${input.idempotencyPrefix}:${keySuffix ?? `reminder:${reminderId}`}`
+    : null;
+  if (sourceEventId) {
+    const existing = await db
+      .prepare(
+        `SELECT 1 AS found FROM friend_reminders
+         WHERE friend_id = ? AND reminder_id = ? AND source_event_id = ? LIMIT 1`,
+      )
+      .bind(friendId, reminderId, sourceEventId)
+      .first<{ found: number }>();
+    if (existing?.found) return;
+  }
+  await enrollFriendInReminder(db, {
+    friendId,
+    reminderId,
+    targetDate,
+    sourceEventId,
+  }).then(() => undefined);
 }
 
 /**
@@ -223,19 +447,36 @@ async function writeDestinations(
   block: FormInputBlock,
   value: unknown,
   friendId: string,
+  stats: FormDestinationWriteStats,
 ): Promise<void> {
   const dest = block.destinations;
   if (!dest) return;
+  // 未回答（空文字・空白だけ・空の選択肢）は「更新しない」。
+  // 空欄を登録先へ流すと空文字での上書き＝既存の登録を消してしまうため、
+  // 書き込みを始める前にここで止める。明示的に消す操作は設けない。
+  if (isFormAnswerEmpty(value)) return;
   const text = toText(value);
 
   for (const fieldId of dest.friendFieldIds ?? []) {
+    // 書けない相手(EC正・削除済み)は数えない。数えると「失敗」になり、
+    // 再送しても直らない工程が未完のまま残る。
     const target = await getFriendFieldById(db, fieldId);
     if (!target || target.ec_is_master === 1) continue;
-    await setFriendFieldValue(db, {
-      friendId,
-      fieldId,
-      value: text === '' ? null : text,
-      updatedBy: 'form',
+    await trackDestinationWrite(stats, 1, async () => {
+      // N-042: 生の回答を項目の型で検証し、正規化した値を保存する。
+      // toText で先に文字列化すると、multi_select の正しい選択まで
+      // 1つの文字列として弾かれるので、配列のまま検証する。
+      const rawForCheck = Array.isArray(value) && target.type === 'multi_select' ? value : text;
+      const checked = validateFriendFieldValue(target, rawForCheck);
+      if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
+      await setFriendFieldValue(db, {
+        friendId,
+        fieldId,
+        value: checked.value,
+        updatedBy: 'form',
+        field: target,
+      });
+      return true;
     });
   }
 
@@ -255,10 +496,28 @@ async function writeDestinations(
   }
   if (columns.length === 0 || text === '') return;
 
-  await db
-    .prepare(`UPDATE friends SET ${columns.join(', ')}, updated_at = ? WHERE id = ?`)
-    .bind(...values, jstNow(), friendId)
-    .run();
+  await trackDestinationWrite(stats, columns.length, async () => {
+    await db
+      .prepare(`UPDATE friends SET ${columns.join(', ')}, updated_at = ? WHERE id = ?`)
+      .bind(...values, jstNow(), friendId)
+      .run();
+    return true;
+  });
+}
+
+async function trackDestinationWrite(
+  stats: FormDestinationWriteStats,
+  count: number,
+  write: () => Promise<boolean>,
+): Promise<void> {
+  stats.attempted += count;
+  try {
+    if (await write()) stats.succeeded += count;
+    else stats.failed += count;
+  } catch (error) {
+    stats.failed += count;
+    console.error('form destination write failed:', error);
+  }
 }
 
 /** 選ばれた選択肢の動作を実行する。 */
@@ -266,24 +525,31 @@ async function runChoiceEffects(
   input: FormEffectInput,
   block: FormInputBlock,
   value: unknown,
+  stats: FormDestinationWriteStats,
+  failed: string[],
 ): Promise<void> {
   const selected = toLabels(value);
   if (selected.length === 0) return;
 
-  const chosen = (block.choices ?? []).filter((c) => selected.includes(c.label));
+  const chosen = (block.choices ?? []).filter((c) => formChoiceIsSelected(block, c, selected));
   for (const choice of chosen) {
     switch (block.choiceMode) {
       case 'tag':
         await applyChoiceTag(input, choice);
         break;
       case 'friendField':
-        await applyChoiceFriendField(input, block, choice);
+        await applyChoiceFriendField(input, block, choice, stats);
         break;
-      case 'action':
-        for (const action of choice.actions ?? []) {
-          await runSafely('choiceAction', () => runFormAction(input, action));
+      case 'action': {
+        const actions = choice.actions ?? [];
+        for (let actionIndex = 0; actionIndex < actions.length; actionIndex += 1) {
+          const action = actions[actionIndex];
+          const actionLabel = `choiceAction:${block.id}:${choice.id}:${actionIndex}`;
+          await runTracked(failed, actionLabel, () =>
+            runFormAction(input, action, stats, undefined, actionLabel));
         }
         break;
+      }
       default:
         // 動作を決めていない選択肢は、回答として残すだけ
         break;
@@ -307,44 +573,88 @@ async function applyChoiceFriendField(
   input: FormEffectInput,
   block: FormInputBlock,
   choice: FormChoice,
+  stats: FormDestinationWriteStats,
 ): Promise<void> {
   const fieldId = block.choiceFriendFieldId;
   if (!fieldId) return;
+  // 書けない相手は数えない(再送しても直らない未完にしない)。
   const target = await getFriendFieldById(input.db, fieldId);
   if (!target || target.ec_is_master === 1) return;
-  // 値を書いていない選択肢は、ラベルをそのまま入れる
-  const value = choice.value && choice.value !== '' ? choice.value : choice.label;
-  await setFriendFieldValue(input.db, {
-    friendId: input.friendId,
-    fieldId,
-    value,
-    updatedBy: 'form',
+  await trackDestinationWrite(stats, 1, async () => {
+    // 値を書いていない選択肢は、ラベルをそのまま入れる
+    const value = choice.value && choice.value !== '' ? choice.value : choice.label;
+    // N-042: 選択肢の値も項目の型で検証する。合わなければ保存せず
+    // 失敗に数える(設定側の直しが必要なため、黙って通さない)。
+    const checked = validateFriendFieldValue(target, value);
+    if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
+    await setFriendFieldValue(input.db, {
+      friendId: input.friendId,
+      fieldId,
+      value: checked.value,
+      updatedBy: 'form',
+      field: target,
+    });
+    return true;
   });
 }
 
-/** 1つの動作を実行する。 */
+/**
+ * 1つの動作を実行する。pushSuffix は送信の安定した識別子で、再開時の
+ * 再送でも同じ値になるものを呼ぶ側が渡す(省略時は動作の種類で代用する)。
+ */
 export async function runFormAction(
   input: FormEffectInput,
   action: FormAction,
+  destinationWrites?: FormDestinationWriteStats,
+  actionIndex?: number,
+  pushSuffix?: string,
 ): Promise<void> {
   const { db, friendId } = input;
 
   switch (action.kind) {
     case 'send_text':
-      if (input.pushText && action.text) await input.pushText(action.text);
+      if (input.pushText && action.text) {
+        const { expandSendCommonVars } = await import('./interpolation-context.js');
+        const text = await expandSendCommonVars(
+          db, action.text,
+          { kind: 'form_reply', id: input.formId ?? input.idempotencyPrefix ?? friendId },
+          { friendId },
+        );
+        await input.pushText(text, pushSuffix ?? `send_text:${action.text}`);
+      }
       return;
 
     case 'send_template': {
       if (!input.pushText || !action.templateId) return;
       const template = await getMessageTemplateById(db, action.templateId);
       if (!template) return;
-      // テキストのテンプレートだけを送る。Flex は組み立てと差し込みが
-      // 配信側の仕組みに乗っているので、そちらを通さずに送らない。
-      if (template.message_type !== 'text') {
-        console.warn('form action: skipped non-text template', action.templateId);
+      // テキストは従来どおり本文をそのまま送る。Flex などそれ以外は
+      // 配信側と同じ組み立て(buildMessage)を通して実際に送る。
+      // N-177: 以前は非テキストを warn して素通りしていたため、選んだ
+      // テンプレートが顧客にも運用にも見えず届かなかった。
+      // {{var.*}} の共通情報は消えていれば fail-closed で止め、
+      // 解決できるものは送信時点の値へ置き換える。
+      const { expandSendCommonVars } = await import('./interpolation-context.js');
+      const content = await expandSendCommonVars(
+        db, template.message_content,
+        { kind: 'form_reply', id: input.formId ?? input.idempotencyPrefix ?? friendId },
+        { friendId },
+      );
+      if (template.message_type === 'text') {
+        if (content) {
+          await input.pushText(content, pushSuffix ?? `send_template:${action.templateId}`);
+        }
         return;
       }
-      if (template.message_content) await input.pushText(template.message_content);
+      if (!input.pushMessage) {
+        // 送信経路が無いのに黙って終わると、届かないことが誰にも分からない。
+        // 工程の失敗として記録し、再実行で補完できるようにする。
+        throw new Error(`form send_template: no push channel for ${template.message_type} template`);
+      }
+      await input.pushMessage(
+        buildMessage(template.message_type, content, template.name),
+        pushSuffix ?? `send_template:${action.templateId}`,
+      );
       return;
     }
 
@@ -367,14 +677,24 @@ export async function runFormAction(
 
     case 'friend_field': {
       if (!action.fieldId) return;
+      // 書けない相手は数えない(再送しても直らない未完にしない)。
       const target = await getFriendFieldById(db, action.fieldId);
       if (!target || target.ec_is_master === 1) return;
-      await setFriendFieldValue(db, {
-        friendId,
-        fieldId: action.fieldId,
-        value: action.value ?? '',
-        updatedBy: 'form',
-      });
+      const write = async () => {
+        // N-042: 動作の値も項目の型で検証する。合わなければ保存しない。
+        const checked = validateFriendFieldValue(target, action.value ?? '');
+        if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
+        await setFriendFieldValue(db, {
+          friendId,
+          fieldId: action.fieldId!,
+          value: checked.value,
+          updatedBy: 'form',
+          field: target,
+        });
+        return true;
+      };
+      if (destinationWrites) await trackDestinationWrite(destinationWrites, 1, write);
+      else await write();
       return;
     }
 
@@ -395,15 +715,20 @@ export async function runFormAction(
       await enrollFriendInScenario(db, friendId, action.scenarioId);
       return;
 
-    case 'reminder':
+    case 'reminder': {
       if (!action.reminderId) return;
-      await enrollFriendInReminder(db, {
-        friendId,
-        reminderId: action.reminderId,
-        // 起点の日付を持たない動作なので、今日から動かす
-        targetDate: jstNow().slice(0, 10),
-      });
+      const reminderLabel = actionIndex === undefined
+        ? `reminder:action:${action.reminderId}`
+        : `reminder:afterAction:${actionIndex}`;
+      // 起点の日付を持たない動作なので、今日から動かす
+      await enrollFormReminderOnce(
+        input,
+        action.reminderId,
+        jstNow().slice(0, 10),
+        reminderLabel,
+      );
       return;
+    }
 
     default:
       return;

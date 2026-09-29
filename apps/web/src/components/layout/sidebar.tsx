@@ -1,20 +1,34 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
-import { HQ_MENU_SECTIONS, orderedMenuSections, type MenuItem } from '@/lib/menu'
+import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem } from '@/lib/menu'
+import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability'
+import { usePageChrome } from '@/components/shell/page-chrome'
+import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
+import SidebarVersion from './sidebar-version'
+import Notice from '@/components/shared/notice'
+import HqAccountMenu from '@/components/hq/account-menu'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
+
+/** 配布の受け口が無いあいだ、統括サイドバーから外す4画面。 */
+const HQ_UNAVAILABLE_DISTRIBUTION_HREFS = new Set([
+  '/hq/friend-attributes',
+  '/hq/templates',
+  '/hq/rich-menus',
+  '/hq/form-submissions',
+])
 
 // ─── メニュー定義 ───
 //
@@ -41,6 +55,30 @@ function NavIcon({ d }: { d: string }) {
   )
 }
 
+function isBooleanRecord(value: unknown): value is Record<string, boolean> {
+  return typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && Object.values(value).every((entry) => typeof entry === 'boolean')
+}
+
+/*
+ * PERF-08: バッジ件数をアカウント単位で共有する直近値。
+ * 切替・再マウントで 0 へちらつかせず、表示は直近値で復帰させてから
+ * 裏で取り直す。値は表示専用で、正本は常にAPIの応答。
+ */
+interface SidebarCounts {
+  unanswered: number
+  photos: number
+  operations: number
+}
+const sidebarCountCache = new Map<string, SidebarCounts>()
+
+/** テスト用: 共有している直近値を捨てる。 */
+export function clearSidebarCountCache(): void {
+  sidebarCountCache.clear()
+}
+
 export default function Sidebar({
   friendAttributesV2Mode = false,
   preview = false,
@@ -52,15 +90,24 @@ export default function Sidebar({
   const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
   const { selectedAccountId } = useAccount()
   const brand = useBrand()
+  /*
+   * モバイルの固定ヘッダーに出す現在地（U037）。
+   * PC の上部バーと同じ「ページが渡した名前 → メニューの名前 → アカウント名」。
+   * PageChromeProvider の外（/visual-qa など）では null が返るだけで落ちない。
+   */
+  const { title: chromeTitle } = usePageChrome()
+  const mobileTitle = chromeTitle ?? defaultTitleForPath(pathname ?? '')
   const [isOpen, setIsOpen] = useState(false)
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
+  const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
 
   useEffect(() => {
     setStaffName(localStorage.getItem('lh_staff_name'))
     setStaffRole(localStorage.getItem('lh_staff_role'))
     try { setStaffPermissions(JSON.parse(localStorage.getItem('lh_staff_permissions') || '[]')) } catch { setStaffPermissions([]) }
+    try { setStaffViewPermissions(JSON.parse(localStorage.getItem('lh_staff_view_permissions') || '[]')) } catch { setStaffViewPermissions([]) }
   }, [])
 
   // 未対応件数 polling — メニュー項目にバッジを出す。5 分間隔。
@@ -83,7 +130,11 @@ export default function Sidebar({
   const [sectionOrder, setSectionOrder] = useState<string[] | null>(null)
   /** 区分の中の項目の並び。機能設定の↑↓で決めたもの。 */
   const [itemOrder, setItemOrder] = useState<Record<string, string[]> | null>(null)
-  const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({})
+  const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean> | null>(null)
+  /** 成功した可視性read-modelのaccount。切替直後に古い表示を使わない。 */
+  const [visibilityAccountId, setVisibilityAccountId] = useState<string | null>(null)
+  const [visibilityStatus, setVisibilityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [visibilityRetry, setVisibilityRetry] = useState(0)
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
   const [currentSearch, setCurrentSearch] = useState('')
 
@@ -93,46 +144,95 @@ export default function Sidebar({
     const sync = () => setCurrentSearch(window.location.search)
     sync()
     window.addEventListener('popstate', sync)
-    return () => window.removeEventListener('popstate', sync)
+    /*
+     * router.push/replace は popstate を出さない（popstate は戻る/進む専用）。
+     * 同じパスでクエリだけ変わる画面（/accounts → /accounts?tab=migration の
+     * UID移行など）でも所属の選択を即時に切り替えられるよう、history の
+     * 2関数だけを薄く包んで再読する。掃除のときは必ず元へ戻す。
+     */
+    const originalPushState = history.pushState
+    const originalReplaceState = history.replaceState
+    history.pushState = function (...args) {
+      const result = originalPushState.apply(this, args)
+      sync()
+      return result
+    }
+    history.replaceState = function (...args) {
+      const result = originalReplaceState.apply(this, args)
+      sync()
+      return result
+    }
+    return () => {
+      window.removeEventListener('popstate', sync)
+      history.pushState = originalPushState
+      history.replaceState = originalReplaceState
+    }
   }, [pathname])
 
-  // 設定を読む。取れなくても既定の並び・表示で使えるので、失敗は握る。
+  // 表示可否は全roleがstaff向けread-modelから読む。未確認/失敗を「表示可」と
+  // みなすと別accountの任意機能を一瞬見せるので、必須ナビ以外はfail-closedにする。
+  // owner/admin表示のときだけ、管理GETから保存済みの並びを追加で読む。
   useEffect(() => {
     if (!selectedAccountId) {
       setSectionOrder(null)
       setItemOrder(null)
-      setFeatureVisibility({})
+      setFeatureVisibility(null)
+      setVisibilityAccountId(null)
+      setVisibilityStatus('ready')
       setSpecializedFeatureKeys([])
       return
     }
     let cancelled = false
+    const accountId = selectedAccountId
+    const canManageFeatureSettings = staffRole === 'owner' || staffRole === 'admin'
+    setFeatureVisibility(null)
+    setVisibilityAccountId(null)
+    setVisibilityStatus('loading')
     const loadSettings = () => {
-      void import('@/lib/api')
-        .then(({ api }) => api.featureSettings.get(selectedAccountId))
-        .then((res) => {
-          if (!cancelled && res.success) {
-            setSectionOrder(res.data.sidebarOrder)
-            setItemOrder(res.data.sidebarItemOrder)
-            setFeatureVisibility(res.data.features)
-            setSpecializedFeatureKeys(res.data.specializedFeatureKeys)
+      void Promise.all([import('@/lib/feature-visibility-cache'), import('@/lib/feature-settings-cache')])
+        .then(async ([{ loadFeatureVisibility }, { loadFeatureSettings }]) => {
+          // 画面側の useFeatureVisibility と同じ答えを共有する（V6R-S0-b）。
+          const visibility = await loadFeatureVisibility(accountId)
+          const features = visibility.success ? visibility.data?.features : undefined
+          if (!cancelled && isBooleanRecord(features)) {
+            setSectionOrder(null)
+            setItemOrder(null)
+            setFeatureVisibility(features)
+            setVisibilityAccountId(accountId)
+            setVisibilityStatus('ready')
+            setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
+          } else if (!cancelled) {
+            setVisibilityStatus('error')
+          }
+          if (!canManageFeatureSettings) return
+          try {
+            // 機能設定画面と同じ答えを共有する。保存の合図で捨てられる。
+            const settings = await loadFeatureSettings(accountId)
+            if (!cancelled && settings.success) {
+              setSectionOrder(settings.data.sidebarOrder)
+              setItemOrder(settings.data.sidebarItemOrder)
+            }
+          } catch {
+            // 権限降格後など管理GETが拒否されても、最小read-modelの表示可否は残す。
           }
         })
         .catch(() => {
-          // 設定が取れなくても、既定の並び・表示で使える。
+          if (!cancelled) setVisibilityStatus('error')
         })
     }
     loadSettings()
     const onSettingsUpdated = (event: Event) => {
       const accountId = (event as CustomEvent<{ accountId?: string }>).detail?.accountId
-      if (!accountId || accountId === selectedAccountId) loadSettings()
+      if (!accountId || accountId === selectedAccountId) setVisibilityRetry((current) => current + 1)
     }
     window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     return () => {
       cancelled = true
       window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, staffRole, visibilityRetry])
   // 区分の中の並びを当ててから、区分そのものの並びを当てる。
+  const currentVisibility = visibilityAccountId === selectedAccountId ? featureVisibility : null
   const storeSections = orderedMenuSections(itemOrder)
   const normalizedSectionOrder = sectionOrder?.map((label) => label === 'NEN運用' ? '専用機能' : label)
   const orderedStoreSections = normalizedSectionOrder
@@ -150,6 +250,12 @@ export default function Sidebar({
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        /*
+         * ★V7 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
+         * 「利用できません」だけのページになるため、サイドバーには出さない。
+         * ページ自体は残し、配布が有効になれば再表示する。
+         */
+        if (isHq && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
         if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
@@ -158,26 +264,48 @@ export default function Sidebar({
         if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
-        if (staffRole === 'staff' && !staffPermissions.includes(item.href)) return false
+        // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
+        if (item.staffOnly && staffRole !== 'staff') return false
+        // 失敗時にも必須ナビは残す。任意機能だけを権限・可視性で絞る。
+        // 変えられる権限でも見えるだけ権限でも、メニューには出す（N-424）。
+        const permissionKey = item.permissionKey ?? item.href
+        if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
-        if (
-          featureKey &&
-          SPECIALIZED_FEATURE_KEYS.includes(featureKey) &&
-          !specializedFeatureKeys.includes(featureKey)
-        ) return false
-        return !featureKey || featureVisibility[featureKey] !== false
+        if (!featureKey) return true
+        if (!currentVisibility || currentVisibility[featureKey] !== true) return false
+        if (SPECIALIZED_FEATURE_KEYS.includes(featureKey) && !specializedFeatureKeys.includes(featureKey)) return false
+        return true
       }),
     }))
     .filter((section) => section.items.length > 0)
     .filter((section) => !friendAttributesV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
 
+  /*
+   * PERF-08: バッジ用の件数は「出す項目があるもの」だけを購読する。
+   *
+   * 写真審査（nenMembers.overview）は、写真バッジの項目がメニューに無い
+   * 環境（機能OFF・権限なし）でも毎サイクル呼ばれて 403 を繰り返していた。
+   * メニューに写真バッジが無いなら呼ばない。未対応・運用警告は必須購読で、
+   * 写真審査は別の購読に分け、成功した分から先に反映する。
+   *
+   * アカウント切替や再マウントで 0 に戻ると数字がちらつくので、
+   * アカウントごとの直近値をモジュールに共有しておき、表示はそれで
+   * 即復帰させてから裏で取り直す。
+   */
+  const photosBadgeVisible = visibleSections.some(
+    (section) => section.items.some((item) => item.badge === 'photos'),
+  )
+
   useEffect(() => {
     if (!selectedAccountId) {
       setUnansweredCount(0)
-      setPendingPhotoCount(0)
       setOperationIssueCount(0)
       return
     }
+    const accountId = selectedAccountId
+    const cached = sidebarCountCache.get(accountId)
+    setUnansweredCount(cached?.unanswered ?? 0)
+    setOperationIssueCount(cached?.operations ?? 0)
     let cancelled = false
     // 連続操作で fetch が並走した際、遅い古いレスポンスが新しい値を上書きしない
     // ように発行順 seq でガードする。
@@ -186,33 +314,24 @@ export default function Sidebar({
       const mySeq = ++seq
       try {
         const { api } = await import('@/lib/api')
-        const [unanswered, nen, accounts] = await Promise.allSettled([
+        // 運用警告は要約APIを1回だけ呼ぶ。件数分の個別取得は呼ばない(#630)。
+        // ログ本文は要らない(警告数だけ)。staff に見える分だけが返る。
+        const [unanswered, summary] = await Promise.allSettled([
           api.inbox.unanswered.count(),
-          api.nenMembers.overview(),
-          api.health.accounts(),
+          api.health.summary(),
         ])
         if (cancelled || mySeq !== seq) return
+        const entry = sidebarCountCache.get(accountId) ?? { unanswered: 0, photos: 0, operations: 0 }
         if (unanswered.status === 'fulfilled' && unanswered.value.success) {
           setUnansweredCount(unanswered.value.data.total)
+          entry.unanswered = unanswered.value.data.total
         }
-        // 写真審査は機能を切っている環境があるので、失敗しても他を巻き込まない。
-        if (nen.status === 'fulfilled' && nen.value.success) {
-          setPendingPhotoCount(nen.value.data.pendingPhotos)
+        if (summary.status === 'fulfilled' && summary.value.success) {
+          const total = summary.value.data.warningCount + summary.value.data.dangerCount
+          setOperationIssueCount(total)
+          entry.operations = total
         }
-        if (accounts.status === 'fulfilled' && accounts.value.success) {
-          const health = await Promise.allSettled(
-            accounts.value.data.map((account) => api.health.getHealth(account.id)),
-          )
-          if (cancelled || mySeq !== seq) return
-          setOperationIssueCount(
-            health.filter(
-              (result) =>
-                result.status === 'fulfilled' &&
-                result.value.success &&
-                (result.value.data.riskLevel === 'danger' || result.value.data.riskLevel === 'warning'),
-            ).length,
-          )
-        }
+        sidebarCountCache.set(accountId, entry)
       } catch {
         // サイレント失敗
       }
@@ -228,10 +347,73 @@ export default function Sidebar({
     }
   }, [selectedAccountId])
 
+  // 写真審査の件数は、写真バッジがメニューに出ているときだけ購読する。
+  // 別購読なので、権限・機能で項目が無い環境では 1回も呼ばれない。
+  useEffect(() => {
+    if (!selectedAccountId || !photosBadgeVisible) {
+      setPendingPhotoCount(0)
+      return
+    }
+    const accountId = selectedAccountId
+    const cached = sidebarCountCache.get(accountId)
+    setPendingPhotoCount(cached?.photos ?? 0)
+    let cancelled = false
+    let seq = 0
+    const fetchPhotos = async () => {
+      const mySeq = ++seq
+      try {
+        const { api } = await import('@/lib/api')
+        const nen = await api.nenMembers.overview()
+        if (cancelled || mySeq !== seq) return
+        if (nen.success) {
+          setPendingPhotoCount(nen.data.pendingPhotos)
+          const entry = sidebarCountCache.get(accountId) ?? { unanswered: 0, photos: 0, operations: 0 }
+          entry.photos = nen.data.pendingPhotos
+          sidebarCountCache.set(accountId, entry)
+        }
+      } catch {
+        // サイレント失敗
+      }
+    }
+    fetchPhotos()
+    const id = setInterval(fetchPhotos, 5 * 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [selectedAccountId, photosBadgeVisible])
+
   useEffect(() => { setIsOpen(false) }, [pathname])
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
+  }, [isOpen])
+
+  /*
+   * スマホのメニューの焦点（★V7 修正方針 §2）。
+   * 開いたら中の先頭へ、Esc で閉じ、閉じたら焦点をハンバーガーへ戻す。
+   * 閉じている間は aside に inert を付け、画面外の項目へ Tab が行かないようにする
+   * （以前は閉じても11項目が Tab で選べ、焦点が見えない所へ行っていた）。
+   */
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLElement>(null)
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (isOpen) {
+      wasOpen.current = true
+      drawerRef.current?.querySelector<HTMLElement>('a[href], button')?.focus()
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') setIsOpen(false)
+      }
+      document.addEventListener('keydown', onKeyDown)
+      return () => document.removeEventListener('keydown', onKeyDown)
+    }
+    if (wasOpen.current) {
+      wasOpen.current = false
+      if (!document.activeElement || document.activeElement === document.body || drawerRef.current?.contains(document.activeElement)) {
+        menuButtonRef.current?.focus()
+      }
+    }
   }, [isOpen])
 
   /**
@@ -264,15 +446,18 @@ export default function Sidebar({
    * 「共通情報」(/contents/vars) を開くと「登録メディア一覧」(/contents) も
    * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
    */
-  // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
-  const activePathname = pathname === '/visual-qa/friend-attributes-v2'
-    ? '/tags-v2'
-    : pathname
+  const activePathname = pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {
       for (const item of section.items) {
         if (item.href === '/') continue
+        // 統括の「店舗管理」(/hq) も完全一致にする。/hq/banners や /hq/members を
+        // 開いたときに店舗管理が光ってしまうため。
+        if (item.href === '/hq') {
+          if (activePathname === '/hq') best = '/hq'
+          continue
+        }
         const path = item.href.split('?')[0]
         if (activePathname !== path && !activePathname.startsWith(path + '/')) continue
         if (best === null || path.length > best.length) best = path
@@ -281,7 +466,25 @@ export default function Sidebar({
     return best
   })()
 
-  const isActive = (href: string) => {
+  /*
+   * #984 LAY-15: URLの置き場とメニュー上の所属が違う画面は、
+   * `SCREEN_MENU_OWNER`（lib/menu.ts が正本）が選ぶ項目を光らせる。
+   * UID移行 `/accounts?tab=migration` は友だちタブの1枚なので、
+   * 「LINEアカウント」ではなく「友だち」が選ばれる。
+   * 宣言先の項目がメニューに無いときは通常のパス一致へ戻す。
+   *
+   * Issue #708: 宣言が複数候補を持つ画面（受付枠など）では、
+   * いまの人に見えている項目のうち最初のものを選ぶ。見えている
+   * 項目だけを対象にするのは、担当者専用項目（自分の勤務）が
+   * 管理者のメニューには無いため。
+   */
+  const ownerItemId = menuOwnerForScreen(activePathname, currentSearch)
+    ?.find((id) => visibleSections.some((section) => section.items.some((item) => item.id === id)))
+  const hasOwnerItem = Boolean(ownerItemId)
+
+  const isActive = (item: MenuItem) => {
+    const href = item.href
+    if (hasOwnerItem) return item.id === ownerItemId
     if (href === '/') return activePathname === '/'
     const [path, query = ''] = href.split('?')
     if (path !== activeHref) return false
@@ -315,7 +518,7 @@ export default function Sidebar({
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-gray-900">{brand.name ?? '然-NEN- LINE管理システム'}</p>
-            <p className="mt-0.5 text-[11px] font-medium text-gray-400">管理メニュー</p>
+            <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
           </div>
         </div>
       ) : (
@@ -325,7 +528,7 @@ export default function Sidebar({
       {isHq ? (
         <div className="px-3 pb-3 pt-4">
           <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
-            <p className="text-xs font-semibold text-accent">musubo</p>
+            <p className="text-xs font-semibold text-accent-deep">musubo</p>
             <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
           </div>
         </div>
@@ -333,10 +536,10 @@ export default function Sidebar({
         <div className="px-[13px] pb-[9px] pt-[18px]">
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent">然</div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
             <div className="ml-3 min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
-              <p className="mt-0.5 truncate text-[10px] text-ink-faint">コミュニケーション</p>
+              <p className="mt-0.5 truncate text-micro text-ink-faint">コミュニケーション</p>
             </div>
           </div>
         </div>
@@ -347,6 +550,29 @@ export default function Sidebar({
 
       {/* ナビゲーション */}
       <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+        {/*
+          ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
+          小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
+          失敗の1枚が使う言葉なので、ここは短い「もう一度」にして
+          1画面に同じ読み直しボタンを2つ出さない。
+        */}
+        {visibilityStatus === 'error' && selectedAccountId && (
+          <Notice
+            tone="warn"
+            className="mx-3 mb-2"
+            action={(
+              <button
+                type="button"
+                onClick={() => setVisibilityRetry((current) => current + 1)}
+                className="cursor-pointer font-bold text-action underline"
+              >
+                もう一度
+              </button>
+            )}
+          >
+            機能設定を読み込めませんでした。
+          </Notice>
+        )}
         {visibleSections.map((section, si) => (
           <div key={si} className={styles.section}>
             {section.label && (
@@ -355,11 +581,9 @@ export default function Sidebar({
               </div>
             )}
             {section.items.map((item) => {
-              const active = isActive(item.href)
+              const active = isActive(item)
               const isDanger = 'danger' in item && item.danger
-              const visibleLabel = friendAttributesV2Mode && item.href === '/tags-v2'
-                ? '友だち属性'
-                : item.label
+              const visibleLabel = item.label
               return (
                 <Link
                   key={item.href}
@@ -394,7 +618,8 @@ export default function Sidebar({
                       <span className={styles.badge}>
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
-                      <span className="sr-only">{badgeCount(item)} 件</span>
+                      {/* 読み上げは「33件」と続け、数字と単位の間に空白を入れない（§2-6）。 */}
+                      <span className="sr-only">{badgeCount(item)}件</span>
                     </>
                   )}
                 </Link>
@@ -405,22 +630,40 @@ export default function Sidebar({
       </nav>
 
       {/*
-        名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
-        ここに残すと二重に出る（`docs/v6-shell-contract.md` §8）。
-        枠だけ残すのは、下端の余白がメニューの最後の項目に食い込まないため。
+        メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
+        commit・配備日時と環境。取れないときは「版の情報なし」。
+        移行中の見た目承認（preview）は版の取得をしない。
       */}
-      <div className={styles.footer} />
+      {preview ? null : <SidebarVersion />}
+
+      {/*
+        名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
+        ここに残すと二重に出る（`docs/v6-common-rules.md` §1）。
+        枠だけ残すのは、下端の余白がメニューの最後の項目に食い込まないため。
+
+        統括（/hq）だけは例外（2026-09-12、§1-2）。下端にログイン中のアカウントを置き、
+        押すとメンバー管理・お問い合わせ・ログアウトのメニューが上に開く。
+        正本は ★V6 36-1 `qAvlC`。中身は `components/hq/account-menu.tsx` が持つ。
+      */}
+      {isHq ? <HqAccountMenu /> : <div className={styles.footer} />}
     </>
   )
 
   return (
     <>
-      {/* モバイル: ハンバーガーヘッダー */}
+      {/*
+        モバイル: ハンバーガーヘッダー。
+        1280px 未満では PC の上部バー（画面名・アカウント切替）を畳み、
+        現在地はここへ出す（U037）。2本のヘッダーを同時に占有させない。
+      */}
       <div className={`${styles.mobileHeader} ${styles.mobileOnly}`}>
         <button
+          ref={menuButtonRef}
           onClick={() => setIsOpen(!isOpen)}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
           aria-label="メニュー"
+          aria-expanded={isOpen}
+          aria-controls="mobile-menu"
         >
           <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isOpen
@@ -429,17 +672,20 @@ export default function Sidebar({
             }
           </svg>
         </button>
-        {/* 名前とアイコンは公式アカウントのもの。ログイン画面と同じ扱い。 */}
-        <div className="flex items-center gap-2">
+        {/* いま開いている画面の名前。取れない画面はアカウント名で埋める。
+            1280px 未満では PC のトップバー（画面の唯一の <h1>）を畳むので、
+            現在地を h1 で持つのはここ（#734: 390px で全画面 h1 が消えていた）。 */}
+        <h1 className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
+          {mobileTitle || brand.name || '然-NEN- LINE管理システム'}
+        </h1>
+        {/* 公式アカウントの印。名前は画面名が持つので、ここはアイコンだけ。 */}
+        <div className={styles.mobileBrand}>
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-lg object-cover" />
           ) : (
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
-          <p className="text-sm font-bold leading-tight text-gray-900 truncate">
-            {brand.name ?? '然-NEN- LINE管理システム'}
-          </p>
         </div>
       </div>
 
@@ -455,7 +701,10 @@ export default function Sidebar({
         レールは残したまま、その幅でもここを開けるようにした。
       */}
       <aside
+        id="mobile-menu"
+        ref={drawerRef}
         aria-label="管理メニュー"
+        inert={!isOpen}
         className={`${styles.drawer} ${styles.mobileOnly} ${isOpen ? '' : styles.drawerClosed}`}
       >
         <div className="absolute right-3 top-2.5 z-10">

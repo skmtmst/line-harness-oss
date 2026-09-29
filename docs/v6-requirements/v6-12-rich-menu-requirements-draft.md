@@ -209,7 +209,7 @@ KPI:
 - LINE反映遅延の注意
 - 公開前エラー
 
-公開予約では対象者スナップショットを固定しない。実行時に最新版の友だち状態で条件を再評価する。ただし公開するメニュー版は予約時に固定する。
+公開aliasは**参照型**利用先、公開するメニュー版は**スナップショット型**利用先である（cross-review §2）。参照型のため、公開予約では対象者スナップショットを固定せず、実行時に最新の友だち状態で条件を再評価し、aliasは実行時点の最新公開版へ付け替える。スナップショット型のため、公開するメニュー版は予約時に固定し、新版へ自動で切り替えない。
 
 ### 5-6. 自分のLINEで確かめる
 
@@ -281,6 +281,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `group_id`, `version_number`, `definition_snapshot`
 - `status`: draft / published / archived
 - `created_by_staff_id`, `published_at`
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
 
 `rich_menu_publish_runs`:
 
@@ -288,6 +289,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `mode`: publish / unpublish / scheduled_restore / reconcile
 - `status`, `started_at`, `completed_at`
 - `requested_by_staff_id`, `last_error_code`
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
 
 `rich_menu_publish_run_pages`:
 
@@ -295,6 +297,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `old_line_richmenu_id`, `new_line_richmenu_id`, `alias_id`
 - `create_status`, `image_status`, `alias_status`, `cleanup_status`
 - `line_request_ids_json`, `last_error_code`
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
 
 `rich_menu_assignments`:
 
@@ -321,6 +324,8 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 
 グループには`current_published_version_id`と`current_draft_version_id`を持つ。公開中の定義行を直接更新しない。
 
+この機能の利用先は2分類（cross-review §2）: 公開aliasは**参照型**、公開する版・個別割当・公開予約は**スナップショット型**。
+
 ## 7. 公開処理
 
 ### 7-1. 公開前
@@ -343,6 +348,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 7. 旧rich menuを非同期で削除
 
 途中失敗時は新規に作った未使用メニューを削除し、aliasと公開版を旧状態に維持する。alias切替後に失敗した場合は照合・修復状態へ送り、自動で旧・新どちらかに揃える。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
 
 ### 7-3. 出し分け
 
@@ -367,6 +373,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `GET /api/rich-menu-groups/{id}/runs`
 - `POST /api/rich-menu-publish-runs/{id}/retry`
 - `POST /api/rich-menu-publish-runs/{id}/reconcile`
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
 - `GET /api/rich-menu-groups/external`
 - `POST /api/rich-menu-groups/external/{lineRichMenuId}/import`
 - `GET /api/rich-menu-groups/{id}/usages`
@@ -428,16 +435,20 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 
 ## 13. 完了条件
 
-- V6実Node ID、1920px設計画像、同幅の実装画像をPR固定
-- 7画面と空・読込・エラー・権限不足・部分失敗を実装
+- V6実Node IDと1920px設計画像をPR固定
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
+- V6 9画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 1440/1920で管理画面に横スクロールなし
 - スマートフォン実機で大・小・切替を確認
 - action labelを端末読み上げで確認
 - 公開途中失敗で旧メニューを壊さない
 - alias更新中の空白時間を作らない
-- DBとLINEの不一致を検出・修復可能
+- LINE・DB・R2・alias・既定の 5 者照合で作った不一致を、修復ジョブ 1 回で 0 件にする自動テストが通る
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
 - 条件変更イベント後に正しい1件へ切り替わる
-- 一括割当の部分成功・再試行を追跡可能
+- 一括割当の部分成功・再試行が`rich_menu_assignment_runs`から追跡できることを自動テストで確認する
 - 期間終了後に指定メニューへ復元
 - 外部取り込みでLINE表示を変えない
 - `準備中`操作なし
@@ -446,7 +457,9 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 
 1. 版、公開実行、ページ実行台帳
 2. alias更新APIを使う公開saga
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
 3. LINE照合・修復
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
 4. 出し分け実行台帳と再評価イベント拡張
 5. 公開予約・終了後復元
 6. action label、日時選択、クリップボード

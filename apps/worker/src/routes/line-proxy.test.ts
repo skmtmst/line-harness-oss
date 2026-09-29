@@ -7,11 +7,23 @@ const lineClientMocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getLineAccounts: vi.fn(),
+  listLineAccountsWithTenantStatus: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   getChatByFriendId: vi.fn(),
   createChat: vi.fn(),
   updateChat: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
+  OPERATION_CAPABILITIES: [
+    'broadcast_dispatch',
+    'scenario_dispatch',
+    'reminder_dispatch',
+    'automation_actions',
+    'auto_reply_dispatch',
+    'webhook_outgoing',
+    'ad_postback',
+  ],
   getStaffById: vi.fn(async () => ({ account_scope: 'all' })),
   getStaffAccountScopeIds: vi.fn(async () => []),
   jstNow: vi.fn(() => '2026-08-02T12:00:00.000'),
@@ -40,11 +52,14 @@ vi.mock('../services/step-delivery.js', () => ({
 
 import {
   getLineAccounts,
+  listLineAccountsWithTenantStatus,
+  getLineAccountScopeEntries,
   getFriendByLineUserIdForAccount,
   upsertFriend,
   getChatByFriendId,
   createChat,
   updateChat,
+  isOperationCapabilityStopped,
   getStaffById,
   getStaffAccountScopeIds,
 } from '@line-crm/db';
@@ -105,7 +120,7 @@ function fakeDb(opts: {
 function loggedRows(executed: Exec[]) {
   const rows: { friendId: unknown; messageType: unknown; content: unknown; deliveryType: unknown; source: unknown; lineAccountId: unknown }[] = [];
   for (const e of executed) {
-    if (!e.sql.includes('INSERT INTO messages_log')) continue;
+    if (!e.sql.includes('INTO messages_log')) continue;
     for (let i = 0; i < e.params.length; i += 8) {
       rows.push({
         friendId: e.params[i + 1],
@@ -168,10 +183,21 @@ beforeEach(() => {
   fetchMock = vi.fn(async () => upstreamResponse());
   vi.stubGlobal('fetch', fetchMock);
   vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT] as never);
+  vi.mocked(listLineAccountsWithTenantStatus).mockImplementation(
+    async (db: D1Database) => (await vi.mocked(getLineAccounts)(db)).map((account) => ({
+      ...account,
+      tenant_status: 'active' as const,
+    })) as never,
+  );
+  vi.mocked(getLineAccountScopeEntries).mockImplementation(
+    async (db: D1Database) => vi.mocked(getLineAccounts)(db) as never,
+  );
   vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue(FRIEND as never);
   vi.mocked(getChatByFriendId).mockResolvedValue({ id: 'chat-1', status: 'unread' } as never);
   vi.mocked(updateChat).mockResolvedValue(undefined as never);
   vi.mocked(authenticateApiToken).mockResolvedValue(null as never);
+  // clearAllMocks は実装を戻さないので、停止状態は各テストで明示的に立てる。
+  vi.mocked(isOperationCapabilityStopped).mockResolvedValue(false as never);
 });
 
 afterEach(() => {
@@ -221,6 +247,20 @@ describe('auth', () => {
     const { db } = fakeDb();
     const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
     expect(res.status).toBe(401);
+  });
+
+  test('停止中アカウントのトークンがenv既定値と同じでも代理送信できない', async () => {
+    vi.mocked(getLineAccounts).mockResolvedValue([
+      { ...ACCOUNT, channel_access_token: 'env-token' },
+    ] as never);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([
+      { ...ACCOUNT, channel_access_token: 'env-token', tenant_status: 'suspended' },
+    ] as never);
+    const { db } = fakeDb();
+    const res = await setupApp().request(pushRequest('env-token'), {}, env(db));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'TENANT_SUSPENDED' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   test("account_scope='all' staff can operate another LINE account in the same organization", async () => {
@@ -379,6 +419,49 @@ describe('push', () => {
       'chat-1',
       expect.objectContaining({ status: 'in_progress' }),
     );
+  });
+
+  /*
+   * R381: 同じ送信キー（X-Line-Retry-Key）の再送は履歴を二重に書かない。
+   * 初回の200で履歴の保存が落ちても、LINEが「受理済み」を返す409の再送で
+   * 同じ決まったIDの行へ補完する。
+   */
+  test('same retry key generates one log row across 200 and accepted-409 retries', async () => {
+    const { db, executed } = fakeDb();
+    const retryHeaders = { 'X-Line-Retry-Key': 'retry-key-1' };
+    const first = await setupApp().request(
+      pushRequest('acc-token', undefined, retryHeaders), {}, env(db),
+    );
+    expect(first.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-Line-Retry-Key': 'retry-key-1' }),
+      }),
+    );
+
+    fetchMock.mockImplementationOnce(async () => new Response('{"message":"accepted"}', {
+      status: 409,
+      headers: { 'content-type': 'application/json', 'x-line-accepted-request-id': 'req-1' },
+    }));
+    const second = await setupApp().request(
+      pushRequest('acc-token', undefined, retryHeaders), {}, env(db),
+    );
+    // 受理済み409はそのまま呼び出し側へ返すが、履歴は書く
+    expect(second.status).toBe(409);
+    const inserts = executed.filter((e) => e.sql.includes('INTO messages_log'));
+    expect(inserts).toHaveLength(2);
+    // 同じ送信キー・同じ友だち・同じ位置 → 同じID。実DBでは INSERT OR IGNORE が1行に畳む。
+    expect(inserts[0].params[0]).toBe(inserts[1].params[0]);
+  });
+
+  test('requests without a retry key still get fresh log ids', async () => {
+    const { db, executed } = fakeDb();
+    await setupApp().request(pushRequest('acc-token'), {}, env(db));
+    await setupApp().request(pushRequest('acc-token'), {}, env(db));
+    const inserts = executed.filter((e) => e.sql.includes('INTO messages_log'));
+    expect(inserts).toHaveLength(2);
+    expect(inserts[0].params[0]).not.toBe(inserts[1].params[0]);
   });
 
   test('manual header logs a 1:1 operator reply as source=manual and is not forwarded', async () => {
@@ -746,5 +829,196 @@ describe('reply and passthrough', () => {
     );
     expect(res.status).toBe(413);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * #960 — broadcast_dispatch 緊急停止はプロキシ送信経路にも効く。
+ * 停止中の一斉送信系 (broadcast/multicast/narrowcast/自動push) は上流へ
+ * fetch しない。例外は reply と manual 明示の 1:1 push。
+ */
+describe('emergency stop (broadcast_dispatch)', () => {
+  function sendRequest(path: string, extraHeaders: Record<string, string> = {}) {
+    return new Request(`http://worker.test/line-api${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer acc-token',
+        'Content-Type': 'application/json',
+        ...extraHeaders,
+      },
+      body: JSON.stringify({ to: USER_A, messages: [{ type: 'text', text: 'hi' }] }),
+    });
+  }
+
+  test.each([
+    '/v2/bot/message/broadcast',
+    '/v2/bot/message/multicast',
+    '/v2/bot/message/narrowcast',
+  ])('stopped: POST %s returns 409 and never reaches upstream', async (path) => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(sendRequest(path), {}, env(db));
+
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loggedRows(executed)).toHaveLength(0);
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(
+      db,
+      'acc-1',
+      'broadcast_dispatch',
+    );
+  });
+
+  test('stopped: automatic push (no manual source) is also blocked', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
+
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loggedRows(executed)).toHaveLength(0);
+  });
+
+  test('stopped: manual push (X-Line-Harness-Source: manual) still goes through', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('acc-token', undefined, { 'X-Line-Harness-Source': 'manual' }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(loggedRows(executed)[0].source).toBe('manual');
+  });
+
+  test('stopped: reply still forwarded (1:1 reply is not dispatch)', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      new Request('http://worker.test/line-api/v2/bot/message/reply', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer acc-token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replyToken: 'rt', messages: [{ type: 'text', text: 'hi' }] }),
+      }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('running: broadcast forwards upstream and checks the capability first', async () => {
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      sendRequest('/v2/bot/message/broadcast'),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(
+      db,
+      'acc-1',
+      'broadcast_dispatch',
+    );
+  });
+
+  /*
+   * #1050 — X-Line-Harness-Capability で送信経路ごとの停止対象を名乗る。
+   * 停止中は上流へ一切出さず 409 を返す。値が無い・知らない値の自動送信は
+   * 従来どおり broadcast_dispatch (安全側) で止める。
+   */
+  test.each([
+    'reminder_dispatch',
+    'scenario_dispatch',
+    'automation_actions',
+  ])('stopped: capability header %s gates automatic push with that capability', async (capability) => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('acc-token', undefined, { 'X-Line-Harness-Capability': capability }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loggedRows(executed)).toHaveLength(0);
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(db, 'acc-1', capability);
+  });
+
+  test('capability header only narrows the capability that is stopped', async () => {
+    // reminder_dispatch だけ止まっている想定。broadcast 既定の自動 push は
+    // reminder_dispatch を名乗らないので broadcast_dispatch で判定する。
+    vi.mocked(isOperationCapabilityStopped).mockImplementation(
+      async (_db, _account, capability) => capability === 'reminder_dispatch',
+    );
+    const { db } = fakeDb();
+    const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(db, 'acc-1', 'broadcast_dispatch');
+  });
+
+  test('unknown capability header falls back to broadcast_dispatch (safe default)', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('acc-token', undefined, { 'X-Line-Harness-Capability': 'not_a_capability' }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(db, 'acc-1', 'broadcast_dispatch');
+  });
+
+  test('manual push ignores the capability header entirely', async () => {
+    // manual 1:1 返信は停止対象外。ヘッダが付いていても manual が優先され、
+    // 停止判定自体を呼ばない。
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('acc-token', undefined, {
+        'X-Line-Harness-Source': 'manual',
+        'X-Line-Harness-Capability': 'reminder_dispatch',
+      }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isOperationCapabilityStopped).not.toHaveBeenCalled();
+    expect(loggedRows(executed)[0].source).toBe('manual');
+  });
+
+  test('stopped: unrelated proxy calls are unaffected', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    fetchMock.mockResolvedValue(
+      new Response('{"displayName":"X"}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      new Request(`http://worker.test/line-api/v2/bot/profile/${USER_A}`, {
+        method: 'GET',
+        headers: { Authorization: 'Bearer acc-token' },
+      }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isOperationCapabilityStopped).not.toHaveBeenCalled();
   });
 });

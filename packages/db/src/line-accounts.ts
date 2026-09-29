@@ -30,10 +30,29 @@ export interface LineAccount {
   channel_secret: string;
   channel_access_token_encrypted?: string | null;
   channel_secret_encrypted?: string | null;
+  channel_access_token_updated_at: string | null;
+  channel_secret_updated_at: string | null;
+  login_channel_secret_updated_at: string | null;
+  /** API直列化専用。秘密値そのものは返さない。 */
+  channel_access_token_last4?: string | null;
+  channel_secret_last4?: string | null;
+  login_channel_secret_last4?: string | null;
   login_channel_id: string | null;
   login_channel_secret: string | null;
   liff_id: string | null;
   is_active: number;
+  is_default: number;
+  archived_at: string | null;
+  archived_by: string | null;
+  archived_reason: string | null;
+  /** 止めた理由（manual | ban_detected | credential_invalid）。動いていれば null。 */
+  inactive_reason?: string | null;
+  inactive_reason_detail?: string | null;
+  inactivated_at?: string | null;
+  login_channel_secret_encrypted?: string | null;
+  last_webhook_received_at?: string | null;
+  /** Webhook 届かない警告を出さないアカウント（受信しない運用なら 1）。 */
+  webhook_silence_exempt?: number;
   country: string | null;
   role: string | null;
   display_order: number;
@@ -41,23 +60,84 @@ export interface LineAccount {
   og_site_name: string | null;
   og_default_image_url: string | null;
   og_default_description: string | null;
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。未設定なら null。 */
+  official_profile_url: string | null;
   /** 友だち数の上限。NULL なら上限を管理しない */
   friend_capacity: number | null;
   /** 何人で警告を出すか。NULL なら警告しない */
   capacity_warn_at: number | null;
   /** 管理画面の一覧やヘッダーで使うアイコン。OGP用の og_default_image_url とは用途が違う */
   icon_url: string | null;
+  /** LINE公式アカウントに設定された公開表示名。 */
+  line_display_name: string | null;
+  /** LINE公式アカウントに設定された公開画像URL。 */
+  line_picture_url: string | null;
+  /** LINE公式アカウントのベーシックID（@から始まるID）。 */
+  line_basic_id: string | null;
+  /** LINE公式プロフィールを最後に同期できた日時。 */
+  line_profile_synced_at: string | null;
   /** LINE公式アカウント構成の上位アカウント。NULLなら未設定（ルート）。 */
   parent_line_account_id: string | null;
   /** 所属する統括。指示Cで認可境界として有効化するまでは表示範囲を変えない。 */
   tenant_id: string | null;
   /** V6の日時指定と日別分析で使うIANAタイムゾーン。 */
   timezone?: string;
+  /** 楽観ロックに使う版番号。変更の保存ごとに1増える。 */
+  revision?: number;
   created_at: string;
   updated_at: string;
 }
 
-export type LineCredentialField = 'channel_access_token' | 'channel_secret';
+export type TenantRuntimeStatus = 'active' | 'suspended' | 'archived';
+
+/**
+ * Runtime-facing account shape. The existing LineAccount APIs intentionally
+ * remain unchanged because management screens must still inspect stopped tenants.
+ */
+export interface LineAccountWithTenantStatus extends LineAccount {
+  tenant_status: TenantRuntimeStatus;
+}
+
+const TENANT_STATUS_SELECT = `CASE
+  WHEN COALESCE(account.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}' THEN 'active'
+  WHEN tenant.status IN ('active', 'suspended', 'archived') THEN tenant.status
+  ELSE 'archived'
+END`;
+
+/** SQL predicate used by dispatcher claim queries. Unknown tenant rows fail closed. */
+export function activeTenantLineAccountSql(accountIdExpression: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(accountIdExpression)) {
+    throw new Error('Invalid line account SQL expression');
+  }
+  return `EXISTS (
+    SELECT 1
+      FROM line_accounts tenant_gate_account
+      LEFT JOIN tenants tenant_gate_tenant
+        ON tenant_gate_tenant.id = COALESCE(tenant_gate_account.tenant_id, '${DEFAULT_TENANT_ID}')
+     WHERE tenant_gate_account.id = ${accountIdExpression}
+       AND (
+         COALESCE(tenant_gate_account.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}'
+         OR tenant_gate_tenant.status = 'active'
+       )
+  )`;
+}
+
+/** Non-secret fields required to resolve admin account visibility. */
+export type LineAccountScopeEntry = Pick<
+  LineAccount,
+  | 'id'
+  | 'tenant_id'
+  | 'parent_line_account_id'
+  | 'is_active'
+  | 'archived_at'
+  | 'login_channel_id'
+  | 'liff_id'
+>;
+
+export type LineCredentialField =
+  | 'channel_access_token'
+  | 'channel_secret'
+  | 'login_channel_secret';
 
 export type LineCredentialFailureReason =
   | 'key_unavailable_or_invalid'
@@ -109,8 +189,16 @@ export interface CreateLineAccountInput {
   ogSiteName?: string | null;
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
+  officialProfileUrl?: string | null;
+  timezone?: string;
+  country?: string | null;
+  role?: string | null;
   parentLineAccountId?: string | null;
   tenantId?: string | null;
+  lineDisplayName?: string | null;
+  linePictureUrl?: string | null;
+  lineBasicId?: string | null;
+  lineProfileSyncedAt?: string | null;
 }
 
 export async function createLineAccount(
@@ -128,9 +216,10 @@ export async function createLineAccount(
     .first<{ next: number }>();
   const displayOrder = orderRow?.next ?? 0;
   const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
-  const [encryptedAccessToken, encryptedChannelSecret] = await Promise.all([
+  const [encryptedAccessToken, encryptedChannelSecret, encryptedLoginSecret] = await Promise.all([
     encryptCredential(input.channelAccessToken, encryptionKey),
     encryptCredential(input.channelSecret, encryptionKey),
+    input.loginChannelSecret ? encryptCredential(input.loginChannelSecret, encryptionKey) : null,
   ]);
 
   await db
@@ -138,12 +227,21 @@ export async function createLineAccount(
       `INSERT INTO line_accounts
          (id, channel_id, name, channel_access_token, channel_secret,
           channel_access_token_encrypted, channel_secret_encrypted,
-          login_channel_id, login_channel_secret, liff_id,
-          is_active, display_order,
+          channel_access_token_updated_at, channel_secret_updated_at,
+          login_channel_secret_updated_at,
+          login_channel_id, login_channel_secret, login_channel_secret_encrypted, liff_id,
+          is_active, is_default, display_order,
           og_site_name, og_default_image_url, og_default_description,
+          official_profile_url, timezone, country, role,
           parent_line_account_id, tenant_id,
+          line_display_name, line_picture_url, line_basic_id, line_profile_synced_at,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
+         CASE WHEN EXISTS (
+           SELECT 1 FROM line_accounts
+            WHERE COALESCE(tenant_id, ?) = ? AND archived_at IS NULL
+          ) THEN 0 ELSE 1 END,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -153,21 +251,167 @@ export async function createLineAccount(
       input.channelSecret,
       encryptedAccessToken,
       encryptedChannelSecret,
+      now,
+      now,
+      input.loginChannelSecret ? now : null,
       input.loginChannelId ?? null,
-      input.loginChannelSecret ?? null,
+      // 平文の列には書かない。値は暗号化列だけに置く（v6-33 §19-2）。
+      null,
+      encryptedLoginSecret,
       input.liffId ?? null,
+      DEFAULT_TENANT_ID,
+      input.tenantId ?? DEFAULT_TENANT_ID,
       displayOrder,
       input.ogSiteName ?? null,
       input.ogDefaultImageUrl ?? null,
       input.ogDefaultDescription ?? null,
+      input.officialProfileUrl ?? null,
+      input.timezone ?? 'Asia/Tokyo',
+      input.country ?? null,
+      input.role ?? null,
       input.parentLineAccountId ?? null,
       input.tenantId ?? DEFAULT_TENANT_ID,
+      input.lineDisplayName ?? null,
+      input.linePictureUrl ?? null,
+      input.lineBasicId ?? null,
+      input.lineProfileSyncedAt ?? null,
       now,
       now,
     )
     .run();
 
   return (await getLineAccountById(db, id, encryptionKey))!;
+}
+
+export type LineAccountConnectionCheckKind =
+  | 'bot_info'
+  | 'webhook_endpoint'
+  | 'webhook_test'
+  | 'liff_config'
+  | 'token_refresh';
+
+export type LineAccountConnectionCheckResult =
+  | 'matched'
+  | 'mismatched'
+  | 'unconfigured'
+  | 'unknown'
+  | 'ok'
+  | 'failed';
+
+export interface LineAccountConnectionCheck {
+  id: string;
+  line_account_id: string;
+  check_kind: LineAccountConnectionCheckKind;
+  result: LineAccountConnectionCheckResult;
+  expected_url: string | null;
+  registered_url: string | null;
+  webhook_active: number | null;
+  http_status: number | null;
+  checked_by: string;
+  checked_at: string;
+  correlation_id: string;
+  idempotency_key: string;
+  account_revision: number;
+}
+
+export interface SaveLineAccountConnectionChecksInput {
+  lineAccountId: string;
+  expectedRevision: number;
+  checkedBy: string;
+  checkedAt: string;
+  correlationId: string;
+  idempotencyKey: string;
+  checks: Array<{
+    kind: LineAccountConnectionCheckKind;
+    result: LineAccountConnectionCheckResult;
+    expectedUrl?: string | null;
+    registeredUrl?: string | null;
+    webhookActive?: boolean | null;
+    httpStatus?: number | null;
+  }>;
+}
+
+export class LineAccountRevisionConflictError extends Error {
+  constructor() {
+    super('REVISION_CONFLICT');
+    this.name = 'LineAccountRevisionConflictError';
+  }
+}
+
+export async function getLineAccountConnectionChecksByIdempotencyKey(
+  db: D1Database,
+  lineAccountId: string,
+  idempotencyKey: string,
+): Promise<LineAccountConnectionCheck[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM line_account_connection_checks
+        WHERE line_account_id = ? AND idempotency_key = ?
+        ORDER BY CASE check_kind
+          WHEN 'bot_info' THEN 1
+          WHEN 'webhook_endpoint' THEN 2
+          WHEN 'webhook_test' THEN 3
+          WHEN 'liff_config' THEN 4
+          ELSE 5 END`,
+    )
+    .bind(lineAccountId, idempotencyKey)
+    .all<LineAccountConnectionCheck>();
+  return result.results;
+}
+
+/**
+ * Saves one complete check run and advances the account revision in one D1 batch.
+ * The INSERTs only select a row after the guarded UPDATE succeeded.
+ */
+export async function saveLineAccountConnectionChecks(
+  db: D1Database,
+  input: SaveLineAccountConnectionChecksInput,
+): Promise<LineAccountConnectionCheck[]> {
+  const nextRevision = input.expectedRevision + 1;
+  const statements = [
+    db.prepare(
+      `UPDATE line_accounts
+          SET revision = revision + 1, updated_at = ?
+        WHERE id = ? AND revision = ? AND archived_at IS NULL`,
+    ).bind(input.checkedAt, input.lineAccountId, input.expectedRevision),
+    ...input.checks.map((check) => db.prepare(
+      `INSERT INTO line_account_connection_checks (
+         id, line_account_id, check_kind, result, expected_url, registered_url,
+         webhook_active, http_status, checked_by, checked_at, correlation_id,
+         idempotency_key, account_revision
+       )
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM line_accounts
+           WHERE id = ? AND revision = ? AND archived_at IS NULL
+        )`,
+    ).bind(
+      crypto.randomUUID(),
+      input.lineAccountId,
+      check.kind,
+      check.result,
+      check.expectedUrl ?? null,
+      check.registeredUrl ?? null,
+      check.webhookActive == null ? null : (check.webhookActive ? 1 : 0),
+      check.httpStatus ?? null,
+      input.checkedBy,
+      input.checkedAt,
+      input.correlationId,
+      input.idempotencyKey,
+      nextRevision,
+      input.lineAccountId,
+      nextRevision,
+    )),
+  ];
+  const results = await db.batch(statements);
+  if (Number(results[0]?.meta?.changes ?? 0) !== 1) {
+    throw new LineAccountRevisionConflictError();
+  }
+  return getLineAccountConnectionChecksByIdempotencyKey(
+    db,
+    input.lineAccountId,
+    input.idempotencyKey,
+  );
 }
 
 /**
@@ -178,17 +422,28 @@ export async function decryptLineAccountCredentials(
   row: LineAccount,
   credentialEncryptionKey?: string,
 ): Promise<LineAccount> {
-  const next = { ...row };
+  const last4 = (value: string | null | undefined): string | null =>
+    value ? value.slice(-4) : null;
+  const next: LineAccount = {
+    ...row,
+    channel_access_token_last4: last4(row.channel_access_token),
+    channel_secret_last4: last4(row.channel_secret),
+    login_channel_secret_last4: last4(row.login_channel_secret),
+  };
   for (const field of [
-    ['channel_access_token', 'channel_access_token_encrypted'],
-    ['channel_secret', 'channel_secret_encrypted'],
+    ['channel_access_token', 'channel_access_token_encrypted', 'channel_access_token_last4'],
+    ['channel_secret', 'channel_secret_encrypted', 'channel_secret_last4'],
+    ['login_channel_secret', 'login_channel_secret_encrypted', 'login_channel_secret_last4'],
   ] as const) {
-    const [plainField, encryptedField] = field;
+    const [plainField, encryptedField, last4Field] = field;
     const encrypted = row[encryptedField];
     if (!encrypted) continue;
     try {
       next[plainField] = await decryptCredential(encrypted, credentialEncryptionKey);
+      next[last4Field] = last4(next[plainField]);
     } catch (error) {
+      // 暗号文があるのに復号できない場合、平文フォールバックで末尾を推測しない。
+      next[last4Field] = null;
       if (!row[plainField]) {
         throw new Error(`Unable to decrypt ${plainField}; no legacy fallback is available`);
       }
@@ -312,6 +567,264 @@ export async function getLineAccounts(
   );
 }
 
+/**
+ * Lists accounts and their owning tenant status in one D1 read. The default
+ * operations tenant is always available; a missing non-default tenant row is
+ * treated as archived so delivery fails closed.
+ */
+export async function listLineAccountsWithTenantStatus(
+  db: D1Database,
+  credentialEncryptionKey?: string,
+): Promise<LineAccountWithTenantStatus[]> {
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const result = await db
+    .prepare(
+      `SELECT account.*, ${TENANT_STATUS_SELECT} AS tenant_status
+         FROM line_accounts account
+         LEFT JOIN tenants tenant
+           ON tenant.id = COALESCE(account.tenant_id, ?)
+        ORDER BY account.display_order ASC, account.created_at ASC`,
+    )
+    .bind(DEFAULT_TENANT_ID)
+    .all<LineAccountWithTenantStatus>();
+  const rows = await Promise.all(
+    result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
+  );
+  return rows as LineAccountWithTenantStatus[];
+}
+
+export async function getLineAccountTenantStatus(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<TenantRuntimeStatus> {
+  const row = await db
+    .prepare(
+      `SELECT ${TENANT_STATUS_SELECT} AS tenant_status
+         FROM line_accounts account
+         LEFT JOIN tenants tenant
+           ON tenant.id = COALESCE(account.tenant_id, ?)
+        WHERE account.id = ?`,
+    )
+    .bind(DEFAULT_TENANT_ID, lineAccountId)
+    .first<{ tenant_status: TenantRuntimeStatus }>();
+  return row?.tenant_status ?? 'archived';
+}
+
+export async function isLineAccountTenantActive(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<boolean> {
+  return (await getLineAccountTenantStatus(db, lineAccountId)) === 'active';
+}
+
+/**
+ * Returns only the non-secret account fields used by authorization scope checks.
+ * The tenant wall is applied by D1 before rows enter Worker memory.
+ */
+export async function getLineAccountScopeEntries(
+  db: D1Database,
+  tenantId: string,
+): Promise<LineAccountScopeEntry[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, tenant_id, parent_line_account_id, is_active, archived_at,
+              login_channel_id, liff_id
+         FROM line_accounts
+        WHERE COALESCE(tenant_id, ?) = ?
+        ORDER BY display_order ASC, created_at ASC`,
+    )
+    .bind(DEFAULT_TENANT_ID, tenantId)
+    .all<LineAccountScopeEntry>();
+  return result.results;
+}
+
+/** Load and decrypt only accounts that a caller has already authorized. */
+export async function getLineAccountsByIds(
+  db: D1Database,
+  ids: readonly string[],
+  credentialEncryptionKey?: string,
+): Promise<LineAccount[]> {
+  if (ids.length === 0) return [];
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const result = await db
+    .prepare(
+      `SELECT account.*
+         FROM line_accounts account
+         INNER JOIN json_each(?) requested
+           ON account.id = CAST(requested.value AS TEXT)
+        ORDER BY account.display_order ASC, account.created_at ASC`,
+    )
+    .bind(JSON.stringify(ids))
+    .all<LineAccount>();
+  return Promise.all(
+    result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
+  );
+}
+
+export interface LineAccountListStats {
+  friendCount: number;
+  activeScenarios: number;
+  messagesThisMonth: number;
+  staffCount: number;
+  connection: {
+    status: 'ok' | 'warn' | 'unknown';
+    checkedAt: string | null;
+  };
+}
+
+/**
+ * Returns the counters and persisted connection health used by the account
+ * list in one D1 query.
+ *
+ * The JSON input keeps the bind count constant even when an operator has many
+ * accounts. Each source is aggregated before UNION ALL so joins cannot
+ * multiply another source's count.
+ */
+export async function getLineAccountListStats(
+  db: D1Database,
+  lineAccountIds: string[],
+): Promise<Record<string, LineAccountListStats>> {
+  if (lineAccountIds.length === 0) return {};
+
+  const result = await db
+    .prepare(
+      `WITH requested_accounts(line_account_id) AS (
+         SELECT CAST(value AS TEXT) FROM json_each(?)
+       ), source_counts AS (
+         SELECT f.line_account_id,
+                COUNT(*) AS friend_count,
+                0 AS active_scenarios,
+                0 AS messages_this_month
+           FROM friends f
+           INNER JOIN requested_accounts requested
+             ON requested.line_account_id = f.line_account_id
+          WHERE f.is_following = 1
+          GROUP BY f.line_account_id
+         UNION ALL
+         SELECT f.line_account_id,
+                0 AS friend_count,
+                COUNT(*) AS active_scenarios,
+                0 AS messages_this_month
+           FROM friend_scenarios fs
+           INNER JOIN friends f ON f.id = fs.friend_id
+           INNER JOIN requested_accounts requested
+             ON requested.line_account_id = f.line_account_id
+          WHERE fs.status = 'active'
+          GROUP BY f.line_account_id
+         UNION ALL
+         SELECT f.line_account_id,
+                0 AS friend_count,
+                0 AS active_scenarios,
+                COUNT(*) AS messages_this_month
+           FROM messages_log ml
+           INNER JOIN friends f ON f.id = ml.friend_id
+           INNER JOIN requested_accounts requested
+             ON requested.line_account_id = f.line_account_id
+          WHERE ml.direction = 'outgoing'
+            AND (ml.delivery_type IS NULL OR ml.delivery_type = 'push')
+            AND ml.created_at >= date('now', 'start of month')
+          GROUP BY f.line_account_id
+       ), staff_assignments AS (
+         SELECT requested.line_account_id, staff.id AS staff_id
+           FROM requested_accounts requested
+           INNER JOIN line_accounts account ON account.id = requested.line_account_id
+           INNER JOIN staff_members staff
+             ON staff.is_active = 1
+            AND staff.invite_status = 'active'
+            AND staff.account_scope = 'all'
+            AND COALESCE(staff.tenant_id, '${DEFAULT_TENANT_ID}') =
+                COALESCE(account.tenant_id, '${DEFAULT_TENANT_ID}')
+         UNION
+         SELECT requested.line_account_id, staff.id AS staff_id
+           FROM requested_accounts requested
+           INNER JOIN line_accounts account ON account.id = requested.line_account_id
+           INNER JOIN staff_account_scopes scope
+             ON scope.line_account_id = requested.line_account_id
+           INNER JOIN staff_members staff
+             ON staff.id = scope.staff_id
+            AND staff.is_active = 1
+            AND staff.invite_status = 'active'
+            AND staff.account_scope = 'accounts'
+            AND COALESCE(staff.tenant_id, '${DEFAULT_TENANT_ID}') =
+                COALESCE(account.tenant_id, '${DEFAULT_TENANT_ID}')
+       ), staff_counts AS (
+         SELECT line_account_id, COUNT(*) AS staff_count
+           FROM staff_assignments
+          GROUP BY line_account_id
+       ), ranked_checks AS (
+         SELECT checks.line_account_id, checks.result, checks.checked_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY checks.line_account_id, checks.check_kind
+                  ORDER BY checks.checked_at DESC, checks.id DESC
+                ) AS recency
+           FROM line_account_connection_checks checks
+           INNER JOIN requested_accounts requested
+             ON requested.line_account_id = checks.line_account_id
+          WHERE checks.check_kind IN (
+            'bot_info', 'webhook_endpoint', 'webhook_test', 'token_refresh'
+          )
+       ), connection_rollup AS (
+         SELECT line_account_id,
+                COUNT(*) AS check_count,
+                MAX(checked_at) AS checked_at,
+                MAX(CASE WHEN result IN ('mismatched', 'unconfigured', 'failed') THEN 1 ELSE 0 END) AS has_warning,
+                MAX(CASE WHEN result NOT IN ('matched', 'ok') THEN 1 ELSE 0 END) AS has_unconfirmed
+           FROM ranked_checks
+          WHERE recency = 1
+          GROUP BY line_account_id
+       )
+       SELECT requested.line_account_id,
+              COALESCE(SUM(source.friend_count), 0) AS friend_count,
+              COALESCE(SUM(source.active_scenarios), 0) AS active_scenarios,
+              COALESCE(SUM(source.messages_this_month), 0) AS messages_this_month,
+              COALESCE(staff_counts.staff_count, 0) AS staff_count,
+              connection.checked_at AS connection_checked_at,
+              CASE
+                WHEN account.token_expires_at IS NOT NULL
+                 AND datetime(account.token_expires_at) < datetime('now') THEN 'warn'
+                WHEN COALESCE(connection.has_warning, 0) = 1 THEN 'warn'
+                WHEN COALESCE(connection.check_count, 0) = 0 THEN 'unknown'
+                WHEN COALESCE(connection.has_unconfirmed, 0) = 0 THEN 'ok'
+                ELSE 'unknown'
+              END AS connection_status
+         FROM requested_accounts requested
+         INNER JOIN line_accounts account ON account.id = requested.line_account_id
+         LEFT JOIN source_counts source
+           ON source.line_account_id = requested.line_account_id
+         LEFT JOIN staff_counts
+           ON staff_counts.line_account_id = requested.line_account_id
+         LEFT JOIN connection_rollup connection
+           ON connection.line_account_id = requested.line_account_id
+        GROUP BY requested.line_account_id`,
+    )
+    .bind(JSON.stringify(lineAccountIds))
+    .all<{
+      line_account_id: string;
+      friend_count: number;
+      active_scenarios: number;
+      messages_this_month: number;
+      staff_count: number;
+      connection_status: 'ok' | 'warn' | 'unknown';
+      connection_checked_at: string | null;
+    }>();
+
+  return Object.fromEntries(
+    result.results.map((row) => [
+      row.line_account_id,
+      {
+        friendCount: Number(row.friend_count),
+        activeScenarios: Number(row.active_scenarios),
+        messagesThisMonth: Number(row.messages_this_month),
+        staffCount: Number(row.staff_count),
+        connection: {
+          status: row.connection_status,
+          checkedAt: row.connection_checked_at,
+        },
+      },
+    ]),
+  );
+}
+
 export async function getLineAccountByChannelId(
   db: D1Database,
   channelId: string,
@@ -339,6 +852,7 @@ export type UpdateLineAccountInput = Partial<
     | 'og_site_name'
     | 'og_default_image_url'
     | 'og_default_description'
+    | 'official_profile_url'
     | 'friend_capacity'
     | 'capacity_warn_at'
     | 'icon_url'
@@ -352,6 +866,11 @@ export async function updateLineAccount(
   updates: UpdateLineAccountInput,
   credentialEncryptionKey?: string,
 ): Promise<LineAccount | null> {
+  const current = await requireWritableLineAccount(db, id);
+  if (!current) return null;
+  if (updates.is_active === 0 && current.is_default) {
+    throw new LineAccountLifecycleError('ACCOUNT_DEFAULT');
+  }
   const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -365,20 +884,33 @@ export async function updateLineAccount(
     values.push(updates.channel_access_token);
     fields.push('channel_access_token_encrypted = ?');
     values.push(await encryptCredential(updates.channel_access_token, encryptionKey));
+    fields.push('channel_access_token_updated_at = ?');
+    values.push(jstNow());
   }
   if (updates.channel_secret !== undefined) {
     fields.push('channel_secret = ?');
     values.push(updates.channel_secret);
     fields.push('channel_secret_encrypted = ?');
     values.push(await encryptCredential(updates.channel_secret, encryptionKey));
+    fields.push('channel_secret_updated_at = ?');
+    values.push(jstNow());
   }
   if (updates.login_channel_id !== undefined) {
     fields.push('login_channel_id = ?');
     values.push(updates.login_channel_id);
   }
   if (updates.login_channel_secret !== undefined) {
+    // 平文の列には書かない。値は暗号化列だけに置き、平文は消す（v6-33 §19-2）。
     fields.push('login_channel_secret = ?');
-    values.push(updates.login_channel_secret);
+    values.push(null);
+    fields.push('login_channel_secret_encrypted = ?');
+    values.push(
+      updates.login_channel_secret
+        ? await encryptCredential(updates.login_channel_secret, encryptionKey)
+        : null,
+    );
+    fields.push('login_channel_secret_updated_at = ?');
+    values.push(jstNow());
   }
   if (updates.liff_id !== undefined) {
     fields.push('liff_id = ?');
@@ -420,6 +952,10 @@ export async function updateLineAccount(
     fields.push('og_default_description = ?');
     values.push(updates.og_default_description);
   }
+  if (updates.official_profile_url !== undefined) {
+    fields.push('official_profile_url = ?');
+    values.push(updates.official_profile_url);
+  }
 
   if (fields.length === 0) return getLineAccountById(db, id, encryptionKey);
 
@@ -435,11 +971,347 @@ export async function updateLineAccount(
   return getLineAccountById(db, id, encryptionKey);
 }
 
-export async function deleteLineAccount(
+/** 作成途中のロールバック専用。永続化済みアカウントは archiveLineAccount を使う。 */
+export async function deleteUncommittedLineAccount(
   db: D1Database,
   id: string,
 ): Promise<void> {
   await db.prepare(`DELETE FROM line_accounts WHERE id = ?`).bind(id).run();
+}
+
+export type LineAccountArchiveBlocker =
+  | 'account_active'
+  | 'default_account'
+  | 'delivery_job_running'
+  | 'traffic_pool_member';
+
+export type LineAccountLifecycleErrorCode =
+  | 'ACCOUNT_ARCHIVED'
+  | 'ACCOUNT_ACTIVE'
+  | 'ACCOUNT_DEFAULT'
+  | 'ACCOUNT_HAS_ACTIVE_DELIVERY'
+  | 'ACCOUNT_IN_TRAFFIC_POOL'
+  | 'ACCOUNT_INACTIVE'
+  | 'ACCOUNT_NOT_ARCHIVED';
+
+export class LineAccountLifecycleError extends Error {
+  constructor(public readonly code: LineAccountLifecycleErrorCode) {
+    super(code);
+    this.name = 'LineAccountLifecycleError';
+  }
+}
+
+async function requireWritableLineAccount(db: D1Database, id: string): Promise<LineAccount | null> {
+  const account = await getLineAccountById(db, id);
+  if (account?.archived_at) throw new LineAccountLifecycleError('ACCOUNT_ARCHIVED');
+  return account;
+}
+
+/** Returns every reason that currently prevents an account from being archived. */
+export async function getLineAccountArchiveBlockers(
+  db: D1Database,
+  id: string,
+): Promise<LineAccountArchiveBlocker[]> {
+  const account = await db
+    .prepare(`SELECT is_active, is_default FROM line_accounts WHERE id = ?`)
+    .bind(id)
+    .first<{ is_active: number; is_default: number }>();
+  if (!account) return [];
+
+  const [delivery, pool] = await Promise.all([
+    db
+      .prepare(
+        `SELECT 1 AS found
+           FROM broadcasts
+          WHERE status IN ('scheduled', 'sending')
+            AND (
+              line_account_id = ?
+              OR EXISTS (
+                SELECT 1 FROM json_each(
+                  CASE WHEN json_valid(broadcasts.account_ids) THEN broadcasts.account_ids ELSE '[]' END
+                )
+                WHERE CAST(value AS TEXT) = ?
+              )
+            )
+          LIMIT 1`,
+      )
+      .bind(id, id)
+      .first<{ found: number }>(),
+    db
+      .prepare(
+        `SELECT 1 AS found FROM traffic_pools WHERE active_account_id = ?
+         UNION ALL
+         SELECT 1 AS found FROM pool_accounts WHERE line_account_id = ?
+         LIMIT 1`,
+      )
+      .bind(id, id)
+      .first<{ found: number }>(),
+  ]);
+
+  const blockers: LineAccountArchiveBlocker[] = [];
+  if (account.is_active) blockers.push('account_active');
+  if (account.is_default) blockers.push('default_account');
+  if (delivery) blockers.push('delivery_job_running');
+  if (pool) blockers.push('traffic_pool_member');
+  return blockers;
+}
+
+/** Switches the single organization default atomically. */
+export async function setDefaultLineAccount(
+  db: D1Database,
+  id: string,
+  expectedTenantId?: string,
+): Promise<LineAccount | null> {
+  const account = await getLineAccountById(db, id);
+  if (!account) return null;
+  if (account.archived_at) throw new LineAccountLifecycleError('ACCOUNT_ARCHIVED');
+  if (!account.is_active) throw new LineAccountLifecycleError('ACCOUNT_INACTIVE');
+  const tenantId = account.tenant_id ?? DEFAULT_TENANT_ID;
+  if (expectedTenantId && tenantId !== expectedTenantId) return null;
+  const now = jstNow();
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE line_accounts
+            SET is_default = 0, updated_at = ?
+          WHERE tenant_id = ? AND is_default = 1 AND id != ?`,
+      )
+      .bind(now, tenantId, id),
+    db
+      .prepare(
+        `UPDATE line_accounts
+            SET is_default = 1, updated_at = ?
+          WHERE id = ? AND tenant_id = ? AND archived_at IS NULL AND is_active = 1`,
+      )
+      .bind(now, id, tenantId),
+  ]);
+  return getLineAccountById(db, id);
+}
+
+/** Retires an account without removing any historical records. */
+export async function archiveLineAccount(
+  db: D1Database,
+  id: string,
+  archivedBy: string,
+  reason: string,
+): Promise<LineAccount | null> {
+  const account = await getLineAccountById(db, id);
+  if (!account) return null;
+  if (account.archived_at) throw new LineAccountLifecycleError('ACCOUNT_ARCHIVED');
+  const blockers = await getLineAccountArchiveBlockers(db, id);
+  if (blockers.includes('account_active')) throw new LineAccountLifecycleError('ACCOUNT_ACTIVE');
+  if (blockers.includes('default_account')) throw new LineAccountLifecycleError('ACCOUNT_DEFAULT');
+  if (blockers.includes('delivery_job_running')) {
+    throw new LineAccountLifecycleError('ACCOUNT_HAS_ACTIVE_DELIVERY');
+  }
+  if (blockers.includes('traffic_pool_member')) {
+    throw new LineAccountLifecycleError('ACCOUNT_IN_TRAFFIC_POOL');
+  }
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE line_accounts
+          SET is_active = 0, is_default = 0,
+              archived_at = ?, archived_by = ?, archived_reason = ?, updated_at = ?
+        WHERE id = ? AND archived_at IS NULL`,
+    )
+    .bind(now, archivedBy, reason, now, id)
+    .run();
+  return getLineAccountById(db, id);
+}
+
+/** Restores an archived account in the stopped state. */
+export async function restoreLineAccount(
+  db: D1Database,
+  id: string,
+): Promise<LineAccount | null> {
+  const account = await getLineAccountById(db, id);
+  if (!account) return null;
+  if (!account.archived_at) throw new LineAccountLifecycleError('ACCOUNT_NOT_ARCHIVED');
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE line_accounts
+          SET is_active = 0, is_default = 0,
+              archived_at = NULL, archived_by = NULL, archived_reason = NULL,
+              updated_at = ?
+        WHERE id = ? AND archived_at IS NOT NULL`,
+    )
+    .bind(now, id)
+    .run();
+  return getLineAccountById(db, id);
+}
+
+export type LineAccountInactiveReason = 'manual' | 'ban_detected' | 'credential_invalid';
+export const LINE_ACCOUNT_INACTIVE_REASONS: readonly LineAccountInactiveReason[] = [
+  'manual',
+  'ban_detected',
+  'credential_invalid',
+];
+
+/**
+ * 送受信を止める。理由は必須（v6-33 §10-1）。
+ * `reason` は区分、`detail` は運用者の自由記述。
+ */
+export async function deactivateLineAccount(
+  db: D1Database,
+  id: string,
+  input: { reason: LineAccountInactiveReason; detail: string },
+): Promise<LineAccount | null> {
+  const current = await requireWritableLineAccount(db, id);
+  if (!current) return null;
+  if (current.is_default) throw new LineAccountLifecycleError('ACCOUNT_DEFAULT');
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE line_accounts
+          SET is_active = 0, inactive_reason = ?, inactive_reason_detail = ?,
+              inactivated_at = ?, updated_at = ?
+        WHERE id = ?`,
+    )
+    .bind(input.reason, input.detail, now, now, id)
+    .run();
+  return getLineAccountById(db, id);
+}
+
+/** 送受信を再開する。止めた理由の記録は消す（v6-33 §10-2）。 */
+export async function activateLineAccount(
+  db: D1Database,
+  id: string,
+): Promise<LineAccount | null> {
+  const current = await requireWritableLineAccount(db, id);
+  if (!current) return null;
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE line_accounts
+          SET is_active = 1, inactive_reason = NULL, inactive_reason_detail = NULL,
+              inactivated_at = NULL, updated_at = ?
+        WHERE id = ?`,
+    )
+    .bind(now, id)
+    .run();
+  return getLineAccountById(db, id);
+}
+
+export interface SkippedDelivery {
+  id: string;
+  line_account_id: string;
+  kind: string;
+  ref_id: string;
+  title: string | null;
+  reason: string;
+  skipped_at: string;
+}
+
+/**
+ * 「止めていたので送らなかった」の記録。同じ job は一度だけ残す
+ * （cron が回るたびに増えないよう UNIQUE で抑える）。
+ */
+export async function recordSkippedDelivery(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    kind: string;
+    refId: string;
+    title?: string | null;
+    reason?: string;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO account_skipped_deliveries
+         (id, line_account_id, kind, ref_id, title, reason, skipped_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.lineAccountId,
+      input.kind,
+      input.refId,
+      input.title ?? null,
+      input.reason ?? 'account_inactive',
+      jstNow(),
+    )
+    .run();
+}
+
+export async function listSkippedDeliveries(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<SkippedDelivery[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM account_skipped_deliveries
+        WHERE line_account_id = ? ORDER BY skipped_at DESC`,
+    )
+    .bind(lineAccountId)
+    .all<SkippedDelivery>();
+  return result.results;
+}
+
+export interface PoolSwitchEvent {
+  id: string;
+  pool_id: string;
+  line_account_id: string;
+  direction: 'out' | 'in';
+  reason: string;
+  actor: string;
+  created_at: string;
+}
+
+export async function recordPoolSwitchEvent(
+  db: D1Database,
+  input: {
+    poolId: string;
+    lineAccountId: string;
+    direction: 'out' | 'in';
+    reason: string;
+    actor?: string;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO account_pool_switch_events
+         (id, pool_id, line_account_id, direction, reason, actor, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.poolId,
+      input.lineAccountId,
+      input.direction,
+      input.reason,
+      input.actor ?? 'system',
+      jstNow(),
+    )
+    .run();
+}
+
+/**
+ * 自動で外れていてまだ戻っていないプール参加を返す。
+ * 「直近の切替が out で、その後に in が無い」行だけ。
+ */
+export async function listAutoSwitchedOutPoolAccounts(
+  db: D1Database,
+): Promise<Array<{ pool_id: string; line_account_id: string; switched_at: string }>> {
+  const result = await db
+    .prepare(
+      `SELECT pool_id, line_account_id, created_at AS switched_at
+         FROM account_pool_switch_events e
+        WHERE e.direction = 'out'
+          AND NOT EXISTS (
+            SELECT 1 FROM account_pool_switch_events r
+             WHERE r.line_account_id = e.line_account_id
+               AND r.pool_id = e.pool_id
+               AND r.direction = 'in'
+               AND (r.created_at > e.created_at
+                    OR (r.created_at = e.created_at AND r.rowid > e.rowid))
+          )
+        GROUP BY e.pool_id, e.line_account_id`,
+    )
+    .all<{ pool_id: string; line_account_id: string; switched_at: string }>();
+  return result.results;
 }
 
 export interface UpdateLineAccountFieldsInput {
@@ -452,19 +1324,33 @@ export interface UpdateLineAccountFieldsInput {
   ogSiteName?: string | null;
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。null で未設定に戻す。 */
+  officialProfileUrl?: string | null;
   /** 友だち数の上限。null で「上限を管理しない」に戻す */
   friendCapacity?: number | null;
   /** 何人で警告を出すか。null で「警告しない」に戻す */
   capacityWarnAt?: number | null;
   /** 管理画面で使うアイコン。null で未設定に戻す */
   iconUrl?: string | null;
+  /** LINE公式プロフィールの公開情報。 */
+  lineDisplayName?: string | null;
+  linePictureUrl?: string | null;
+  lineBasicId?: string | null;
+  lineProfileSyncedAt?: string | null;
 }
 
 export async function updateLineAccountFields(
   db: D1Database,
   id: string,
   input: UpdateLineAccountFieldsInput,
+  credentialEncryptionKey?: string,
 ): Promise<LineAccount | null> {
+  const current = await requireWritableLineAccount(db, id);
+  if (!current) return null;
+  if (input.isActive === false && current.is_default) {
+    throw new LineAccountLifecycleError('ACCOUNT_DEFAULT');
+  }
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   const sets: string[] = [];
   const binds: unknown[] = [];
 
@@ -485,8 +1371,17 @@ export async function updateLineAccountFields(
     binds.push(input.loginChannelId);
   }
   if (input.loginChannelSecret !== undefined) {
+    // 平文の列には書かない。値は暗号化列だけに置き、平文は消す（v6-33 §19-2）。
     sets.push('login_channel_secret = ?');
-    binds.push(input.loginChannelSecret);
+    binds.push(null);
+    sets.push('login_channel_secret_encrypted = ?');
+    binds.push(
+      input.loginChannelSecret
+        ? await encryptCredential(input.loginChannelSecret, encryptionKey)
+        : null,
+    );
+    sets.push('login_channel_secret_updated_at = ?');
+    binds.push(jstNow());
   }
   if (input.liffId !== undefined) {
     sets.push('liff_id = ?');
@@ -504,6 +1399,10 @@ export async function updateLineAccountFields(
     sets.push('og_default_description = ?');
     binds.push(input.ogDefaultDescription);
   }
+  if (input.officialProfileUrl !== undefined) {
+    sets.push('official_profile_url = ?');
+    binds.push(input.officialProfileUrl);
+  }
   if (input.friendCapacity !== undefined) {
     sets.push('friend_capacity = ?');
     binds.push(input.friendCapacity);
@@ -516,9 +1415,25 @@ export async function updateLineAccountFields(
     sets.push('icon_url = ?');
     binds.push(input.iconUrl);
   }
+  if (input.lineDisplayName !== undefined) {
+    sets.push('line_display_name = ?');
+    binds.push(input.lineDisplayName);
+  }
+  if (input.linePictureUrl !== undefined) {
+    sets.push('line_picture_url = ?');
+    binds.push(input.linePictureUrl);
+  }
+  if (input.lineBasicId !== undefined) {
+    sets.push('line_basic_id = ?');
+    binds.push(input.lineBasicId);
+  }
+  if (input.lineProfileSyncedAt !== undefined) {
+    sets.push('line_profile_synced_at = ?');
+    binds.push(input.lineProfileSyncedAt);
+  }
 
   if (sets.length === 0) {
-    return getLineAccountById(db, id);
+    return getLineAccountById(db, id, encryptionKey);
   }
 
   sets.push('updated_at = ?');
@@ -530,7 +1445,7 @@ export async function updateLineAccountFields(
     .bind(...binds)
     .run();
 
-  return getLineAccountById(db, id);
+  return getLineAccountById(db, id, encryptionKey);
 }
 
 export async function updateLineAccountOrder(
@@ -538,6 +1453,10 @@ export async function updateLineAccountOrder(
   ordered: Array<{ id: string; displayOrder: number }>,
 ): Promise<void> {
   if (ordered.length === 0) return;
+
+  for (const item of ordered) {
+    await requireWritableLineAccount(db, item.id);
+  }
 
   const now = jstNow();
   const stmts = ordered.map(({ id, displayOrder }) =>

@@ -13,7 +13,7 @@ const modules = [
   'breadcrumb.module.css',
   'chip.module.css',
   'toggle.module.css',
-  'select-field.module.css',
+  'select.module.css',
   'text-field.module.css',
   'row-actions.module.css',
   'data-table.module.css',
@@ -21,6 +21,7 @@ const modules = [
   'note-bar.module.css',
   'side-cards.module.css',
   'sticky-bar.module.css',
+  'radio-card.module.css',
 ]
 
 describe('V6共通部品のトークン', () => {
@@ -33,10 +34,14 @@ describe('V6共通部品のトークン', () => {
       '--color-status-warn-deep: #a15c00;',
       '--color-status-danger: #e5484d;',
       '--color-status-danger-soft: #fef0f0;',
+      // 2026-09-04: #068a3c は **4.46:1 で AA の 4.5:1 に届かない**。
+      // 要件索引 §5-2 の決定どおり、既存トークン $accent-deep(#087a3e、5.44:1)
+      // へ戻した。新しい色トークンは作らない。
+      // #087a3e（5.44:1）から少し明るくなるが、決定どおり。
       '--color-accent-deep: #087a3e;',
       '--color-step-idle: #eef0f3;',
       '--color-surface-chrome: #ebedf1;',
-      '--radius-tiny: 3px;',
+      '--radius-icon: 3px;',
       '--text-body: 14px;',
       '--text-display: 30px;',
     ]
@@ -49,12 +54,14 @@ describe('V6共通部品の主要寸法', () => {
     const css = read('tabs.module.css')
     expect(css).toContain('height: 44px;')
     expect(css).toContain('border-bottom: 2px solid transparent;')
-    expect(css).toContain('border-bottom-color: var(--color-accent);')
+    /* #976 U084: 選択中の下線は白地で読める accent-deep（accent は 2.26:1） */
+    expect(css).toContain('border-bottom-color: var(--color-accent-deep);')
   })
 
-  it('標準プルダウンは高さ42px、標準176px・件数128px', () => {
-    const css = read('select-field.module.css')
-    expect(css).toContain('height: 42px;')
+  it('標準プルダウンは高さ40px、標準176px・件数128px', () => {
+    const css = read('select.module.css')
+    /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえた */
+    expect(css).toContain('height: 40px;')
     expect(css).toContain('width: 176px;')
     expect(css).toContain('width: 128px;')
   })
@@ -86,10 +93,11 @@ describe('V6共通部品の実装境界', () => {
       'tabs.module.css',
       'breadcrumb.module.css',
       'toggle.module.css',
-      'select-field.module.css',
+      'select.module.css',
       'text-field.module.css',
       'row-actions.module.css',
       'side-cards.module.css',
+      'radio-card.module.css',
     ]) {
       expect(read(name), `${name} に :focus-visible がない`).toContain(':focus-visible')
     }
@@ -101,13 +109,14 @@ describe('V6共通部品の実装境界', () => {
       'breadcrumb.tsx',
       'chip.tsx',
       'toggle.tsx',
-      'select-field.tsx',
+      'select.tsx',
       'text-field.tsx',
       'row-actions.tsx',
       'page-header.tsx',
       'note-bar.tsx',
       'side-cards.tsx',
       'sticky-bar.tsx',
+      'radio-card.tsx',
     ]) {
       expect(read(name), `${name} に任意値記法がある`).not.toMatch(/className="[^"]*\[/)
     }

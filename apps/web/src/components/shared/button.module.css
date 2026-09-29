@@ -1,17 +1,65 @@
+@layer components {
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 36px;
   padding: 9px 13px;
   border: 1px solid;
   border-radius: var(--radius-control);
-  font-size: var(--text-label);
+  /*
+   * #976 U079/U083: ボタンの文字は入力欄と同じ `$size-body`(14px)。
+   * 以前は `$size-label`(13px) で、同じ行に並ぶ入力欄より小さかった。
+   */
+  font-size: var(--text-body);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-instant) var(--motion-ease-out);
+}
+
+/*
+ * 押したら少し沈む（★V7 修正方針 §4・ボタン板「押した」）。0.96 は better-ui の値。
+ * 動きを減らす設定では大きさを変えない（色の変化だけ残る）。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .button:active:not(:disabled) {
+    scale: 0.96;
+  }
+}
+
+/*
+ * #976 U083: PC標準は40pxにそろえる（入力欄・検索欄と同じ高さ）。
+ * Pencil V5の実測は36pxだったが、共通デザイン仕様（監査 #976）で
+ * 「主要ボタン・入力・検索・選択はPC 40px」と決め直した。
+ */
+.standard {
+  height: 40px;
+}
+
+.field {
+  height: 40px;
+}
+
+/*
+ * 行内用は32px（★V7：行内の操作は32）。アイコン操作（32×32）と
+ * 同じ高さにそろえる。文字サイズ・余白は共通のまま変えない。
+ */
+.compact {
+  height: 32px;
+}
+
+/* タッチ端末は指の当たり判定のため44pxを確保する（#976 U083）。 */
+@media (pointer: coarse) {
+  .standard,
+  .field,
+  .compact {
+    min-height: 44px;
+  }
 }
 
 .button[hidden] {
@@ -27,15 +75,31 @@
   opacity: 0.4;
 }
 
+/*
+ * 主ボタンは `$accent-deep`(#087a3e) + 白文字。
+ *
+ * LINE の緑 `$accent`(#06c755) に白文字を乗せると **2.26:1** しかない。
+ * ラベルは `$size-label`(13px) なので、AA が求める 4.5:1 に届かない。
+ * `$accent-deep` なら **5.44:1**。新しい色は作らない——Pencil の
+ * トークン表にある色だけを使う（正本は要件索引 §5-2）。
+ *
+ * **`$accent` は消さない。** 選択状態・チップ・有効表示には残す
+ * （文字が乗らない用途）。
+ */
 .primary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
+/*
+ * 押したときはさらに沈める。**新しい色は作らない。**
+ * `$accent-deep` より濃い緑は Pencil のトークン表に無いので、
+ * 同じ色を暗くして出す。暗くするぶん白文字との比は 5.44:1 より上がる。
+ * `$accent-hover`(#05b34c) へ戻すと、押した瞬間だけ 2.78:1 に落ちる。
+ */
 .primary:hover:not(:disabled) {
-  border-color: var(--color-accent-hover);
-  background: var(--color-accent-hover);
+  filter: brightness(0.92);
 }
 
 .secondary {
@@ -46,4 +110,24 @@
 
 .secondary:hover:not(:disabled) {
   background: var(--color-canvas-sunken);
+}
+
+/*
+ * 危険操作（削除・解除）。`$danger`(#b3261e) + 白文字。
+ *
+ * #976 U077/U084: 以前は `$status-danger`(#e5484d) の画面が多く、
+ * 白文字で 3.4:1 しか取れなかった。`$danger` なら 5.9:1。
+ * `$status-danger` は小さな印（チップ・バッジの文字）用の色で、
+ * 白文字が乗る面には使わない——主ボタンの `$accent` → `$accent-deep`
+ * と同じ考え方。
+ */
+.danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-on-accent);
+}
+
+.danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
 }

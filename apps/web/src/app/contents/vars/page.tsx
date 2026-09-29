@@ -4,13 +4,24 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import FolderPanel from '@/components/shared/folder-panel'
-import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
+import {
+  api,
+  ApiError,
+  type CommonVarReplacementCandidate,
+  type CommonVarReplacementImpact,
+} from '@/lib/api'
+import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { formatStamp, COMMON_VAR_STATE_LABELS } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import {
   blockedReason,
   canDelete as canDeleteVar,
@@ -22,7 +33,18 @@ import {
   usageText,
 } from './delete-impact'
 import ListState from '@/components/shared/list-state'
+import CopyTextButton from '@/components/ui/copy-text-button'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
+import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
+import Select from '@/components/shared/select'
+import {
+  filterAndSortCommonVars,
+  type CommonVarFilter,
+  type CommonVarOrder,
+} from './list-model'
+import VarsExportPanel from './export-panel'
 
 /**
  * 共通情報の一覧。
@@ -36,8 +58,42 @@ import { useAccount } from '@/contexts/account-context'
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
 
-/** 1ページに出す件数。Lステップと同じく、下にページ番号を並べる。 */
-const PER_PAGE = 20
+/*
+ * 一括削除の上限。1件ごとに使用先9種の走査が走るため、
+ * 件数に比例してWorker・D1が重くなる。上限を超えたら確認口を打たず、
+ * 絞り込みで分けるよう案内する。
+ */
+const MAX_BATCH_DELETE_COUNT = 20
+
+/*
+ * 一覧の更新日は、次回変更と同じセルに収まる短い形で出す。
+ * `formatStamp`（`@/lib/common-vars`）とは別物。あちらは履歴・予定の
+ * 「いつ」を読ませる長い形。用途が違うので統一せず、名前で使い分ける。
+ */
+function formatListDate(value: string): string {
+  /*
+   * 更新日は UTC の ISO で来る。区切り文字だけ直す素朴な整形だと
+   * JSTで日付がずれる（深夜の更新が前日扱い）ので、JST固定で出す。
+   */
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+/*
+ * 種別が年月日・日時の値は、保存形（2027-10-01 や 2027-10-01T10:00）を
+ * そのまま出すと一覧のほかの日付（2026/09/29）と区切りが違って見える。
+ * 更新予定と同じ `formatStamp` の「/」区切り（曜日付き）にそろえる。
+ */
+function formatVarValue(type: CommonVar['type'], value: string): string {
+  if (!value) return ''
+  if (type === 'date' || type === 'datetime') return formatStamp(value)
+  return value
+}
 
 function VarsPageInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -48,11 +104,19 @@ function VarsPageInner() {
 
   const [items, setItems] = useState<CommonVar[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
+  // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
+  // kind=common_var は件数未対応のため来ない。来ないときは null（「—」表示）。
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 一覧が件数上限で切られたときに絞り込み誘導を出す。 */
+  const [listLimited, setListLimited] = useState(false)
 
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [stateFilter, setStateFilter] = useState<CommonVarFilter>('all')
+  const [order, setOrder] = useState<CommonVarOrder>('usage_desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleteTargets, setDeleteTargets] = useState<CommonVar[]>([])
   /** 1件ずつの削除確認（設計 `yPkWe`）。 */
@@ -61,8 +125,15 @@ function VarsPageInner() {
   const [singlePhase, setSinglePhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [singleBusy, setSingleBusy] = useState(false)
   const [singleError, setSingleError] = useState('')
+  const [replacementCandidates, setReplacementCandidates] = useState<CommonVarReplacementCandidate[]>([])
+  const [replacementId, setReplacementId] = useState('')
+  const [replacementImpact, setReplacementImpact] = useState<CommonVarReplacementImpact | null>(null)
+  const [replacementPhase, setReplacementPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   /** 確認のために打ってもらう差し込みキー。 */
   const [typedKey, setTypedKey] = useState('')
+  /** 消した理由。版履歴に残すので必須。 */
+  const [singleReason, setSingleReason] = useState('')
+  const [batchReason, setBatchReason] = useState('')
   /** いま影響を読んでいるアカウント・対象・世代。遅れて返った別の結果を捨てるために持つ。 */
   const singleRequestRef = useRef({ accountId: selectedAccountId, itemId: null as string | null, generation: 0 })
   const [deleting, setDeleting] = useState(false)
@@ -78,6 +149,30 @@ function VarsPageInner() {
 
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderName, setFolderName] = useState('')
+  /*
+    R37: フォルダの名前変更・削除を FolderPanel の「…」へ接続する。
+    権限の無い人には押して失敗する口を見せない（canManageFolders）。
+  */
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
+  const [canManageFolders, setCanManageFolders] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      setCanManageFolders(
+        response.success && (response.data.role === 'owner' || response.data.role === 'admin'),
+      )
+    }).catch(() => {
+      if (active) setCanManageFolders(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
   const [savingFolder, setSavingFolder] = useState(false)
 
   const load = useCallback(async () => {
@@ -92,13 +187,26 @@ function VarsPageInner() {
     try {
       const [vars, folderList] = await Promise.all([
         api.commonVars.list(accountAtRequest),
-        api.folders.list('common_var'),
+        // #730: 選択中の1件に閉じた母集団で数える。
+        api.folders.list('common_var', accountAtRequest),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
-      if (vars.success) setItems(vars.data)
-      if (folderList.success) setFolders(folderList.data)
-    } catch {
-      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
+      if (vars.success) {
+        setItems(vars.data)
+        setListLimited(vars.meta?.limited ?? false)
+      }
+      if (folderList.success) {
+        setFolders(folderList.data)
+        setUnfiledCount(folderList.unfiledCount ?? null)
+      }
+    } catch (e) {
+      // 権限なしと通信障害で文言を分ける。同じ文言だと運用者が接続を
+      // 確かめ続け、権限申請に気づけない。
+      if (accountAtRequest === latestAccountRef.current) {
+        setError(e instanceof ApiError && e.status === 403
+          ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
+          : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
+      }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
@@ -121,6 +229,11 @@ function VarsPageInner() {
     setSingleBusy(false)
     setSingleError('')
     setTypedKey('')
+    setSingleReason('')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('idle')
     deleteRequestRef.current = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -129,26 +242,29 @@ function VarsPageInner() {
     setDeleteTargets([])
     setDeleting(false)
     setDeleteError('')
+    setListLimited(false)
   }, [selectedAccountId])
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return items.filter((item) => {
-      if (folderFilter === UNGROUPED && item.folderId !== null) return false
-      if (folderFilter && folderFilter !== UNGROUPED && item.folderId !== folderFilter) return false
-      if (!needle) return true
-      return (
-        item.name.toLowerCase().includes(needle) ||
-        item.varKey.toLowerCase().includes(needle) ||
-        item.value.toLowerCase().includes(needle)
-      )
-    })
-  }, [items, folderFilter, query])
+  const filtered = useMemo(
+    () => filterAndSortCommonVars(items, {
+      query,
+      folderId: folderFilter,
+      ungroupedValue: UNGROUPED,
+      filter: stateFilter,
+      order,
+    }),
+    [folderFilter, items, order, query, stateFilter],
+  )
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = useMemo(
-    () => filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE),
-    [filtered, page],
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  )
+
+  const emptyInUseCount = useMemo(
+    () => items.filter((item) => item.value === '' && typeof item.usageCount === 'number' && item.usageCount > 0).length,
+    [items],
   )
 
   useEffect(() => {
@@ -176,6 +292,37 @@ function VarsPageInner() {
     }
   }
 
+  /** R37: フォルダを消す。中身は消えず未分類に戻る。消した先を選んでいたら「すべて」へ戻す。 */
+  const removeFolder = async () => {
+    if (!deletingFolder || !selectedAccountId || folderBusy) return
+    const accountAtRequest = selectedAccountId
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const res = await api.folders.delete(deletingFolder.id, accountAtRequest)
+      if (!res.success) throw new Error(res.error)
+      if (accountAtRequest !== latestAccountRef.current) return
+      setDeletingFolder(null)
+      if (folderFilter === deletingFolder.id) setFolderFilter('')
+      void load()
+    } catch {
+      if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  /** R37: スマホの選択欄で選んでいる利用者フォルダ。縦パネルの「…」と同じ操作へ届ける。 */
+  const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+
+  /** R38: 絞り込みの0件から条件を外す口。フォルダも含めて「すべて」へ戻す。 */
+  const clearVarFilters = () => {
+    setQuery('')
+    setFolderFilter('')
+    setStateFilter('all')
+    setPage(1)
+  }
+
   /*
     1件ずつの削除確認（設計 `yPkWe`）。**窓を開けてから読む。**
     一覧を出すたびに全件ぶん読むと、消さない人にも8種類の走査が走る。
@@ -183,9 +330,14 @@ function VarsPageInner() {
   const openSingleDelete = async (item: CommonVar) => {
     setSingleTarget(item)
     setTypedKey('')
+    setSingleReason('')
     setSingleError('')
     setSingleImpact(null)
     setSinglePhase('loading')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('loading')
     if (!selectedAccountId) {
       setSinglePhase('error')
       return
@@ -205,19 +357,115 @@ function VarsPageInner() {
       singleRequestRef.current.accountId === request.accountId &&
       singleRequestRef.current.itemId === request.itemId &&
       singleRequestRef.current.generation === request.generation
+    const [impactResult, candidatesResult] = await Promise.allSettled([
+      api.commonVars.deleteImpact(request.itemId, request.accountId),
+      api.commonVars.replacementCandidates(request.itemId, request.accountId),
+    ])
+    if (!isCurrentRequest()) return
+    if (impactResult.status === 'rejected' || !impactResult.value.success) {
+      setSinglePhase('error')
+      setReplacementPhase('error')
+      return
+    }
+    setSingleImpact(impactResult.value.data)
+    setSinglePhase('ready')
+    if (candidatesResult.status === 'rejected' || !candidatesResult.value.success) {
+      setReplacementPhase('error')
+      return
+    }
+    setReplacementCandidates(candidatesResult.value.data.candidates)
+    const first = candidatesResult.value.data.candidates[0]
+    if (!first) {
+      setReplacementPhase('ready')
+      return
+    }
+    setReplacementId(first.id)
     try {
-      const res = await api.commonVars.deleteImpact(request.itemId, request.accountId)
+      const preview = await api.commonVars.replacementImpact(request.itemId, request.accountId, first.id)
       if (!isCurrentRequest()) return
-      if (!res.success) throw new Error('impact_failed')
-      setSingleImpact(res.data)
-      setSinglePhase('ready')
+      if (!preview.success) throw new Error('replacement_impact_failed')
+      setReplacementImpact(preview.data)
+      setReplacementPhase('ready')
     } catch {
       if (!isCurrentRequest()) return
-      /*
-        使用先が読めないときは**消させない**。「参照0件」と読み違えて
-        消すと、差し込んでいた文が空欄のまま送られ続ける。
-      */
-      setSinglePhase('error')
+      setReplacementPhase('error')
+    }
+  }
+
+  const selectReplacement = async (nextId: string) => {
+    if (!singleTarget || !selectedAccountId) return
+    setReplacementId(nextId)
+    setReplacementImpact(null)
+    if (!nextId) {
+      setReplacementPhase('ready')
+      return
+    }
+    const request = {
+      accountId: selectedAccountId,
+      itemId: singleTarget.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    setReplacementPhase('loading')
+    try {
+      const res = await api.commonVars.replacementImpact(request.itemId, request.accountId, nextId)
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (!res.success) throw new Error('replacement_impact_failed')
+      setReplacementImpact(res.data)
+      setReplacementPhase('ready')
+    } catch {
+      if (singleRequestRef.current.generation === request.generation) setReplacementPhase('error')
+    }
+  }
+
+  const confirmReplacement = async () => {
+    if (!singleTarget || !selectedAccountId || !replacementImpact?.canReplace || singleBusy) return
+    if (!singleReason.trim()) {
+      setSingleError('消した理由を入力してください。')
+      return
+    }
+    const request = {
+      accountId: selectedAccountId,
+      itemId: singleTarget.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    setSingleBusy(true)
+    setSingleError('')
+    try {
+      const res = await api.commonVars.replace(request.itemId, request.accountId, {
+        replacementId: replacementImpact.replacement.id,
+        expectedVersion: replacementImpact.source.version,
+        expectedRevision: replacementImpact.revision,
+        changeReason: singleReason.trim(),
+      })
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (!res.success) throw new Error('replace_failed')
+      singleRequestRef.current = {
+        accountId: selectedAccountId,
+        itemId: null,
+        generation: request.generation + 1,
+      }
+      setSingleTarget(null)
+      setSingleImpact(null)
+      setSinglePhase('idle')
+      setSingleBusy(false)
+      setReplacementCandidates([])
+      setReplacementId('')
+      setReplacementImpact(null)
+      setReplacementPhase('idle')
+      await load()
+    } catch (error) {
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (error instanceof ApiError && error.status === 409) {
+        setSingleError('使用先が変わりました。影響をもう一度確認してください。')
+        setSingleBusy(false)
+        await selectReplacement(replacementImpact.replacement.id)
+      } else {
+        setSingleError('差し替えを完了できませんでした。状態を読み直して、もう一度お試しください。')
+      }
+    } finally {
+      if (singleRequestRef.current.generation === request.generation) setSingleBusy(false)
     }
   }
 
@@ -236,7 +484,7 @@ function VarsPageInner() {
     setSingleBusy(true)
     setSingleError('')
     try {
-      const res = await api.commonVars.delete(request.itemId, request.accountId)
+      const res = await api.commonVars.delete(request.itemId, request.accountId, singleReason.trim())
       if (!isCurrentRequest()) return
       if (!res.success) throw new Error('delete_failed')
       setSingleTarget(null)
@@ -278,10 +526,19 @@ function VarsPageInner() {
     setSinglePhase('idle')
     setSingleError('')
     setTypedKey('')
+    setSingleReason('')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('idle')
   }
 
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
+    if (selected.size > MAX_BATCH_DELETE_COUNT) {
+      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT}件までです。フォルダや検索で絞り込んで分けて削除してください。`)
+      return
+    }
     const request = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -319,11 +576,16 @@ function VarsPageInner() {
       setError('選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')
       return
     }
+    setBatchReason('')
     setDeleteTargets(targets)
   }
 
   const removeSelected = async () => {
     if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
+    if (!batchReason.trim()) {
+      setDeleteError('消した理由を入力してください。')
+      return
+    }
     const request = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -338,7 +600,7 @@ function VarsPageInner() {
     const failed: CommonVar[] = []
     for (const target of targets) {
       try {
-        const result = await api.commonVars.delete(target.id, request.accountId)
+        const result = await api.commonVars.delete(target.id, request.accountId, batchReason.trim())
         if (!result.success) throw new Error(result.error)
       } catch {
         failed.push(target)
@@ -361,6 +623,7 @@ function VarsPageInner() {
       }
 
       setDeleteTargets([])
+      setBatchReason('')
       setSelected(new Set())
       await load()
     } finally {
@@ -378,79 +641,172 @@ function VarsPageInner() {
 
   const allOnPageSelected = current.length > 0 && current.every((item) => selected.has(item.id))
 
+  /*
+   * フォルダ新設の入力欄（#973 U026）。狭い幅では縦パネルを畳んで選択欄に
+   * するため、縦パネルと選択欄の両方から同じ形を使う。
+   */
+  const folderForm = (
+    <div className="space-y-2">
+      <input
+        type="text"
+        autoFocus
+        value={folderName}
+        onChange={(e) => setFolderName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void addFolder()
+          if (e.key === 'Escape') setAddingFolder(false)
+        }}
+        placeholder="フォルダ名を入力"
+        aria-label="フォルダ名"
+        className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
+      />
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => {
+            setAddingFolder(false)
+            setFolderName('')
+          }}
+          className="border-hairline text-ink-secondary rounded-control border px-3 py-1 text-xs"
+        >
+          キャンセル
+        </button>
+        <button
+          onClick={() => void addFolder()}
+          disabled={!folderName.trim() || savingFolder}
+          className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
+        >
+          決定
+        </button>
+      </div>
+    </div>
+  )
+
+  /*
+   * 狭い幅で出すフォルダの選択欄（#973 U026）。縦パネルは長い一覧が
+   * 本文の前に来て、親グリッドの右へはみ出す元にもなっていた。
+   */
+  const folderOptions = [
+    { value: '', label: `すべて（${items.length}件）` },
+    { value: UNGROUPED, label: `未分類（${unfiledCount === null ? '—' : `${unfiledCount}件`}）` },
+    ...folders.map((folder) => ({
+      value: folder.id,
+      label: folder.itemCount === null || folder.itemCount === undefined
+        ? folder.name
+        : `${folder.name}（${folder.itemCount}件）`,
+    })),
+  ]
+
   return (
-    <div data-design-node="WuKzU">
+    <div data-design-node="WuKzU" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {!selectedAccountId && !accountLoading && (
-        <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。" />
-      )}
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。" />
         </div>
       )}
+      {/*
+        ★V7 `x63W5x`：読み込み失敗の帯は出さない。一覧の場所の ListState error
+        だけにまとめる（同じ失敗を2回出さない）。
+      */}
 
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <div className="space-y-3">
-          <button
-            onClick={() => setAddingFolder(true)}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control w-full border px-3 py-2 text-sm font-medium"
-          >
-            ＋ 新しいフォルダ
-          </button>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/*
+            ★V7 `x63W5x`：失敗している間は作成ボタンを出さない。
+            読めていないのに「作る」があると、消えたように読める。
+          */}
+          {error ? null : (
+            <Button href="/contents/vars/new" variant="primary">＋ 共通情報を作る</Button>
+          )}
+        </div>
+        {/*
+          N-192: 端末で見えている分だけをCSV化するのをやめ、台帳へ残る
+          サーバ出力へ切り替えた。選択中のフォルダ条件はそのまま渡す。
+        */}
+        <VarsExportPanel
+          accountId={selectedAccountId}
+          folderId={folderFilter && folderFilter !== UNGROUPED ? folderFilter : null}
+          ungrouped={folderFilter === UNGROUPED}
+        />
+      </div>
 
+      {emptyInUseCount > 0 ? (
+        <div className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm font-semibold" role="status">
+          中身が空のまま使われているものが {emptyInUseCount.toLocaleString('ja-JP')}件あります。差し込んだところが空欄のまま送られます。
+        </div>
+      ) : null}
+
+      {listLimited ? (
+        <div className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm font-semibold" role="status">
+          表示は最初の200件までです。フォルダや検索で絞り込んでください。
+        </div>
+      ) : null}
+
+      {/*
+        #973 U026: グリッド子は `min-w-0` で縮める。無いと中身（820pxの表を
+        抱える一覧側）の最小幅がそのまま段の最小幅になり、ページ全体が
+        右へはみ出す。
+      */}
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+        {/* 狭い幅では縦パネルの代わりに1行の選択欄を出す（#973 U026）。 */}
+        <div className="space-y-2 lg:hidden">
+          <label className="text-ink-secondary block text-xs font-semibold" htmlFor="vars-folder-filter">
+            フォルダ
+          </label>
+          <Select size="full" id="vars-folder-filter" aria-label="フォルダ" value={folderFilter} onChange={(value) => setFolderFilter(value)} options={folderOptions} />
+          {addingFolder ? (
+            folderForm
+          ) : (
+            <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
+          )}
+          {/*
+            R37: 狭い幅では縦パネルが出ないため、選んでいるフォルダの
+            名前変更・削除を選べる口をここに置く。PCの「…」と同じ窓へ届く。
+          */}
+          {canManageFolders && selectedUserFolder && !addingFolder ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => setEditingFolder(selectedUserFolder)}>
+                フォルダ名を変える
+              </Button>
+              <Button type="button" onClick={() => { setFolderError(''); setDeletingFolder(selectedUserFolder) }}>
+                フォルダを削除
+              </Button>
+            </div>
+          ) : null}
+        </div>
+        <div className="hidden space-y-3 lg:block">
           <FolderPanel
-            total={`${items.length} 件`}
+            /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧側の ListRange に出す。 */
             activeId={folderFilter}
             onSelect={setFolderFilter}
+            onAddFolder={() => setAddingFolder(true)}
             rows={[
               { id: '', label: 'すべて', count: items.length },
               {
                 id: UNGROUPED,
                 label: '未分類',
-                count: items.filter((item) => item.folderId === null).length,
+                count: unfiledCount,
               },
               ...folders.map((folder) => ({
                 id: folder.id,
                 label: folder.name,
-                count: items.filter((item) => item.folderId === folder.id).length,
+                // #721: フォルダ件数はAPI(itemCount)をそのまま出す。
+                // kind=common_var は件数未対応で来ないため「—」になる。
+                // 読み込み済み範囲だけを数える計算は、黙って別の母集団に
+                // すり替わるため廃止。
+                count: folder.itemCount ?? null,
                 color: folder.color,
+                // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
+                // 押して失敗する口を見せない。
+                onEdit: canManageFolders ? () => setEditingFolder(folder) : undefined,
+                onDelete: canManageFolders ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
+                deleteNote: '削除しても、入っていた共通情報は未分類として残ります。',
               })),
             ]}
           >
+            {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
             {addingFolder ? (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  autoFocus
-                  value={folderName}
-                  onChange={(e) => setFolderName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void addFolder()
-                    if (e.key === 'Escape') setAddingFolder(false)
-                  }}
-                  placeholder="フォルダ名を入力"
-                  aria-label="フォルダ名"
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => {
-                      setAddingFolder(false)
-                      setFolderName('')
-                    }}
-                    className="border-hairline text-ink-secondary rounded-control border px-3 py-1 text-xs"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    onClick={() => void addFolder()}
-                    disabled={!folderName.trim() || savingFolder}
-                    className="bg-accent text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
-                  >
-                    決定
-                  </button>
-                </div>
-              </div>
+              folderForm
             ) : (
               <p className="text-ink-faint text-xs leading-relaxed">
                 フォルダを消しても、入っていた共通情報は未分類として残ります。
@@ -459,34 +815,115 @@ function VarsPageInner() {
           </FolderPanel>
         </div>
 
-        <div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value)
+        <div className="min-w-0">
+          {/*
+            検索は独立した全幅の行にする（#973 U026）。表示件数と同じ行に
+            押し込むと、狭い幅で入力文が読めないほど潰れる。
+          */}
+          <div data-search-row className="mb-3">
+            <SearchField
+              value={query}
+              onChange={(value) => {
+                setQuery(value)
+                setPage(1)
+              }}
+              onClear={() => {
+                setQuery('')
+                setPage(1)
+              }}
+              placeholder="名前・差し込みキー・中身で検索"
+              aria-label="共通情報を検索"
+            />
+          </div>
+
+          {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+            {([
+              ['all', 'すべて'],
+              ['empty', '空のまま'],
+              ['scheduled', '期限つき'],
+              ['unused', '使われていない'],
+              ['draft', '下書き'],
+              ['stopped', '止めた'],
+              ['expired', '期限切れ'],
+            ] as const).map(([value, label]) => (
+              <FilterChip
+                key={value}
+                selected={stateFilter === value}
+                onChange={() => {
+                  setStateFilter(value)
                   setPage(1)
                 }}
-                placeholder="検索"
-                aria-label="共通情報を検索"
-                className="border-hairline rounded-control focus:ring-accent w-48 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              />
-            </div>
+              >
+                {label}
+              </FilterChip>
+            ))}
+            <SortSelect
+              className="ml-auto"
+              value={order}
+              onChange={(value) => setOrder(value as CommonVarOrder)}
+              options={[
+                { value: 'usage_desc', label: '使われている数が多い順' },
+                { value: 'updated_desc', label: '更新が新しい順' },
+                { value: 'name_asc', label: '名前順' },
+              ]}
+            />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(value) => {
+                setPageSize(value)
+                setPage(1)
+              }}
+            />
           </div>
 
           <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px]">
+            {/*
+              #973 U026: 読み込み・空の状態は820pxの表の外へ出す。
+              表のセルに入れると、空状態の主操作まで横スクロールの奥へ切れる。
+            */}
+            {loading ? (
+              <div className="text-ink-faint px-4 py-8 text-center text-sm">
+                <ListState kind="loading" title="共通情報を読み込んでいます" />
+              </div>
+            ) : error ? (
+              // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+              // 消えたように読めるため、空の案内と作成ボタンは出さない。
+              <div className="text-ink-faint px-4 py-8 text-center text-sm">
+                <ListState
+                  kind="error"
+                  title="共通情報を読み込めませんでした"
+                  description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+                  onRetry={() => void load()}
+                />
+              </div>
+            ) : current.length === 0 ? (
+              <div className="text-ink-faint px-4 py-8 text-center text-sm">
+                <ListState
+                  kind="empty"
+                  emptyPreset={items.length === 0 ? 'createable' : 'filtered'}
+                  title={items.length === 0
+                    ? 'まだ共通情報がありません'
+                    : '条件に合う共通情報はありません'}
+                  description={items.length === 0
+                    ? '何度も使う営業時間や会社名を登録できます。'
+                    : '検索語やフォルダを変えてください。'}
+                  action={items.length === 0
+                    ? <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
+                    : <Button type="button" onClick={clearVarFilters}>条件を外す</Button>}
+                />
+              </div>
+            ) : (
+            <div className="overflow-x-auto @container">
+              {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「更新・次の変更」を畳む。 */}
+              <table className="w-full min-w-[664px] table-fixed @[870px]:min-w-[820px]">
                 <thead>
-                  <tr className="bg-canvas-sunken border-hairline border-b">
-                    <th className="w-10 px-3 py-3">
-                      <input
-                        type="checkbox"
+                  <TableHeadRow className="bg-canvas-sunken border-hairline border-b">
+                    <Th className="w-10 px-3 py-3">
+                      <Checkbox
                         checked={allOnPageSelected}
-                        onChange={() =>
+                        onCheckedChange={() =>
                           setSelected((prev) => {
                             const next = new Set(prev)
                             for (const item of current) {
@@ -497,119 +934,169 @@ function VarsPageInner() {
                           })
                         }
                         aria-label="このページの共通情報をすべて選ぶ"
-                        className="accent-green-500"
                       />
-                    </th>
-                    <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
-                      共通情報名
-                    </th>
-                    <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
-                      種別
-                    </th>
-                    <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">値</th>
-                    <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
-                      スケジュール
-                    </th>
-                    <th className="px-4 py-3" />
-                  </tr>
+                    </Th>
+                    {/* 見出しも固定幅で切れ得るので、重ねると全文が読める
+                        title を付ける（第5パス D-3）。 */}
+                    <Th className="w-28 px-4 py-3" title="共通情報">
+                      共通情報
+                    </Th>
+                    <Th className="w-40 px-4 py-3" title="差し込みキー">
+                      差し込みキー
+                    </Th>
+                    {/* Q: 状態は安全に関わるので谷間帯でも畳まない。 */}
+                    <Th className="w-20 px-4 py-3" title="状態">
+                      状態
+                    </Th>
+                    <Th className="px-4 py-3" title="中身">中身</Th>
+                    <Th className="w-32 px-4 py-3" title="使われている場所">
+                      使われている場所
+                    </Th>
+                    <Th className="cq-hide-below-870 px-4 py-3" style={{ width: '19%' }} title="最終更新日・次の変更予定">
+                      更新・次の変更
+                    </Th>
+                    {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                    <Th align="right" className="bg-canvas-sunken sticky right-0 w-36 px-4 py-3" title="編集・削除">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={6} className="text-ink-faint px-4 py-8 text-center text-sm">
-                        <ListState kind="loading" title="共通情報を読み込んでいます" />
-                      </td>
-                    </tr>
-                  ) : current.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-ink-faint px-4 py-8 text-center text-sm">
-                        <ListState
-                          kind="empty"
-                          title={items.length === 0
-                            ? 'まだ共通情報がありません'
-                            : '条件に合う共通情報はありません'}
-                          description={items.length === 0
-                            ? '何度も使う営業時間や会社名を登録できます。'
-                            : '検索語やフォルダを変えてください。'}
-                          action={items.length === 0
-                            ? <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
-                            : undefined}
-                        />
-                      </td>
-                    </tr>
-                  ) : (
-                    current.map((item) => {
+                  {current.map((item) => {
                       const pending = item.nextSchedule
                       return (
-                        <tr key={item.id} className="hover:bg-canvas-sunken">
+                        <tr key={item.id} className="group hover:bg-canvas-sunken">
                           <td className="px-3 py-3">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={selected.has(item.id)}
-                              onChange={() => toggle(item.id)}
+                              onCheckedChange={() => toggle(item.id)}
                               aria-label={`${item.name}を選ぶ`}
-                              className="accent-green-500"
                             />
                           </td>
                           <td className="px-4 py-3">
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
-                              className="text-info text-sm font-medium hover:underline"
+                              title={item.name}
+                              className="text-info block truncate text-sm font-medium hover:underline"
                             >
                               {item.name}
                             </Link>
-                            {/* 差し込みの書き方を一覧に出す。編集画面を開かないと
-                                分からないと、テンプレートを書く手が止まる。 */}
-                            <code className="text-ink-faint block text-xs">{`{{var.${item.varKey}}}`}</code>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
-                              {VAR_TYPE_LABELS[item.type] ?? item.type}
-                            </span>
+                            {/* 差し込みの書き方を独立した列に出す。名前と混ぜず、
+                                テンプレートを書くときに横へ追って確認できる。
+                                省略表示のキーは title で読めるが取り出せないので、
+                                全文コピーの口を隣へ添える（監査6 #665）。 */}
+                            <div className="flex items-center gap-1">
+                              <code
+                                title={placeholderText(item.varKey)}
+                                className="text-ink-faint min-w-0 flex-1 truncate whitespace-nowrap text-xs"
+                              >{placeholderText(item.varKey)}</code>
+                              <CopyTextButton
+                                value={placeholderText(item.varKey)}
+                                aria-label={`${item.name}の差し込みキーをコピー`}
+                              />
+                            </div>
                           </td>
-                          <td className="text-ink max-w-[18rem] truncate px-4 py-3 text-sm">
-                            {item.value || <span className="text-ink-faint">（空）</span>}
+                          <td className="whitespace-nowrap px-4 py-3">
+                            {/* Q: 状態の札。使用中は静かな色、止めた・期限切れ・下書きは
+                                運用者が気づけるように札で出す。 */}
+                            {(() => {
+                              const state = item.state ?? 'active'
+                              const label = COMMON_VAR_STATE_LABELS[state] ?? '使用中'
+                              return (
+                                <span
+                                  className={`rounded-control bg-canvas-sunken px-2 py-0.5 text-xs font-semibold ${
+                                    state === 'active'
+                                      ? 'text-ink-faint'
+                                      : state === 'expired'
+                                        ? 'text-status-warning'
+                                        : 'text-status-info'
+                                  }`}
+                                  title={`状態：${label}`}
+                                >
+                                  {label}
+                                </span>
+                              )
+                            })()}
                           </td>
-                          <td className="text-ink-secondary px-4 py-3 text-xs">
+                          <td title={formatVarValue(item.type, item.value) || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
+                            {formatVarValue(item.type, item.value) || <span className="text-ink-faint">（空）</span>}
+                          </td>
+                          <td
+                            className="text-ink-secondary whitespace-nowrap px-4 py-3 text-xs"
+                            title={item.usageCount === undefined
+                              ? '使われている場所（未取得）'
+                              : item.usageCount === 0
+                                ? '使われていません'
+                                : `${item.usageCount.toLocaleString('ja-JP')}か所で使われています`}
+                          >
+                            {item.usageCount === undefined
+                              ? '—（未取得）'
+                              : item.usageCount === 0
+                                ? '使われていません'
+                                : `${item.usageCount.toLocaleString('ja-JP')}か所`}
+                          </td>
+                          {/* 更新日と次の変更が長いと切れるため、セル全体に
+                              全文が読める title を付ける（第5パス D-3）。 */}
+                          <td
+                            className="text-ink-secondary cq-hide-below-870 px-4 py-3 text-xs"
+                            title={`最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`}
+                          >
+                            {/*
+                              狭い列でも横に流さないよう、日付と予定は2行に分ける。
+                              空白の位置で折れる（全文は列の title）。
+                            */}
+                            <span className="block">{formatListDate(item.updatedAt)}</span>
                             {!pending ? (
-                              <span className="text-ink-faint">—</span>
+                              <span className="text-ink-faint block"> ／ 予定なし</span>
                             ) : (
                               <>
-                                {formatStamp(pending.effectiveFrom)} から
-                                <span className="text-ink-faint"> → {pending.value || '（空）'}</span>
+                                <span className="text-ink-faint block"> ／ {formatStamp(pending.effectiveFrom)} に</span>
+                                <span className="text-ink-faint"> {formatVarValue(item.type, pending.value) || '（空）'}へ</span>
                                 {(item.pendingScheduleCount ?? 0) > 1 && (
                                   <span className="text-ink-faint"> ほか{(item.pendingScheduleCount ?? 1) - 1}件</span>
                                 )}
                               </>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <Link
-                              href={`/contents/vars/edit?id=${item.id}`}
-                              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs"
-                            >
-                              編集
-                            </Link>
-                            <Button
-                              type="button"
-                              onClick={() => void openSingleDelete(item)}
-                              data-qa-open="yPkWe"
-                              aria-label={`${item.name}を削除`}
-                              className="ml-2"
-                            >
-                              削除
-                            </Button>
+                          <td className="bg-canvas group-hover:bg-canvas-sunken whitespace-nowrap sticky right-0 px-4 py-3 text-right" title="編集・削除">
+                            {/*
+                              行の操作は同じ高さ（32）にそろえる。削除は撮影入口
+                             （data-qa-open="yPkWe"）のため行に残す。
+                            */}
+                            <span className="flex w-full items-center justify-end gap-2">
+                              <Button
+                                href={`/contents/vars/edit?id=${item.id}`}
+                                size="compact"
+                              >
+                                編集
+                              </Button>
+                              <Button
+                                type="button"
+                                size="compact"
+                                onClick={() => void openSingleDelete(item)}
+                                data-qa-open="yPkWe"
+                                aria-label={`${item.name}を削除`}
+                              >
+                                削除
+                              </Button>
+                            </span>
                           </td>
                         </tr>
                       )
-                    })
-                  )}
+                    })}
                 </tbody>
               </table>
             </div>
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            {/* m18s: 絞り込み後の件数は一覧の側に出す。見出しには出さない。 */}
+            <ListRange
+              total={filtered.length}
+              first={filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}
+              last={Math.min(page * pageSize, filtered.length)}
+            />
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
             <button
@@ -631,6 +1118,7 @@ function VarsPageInner() {
       */}
       <Dialog
         open={singleTarget !== null}
+        designNode="yPkWe"
         tone="destructive"
         title={singleTarget ? `共通情報「${singleTarget.name}」を削除しますか？` : ''}
         description="この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。"
@@ -648,8 +1136,27 @@ function VarsPageInner() {
               >
                 キャンセル
               </Button>
+              {singleImpact && !singleImpact.canDelete && replacementImpact?.canReplace ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => void confirmReplacement()}
+                  disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()}
+                >
+                  {singleBusy ? '差し替え中…' : '差し替えて削除'}
+                </Button>
+              ) : null}
+              {singleImpact && !singleImpact.canDelete ? (
+                <Button
+                  type="button"
+                  disabled
+                  title="使用中の共通情報は削除できません"
+                >
+                  このまま削除
+                </Button>
+              ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
-              {canDeleteVar({ impact: singleImpact, typedKey, busy: singleBusy }) ? (
+              {canDeleteVar({ impact: singleImpact, typedKey, reason: singleReason, busy: singleBusy }) ? (
                 <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()}>
                   {singleBusy ? '処理中…' : 'このまま削除する'}
                 </Button>
@@ -673,6 +1180,53 @@ function VarsPageInner() {
               {consequenceText(singleImpact) ? (
                 <p className="text-ink-secondary text-xs leading-5">{consequenceText(singleImpact)}</p>
               ) : null}
+
+              <div>
+                <h3 className="text-ink text-sm font-bold">どうしますか</h3>
+                <div className="mt-2 space-y-2">
+                  <div className="border-accent bg-accent-soft rounded-control border p-3">
+                    <p className="text-ink text-sm font-bold">別の共通情報に差し替えてから削除する（おすすめ）</p>
+                    <p className="text-ink-secondary mt-1 text-xs leading-5">
+                      {singleImpact.blockingTotal.toLocaleString('ja-JP')}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
+                    </p>
+                    <label className="text-ink-secondary mt-2 block text-xs font-semibold">
+                      差し替え先
+                      <Select size="full"
+                        value={replacementId}
+                        disabled={singleBusy || replacementCandidates.length === 0}
+                        onChange={(value) => void selectReplacement(value)}
+                        aria-label="差し替え先"
+                        className="mt-1"
+                        options={replacementCandidates.length > 0
+                          ? replacementCandidates.map((candidate) => ({
+                              value: candidate.id,
+                              label: `${placeholderText(candidate.varKey)} — ${candidate.value || '（空）'}`,
+                            }))
+                          : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
+                      />
+                    </label>
+                    {replacementPhase === 'loading' ? (
+                      <p className="text-ink-faint mt-2 text-xs">差し替え後の影響を確認しています…</p>
+                    ) : replacementPhase === 'error' ? (
+                      <p className="text-danger mt-2 text-xs font-semibold">差し替え後の影響を確認できませんでした。</p>
+                    ) : replacementImpact ? (
+                      <p className={replacementImpact.canReplace ? 'text-success mt-2 text-xs font-semibold' : 'text-danger mt-2 text-xs font-semibold'}>
+                        {replacementImpact.canReplace
+                          ? `${replacementImpact.replaceableTotal.toLocaleString('ja-JP')}か所を差し替え、元の共通情報を保管できます。`
+                          : `${replacementImpact.blockedTotal.toLocaleString('ja-JP')}か所は自動で差し替えられません。先に個別に確認してください。`}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="border-hairline rounded-control border p-3" aria-disabled={!singleImpact.canDelete}>
+                    <p className="text-ink text-sm font-bold">このまま削除する</p>
+                    <p className="text-ink-secondary mt-1 text-xs leading-5">
+                      {singleImpact.canDelete
+                        ? '使われている場所が無いことを確認してから削除します。'
+                        : `${singleImpact.blockingTotal.toLocaleString('ja-JP')}か所が空欄になるため、先に使用先を直してください。`}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               {splitItems(singleImpact.items).blocking.length > 0 ? (
                 <div>
@@ -710,6 +1264,22 @@ function VarsPageInner() {
                 **差し込みキーを打ってもらう。** 空欄のまま送られる場所がある
                 操作を、ボタン1つで通さない。
               */}
+              {/*
+                Q: 消す・差し替えて保管する、どちらでも理由が必須。
+                版履歴に「誰が・なぜ」を残すため。
+              */}
+              <label className="block">
+                <span className="text-ink-secondary text-xs font-semibold">
+                  消した理由 <span className="text-danger">必須</span>
+                </span>
+                <input
+                  value={singleReason}
+                  onChange={(e) => setSingleReason(e.target.value)}
+                  placeholder="例: 店舗情報の変更のため"
+                  className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+                />
+              </label>
+
               {singleImpact.canDelete ? (
                 <label className="block">
                   <span className="text-ink-secondary text-xs font-semibold">
@@ -724,13 +1294,13 @@ function VarsPageInner() {
                 </label>
               ) : null}
 
-              {blockedReason({ impact: singleImpact, typedKey }) ? (
-                <p className="text-ink-faint text-micro">{blockedReason({ impact: singleImpact, typedKey })}</p>
+              {blockedReason({ impact: singleImpact, typedKey, reason: singleReason }) ? (
+                <p className="text-ink-faint text-micro">{blockedReason({ impact: singleImpact, typedKey, reason: singleReason })}</p>
               ) : null}
 
               <p className="text-ink-faint text-micro leading-5">
-                {checkedAtText(singleImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時の8種類を確認しました。
-                まとめて差し替える操作は、まだ用意していません。
+                {checkedAtText(singleImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
+                差し替え前にも使用先の世代を再確認します。
               </p>
             </div>
           ) : null}
@@ -755,8 +1325,52 @@ function VarsPageInner() {
             generation: deleteRequestRef.current.generation + 1,
           }
           setDeleteError('')
+          setBatchReason('')
           setDeleteTargets([])
         }}
+      >
+        {/* Q: 消す理由は版履歴に残すので必須。 */}
+        <label className="block">
+          <span className="text-ink-secondary text-xs font-semibold">
+            消した理由 <span className="text-danger">必須</span>
+          </span>
+          <input
+            value={batchReason}
+            onChange={(e) => setBatchReason(e.target.value)}
+            placeholder="例: 店舗情報の変更のため"
+            className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+          />
+        </label>
+      </ConfirmDialog>
+
+      {editingFolder && (
+        <FolderAddDialog
+          kind="common_var"
+          folder={editingFolder}
+          accountId={selectedAccountId}
+          note="共通情報を分けてしまう箱です。削除しても、入っていた共通情報は未分類として残ります。"
+          placeholder="例: 01_店舗案内"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void load() }}
+        />
+      )}
+
+      {/*
+        R37: 消す前に、中身がどうなるかを本文で読ませる。
+        「中身は未分類に戻ります」の確認を ConfirmDialog で行う。
+      */}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={deletingFolder?.itemCount != null
+          ? `削除しても、入っていた共通情報は未分類として残ります。いまこのフォルダに入っているのは${deletingFolder.itemCount}件です。`
+          : '削除しても、入っていた共通情報は未分類として残ります。'}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
+        onConfirm={() => void removeFolder()}
       />
     </div>
   )
@@ -766,7 +1380,10 @@ export default function CommonVarsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <VarsPageInner />
+      {/* 直URLでも共通情報オフのaccountには画面を出さない。 */}
+      <FeatureGate feature="common_vars">
+        <VarsPageInner />
+      </FeatureGate>
     </Suspense>
   )
 }

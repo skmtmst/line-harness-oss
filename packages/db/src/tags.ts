@@ -1,9 +1,21 @@
 import { jstNow } from './utils.js';
 import { enqueueMileageEvent } from './mileage.js';
+import { recordConversionSourceEvent } from './conversion-event-sources.js';
 export interface Tag {
   id: string;
   name: string;
   color: string;
+  line_account_id: string | null;
+  description: string | null;
+  normalized_name: string | null;
+  manual_assignment_allowed: number;
+  reapply_policy: 'first_only' | 'every_time';
+  linked_enabled: number;
+  status: 'active' | 'archived';
+  version: number;
+  created_by: string | null;
+  updated_by: string | null;
+  updated_at: string | null;
   /**
    * @deprecated 099 で folders へ移送済み。folder_id を見ること。
    * 追加のみポリシーで列を落とせないため残っているだけで、読み書きしない。
@@ -40,6 +52,8 @@ export interface Tag {
  */
 export interface TagGroup {
   id: string;
+  /** この分類を所有するLINE公式アカウント。旧データだけ null。 */
+  account_id: string | null;
   name: string;
   sort_order: number;
   /** #RRGGBB。未設定は null。115 で folders.color を足した。 */
@@ -119,6 +133,12 @@ export const TAG_USAGE_BLOCKING_REFERENCE_SELECTS = [
   'SELECT on_submit_tag_id AS tag_id FROM forms WHERE on_submit_tag_id IS NOT NULL',
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM forms f,
      json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END) j WHERE j.type = 'text'`,
+  `SELECT v.on_submit_tag_id AS tag_id FROM forms f
+     JOIN form_versions v ON v.id = f.current_published_version_id
+    WHERE v.on_submit_tag_id IS NOT NULL`,
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM forms f
+     JOIN form_versions v ON v.id = f.current_published_version_id,
+     json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END) j WHERE j.type = 'text'`,
   'SELECT trigger_tag_id AS tag_id FROM scenarios WHERE trigger_tag_id IS NOT NULL',
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM scenarios s,
      json_tree(CASE WHEN json_valid(s.audience_condition_json) THEN s.audience_condition_json ELSE 'null' END) j
@@ -130,10 +150,11 @@ export const TAG_USAGE_BLOCKING_REFERENCE_SELECTS = [
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM scenario_actions a,
      json_tree(CASE WHEN json_valid(a.condition_json) THEN a.condition_json ELSE 'null' END) j WHERE j.type = 'text'`,
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM auto_replies a,
-     json_tree(CASE WHEN json_valid(a.actions_json) THEN a.actions_json ELSE 'null' END) j WHERE j.type = 'text'`,
+     json_tree(CASE WHEN json_valid(a.actions_json) THEN a.actions_json ELSE 'null' END) j
+    WHERE j.type = 'text' AND a.deleted_at IS NULL`,
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM auto_replies a,
      json_tree(CASE WHEN json_valid(a.friend_conditions_json) THEN a.friend_conditions_json ELSE 'null' END) j
-    WHERE j.type = 'text'`,
+    WHERE j.type = 'text' AND a.deleted_at IS NULL`,
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM saved_searches s,
      json_tree(CASE WHEN json_valid(s.conditions_json) THEN s.conditions_json ELSE 'null' END) j WHERE j.type = 'text'`,
   ...[
@@ -147,7 +168,7 @@ export const TAG_USAGE_BLOCKING_REFERENCE_SELECTS = [
      json_tree(CASE WHEN json_valid(r.${column}) THEN r.${column} ELSE 'null' END) j WHERE j.type = 'text'`),
   'SELECT tag_on_attend AS tag_id FROM webinars WHERE tag_on_attend IS NOT NULL',
   'SELECT tag_on_cta_click AS tag_id FROM webinars WHERE tag_on_cta_click IS NOT NULL',
-  'SELECT target_tag_id AS tag_id FROM reminders WHERE target_tag_id IS NOT NULL',
+  'SELECT target_tag_id AS tag_id FROM reminders WHERE target_tag_id IS NOT NULL AND deleted_at IS NULL',
   'SELECT tag_id FROM entry_routes WHERE tag_id IS NOT NULL',
   'SELECT tag_id FROM tracked_links WHERE tag_id IS NOT NULL',
   'SELECT auto_tag_id AS tag_id FROM menus WHERE auto_tag_id IS NOT NULL',
@@ -199,6 +220,43 @@ export function normalizeTagNameForCleanup(name: string): string {
     .trim()
     .replace(/\s+/gu, ' ')
     .toLocaleLowerCase('ja-JP');
+}
+
+/** Find an equal comparison name, including rows created before normalized_name. */
+export async function findTagByNormalizedName(
+  db: D1Database,
+  name: string,
+  lineAccountId: string | null,
+  excludeId?: string,
+): Promise<Tag | null> {
+  const normalizedName = normalizeTagNameForCleanup(name);
+  const rows = await db.prepare(
+    `SELECT * FROM tags
+      WHERE line_account_id IS ?
+        AND (normalized_name = ? OR normalized_name IS NULL)
+      ORDER BY id`,
+  ).bind(lineAccountId, normalizedName).all<Tag>();
+  return (rows.results ?? []).find((row) =>
+    row.id !== excludeId
+    && (row.normalized_name === normalizedName
+      || (row.normalized_name === null
+        && normalizeTagNameForCleanup(row.name) === normalizedName))) ?? null;
+}
+
+function tagNameConflict(): Error {
+  // Existing route contracts map SQLite UNIQUE errors to HTTP 409.
+  return new Error('UNIQUE constraint failed: tags normalized name');
+}
+
+export async function assertTagNameAvailable(
+  db: D1Database,
+  name: string,
+  lineAccountId: string | null,
+  excludeId?: string,
+): Promise<void> {
+  if (await findTagByNormalizedName(db, name, lineAccountId, excludeId)) {
+    throw tagNameConflict();
+  }
 }
 
 export async function getTagsWithCounts(
@@ -294,19 +352,28 @@ export async function getTagsWithUsage(
            FROM forms f,
                 json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END) j
           WHERE j.type = 'text'
+         UNION
+         SELECT v.on_submit_tag_id, f.id
+           FROM forms f JOIN form_versions v ON v.id = f.current_published_version_id
+          WHERE v.on_submit_tag_id IS NOT NULL
+         UNION
+         SELECT CAST(j.value AS TEXT), f.id
+           FROM forms f JOIN form_versions v ON v.id = f.current_published_version_id,
+                json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END) j
+          WHERE j.type = 'text'
        )`,
     used_in_auto_replies: `WITH refs(tag_id, entity_id) AS (
          SELECT CAST(j.value AS TEXT), a.id
            FROM auto_replies a,
                 json_tree(CASE WHEN json_valid(a.actions_json)
                                THEN a.actions_json ELSE 'null' END) j
-          WHERE j.type = 'text'
+          WHERE j.type = 'text' AND a.deleted_at IS NULL
          UNION
          SELECT CAST(j.value AS TEXT), a.id
            FROM auto_replies a,
                 json_tree(CASE WHEN json_valid(a.friend_conditions_json)
                                THEN a.friend_conditions_json ELSE 'null' END) j
-          WHERE j.type = 'text'
+          WHERE j.type = 'text' AND a.deleted_at IS NULL
        )`,
     used_in_saved_searches: `WITH refs(tag_id, entity_id) AS (
          SELECT CAST(j.value AS TEXT), s.id
@@ -615,14 +682,24 @@ export async function getTagDeleteImpact(
                                              THEN b.segment_conditions ELSE 'null' END) j
                  WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
               )) AS broadcasts,
-            (SELECT COUNT(*) FROM forms f
-              WHERE f.on_submit_tag_id = t.id OR EXISTS (
-                SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout)
-                                             THEN f.layout ELSE 'null' END) j
-                 WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
-              )) AS forms,
+            (SELECT COUNT(*) FROM (
+               SELECT f.id FROM forms f
+                WHERE f.on_submit_tag_id = t.id OR EXISTS (
+                  SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout)
+                                               THEN f.layout ELSE 'null' END) j
+                   WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
+                )
+               UNION
+               SELECT f.id FROM forms f
+                 JOIN form_versions v ON v.id = f.current_published_version_id
+                WHERE v.on_submit_tag_id = t.id OR EXISTS (
+                  SELECT 1 FROM json_tree(CASE WHEN json_valid(v.layout)
+                                               THEN v.layout ELSE 'null' END) j
+                   WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
+                )
+             )) AS forms,
             (SELECT COUNT(*) FROM scenario_refs) AS scenarios,
-            (SELECT COUNT(*) FROM auto_replies a WHERE EXISTS (
+            (SELECT COUNT(*) FROM auto_replies a WHERE a.deleted_at IS NULL AND (EXISTS (
               SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions_json)
                                            THEN a.actions_json ELSE 'null' END) j
                WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
@@ -630,7 +707,7 @@ export async function getTagDeleteImpact(
               SELECT 1 FROM json_tree(CASE WHEN json_valid(a.friend_conditions_json)
                                            THEN a.friend_conditions_json ELSE 'null' END) j
                WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
-            )) AS auto_replies,
+            ))) AS auto_replies,
             (SELECT COUNT(*) FROM saved_searches s WHERE EXISTS (
               SELECT 1 FROM json_tree(CASE WHEN json_valid(s.conditions_json)
                                            THEN s.conditions_json ELSE 'null' END) j
@@ -651,7 +728,7 @@ export async function getTagDeleteImpact(
             )) AS templates,
             (SELECT COUNT(*) FROM webinars w
               WHERE w.tag_on_attend = t.id OR w.tag_on_cta_click = t.id) AS webinars,
-            (SELECT COUNT(*) FROM reminders r WHERE r.target_tag_id = t.id) AS reminders,
+            (SELECT COUNT(*) FROM reminders r WHERE r.target_tag_id = t.id AND r.deleted_at IS NULL) AS reminders,
             (SELECT COUNT(*) FROM entry_routes er WHERE er.tag_id = t.id) AS entry_routes,
             (SELECT COUNT(*) FROM tracked_links tl WHERE tl.tag_id = t.id) AS tracked_links,
             (SELECT COUNT(*) FROM menus m WHERE m.auto_tag_id = t.id) AS booking_menus,
@@ -717,9 +794,9 @@ export interface CreateTagsBulkResult {
   tagId?: string;
 }
 
-// D1 は1文につき100個までしか値を束縛できない。このINSERTは1行4個なので、
-// 25行でちょうど100個。500行でも20文に収まり、無料枠の1実行50クエリを超えない。
-const TAGS_PER_BULK_INSERT = 25;
+// D1 は1文100バインドまで。正規化名を含む1行5個×20行、500行25文で
+// 無料枠の1実行50クエリ内に収める。旧APIの作成先は未所属(global)のまま。
+const TAGS_PER_BULK_INSERT = 20;
 
 export async function createTag(
   db: D1Database,
@@ -729,13 +806,15 @@ export async function createTag(
   const now = jstNow();
   const color = input.color ?? '#3B82F6';
 
+  await assertTagNameAvailable(db, input.name, null);
+
   await db
     .prepare(
       // group_id は書かない。folders が正で、group_id は移送前の名残。
-      `INSERT INTO tags (id, name, color, folder_id, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO tags (id, name, color, folder_id, created_at, line_account_id, normalized_name)
+       VALUES (?, ?, ?, ?, ?, NULL, ?)`,
     )
-    .bind(id, input.name, color, input.groupId ?? null, now)
+    .bind(id, input.name, color, input.groupId ?? null, now, normalizeTagNameForCleanup(input.name))
     .run();
 
   return (await db
@@ -744,13 +823,30 @@ export async function createTag(
     .first<Tag>())!;
 }
 
+export async function findOrCreateGlobalTag(
+  db: D1Database,
+  input: CreateTagInput,
+): Promise<Tag> {
+  const existing = await findTagByNormalizedName(db, input.name, null);
+  if (existing) return existing;
+  try {
+    return await createTag(db, input);
+  } catch (error) {
+    // The normalized unique index serializes concurrent writers. Recover the
+    // winner so webhook retries attach the already-created tag.
+    const concurrent = await findTagByNormalizedName(db, input.name, null);
+    if (concurrent) return concurrent;
+    throw error;
+  }
+}
+
 /**
  * CSVからのタグ登録を、D1の1実行あたりのクエリ上限内でまとめて書く。
  *
  * - idを先に作り、RETURNINGで実際に入った行だけを判別する。
  * - 同名が先に作られた行はINSERT OR IGNOREで見送りにする。
  * - 確認後にフォルダが消えた場合は、外部キー違反にせず未分類で登録する。
- * - 1文が失敗しても、ほかの25行単位の文は続ける。
+ * - 1文が失敗しても、ほかの20行単位の文は続ける。
  */
 export async function createTagsBulk(
   db: D1Database,
@@ -761,6 +857,13 @@ export async function createTagsBulk(
     () => ({ status: 'failed' }),
   );
   const now = jstNow();
+  const legacyNullNames = new Set(
+    ((await db.prepare(
+      `SELECT name FROM tags
+        WHERE line_account_id IS NULL AND normalized_name IS NULL`,
+    ).all<{ name: string }>()).results ?? [])
+      .map((row) => normalizeTagNameForCleanup(row.name)),
+  );
 
   for (let offset = 0; offset < inputs.length; offset += TAGS_PER_BULK_INSERT) {
     const chunk = inputs.slice(offset, offset + TAGS_PER_BULK_INSERT);
@@ -768,16 +871,25 @@ export async function createTagsBulk(
       id: crypto.randomUUID(),
       name: input.name,
       groupId: input.groupId ?? null,
+      normalizedName: normalizeTagNameForCleanup(input.name),
     }));
-    const values = prepared
-      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?)")
+    const insertable = prepared.filter((row, index) => {
+      if (legacyNullNames.has(row.normalizedName)) {
+        results[offset + index] = { status: 'skipped' };
+        return false;
+      }
+      return true;
+    });
+    if (insertable.length === 0) continue;
+    const values = insertable
+      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?, NULL, ?)")
       .join(', ');
-    const binds = prepared.flatMap((row) => [row.id, row.name, row.groupId, now]);
+    const binds = insertable.flatMap((row) => [row.id, row.name, row.groupId, now, row.normalizedName]);
 
     try {
       const inserted = await db
         .prepare(
-          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at)
+          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at, line_account_id, normalized_name)
            VALUES ${values}
            RETURNING id`,
         )
@@ -785,13 +897,15 @@ export async function createTagsBulk(
         .run<{ id: string }>();
       const insertedIds = new Set((inserted.results ?? []).map((row) => row.id));
       prepared.forEach((row, index) => {
+        if (legacyNullNames.has(row.normalizedName)) return;
         results[offset + index] = insertedIds.has(row.id)
           ? { status: 'created', tagId: row.id }
           : { status: 'skipped' };
       });
     } catch (error) {
       console.error(`createTagsBulk rows ${offset + 1}-${offset + chunk.length} error:`, error);
-      prepared.forEach((_row, index) => {
+      prepared.forEach((row, index) => {
+        if (legacyNullNames.has(row.normalizedName)) return;
         results[offset + index] = { status: 'failed' };
       });
     }
@@ -811,54 +925,15 @@ export async function assignTagToGroup(
   id: string,
   groupId: string | null,
 ): Promise<Tag | null> {
-  await db
-    .prepare(`UPDATE tags SET folder_id = ? WHERE id = ?`)
-    .bind(groupId, id)
+  const result = await db
+    .prepare(`UPDATE tags SET folder_id = ?, updated_at = ?, version = version + 1 WHERE id = ?
+      AND (? IS NULL OR EXISTS (SELECT 1 FROM folders f WHERE f.id = ? AND f.kind = 'tag' AND f.account_id IS tags.line_account_id))`)
+    .bind(groupId, jstNow(), id, groupId, groupId)
     .run();
+  if (Number(result.meta?.changes ?? 0) !== 1) return null;
   return (
     (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ??
     null
-  );
-}
-
-/**
- * タグの名前と色を変える。
- *
- * 一覧の表からマイルの列を外して編集画面へ移したときに要るようになった。
- * それまでは作るときにしか決められず、打ち間違えたタグは消して作り直す
- * しかなかった。作り直すと、付いていた友だちの分がすべて外れる。
- *
- * 渡されたものだけ当てる。色だけ変えたいときに名前を送らせると、
- * 呼ぶ側が現在値を読んでから書くことになり、その間に別の人が変えた
- * 名前を上書きしてしまう。
- */
-export async function updateTag(
-  db: D1Database,
-  id: string,
-  input: { name?: string; color?: string; isStarred?: boolean },
-): Promise<Tag | null> {
-  const sets: string[] = [];
-  const binds: unknown[] = [];
-  if (input.name !== undefined) {
-    sets.push('name = ?');
-    binds.push(input.name);
-  }
-  if (input.color !== undefined) {
-    sets.push('color = ?');
-    binds.push(input.color);
-  }
-  if (input.isStarred !== undefined) {
-    sets.push('is_starred = ?');
-    binds.push(input.isStarred ? 1 : 0);
-  }
-  if (sets.length > 0) {
-    await db
-      .prepare(`UPDATE tags SET ${sets.join(', ')} WHERE id = ?`)
-      .bind(...binds, id)
-      .run();
-  }
-  return (
-    (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ?? null
   );
 }
 
@@ -872,17 +947,21 @@ export async function updateTag(
  * 現在占めている位置だけを入れ替え、指定されていないタグはその場に残す。
  * 最後に全体へ一意の順番を振るので、部分的な並び替えでも順番が重複しない。
  */
-export async function reorderTags(db: D1Database, ids: string[]): Promise<void> {
+export async function reorderTags(db: D1Database, ids: string[], scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean }): Promise<void> {
   if (ids.length < 2) return;
 
+  const allowed = scope?.allowedAccountIds ?? [];
+  const where = scope ? `WHERE (${allowed.length ? `t.line_account_id IN (${allowed.map(() => '?').join(',')})` : '0'} OR ${scope.canSeeUnassigned ? 't.line_account_id IS NULL' : '0'})` : '';
   const current = await db
     .prepare(
       `SELECT t.id
          FROM tags t
          LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+        ${where}
         GROUP BY t.id
         ORDER BY t.display_order ASC, COUNT(ft.friend_id) DESC, t.name ASC`,
     )
+    .bind(...allowed)
     .all<{ id: string }>();
 
   const existing = new Set(current.results.map((tag) => tag.id));
@@ -911,33 +990,37 @@ export async function deleteTag(db: D1Database, id: string): Promise<void> {
 // 「お悩み」「ペット」のような分類でタグをまとめる。分類は入れ子にしない。
 // 二段で足りることが分かっているし、階層を許すと画面もクエリも一気に複雑になる。
 
-export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
+export async function getTagGroups(db: D1Database, scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean }): Promise<TagGroup[]> {
+  const ids = scope?.allowedAccountIds ?? [];
+  const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
+  const condition = `(${own} OR ${scope?.canSeeUnassigned !== false ? "account_id IS NULL" : "0"})`;
   const result = await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
-         FROM folders WHERE kind = 'tag'
+      `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
+         FROM folders WHERE kind = 'tag' AND ${condition}
         ORDER BY display_order ASC, name ASC`,
     )
+    .bind(...ids)
     .all<TagGroup>();
   return result.results;
 }
 
 export async function createTagGroup(
   db: D1Database,
-  input: { name: string; sortOrder?: number; color?: string | null },
+  input: { name: string; sortOrder?: number; color?: string | null; accountId?: string | null },
 ): Promise<TagGroup> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO folders (id, kind, name, display_order, color, created_at, updated_at)
-       VALUES (?, 'tag', ?, ?, ?, ?, ?)`,
+      `INSERT INTO folders (id, kind, name, display_order, color, account_id, created_at, updated_at)
+       VALUES (?, 'tag', ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.sortOrder ?? 0, input.color ?? null, now, now)
+    .bind(id, input.name, input.sortOrder ?? 0, input.color ?? null, input.accountId ?? null, now, now)
     .run();
   return (await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
+      `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
          FROM folders WHERE id = ?`,
     )
     .bind(id)
@@ -974,7 +1057,7 @@ export async function updateTagGroup(
   return (
     (await db
       .prepare(
-        `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
+        `SELECT id, account_id, name, display_order AS sort_order, color, created_at, updated_at
            FROM folders WHERE id = ? AND kind = 'tag'`,
       )
       .bind(id)
@@ -993,10 +1076,43 @@ export async function deleteTagGroup(db: D1Database, id: string): Promise<void> 
   await db.prepare(`DELETE FROM folders WHERE id = ? AND kind = 'tag'`).bind(id).run();
 }
 
+/**
+ * 友だちにタグを1本付ける。新しく付いたときだけ副作用を起こす。
+ *
+ * **この関数を通らない付け方が2つある(#648)。**どちらも `friend_tags` へ直に
+ * INSERT していて、マイルも成果計測も通らない。
+ *
+ *  - `packages/db/src/tag-definitions.ts` のタグ廃止時の置き換え
+ *  - `apps/worker/src/services/nen-column-operations.ts` のコラム読了タグ
+ *
+ * **タグ廃止の置き換えは、通してはいけない。**あれは「そのタグが付いている
+ * 全員へ、置き換え先のタグを一斉に付ける」処理で、成果として数えると
+ * **運用者がタグを1本片づけただけで成果が何百件も一気に増える。**業務の
+ * 出来事ではなく、台帳の引っ越しだからである。将来この箇所をここ経由へ
+ * 書き換えるときは、成果計測を迂回する道を先に用意すること。
+ *
+ * コラム読了タグの方は「本来数えるべき」に見えるが、ここ経由にすると
+ * 成果計測と同時にマイル加算も始まり、利用者の残高が変わる。その扱いは
+ * この票の外なので別票で決める(司令塔裁定 2026-09-12)。
+ */
 export async function addTagToFriend(
   db: D1Database,
   friendId: string,
   tagId: string,
+  options?: {
+    /**
+     * R403: 連動処理の冪等キー。受信Webhookの再試行など、同じ出来事を
+     * 繰り返す呼び出し元が安定した値を渡す。同じ値の再実行は二重計上しない。
+     * 省略時は従来どおり付与時刻入りの値を使う（単発の手動付与用）。
+     */
+    sourceEventId?: string;
+    /**
+     * R403: true のとき連動処理の失敗を握りつぶさず投げる。
+     * 受信Webhookの受領は失敗状態で残り、同じ受信の再送で欠けた記録だけを
+     * 復旧できる。手動付与など単発の呼び出しは従来どおり false。
+     */
+    strictSideEffects?: boolean;
+  },
 ): Promise<boolean> {
   const now = jstNow();
   const result = await db
@@ -1007,12 +1123,15 @@ export async function addTagToFriend(
     .bind(friendId, tagId, now)
     .run();
   const added = (result.meta?.changes ?? 0) > 0;
-  if (added) {
+  const sideEffectKey = options?.sourceEventId ?? `${friendId}:${tagId}:${now}`;
+  // 安定キーがある再実行は、タグ行が既にあっても連動処理を試す
+  // （冪等キーで二重計上しない）。単発の付け直しは従来どおり何もしない。
+  if (added || options?.sourceEventId !== undefined) {
     try {
       await enqueueMileageEvent(db, {
         eventType: 'tag_added',
         source: 'tag',
-        sourceEventId: `${friendId}:${tagId}:${now}`,
+        sourceEventId: sideEffectKey,
         friendId,
         subjectKey: tagId,
         metadata: { tagId },
@@ -1020,6 +1139,34 @@ export async function addTagToFriend(
       });
     } catch (error) {
       console.error('tag mileage enqueue failed:', error);
+      if (options?.strictSideEffects) throw error;
+    }
+    // 「タグが付いた」を成果として数える(#648)。
+    //
+    // マイルの隣に置くのは、**呼び出し元を1つも触らずに全経路へ届かせる**ため。
+    // 以前はこの計測を worker の attachTagAndFireSideEffects の中だけに置いて
+    // いたので、友だち詳細画面の手動タグ付け・オートメーションのタグ付け
+    // アクション(どちらもこの関数を直に呼ぶ)では 0 件のままだった。
+    // 画面の起点一覧は「タグが付いた」としか書いておらず、誰が付けたかで
+    // 数えたり数えなかったりする境界は運用者に説明できない。
+    //
+    // 冪等キーは安定キー（受領起点）か付与時刻。単発の付け直しは上の
+    // INSERT OR IGNORE が 0 行になり added=false なので、ここへ来ない。
+    // 単発では失敗しても握って進む。タグ付与そのものを巻き添えにしない。
+    // R403: strict のときは失敗を残す。欠けた記録は同じ安定キーの再送で復旧する。
+    try {
+      const conversion = await recordConversionSourceEvent(db, {
+        sourceType: 'tag_added',
+        friendId,
+        sourceEventId: sideEffectKey,
+        metadata: { tagId },
+      });
+      if (options?.strictSideEffects && conversion.failed > 0) {
+        throw new Error(`tag conversion record failed: ${conversion.failed}`);
+      }
+    } catch (error) {
+      console.error('tag conversion record failed:', error);
+      if (options?.strictSideEffects) throw error;
     }
   }
   return added;
@@ -1084,8 +1231,15 @@ export async function enqueueHistoricTagMileage(
   const inserted = await db
     .prepare(
       `INSERT OR IGNORE INTO mileage_event_queue
-         (engagement_event_id, status, attempts, available_at, created_at, updated_at)
-       SELECT ee.id, 'pending', 0, ?, ?, ?
+         (engagement_event_id, status, attempts, available_at,
+          applied_published_snapshot, created_at, updated_at)
+       SELECT ee.id, 'pending', 0, ?,
+              -- N-231 案1: 受付(補完実行)時点で適用版の集合を固定する。
+              (SELECT json_group_object(r.id, COALESCE(r.published_version_number, 0))
+                 FROM friends f
+                 JOIN mileage_rules r ON r.line_account_id = f.line_account_id
+                WHERE f.id = ee.actor_friend_id),
+              ?, ?
          FROM engagement_events ee
         WHERE ee.event_type = 'tag_added'
           AND ee.source = 'tag'
@@ -1126,6 +1280,130 @@ export async function enqueueHistoricTagMileage(
   return (inserted.meta?.changes ?? 0) + (reset.meta?.changes ?? 0);
 }
 
+// ─── 既存友だちへの遡及マイル：実行前の事前計算 ──────────────────
+//
+// N-047: 遡及実行の前に「何人に何マイル付くか」をサーバー側で確定させ、
+// 実行時はこの結果と照合して、ズレていれば止める（プレビュー照合）。
+// enqueueHistoricTagMileage が実際にキューへ積む対象と同じ条件で
+// 数えるので、確認画面の数字と実際の付与が一致する。
+export interface TagRetroactiveMileagePreview {
+  tagId: string;
+  lineAccountId: string | null;
+  /** タグが付いている友だちの合計 */
+  friendIds: string[];
+  /** 本人マイルをまだ受け取っていない友だち */
+  selfTargetIds: string[];
+  /** 本人マイルをすでに受け取っている友だち */
+  selfExcludedIds: string[];
+  /** 紹介者マイルの対象になる友だち（まだ紹介者側へ付与されていないもの） */
+  referralTargetIds: string[];
+  /** 紹介者マイルの対象だが、すでに紹介者側へ付与済みの友だち */
+  referralExcludedIds: string[];
+}
+
+export async function getTagRetroactiveMileagePreview(
+  db: D1Database,
+  tagId: string,
+): Promise<TagRetroactiveMileagePreview | null> {
+  const tag = await db
+    .prepare('SELECT line_account_id FROM tags WHERE id = ?')
+    .bind(tagId)
+    .first<{ line_account_id: string | null }>();
+  if (!tag) return null;
+
+  const tagged = await db
+    .prepare(
+      `SELECT ft.friend_id
+       FROM friend_tags ft
+       JOIN friends f ON f.id = ft.friend_id
+       WHERE ft.tag_id = ?`,
+    )
+    .bind(tagId)
+    .all<{ friend_id: string }>();
+  const friendIds = tagged.results.map((row) => row.friend_id);
+
+  // 本人分: 実行側と同じ冪等キー(tag-reward:identity:...)で既付与を除く
+  const selfRows = await db
+    .prepare(
+      `SELECT t.friend_id, EXISTS (
+         SELECT 1 FROM mileage_ledger ml
+         WHERE ml.entry_type = 'grant' AND ml.status != 'void' AND ml.source = 'tag'
+           AND ml.idempotency_key = 'tag-reward:identity:'
+             || CASE WHEN t.user_id IS NOT NULL THEN 'user:' || t.user_id ELSE 'friend:' || t.friend_id END
+             || ':tag:' || ?
+       ) AS already_granted
+       FROM (
+         SELECT ft.friend_id, f.user_id
+         FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
+         WHERE ft.tag_id = ?
+       ) t`,
+    )
+    .bind(tagId, tagId)
+    .all<{ friend_id: string; already_granted: number }>();
+  const selfTargetIds = selfRows.results
+    .filter((row) => row.already_granted === 0)
+    .map((row) => row.friend_id);
+  const selfExcludedIds = selfRows.results
+    .filter((row) => row.already_granted !== 0)
+    .map((row) => row.friend_id);
+
+  // 紹介者分: 実行側(resolveReferralMileageBeneficiary)と同じ解決をSQLで再現。
+  // 同一人物(user_id)を持つ行もまとめて紹介追跡を探し、±1日以内に
+  // 同一人物でないアフィリエイター行が見つかった友だちだけを対象にする。
+  const referralRows = await db
+    .prepare(
+      `SELECT t.friend_id, EXISTS (
+         SELECT 1 FROM mileage_ledger ml
+         WHERE ml.entry_type = 'grant' AND ml.status != 'void' AND ml.source = 'tag_referral'
+           AND ml.idempotency_key LIKE 'tag-referral:referrer:%:referred:'
+             || CASE WHEN t.actor_user_id IS NOT NULL THEN 'user:' || t.actor_user_id ELSE 'friend:' || t.friend_id END
+             || ':tag:' || ?
+       ) AS already_granted
+       FROM (
+         SELECT DISTINCT t0.friend_id
+         FROM (
+           SELECT ft.friend_id, f.user_id AS actor_user_id
+           FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
+           WHERE ft.tag_id = ?
+         ) t0
+         JOIN friends rf ON rf.id = t0.friend_id
+            OR (t0.actor_user_id IS NOT NULL AND rf.user_id = t0.actor_user_id)
+         JOIN ref_tracking rt ON rt.friend_id = rf.id
+         JOIN affiliate_links al ON al.ref_code = rt.ref_code
+         JOIN affiliates a ON a.id = al.affiliate_id
+         JOIN friends referrer ON referrer.id = a.friend_id
+         WHERE julianday(rt.created_at) >= julianday(rf.created_at) - 1
+           AND julianday(rt.created_at) <= julianday(rf.created_at) + 1
+           AND a.friend_id != rf.id
+           AND (rf.user_id IS NULL OR referrer.user_id IS NULL
+                OR referrer.user_id != rf.user_id)
+       ) matched
+       JOIN (
+         SELECT ft.friend_id, f.user_id AS actor_user_id
+         FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
+         WHERE ft.tag_id = ?
+       ) t ON t.friend_id = matched.friend_id`,
+    )
+    .bind(tagId, tagId, tagId)
+    .all<{ friend_id: string; already_granted: number }>();
+  const referralTargetIds = referralRows.results
+    .filter((row) => row.already_granted === 0)
+    .map((row) => row.friend_id);
+  const referralExcludedIds = referralRows.results
+    .filter((row) => row.already_granted !== 0)
+    .map((row) => row.friend_id);
+
+  return {
+    tagId,
+    lineAccountId: tag.line_account_id,
+    friendIds,
+    selfTargetIds,
+    selfExcludedIds,
+    referralTargetIds,
+    referralExcludedIds,
+  };
+}
+
 export async function removeTagFromFriend(
   db: D1Database,
   friendId: string,
@@ -1157,21 +1435,54 @@ export async function getFriendTags(
   return result.results;
 }
 
+/**
+ * 表示中の友だちのタグを1回で取得する。
+ * ID配列はjson_eachへ1バインドで渡し、D1のバインド数上限にも依存しない。
+ */
+export async function getFriendTagsByFriendIds(
+  db: D1Database,
+  friendIds: string[],
+): Promise<Map<string, Tag[]>> {
+  if (friendIds.length === 0) return new Map();
+  const result = await db
+    .prepare(
+      `SELECT ft.friend_id, t.*, fo.color AS folder_color
+       FROM friend_tags ft
+       INNER JOIN tags t ON t.id = ft.tag_id
+       LEFT JOIN folders fo ON fo.id = t.folder_id
+       WHERE ft.friend_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+       ORDER BY ft.friend_id ASC, t.name ASC`,
+    )
+    .bind(JSON.stringify(friendIds))
+    .all<Tag & { friend_id: string }>();
+
+  const byFriendId = new Map<string, Tag[]>();
+  for (const row of result.results) {
+    const tags = byFriendId.get(row.friend_id) ?? [];
+    tags.push(row);
+    byFriendId.set(row.friend_id, tags);
+  }
+  return byFriendId;
+}
+
 import type { Friend } from './friends';
 
 export async function getFriendsByTag(
   db: D1Database,
   tagId: string,
+  lineAccountId?: string | null,
 ): Promise<Friend[]> {
+  const accountClause = lineAccountId ? ' AND f.line_account_id = ?' : '';
+  const bindings = lineAccountId ? [tagId, lineAccountId] : [tagId];
   const result = await db
     .prepare(
       `SELECT f.*
        FROM friends f
        INNER JOIN friend_tags ft ON ft.friend_id = f.id
-       WHERE ft.tag_id = ?
+       WHERE ft.tag_id = ?${accountClause}
        ORDER BY f.created_at DESC`,
     )
-    .bind(tagId)
+    .bind(...bindings)
     .all<Friend>();
   return result.results;
 }

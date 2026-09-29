@@ -1,10 +1,13 @@
 import {
   getFriendFieldReminders,
-  getFriendsWithFieldValue,
-  getReminderEnrollmentKeys,
-  enrollFriendInReminder,
+  getFriendsWithFieldValuePage,
+  setFriendFieldReminderScanCursor,
+  enrollFriendsInReminderOnce,
 } from '@line-crm/db';
 import { nextAnniversary, isSameJstDay, toJstParts } from '@line-crm/shared';
+import { featureJobCanRun } from './feature-enforcement.js';
+import { getReminderTargetCondition } from './reminder-trigger.js';
+import { matchesCondition } from './segment-query.js';
 
 /**
  * 友だち情報欄の日付を見て、リマインダのゴール日を立てる。
@@ -25,33 +28,53 @@ import { nextAnniversary, isSameJstDay, toJstParts } from '@line-crm/shared';
 export async function processFriendFieldReminders(
   db: D1Database,
   now: Date = new Date(),
-): Promise<{ enrolled: number; skipped: number }> {
+): Promise<{ enrolled: number; skipped: number; scanned: number; hasMore: boolean }> {
   let enrolled = 0;
   let skipped = 0;
+  let scanned = 0;
+  let hasMore = false;
 
   const reminders = await getFriendFieldReminders(db);
-  if (reminders.length === 0) return { enrolled, skipped };
+  if (reminders.length === 0) return { enrolled, skipped, scanned, hasMore };
+
+  // 対象者の読込と登録済み確認を合わせても1万行を超えないよう、対象者は
+  // 全リマインダ合計4,000人までにする。各リマインダへ均等に割り振ることで、
+  // 大きいリマインダが先頭にあっても後続が止まり続けない。
+  const maxFriendRows = 4_000;
+  const pageSize = Math.max(1, Math.floor(maxFriendRows / reminders.length));
+  let remaining = maxFriendRows;
 
   for (const reminder of reminders) {
-    if (!reminder.trigger_field_id) continue;
+    if (!reminder.trigger_field_id || remaining === 0) {
+      hasMore = true;
+      continue;
+    }
+    // 機能オフ中は走査せず登録も進めない。再オンで再開する。
+    if (reminder.line_account_id && !await featureJobCanRun(db, { accountId: reminder.line_account_id, featureId: 'friend_fields', job: 'friend field reminders' })) {
+      hasMore = true;
+      continue;
+    }
     try {
-      const friends = await getFriendsWithFieldValue(db, reminder.trigger_field_id);
-
-      /*
-       * 「もう入っているか」は、1回引いて手元で照合する。
-       *
-       * 1人ずつ問い合わせると、**友だちの数だけ問い合わせが飛ぶ。**
-       * 誕生日リマインダは「誕生日が入っている人」を全員見るので、
-       * 5,000人いれば毎日5,000回になる。Cloudflare Workers の1回の実行で
-       * 出せる問い合わせ数には上限があり、そこに当たるとその日のぶんが
-       * 途中で止まる。**例外にならないので、途中まで動いたように見える。**
-       */
-      const already = await getReminderEnrollmentKeys(db, reminder.id);
+      const limit = Math.min(pageSize, remaining);
+      const friends = await getFriendsWithFieldValuePage(
+        db,
+        reminder.trigger_field_id,
+        reminder.line_account_id,
+        reminder.scan_cursor,
+        limit,
+      );
+      scanned += friends.length;
+      remaining -= friends.length;
+      const candidates: Array<{ friendId: string; targetDate: string }> = [];
+      // 公開版の対象条件はこのリマインダで1回だけ読む。友だちごとに
+      // 読み直すと、走査のたびに同じ行を何千回も読むことになる。
+      const targetCondition = await getReminderTargetCondition(db, reminder.id);
 
       for (const friend of friends) {
         // 毎年くり返すなら「次に来るその日」、くり返さないなら「その日が今日か」。
+        // 2月29日は設定者が選んだ平年の扱い（2/28・3/1・送らない）に従う（419）。
         const targetDate = reminder.repeat_yearly === 1
-          ? nextAnniversary(friend.value, now)
+          ? nextAnniversary(friend.value, now, reminder.leap_year_policy)
           : isSameJstDay(friend.value, now)
             ? toJstParts(now).date
             : null;
@@ -59,27 +82,44 @@ export async function processFriendFieldReminders(
           skipped++;
           continue;
         }
+        // 条件に外れる友だちは登録しない。判定で転んでも走査は止めず、
+        // その1人だけ飛ばす。カーソルは進めるので、後続は止まらない。
+        if (targetCondition) {
+          let matched = false;
+          try {
+            matched = await matchesCondition(db, friend.friend_id, targetCondition);
+          } catch (err) {
+            console.error(`[friendFieldReminders] target condition failed for reminder ${reminder.id}`, err);
+          }
+          if (!matched) {
+            skipped++;
+            continue;
+          }
+        }
 
         // ゴール日は日本時間の 0:00 として持つ。何時にするかは通ごとの設定で決まる。
         const targetDateTime = `${targetDate}T00:00:00+09:00`;
-
-        if (already.has(`${friend.friend_id}\u0000${targetDateTime}`)) {
-          skipped++;
-          continue;
-        }
-
-        await enrollFriendInReminder(db, {
+        candidates.push({
           friendId: friend.friend_id,
-          reminderId: reminder.id,
           targetDate: targetDateTime,
         });
-        enrolled++;
       }
+
+      const newlyEnrolled = await enrollFriendsInReminderOnce(db, reminder.id, candidates);
+      enrolled += newlyEnrolled;
+      skipped += candidates.length - newlyEnrolled;
+
+      const nextCursor = friends.length === limit
+        ? friends.at(-1)?.friend_id ?? reminder.scan_cursor
+        : null;
+      await setFriendFieldReminderScanCursor(db, reminder.id, nextCursor);
+      if (nextCursor !== null) hasMore = true;
     } catch (err) {
       // 1つのリマインダで転んでも、残りは続ける。
       console.error(`[friendFieldReminders] reminder ${reminder.id} failed`, err);
+      hasMore = true;
     }
   }
 
-  return { enrolled, skipped };
+  return { enrolled, skipped, scanned, hasMore };
 }

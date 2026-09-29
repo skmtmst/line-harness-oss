@@ -1,0 +1,41 @@
+import { adminSessionHeaders, clearAdminSession } from './admin-session'
+import { resetAuthSelectionCleared } from './hq-navigation'
+import { clearCommonCaches } from './common-caches'
+
+/**
+ * ログアウト。共通トップバーと、統括の左下アカウントメニューが同じものを呼ぶ。
+ *
+ * サーバーのセッションを消し、手元に残した名前・権限・CSRF も消してから
+ * ログイン画面へ移る。通信に失敗しても手元の後始末は必ず行う。
+ */
+/** `loginPath` は行き先。運営コンソール（★V6 37）からは '/ops/login' を渡す。 */
+export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<void> {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    if (apiUrl) {
+      await fetch(`${apiUrl}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: adminSessionHeaders(),
+      })
+    }
+  } catch {
+    // 通信に失敗しても、手元の後始末は必ず行う
+  }
+  try {
+    localStorage.removeItem('lh_api_key')
+    localStorage.removeItem('lh_csrf')
+    localStorage.removeItem('lh_staff_name')
+    localStorage.removeItem('lh_staff_role')
+    localStorage.removeItem('lh_staff_permissions')
+    localStorage.removeItem('lh_staff_view_permissions')
+    resetAuthSelectionCleared(localStorage, sessionStorage)
+  } catch {
+    // ストレージが使えなくても、行き先だけは変える
+  }
+  clearAdminSession()
+  // 使い回していた共通の答えを捨てる（次のログインで古い権限を見せない）。
+  // ふつうはこの後の画面遷移で破棄されるが、遷移に失敗しても残さない。
+  clearCommonCaches()
+  window.location.href = loginPath
+}

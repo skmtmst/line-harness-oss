@@ -6,24 +6,21 @@
 //   Compact 2500 x 843
 //   PNG / JPEG, 1MB 以下
 
+import { RICH_MENU_DIMENSIONS, type RichMenuSize } from '@line-crm/shared';
+
 export type ImageMeta = {
   format: 'png' | 'jpeg';
   width: number;
   height: number;
 };
 
-export type RichMenuSize = 'large' | 'compact';
+export type { RichMenuSize } from '@line-crm/shared';
 
 export type ValidationResult =
   | { ok: true; size: RichMenuSize; format: 'png' | 'jpeg' }
   | { ok: false; error: string };
 
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
-const VALID_DIMENSIONS: Record<RichMenuSize, { width: number; height: number }> = {
-  large: { width: 2500, height: 1686 },
-  compact: { width: 2500, height: 843 },
-};
 
 const MAX_FILE_BYTES = 1024 * 1024;
 
@@ -92,13 +89,13 @@ export function validateRichMenuImage(bytes: Uint8Array, fileSize: number): Vali
   if (!meta) {
     return { ok: false, error: 'unrecognized image format (PNG or JPEG only)' };
   }
-  for (const [size, dims] of Object.entries(VALID_DIMENSIONS) as [RichMenuSize, { width: number; height: number }][]) {
+  for (const [size, dims] of Object.entries(RICH_MENU_DIMENSIONS) as [RichMenuSize, { width: number; height: number }][]) {
     if (meta.width === dims.width && meta.height === dims.height) {
       return { ok: true, size, format: meta.format };
     }
   }
   return {
     ok: false,
-    error: `dimensions ${meta.width}x${meta.height} are not supported (need 2500x1686 or 2500x843)`,
+    error: `dimensions ${meta.width}x${meta.height} are not supported (need ${RICH_MENU_DIMENSIONS.large.width}x${RICH_MENU_DIMENSIONS.large.height} or ${RICH_MENU_DIMENSIONS.compact.width}x${RICH_MENU_DIMENSIONS.compact.height})`,
   };
 }

@@ -9,7 +9,7 @@
 /**
  * 種別の呼び名。
  *
- * 保存できる種別は text / url / image / number の4つ（common_vars の
+ * 保存できる種別は text / url / image / number / long_text / date / datetime / boolean（common_vars の
  * CHECK 制約）。Lステップの「標準・数値・長文・年月日」とは中身が違うので、
  * 「標準」だけ名前を合わせ、残りは実際に保存できるものの名前を出す。
  */
@@ -18,6 +18,85 @@ export const VAR_TYPE_LABELS: Record<string, string> = {
   url: 'URL',
   image: '画像',
   number: '数値',
+  long_text: '長文',
+  date: '年月日',
+  datetime: '日時',
+  boolean: '真偽',
+}
+
+/**
+ * 空欄を許さない種別（VAR-06）。
+ *
+ * 真偽・年月日・日時は、空文字がサーバの型検査（normalizeCommonVarValue）
+ * で弾かれる。値欄に必須の印を付け、送信前に画面で止める。
+ */
+export const COMMON_VAR_VALUE_REQUIRED: ReadonlySet<string> = new Set([
+  'boolean',
+  'date',
+  'datetime',
+])
+
+/** 年月日・日時の実在検査。worker の normalizeCommonVarValue と同じ判定。 */
+function isRealCalendarValue(type: 'date' | 'datetime', value: string): boolean {
+  const match = type === 'date'
+    ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+    : /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
+  if (!match) return false
+  const [year, month, day, hour = '00', minute = '00'] = match.slice(1)
+  const at = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)))
+  return at.getUTCFullYear() === Number(year) && at.getUTCMonth() === Number(month) - 1
+    && at.getUTCDate() === Number(day) && at.getUTCHours() === Number(hour)
+    && at.getUTCMinutes() === Number(minute)
+}
+
+/**
+ * 種別ごとの値検査（VAR-06）。新規・編集・代替値・更新予約で同じ判定を使う。
+ *
+ * サーバの normalizeCommonVarValue（packages/db/src/common-vars.ts）と
+ * 同じ条件を送信前に画面で検査し、通らないときは理由の文を返す。
+ * 通るときは null。label は「代替値」「更新後の値」のように呼び名を
+ * 変えるためのもの。
+ */
+export function commonVarValueError(type: string, value: string, label = '値'): string | null {
+  if (type === 'boolean') {
+    if (value === '') return `${label}を選んでください`
+    return value === 'true' || value === 'false'
+      ? null
+      : `${label}は種別に合う値を入力してください`
+  }
+  if (type === 'date') {
+    if (value === '') return `${label}の日付を入力してください`
+    return isRealCalendarValue('date', value)
+      ? null
+      : `${label}は 2026-09-16 のような実在する日付で入力してください`
+  }
+  if (type === 'datetime') {
+    if (value === '') return `${label}の日時を入力してください`
+    return isRealCalendarValue('datetime', value)
+      ? null
+      : `${label}は 2026-09-16T10:00 のような実在する日時で入力してください`
+  }
+  if (type === 'long_text') {
+    return value.length <= 10_000 ? null : `${label}は10,000文字までで入力してください`
+  }
+  // 画像はLINEへ画像URLとして差し込まれる。URLでない文字列は送信時に
+  // 壊れるため https URL だけを受ける（VAR-03。サーバも同じ判定）。
+  if (type === 'image') {
+    if (value === '') return null
+    return value.length <= 200 && /^https:\/\/\S+$/.test(value)
+      ? null
+      : `${label}は https:// からはじまるURLで入力してください`
+  }
+  // URL型はリンク先として差し込まれる。URLでない文章は配信・予約導線で
+  // 壊れるため、画面でも止める（R36。サーバも同じ判定）。画像と違い
+  // http も受ける。
+  if (type === 'url') {
+    if (value === '') return null
+    return value.length <= 200 && /^https?:\/\/\S+$/.test(value)
+      ? null
+      : `${label}は http:// または https:// からはじまるURLで入力してください`
+  }
+  return value.length <= 200 ? null : `${label}は200文字までで入力してください`
 }
 
 /** 「2026-08-26T10:00」→「2026/08/26(水) 10:00」。列に収まる長さにする。 */
@@ -29,4 +108,37 @@ export function formatStamp(value: string): string {
     new Date(Number(y), Number(m) - 1, Number(d)).getDay()
   ]
   return `${y}/${m}/${d}(${week})${hh ? ` ${hh}:${mm}` : ''}`
+}
+
+/*
+ * Q: 鍵の形・長い乱数は共通情報に保存できない（サーバの isSecretLikeValue と同じ判定）。
+ * サーバが422で止めるので、画面ではAPIを呼ぶ前に理由を出して欄へ戻す。
+ * URL はパスやクエリに英数字が混ざるだけなので鍵扱いしない。
+ */
+const SECRET_SHAPED_PATTERNS: readonly RegExp[] = [
+  /sk[-_](live|test|prod)?[-_]?[A-Za-z0-9]{10,}/i,
+  /AKIA[0-9A-Z]{16}/,
+  /AIza[0-9A-Za-z_-]{35}/,
+  /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /xox[baprs]-[0-9A-Za-z-]{10,}/,
+  /ya29\.[0-9A-Za-z_-]{10,}/,
+  /^[0-9a-f]{32,}$/i,
+]
+
+export function isSecretLikeVarValue(value: string): boolean {
+  if (SECRET_SHAPED_PATTERNS.some((pattern) => pattern.test(value))) return true
+  if (/^https?:\/\//i.test(value)) return false
+  if (value.length < 32 || /\s/.test(value)) return false
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/]
+    .filter((pattern) => pattern.test(value)).length
+  return classes >= 3
+}
+
+/** Q: 共通情報の状態の呼び名。一覧と編集で同じ言葉を使う。 */
+export const COMMON_VAR_STATE_LABELS: Record<string, string> = {
+  draft: '下書き',
+  active: '使用中',
+  stopped: '止めた',
+  expired: '期限切れ',
 }

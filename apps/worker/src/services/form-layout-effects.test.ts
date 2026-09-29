@@ -13,17 +13,23 @@ const mocks = vi.hoisted(() => ({
   attachTag: vi.fn(),
 }));
 
-vi.mock('@line-crm/db', () => ({
-  countChoiceUsage: mocks.countChoiceUsage,
-  countFormSubmissionsByFriend: mocks.countFormSubmissionsByFriend,
-  enrollFriendInReminder: mocks.enrollFriendInReminder,
-  enrollFriendInScenario: mocks.enrollFriendInScenario,
-  getFriendFieldById: mocks.getFriendFieldById,
-  getMessageTemplateById: mocks.getMessageTemplateById,
-  removeTagFromFriend: mocks.removeTagFromFriend,
-  setFriendFieldValue: mocks.setFriendFieldValue,
-  jstNow: () => '2026-08-19T12:00:00+09:00',
-}));
+vi.mock('@line-crm/db', async (importOriginal) => {
+  // N-042: 検証だけは本物を使う。mock にすると「検証を外す逆変異」が
+  // 捕まらなくなる。書き込み(get/set)は上の差し替えのまま。
+  const actual = await importOriginal<typeof import('@line-crm/db')>();
+  return {
+    countChoiceUsage: mocks.countChoiceUsage,
+    countFormSubmissionsByFriend: mocks.countFormSubmissionsByFriend,
+    enrollFriendInReminder: mocks.enrollFriendInReminder,
+    enrollFriendInScenario: mocks.enrollFriendInScenario,
+    getFriendFieldById: mocks.getFriendFieldById,
+    getMessageTemplateById: mocks.getMessageTemplateById,
+    removeTagFromFriend: mocks.removeTagFromFriend,
+    setFriendFieldValue: mocks.setFriendFieldValue,
+    validateFriendFieldValue: actual.validateFriendFieldValue,
+    jstNow: () => '2026-08-19T12:00:00+09:00',
+  };
+});
 
 vi.mock('./friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: mocks.attachTag,
@@ -32,7 +38,7 @@ vi.mock('./friend-tag-attach.js', () => ({
 import { applyFormLayoutEffects, checkFormGates } from './form-layout-effects.js';
 
 /** UPDATE 文を覚えるだけの D1 の身代わり。 */
-function fakeDb() {
+function fakeDb(firstResult: unknown = null) {
   const calls: { sql: string; binds: unknown[] }[] = [];
   const db = {
     prepare(sql: string) {
@@ -43,6 +49,8 @@ function fakeDb() {
               calls.push({ sql, binds });
               return { meta: { changes: 1 } };
             },
+            first: async () => firstResult,
+            all: async () => ({ results: [] }),
           };
         },
       };
@@ -71,8 +79,23 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.countChoiceUsage.mockResolvedValue(new Map());
   mocks.countFormSubmissionsByFriend.mockResolvedValue(0);
-  mocks.getFriendFieldById.mockResolvedValue({ id: 'ff-1', ec_is_master: 0 });
+  mocks.enrollFriendInReminder.mockResolvedValue(undefined);
+  mocks.enrollFriendInScenario.mockResolvedValue(undefined);
+  mocks.getFriendFieldById.mockResolvedValue({
+    id: 'ff-1',
+    ec_is_master: 0,
+    type: 'text',
+    options_json: null,
+  });
+  mocks.setFriendFieldValue.mockResolvedValue(undefined);
 });
+
+const TEXT_FIELD = {
+  id: 'ff-1',
+  ec_is_master: 0,
+  type: 'text',
+  options_json: null,
+};
 
 describe('受け付けてよいかの判定', () => {
   const base = {
@@ -169,6 +192,23 @@ describe('受け付けてよいかの判定', () => {
     expect(await checkFormGates({ ...base, db, layout, answers: { slot: '午後' } })).toBeNull();
   });
 
+  // FORM-09: YYYY-MM-DD の形だけでは足りず、暦に存在する日付だけを通す。
+  test('暦に無い日付(2月30日・平年の2月29日)は断る', async () => {
+    const layout = layoutWith([input({ name: 'day', label: '希望日', type: 'date' })]);
+    const { db } = fakeDb();
+
+    expect(
+      await checkFormGates({ ...base, db, layout, answers: { day: '2026-02-30' } }),
+    ).toBe('希望日 は存在しない日付です');
+    expect(
+      await checkFormGates({ ...base, db, layout, answers: { day: '2023-02-29' } }),
+    ).toBe('希望日 は存在しない日付です');
+    // うるう年の2月29日・通常の日付は通る
+    expect(
+      await checkFormGates({ ...base, db, layout, answers: { day: '2024-02-29' } }),
+    ).toBeNull();
+  });
+
   test('定員を決めていない選択肢は、数えに行かない', async () => {
     const layout = layoutWith([
       input({
@@ -209,6 +249,7 @@ describe('回答を配る', () => {
       fieldId: 'ff-1',
       value: '山田太郎',
       updatedBy: 'form',
+      field: TEXT_FIELD,
     });
   });
 
@@ -301,10 +342,11 @@ describe('回答を配る', () => {
       fieldId: 'ff-1',
       value: 'premium',
       updatedBy: 'form',
+      field: TEXT_FIELD,
     });
 
     vi.clearAllMocks();
-    mocks.getFriendFieldById.mockResolvedValue({ id: 'ff-1', ec_is_master: 0 });
+    mocks.getFriendFieldById.mockResolvedValue({ ...TEXT_FIELD });
     await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: { plan: '竹' } });
     expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(
       db,
@@ -354,6 +396,43 @@ describe('回答を配る', () => {
     expect(mocks.attachTag).not.toHaveBeenCalled();
   });
 
+  // N-189: 選択肢の送信文に消えた共通情報が残っていても、生の差し込み名を
+  // 送らない。効果は未完として記録され、運用者が直せば再送で補完される。
+  test('解決できない共通情報を含む送信文は送らず、その効果を未完に残す', async () => {
+    const layout = layoutWith([
+      input({
+        name: 'want',
+        label: '希望',
+        type: 'radio',
+        choiceMode: 'action',
+        choices: [
+          {
+            id: 'c1',
+            label: '資料がほしい',
+            actions: [{ kind: 'send_text', text: '営業時間は{{var.hours}}です' }],
+          },
+        ],
+      }),
+    ]);
+    const { db } = fakeDb();
+    const sent: string[] = [];
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { want: '資料がほしい' },
+      formId: 'form-1',
+      pushText: async (text) => {
+        sent.push(text);
+      },
+    });
+
+    expect(sent).toEqual([]);
+    // 選択肢の動作を束ねる choices:<ブロックID> が未完に残る。
+    expect(result.failedEffects.some((id) => id.startsWith('choices:'))).toBe(true);
+  });
+
   test('日付の回答からリマインダを動かす', async () => {
     const layout = layoutWith([
       input({
@@ -376,6 +455,7 @@ describe('回答を配る', () => {
       friendId: 'f1',
       reminderId: 'rm-1',
       targetDate: '2026-09-01',
+      sourceEventId: null,
     });
   });
 
@@ -416,14 +496,177 @@ describe('回答を配る', () => {
         friendId: 'f1',
         answers: { pet: ['犬', '猫'], full_name: '山田' },
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({
+      destinationWrites: { attempted: 1, succeeded: 1, failed: 0 },
+      failedEffects: [expect.stringMatching(/^choices:/)],
+    });
 
     expect(mocks.setFriendFieldValue).toHaveBeenCalled();
   });
 
-  test('テキストではないテンプレートは送らない', async () => {
+  test('友だち情報欄への書き込み失敗を回答単位で数える', async () => {
+    mocks.setFriendFieldValue.mockRejectedValueOnce(new Error('write failed'));
+    const fullName = input({
+      name: 'full_name',
+      label: 'お名前',
+      destinations: { friendFieldIds: ['ff-1'] },
+    });
+    const layout = layoutWith([fullName]);
+    const { db } = fakeDb();
+
+    // 書き込みの失敗は握らず、工程の未完として残す(再送で補完する)。
+    await expect(applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { full_name: '山田' },
+    })).resolves.toEqual({
+      destinationWrites: { attempted: 1, succeeded: 0, failed: 1 },
+      failedEffects: [`destinations:${fullName.id}`],
+    });
+  });
+
+  test('EC側が正の情報欄は数えず、工程を未完にしない', async () => {
+    mocks.getFriendFieldById.mockResolvedValue({ id: 'ff-1', ec_is_master: 1 });
+    const layout = layoutWith([
+      input({ name: 'addr', label: '住所', destinations: { friendFieldIds: ['ff-1'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    await expect(applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'friend-1',
+      answers: { addr: '東京都...' },
+    })).resolves.toEqual({
+      destinationWrites: { attempted: 0, succeeded: 0, failed: 0 },
+      failedEffects: [],
+    });
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  test('終わった効果は飛ばし、終わった効果だけを記録する', async () => {
+    const pet = input({
+      name: 'pet',
+      label: '飼っている子',
+      type: 'radio',
+      choiceMode: 'tag',
+      choices: [{ id: 'c1', label: '犬', tagId: 'tag-dog' }],
+    });
+    const layout = layoutWith([
+      pet,
+      input({ name: 'full_name', label: 'お名前', destinations: { friendFieldIds: ['ff-1'] } }),
+    ]);
+    const { db } = fakeDb();
+    const completed: Array<{ id: string; stats: { attempted: number; succeeded: number; failed: number } }> = [];
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { pet: '犬', full_name: '山田' },
+      skipEffect: (effectId) => effectId === `choices:${pet.id}`,
+      onEffectComplete: async (effectId, stats) => {
+        completed.push({ id: effectId, stats });
+      },
+    });
+    // 飛ばした選択肢のタグは付かない。残りは実行される。
+    expect(mocks.attachTag).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValue).toHaveBeenCalled();
+    expect(result.failedEffects).toEqual([]);
+    expect(completed.map((entry) => entry.id).sort()).toEqual(
+      [`destinations:${pet.id}`, `destinations:${layout.sections[0].blocks[1].id}`].sort(),
+    );
+  });
+
+  test('内側の選択肢動作の失敗は外側の工程も未完にする', async () => {
+    const want = input({
+      name: 'want',
+      label: '希望',
+      type: 'radio',
+      choiceMode: 'action',
+      choices: [
+        {
+          id: 'c1',
+          label: '資料がほしい',
+          actions: [{ kind: 'send_text', text: '資料をお送りします' }],
+        },
+      ],
+    });
+    const layout = layoutWith([want]);
+    const { db } = fakeDb();
+    const sent: Array<{ text: string; suffix: string }> = [];
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { want: '資料がほしい' },
+      pushText: async (text, stableSuffix) => {
+        sent.push({ text, suffix: stableSuffix });
+        throw new Error('push failed');
+      },
+    });
+    // 送信の識別子は安定した値で渡る。
+    expect(sent).toEqual([{ text: '資料をお送りします', suffix: `choiceAction:${want.id}:c1:0` }]);
+    expect(result.failedEffects).toContain(`choiceAction:${want.id}:c1:0`);
+    expect(result.failedEffects).toContain(`choices:${want.id}`);
+  });
+
+  test('完了記録の失敗は握らず呼び出し元へ返す', async () => {
+    const layout = layoutWith([
+      input({ name: 'full_name', label: 'お名前', destinations: { friendFieldIds: ['ff-1'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    await expect(applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { full_name: '山田' },
+      onEffectComplete: async () => {
+        throw new Error('claim ownership lost');
+      },
+    })).rejects.toThrow('claim ownership lost');
+  });
+
+  // N-177: Flex テンプレートは組み立てて実際に送る。以前は warn して
+  // 素通りしていたため、選んだテンプレートが静かに不達になっていた。
+  test('Flex のテンプレートは組み立てて送る', async () => {
     mocks.getMessageTemplateById.mockResolvedValue({
       id: 'tpl-1',
+      name: '診断カード',
+      message_type: 'flex',
+      message_content: '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[{"type":"text","text":"結果です"}]}}',
+    });
+    const layout = emptyLayout();
+    layout.options.afterActions = [{ kind: 'send_template', templateId: 'tpl-1' }];
+    const { db } = fakeDb();
+    const sent: unknown[] = [];
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: {},
+      pushText: async () => {},
+      pushMessage: async (message, stableSuffix) => {
+        sent.push({ message, stableSuffix });
+      },
+    });
+    expect(result.failedEffects).toEqual([]);
+    expect(sent).toHaveLength(1);
+    const sentMessage = (sent[0] as { message: { type: string; contents?: unknown } }).message;
+    expect(sentMessage.type).toBe('flex');
+    // 再送キーは pushText と同じく工程 id(afterAction:N)を使う。
+    // 同じテンプレートを別の動作で送っても衝突しない。
+    expect((sent[0] as { stableSuffix: string }).stableSuffix).toBe('afterAction:0');
+  });
+
+  test('非テキストを送る経路が無いときは、黙らず工程の失敗にする', async () => {
+    mocks.getMessageTemplateById.mockResolvedValue({
+      id: 'tpl-1',
+      name: '診断カード',
       message_type: 'flex',
       message_content: '{}',
     });
@@ -432,7 +675,7 @@ describe('回答を配る', () => {
     const { db } = fakeDb();
     const sent: string[] = [];
 
-    await applyFormLayoutEffects({
+    const result = await applyFormLayoutEffects({
       db,
       layout,
       friendId: 'f1',
@@ -442,6 +685,8 @@ describe('回答を配る', () => {
       },
     });
     expect(sent).toEqual([]);
+    // 静かな不達にしない。未完として残り、再実行の対象になる。
+    expect(result.failedEffects).toEqual(['afterAction:0']);
   });
 
   test('答えていない欄には、何も起こさない', async () => {
@@ -458,5 +703,359 @@ describe('回答を配る', () => {
 
     await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: {} });
     expect(mocks.attachTag).not.toHaveBeenCalled();
+  });
+
+  // FORM-13: 未回答の欄を登録先へ流すと、空文字での上書き＝既存の登録が
+  // 消える。空欄は「更新しない」。情報欄の呼び出しも friends 列の UPDATE
+  // も走らないことを、書き込みの形まで見て確認する。
+  test.each([
+    { name: '空文字', value: '' },
+    { name: '空白だけ', value: '   ' },
+    { name: 'null', value: null },
+    { name: '空の選択肢', value: [] },
+    { name: '空白だけの選択肢', value: ['', '  '] },
+  ])('任意欄の未回答($name)は登録先を更新しない', async ({ value }) => {
+    const layout = layoutWith([
+      input({
+        name: 'full_name',
+        label: 'お名前',
+        destinations: { friendFieldIds: ['ff-1'], realName: true, note: true },
+      }),
+    ]);
+    const { db, calls } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { full_name: value },
+    });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(calls.filter((c) => c.sql.includes('UPDATE friends'))).toEqual([]);
+    expect(result.destinationWrites).toEqual({ attempted: 0, succeeded: 0, failed: 0 });
+    expect(result.failedEffects).toEqual([]);
+  });
+
+  // FORM-15: 任意の日付欄を空のまま送っても、空の日付でリマインダの
+  // 登録予定を作らない。暦に無い日付も同じく「何もしない」。
+  test.each([
+    { name: '空文字', value: '' },
+    { name: '存在しない日付', value: '2026-02-30' },
+  ])('日付欄の未回答・不正な日付($name)ではリマインダを動かさない', async ({ value }) => {
+    const layout = layoutWith([
+      input({
+        name: 'day',
+        label: '希望日',
+        type: 'date',
+        reminder: { reminderId: 'rm-1', time: '09:00' },
+      }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { day: value },
+    });
+
+    expect(mocks.enrollFriendInReminder).not.toHaveBeenCalled();
+    expect(result.failedEffects).toEqual([]);
+  });
+
+  test('失敗した工程の名前を残し、欠落を固定しない', async () => {
+    mocks.attachTag.mockRejectedValueOnce(new Error('タグの付与に失敗'));
+    const pet = input({
+      name: 'pet',
+      label: '飼っている子',
+      type: 'checkbox',
+      choiceMode: 'tag',
+      choices: [{ id: 'c1', label: '犬', tagId: 'tag-dog' }],
+    });
+    const layout = layoutWith([pet]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { pet: ['犬'] },
+    });
+    expect(result.failedEffects).toEqual([`choices:${pet.id}`]);
+  });
+
+  test('接頭辞つきのリマインダ登録は安定した登録元idを付ける', async () => {
+    const day = input({
+      name: 'day',
+      label: '希望日',
+      type: 'date',
+      reminder: { reminderId: 'rm-1', time: '09:00' },
+    });
+    const layout = layoutWith([day]);
+    const { db } = fakeDb();
+
+    await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { day: '2026-09-01' },
+      idempotencyPrefix: 'form-submit:answer-1',
+    });
+    expect(mocks.enrollFriendInReminder).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      reminderId: 'rm-1',
+      targetDate: '2026-09-01',
+      // 登録元idは「どの日付欄からか」まで入る。同じリマインダを別の欄に
+      // 割り当てても、別の欄の登録と混ざらない(FORM-16)。
+      sourceEventId: `form-submit:answer-1:reminder:${day.id}`,
+    });
+  });
+
+  test('登録済みのリマインダは再開時に重ねない', async () => {
+    const day = input({
+      name: 'day',
+      label: '希望日',
+      type: 'date',
+      reminder: { reminderId: 'rm-1', time: '09:00' },
+    });
+    const layout = layoutWith([day]);
+    const { db } = fakeDb({ found: 1 });
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { day: '2026-09-01' },
+      idempotencyPrefix: 'form-submit:answer-1',
+    });
+    expect(mocks.enrollFriendInReminder).not.toHaveBeenCalled();
+    expect(result.failedEffects).toEqual([]);
+  });
+
+  // FORM-16: 同じリマインダを別の日付欄に割り当てたとき、欄ごとに別の
+  // 予定を立てる。記録キー(source_event_id)に欄のIDが入るので、2つ目の
+  // 予定が「登録済み」と誤認されて消えることはない。
+  test('同じリマインダを2つの日付欄に割り当てても、欄ごとに登録される', async () => {
+    const day1 = input({ name: 'day1', label: '初回', type: 'date', reminder: { reminderId: 'rm-1', time: '09:00' } });
+    const day2 = input({ name: 'day2', label: '再来', type: 'date', reminder: { reminderId: 'rm-1', time: '09:00' } });
+    const layout = layoutWith([day1, day2]);
+    const { db } = fakeDb();
+
+    await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { day1: '2026-09-01', day2: '2026-10-01' },
+      idempotencyPrefix: 'form-submit:answer-1',
+    });
+
+    const sourceIds = mocks.enrollFriendInReminder.mock.calls.map(
+      (call) => (call[1] as { sourceEventId: string | null }).sourceEventId,
+    );
+    expect(sourceIds).toEqual([
+      `form-submit:answer-1:reminder:${day1.id}`,
+      `form-submit:answer-1:reminder:${day2.id}`,
+    ]);
+    expect(mocks.enrollFriendInReminder).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('N-042 型検証の接続(#702)', () => {
+  const numberField = (id: string) => ({ id, ec_is_master: 0, type: 'number', options_json: null });
+
+  test('F2 数値項目へ文字の回答は保存せず失敗に数える', async () => {
+    mocks.getFriendFieldById.mockResolvedValue(numberField('ff-num'));
+    const layout = layoutWith([
+      input({ name: 'count', label: '回数', destinations: { friendFieldIds: ['ff-num'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { count: 'あいう' },
+    });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+  });
+
+  test('F2 数値のカンマは正規化して保存する', async () => {
+    const field = numberField('ff-num');
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = layoutWith([
+      input({ name: 'count', label: '回数', destinations: { friendFieldIds: ['ff-num'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { count: '1,000' },
+    });
+
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      fieldId: 'ff-num',
+      value: '1000',
+      updatedBy: 'form',
+      field,
+    });
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
+  });
+
+  test('F2 multi_selectの配列回答は正規化JSONで保存する', async () => {
+    const field = {
+      id: 'ff-multi',
+      ec_is_master: 0,
+      type: 'multi_select',
+      options_json: JSON.stringify(['犬', '猫']),
+    };
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = layoutWith([
+      input({ name: 'pet', label: '飼っている子', destinations: { friendFieldIds: ['ff-multi'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { pet: ['犬', '猫'] },
+    });
+
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      fieldId: 'ff-multi',
+      value: JSON.stringify(['犬', '猫']),
+      updatedBy: 'form',
+      field,
+    });
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
+  });
+
+  test('F2 multi_selectの選択肢外は保存しない', async () => {
+    mocks.getFriendFieldById.mockResolvedValue({
+      id: 'ff-multi',
+      ec_is_master: 0,
+      type: 'multi_select',
+      options_json: JSON.stringify(['犬', '猫']),
+    });
+    const layout = layoutWith([
+      input({ name: 'pet', label: '飼っている子', destinations: { friendFieldIds: ['ff-multi'] } }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { pet: ['恐竜'] },
+    });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+  });
+
+  test('F3 選択肢の値が項目の選択肢に無ければ保存しない', async () => {
+    const field = {
+      id: 'ff-sel',
+      ec_is_master: 0,
+      type: 'select',
+      options_json: JSON.stringify(['松', '竹']),
+    };
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = layoutWith([
+      input({
+        name: 'plan',
+        label: 'プラン',
+        type: 'radio',
+        choiceMode: 'friendField',
+        choiceFriendFieldId: 'ff-sel',
+        choices: [{ id: 'c1', label: '松', value: 'premium' }],
+      }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { plan: '松' },
+    });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+  });
+
+  test('F3 選択肢の値が項目に合えば正規化して保存する', async () => {
+    const field = {
+      id: 'ff-sel',
+      ec_is_master: 0,
+      type: 'select',
+      options_json: JSON.stringify([{ id: 'premium', label: '松' }, { id: 'std', label: '竹' }]),
+    };
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = layoutWith([
+      input({
+        name: 'plan',
+        label: 'プラン',
+        type: 'radio',
+        choiceMode: 'friendField',
+        choiceFriendFieldId: 'ff-sel',
+        choices: [{ id: 'c1', label: '松', value: 'premium' }],
+      }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { plan: '松' },
+    });
+
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      fieldId: 'ff-sel',
+      value: 'premium',
+      updatedBy: 'form',
+      field,
+    });
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
+  });
+
+  test('F4 回答後動作の型外の値は保存せず失敗に数える', async () => {
+    mocks.getFriendFieldById.mockResolvedValue(numberField('ff-num'));
+    const layout = emptyLayout();
+    layout.options.afterActions = [{ kind: 'friend_field', fieldId: 'ff-num', value: 'あいう' }];
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: {} });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+  });
+
+  test('F4 回答後動作の正しい値は保存する', async () => {
+    const field = numberField('ff-num');
+    mocks.getFriendFieldById.mockResolvedValue(field);
+    const layout = emptyLayout();
+    layout.options.afterActions = [{ kind: 'friend_field', fieldId: 'ff-num', value: '42' }];
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: {} });
+
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      fieldId: 'ff-num',
+      value: '42',
+      updatedBy: 'form',
+      field,
+    });
+    expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
   });
 });

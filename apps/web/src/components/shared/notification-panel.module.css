@@ -1,3 +1,4 @@
+@layer components {
 .panel {
   position: absolute;
   top: calc(100% + 8px);
@@ -41,7 +42,7 @@
   border: 0;
   background: transparent;
   padding: 2px;
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
   font-size: var(--text-caption);
   font-weight: 600;
   cursor: pointer;
@@ -67,8 +68,12 @@
   cursor: pointer;
 }
 
+/*
+ * 選んでいる区分の札。**白文字が乗るので `$accent-deep`。**
+ * `$accent`(#06c755) に白文字は 2.26:1 で読めない。
+ */
 .selected {
-  background: var(--color-accent);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
@@ -186,4 +191,5 @@
   align-items: center;
   gap: 5px;
   color: var(--color-ink-faint);
+}
 }

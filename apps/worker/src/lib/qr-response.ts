@@ -1,9 +1,13 @@
+import { encodeQr, QrInputError } from './qr-matrix.js';
+import { renderQrJpeg, renderQrPng, renderQrSvg } from './qr-image.js';
+
+export { QrInputError };
+
 /**
  * QRとして出せる形式。
  *
- * 上流（api.qrserver.com）はもっと受けるが、こちらから渡す値は
- * 名前で挙げたものだけにする。クエリをそのまま上流へ流すと、
- * 画面に無い形式や壊れた値がそのまま外へ出る。
+ * 画面から来た値をそのまま使わず、名前で挙げたものだけにする。
+ * 知らない形式を通すと、描き分けの無い分岐へ落ちる。
  *
  * 印刷に使うなら svg。拡大しても粗くならない。png は画面と
  * ほとんどの入稿用、jpg は png を受け付けない古い入稿用。
@@ -51,4 +55,36 @@ export function qrResponseHeaders(
     headers['Content-Disposition'] = `attachment; filename="${safeName}.${format}"`;
   }
   return headers;
+}
+
+/** 返してよい画像の上限。ここを超えたら作り方を疑う。 */
+export const QR_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+export interface QrImage {
+  readonly bytes: Uint8Array;
+  readonly contentType: string;
+}
+
+/**
+ * 正規化済みの size / format から QR 画像を作る。
+ *
+ * ここが外部へ出ていく唯一の場所だった。流入 ref や LIFF URL を
+ * 第三者の生成サービスへ渡していたので、Worker の中だけで作るようにした。
+ * この関数は fetch を呼ばない。
+ *
+ * @throws {QrInputError} 指定の大きさに収まらない・長すぎるとき。
+ */
+export async function createQrImage(data: string, size: string, format: QrFormat): Promise<QrImage> {
+  const [width, height] = size.split('x').map(Number);
+  const symbol = encodeQr(data);
+  if (format === 'svg') {
+    return {
+      bytes: new TextEncoder().encode(renderQrSvg(symbol, width, height)),
+      contentType: 'image/svg+xml',
+    };
+  }
+  if (format === 'jpg') {
+    return { bytes: renderQrJpeg(symbol, width, height), contentType: 'image/jpeg' };
+  }
+  return { bytes: await renderQrPng(symbol, width, height), contentType: 'image/png' };
 }

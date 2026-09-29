@@ -3,39 +3,105 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ApiError, api, type ApiBroadcast } from '@/lib/api'
-import Header from '@/components/layout/header'
+import type { Tag } from '@line-crm/shared'
+import { ApiError, api, type ApiBroadcast, type BroadcastDisplayStatus, type BroadcastInsight, type BroadcastApprovalState } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Progress from '@/components/shared/progress'
+import { Tabs } from '@/components/shared/tabs'
+import TargetMissing from '@/components/shared/target-missing'
+import BroadcastStatusRail, { isApprovalInvolved } from './broadcast-status-rail'
+import BroadcastRecipients from './broadcast-recipients'
+import BroadcastActivity from './broadcast-activity'
+import {
+  ApprovalBadge,
+  ApprovalRequestFields,
+  ApprovalStatusSection,
+  ApproverSection,
+  formatApprovalDateTime,
+} from '@/components/broadcasts/broadcast-approval'
+import type { BroadcastApprovalCandidate } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { messageTypeLabel } from '@/lib/broadcast-summary'
+import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
-import { clickInsightDetail, openInsightDetail } from './broadcast-insight-display'
+import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from './broadcast-insight-display'
+import { broadcastDetailCsv } from './broadcast-detail-export'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
+import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
 import { usePageTitle } from '@/components/shell/page-chrome'
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: '下書き',
-  scheduled: '予約済み',
-  sending: '送信中',
-  sent: '送信済み',
-}
 
 function BroadcastDetailInner() {
   const params = useSearchParams()
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const id = params.get('id') ?? ''
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
-  const [insight, setInsight] = useState<{
-    delivered: number | null
-    uniqueImpression: number | null
-    uniqueClick: number | null
-    suppressedByAudienceSize: boolean
-  } | null>(null)
+  usePageTitle(broadcast ? `配信結果：${broadcast.title}` : '配信の詳細')
+  const [insight, setInsight] = useState<(BroadcastInsight & { suppressedByAudienceSize: boolean }) | null>(null)
   // 集計は配信本体とは別に取る。取れていないのか、取りに行って失敗したのかを
   // 「—」に混ぜると、待てば出るのか操作が要るのかを運用者が判断できない。
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
   const [reloadToken, setReloadToken] = useState(0)
+  // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。配信本体とは別に取る。
+  // 読み込めないことと、宛先が消えていることは分けて出す。
+  const [audienceNameState, setAudienceNameState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [audienceNames, setAudienceNames] = useState<{
+    tags: Tag[]
+    scenarios: Array<{ id: string; name: string }>
+  }>({ tags: [], scenarios: [] })
   const contentRef = useRef<HTMLElement>(null)
+  /*
+   * 二者承認（m12a / 設計 A-2・A-3）。配信本体とは別に読む。
+   * 取れなくても配信の詳細は出し続ける（承認の欄だけ出さない）。
+   */
+  const [approvalState, setApprovalState] = useState<BroadcastApprovalState | null>(null)
+  const [approvalCandidates, setApprovalCandidates] = useState<BroadcastApprovalCandidate[]>([])
+  const [approvalBusy, setApprovalBusy] = useState(false)
+  const [approvalMessage, setApprovalMessage] = useState<string | null>(null)
+  const [approvalStepUp, setApprovalStepUp] = useState<StepUpRequest | null>(null)
+  // 承認の依頼を出し直すときの入力（差し戻し・期限切れのあと）。
+  const [reApproverId, setReApproverId] = useState('')
+  const [reApprovalNote, setReApprovalNote] = useState('')
+  /*
+   * 詳細のタブ（#816 概要・宛先・記録）。?tab= から開く。
+   * 履歴に積まず置き換える（戻るで一覧へ戻れるように）。
+   */
+  const initialTab = params.get('tab')
+  const [tab, setTab] = useState<'overview' | 'recipients' | 'activity'>(
+    initialTab === 'recipients' || initialTab === 'activity' ? initialTab : 'overview',
+  )
+  const selectTab = (next: 'overview' | 'recipients' | 'activity') => {
+    setTab(next)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', next)
+      window.history.replaceState(null, '', url.toString())
+    } catch {
+      // URLが触れなくてもタブは切り替わる。
+    }
+  }
+
+  const exportCsv = () => {
+    if (!broadcast) return
+    const csv = broadcastDetailCsv({
+      title: broadcast.title,
+      status: broadcast.status,
+      sentAt: broadcast.sentAt,
+      scheduledAt: broadcast.scheduledAt,
+      totalCount: broadcast.totalCount,
+      successCount: broadcast.successCount,
+      delivered: insight?.delivered ?? null,
+      uniqueImpression: insight?.uniqueImpression ?? null,
+      uniqueClick: insight?.uniqueClick ?? null,
+    }, formatBroadcastDateTime)
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = broadcastCsvFilename(broadcast.title, broadcast.id)
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   useEffect(() => {
     let active = true
@@ -50,6 +116,7 @@ function BroadcastDetailInner() {
       setLoadState('not-found')
       return
     }
+    setAudienceNameState('idle')
     void (async () => {
       try {
         const detail = await api.broadcasts.get(id)
@@ -62,6 +129,47 @@ function BroadcastDetailInner() {
         setBroadcast(detail.data)
         setLoadState('ready')
 
+        // 二者承認の今の状態。取れなくても詳細は出す。
+        setApprovalState(null)
+        setApprovalMessage(null)
+        void api.broadcasts.approval.get(id).then((approvalRes) => {
+          if (!active) return
+          if (approvalRes.success) {
+            setApprovalState(approvalRes.data)
+            // 承認する人・頼み直す人の名前を出すため、候補も読む。
+            if (selectedAccountId) {
+              void api.broadcasts.approval.candidates(selectedAccountId).then((candidatesRes) => {
+                if (!active) return
+                if (candidatesRes.success) setApprovalCandidates(candidatesRes.data)
+              }).catch(() => undefined)
+            }
+          }
+        }).catch(() => undefined)
+
+        // 宛先が絞り込みのときだけ、条件に出すタグ名・シナリオ名を取る。
+        // 取れなくても配信の詳細は出し続ける。
+        const needsAudienceNames =
+          detail.data.targetType !== 'all' && detail.data.targetType !== 'multi-account-dedup'
+        if (needsAudienceNames) {
+          setAudienceNameState('loading')
+          // R23横展開: この配信のアカウントの候補だけで名前を解決する。
+          void Promise.allSettled([
+            api.tags.list({ accountId: selectedAccountId }),
+            api.scenarios.list({ accountId: selectedAccountId }),
+          ])
+            .then(([tagsRes, scenariosRes]) => {
+              if (!active) return
+              const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null
+              const scenarios = scenariosRes.status === 'fulfilled' && scenariosRes.value.success ? scenariosRes.value.data : null
+              if (!tags && !scenarios) {
+                setAudienceNameState('error')
+                return
+              }
+              setAudienceNames({ tags: tags ?? [], scenarios: scenarios ?? [] })
+              setAudienceNameState('ready')
+            })
+        }
+
         // 詳細画面は送信日が30日より前でも開く。期間集計ではなく、
         // この配信自身の保存済みインサイトを読む。
         try {
@@ -69,9 +177,7 @@ function BroadcastDetailInner() {
           if (!active) return
           if (stats.success && stats.data) {
             setInsight({
-              delivered: stats.data.delivered,
-              uniqueImpression: stats.data.uniqueImpression,
-              uniqueClick: stats.data.uniqueClick,
+              ...stats.data,
               suppressedByAudienceSize:
                 stats.data.uniqueImpression == null
                 && (stats.data.delivered ?? 0) > 0
@@ -98,16 +204,79 @@ function BroadcastDetailInner() {
     }
   }, [accountLoading, id, reloadToken, selectedAccountId])
 
+  /*
+   * 送信中は5秒ごとに配信を取り直し、進み具合と成功件数を更新する。
+   * 送信中に開いた人が止まった数字を見続けないようにする。
+   * 送り終わった・失敗した・画面を離れたら止める。
+   */
+  useEffect(() => {
+    if (!id || broadcast?.status !== 'sending') return
+    let active = true
+    const timer = setInterval(() => {
+      void (async () => {
+        try {
+          const detail = await api.broadcasts.get(id)
+          if (!active || !detail.success) return
+          if (detail.data.status !== 'sending') {
+            // 状態が変わったら全体を取り直して集計も更新する。
+            setReloadToken((value) => value + 1)
+          }
+          setBroadcast((prev) => (prev && prev.id === id ? detail.data : prev))
+        } catch {
+          // 失敗は数えず、次の周期で取り直す。
+        }
+      })()
+    }, 5000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [id, broadcast?.status])
+
   if (!id) {
     return (
-      <div>
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          配信が指定されていません。
-          <Link href="/broadcasts" className="text-accent ml-1 hover:underline">
-            一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="見る配信が指定されていません"
+        description="一覧から、見たい配信を選び直してください。"
+        backHref="/broadcasts"
+        backLabel="一斉配信の一覧へ戻る"
+      />
+    )
+  }
+
+  if (loadState === 'error') {
+    return (
+      <TargetMissing
+        kind="error"
+        title="配信を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadToken((value) => value + 1)}
+      />
+    )
+  }
+
+  if (loadState === 'not-found' || (loadState === 'ready' && !broadcast)) {
+    if (!selectedAccountId) {
+      // アカウント未選択は対象の有無とは別の状態。他の画面と同じく ListState で出す。
+      return (
+        <ListState
+          kind="empty"
+          title="LINE公式アカウントを選んでください"
+          description="選ぶと配信を確認できます。"
+          action={<Button href="/broadcasts">一斉配信の一覧へ戻る</Button>}
+        />
+      )
+    }
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この配信は見つかりません"
+        description="このLINEアカウントで確認できる配信は見つかりませんでした。削除されたか、一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/broadcasts"
+        backLabel="一斉配信の一覧へ戻る"
+      />
     )
   }
 
@@ -117,96 +286,282 @@ function BroadcastDetailInner() {
   const pct = (n: number, base: number) =>
     base > 0 ? `${Math.round((n / base) * 1000) / 10}%` : '—'
 
+  // BROADCAST-15: 宛先の条件は一覧・配信詳細パネルと同じ audienceSummary。
+  // 名前を読み込む間は「確認中」、読めないときは失敗と分かる言い方にする。
+  const tagNameById = (tagId: string) => audienceNames.tags.find((t) => t.id === tagId)?.name ?? null
+  const scenarioNameById = (scenarioId: string) =>
+    audienceNames.scenarios.find((s) => s.id === scenarioId)?.name ?? null
+  const audienceLabel = !broadcast
+    ? ''
+    : broadcast.targetType === 'all' || broadcast.targetType === 'multi-account-dedup'
+      ? audienceSummary(broadcast, tagNameById)
+      : audienceNameState === 'ready'
+        ? audienceSummary(broadcast, tagNameById, scenarioNameById)
+        : audienceNameState === 'error'
+          ? '宛先の条件を確認できませんでした'
+          : '宛先の条件を確認しています…'
+
+  /*
+   * 二者承認の操作（設計 A-2・A-3）。終わったら状態を読み直す。
+   * 承認して送るは、承認のあと送る操作まで続ける。
+   */
+  const reloadApproval = async () => {
+    if (!id) return
+    try {
+      const res = await api.broadcasts.approval.get(id)
+      if (res.success) setApprovalState(res.data)
+    } catch {
+      // 読み直しの失敗は黙って次へ。帯の文は古いまま残る。
+    }
+  }
+  const runApprovalAction = async (
+    action: () => Promise<{ success: boolean; error?: string }>,
+  ) => {
+    if (approvalBusy) return
+    setApprovalBusy(true)
+    setApprovalMessage(null)
+    try {
+      const res = await action()
+      if (!res.success) {
+        setApprovalMessage(res.error ?? '操作できませんでした。')
+        return
+      }
+      await reloadApproval()
+    } catch {
+      setApprovalMessage('操作できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setApprovalBusy(false)
+    }
+  }
+  const handleApprovalCancel = () => void runApprovalAction(() => api.broadcasts.approval.cancel(id))
+  const handleApprovalRemind = () => void runApprovalAction(() => api.broadcasts.approval.remind(id))
+  const handleApprovalReject = (reason: string) =>
+    void runApprovalAction(() => api.broadcasts.approval.reject(id, reason))
+  const handleApprovalApprove = (stepUpToken?: string) =>
+    void (async () => {
+      if (approvalBusy) return
+      setApprovalBusy(true)
+      setApprovalMessage(null)
+      try {
+        const approved = await api.broadcasts.approval.approve(id, stepUpToken)
+        if (!approved.success) {
+          setApprovalMessage(approved.error)
+          return
+        }
+        // 予約なし（今すぐ送る分）は、承認のあと既存の送信の流れへ渡す。
+        if (approved.data?.needsSend) {
+          const sent = await api.broadcasts.send(id)
+          if (!sent.success) {
+            setApprovalMessage(`承認しましたが、送信できませんでした。${sent.error}`)
+            await reloadApproval()
+            return
+          }
+          setReloadToken((value) => value + 1)
+          return
+        }
+        await reloadApproval()
+      } catch (caught) {
+        // 一斉配信の承認は大事な操作。本人確認を求められたら窓を立てる（V-1）。
+        if (!stepUpToken && isStepUpRequired(caught)) {
+          setApprovalStepUp({ purpose: 'broadcast.approval', action: '一斉配信を承認する', retry: (token) => Promise.resolve(handleApprovalApprove(token)) })
+          return
+        }
+        setApprovalMessage('操作できませんでした。状態を読み直してから、もう一度お試しください。')
+      } finally {
+        setApprovalBusy(false)
+      }
+    })()
+  const handleApprovalRequest = () =>
+    void (async () => {
+      if (approvalBusy) return
+      if (!reApproverId) {
+        setApprovalMessage('承認をお願いする人を選んでください')
+        return
+      }
+      setApprovalBusy(true)
+      setApprovalMessage(null)
+      try {
+        const requested = await api.broadcasts.approval.request(id, {
+          approverStaffId: reApproverId,
+          note: reApprovalNote.trim() || undefined,
+        })
+        if (!requested.success) {
+          setApprovalMessage(requested.error)
+          return
+        }
+        setReApproverId('')
+        setReApprovalNote('')
+        await reloadApproval()
+      } catch {
+        setApprovalMessage('依頼できませんでした。状態を読み直してから、もう一度お試しください。')
+      } finally {
+        setApprovalBusy(false)
+      }
+    })()
+  const approvalRequesterName = approvalState?.approval.requestedByStaffId
+    ? (approvalCandidates.find((item) => item.id === approvalState.approval.requestedByStaffId)?.name ?? null)
+    : null
+  const approvalApproverName = approvalState?.approval.approverStaffId
+    ? (approvalCandidates.find((item) => item.id === approvalState.approval.approverStaffId)?.name ?? null)
+    : null
+  const approvalMessageSummary = broadcast?.messageBubbles && broadcast.messageBubbles.length > 0
+    ? `${broadcast.messageBubbles.length}通`
+    : null
+  // 差し戻し・期限切れ・取り消しのあと、頼み直せる条件。
+  const canReRequest = broadcast
+    && approvalState
+    && approvalState.gate.required
+    && !approvalState.gate.singleOperator
+    && (broadcast.status === 'draft' || broadcast.status === 'scheduled')
+    && ['none', 'rejected', 'cancelled', 'expired'].includes(approvalState.approval.status)
+
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/broadcasts" className="hover:underline">
-          一斉配信
+          ← 一斉配信一覧
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>{broadcast?.title ?? '詳細'}</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title={broadcast?.title ?? '配信の詳細'}
-          description={
-            broadcast?.sentAt
-              ? `${new Date(broadcast.sentAt).toLocaleString('ja-JP')} に送信`
-              : broadcast?.scheduledAt
-                ? `${new Date(broadcast.scheduledAt).toLocaleString('ja-JP')} に予約`
-                : undefined
-          }
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                disabled={!broadcast}
-              >
-                配信内容を見る
-              </Button>
-              {/* 既存の配信を種にして作り直す口が無い。作成は空から始まる。 */}
-              <button
-                disabled
-                title="複製は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                複製して作る
-              </button>
-            </div>
-          }
-        />
-      </div>
-
-      {loadState === 'loading' ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
-        </div>
-      ) : loadState === 'error' ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
-          <p className="text-ink text-sm font-semibold">配信を読み込めませんでした</p>
-          <p className="text-ink-faint mt-1 text-xs">通信状態を確認して、もう一度お試しください。</p>
-          <Button className="mt-4" onClick={() => setReloadToken((value) => value + 1)}>
-            配信を再読み込み
-          </Button>
-        </div>
-      ) : loadState === 'not-found' || !broadcast ? (
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          このLINEアカウントで確認できる配信は見つかりませんでした。
-        </p>
+      {/*
+        ★V7 `x63W5x`：読み込み中は一覧の場所に ListState loading を1つ。
+        素の「読み込み中...」は出さない。
+      */}
+      {loadState === 'loading' || !broadcast ? (
+        <ListState kind="loading" title="配信を読み込んでいます" />
+      ) : String(broadcast.status) === 'sent' ? (
+        <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} tab={tab} selectTab={selectTab} approval={approvalState} onExportCsv={exportCsv} />
       ) : (
-        <div className="max-w-3xl space-y-4">
+        <div className="space-y-4">
+          <DetailStatusRail broadcast={broadcast} approval={approvalState} />
+          {/*
+            二者承認（設計 A-2）。配信の題の横に承認待ちの札を出す。
+            題自体は枠の見出しに出るので、ここでは札と並べるだけにする。
+          */}
+          {/*
+            監査 R207: 保存した下書きを同じIDで編集し続けられる。
+            同じ設定で作り直す（複製）は別名・宛先未引継ぎなので、
+            直す操作の代わりにならない。送信済み・送信中には出さない。
+          */}
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-ink min-w-0 flex-1 text-base font-bold">{broadcast.title}</p>
+            <ApprovalBadge status={broadcast.approvalStatus} />
+            {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
+              <Button href={`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`}>
+                編集を続ける
+              </Button>
+            )}
+          </div>
+          {/*
+            二者承認（設計 A-2・A-3）。承認待ちの帯と、承認する人の操作。
+            差し戻し・期限切れのあとは頼み直す欄を出す。
+          */}
+          {approvalState ? (
+            <ApprovalStatusSection
+              approval={approvalState.approval}
+              scheduledLabel={
+                broadcast.scheduledAt ? formatApprovalDateTime(broadcast.scheduledAt) : null
+              }
+              approverName={approvalApproverName}
+              requesterName={approvalRequesterName}
+              viewer={approvalState.viewer}
+              onCancel={handleApprovalCancel}
+              onRemind={handleApprovalRemind}
+              busy={approvalBusy}
+              message={approvalMessage}
+            />
+          ) : null}
+          {approvalState ? (
+            <ApproverSection
+              approval={approvalState.approval}
+              viewer={approvalState.viewer}
+              requesterName={approvalRequesterName}
+              recipientCount={approvalState.gate.recipientCount}
+              scheduledLabel={
+                broadcast.scheduledAt ? formatApprovalDateTime(broadcast.scheduledAt) : null
+              }
+              messageSummary={approvalMessageSummary}
+              messageHref="#broadcast-content"
+              onApprove={handleApprovalApprove}
+              onReject={handleApprovalReject}
+              busy={approvalBusy}
+              message={approvalMessage}
+            />
+          ) : null}
+          {canReRequest && approvalState ? (
+            <section aria-label="承認の依頼" className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-semibold">承認を依頼する</p>
+              <p className="text-ink-secondary mt-1 text-xs leading-5">
+                {approvalState.gate.recipientCount.toLocaleString('ja-JP')}人への配信です。
+                承認されるまで送られません。
+              </p>
+              <div className="mt-3">
+                <ApprovalRequestFields
+                  recipientCount={approvalState.gate.recipientCount}
+                  threshold={approvalState.gate.threshold}
+                  candidates={approvalCandidates}
+                  candidatesState={approvalCandidates.length > 0 ? 'ready' : 'loading'}
+                  approverId={reApproverId}
+                  onApproverChange={setReApproverId}
+                  note={reApprovalNote}
+                  onNoteChange={setReApprovalNote}
+                />
+              </div>
+              {approvalMessage ? <p className="text-danger mt-2 text-xs">{approvalMessage}</p> : null}
+              <div className="mt-3">
+                <Button variant="secondary" onClick={handleApprovalRequest} disabled={approvalBusy}>
+                  承認を依頼する
+                </Button>
+              </div>
+            </section>
+          ) : null}
+          <DetailTabs tab={tab} selectTab={selectTab} recipientCount={broadcast.totalCount} />
+          {tab === 'recipients' ? (
+            <BroadcastRecipients broadcastId={broadcast.id} total={broadcast.totalCount} version={broadcast.version ?? 1} />
+          ) : tab === 'activity' ? (
+            <BroadcastActivity broadcastId={broadcast.id} formatDateTime={formatBroadcastDateTime} />
+          ) : (
+          <>
+          {/* ★V7: 予約・下書きも共通の枠の幅いっぱいに広げる。絞ると 1920px で右が大きく空く。 */}
           <section className="bg-canvas rounded-card border-hairline border p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-ink text-sm font-semibold">送信の進み具合</p>
-              <span
-                className={`rounded-pill px-2 py-0.5 text-xs ${
-                  broadcast.status === 'sent'
-                    ? 'bg-success-bg text-success'
-                    : broadcast.status === 'sending'
-                      ? 'bg-warning-bg text-warning'
-                      : 'bg-canvas-sunken text-ink-faint'
-                }`}
-              >
-                {STATUS_LABELS[broadcast.status] ?? broadcast.status}
-              </span>
-            </div>
-            <p className="text-ink mt-2 text-sm tabular-nums">
-              {success.toLocaleString('ja-JP')} / {total.toLocaleString('ja-JP')} 件
-              {broadcast.status === 'sent' ? ' 完了' : ''}
-            </p>
-            <div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full">
-              <div
-                className="bg-accent h-full"
-                style={{ width: total > 0 ? `${(success / total) * 100}%` : '0%' }}
-              />
-            </div>
-            {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
-            <p className="text-ink-faint mt-2 text-xs">
-              {broadcast.sentAt
-                ? `完了 ${new Date(broadcast.sentAt).toLocaleTimeString('ja-JP')}`
-                : '開始・完了の時刻は記録していません'}
-            </p>
+            <p className="text-ink text-sm font-semibold">送信の進み具合</p>
+            {/*
+              Progress（処理の進み部品）は送信中（sending）だけに出す。
+              下書き・予約で preparing の棒や回る印を出すと、まだ送って
+              いないのに送り始めているように見える。そのときは棒も印も
+              出さず、1行の文だけにする。sent は上の分かれ道で SentResult
+              へ行くので、ここに done / partial の分岐は置かない。
+            */}
+            {broadcast.status === 'sending' ? (
+              <>
+                <Progress
+                  state="active"
+                  title="送信中"
+                  percent={total > 0 ? (success / total) * 100 : 0}
+                  countText={`${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件`}
+                  className="mt-3"
+                />
+                {/*
+                  失敗数は `totalCount - successCount` でしか出せない。送信中は
+                  「まだ送っていないぶん」も同じ引き算に入るため、その数を失敗として
+                  出すと、起きていない失敗を作ることになる。完了してから出す。
+                  （下の「到達」の欄と同じ理由。）
+                */}
+                {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
+                <p className="text-ink-faint mt-2 text-xs">
+                  {broadcast.sentAt
+                    ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
+                    : '開始・完了の時刻は記録していません'}
+                </p>
+              </>
+            ) : (
+              <p className="text-ink-secondary mt-2 text-sm">
+                {broadcast.scheduledAt
+                  ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送り始めます`
+                  : 'まだ送っていません'}
+              </p>
+            )}
           </section>
 
           <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -293,21 +648,20 @@ function BroadcastDetailInner() {
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-semibold">この配信の設定</p>
-              <button
-                disabled
-                title="同じ設定での作り直しは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
+              <Link
+                href={`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`}
+                className="border-hairline text-action rounded-control border px-3 py-1 text-xs hover:underline"
               >
                 同じ設定で作り直す
-              </button>
+              </Link>
             </div>
-            {/* 押せない理由は吹き出しだけでなく本文にも置く。触って初めて
-                分かる形にすると、押せないことしか伝わらない。 */}
             <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-              「複製して作る」「同じ設定で作り直す」は、既にある配信を種にして作り直す口がまだないため押せません。作成は空から始まります。
+              複製して作る操作です。題名と本文を引き継いで新規作成を開きます。宛先・予約日時は引き継がないので、送る前に確かめてください。
             </p>
             <dl className="mt-3 space-y-2 text-sm">
-              <Row label="宛先の条件" value={broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込みあり'} />
+              {/* BROADCAST-15: 一覧・作成確認と同じ要約（audienceSummary）を出す。
+                  シナリオ指定を「絞り込みあり」「タグ未指定」とは出さない。 */}
+              <Row label="宛先の条件" value={audienceLabel} />
               <Row
                 label="対象人数"
                 value={`${total.toLocaleString('ja-JP')}人（ブロック中を自動で除外）`}
@@ -317,19 +671,24 @@ function BroadcastDetailInner() {
                 label="送信タイミング"
                 value={
                   broadcast.scheduledAt
-                    ? `${new Date(broadcast.scheduledAt).toLocaleString('ja-JP')} に予約`
+                    ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に予約`
                     : '即時配信'
                 }
               />
               {/* 誰が作ったかを記録していない。 */}
-              <Row label="作成者" value={`記録していません ・ ${new Date(broadcast.createdAt).toLocaleString('ja-JP')} 作成`} />
+              <Row
+                label="作成者"
+                value={broadcast.createdAt
+                  ? `記録していません ・ ${formatBroadcastDateTime(broadcast.createdAt)} 作成`
+                  : '記録していません ・ 作成日時 —'}
+              />
             </dl>
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-semibold">クリックされたリンク</p>
-              <Link href="/inflow-links" className="text-accent text-xs hover:underline">
+              <Link href="/inflow-links" className="text-action text-xs hover:underline">
                 流入経路で見る
               </Link>
             </div>
@@ -345,11 +704,20 @@ function BroadcastDetailInner() {
             className="bg-canvas rounded-card border-hairline scroll-mt-20 border p-5"
           >
             <p className="text-ink text-sm font-semibold">送った内容</p>
-            <p className="text-ink-faint mt-0.5 mb-2 text-xs">実際に届いた形</p>
+            <p className="text-ink-faint mt-0.5 text-xs">実際に届いた形</p>
+            <p className="text-ink-faint mb-2 mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
+            {/*
+              監査 R211: 本文の生出しをやめ、種別ごとの見え方にする。
+              位置情報は見出し・住所・緯度経度、ボタンは1通目の下に出る。
+            */}
             <div className="bg-canvas-sunken rounded-card p-3">
-              <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-                {broadcast.messageContent}
-              </p>
+              <BroadcastMessagePreview
+                bubbles={broadcast.messageBubbles}
+                messageType={broadcast.messageType}
+                messageContent={broadcast.messageContent}
+                buttons={broadcast.messageOptions?.buttons}
+                unsentNote
+              />
             </div>
           </section>
 
@@ -368,15 +736,241 @@ function BroadcastDetailInner() {
             </ul>
           </section>
 
-          <Link
-            href="/broadcasts"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken inline-block border px-4 py-2 text-sm font-medium"
-          >
-            一覧へ戻る
-          </Link>
+          {/*
+            書き出しは概要のタブの中に1つ。宛先のタブの書き出しとは別物
+            （概要の実測値の1行）で、下の追従バーには置かない（#816 C）。
+          */}
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/broadcasts"
+              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken inline-block border px-4 py-2 text-sm font-medium"
+            >
+              一覧へ戻る
+            </Link>
+            <Button variant="secondary" onClick={exportCsv}>
+              CSVで書き出す
+            </Button>
+          </div>
+          </>
+          )}
         </div>
       )}
+      {/*
+        書き出しはタブの中（#816 C）。下の追従バーは出さない。
+        向こうの版にあった下のバーの書き出しは、概要タブの中の
+        1つ（onExportCsv）に引っ越したので、ここでは出さない。
+      */}
+      {approvalStepUp && <StepUpPrompt request={approvalStepUp} onDone={() => setApprovalStepUp(null)} onClose={() => setApprovalStepUp(null)} />}
     </div>
+  )
+}
+
+/**
+ * 「この配信のリンクを押していない人」を宛先にした作成画面のURL。
+ * 宛先は condition 引継ぎ、文面は duplicateFrom で種にする。
+ */
+function chaseHref(broadcastId: string): string {
+  const condition = JSON.stringify({
+    operator: 'AND',
+    rules: [{ type: 'broadcast_link_clicked', value: { broadcastId, clicked: false } }],
+  })
+  return `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcastId)}&condition=${encodeURIComponent(condition)}`
+}
+
+function rateText(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(rate)) return '—'
+  return `${((rate <= 1 ? rate * 100 : rate)).toFixed(1)}%`
+}
+
+function SentResult({
+  broadcast,
+  insight,
+  insightState,
+  contentRef,
+  tab,
+  selectTab,
+  approval,
+  onExportCsv,
+}: {
+  broadcast: ApiBroadcast
+  insight: (BroadcastInsight & { suppressedByAudienceSize: boolean }) | null
+  insightState: 'loading' | 'ready' | 'error'
+  contentRef: { current: HTMLElement | null }
+  tab: 'overview' | 'recipients' | 'activity'
+  selectTab: (next: 'overview' | 'recipients' | 'activity') => void
+  approval: BroadcastApprovalState | null
+  onExportCsv: () => void
+}) {
+  const delivered = insight?.delivered ?? broadcast.successCount
+  const opened = insight?.opens?.count ?? insight?.uniqueImpression ?? null
+  const openRate = insight?.opens?.rate ?? insight?.openRate ?? null
+  const failed = Math.max(0, broadcast.totalCount - broadcast.successCount)
+
+  return (
+    <div className="space-y-4">
+      <DetailStatusRail broadcast={broadcast} approval={approval} />
+      <DetailTabs tab={tab} selectTab={selectTab} recipientCount={broadcast.totalCount} />
+      {tab === 'recipients' ? (
+        <BroadcastRecipients broadcastId={broadcast.id} total={broadcast.totalCount} version={broadcast.version ?? 1} />
+      ) : tab === 'activity' ? (
+        <BroadcastActivity broadcastId={broadcast.id} formatDateTime={formatBroadcastDateTime} />
+      ) : (
+      <>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="space-y-4 xl:col-span-2">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">配信結果</h2>
+            <p className="text-ink-faint mt-1 text-xs">送信・開封・クリック・ブロックを確認します。</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="border-hairline rounded-control border p-3">
+                <p className="text-ink-faint text-xs font-semibold">送信成功</p>
+                <p className="text-ink mt-2 text-sm font-bold">{broadcast.totalCount > 0 ? rateText(delivered / broadcast.totalCount) : '—'}</p>
+                <p className="text-ink mt-1 text-lg font-bold">{delivered.toLocaleString('ja-JP')}人</p>
+                <p className="text-ink-faint text-xs">届いた人</p>
+              </div>
+              <div className="border-hairline rounded-control border p-3">
+                <p className="text-ink-faint text-xs font-semibold">開封</p>
+                <p className="text-ink mt-2 text-sm font-bold">{insightState === 'loading' ? '読込中' : rateText(openRate)}</p>
+                <p className="text-ink mt-1 text-lg font-bold">{opened == null ? '—' : `${opened.toLocaleString('ja-JP')}人`}</p>
+                <p className="text-ink-faint text-xs">開いた人</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">反応</h2>
+            <p className="text-ink-faint mt-1 text-xs">ボタンとリンクごとの結果です。</p>
+            {insight?.links?.length ? (
+              <div className="mt-3 space-y-2">
+                {insight.links.map((link) => (
+                  <div key={link.id} className="bg-canvas-sunken rounded-control flex items-center justify-between gap-4 p-3">
+                    <div className="min-w-0"><p className="text-ink truncate text-sm font-bold" title={link.label}>{link.label}</p><p className="text-ink-faint truncate text-xs" title={link.url}>{link.url}</p></div>
+                    <p className="text-ink-secondary shrink-0 text-xs">クリック {link.uniqueClickCount.toLocaleString('ja-JP')}人（{rateText(link.clickRate)}）</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-ink-faint bg-canvas-sunken mt-3 rounded-control p-3 text-xs">計測したボタン・リンクはありません。</p>
+            )}
+            {/*
+              追いかけ配信。この配信を受け取って計測リンクを押さなかった人を
+              宛先にした作成画面を開く。文面は同じものを種にして作り直すので、
+              追送らしい文面への書き換えは運用者が行う。
+              計測リンクが無い配信では「押していない人」が全員になるので出さない。
+            */}
+            {insight?.links?.length ? (
+              <div className="border-hairline mt-3 rounded-control border p-3">
+                <p className="text-ink text-sm font-bold">リンクを押していない人へ追送</p>
+                <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                  届いたのにリンクを押していない人だけを宛先にして、同じ文面で作り直します。対象は作成画面で人数を確かめてから送ってください。
+                </p>
+                <div className="mt-2">
+                  <Link
+                    href={chaseHref(broadcast.id)}
+                    className="text-action text-xs font-semibold hover:underline"
+                  >
+                    追送する配信を作る →
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+            <div className="bg-canvas-sunken mt-3 rounded-control p-3">
+              <p className="text-ink text-sm font-bold">エラー</p>
+              <p className="text-ink-faint mt-1 text-xs">送信失敗 {failed.toLocaleString('ja-JP')}人</p>
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-4">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">配信した設定</h2>
+            <p className="text-ink-faint mt-1 text-xs">この配信で使った対象と送信方法です。</p>
+            <dl className="mt-4 space-y-3 text-sm">
+              <Row label="配信済み" value={`${delivered.toLocaleString('ja-JP')}人`} />
+              <Row label="開封率" value={rateText(openRate)} />
+              <Row label="クリック率" value={rateText(insight?.clickRate)} />
+            </dl>
+          </section>
+
+          <section ref={contentRef} id="broadcast-content" className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">メッセージプレビュー</h2>
+            <p className="text-ink-faint mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
+            <div className="bg-info mt-3 min-h-48 rounded-card p-4">
+              <BroadcastMessagePreview
+                bubbles={broadcast.messageBubbles}
+                messageType={broadcast.messageType}
+                messageContent={broadcast.messageContent}
+                buttons={broadcast.messageOptions?.buttons}
+              />
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {insightState === 'error' && <p role="alert" className="text-danger text-xs">開封・クリックを読み込めませんでした。</p>}
+      {/*
+        書き出しは概要のタブの中に1つ。宛先のタブの書き出しとは別物
+        （概要の実測値の1行）で、下の追従バーには置かない（#816 C）。
+      */}
+      <div>
+        <Button variant="secondary" onClick={onExportCsv}>
+          CSVで書き出す
+        </Button>
+      </div>
+      </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 10の状態が無い古い応答の読み替え（#816）。
+ * 新しい口は displayStatus を返すので、ここは予備。
+ */
+function fallbackDisplayStatus(broadcast: ApiBroadcast): BroadcastDisplayStatus {
+  if (broadcast.approvalStatus === 'pending') return 'pending_approval'
+  if (broadcast.approvalStatus === 'expired') return 'expired'
+  if (broadcast.stopped) return 'stopped'
+  if (broadcast.status === 'sending') return 'sending'
+  if (broadcast.status === 'scheduled') return 'scheduled'
+  if (broadcast.status === 'sent') return 'sent'
+  return 'draft'
+}
+
+function DetailStatusRail({ broadcast, approval }: { broadcast: ApiBroadcast; approval: BroadcastApprovalState | null }) {
+  const displayStatus = broadcast.displayStatus ?? fallbackDisplayStatus(broadcast)
+  return (
+    <BroadcastStatusRail
+      displayStatus={displayStatus}
+      approvalInvolved={isApprovalInvolved(broadcast.approvalStatus, approval)}
+      scheduled={broadcast.status === 'scheduled' || broadcast.scheduledAt != null}
+      ledger={broadcast.ledger ?? null}
+      total={broadcast.totalCount}
+      formatDateTime={formatBroadcastDateTime}
+      scheduledAt={broadcast.scheduledAt}
+    />
+  )
+}
+
+function DetailTabs({
+  tab,
+  selectTab,
+  recipientCount,
+}: {
+  tab: 'overview' | 'recipients' | 'activity'
+  selectTab: (next: 'overview' | 'recipients' | 'activity') => void
+  recipientCount: number
+}) {
+  return (
+    <Tabs
+      label="配信の詳細"
+      items={[
+        { label: '概要', current: tab === 'overview', onClick: () => selectTab('overview') },
+        { label: '宛先', count: recipientCount, current: tab === 'recipients', onClick: () => selectTab('recipients') },
+        { label: '記録', current: tab === 'activity', onClick: () => selectTab('activity') },
+      ]}
+    />
   )
 }
 
@@ -413,7 +1007,6 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function BroadcastDetailPage() {
-  usePageTitle('配信の詳細')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

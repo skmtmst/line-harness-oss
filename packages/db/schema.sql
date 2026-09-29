@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS friend_scenarios (
 );
 
 CREATE INDEX IF NOT EXISTS idx_friend_scenarios_next_delivery_at ON friend_scenarios (next_delivery_at);
+CREATE INDEX IF NOT EXISTS idx_friend_scenarios_due_delivery ON friend_scenarios (next_delivery_at, id) WHERE status = 'active' AND next_delivery_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_friend_scenarios_status ON friend_scenarios (status);
 CREATE INDEX IF NOT EXISTS idx_friend_scenarios_friend_id ON friend_scenarios (friend_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_friend_scenarios_unique ON friend_scenarios (friend_id, scenario_id) WHERE status != 'completed';
@@ -209,13 +210,17 @@ CREATE TABLE IF NOT EXISTS messages_log (
   source           TEXT,
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
+  line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_log_broadcast_id ON messages_log(broadcast_id);
+CREATE INDEX IF NOT EXISTS idx_messages_log_broadcast_friend_direction
+  ON messages_log (broadcast_id, friend_id, direction);
 
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_id ON messages_log (friend_id);
 CREATE INDEX IF NOT EXISTS idx_messages_log_created_at ON messages_log (created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_log_line_event_at ON messages_log (line_event_at);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_source ON messages_log (friend_id, source);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_direction_created ON messages_log (friend_id, direction, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
@@ -341,13 +346,21 @@ CREATE TABLE IF NOT EXISTS line_accounts (
   -- 172: AES-GCM encrypted values. Legacy plaintext columns remain during migration.
   channel_access_token_encrypted TEXT,
   channel_secret_encrypted       TEXT,
+  channel_access_token_updated_at TEXT,
+  channel_secret_updated_at       TEXT,
+  login_channel_secret_updated_at TEXT,
   is_active              INTEGER NOT NULL DEFAULT 1,
+  is_default             INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+  archived_at            TEXT,
+  archived_by            TEXT,
+  archived_reason        TEXT,
   country                TEXT,
   role                   TEXT,
   display_order          INTEGER NOT NULL DEFAULT 0,
   og_site_name           TEXT,
   og_default_image_url   TEXT,
   og_default_description TEXT,
+  official_profile_url   TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -363,7 +376,10 @@ CREATE TABLE IF NOT EXISTS conversion_points (
   name       TEXT NOT NULL,
   event_type TEXT NOT NULL,
   value      REAL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  status     TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'stopped')),
+  stopped_at TEXT,
+  updated_at TEXT
 );
 
 -- ============================================================
@@ -380,6 +396,10 @@ CREATE TABLE IF NOT EXISTS conversion_events (
   attributed_ref_code  TEXT,
   approval_status      TEXT CHECK (approval_status IN ('pending','approved','rejected')),
   approved_at          TEXT,
+  point_name_snapshot  TEXT,
+  event_type_snapshot  TEXT,
+  value_snapshot       REAL,
+  idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -387,6 +407,28 @@ CREATE INDEX IF NOT EXISTS idx_conversion_events_point ON conversion_events (con
 CREATE INDEX IF NOT EXISTS idx_conversion_events_friend ON conversion_events (friend_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_events_affiliate ON conversion_events (affiliate_code);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversion_events_point_idempotency
+  ON conversion_events(conversion_point_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+CREATE TABLE IF NOT EXISTS conversion_event_dedup_claims (
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  friend_id           TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  mode                TEXT NOT NULL CHECK (mode IN ('lifetime', 'window')),
+  window_days         INTEGER CHECK (window_days IS NULL OR window_days BETWEEN 1 AND 365),
+  last_event_id       TEXT NOT NULL,
+  last_at             TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  PRIMARY KEY (conversion_point_id, friend_id),
+  CHECK ((mode = 'lifetime' AND window_days IS NULL)
+      OR (mode = 'window' AND window_days IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_conversion_event_dedup_claims_event
+  ON conversion_event_dedup_claims(last_event_id);
+CREATE INDEX IF NOT EXISTS idx_conversion_points_status ON conversion_points(status, created_at DESC);
+
+CREATE TRIGGER IF NOT EXISTS conversion_points_prevent_delete
+BEFORE DELETE ON conversion_points
+BEGIN SELECT RAISE(ABORT, 'conversion_points must be stopped, not deleted'); END;
 
 -- ============================================================
 -- Round 2: Affiliates
@@ -497,6 +539,7 @@ CREATE TABLE IF NOT EXISTS mileage_rules (
   initial_status TEXT NOT NULL DEFAULT 'available'
                  CHECK (initial_status IN ('pending','available')),
   conditions     TEXT CHECK (conditions IS NULL OR json_valid(conditions)),
+  line_account_id TEXT REFERENCES line_accounts(id),
   is_active      INTEGER NOT NULL DEFAULT 1,
   valid_from     TEXT,
   valid_until    TEXT,

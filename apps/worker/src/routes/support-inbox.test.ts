@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { extractContactFormReceipt, paginateSupportInboxItems } from './support-inbox.js';
 
@@ -11,9 +12,9 @@ describe('extractContactFormReceipt', () => {
   it('extracts the customer and only the submitted inquiry from the legacy receipt', () => {
     const result = extractContactFormReceipt(`※本メールは自動配信メールです。
 
-坂本 真人 様
+山田 太郎 様
 
-お名前：坂本 真人 (サカモト マサト) 様
+お名前：山田 太郎 (ヤマダ タロウ) 様
 メールアドレス：customer@example.com
 お問い合わせ内容：
 
@@ -22,7 +23,7 @@ ECサイトのお問い合わせフォームから送信しています。`);
 
     expect(result).toEqual({
       customerEmail: 'customer@example.com',
-      customerName: '坂本 真人',
+      customerName: '山田 太郎',
       inquiry: 'フォーム統合テスト\nECサイトのお問い合わせフォームから送信しています。',
     });
   });
@@ -39,5 +40,13 @@ ECサイトのお問い合わせフォームから送信しています。`);
 本メールは自動配信のため返信できません。`);
 
     expect(result.inquiry).toBe('商品の保存方法を教えてください。');
+  });
+});
+
+describe('support inbox assignee contract', () => {
+  it('担当者は顧客usersではなく有効なstaff_membersで確認する', () => {
+    const source = readFileSync(new URL('./support-inbox.ts', import.meta.url), 'utf8');
+    expect(source).toContain('SELECT 1 FROM staff_members WHERE id = ? AND is_active = 1');
+    expect(source).not.toContain('SELECT 1 FROM users WHERE id = ?');
   });
 });

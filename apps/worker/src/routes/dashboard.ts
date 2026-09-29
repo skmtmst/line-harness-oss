@@ -1,15 +1,23 @@
 import { Hono } from 'hono';
 import {
+  DASHBOARD_CARD_GROUPS as SHARED_DASHBOARD_CARD_GROUPS,
+  DASHBOARD_TODAY_VISIBLE_LIMIT,
+} from '@line-crm/shared';
+import {
   getDashboardOverview,
   getDashboardDefaultPreference,
   getDashboardPreference,
+  getDashboardUpcoming,
+  getDeliveryFailureOrigins,
   getListStats,
   getLineAccountById,
+  getLineAccountsByIds,
   deleteDashboardPreference,
   saveDashboardDefaultPreference,
   saveDashboardPreference,
+  dashboardFreshness,
+  summarizeDashboardFreshness,
   type DashboardPeriod,
-  type DashboardOverview,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -28,18 +36,26 @@ export const dashboard = new Hono<Env>();
 
 const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28'];
 
+/*
+ * 概要応答の中で送信枠の取得に使える時間（DASH-14）。
+ * LINE 側の応答が遅いときでも、DBで集計済みの友だち数・受信などを
+ * 待たせ続けないための上限。超えたら枠だけを失敗として返す。
+ */
+const QUOTA_OVERVIEW_BUDGET_MS = 3_500;
+
 function readPeriod(raw: string | undefined): DashboardPeriod {
   return PERIODS.includes(raw as DashboardPeriod) ? (raw as DashboardPeriod) : 'today';
 }
 
+/*
+ * 許可するカードIDは @line-crm/shared の DASHBOARD_CARD_GROUPS が正本。
+ * 画面のカード定義とここが別々だと、画面が必ず送るIDをAPIが拒否して
+ * 保存できなくなる（DASH-01: support-mark-status の抜けで全保存が400）。
+ */
 const DASHBOARD_CARD_GROUPS = {
-  today: new Set(['today-inbox', 'today-photo-review', 'today-bookings', 'today-shipments']),
-  main: new Set(['shipment', 'pending-inbox', 'friend-trend', 'friend-add', 'scenario-status', 'uid-migration']),
-  right: new Set([
-    'send-quota', 'operational-alerts', 'connection-status', 'friend-status', 'upcoming',
-    'monthly-delivery', 'recent-results', 'booking-status', 'inflow-top', 'funnel-alert',
-    'automation-failures',
-  ]),
+  today: new Set<string>(SHARED_DASHBOARD_CARD_GROUPS.today),
+  main: new Set<string>(SHARED_DASHBOARD_CARD_GROUPS.main),
+  right: new Set<string>(SHARED_DASHBOARD_CARD_GROUPS.right),
 } as const;
 
 type DashboardCards = Record<keyof typeof DASHBOARD_CARD_GROUPS, Array<{ id: string; visible: boolean }>>;
@@ -60,12 +76,18 @@ function readDashboardCards(value: unknown): DashboardCards | null {
     for (const candidate of input) {
       if (!candidate || typeof candidate !== 'object') return null;
       const item = candidate as { id?: unknown; visible?: unknown };
-      if (typeof item.id !== 'string' || !DASHBOARD_CARD_GROUPS[group].has(item.id)) return null;
+      if (typeof item.id !== 'string' || item.id.length === 0) return null;
       if (typeof item.visible !== 'boolean' || seen.has(item.id)) return null;
       seen.add(item.id);
-      items.push({ id: item.id, visible: item.visible });
+      /*
+       * 機能OFF・廃止で候補から外れたIDが残っていても保存全体を400に
+       * しない。未知IDは visible=false で保持し、表示には使わない。
+       * 並びは残るため、機能が戻ったときに配置が復活する。
+       */
+      const known = DASHBOARD_CARD_GROUPS[group].has(item.id);
+      items.push({ id: item.id, visible: known && item.visible });
     }
-    if (group === 'today' && items.filter((item) => item.visible).length > 4) return null;
+    if (group === 'today' && items.filter((item) => item.visible).length > DASHBOARD_TODAY_VISIBLE_LIMIT) return null;
     out[group] = items;
   }
   return out;
@@ -96,32 +118,76 @@ async function requireVisibleAccount(c: {
  * 取れなくても画面は出したいので、失敗は null にして握りつぶす。
  * ここで落とすと、LINE 側の一時的な不調で管理画面全体が開かなくなる。
  */
+/**
+ * 同時実行数を抑えて順に回す。
+ *
+ * organization-overview は可視アカウント全件の LINE 枠を取る。無制限の
+ * `Promise.all` で投げると、アカウントが増えたときに遅延し、LINE 側の
+ * 429・タイムアウトの巻き添えで全体が遅くなる。5件ずつに区切る。
+ */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  task: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(limit, 1), items.length) },
+    async () => {
+      while (next < items.length) {
+        const index = next;
+        next += 1;
+        results[index] = await task(items[index]);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+interface QuotaResult {
+  limit: number | null;
+  used: number | null;
+  /** LINE 側が type=none を返した「上限なし」の契約。limit=null と取得失敗を分ける（DASH-08）。 */
+  unlimited: boolean;
+  failed: boolean;
+  reason: 'not_connected' | 'fetch_failed' | null;
+  asOf: string | null;
+}
+
 async function fetchQuota(
   token: string | undefined,
-): Promise<{ limit: number | null; used: number | null; failed: boolean }> {
-  if (!token) return { limit: null, used: null, failed: false };
+  timeoutMs = 10_000,
+): Promise<QuotaResult> {
+  if (!token) {
+    return { limit: null, used: null, unlimited: false, failed: false, reason: 'not_connected', asOf: null };
+  }
   try {
     const [quota, consumption] = await Promise.all([
       fetch('https://api.line.me/v2/bot/message/quota', {
         headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(timeoutMs),
       }),
       fetch('https://api.line.me/v2/bot/message/quota/consumption', {
         headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(timeoutMs),
       }),
     ]);
-    if (!quota.ok || !consumption.ok) return { limit: null, used: null, failed: true };
+    if (!quota.ok || !consumption.ok) {
+      return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
+    }
     // type が 'none' のときは上限なし。数字が入らないので null のままにする。
     const q = (await quota.json()) as { type?: string; value?: number };
     const c = (await consumption.json()) as { totalUsage?: number };
-    return {
-      limit: q.type === 'limited' && typeof q.value === 'number' ? q.value : null,
-      used: typeof c.totalUsage === 'number' ? c.totalUsage : null,
-      failed: false,
-    };
+    const limit = q.type === 'limited' && typeof q.value === 'number' ? q.value : null;
+    const used = typeof c.totalUsage === 'number' ? c.totalUsage : null;
+    if ((q.type !== 'limited' && q.type !== 'none') || used === null || (q.type === 'limited' && limit === null)) {
+      return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
+    }
+    return { limit, used, unlimited: q.type === 'none', failed: false, reason: null, asOf: new Date().toISOString() };
   } catch {
-    return { limit: null, used: null, failed: true };
+    return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
   }
 }
 
@@ -137,13 +203,61 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     }
 
     const statsScope = { allowedAccountIds: [accountId], includeUnassigned: false };
-    const overview: DashboardOverview = await getDashboardOverview(c.env.DB, period, statsScope);
+    /*
+     * 受信箱の数だけは、受信箱の一覧と同じ範囲で数える。MAIL は LINE
+     * アカウントを持たないため、未割り当てが見える担当者の範囲では MAIL も
+     * 合わせる（受信箱の「すべて」と同じ条件）。見えない範囲では LINE だけ。
+     */
+    const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const inboxScope = {
+      allowedAccountIds: [accountId],
+      includeUnassigned: visibleScope.canSeeUnassigned,
+    };
     const quotaToken = selectedAccount.channel_access_token;
-    const quota = await fetchQuota(quotaToken);
+    /*
+     * LINE の送信枠は外部APIなので、DB集計と並行して始め、待つ時間に上限を
+     * 置く（DASH-14）。枠の応答が遅い・止まっているときに概要全体が
+     * 返らなくなるのを防ぐ。上限を超えたら枠だけ失敗として返し、
+     * 友だち数などの成功分は使える状態にする。
+     */
+    const [overview, quota] = await Promise.all([
+      getDashboardOverview(c.env.DB, period, statsScope, inboxScope),
+      fetchQuota(quotaToken, QUOTA_OVERVIEW_BUDGET_MS),
+    ]);
     if (quota.failed) {
       overview.partialFailures.push('quota');
     }
-    overview.sections.quota.status = quota.failed ? 'unavailable' : 'ok';
+    const quotaAvailable = quota.reason === null;
+    overview.sections.quota.status = quotaAvailable ? 'ok' : 'unavailable';
+    overview.sections.quota.asOf = quota.asOf;
+    overview.sections.quota.freshness = dashboardFreshness(quota.asOf, {
+      failedSources: quotaAvailable ? 0 : 1,
+      totalSources: 1,
+    });
+    overview.sections.quota.reason = quota.reason;
+    overview.metrics.monthlyQuota = {
+      value: quotaAvailable ? {
+        used: quota.used,
+        limit: quota.limit,
+        remaining: quota.limit === null || quota.used === null
+          ? null
+          : Math.max(quota.limit - quota.used, 0),
+        unlimited: quota.unlimited,
+      } : null,
+      state: quotaAvailable ? 'available' : 'unavailable',
+      reason: quota.reason,
+      asOf: quota.asOf,
+      period: 'this-month',
+    };
+    const officialProfileUrl = selectedAccount.official_profile_url?.trim() || null;
+    overview.metrics.officialProfileUrl = {
+      value: officialProfileUrl,
+      state: officialProfileUrl ? 'available' : 'unavailable',
+      reason: officialProfileUrl ? null : 'not_connected',
+      asOf: officialProfileUrl ? selectedAccount.updated_at : null,
+      period: 'latest',
+    };
+    Object.assign(overview, summarizeDashboardFreshness(overview.sections));
 
     return c.json({
       success: true as const,
@@ -166,23 +280,81 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
     const overview = await getDashboardOverview(c.env.DB, period, {
       allowedAccountIds: visibleScope.allowedAccountIds,
       includeUnassigned: false,
+    }, {
+      allowedAccountIds: visibleScope.allowedAccountIds,
+      includeUnassigned: visibleScope.canSeeUnassigned,
     });
-    const quotas = await Promise.all(visibleScope.accounts.map((account) => fetchQuota(account.channel_access_token)));
-    const quotaFailed = quotas.some((quota) => quota.failed);
-    if (quotaFailed) {
+    const credentialAccounts = await getLineAccountsByIds(
+      c.env.DB,
+      visibleScope.allowedAccountIds,
+      c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    );
+    const quotas = await mapWithConcurrency(
+      credentialAccounts,
+      5,
+      (account) => fetchQuota(account.channel_access_token),
+    );
+    const successfulQuotas = quotas.filter((quota) => quota.reason === null);
+    const failedQuotaCount = quotas.length - successfulQuotas.length;
+    if (failedQuotaCount > 0) {
       overview.partialFailures.push('quota');
     }
-    overview.sections.quota.status = quotaFailed ? 'unavailable' : 'ok';
+    const quotaStatus = quotas.length === 0 || successfulQuotas.length === 0
+      ? 'unavailable'
+      : failedQuotaCount > 0 ? 'partial' : 'ok';
+    const successfulAsOf = successfulQuotas
+      .map((quota) => quota.asOf)
+      .filter((value): value is string => value !== null)
+      .sort((left, right) => Date.parse(left) - Date.parse(right))[0] ?? null;
+    overview.sections.quota.status = quotaStatus;
+    overview.sections.quota.asOf = successfulAsOf;
+    overview.sections.quota.freshness = dashboardFreshness(successfulAsOf, {
+      failedSources: quotas.length === 0 ? 1 : failedQuotaCount,
+      totalSources: Math.max(quotas.length, 1),
+    });
+    overview.sections.quota.reason = quotaStatus === 'ok'
+      ? null
+      : quotas.some((quota) => quota.reason === 'fetch_failed') ? 'fetch_failed' : 'not_connected';
     const everyLimitKnown = quotas.length > 0 && quotas.every((quota) => quota.limit !== null);
     const everyUsageKnown = quotas.length > 0 && quotas.every((quota) => quota.used !== null);
+    const quotaLimit = quotaStatus === 'ok' && everyLimitKnown
+      ? quotas.reduce((sum, quota) => sum + (quota.limit ?? 0), 0)
+      : null;
+    const quotaUsed = quotaStatus === 'ok' && everyUsageKnown
+      ? quotas.reduce((sum, quota) => sum + (quota.used ?? 0), 0)
+      : null;
+    // quotaStatus が ok のとき successfulQuotas は空でない。「全て上限なし」のときだけ立つ。
+    const everyQuotaUnlimited = successfulQuotas.every((quota) => quota.unlimited);
+    overview.metrics.monthlyQuota = {
+      value: quotaStatus === 'ok' ? {
+        used: quotaUsed,
+        limit: quotaLimit,
+        remaining: quotaLimit === null || quotaUsed === null ? null : Math.max(quotaLimit - quotaUsed, 0),
+        unlimited: everyQuotaUnlimited,
+      } : null,
+      state: quotaStatus === 'ok' ? 'available' : quotaStatus,
+      reason: quotaStatus !== 'ok'
+        ? (quotas.some((quota) => quota.reason === 'fetch_failed') ? 'fetch_failed' : 'not_connected')
+        : null,
+      asOf: successfulAsOf,
+      period: 'this-month',
+    };
+    overview.metrics.officialProfileUrl = {
+      value: null,
+      state: 'unavailable',
+      reason: 'not_applicable',
+      asOf: null,
+      period: 'latest',
+    };
+    Object.assign(overview, summarizeDashboardFreshness(overview.sections));
     return c.json({
       success: true as const,
       data: {
         ...overview,
         delivery: {
           ...overview.delivery,
-          quotaLimit: everyLimitKnown ? quotas.reduce((sum, quota) => sum + (quota.limit ?? 0), 0) : null,
-          quotaUsed: everyUsageKnown ? quotas.reduce((sum, quota) => sum + (quota.used ?? 0), 0) : null,
+          quotaLimit,
+          quotaUsed,
         },
       },
     });
@@ -272,6 +444,61 @@ dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), async 
   } catch (err) {
     console.error('PUT /api/dashboard/preferences/default error:', err);
     return c.json({ success: false as const, error: '会社の既定配置を保存できませんでした' }, 500);
+  }
+});
+
+/**
+ * M (今後の予定): 06予約配信・07リマインダ・27予約を7日分だけ束ねる。
+ *
+ * 新しい表は作らず、読むだけ。各機能の画面へのつなぎは一覧へのリンクに
+ * 留める。`days` は1〜31に収める(収まらない値は1〜31へ丸める)。
+ */
+dashboard.get('/api/dashboard/upcoming', async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const rawDays = Number(c.req.query('days') ?? 7);
+    const days = Number.isFinite(rawDays) ? Math.min(Math.max(Math.floor(rawDays), 1), 31) : 7;
+    const data = await getDashboardUpcoming(c.env.DB, {
+      lineAccountId: access.accountId,
+      now: new Date().toISOString(),
+      days,
+    });
+    return c.json({ success: true as const, data });
+  } catch (err) {
+    console.error('GET /api/dashboard/upcoming error:', err);
+    return c.json({ success: false as const, error: '今後の予定を取得できませんでした' }, 500);
+  }
+});
+
+/** 日本時間の今日 0:00。失敗の「今日ぶん」の既定の境目。 */
+function jstDayStart(now: Date): string {
+  return `${new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10)}T00:00:00+09:00`;
+}
+
+/**
+ * L (#824 数字の出どころ): 失敗の数を通知の送達台帳から出どころ別に数える。
+ *
+ * 同じ失敗は通知1件として数え、送り直しは数えない。件数は台帳の件数と
+ * 一致する。カードの「i」はこの応答の出どころと時点を見せる。
+ */
+dashboard.get('/api/dashboard/delivery-failure-origins', async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const rawSince = c.req.query('since');
+    const since = rawSince ?? jstDayStart(new Date());
+    if (!Number.isFinite(Date.parse(since))) {
+      return c.json({ success: false as const, error: '日時の指定が正しくありません' }, 400);
+    }
+    const data = await getDeliveryFailureOrigins(c.env.DB, {
+      lineAccountId: access.accountId,
+      since,
+    });
+    return c.json({ success: true as const, data });
+  } catch (err) {
+    console.error('GET /api/dashboard/delivery-failure-origins error:', err);
+    return c.json({ success: false as const, error: '失敗の出どころを取得できませんでした' }, 500);
   }
 });
 

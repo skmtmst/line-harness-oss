@@ -7,8 +7,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // without a real D1 binding.
 const dbMocks = {
   // eager module-load deps (mirror affiliate-links-redirect.test.ts)
-  getLineAccounts: vi.fn().mockResolvedValue([
-    { id: 'account-main', login_channel_id: '2000000000' },
+  listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active' },
   ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
@@ -28,11 +28,25 @@ const dbMocks = {
   getMileageHistoryForFriend: vi.fn(),
   getMileageSelfInsights: vi.fn(),
   getMileageEarningOpportunitiesForFriend: vi.fn(),
+  listMileageRewards: vi.fn(),
+  getMileageRewardRedemptionCounts: vi.fn(),
+  reserveMileageRewardRedemption: vi.fn(),
+  encryptCredential: vi.fn(),
+  getAffiliateBankProfile: vi.fn(),
+  saveAffiliateBankProfile: vi.fn(),
+  listAffiliateStatementsForSelf: vi.fn(),
+  getAffiliateStatementDownload: vi.fn(),
+  MileageRewardError: class MileageRewardError extends Error {
+    constructor(public code: string, message: string, public status = 400) { super(message); }
+  },
   generateRefSlug: vi.fn(() => 'slug00'),
   // account-settings helpers (used by resolveLinkBaseUrl via @line-crm/db)
   getLinkBaseUrl: vi.fn().mockResolvedValue(null),
 };
 vi.mock('@line-crm/db', () => dbMocks);
+
+const deliveryMocks = { deliverMileageReward: vi.fn() };
+vi.mock('../services/mileage-reward-delivery.js', () => deliveryMocks);
 
 // Import after the mock so index.ts binds the mocked helpers.
 const worker = (await import('../index.js')).default;
@@ -44,12 +58,15 @@ const DB = {} as D1Database;
 // account login channels), so tokens minted by any other channel are rejected.
 const LOGIN_CHANNEL_ID = '2000000000';
 
+const imagesGet = vi.fn();
 const env = {
   DB,
   LIFF_URL: 'https://liff.line.me/1000000000-DefaultAA',
   WORKER_URL: 'https://worker.example.com',
   LINE_LOGIN_CHANNEL_ID: LOGIN_CHANNEL_ID,
   LINE_CHANNEL_SECRET: 'wallet-link-secret',
+  LINE_CREDENTIAL_ENCRYPTION_KEY: 'test-encryption-key',
+  IMAGES: { get: imagesGet },
 } as unknown as import('../index.js').Env['Bindings'];
 
 function call(path: string, init?: RequestInit) {
@@ -109,9 +126,9 @@ let linksByAffiliate: Map<string, LinkRow[]>;
 let statsByAffiliate: Map<string, Map<string, { friendAdds: number; conversions: number; conversionsPending: number; conversionsApproved: number }>>;
 let slugCounter: number;
 
-const FRIENDS: Record<string, { id: string; display_name: string; user_id: string }> = {
-  'U-alice': { id: 'friend-alice', display_name: 'Alice', user_id: 'user-alice' },
-  'U-bob': { id: 'friend-bob', display_name: 'Bob', user_id: 'user-bob' },
+const FRIENDS: Record<string, { id: string; display_name: string; user_id: string; line_account_id: string }> = {
+  'U-alice': { id: 'friend-alice', display_name: 'Alice', user_id: 'user-alice', line_account_id: 'account-main' },
+  'U-bob': { id: 'friend-bob', display_name: 'Bob', user_id: 'user-bob', line_account_id: 'account-main' },
 };
 
 function installStore() {
@@ -185,8 +202,9 @@ function installStore() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
-  dbMocks.getLineAccounts.mockResolvedValue([
-    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID },
+  imagesGet.mockReset();
+  dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
+    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID, tenant_status: 'active' },
   ]);
   // No offers by default → serializeLink emits offerId/offerName = null.
   dbMocks.listAffiliateOffers.mockResolvedValue([]);
@@ -219,6 +237,33 @@ beforeEach(() => {
       url: 'https://liff.line.me/123/?page=webinar&slug=ai',
     },
   ]);
+  dbMocks.listMileageRewards.mockResolvedValue([]);
+  dbMocks.getMileageRewardRedemptionCounts.mockResolvedValue({
+    beneficiaryKey: 'user:user-alice',
+    byRewardId: new Map(),
+    byVersionId: new Map(),
+  });
+  dbMocks.reserveMileageRewardRedemption.mockResolvedValue({
+    kind: 'created',
+    redemption: { id: 'redemption-1' },
+  });
+  dbMocks.encryptCredential.mockResolvedValue('encrypted-account-number');
+  dbMocks.getAffiliateBankProfile.mockResolvedValue(null);
+  dbMocks.saveAffiliateBankProfile.mockResolvedValue({
+    kind: 'created',
+    profile: {
+      affiliateId: 'aff-friend-alice', lineAccountId: 'account-main',
+      bankCode: '0001', bankName: 'テスト銀行', branchCode: '001', branchName: '本店',
+      accountType: 'ordinary', accountLast4: '4567', accountHolderName: 'ALICE',
+      version: 1, updatedAt: '2026-09-07T00:00:00.000Z',
+    },
+  });
+  dbMocks.listAffiliateStatementsForSelf.mockResolvedValue([]);
+  dbMocks.getAffiliateStatementDownload.mockResolvedValue(null);
+  deliveryMocks.deliverMileageReward.mockResolvedValue({
+    status: 'succeeded',
+    message: '交換しました',
+  });
   installLineFetchMock();
   installStore();
 });
@@ -311,6 +356,66 @@ describe('GET /api/liff/mileage/me — generic wallet', () => {
     const body = (await res.json()) as { opportunities: Array<{ url: string }> };
     const missionUrl = new URL(body.opportunities[0].url);
     expect(missionUrl.searchParams.get('crossAccountToken')).toMatch(/^v1\./u);
+  });
+});
+
+describe('LIFF mileage rewards — verified account and real limits', () => {
+  it('rejects a legacy fallback friend from a different LINE account', async () => {
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValueOnce({
+      ...FRIENDS['U-alice'],
+      line_account_id: 'account-other',
+    });
+
+    const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
+
+    expect(response.status).toBe(404);
+    expect(dbMocks.listMileageRewards).not.toHaveBeenCalled();
+  });
+
+  it('does not say redeemable after the per-person limit is reached', async () => {
+    dbMocks.listMileageRewards.mockResolvedValueOnce([{
+      id: 'reward-1',
+      rewardKind: 'coupon',
+      availableCodeCount: 2,
+      currentVersion: {
+        id: 'reward-version-1', requiredMiles: 300, perFriendLimit: 1, stockLimit: 10,
+      },
+    }]);
+    dbMocks.getMileageRewardRedemptionCounts.mockResolvedValueOnce({
+      beneficiaryKey: 'user:user-alice',
+      byRewardId: new Map([['reward-1', 1]]),
+      byVersionId: new Map([['reward-version-1', 1]]),
+    });
+
+    const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
+    expect(response.status).toBe(200);
+    const body = await response.json() as { rewards: Array<{ canRedeem: boolean; unavailableReason: string }> };
+    expect(body.rewards[0]).toMatchObject({
+      canRedeem: false,
+      unavailableReason: 'この使い道の交換上限に達しています',
+    });
+  });
+
+  it('requires idempotency and reserves only for the friend resolved from LINE', async () => {
+    const missing = await call('/api/liff/mileage/rewards/reward-1/redeem', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(missing.status).toBe(400);
+
+    const response = await call('/api/liff/mileage/rewards/reward-1/redeem', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbdb93' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.reserveMileageRewardRedemption).toHaveBeenCalledWith(DB, expect.objectContaining({
+      lineAccountId: 'account-main',
+      friendId: 'friend-alice',
+      rewardId: 'reward-1',
+      idempotencyKey: '018f6c6e-7b37-4a2f-8a71-1e1224dbdb93',
+    }));
   });
 });
 
@@ -469,8 +574,12 @@ describe('LINE token verification', () => {
     // Env default channel does NOT match; a DB line_account's login_channel_id
     // does. Mirrors liff.ts allowing multi-account login channels.
     installLineFetchMock('3000000000');
-    dbMocks.getLineAccounts.mockResolvedValue([
-      { login_channel_id: '3000000000' } as unknown as never,
+    dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
+      {
+        id: 'account-main',
+        login_channel_id: '3000000000',
+        tenant_status: 'active',
+      } as unknown as never,
     ]);
 
     const reg = await call('/api/liff/affiliate/register', {
@@ -479,6 +588,27 @@ describe('LINE token verification', () => {
       body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
     });
     expect(reg.status).toBe(200);
+  });
+
+  it('(d4) rejects a verified token for a suspended tenant before any write', async () => {
+    dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
+      {
+        id: 'account-main',
+        login_channel_id: LOGIN_CHANNEL_ID,
+        tenant_status: 'suspended',
+      } as unknown as never,
+    ]);
+
+    const reg = await call('/api/liff/affiliate/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+
+    expect(reg.status).toBe(503);
+    await expect(reg.json()).resolves.toMatchObject({ code: 'TENANT_SUSPENDED' });
+    expect(dbMocks.getFriendByLineUserIdForAccount).not.toHaveBeenCalled();
+    expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
   });
 });
 
@@ -518,5 +648,77 @@ describe('POST /api/liff/affiliate/register — concurrent double-register', () 
     expect(body.affiliate.id).toBe('aff-winner');
     // The loser must NOT auto-issue a second first-link.
     expect(dbMocks.createAffiliateLink).not.toHaveBeenCalled();
+  });
+});
+
+describe('LIFF affiliate bank and statements', () => {
+  async function registerAlice() {
+    const response = await call('/api/liff/affiliate/register', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(response.status).toBe(200);
+  }
+
+  it('LINEで再照合した本人だけが振込先を保存し、口座番号を返さない', async () => {
+    await registerAlice();
+    const response = await call('/api/liff/affiliate/bank', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbba01' },
+      body: JSON.stringify({
+        lineAccessToken: 'tok-alice', bankCode: '0001', bankName: 'テスト銀行',
+        branchCode: '001', branchName: '本店', accountType: 'ordinary',
+        accountNumber: '1234567', accountHolderName: 'ALICE', expectedVersion: 0,
+      }),
+    });
+    expect(response.status).toBe(201);
+    expect(dbMocks.encryptCredential).toHaveBeenCalledWith('1234567', 'test-encryption-key');
+    expect(dbMocks.saveAffiliateBankProfile).toHaveBeenCalledWith(DB, expect.objectContaining({
+      affiliateId: expect.stringContaining('friend-alice'), lineAccountId: 'account-main',
+      accountLast4: '4567', encryptedAccountNumber: 'encrypted-account-number',
+    }));
+    const json = JSON.stringify(await response.json());
+    expect(json).not.toContain('1234567');
+    expect(json).not.toContain('encrypted-account-number');
+    expect(json).toContain('4567');
+  });
+
+  it('振込先の版競合を409にし、別の紹介者IDを入力で指定させない', async () => {
+    await registerAlice();
+    dbMocks.saveAffiliateBankProfile.mockResolvedValueOnce({ kind: 'changed' });
+    const response = await call('/api/liff/affiliate/bank', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbba02' },
+      body: JSON.stringify({
+        lineAccessToken: 'tok-alice', affiliateId: 'affiliate-bob',
+        bankCode: '0001', bankName: 'テスト銀行', branchCode: '001', branchName: '本店',
+        accountType: 'ordinary', accountNumber: '1234567', accountHolderName: 'ALICE', expectedVersion: 1,
+      }),
+    });
+    expect(response.status).toBe(409);
+    expect(dbMocks.saveAffiliateBankProfile).toHaveBeenCalledWith(DB, expect.objectContaining({
+      affiliateId: expect.stringContaining('friend-alice'),
+    }));
+  });
+
+  it('自分の明細だけを一覧・downloadする', async () => {
+    await registerAlice();
+    dbMocks.listAffiliateStatementsForSelf.mockResolvedValueOnce([{ id: 'statement-1', totalAmount: 5000 }]);
+    const list = await call('/api/liff/affiliate/statements?lineAccessToken=tok-alice');
+    expect(list.status).toBe(200);
+    expect(dbMocks.listAffiliateStatementsForSelf).toHaveBeenCalledWith(DB, expect.objectContaining({
+      lineAccountId: 'account-main', affiliateId: expect.stringContaining('friend-alice'),
+    }));
+
+    dbMocks.getAffiliateStatementDownload.mockResolvedValueOnce({
+      statement: { id: 'statement-1' }, objectKey: 'affiliate-statements/statement-1.pdf', checksum: 'sum',
+    });
+    imagesGet.mockResolvedValueOnce({ body: 'pdf-body' });
+    const download = await call('/api/liff/affiliate/statements/statement-1/download?lineAccessToken=tok-alice');
+    expect(download.status).toBe(200);
+    expect(download.headers.get('content-type')).toBe('application/pdf');
+    expect(dbMocks.getAffiliateStatementDownload).toHaveBeenCalledWith(DB, expect.objectContaining({
+      affiliateId: expect.stringContaining('friend-alice'), statementId: 'statement-1',
+    }));
   });
 });

@@ -1,21 +1,34 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { X } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
-import { api } from '@/lib/api'
+import { api, ApiError, type FormDeleteImpact } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { countryFlag } from '@/lib/country-flag'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
-import FormKpiValue from './form-kpi-value'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
+import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
-import type { FormLayout } from '@line-crm/shared'
-import { summarizeFormDestinations } from './form-destination-summary'
+import ListToolbar from '@/components/shared/list-toolbar'
+import FilterChip from '@/components/shared/filter-chip'
+import Pagination from '@/components/shared/pagination'
+import StatusBadge from '@/components/shared/status-badge'
+import type { Folder, FormLayout } from '@line-crm/shared'
+import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import CopyTextButton from '@/components/ui/copy-text-button'
+import HelpTip from '@/components/shared/help-tip'
+import ListRange from '@/components/ui/list-range'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import './form-submissions.css'
 
 interface UsedByAccount {
   id: string
@@ -33,202 +46,316 @@ interface Form {
   layout: FormLayout
   onSubmitTagId: string | null
   isActive: boolean
+  status: 'active' | 'archived'
+  revision: number
   submitCount?: number
+  /**
+   * P（一覧の数）：日本時間の1日から数えた今月の回答完了数・開いた人数・完了率。
+   * 取れていないときは null（「—」と出す。0 とは言わない）。
+   */
+  monthlySubmitCount?: number | null
+  monthlyOpenCount?: number | null
+  monthlyCompletionRate?: number | null
+  folderId?: string | null
+  destinationSummary?: { friendFieldCount: number; tagCount: number }
   createdAt: string
+  updatedAt: string | null
   lastSubmittedAt: string | null
   usedByAccounts: UsedByAccount[]
-}
-
-interface FormDetail extends Form {
-  fields: Array<{ name: string; label: string; type?: string }>
-}
-
-interface Submission {
-  id: string
-  formId: string
-  friendId: string | null
-  friendName?: string | null
-  data: Record<string, unknown>
-  createdAt: string
-}
-
-type FormFilter = 'all' | 'answered' | 'unanswered'
-
-function formatRelative(iso: string | null): string {
-  if (!iso) return '未回答'
-  const d = new Date(iso)
-  const now = Date.now()
-  const diffMin = Math.floor((now - d.getTime()) / 60000)
-  if (diffMin < 1) return 'たった今'
-  if (diffMin < 60) return `${diffMin}分前`
-  if (diffMin < 60 * 24) return `${Math.floor(diffMin / 60)}時間前`
-  if (diffMin < 60 * 24 * 7) return `${Math.floor(diffMin / (60 * 24))}日前`
-  return d.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })
-}
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  accountScopeReviewRequired?: boolean
 }
 
 /**
- * 添付された画像の回答か。
- *
- * 回答に入るのはURLだけで、中身は R2 にある。文字として出すと
- * `https://.../images/form-uploads/...` の長い1行になり、何が送られたのか
- * 分からない。ここだけ絵で出す。
+ * 「未分類」の送り値。`GET /api/forms` の `folder_id=unfiled` と同じ。
+ * フォルダのIDとは重ならないよう、予約語として扱う。
  */
-function isUploadedImage(v: unknown): v is string {
-  return typeof v === 'string' && /^https?:\/\/[^\s]+\/images\/form-uploads\//.test(v)
+const UNFILED_VALUE = 'unfiled'
+
+type FormListResponse = Form[] | {
+  items: Form[]
+  /** 絞り込み後の総件数（ページ送りの母数）。 */
+  total: number
+  /** フォルダ範囲だけの総件数（フォルダ欄の「すべて」表示用。#1060で追加）。 */
+  all_total?: number
+  page: number
+  limit: number
 }
 
-/** 回答1つを描く。画像なら小さく出し、押すと元の大きさで開く。 */
-function AnswerValue({ value, thumb }: { value: unknown; thumb?: boolean }) {
-  if (isUploadedImage(value)) {
-    return (
-      <a href={value} target="_blank" rel="noreferrer" className="inline-block">
-        {/* R2 に置いた画像をそのまま出すため next/image は使わない */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={value}
-          alt="送られた画像"
-          className={`rounded-control border-hairline border object-cover ${
-            thumb ? 'h-10 w-10' : 'max-h-60'
-          }`}
-        />
-      </a>
-    )
-  }
-  return <>{formatValue(value)}</>
+type FormFilter = 'all' | 'published' | 'draft' | 'stored'
+type FormSort = 'latest-answer' | 'answers' | 'updated' | 'name'
+
+const FORM_PAGE_SIZES = [20, 50, 100] as const
+
+function formAnswerCount(form: Form): number {
+  return form.submitCount ?? form.usedByAccounts.reduce((sum, account) => sum + account.count, 0)
 }
 
-function formatValue(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '—'
-  if (Array.isArray(v)) return v.length === 0 ? '—' : v.join(', ')
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
+function validSort(value: string | null): FormSort {
+  return value === 'answers' || value === 'updated' || value === 'name' ? value : 'latest-answer'
+}
+
+function validFilter(value: string | null): FormFilter {
+  return value === 'published' || value === 'draft' || value === 'stored' ? value : 'all'
+}
+
+function validPageSize(value: string | null): number {
+  const parsed = Number(value)
+  return FORM_PAGE_SIZES.includes(parsed as (typeof FORM_PAGE_SIZES)[number]) ? parsed : 20
+}
+
+function validPage(value: string | null): number {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
+}
+
+function compareDatesNewest(first: string | null | undefined, second: string | null | undefined): number {
+  if (first && second) return new Date(second).getTime() - new Date(first).getTime()
+  if (first) return -1
+  if (second) return 1
+  return 0
+}
+
+function sortForms(forms: Form[], sort: FormSort): Form[] {
+  if (sort === 'latest-answer') return sortFormsByLatestAnswer(forms)
+  return [...forms].sort((first, second) => {
+    if (sort === 'answers') {
+      const countDifference = formAnswerCount(second) - formAnswerCount(first)
+      if (countDifference !== 0) return countDifference
+      return compareDatesNewest(first.updatedAt, second.updatedAt) || first.id.localeCompare(second.id)
+    }
+    if (sort === 'updated') {
+      return compareDatesNewest(first.updatedAt, second.updatedAt) || first.id.localeCompare(second.id)
+    }
+    return displayFormName(first.name).localeCompare(displayFormName(second.name), 'ja-JP') || first.id.localeCompare(second.id)
+  })
+}
+
+function displayUpdatedAt(value: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })
 }
 
 export default function FormSubmissionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  /*
+   * 箱の作成・名前変更・削除・並び替えは `POST/PATCH/DELETE /api/folders` が
+   * `requireRole('owner', 'admin')` で閉じている。staff へ操作を見せると
+   * 押しても 403 になるだけなので、操作ごと出さない（テンプレート一覧と同じ）。
+   * 自動化の操作可否（useCanManage）では見ない。あれは項目キーがあれば
+   * staff も通るが、箱の口は役割だけを見るため食い違う。
+   */
+  const [canManageFolders] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const [forms, setForms] = useState<Form[]>([])
-  const [selectedFormId, setSelectedFormId] = useState<string | null>(null)
-  const [submissions, setSubmissions] = useState<Submission[]>([])
-  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  /** 消す箱に入っているフォーム数。`null` はまだ数えていない。 */
+  const [deletingFolderCount, setDeletingFolderCount] = useState<number | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  /** 箱の読み込み・操作の失敗。箱の場所に小さく出す。一覧は普通に出す。 */
+  const [folderError, setFolderError] = useState('')
+  const [moveTarget, setMoveTarget] = useState<Form | null>(null)
+  const [moveFolderId, setMoveFolderId] = useState<string>(UNFILED_VALUE)
+  const [moveBusy, setMoveBusy] = useState(false)
+  const [moveError, setMoveError] = useState('')
+  const [formTotal, setFormTotal] = useState(0)
+  /** フォルダ欄の「すべて」件数。絞り込み前の件数（all_total）。 */
+  const [folderTotal, setFolderTotal] = useState(0)
+  const [activeFolderId, setActiveFolderId] = useState('all')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [subLoading, setSubLoading] = useState(false)
-  const [subError, setSubError] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [submissionTotal, setSubmissionTotal] = useState(0)
-  const [detailSubmission, setDetailSubmission] = useState<Submission | null>(null)
-  const [query, setQuery] = useState('')
-  const [formFilter, setFormFilter] = useState<FormFilter>('all')
+  const [query, setQuery] = useState(() => searchParams.get('q') || '')
+  /**
+   * #1060: 検索は Worker 側で絞る。1打鍵ごとの往復を避けるため、
+   * 実際の取得には遅延した語を使う。
+   */
+  const [fetchQuery, setFetchQuery] = useState(() => searchParams.get('q') || '')
+  /**
+   * 管理者確認モード(#724)。通常一覧へ混ぜず、選んだときだけ未割当専用口を叩く。
+   * URLには載せない。通常一覧の絞り込み・ページ送りの挙動を変えないため。
+   */
+  const [reviewMode, setReviewMode] = useState(false)
+  const [reviewForbidden, setReviewForbidden] = useState(false)
+  const [formFilter, setFormFilter] = useState<FormFilter>(() => validFilter(searchParams.get('filter')))
+  const [formSort, setFormSort] = useState<FormSort>(() => validSort(searchParams.get('sort')))
+  const [pageSize, setPageSize] = useState(() => validPageSize(searchParams.get('limit')))
+  const [page, setPage] = useState(() => validPage(searchParams.get('page')))
   const [editingForm, setEditingForm] = useState<Form | null>(null)
   const [editingName, setEditingName] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [renameError, setRenameError] = useState('')
+  /** 名前変更の保存に添える編集の版。一覧は持っていないので開くときに読む。 */
+  const [renameRevision, setRenameRevision] = useState<number | null>(null)
+  // 名前変更の窓も共通の約束へ: Escapeで閉じる（保存中は止める）・
+  // Tabは窓の中・閉じたら起点へ戻す。
+  const renamePanelRef = useOverlayFocus(!!editingForm, () => setEditingForm(null), savingName)
+  /*
+   * R230: フォーム全体の複製。質問・分岐・デザイン・受付設定を引き継いだ
+   * 別IDの停止中フォームを作る。回答・公開状態・集計は引き継がない。
+   */
+  const [duplicateTarget, setDuplicateTarget] = useState<Form | null>(null)
+  const [duplicateName, setDuplicateName] = useState('')
+  const [duplicating, setDuplicating] = useState(false)
+  const [duplicateError, setDuplicateError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
+  const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
+  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [stopping, setStopping] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
-  const submissionRequest = useRef(0)
   const formRequest = useRef(0)
 
   const loadForms = useCallback(async () => {
     const request = ++formRequest.current
+    if (reviewMode && selectedAccountId) {
+      setLoading(true)
+      setLoadError('')
+      setReviewForbidden(false)
+      try {
+        const account = `account_id=${encodeURIComponent(selectedAccountId)}`
+        const res = await fetchApi<{ success: boolean; data: Form[] }>(`/api/forms/unassigned?${account}`)
+        if (!res.success) throw new Error('load_failed')
+        if (request !== formRequest.current) return
+        setForms(res.data)
+        setFolders([])
+        setFormTotal(res.data.length)
+        setFolderTotal(res.data.length)
+      } catch (error) {
+        if (request !== formRequest.current) return
+        // 権限が無い人（staff・制限付き・別テナント）は専用口が403/404を返す。
+        // エラー画面にせず「確認できるものは無い」と伝える(#724)。
+        if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+          setReviewForbidden(true)
+          setForms([])
+          setFolders([])
+          setFormTotal(0)
+          setFolderTotal(0)
+        } else {
+          setLoadError('回答フォームを読み込めませんでした。')
+          setForms([])
+          setFolders([])
+          setFormTotal(0)
+          setFolderTotal(0)
+        }
+      } finally {
+        if (request === formRequest.current) setLoading(false)
+      }
+      return
+    }
     if (!selectedAccountId) {
       setForms([])
-      setSelectedFormId(null)
-      setSubmissions([])
-      setSubmissionTotal(0)
+      setFolders([])
+      setFormTotal(0)
+      setFolderTotal(0)
       setLoading(false)
       return
     }
     setLoading(true)
     setLoadError('')
     try {
-      const res = await fetchApi<{ success: boolean; data: Form[] }>(
-        `/api/forms?account_id=${encodeURIComponent(selectedAccountId)}`,
-      )
-      if (!res.success) throw new Error('load_failed')
+      const account = `account_id=${encodeURIComponent(selectedAccountId)}`
+      // N-175 (#805): フォルダ絞りはサーバーが正本。選択をfolder_idで渡す。
+      const folder = `&folder_id=${encodeURIComponent(activeFolderId)}`
+      /*
+       * #1060: 絞り込み・検索・並び替え・ページ切りは Worker と同じ規則で
+       * サーバー側に任せる（規則の正本は @line-crm/shared）。応答は
+       * 1ページ分だけで、全件をブラウザへ運ばない。
+       */
+      const paging = `&with_list_summary=1&page=${page}&limit=${pageSize}`
+        + `&filter=${formFilter}&sort=${formSort}`
+        + (fetchQuery.trim() ? `&q=${encodeURIComponent(fetchQuery.trim())}` : '')
+      const [res, folderRes] = await Promise.all([
+        fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}${folder}${paging}`),
+        api.folders.list('form', selectedAccountId),
+      ])
+      if (!res.success || !folderRes.success) {
+        // 箱だけ取れないときは一覧を落とさない。箱の場所に小さく出す。
+        if (res.success && request === formRequest.current) {
+          const items = Array.isArray(res.data) ? res.data : res.data.items
+          setForms(items)
+          setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
+          setFolderTotal(Array.isArray(res.data) ? items.length : (res.data.all_total ?? res.data.total))
+          setFolders([])
+          setFolderError('フォルダを読み込めませんでした。')
+          return
+        }
+        throw new Error('load_failed')
+      }
       if (request !== formRequest.current) return
-      setForms(res.data)
+      setFolderError('')
+      const items = Array.isArray(res.data) ? res.data : res.data.items
+      setForms(items)
+      setFolders(folderRes.data)
+      setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
+      setFolderTotal(Array.isArray(res.data) ? items.length : (res.data.all_total ?? res.data.total))
     } catch {
       if (request !== formRequest.current) return
       setLoadError('回答フォームを読み込めませんでした。')
       setForms([])
+      setFolders([])
+      setFormTotal(0)
+      setFolderTotal(0)
     } finally {
       if (request === formRequest.current) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery])
 
   useEffect(() => {
-    submissionRequest.current += 1
-    setSelectedFormId(null)
-    setSubmissions([])
-    setSubmissionTotal(0)
     void loadForms()
   }, [loadForms])
 
-  const loadSubmissions = useCallback(async (formId: string, requestedPage = 1, requestedLimit = 20) => {
-    if (!selectedAccountId) return
-    const request = ++submissionRequest.current
-    setSubLoading(true)
-    setSubError('')
-    setPage(1)
-    setDetailSubmission(null)
-    try {
-      const accountQuery = `account_id=${encodeURIComponent(selectedAccountId)}`
-      const formRes = await fetchApi<{ success: boolean; data: FormDetail | { fields: string | FormDetail['fields'] } }>(`/api/forms/${formId}?${accountQuery}`)
-      const subRes = await fetchApi<{
-        success: boolean
-        data: { items: Submission[]; total: number; page: number; limit: number }
-      }>(`/api/forms/${formId}/submissions?page=${requestedPage}&limit=${requestedLimit}&${accountQuery}`)
-      if (!subRes.success) throw new Error('submissions_failed')
-      if (request !== submissionRequest.current) return
+  const searchKey = searchParams.toString()
+  useEffect(() => {
+    const params = new URLSearchParams(searchKey)
+    setQuery(params.get('q') || '')
+    setFormFilter(validFilter(params.get('filter')))
+    setFormSort(validSort(params.get('sort')))
+    setPageSize(validPageSize(params.get('limit')))
+    setPage(validPage(params.get('page')))
+  }, [searchKey])
 
-      if (formRes.success) {
-        const rawFields = (formRes.data as { fields: unknown }).fields
-        const fields = typeof rawFields === 'string'
-          ? (JSON.parse(rawFields) as Array<{ name: string; label: string }>)
-          : (rawFields as Array<{ name: string; label: string }>)
-        const labels: Record<string, string> = {}
-        for (const f of fields ?? []) labels[f.name] = f.label
-        setFieldLabels(labels)
-      }
-      setPage(subRes.data.page)
-      setPageSize(subRes.data.limit)
-      setSubmissionTotal(subRes.data.total)
-      setSubmissions(
-        subRes.data.items.map((s) => ({
-          ...s,
-          data: typeof s.data === 'string' ? JSON.parse(s.data) : s.data,
-          friendName: s.friendName ?? null,
-        })),
-      )
-    } catch {
-      if (request !== submissionRequest.current) return
-      setSubError('回答を読み込めませんでした。')
-      setSubmissions([])
-      setSubmissionTotal(0)
-    } finally {
-      if (request === submissionRequest.current) setSubLoading(false)
+  // #1060: 検索語のサーバー取得は少し遅らせ、1打鍵ごとの往復を避ける。
+  useEffect(() => {
+    const timer = window.setTimeout(() => setFetchQuery(query), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
+
+  const updateListState = (next: Partial<{
+    query: string
+    filter: FormFilter
+    sort: FormSort
+    pageSize: number
+    page: number
+  }>) => {
+    const state = {
+      query: next.query ?? query,
+      filter: next.filter ?? formFilter,
+      sort: next.sort ?? formSort,
+      pageSize: next.pageSize ?? pageSize,
+      page: next.page ?? page,
     }
-  }, [selectedAccountId])
+    if (next.query !== undefined) setQuery(next.query)
+    if (next.filter !== undefined) setFormFilter(next.filter)
+    if (next.sort !== undefined) setFormSort(next.sort)
+    if (next.pageSize !== undefined) setPageSize(next.pageSize)
+    if (next.page !== undefined) setPage(next.page)
 
-  const handleSelectForm = (formId: string) => {
-    setSelectedFormId(formId)
-    loadSubmissions(formId, 1, pageSize)
+    const params = new URLSearchParams()
+    if (state.query) params.set('q', state.query)
+    if (state.filter !== 'all') params.set('filter', state.filter)
+    if (state.sort !== 'latest-answer') params.set('sort', state.sort)
+    if (state.pageSize !== 20) params.set('limit', String(state.pageSize))
+    if (state.page !== 1) params.set('page', String(state.page))
+    const queryString = params.toString()
+    router.replace(queryString ? `/form-submissions?${queryString}` : '/form-submissions', { scroll: false })
   }
 
   const createDraft = async () => {
@@ -246,10 +373,31 @@ export default function FormSubmissionsPage() {
     }
   }
 
-  const openRename = (form: Form) => {
+  /*
+   * R27: 名前の変更は「…」の中の操作。保存は編集保存と同じ口を通るので、
+   * 確認した編集の版を添える。一覧は版を持っていないため、窓を開くときに
+   * 1件取得で読む。版なしで送ると口が 400 にする（#723）。
+   */
+  const openRename = async (form: Form) => {
     setEditingForm(form)
     setEditingName(displayFormName(form.name))
     setRenameError('')
+    setRenameRevision(null)
+    if (!selectedAccountId) {
+      setRenameError('LINE公式アカウントを選んでください。')
+      return
+    }
+    try {
+      const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+        `/api/forms/${form.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+      )
+      if (!res.success) throw new Error('rename_revision_failed')
+      const revision = res.data.contentRevision
+      if (!Number.isInteger(revision)) throw new Error('rename_revision_failed')
+      setRenameRevision(revision as number)
+    } catch {
+      setRenameError('フォームの状態を確認できませんでした。開き直してください。')
+    }
   }
 
   const saveName = async () => {
@@ -258,489 +406,620 @@ export default function FormSubmissionsPage() {
     setSavingName(true)
     setRenameError('')
     try {
+      let revision = renameRevision
+      if (revision === null) {
+        const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+          `/api/forms/${editingForm.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        )
+        if (!res.success || !Number.isInteger(res.data.contentRevision)) {
+          throw new Error('rename_revision_failed')
+        }
+        revision = res.data.contentRevision as number
+        setRenameRevision(revision)
+      }
       const res = await fetchApi<{ success: boolean; data: Form }>(`/api/forms/${editingForm.id}?account_id=${encodeURIComponent(selectedAccountId)}`, {
         method: 'PUT',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, expectedContentRevision: revision }),
       })
       if (!res.success) throw new Error('rename_failed')
       setForms((current) => current.map((form) => (
         form.id === editingForm.id ? { ...form, name } : form
       )))
       setEditingForm(null)
-    } catch {
-      setRenameError('フォーム名を変更できませんでした。もう一度お試しください。')
+      // 名前は検索・名前順の対象。サーバー側の絞り込み・並びとずれないよう読み直す。
+      void loadForms()
+    } catch (error) {
+      setRenameError(error instanceof ApiError && error.status === 409
+        ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
+        : 'フォーム名を変更できませんでした。もう一度お試しください。')
     } finally {
       setSavingName(false)
     }
   }
 
-  const openDelete = (form: Form) => {
+  const openDuplicate = (form: Form) => {
+    setDuplicateTarget(form)
+    setDuplicateName(`${displayFormName(form.name)}の複製`)
+    setDuplicateError('')
+  }
+
+  const duplicateForm = async () => {
+    if (!duplicateTarget || duplicating || !selectedAccountId) return
+    const name = duplicateName.trim()
+    if (!name) {
+      setDuplicateError('複製の名前を入力してください。')
+      return
+    }
+    setDuplicating(true)
+    setDuplicateError('')
+    try {
+      const res = await api.forms.duplicate(duplicateTarget.id, selectedAccountId, name)
+      if (!res.success) throw new Error(res.error)
+      setDuplicateTarget(null)
+      // 複製は停止中の下書き。用途に合わせて直せるよう、編集画面を開く。
+      router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
+    } catch (error) {
+      setDuplicateError(error instanceof ApiError && error.status === 404
+        ? '元のフォームが見つかりませんでした。一覧を開き直してください。'
+        : 'フォームを複製できませんでした。もう一度お試しください。')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
+  const openDelete = async (form: Form) => {
     setDeleteTarget(form)
+    setDeleteImpact(null)
+    setDeleteImpactLoading(true)
     setDeleteError('')
+    if (!selectedAccountId) {
+      setDeleteImpactLoading(false)
+      setDeleteError('LINE公式アカウントを選んでください。')
+      return
+    }
+    try {
+      const result = await api.forms.deleteImpact(form.id, selectedAccountId)
+      if (!result.success) throw new Error(result.error)
+      setDeleteImpact(result.data)
+    } catch {
+      setDeleteError('アーカイブしたときの影響を確認できませんでした。もう一度開き直してください。')
+    } finally {
+      setDeleteImpactLoading(false)
+    }
   }
 
   const removeForm = async () => {
-    if (!deleteTarget || deleting || !selectedAccountId) return
+    if (!deleteTarget || !deleteImpact || deleting || stopping || !selectedAccountId) return
     const targetId = deleteTarget.id
+    // 完全削除と保管で文言を分ける。削除したのに「アーカイブできなかった」と
+    // 出ると、結果を誤認して不要な再試行が起きる（R199）。
+    const permanentDelete = deleteImpact.canDelete
     setDeleting(true)
     setDeleteError('')
     try {
-      const result = await api.forms.remove(targetId, selectedAccountId)
+      const result = permanentDelete
+        ? await api.forms.remove(targetId, selectedAccountId, deleteImpact.revision)
+        : await api.forms.archive(targetId, selectedAccountId, deleteImpact.revision)
       if (!result.success) throw new Error('delete_failed')
       setForms((current) => current.filter((form) => form.id !== targetId))
-      if (selectedFormId === targetId) {
-        submissionRequest.current += 1
-        setSelectedFormId(null)
-        setSubmissions([])
-        setSubmissionTotal(0)
-        setDetailSubmission(null)
-      }
       setDeleteTarget(null)
+      // ページの欠け・件数のずれを残さないよう、サーバー側の一覧を読み直す。
+      void loadForms()
     } catch {
-      setDeleteError('この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      /*
+       * R199: 処理済みなのに失敗を返す経路をなくす。応答が失われたときは
+       * 対象を読み直し、既に消えていれば成功として扱う（行を外して閉じる）。
+       * 残っているときだけ失敗文を出す。どちらの操作をしたかが分かる文言にする。
+       */
+      let gone = false
+      try {
+        await api.forms.get(targetId, selectedAccountId)
+      } catch (checkError) {
+        // 保管済みも取得口では見つからない（404）。どちらも一覧には戻らない。
+        if (checkError instanceof ApiError && checkError.status === 404) gone = true
+      }
+      if (gone) {
+        setForms((current) => current.filter((form) => form.id !== targetId))
+        setDeleteTarget(null)
+        void loadForms()
+      } else {
+        setDeleteError(permanentDelete
+          ? 'この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。'
+          : 'この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
+      }
     } finally {
       setDeleting(false)
     }
   }
 
-  const sortedForms = useMemo(() => sortFormsByLatestAnswer(forms), [forms])
-  const formCountsAvailable = !accountLoading && Boolean(selectedAccountId) && !loading && !loadError
-  const answeredCount = useMemo(
-    () => forms.filter((form) => form.lastSubmittedAt !== null).length,
-    [forms],
-  )
-  const filteredForms = useMemo(() => {
+  /*
+   * R25: 箱の並び替え。2つの更新は口が1回で行う。途中で片方だけ変わらない。
+   */
+  const moveFolder = async (index: number, direction: -1 | 1) => {
+    const target = folders[index]
+    const neighbor = folders[index + direction]
+    if (!target || !neighbor || folderBusy || !selectedAccountId) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
+      if (!result.success) throw new Error(result.error)
+      await loadForms()
+    } catch {
+      setFolderError('並び順を変えられませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const openFolderDelete = async (folder: Folder) => {
+    setDeletingFolder(folder)
+    setDeletingFolderCount(null)
+    setFolderError('')
+    if (!selectedAccountId) return
+    // 消す前に中の件数を読む。取れなくても消す操作自体はできる。
+    try {
+      const account = `account_id=${encodeURIComponent(selectedAccountId)}`
+      const res = await fetchApi<{ success: boolean; data: FormListResponse }>(
+        `/api/forms?${account}&folder_id=${encodeURIComponent(folder.id)}&with_list_summary=1&page=1&limit=1&filter=all&sort=latest-answer`,
+      )
+      if (res.success) {
+        setDeletingFolderCount(Array.isArray(res.data) ? res.data.length : res.data.total)
+      }
+    } catch {
+      setDeletingFolderCount(null)
+    }
+  }
+
+  const removeFolder = async () => {
+    if (!deletingFolder || folderBusy || !selectedAccountId) return
+    const targetId = deletingFolder.id
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const res = await api.folders.delete(targetId, selectedAccountId)
+      if (!res.success) throw new Error(res.error)
+      setDeletingFolder(null)
+      if (activeFolderId === targetId) setActiveFolderId('all')
+      await loadForms()
+    } catch {
+      setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const openMove = (form: Form) => {
+    setMoveTarget(form)
+    setMoveFolderId(form.folderId ?? UNFILED_VALUE)
+    setMoveError('')
+  }
+
+  const moveForm = async () => {
+    if (!moveTarget || moveBusy || !selectedAccountId) return
+    const nextFolderId = moveFolderId === UNFILED_VALUE ? null : moveFolderId
+    if ((moveTarget.folderId ?? null) === nextFolderId) {
+      setMoveTarget(null)
+      return
+    }
+    setMoveBusy(true)
+    setMoveError('')
+    try {
+      const res = await fetchApi<{ success: boolean; data: Form }>(
+        `/api/forms/${moveTarget.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        { method: 'PUT', body: JSON.stringify({ folderId: nextFolderId }) },
+      )
+      if (!res.success) throw new Error('move_failed')
+      setMoveTarget(null)
+      await loadForms()
+    } catch (error) {
+      setMoveError(error instanceof ApiError && error.status === 422
+        ? 'そのフォルダはありません。開き直して、もう一度お試しください。'
+        : 'フォルダへ移せませんでした。もう一度お試しください。')
+    } finally {
+      setMoveBusy(false)
+    }
+  }
+
+  const stopAccepting = async () => {
+    if (!deleteTarget || !deleteImpact || stopping || deleting || !selectedAccountId) return
+    setStopping(true)
+    setDeleteError('')
+    try {
+      /*
+       * #723: 受付停止も編集保存と同じ口（`PUT /api/forms/:id`）を通る。
+       * だから版を免除しない。免除すると、止めたはずのフォームが編集画面の
+       * 保存で公開中に戻り、回答が入り続ける。
+       *
+       * 版は押す直前に読み直した `deleteImpact` から渡す。`revision`（影響の版）
+       * ではなく `contentRevision`（編集の版）を渡す。
+       */
+      const result = await api.forms.update(deleteTarget.id, selectedAccountId, {
+        isActive: false,
+        expectedContentRevision: deleteImpact.contentRevision,
+      })
+      if (!result.success) throw new Error(result.error)
+      setForms((current) => current.map((form) => (
+        form.id === deleteTarget.id ? { ...form, isActive: false } : form
+      )))
+      setDeleteTarget(null)
+      setDeleteImpact(null)
+      // 公開中/下書きの絞り込み対象が変わるため読み直す。
+      void loadForms()
+    } catch (error) {
+      setDeleteError(error instanceof ApiError && error.status === 409
+        ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
+        : '回答の受付を止められませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setStopping(false)
+    }
+  }
+
+  /*
+   * 管理者確認モード（未割り当て一覧）は専用口が全件を返すので、従来どおり
+   * 画面側で絞り込み・並び替え・ページ切りをする。通常一覧は Worker が
+   * 同じ規則（@line-crm/shared）で済ませた1ページ分だけを返す（#1060）。
+   */
+  const clientFilteredForms = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('ja-JP')
-    return sortedForms.filter((form) => {
-      if (formFilter === 'answered' && !form.lastSubmittedAt) return false
-      if (formFilter === 'unanswered' && form.lastSubmittedAt) return false
+    return sortForms(forms, formSort).filter((form) => {
+      // N-175 (#805): フォルダ絞りはサーバーが済ませている。画面では絞らない。
+      if (formFilter === 'published' && !form.isActive) return false
+      if (formFilter === 'draft' && form.isActive) return false
+      if (formFilter === 'stored' && !hasStoredDestination(form.layout, form.onSubmitTagId)) return false
       if (!normalizedQuery) return true
       return (
         displayFormName(form.name).toLocaleLowerCase('ja-JP').includes(normalizedQuery)
+        || form.fields.some((field) => field.label.toLocaleLowerCase('ja-JP').includes(normalizedQuery))
         || form.usedByAccounts.some((account) => account.name.toLocaleLowerCase('ja-JP').includes(normalizedQuery))
       )
     })
-  }, [formFilter, query, sortedForms])
-  const duplicateNameCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const form of forms) {
-      const name = displayFormName(form.name).toLocaleLowerCase('ja-JP')
-      counts.set(name, (counts.get(name) ?? 0) + 1)
-    }
-    return counts
-  }, [forms])
+  }, [formFilter, query, formSort, forms])
 
-  const selectedForm = useMemo(
-    () => forms.find((f) => f.id === selectedFormId) ?? null,
-    [forms, selectedFormId],
-  )
+  const listTotal = reviewMode ? clientFilteredForms.length : formTotal
+  const pageCount = Math.max(1, Math.ceil(listTotal / pageSize))
+  const visiblePage = Math.min(page, pageCount)
+  const pageStart = (visiblePage - 1) * pageSize
+  const visibleForms = reviewMode
+    ? clientFilteredForms.slice(pageStart, pageStart + pageSize)
+    : forms
 
-  const totalPages = Math.max(1, Math.ceil(submissionTotal / pageSize))
-
-  const fieldKeys = useMemo(
-    () =>
-      submissions.length > 0
-        ? [...new Set(submissions.flatMap((s) => Object.keys(s.data)))]
-        : [],
-    [submissions],
-  )
+  useEffect(() => {
+    if (!loading && !loadError && page > pageCount) updateListState({ page: pageCount })
+    // updateListState intentionally uses the current list state. Running only when the
+    // calculated last page changes avoids replacing the URL after unrelated renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadError, loading, page, pageCount])
 
   return (
-    <div data-design-node="EMBIK">
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">フォーム</p>
-          <FormKpiValue value={formCountsAvailable ? forms.length : null} />
-          <p className="text-ink-faint mt-0.5 text-xs">作成済み</p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">公開中</p>
-          <FormKpiValue value={formCountsAvailable ? forms.filter((form) => form.isActive).length : null} />
-          <p className="text-ink-faint mt-0.5 text-xs">回答を受け付けています</p>
-        </div>
-        {/* 月ごとの集計と、回答率（配ったうち何人が答えたか）を出す経路が無い。 */}
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">今月の回答</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">月ごとの集計は未対応</p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">回答率</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">配った人数を持っていません</p>
+    <div data-design-node="EMBIK" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Bar" className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" onClick={createDraft} disabled={creating}>
+            {creating ? '下書きを作成中' : '＋ フォームを作る'}
+          </Button>
         </div>
       </div>
 
-      {/* Form cards */}
-      <section className="mb-6">
-        {!loading && !loadError && forms.length > 0 && (
-          <div className="mb-4 space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="primary" onClick={createDraft} disabled={creating}>
-                  {creating ? '下書きを作成中' : 'フォームを作る'}
-                </Button>
+      <div style={FOLDER_RAIL_STYLE} className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+        <FolderPanel
+          /* R12: 総数は「すべて」の行と同じ数なので見出しには出さない。 */
+          activeId={activeFolderId}
+          onSelect={(folder) => {
+            setActiveFolderId(folder)
+            updateListState({ page: 1 })
+          }}
+          // R25: 箱は選んだアカウントに付けて作る。staff には操作ごと出さない。
+          onAddFolder={canManageFolders ? () => setFolderDialogOpen(true) : undefined}
+          rows={[
+            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal },
+            ...folders.map((folder, index) => ({
+              id: folder.id,
+              label: folder.name,
+              // 箱ごとの件数はまだ数えていない（#631 の流儀で出さない）。
+              count: folder.itemCount ?? null,
+              color: folder.color,
+              onEdit: canManageFolders ? () => setEditingFolder(folder) : undefined,
+              onMoveUp: canManageFolders && index > 0 ? () => void moveFolder(index, -1) : undefined,
+              onMoveDown: canManageFolders && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+              onDelete: canManageFolders ? () => void openFolderDelete(folder) : undefined,
+              deleteNote: '削除しても、中のフォームは未分類に残ります。',
+            })),
+            // 未分類の件数も数えていない。0 とは言わない。
+            { id: UNFILED_VALUE, label: '未分類', count: null },
+          ]}
+        >
+          <p className="text-ink-faint text-xs leading-relaxed">
+            フォルダを消しても、入っていたフォームは未分類として残ります。
+          </p>
+          {folderError ? (
+            <p role="alert" className="text-ink-secondary text-xs">
+              {folderError}
+              <button type="button" onClick={() => void loadForms()} className="text-action ml-2 font-semibold hover:underline">
+                もう一度
+              </button>
+            </p>
+          ) : null}
+        </FolderPanel>
+
+        <section className="min-w-0">
+          {/*
+            ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+            右端に並び順と表示件数。管理者確認の切り替えは2行目の右へ。
+            設計の Saved（絞り込み行）は共通 ListToolbar の2行目にいる。
+            印だけここに残し、設計との突き合わせを保つ（Bar の印は上の
+            作成行にある）。
+          */}
+          <div data-design="Saved">
+          <ListToolbar
+            search={{
+              placeholder: 'フォーム名・質問文で検索',
+              value: query,
+              onChange: (value) => updateListState({ query: value, page: 1 }),
+            }}
+            filters={
+              <>
+                <span className="text-xs text-ink-faint">絞り込み</span>
                 {([
-                  ['all', `すべて ${forms.length}`],
-                  ['answered', `回答あり ${answeredCount}`],
-                  ['unanswered', `未回答 ${forms.length - answeredCount}`],
+                  ['all', 'すべて'],
+                  ['published', '公開中'],
+                  ['draft', '下書き'],
+                  ['stored', '情報欄に保存している'],
                 ] as Array<[FormFilter, string]>).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setFormFilter(value)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                      formFilter === value
-                        ? 'bg-gray-900 text-white'
-                        : 'border border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
+                  <FilterChip key={value} selected={formFilter === value} onChange={() => updateListState({ filter: value, page: 1 })}>
                     {label}
-                  </button>
+                  </FilterChip>
                 ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="hidden text-[11px] text-gray-400 md:inline">最新回答順</span>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="フォーム名・アカウントで検索"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-gray-300 focus:border-accent sm:w-64"
+              </>
+            }
+            trailing={
+              <>
+                <Select
+                  aria-label="並び順"
+                  value={formSort}
+                  options={[
+                    { value: 'latest-answer', label: '最新の回答順' },
+                    { value: 'answers', label: '回答が多い順' },
+                    { value: 'updated', label: '更新が新しい順' },
+                    { value: 'name', label: '名前順' },
+                  ]}
+                  onChange={(value) => updateListState({ sort: value as FormSort, page: 1 })}
                 />
-              </div>
-            </div>
-            {query && (
-              <p className="text-xs text-gray-400">{filteredForms.length}件見つかりました</p>
-            )}
-            {createError && <p className="text-danger text-sm">{createError}</p>}
+                <Select
+                  aria-label="表示件数"
+                  size="page-size"
+                  value={String(pageSize)}
+                  options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+                  onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
+                />
+                <FilterChip
+                  selected={reviewMode}
+                  onChange={(next) => { setReviewMode(next); setPage(1) }}
+                >
+                  {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
+                </FilterChip>
+              </>
+            }
+          />
           </div>
-        )}
-        {accountLoading ? (
+          {reviewMode && (
+            <div className="border-hairline rounded-card border bg-white p-3 text-xs text-ink-secondary">
+              <p><span className="font-bold text-ink">管理者確認中のフォーム</span> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
+              <p className="mt-1">担当の割り当ては後続の対応（#771）で行います。この画面では割り当て操作はできません。</p>
+            </div>
+          )}
+
+          {createError && <p className="text-sm text-danger">{createError}</p>}
+          {accountLoading ? (
           <ListState kind="loading" title="LINE公式アカウントを確認しています" />
         ) : !selectedAccountId ? (
-          <ListState
-            kind="empty"
-            title="LINE公式アカウントを選んでください"
-            description="上のアカウント切替から、回答フォームを使う公式アカウントを選びます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="LINE公式アカウントを選んでください"
+              description="上のアカウント切替から、回答フォームを使う公式アカウントを選びます。"
+            />
+          </div>
         ) : loading ? (
-          <ListState kind="loading" title="回答フォームを読み込んでいます" />
+          <ListState
+            kind="loading"
+            title="読み込んでいます"
+            description="このまま少しお待ちください。"
+          />
         ) : loadError ? (
           <ListState
             kind="error"
-            title="回答フォームを読み込めませんでした"
-            description="通信状態を確認して、もう一度読み込んでください。"
-            action={<Button onClick={() => void loadForms()}>回答フォームを再読み込み</Button>}
+            title="表示できませんでした"
+            description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+            onRetry={() => void loadForms()}
           />
-        ) : forms.length === 0 ? (
-          <ListState
-            kind="empty"
-            title="まだ回答フォームがありません"
-            description="最初のフォームを下書きで作り、質問と公開条件を設定します。"
-            action={(
-              <Button variant="primary" onClick={createDraft} disabled={creating}>
-                {creating ? '下書きを作成中' : 'フォームを作る'}
-              </Button>
-            )}
-          />
-        ) : (
-          filteredForms.length === 0 ? (
+        ) : reviewMode && reviewForbidden ? (
+          <div className="bg-canvas rounded-card border-hairline border">
             <ListState
               kind="empty"
-              title="条件に合うフォームはありません"
-              description="検索語や絞り込み条件を変えてください。"
+              title="確認できる未割り当てフォームはありません"
+              description="管理者確認は既定テナントの管理者のみ利用できます。"
             />
+          </div>
+        ) : reviewMode && forms.length === 0 ? (
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="担当未割り当てのフォームはありません"
+              description="担当の決まっていない旧フォームはここに出ます。"
+            />
+          </div>
+        ) : folderTotal === 0 ? (
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="まだフォームがありません"
+              description="最初の1つを作ると、集まった回答もここから見られます。"
+            action={(
+              <Button variant="primary" onClick={createDraft} disabled={creating}>
+                {creating ? '下書きを作成中' : '＋ フォームを作る'}
+              </Button>
+            )}
+            />
+          </div>
+        ) : (
+          listTotal === 0 ? (
+            <div className="bg-canvas rounded-card border-hairline border">
+              <ListState
+                kind="empty"
+                title="条件に合うフォームはありません"
+                description="検索語や絞り込み条件を変えてください。"
+              />
+            </div>
           ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {filteredForms.map((form) => {
-              const isSelected = selectedFormId === form.id
+          <div className="border-hairline rounded-card overflow-hidden border bg-white">
+            {/*
+              ★V7：1440px で右端の「編集」と削除が切れていた（表の最小幅＞実幅）。
+              最小幅は1440pxの実幅（約835px）より小さい800pxにし、名前の列を伸び縮みさせる。操作の列は2つのボタンが収まる固定幅。
+              狭い画面だけ表の中で横に流れる。回答数は「回答を見る」の入口を兼ねる。
+            */}
+            {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「更新」を畳む。 */}
+            <div className="overflow-x-auto @container">
+            <table className="w-full min-w-[720px] table-fixed text-sm @[800px]:min-w-[800px]">
+              <thead>
+                <TableHeadRow>
+                  <Th>フォーム</Th>
+                  <Th className="w-20">状態</Th>
+                  <Th className="w-32">回答の保存先</Th>
+                  <Th className="w-36" align="right">
+                    回答数
+                    {' '}
+                    <HelpTip label="今月の完了率の説明">
+                      今月の件数は日本時間の1日から数えています。完了率は今月の回答完了を今月開いた人で割った割合で、試しの回答は入れていません。
+                    </HelpTip>
+                  </Th>
+                  <Th className="cq-hide-below-800 w-20">更新</Th>
+                  {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                  <Th className="bg-surface-pearl sticky right-0 w-32" align="right">操作</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody className="divide-hairline divide-y">
+            {visibleForms.map((form) => {
               const totalCount = form.usedByAccounts.reduce((sum, a) => sum + a.count, 0)
               const displayCount = form.submitCount ?? totalCount
               const normalizedName = displayFormName(form.name)
-              const isDuplicate = (duplicateNameCounts.get(normalizedName.toLocaleLowerCase('ja-JP')) ?? 0) > 1
               const destinationSummary = summarizeFormDestinations(form.layout, form.onSubmitTagId)
+              const listDestinationSummary = form.destinationSummary
+                ? [
+                    form.destinationSummary.friendFieldCount > 0 ? `友だち情報欄${form.destinationSummary.friendFieldCount}` : '',
+                    form.destinationSummary.tagCount > 0 ? `タグ${form.destinationSummary.tagCount}` : '',
+                  ].filter(Boolean).join('・') || '—'
+                : destinationSummary.label
               return (
-                <article
-                  key={form.id}
-                  className="group relative"
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSelectForm(form.id)}
-                    aria-pressed={isSelected}
-                    className={`w-full cursor-pointer rounded-xl border p-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 ${
-                      isSelected
-                        ? 'border-accent bg-accent-soft shadow-sm'
-                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
-                    }`}
-                  >
-                  <div className="mb-2 flex items-start gap-2 pr-14">
-                    <h3 className={`text-sm font-semibold leading-snug ${isSelected ? 'text-accent' : 'text-gray-900'}`}>
-                      {normalizedName}
-                    </h3>
-                  </div>
-
-                  <div className="flex items-baseline gap-1 mb-3">
-                    <span className="text-2xl font-bold text-gray-900 tabular-nums">{displayCount}</span>
-                    <span className="text-xs text-gray-400">件の回答</span>
-                  </div>
-
-                  {form.usedByAccounts.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {form.usedByAccounts.map((acc) => {
-                        const flag = countryFlag(acc.country)
-                        return (
-                          <span
-                            key={acc.id}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-gray-100 text-[11px] text-gray-700"
-                            title={`${acc.name}: ${acc.count}件`}
-                          >
-                            {flag && <span>{flag}</span>}
-                            <span className="font-medium">{acc.name}</span>
-                            <span className="text-gray-400 tabular-nums">{acc.count}</span>
-                          </span>
-                        )
-                      })}
+                <tr key={form.id} className="text-ink-secondary">
+                  <td className="px-3 py-2.5">
+                    {/*
+                     * フォーム名は識別子として別の文面へ写すことがある。
+                     * 省略表示は title で読めるが取り出せないため、差し込みキー
+                     * と同じく全文コピーの口を添える（監査6 #665）。
+                     */}
+                    <div className="flex items-center gap-1">
+                      {reviewMode ? (
+                        <span className="block min-w-0 flex-1 truncate font-semibold text-ink" title={normalizedName}>
+                          {normalizedName}
+                          {form.accountScopeReviewRequired && <span className="border-accent bg-accent-soft rounded-pill ml-2 border px-2 py-0.5 text-xs text-ink">管理者確認</span>}
+                        </span>
+                      ) : (
+                        <>
+                          <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block min-w-0 truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
+                          {/* 管理者確認は読み取り専用なので、通常の一覧にだけコピー口を出す。 */}
+                          <CopyTextButton
+                            value={normalizedName}
+                            aria-label={`${normalizedName}のフォーム名をコピー`}
+                          />
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-[11px] text-gray-300">回答元アカウントなし</div>
-                  )}
-
-                  <div className="bg-canvas-sunken mt-3 flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-xs">
-                    <span className="text-ink-faint shrink-0">回答の保存先</span>
-                    <span className="text-ink truncate font-medium" title={destinationSummary.label}>
-                      {destinationSummary.label}
+                    <span className="block truncate text-xs text-ink-faint">{form.description || `${form.fields.length}ブロック`}</span>
+                  </td>
+                  <td className="px-3 py-2.5 text-xs">
+                    <StatusBadge size="compact" tone={form.isActive ? 'success' : 'neutral'}>{form.isActive ? '公開中' : '下書き'}</StatusBadge>
+                  </td>
+                  <td className="truncate px-3 py-2.5 text-xs" title={listDestinationSummary}>{listDestinationSummary}</td>
+                  <td className="px-3 py-2.5 text-right text-xs tabular-nums">
+                    {/* ★V7：回答数そのものを「回答を見る」の入口にし、操作の列を細くして名前を読めるようにする。 */}
+                    {reviewMode ? (
+                      <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
+                    ) : (
+                      <Link
+                        href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`}
+                        aria-label={`${normalizedName}の集まった回答を見る`}
+                        title="集まった回答を見る"
+                        className="text-action block font-medium hover:underline"
+                      >
+                        {displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '0件'}
+                      </Link>
+                    )}
+                    {/*
+                      P（一覧の数）：今月は日本時間の1日から数える。
+                      完了率 ＝ 今月の回答完了 ÷ 今月開いた人。試しの回答は入れない。
+                      取れていない数は「—」だけ出す（0 とは言わない）。
+                      定義・分母は見出しの「？」に1つだけ置き、行には置かない。
+                    */}
+                    <span className="text-ink-faint block">
+                      {form.monthlySubmitCount == null
+                        ? '今月 —'
+                        : `今月 ${form.monthlySubmitCount.toLocaleString('ja-JP')}件`}
                     </span>
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-2 text-[11px] text-gray-400">
-                    <span>{form.lastSubmittedAt ? `最終回答 ${formatRelative(form.lastSubmittedAt)}` : '回答はまだありません'}</span>
-                    {!form.isActive && (
-                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">停止中</span>
+                    <span className="text-ink-faint block">
+                      {form.monthlyCompletionRate == null
+                        ? '完了率 —'
+                        : `完了率 ${form.monthlyCompletionRate.toLocaleString('ja-JP')}%`}
+                    </span>
+                  </td>
+                  <td className="cq-hide-below-800 px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
+                  <td className="bg-canvas sticky right-0 px-3 py-2.5 text-right text-xs">
+                    {/*
+                     * 管理者確認モードは読み取り専用(#724)。編集・削除・回答の口は
+                     * 担当アカウント経由しか受けないため、未割当フォームには使えない。
+                     * 押せる口を置くと失敗するだけなので、割り当て（#771）まで置かない。
+                     */}
+                    {reviewMode ? (
+                      <span className="sr-only">読み取り専用</span>
+                    ) : (
+                      /*
+                       * R27: 行の主ボタン「編集」は質問の編集（編集画面）へ。
+                       * 名前の変更と箱への移動は「…」の中。削除は区切りの後の
+                       * 危ない操作へ。共通の RowActions にそろえる。
+                       */
+                      <RowActions
+                        edit={{ href: `/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic` }}
+                        menuItems={[
+                          { id: 'rename', label: '名前を変更', onSelect: () => void openRename(form) },
+                          { id: 'move', label: 'フォルダへ移す', onSelect: () => openMove(form) },
+                          // R230: フォーム全体の複製。質問・分岐・受付設定を引き継いだ別IDの下書きを作る。
+                          { id: 'duplicate', label: '複製する', onSelect: () => openDuplicate(form) },
+                        ]}
+                        destructiveItem={{ id: 'delete', label: '削除する', onSelect: () => void openDelete(form) }}
+                        subjectName={normalizedName}
+                      />
                     )}
-                    {isDuplicate && (
-                      <span className="ml-auto" title={`フォームID: ${form.id}`}>
-                        同名あり・{form.fields.length}項目・作成 {new Date(form.createdAt).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}
-                      </span>
-                    )}
-                  </div>
-                  </button>
-
-                  <div className="absolute right-3 top-3 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openRename(form)}
-                      className="rounded-md p-1 text-gray-300 opacity-60 transition hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
-                      aria-label={`${normalizedName}の名前を変更`}
-                      title="フォーム名を変更"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931ZM19.5 7.125 16.875 4.5M18 13.5V19.125A1.875 1.875 0 0 1 16.125 21H4.875A1.875 1.875 0 0 1 3 19.125V7.875A1.875 1.875 0 0 1 4.875 6H10.5" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openDelete(form)}
-                      className="text-ink-faint hover:bg-danger-bg hover:text-danger rounded-md p-1 opacity-60 transition group-hover:opacity-100"
-                      aria-label={`${normalizedName}を削除`}
-                      title="回答フォームを削除"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M19.228 5.79 18.16 19.673A2.25 2.25 0 0 1 15.916 21H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0V4.477c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                      </svg>
-                    </button>
-                  </div>
-                </article>
+                  </td>
+                </tr>
               )
             })}
+              </tbody>
+            </table>
+            </div>
           </div>
           )
         )}
-      </section>
-
-      {/* Submissions table */}
-      {selectedForm && (
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-base font-semibold text-gray-900">{displayFormName(selectedForm.name)}</h2>
-              <span className="text-xs text-gray-400">
-                {subLoading ? '読み込み中...' : `${submissionTotal}件`}
-              </span>
+          {!loading && !loadError && visibleForms.length > 0 ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p>
+                <ListRange total={listTotal} first={listTotal === 0 ? 0 : pageStart + 1} last={Math.min(pageStart + visibleForms.length, listTotal)} />
+              </p>
+              <Pagination page={visiblePage} pageCount={pageCount} onPageChange={(next) => updateListState({ page: next })} ariaLabel="回答フォームのページ送り" />
             </div>
-            <button
-              onClick={() => {
-                submissionRequest.current++
-                setSelectedFormId(null)
-                setSubmissions([])
-                setSubmissionTotal(0)
-                setDetailSubmission(null)
-              }}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              閉じる ✕
-            </button>
-          </div>
-
-          {subLoading ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">読み込み中...</div>
-          ) : subError ? (
-            <ListState
-              kind="error"
-              title="回答を読み込めませんでした"
-              description="通信状態を確認して、もう一度読み込んでください。"
-              action={<Button onClick={() => void loadSubmissions(selectedForm.id, page, pageSize)}>回答を再読み込み</Button>}
-            />
-          ) : submissions.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">回答がありません</div>
-          ) : (
-            <>
-              <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-                <table className="w-full min-w-[700px]">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">名前</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">日時</th>
-                      {fieldKeys.slice(0, 4).map((key) => (
-                        <th key={key} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">
-                          {fieldLabels[key] || key}
-                        </th>
-                      ))}
-                      {fieldKeys.length > 4 && (
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">…</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {submissions.map((sub) => (
-                      <tr
-                        key={sub.id}
-                        onClick={() => setDetailSubmission(sub)}
-                        className="hover:bg-gray-50 cursor-pointer"
-                      >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
-                          {sub.friendId ? (
-                            <Link
-                              href={`/chats?friend=${encodeURIComponent(sub.friendId)}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-accent hover:underline"
-                            >
-                              {sub.friendName || '不明'}
-                            </Link>
-                          ) : (
-                            <span>{sub.friendName || '不明'}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                          {new Date(sub.createdAt).toLocaleString('ja-JP', {
-                            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-                          })}
-                        </td>
-                        {fieldKeys.slice(0, 4).map((key) => (
-                          <td key={key} className="px-4 py-3 text-sm text-gray-700 max-w-[200px] truncate">
-                            <AnswerValue value={sub.data[key]} thumb />
-                          </td>
-                        ))}
-                        {fieldKeys.length > 4 && (
-                          <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">他 {fieldKeys.length - 4} 項目</td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {submissionTotal > 0 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-xs text-gray-400">
-                    {(page - 1) * pageSize + 1}〜{Math.min(page * pageSize, submissionTotal)}件 / 全{submissionTotal}件
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Select
-                      aria-label="回答の表示件数"
-                      size="page-size"
-                      value={String(pageSize)}
-                      options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件表示` }))}
-                      onChange={(value) => void loadSubmissions(selectedForm.id, 1, Number(value))}
-                    />
-                    <Pagination
-                      page={page}
-                      pageCount={totalPages}
-                      disabled={subLoading}
-                      ariaLabel="回答一覧のページ送り"
-                      onPageChange={(nextPage) => void loadSubmissions(selectedForm.id, nextPage, pageSize)}
-                    />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          ) : null}
         </section>
-      )}
-
-      {/* Detail panel */}
-      {detailSubmission && (
-        <div className="fixed inset-0 z-40 flex justify-end">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setDetailSubmission(null)}
-            aria-hidden
-          />
-          <aside className="relative h-full w-full max-w-md bg-white shadow-xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">回答詳細</h3>
-              <button
-                onClick={() => setDetailSubmission(null)}
-                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-                aria-label="閉じる"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="p-5 space-y-5">
-              <div>
-                <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">回答者</div>
-                {detailSubmission.friendId ? (
-                  <Link
-                    href={`/chats?friend=${encodeURIComponent(detailSubmission.friendId)}`}
-                    className="inline-flex items-center gap-2 text-sm text-accent hover:underline"
-                  >
-                    <span className="font-medium">{detailSubmission.friendName || '不明'}</span>
-                    <span className="text-[11px] text-gray-400">→ チャットを開く</span>
-                  </Link>
-                ) : (
-                  <span className="text-sm text-gray-700">{detailSubmission.friendName || '不明'}</span>
-                )}
-              </div>
-
-              <div>
-                <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">送信日時</div>
-                <div className="text-sm text-gray-700">{formatDateTime(detailSubmission.createdAt)}</div>
-              </div>
-
-              <div>
-                <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">回答内容</div>
-                <dl className="space-y-3">
-                  {fieldKeys.length === 0 ? (
-                    <div className="text-sm text-gray-400">項目なし</div>
-                  ) : (
-                    fieldKeys.map((key) => (
-                      <div key={key} className="grid grid-cols-1 gap-1">
-                        <dt className="text-[11px] text-gray-500">{fieldLabels[key] || key}</dt>
-                        <dd className="text-sm text-gray-900 break-words whitespace-pre-wrap">
-                          <AnswerValue value={detailSubmission.data[key]} />
-                        </dd>
-                      </div>
-                    ))
-                  )}
-                </dl>
-              </div>
-            </div>
-          </aside>
-        </div>
-      )}
+      </div>
 
       {/* Rename dialog */}
       {editingForm && (
@@ -751,8 +1030,19 @@ export default function FormSubmissionsPage() {
             onClick={() => !savingName && setEditingForm(null)}
             aria-label="名前変更を閉じる"
           />
-          <div className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-            <h3 className="text-base font-semibold text-gray-900">フォーム名を変更</h3>
+          <div ref={renamePanelRef} role="dialog" aria-modal="true" aria-labelledby="rename-form-title" className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <h3 id="rename-form-title" className="text-base font-semibold text-ink">フォーム名を変更</h3>
+              <button
+                type="button"
+                onClick={() => !savingName && setEditingForm(null)}
+                disabled={savingName}
+                aria-label="閉じる"
+                className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+              >
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
             <p className="mt-1 text-xs text-gray-400">
               回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。
             </p>
@@ -791,7 +1081,7 @@ export default function FormSubmissionsPage() {
                 type="button"
                 onClick={() => void saveName()}
                 disabled={!editingName.trim() || savingName}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                className="rounded-lg bg-accent-deep px-4 py-2 text-sm font-medium text-white hover:brightness-92 disabled:opacity-50"
               >
                 {savingName ? '保存中...' : '保存'}
               </button>
@@ -800,21 +1090,172 @@ export default function FormSubmissionsPage() {
         </div>
       )}
 
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="form"
+          accountId={selectedAccountId}
+          note="フォームを分けてしまう箱です。消しても、入っていたフォームは未分類として残ります。"
+          placeholder="例: 01_来店・予約"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadForms()}
+        />
+      )}
+
+      {editingFolder && (
+        <FolderAddDialog
+          kind="form"
+          folder={editingFolder}
+          accountId={selectedAccountId}
+          note="フォームを分けてしまう箱です。削除しても、中のフォームは未分類に残ります。"
+          placeholder="例: 01_来店・予約"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void loadForms() }}
+        />
+      )}
+
       <ConfirmDialog
-        open={deleteTarget !== null}
-        title={deleteTarget ? `「${displayFormName(deleteTarget.name)}」を削除しますか？` : '回答フォームを削除しますか？'}
-        description="フォームの質問・公開設定・集まった回答を削除します。回答から友だち情報欄やタグへ反映済みの内容は残ります。この操作は元に戻せません。"
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={`削除しても、中のフォームは未分類に残ります。${
+          deletingFolderCount === null
+            ? 'いまこのフォルダに入っている件数を確認できませんでした。'
+            : `いまこのフォルダに入っているのは${deletingFolderCount.toLocaleString('ja-JP')}件です。`
+        }`}
         confirmLabel="削除する"
         destructive
-        busy={deleting}
+        busy={folderBusy}
+        error={folderError || undefined}
+        onConfirm={() => void removeFolder()}
+        onCancel={() => {
+          if (folderBusy) return
+          setDeletingFolder(null)
+          setFolderError('')
+        }}
+      />
+
+      <ConfirmDialog
+        open={moveTarget !== null}
+        title={moveTarget ? `「${displayFormName(moveTarget.name)}」をどのフォルダへ移しますか？` : 'フォルダへ移しますか？'}
+        description="回答やURLは変わりません。入れる箱だけが変わります。"
+        confirmLabel="移動する"
+        busy={moveBusy}
+        error={moveError || undefined}
+        onConfirm={() => void moveForm()}
+        onCancel={() => {
+          if (moveBusy) return
+          setMoveTarget(null)
+          setMoveError('')
+        }}
+      >
+        <RadioCardGroup legend="移動先のフォルダ" className="space-y-1">
+          {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
+            <RadioCard
+              key={folder.id}
+              name="move-folder"
+              value={folder.id}
+              checked={moveFolderId === folder.id}
+              onChange={() => setMoveFolderId(folder.id)}
+              title={folder.name}
+            />
+          ))}
+        </RadioCardGroup>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={duplicateTarget !== null}
+        title={duplicateTarget ? `「${displayFormName(duplicateTarget.name)}」を複製しますか？` : 'フォームを複製しますか？'}
+        description="質問・分岐・デザイン・回答後の設定を引き継いだ、受付停止中のフォームを作ります。集まった回答・公開状態・集計は引き継ぎません。"
+        confirmLabel="複製する"
+        busy={duplicating}
+        error={duplicateError || undefined}
+        onConfirm={() => void duplicateForm()}
+        onCancel={() => {
+          if (duplicating) return
+          setDuplicateTarget(null)
+          setDuplicateError('')
+        }}
+      >
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-ink-secondary">複製の名前</span>
+          <input
+            value={duplicateName}
+            onChange={(event) => setDuplicateName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void duplicateForm()
+            }}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </label>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        designNode="gBp2J"
+        title={deleteTarget
+          ? `「${displayFormName(deleteTarget.name)}」を${deleteImpact?.canDelete ? '削除' : 'アーカイブ'}しますか？`
+          : '回答フォームをアーカイブしますか？'}
+        description={deleteImpact?.canDelete
+          ? '未公開で回答も利用先もないため、フォームを完全に削除できます。この操作は元に戻せません。'
+          : '公開中・回答あり・利用中のフォームは削除せず、回答と利用先を残してアーカイブします。公開URLは開けなくなります。'}
+        confirmLabel={deleteImpact?.canDelete ? '削除する' : 'アーカイブする'}
+        destructive={deleteImpact?.canDelete ?? false}
+        busy={deleting || stopping || deleteImpactLoading}
         error={deleteError}
         onCancel={() => {
-          if (deleting) return
+          if (deleting || stopping) return
           setDeleteTarget(null)
+          setDeleteImpact(null)
           setDeleteError('')
         }}
-        onConfirm={() => void removeForm()}
-      />
+        onConfirm={deleteImpact && deleteImpact.recommendedAction !== 'none'
+          ? () => void removeForm()
+          : undefined}
+      >
+        {deleteImpactLoading ? (
+          <p className="text-ink-faint text-sm">公開状態・回答数・利用中の場所を確認しています。</p>
+        ) : deleteImpact ? (
+          <div className="space-y-3 text-sm">
+            <dl className="bg-canvas-sunken grid grid-cols-2 gap-2 rounded-control p-3">
+              <div><dt className="text-ink-faint text-xs">公開状態</dt><dd className="text-ink mt-1 font-medium">{deleteImpact.form.isActive ? '公開中' : '受付停止中'}</dd></div>
+              <div><dt className="text-ink-faint text-xs">集まった回答</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.submissionCount.toLocaleString('ja-JP')}件</dd></div>
+              <div><dt className="text-ink-faint text-xs">利用中の場所</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.referenceCount.toLocaleString('ja-JP')}か所</dd></div>
+              <div><dt className="text-ink-faint text-xs">開かれた回数</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.openCount.toLocaleString('ja-JP')}回</dd></div>
+            </dl>
+            {deleteImpact.answerUrl && (
+              <div>
+                <p className="text-ink-faint text-xs">開けなくなる公開URL</p>
+                <p className="text-ink mt-1 break-all text-xs">{deleteImpact.answerUrl}</p>
+              </div>
+            )}
+            {deleteImpact.references.length > 0 && (
+              <div>
+                <p className="text-ink-faint text-xs">先に差し替える利用先</p>
+                <ul className="text-ink-secondary mt-1 space-y-1 text-xs">
+                  {deleteImpact.references.map((reference, index) => (
+                    <li key={`${reference.kind}-${reference.href ?? index}`}>
+                      ・{reference.name ?? '名前を確認できない利用先'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {!deleteImpact.canDelete && deleteImpact.form.isActive && (
+              <div className="border-hairline rounded-control border p-3">
+                <p className="text-ink text-xs font-medium">受付だけ止める（おすすめ）</p>
+                <p className="text-ink-faint mt-1 text-xs">一覧と回答を残したまま、新しい回答だけを止めます。</p>
+                <Button className="mt-3" onClick={() => void stopAccepting()} disabled={stopping || deleting}>
+                  {stopping ? '停止中' : '受付だけ止める'}
+                </Button>
+              </div>
+            )}
+            {deleteImpact.submissionCount > 0 && (
+              <Button href={`/form-submissions/responses?id=${encodeURIComponent(deleteImpact.form.id)}`}>
+                回答をCSVで書き出す画面へ
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </div>
   )
 }

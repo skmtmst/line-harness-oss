@@ -1,4 +1,5 @@
 import type { FormLayout } from '@line-crm/shared';
+import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -29,8 +30,24 @@ export interface AvailabilityResponse {
   by_staff: Array<{
     staff_id: string;
     display_name: string;
-    slots: Array<{ date: string; start: string; end: string }>;
+    slots: Array<{
+      date: string;
+      start: string;
+      end: string;
+      /** 残り枠。0 は埋まった枠（カレンダーの「満」の判定に使う）。無いときは空きありと扱う。 */
+      remaining?: number;
+      /** 枠の状態（Worker が付ける。'full' は埋まった枠）。 */
+      state?: 'available' | 'limited' | 'full' | 'closed';
+    }>;
   }>;
+  /** 休みの日（お店・担当が閉めている日）。カレンダーの「休」の印に使う。 */
+  closed_dates?: string[];
+}
+
+/** LIFF 予約の設定（日時を選ぶ段の最初の形と受付期間）。 */
+export interface LiffBookingSettings {
+  liff_date_view: 'list' | 'calendar';
+  booking_window_days: number;
 }
 
 export interface BookingHistoryItem {
@@ -109,6 +126,14 @@ async function postBinary<T>(path: string, file: Blob): Promise<T> {
 // Event booking types
 // ============================================================
 
+export interface EventQuestion {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'radio' | 'checkbox';
+  required: boolean;
+  options?: string[] | null;
+}
+
 export interface EventDetail {
   id: string;
   name: string;
@@ -120,6 +145,10 @@ export interface EventDetail {
   max_bookings_per_friend: number | null;
   requires_approval: number;
   cancel_deadline_hours_before: number | null;
+  /** 満席のあとキャンセル待ちを受けるか (GET /api/liff/events/:id が行ごと返す)。 */
+  waitlist_enabled?: number | null;
+  /** 申込時のカスタム質問 (#841)。定義が無いイベントは空配列。 */
+  questions?: EventQuestion[];
 }
 
 export interface EventSlot {
@@ -132,6 +161,16 @@ export interface EventSlot {
   active_count: number;
   remaining: number | null;
 }
+
+/**
+ * 申込の返し。席が取れたときは {id, status} (status は requested=承認待ち /
+ * confirmed=確定)。満席で待ちに入ったときは 200 で {waitlisted: true} が
+ * 返る (Worker events.ts runBookingFlow/enterWaitlist)。409 だと画面側が
+ * 失敗として扱い「キャンセル待ちに入りました」を出せないための形。
+ */
+export type CreateEventBookingResponse =
+  | { id: string; status: string }
+  | { waitlisted: true; slot_id: string };
 
 export interface EventBookingMine {
   id: string;
@@ -186,6 +225,18 @@ export interface PublicForm {
   description: string | null;
   layout: FormLayout;
   isActive: boolean;
+  /** P（試し回答）：true は下書きの試し。集計に入らず、後処理も動かない。 */
+  isTest?: boolean;
+}
+
+/** フォーム回答の送信結果。未完のとき data.complete が false で返る。 */
+export interface FormSubmitResponse {
+  success: boolean;
+  data?: Record<string, unknown> & { complete?: boolean; pendingEffects?: string[] };
+  retryable?: boolean;
+  error?: string;
+  code?: string;
+  idempotencyKey?: string;
 }
 
 export const api = {
@@ -197,6 +248,8 @@ export const api = {
     if (staffId) qs.set('staff_id', staffId);
     return get<AvailabilityResponse>(`/api/liff/booking/availability?${qs}`);
   },
+  /** 予約の設定を読む。読めないときは呼び側が既定（リスト・60日）に倒す。 */
+  bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
     body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string },
@@ -214,10 +267,15 @@ export const api = {
   getEventSlots: (id: string) => get<{ items: EventSlot[] }>(`/api/liff/events/${id}/slots`),
   createEventBooking: (
     eventId: string,
-    body: { slot_id: string; customer_note?: string | null },
+    body: {
+      slot_id: string;
+      customer_note?: string | null;
+      /** カスタム質問への回答。質問id → 文字列、複数選択は文字列配列 */
+      answers?: Record<string, string | string[]>;
+    },
     idempotencyKey: string,
   ) =>
-    post<{ id: string; status: string }>(
+    post<CreateEventBookingResponse>(
       `/api/liff/events/${eventId}/bookings`,
       body,
       { 'Idempotency-Key': idempotencyKey },
@@ -226,29 +284,89 @@ export const api = {
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
   cancelMyEventBooking: (bookingId: string) =>
     post<{ ok: true }>(`/api/liff/events/me/${bookingId}/cancel`, {}),
+  /**
+   * U-3: 自分の申込の開催回変更。新しい席を確保できた時だけ元の申込を
+   * 取り消す、まとめて1つの操作。Idempotency-Key は呼び出し側が
+   * 1操作ぶん安定した鍵を使い回す。
+   */
+  changeMyEventBooking: (bookingId: string, toSlotId: string, idempotencyKey: string) =>
+    post<{ id: string; status: string }>(
+      `/api/events/liff/bookings/${bookingId}/change`,
+      { to_slot_id: toSlotId },
+      { 'Idempotency-Key': idempotencyKey },
+    ),
+  acceptEventWaitlistOffer: (token: string) =>
+    post<{
+      success: true;
+      data: { bookingId: string; status: 'confirmed'; alreadyConfirmed: boolean };
+    }>(`/api/liff/events/waitlist/${encodeURIComponent(token)}/accept`, {}),
 
   // ===== 回答フォーム =====
-  getForm: (id: string) => get<PublicForm>(`/api/forms/${id}`),
+  /**
+   * P（試し回答）：試し合言葉を添えると、未公開の下書きをお客さまの形で返す。
+   * 合言葉が違うときは 403 になる（本物としては扱わない）。
+   */
+  getForm: (id: string, testToken?: string) =>
+    get<PublicForm>(`/api/forms/${id}${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`),
   /** 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る */
   getMyLatestFormAnswer: (id: string) =>
     get<{ answers: Record<string, unknown>; createdAt: string } | null>(
       `/api/forms/${id}/my-latest`,
     ),
-  submitForm: (
+  /**
+   * フォーム回答の送信。Idempotency-Key は呼び出し側が1回答ぶん安定した
+   * UUID を作って必ず渡す(連打・再送の二重回答を防ぐ。イベント予約と同じ)。
+   * 未完のときは data.complete が false で返るので、同じキーで送り直す。
+   *
+   * HTTP の失敗では投げず、状態と本文をそのまま返す。送り直すかどうかの
+   * 判定は lib/form-submit-flow.ts の判定表が行う(投げると 409 の符号が
+   * 例外の形に埋もれて、自動送り直しの誤りを見逃しやすくなる)。
+   */
+  submitForm: async (
     id: string,
-    body: { data: Record<string, unknown>; trackedLinkId?: string },
-  ) => post<{ id: string }>(`/api/forms/${id}/submit`, body),
+    body: { data: Record<string, unknown>; trackedLinkId?: string; testToken?: string },
+    // #729: 第3引数は必須のまま(付け忘れは従来どおり型で落ちる)。
+    // 共有ヘッダ関数へ渡す際に UUID 検証を通す。呼び出し側(Form.tsx)は
+    // 所有パス外のため、この境界で検証する形に留める。
+    idempotencyKey: string,
+    // P（試し回答）：試し合言葉を添えると、下書きへの試し回答になる。
+    // 集計に入らず、後処理も動かない。
+    testToken?: string,
+  ): Promise<{ status: number; body: FormSubmitResponse | null }> => {
+    const url = new URL(`${BASE}/api/forms/${id}/submit`, window.location.origin);
+    url.searchParams.set('liffId', getLiffId());
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      // #729: ヘッダ組立は共有部品へ寄せる。認証の取得・URL・応答判定はここに残す。
+      headers: authHeaders(buildFormSubmitHeaders(toFormIdempotencyKey(idempotencyKey))),
+      body: JSON.stringify(testToken ? { ...body, testToken } : body),
+    });
+    let parsed: FormSubmitResponse | null = null;
+    try {
+      parsed = (await res.json()) as FormSubmitResponse;
+    } catch {
+      parsed = null;
+    }
+    return { status: res.status, body: parsed };
+  },
   /** 回答に添付する画像を預ける。返ってきたURLを回答に入れる */
-  uploadFormFile: (id: string, file: File) =>
+  uploadFormFile: (id: string, file: File, testToken?: string) =>
     postBinary<{ success: true; data: { key: string; url: string; mimeType: string; size: number } }>(
-      `/api/forms/${id}/files`,
+      `/api/forms/${id}/files${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`,
       file,
     ),
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),
-  webinarHeartbeat: (slug: string, sessionStartAt: number, positionSeconds: number) =>
-    post<{ ok: true }>(`/api/liff/webinars/${slug}/heartbeat`, { sessionStartAt, positionSeconds }),
+  webinarHeartbeat: (
+    slug: string,
+    sessionStartAt: number,
+    positionSeconds: number,
+    extra?: { playerState?: string; playbackRate?: number; clientAtMs?: number },
+  ) =>
+    post<{ ok: true }>(`/api/liff/webinars/${slug}/heartbeat`, {
+      sessionStartAt, positionSeconds, ...extra,
+    }),
   webinarComment: (slug: string, sessionStartAt: number, atSeconds: number, body: string) =>
     post<{ ok: true }>(`/api/liff/webinars/${slug}/comments`, { sessionStartAt, atSeconds, body }),
   webinarCtaClick: (slug: string, sessionStartAt: number) =>

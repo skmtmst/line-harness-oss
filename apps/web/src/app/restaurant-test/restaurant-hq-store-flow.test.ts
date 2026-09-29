@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const stores = readFileSync(new URL('./stores/store-list.tsx', import.meta.url), 'utf8')
 const wizard = readFileSync(new URL('./stores/new/page.tsx', import.meta.url), 'utf8')
+const terms = readFileSync(new URL('./terms/page.tsx', import.meta.url), 'utf8')
 const banner = readFileSync(new URL('./stores/store-context-banner.tsx', import.meta.url), 'utf8')
 const index = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const storesPage = readFileSync(new URL('./stores/page.tsx', import.meta.url), 'utf8')
@@ -18,8 +19,15 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(index).toContain("redirect('/hq')")
     expect(storesPage).toContain("redirect('/hq')")
     expect(stores).toContain("router.replace('/hq')")
-    expect(accountsPage).toContain("redirect('/hq')")
-    expect(accountsNewPage).toContain("redirect('/restaurant-test/stores/new')")
+    /*
+      2026-09-04: `/accounts` と `/accounts/new` の転送はどちらもやめた。
+      **統括の店舗管理と、LINE公式アカウントの設定は別のもの。**
+      **店舗を作ることと、アカウントを登録することも別**（要件 §5-3）。
+      店舗の入口はここで見張るが、`/accounts` は設計 ★V6 33-1 の一覧、
+      `/accounts/new` は 33-2 の登録になった。
+    */
+    expect(accountsPage).not.toContain("redirect('/hq')")
+    expect(accountsNewPage).not.toContain("redirect('/restaurant-test/stores/new')")
   })
 
   it('デモ作成UIと公開bootstrap呼出しを持たず、空組織を統括へ案内する', () => {
@@ -57,6 +65,17 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(wizard).toContain('type="password"')
   })
 
+  it('店舗追加と利用規約の画面名はトップバーだけに置き、戻る導線は本文に残す', () => {
+    expect(wizard).toContain("usePageTitle('店舗を追加')")
+    expect(terms).toContain("usePageTitle('利用規約')")
+    expect(wizard).toContain('統括へ戻る')
+    expect(terms).toContain('店舗追加へ戻る')
+    expect(wizard).not.toContain("@/components/layout/header")
+    expect(terms).not.toContain("@/components/layout/header")
+    expect(wizard).not.toContain('<Header')
+    expect(terms).not.toContain('<Header')
+  })
+
   it('店舗未選択の新しい統括でも規約同意から店舗登録まで進める', () => {
     expect(api).toContain('withOptionalAccount')
     expect(wizard).toContain('restaurantTestApi.termsAgreement(selectedAccountId)')
@@ -65,9 +84,9 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(wizard).toContain('統括の店舗一覧へ')
   })
 
-  it('マニュアルURLをJSXへ直書きせず、空の間は非活性にする', () => {
+  it('マニュアルURLをJSXへ直書きせず、空の間は押し口を出さない', () => {
     expect(wizard).toContain('MANUAL_LINKS')
-    expect(wizard).toContain('マニュアルは準備中です')
+    expect(wizard).toContain('if (!href) return null')
     expect(manualLinks).toContain("createOfficialAccount: ''")
     expect(manualLinks).toContain("enableMessagingApi: ''")
     expect(manualLinks).toContain("findChannelCredentials: ''")

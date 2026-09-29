@@ -1,3 +1,4 @@
+import { refreshBroadcastReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
 // 'segment' は 029 の CHECK では前から許されていたが、型だけ落ちていた。
 // 絞り込み条件（segment_conditions）で宛先を決める配信で使う。
@@ -41,16 +42,71 @@ export interface Broadcast {
   dedup_progress: string | null;
   batch_lock_at: string | null;
   track_links: number;
+  /** 何分かけて配るか。0なら一気に送る。 */
+  stealth_spread_minutes?: number;
+  /** 初回実行時に固定した、account別の共通情報値・版。 */
+  common_var_snapshot?: string | null;
+  /** Worker再試行でも変えない共通情報の判定時刻。 */
+  common_var_snapshot_at?: string | null;
+  /** SegmentConditionのJSON。segment配信だけが持つ。 */
+  segment_conditions?: string | null;
   folder_id?: string | null;
   /** 開封数を取るか。1 = 取る（既定）。 */
   measure_opens?: number;
   line_account_id?: string | null;
   alt_text?: string | null;
+  internal_memo?: string | null;
+  draft_step?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm' | null;
+  draft_payload_json?: string | null;
+  message_options_json?: string | null;
+  after_action_version_id?: string | null;
+  lock_version?: number;
+  /** 停止を受け付けた時刻（JST）。NULL なら止まっていない。#662 */
+  stopped_at?: string | null;
+  /** 停止を押した担当者。監査で「誰が止めたか」を読むために残す。 */
+  stopped_by?: string | null;
+  /** 送信の試行番号。失敗分の再送で1つ進む。provider へ渡す再送キーの一部。 */
+  send_attempt_no?: number;
+  /**
+   * 二者承認の今の状態（m12a）。
+   * none（承認がいらない・まだ頼んでいない）/ pending / approved /
+   * rejected / cancelled / expired（予約時刻を過ぎた）。
+   * 送信の段階（status）とは別の軸。未マイグレーション環境では undefined。
+   */
+  approval_status?: string | null;
+  /** 承認を頼んだ担当者（送る人）。 */
+  approval_requested_by_staff_id?: string | null;
+  /** 承認を頼んだ日時（JST）。 */
+  approval_requested_at?: string | null;
+  /** 承認を頼まれた担当者（承認する人）。 */
+  approval_approver_staff_id?: string | null;
+  /** 承認を頼むときのひとこと（任意）。 */
+  approval_note?: string | null;
+  /** 承認・差し戻しを決めた担当者。 */
+  approval_decided_by_staff_id?: string | null;
+  /** 承認・差し戻しを決めた日時（JST）。 */
+  approval_decided_at?: string | null;
+  /** 差し戻しの理由（差し戻すとき必須）。 */
+  approval_reject_reason?: string | null;
+  /** 1人運用のとき、送る人が確認で入れた人数。 */
+  approval_confirmed_count?: number | null;
 }
 
-export async function getBroadcasts(db: D1Database, accountId?: string): Promise<Broadcast[]> {
+export async function getBroadcasts(
+  db: D1Database,
+  accountId?: string,
+  scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
+  // 一覧の並び順。一覧画面の「並び順」選択と連動する。既定は新しい順。
+  opts?: { order?: 'asc' | 'desc' },
+): Promise<Broadcast[]> {
+  // 一覧に集計の最新行を同梱する。送信済みごとに insight 口を叩く N+1 を
+  // 一覧1クエリで吸収するため。LINEへの再取得は手動ボタン(fetch-insight)に寄せる。
   let sql = `SELECT b.*,
+       bi.id as insight_id,
        bi.status as insight_status,
+       bi.delivered as insight_delivered,
+       bi.unique_impression as insight_unique_impression,
+       bi.unique_click as insight_unique_click,
        bi.open_rate, bi.click_rate
 FROM broadcasts b
 LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
@@ -71,8 +127,29 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
       )
     )`;
     params.push(accountId, accountId);
+  } else if (scope) {
+    const conditions: string[] = [];
+    if (scope.allowedAccountIds.length > 0) {
+      const placeholders = scope.allowedAccountIds.map(() => '?').join(',');
+      conditions.push(`(
+        b.line_account_id IN (${placeholders})
+        OR (
+          b.target_type = 'multi-account-dedup'
+          AND b.account_ids IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM json_each(b.account_ids)
+             WHERE value IN (${placeholders})
+          )
+        )
+      )`);
+      params.push(...scope.allowedAccountIds, ...scope.allowedAccountIds);
+    }
+    if (scope.canSeeUnassigned) {
+      conditions.push('(b.line_account_id IS NULL AND b.account_ids IS NULL)');
+    }
+    sql += ` WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'}`;
   }
-  sql += ` ORDER BY COALESCE(b.sent_at, b.scheduled_at, b.created_at) DESC`;
+  sql += ` ORDER BY COALESCE(b.sent_at, b.scheduled_at, b.created_at) ${opts?.order === 'asc' ? 'ASC' : 'DESC'}`;
   const result = params.length > 0
     ? await db.prepare(sql).bind(...params).all<Broadcast>()
     : await db.prepare(sql).all<Broadcast>();
@@ -132,6 +209,13 @@ export interface CreateBroadcastInput {
    * こないので、そこで切れるようにしてある。
    */
   measureOpens?: boolean;
+  internalMemo?: string | null;
+  draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm' | null;
+  draftPayloadJson?: string | null;
+  messageOptionsJson?: string | null;
+  afterActionVersionId?: string | null;
+  /** 予定日時が入力済みでも、途中保存なら実行待ちにしない。 */
+  saveAsDraft?: boolean;
 }
 
 export async function createBroadcast(
@@ -141,13 +225,15 @@ export async function createBroadcast(
   const id = input.id ?? crypto.randomUUID();
   const now = jstNow();
 
-  const initialStatus: BroadcastStatus = input.scheduledAt ? 'scheduled' : 'draft';
+  const initialStatus: BroadcastStatus = input.saveAsDraft
+    ? 'draft'
+    : input.scheduledAt ? 'scheduled' : 'draft';
 
   await db
     .prepare(
       `INSERT INTO broadcasts
-         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, segment_conditions, folder_id, measure_opens, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, segment_conditions, folder_id, measure_opens, internal_memo, draft_step, draft_payload_json, message_options_json, after_action_version_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -169,10 +255,17 @@ export async function createBroadcast(
       input.segmentConditions ?? null,
       input.folderId ?? null,
       input.measureOpens === false ? 0 : 1,
+      input.internalMemo ?? null,
+      input.draftStep ?? null,
+      input.draftPayloadJson ?? null,
+      input.messageOptionsJson ?? null,
+      input.afterActionVersionId ?? null,
       now,
     )
     .run();
 
+  // 467: 保存で参照表を書き換える。吹き出しの templateId を読む。
+  await refreshBroadcastReferences(db, id, input.messageBubblesJson ?? null);
   return (await getBroadcastById(db, id))!;
 }
 
@@ -182,20 +275,33 @@ export type UpdateBroadcastInput = Partial<
     | 'title'
     | 'message_type'
     | 'message_content'
+    | 'message_bubbles_json'
     | 'target_type'
     | 'target_tag_id'
+    | 'segment_conditions'
+    | 'stealth_spread_minutes'
     | 'folder_id'
     | 'measure_opens'
     | 'status'
     | 'scheduled_at'
     | 'track_links'
+    | 'internal_memo'
+    | 'draft_step'
+    | 'draft_payload_json'
+    | 'message_options_json'
+    | 'after_action_version_id'
   >
->;
+> & {
+  /** 運用者がsnapshotの意味を変える編集・再予約をしたときだけtrue。 */
+  resetCommonVarSnapshot?: boolean;
+};
 
+// #772: 版を必須にし、版なし迂回を残さない。呼び元は PUT 経路だけ。
 export async function updateBroadcast(
   db: D1Database,
   id: string,
   updates: UpdateBroadcastInput,
+  expectedVersion: number,
 ): Promise<Broadcast | null> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -212,6 +318,10 @@ export async function updateBroadcast(
     fields.push('message_content = ?');
     values.push(updates.message_content);
   }
+  if (updates.message_bubbles_json !== undefined) {
+    fields.push('message_bubbles_json = ?');
+    values.push(updates.message_bubbles_json);
+  }
   if (updates.target_type !== undefined) {
     fields.push('target_type = ?');
     values.push(updates.target_type);
@@ -219,6 +329,14 @@ export async function updateBroadcast(
   if (updates.target_tag_id !== undefined) {
     fields.push('target_tag_id = ?');
     values.push(updates.target_tag_id);
+  }
+  if (updates.segment_conditions !== undefined) {
+    fields.push('segment_conditions = ?');
+    values.push(updates.segment_conditions);
+  }
+  if (updates.stealth_spread_minutes !== undefined) {
+    fields.push('stealth_spread_minutes = ?');
+    values.push(updates.stealth_spread_minutes);
   }
   if (updates.folder_id !== undefined) {
     fields.push('folder_id = ?');
@@ -240,20 +358,56 @@ export async function updateBroadcast(
     fields.push('track_links = ?');
     values.push(updates.track_links ? 1 : 0);
   }
-
-  if (fields.length > 0) {
-    values.push(id);
-    await db
-      .prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ?`)
-      .bind(...values)
-      .run();
+  if (updates.internal_memo !== undefined) {
+    fields.push('internal_memo = ?');
+    values.push(updates.internal_memo);
+  }
+  if (updates.draft_step !== undefined) {
+    fields.push('draft_step = ?');
+    values.push(updates.draft_step);
+  }
+  if (updates.draft_payload_json !== undefined) {
+    fields.push('draft_payload_json = ?');
+    values.push(updates.draft_payload_json);
+  }
+  if (updates.message_options_json !== undefined) {
+    fields.push('message_options_json = ?');
+    values.push(updates.message_options_json);
+  }
+  if (updates.after_action_version_id !== undefined) {
+    fields.push('after_action_version_id = ?');
+    values.push(updates.after_action_version_id);
   }
 
-  return getBroadcastById(db, id);
+  if (fields.length > 0) {
+    if (updates.resetCommonVarSnapshot) {
+      // 新しい試行だけ判定時刻・値を同じCAS更新内で捨てる。provider失敗後に
+      // 日時だけ入れ直す同一試行はfalseとして、固定済みsnapshotを維持する。
+      fields.push('common_var_snapshot = NULL', 'common_var_snapshot_at = NULL');
+    }
+    fields.push('lock_version = lock_version + 1');
+    const result = await db
+      .prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ? AND lock_version = ?`)
+      .bind(...values, id, expectedVersion)
+      .run();
+    if (!result.meta.changes) return null;
+  } else {
+    const current = await getBroadcastById(db, id);
+    if (!current || Number(current.lock_version ?? 1) !== expectedVersion) return null;
+  }
+
+  const saved = await getBroadcastById(db, id);
+  // 467: 吹き出しが変わった保存だけ参照を数え直す。触っていない保存では残す。
+  if (saved && updates.message_bubbles_json !== undefined) {
+    await refreshBroadcastReferences(db, id, updates.message_bubbles_json);
+  }
+  return saved;
 }
 
 export async function deleteBroadcast(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM broadcasts WHERE id = ?`).bind(id).run();
+  // 467: 消えた配信の参照を消す。
+  await removeConsumerReferences(db, 'broadcast', id);
 }
 
 export async function createBroadcastInsight(
@@ -413,7 +567,10 @@ export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> 
   // sent_at IS NULL: 完了済みは除外
   const result = await db
     .prepare(
-      `SELECT * FROM broadcasts WHERE status = 'sending' AND batch_offset >= 0 AND sent_at IS NULL AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL) ORDER BY created_at ASC`,
+      // stopped_at IS NOT NULL は停止を受け付けた配信。**新しい送信権を取らせない**
+      // ので、ここで拾わない（#662）。止めたあと再開すると stopped_at が NULL に
+      // 戻り、次の tick から続きを送る。
+      `SELECT * FROM broadcasts WHERE status = 'sending' AND batch_offset >= 0 AND sent_at IS NULL AND stopped_at IS NULL AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL) ORDER BY created_at ASC`,
     )
     .all<Broadcast>();
   return result.results;
@@ -435,6 +592,11 @@ export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> 
  *    してよい。success_count > 0 だが dedup_progress=NULL の row (resume 機能 deploy 前の
  *    停滞 / 030 migration 直後の在庫) は ID 集合が無く安全に再開できないため両系統とも
  *    対象外にし、手動対応 (D1 で sent に書き換え等) に委ねる。
+ *
+ * 3 系統とも `stopped_at IS NULL` で絞る。停止中の配信はロックを持ったまま
+ * Worker が消えていても**戻さない**。戻すと次の cron が拾って送信を続け、
+ * 運用者が押した停止が黙って無効になる (#662)。停止中のロックは再開
+ * (resumeBroadcastSending) が外す。
  */
 export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
   // 進捗ゼロ (success_count=0) の lock 用。idempotency 保護が無いので長め。0.021日 ≈ 30分。
@@ -450,7 +612,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
     .prepare(
       `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL
        WHERE status = 'sending' AND batch_offset = -1
-       AND sent_at IS NULL AND success_count = 0
+       AND sent_at IS NULL AND stopped_at IS NULL AND success_count = 0
        AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL)
        AND batch_lock_at IS NOT NULL
        AND julianday('now', '+9 hours') - julianday(batch_lock_at) > ${STALL_LOCK_REVOKE_DAYS_NO_PROGRESS}`,
@@ -470,7 +632,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
     .prepare(
       `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL
        WHERE status = 'sending' AND batch_offset = -1
-       AND sent_at IS NULL
+       AND sent_at IS NULL AND stopped_at IS NULL
        AND target_type = 'multi-account-dedup'
        AND success_count > 0 AND dedup_progress IS NOT NULL
        AND batch_lock_at IS NOT NULL
@@ -487,7 +649,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
     .prepare(
       `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL
        WHERE status = 'sending' AND batch_offset = -1
-       AND sent_at IS NULL
+       AND sent_at IS NULL AND stopped_at IS NULL
        AND target_type != 'multi-account-dedup'
        AND segment_conditions IS NOT NULL
        AND instr(replace(message_content, ' ', ''), '{{name}}') > 0
@@ -567,4 +729,138 @@ export async function updateBroadcastFailedAccountIds(
   await db.prepare(`UPDATE broadcasts SET failed_account_ids = ? WHERE id = ?`)
     .bind(JSON.stringify(failedAccountIds), broadcastId)
     .run();
+}
+
+/*
+ * 送信中の一斉配信を止める／再開する／失敗した相手だけ送り直す（#662 / N-059）。
+ *
+ * どれも**版（lock_version）付きの条件付き UPDATE 1本**で決める。
+ * 読んでから書くと、2人が同時に押したときに両方が「自分が勝った」と読む。
+ * 変わった行数（changes）を見て、1 だった者だけが先へ進む。
+ *
+ * 停止は status を動かさない。status の意味（下書き→予約→送信中→送信済み）は
+ * そのままにして、「新しい送信権をもう取らない」という別の軸を stopped_at で
+ * 持つ。status を増やすと 30 列の表を作り直すことになり、既存の
+ * `status = 'sending'` の判定すべての意味が変わる。代わりに、送信中の行を
+ * **拾う口すべて**に `stopped_at IS NULL` を足してある
+ * （getQueuedBroadcasts / recoverStalledBroadcasts / バッチ取得の CAS）。
+ */
+
+export interface BroadcastStopInput {
+  id: string;
+  expectedVersion: number;
+  actorId?: string | null;
+  at?: string;
+}
+
+/** 停止を受け付ける。送信中で、まだ止まっていなくて、版が一致したときだけ 1 を返す。 */
+export async function requestBroadcastStop(
+  db: D1Database,
+  input: BroadcastStopInput,
+): Promise<number> {
+  const result = await db
+    .prepare(
+      `UPDATE broadcasts
+          SET stopped_at = ?, stopped_by = ?, lock_version = lock_version + 1
+        WHERE id = ? AND status = 'sending' AND stopped_at IS NULL AND lock_version = ?`,
+    )
+    .bind(input.at ?? jstNow(), input.actorId ?? null, input.id, input.expectedVersion)
+    .run();
+  return result.meta.changes ?? 0;
+}
+
+/**
+ * 再開する。止まっているときだけ。
+ *
+ * `batch_offset` が -1（ロック中）のまま止まった場合は 0 に戻す。台帳が
+ * 送達済み・送達不明を覚えているので、先頭から歩き直しても二重に送らない。
+ */
+export async function resumeBroadcastSending(
+  db: D1Database,
+  input: { id: string; expectedVersion: number; segmentConditions?: string | null },
+): Promise<number> {
+  const fields = [
+    'stopped_at = NULL',
+    'stopped_by = NULL',
+    'batch_lock_at = NULL',
+    'batch_offset = CASE WHEN batch_offset < 0 THEN 0 ELSE batch_offset END',
+    'lock_version = lock_version + 1',
+  ];
+  const values: unknown[] = [];
+  if (input.segmentConditions) {
+    fields.push('segment_conditions = ?');
+    values.push(input.segmentConditions);
+  }
+  values.push(input.id, input.expectedVersion);
+  const result = await db
+    .prepare(
+      `UPDATE broadcasts SET ${fields.join(', ')}
+        WHERE id = ? AND status = 'sending' AND stopped_at IS NOT NULL AND lock_version = ?`,
+    )
+    .bind(...values)
+    .run();
+  return result.meta.changes ?? 0;
+}
+
+export interface BroadcastRetryAttemptInput {
+  id: string;
+  expectedVersion: number;
+  /**
+   * キューに載せるための絞り込み条件。tag 配信をキュー経路へ移すときだけ渡す。
+   * 500人以下の tag 配信はその場で送り切る作りで、キューを通らないため、
+   * 再送では条件の印を書いてキュー側へ寄せる。
+   */
+  segmentConditions?: string | null;
+}
+
+/**
+ * 失敗した相手だけの再送を始める。試行番号を1つ進めて、キューへ戻す。
+ *
+ * 止まっている配信と、送り終わった配信のどちらからでも始められる。
+ * **誰に送るかはここでは決めない。**台帳側（reopenFailedClaims）が
+ * failed の行だけを開け直し、送信側が sent / unknown を飛ばす。
+ */
+export async function beginBroadcastRetryAttempt(
+  db: D1Database,
+  input: BroadcastRetryAttemptInput,
+): Promise<{ changes: number; attemptNo: number | null }> {
+  const fields = [
+    'send_attempt_no = send_attempt_no + 1',
+    "status = 'sending'",
+    'sent_at = NULL',
+    'stopped_at = NULL',
+    'stopped_by = NULL',
+    'batch_offset = 0',
+    'batch_lock_at = NULL',
+    'lock_version = lock_version + 1',
+  ];
+  const values: unknown[] = [];
+  if (input.segmentConditions) {
+    fields.push('segment_conditions = ?');
+    values.push(input.segmentConditions);
+  }
+  values.push(input.id, input.expectedVersion);
+  const result = await db
+    .prepare(
+      `UPDATE broadcasts SET ${fields.join(', ')}
+        WHERE id = ? AND lock_version = ?
+          AND (status = 'sent' OR (status = 'sending' AND stopped_at IS NOT NULL))`,
+    )
+    .bind(...values)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) return { changes: 0, attemptNo: null };
+  const row = await db
+    .prepare(`SELECT send_attempt_no FROM broadcasts WHERE id = ?`)
+    .bind(input.id)
+    .first<{ send_attempt_no: number }>();
+  return { changes: 1, attemptNo: Number(row?.send_attempt_no ?? 1) };
+}
+
+/** 停止の印を読む。送信の途中で「もう止まっているか」を確かめるのに使う。 */
+export async function isBroadcastStopped(db: D1Database, id: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT stopped_at FROM broadcasts WHERE id = ?`)
+    .bind(id)
+    .first<{ stopped_at: string | null }>();
+  return !!row?.stopped_at;
 }

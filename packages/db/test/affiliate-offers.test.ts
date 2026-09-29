@@ -18,6 +18,7 @@ import {
   getMileageHistoryForFriend,
   getMileageSummaryForFriend,
   postMileageEntry,
+  processPendingMileageEvents,
   recordEngagementEvent,
   syncAffiliateConversionMileage,
 } from '../src/mileage.js';
@@ -42,7 +43,16 @@ function execSafe(db: Database.Database, sql: string): void {
   }
 }
 
+/*
+ * 移行の再生は全部同期で走る。テストごとに繰り返すとその間ワーカーが
+ * 止まり、CI が vitest の状況報告待ちで落ちる。1度だけ組み立てて中身を
+ * 控え、以後は写しから起こす。写しは独立したDBなので、テスト同士は
+ * 影響し合わない。
+ */
+let migratedSnapshot: Buffer | null = null;
+
 function setupDb(): Database.Database {
+  if (migratedSnapshot) return new Database(migratedSnapshot);
   const db = new Database(':memory:');
   execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
   const migrationFiles = readdirSync(MIGRATIONS_DIR)
@@ -51,6 +61,7 @@ function setupDb(): Database.Database {
   for (const file of migrationFiles) {
     execSafe(db, readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
   }
+  migratedSnapshot = db.serialize();
   return db;
 }
 
@@ -413,7 +424,22 @@ describe('getConversionApprovalNotifyInfo', () => {
       .run();
 
     const info = await getConversionApprovalNotifyInfo(db, 'ce-1');
-    expect(info).toEqual({ affiliateId: 'aff-1', offerName: '案件A', rewardAmount: 5000 });
+    expect(info).toEqual({
+      affiliateId: 'aff-1', offerName: '案件A', rewardAmount: 5000, notifyOnConversion: false,
+    });
+  });
+
+  test('notify_on_conversion=1 の紹介者は notifyOnConversion=true を返す', async () => {
+    sqlite.prepare(`UPDATE affiliates SET notify_on_conversion = 1 WHERE id = 'aff-1'`).run();
+    sqlite
+      .prepare(
+        `INSERT INTO conversion_events (id, conversion_point_id, friend_id, created_at, affiliate_id, approval_status)
+         VALUES ('ce-on', 'cp-1', 'f-1', '2024-01-01T00:00:00.000', 'aff-1', 'approved')`,
+      )
+      .run();
+
+    const info = await getConversionApprovalNotifyInfo(db, 'ce-on');
+    expect(info?.notifyOnConversion).toBe(true);
   });
 
   test('offer-less (generic link) attribution → null offer name, 0 reward', async () => {
@@ -431,7 +457,9 @@ describe('getConversionApprovalNotifyInfo', () => {
       .run();
 
     const info = await getConversionApprovalNotifyInfo(db, 'ce-2');
-    expect(info).toEqual({ affiliateId: 'aff-1', offerName: null, rewardAmount: 0 });
+    expect(info).toEqual({
+      affiliateId: 'aff-1', offerName: null, rewardAmount: 0, notifyOnConversion: false,
+    });
   });
 
   test('returns null for a non-attributed (affiliate_id NULL) event', async () => {
@@ -500,9 +528,11 @@ describe('mileage foundation', () => {
       lifetimeEarned: 750,
     });
     expect(await getMileageHistoryForFriend(db, 'friend-aff')).toHaveLength(1);
+    // 直接付与の台帳イベント + ルール適用キュー用の正規化イベント（N-238）の2行。
+    // 同じ承認を再送しても、どちらも冪等キーで増えない。
     expect(
       (sqlite.prepare(`SELECT COUNT(*) AS count FROM engagement_events`).get() as { count: number }).count,
-    ).toBe(1);
+    ).toBe(2);
 
     expect(await setConversionApproval(db, 'ce-mile', 'rejected')).toBe(true);
     sqlite.prepare(`UPDATE conversion_events SET approved_at = '2026-01-03' WHERE id = 'ce-mile'`).run();
@@ -515,6 +545,69 @@ describe('mileage foundation', () => {
     });
     const history = await getMileageHistoryForFriend(db, 'friend-aff');
     expect(history.map((item) => item.amount).sort((a, b) => a - b)).toEqual([-750, 750]);
+  });
+
+  // N-238: 承認された紹介成果は「たまる決めごと」のきっかけとして選べる。
+  // キューへ乗ったイベントが、対応するルールへ実際に届くことを確かめる。
+  test('an approved conversion is queued so an affiliate_conversion_approved rule can grant', async () => {
+    sqlite
+      .prepare(
+        `INSERT INTO conversion_events
+           (id, conversion_point_id, friend_id, affiliate_id,
+            attributed_ref_code, approval_status, created_at)
+         VALUES ('ce-queue', 'cp-mile', 'friend-customer', 'aff-mile', 'REF-Q', 'pending', '2026-01-01')`,
+      )
+      .run();
+    // 全店共通のルール（所属ルールの固定版が無い場合に live で読まれる）。
+    sqlite
+      .prepare(
+        `INSERT INTO mileage_rules
+           (id, program_id, name, event_type, source, amount, initial_status,
+            is_active, created_at, updated_at)
+         VALUES ('rule-aff', 'default', '紹介成果ボーナス', 'affiliate_conversion_approved',
+                 'affiliate_conversion', 40, 'available', 1, '2026-01-01', '2026-01-01')`,
+      )
+      .run();
+
+    expect(await setConversionApproval(db, 'ce-queue', 'approved')).toBe(true);
+    sqlite.prepare(`UPDATE conversion_events SET approved_at = '2026-01-02' WHERE id = 'ce-queue'`).run();
+    await syncAffiliateConversionMileage(db, 'ce-queue', 'approved');
+
+    // キューには1行だけ入る（同じ承認の再送では増えない）。
+    await syncAffiliateConversionMileage(db, 'ce-queue', 'approved');
+    expect(
+      (sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_event_queue`).get() as { count: number }).count,
+    ).toBe(1);
+
+    // キューの available_at は実行時刻で打たれるため、回収は未来日時で走らせる。
+    await processPendingMileageEvents(db, { now: '2099-01-01' });
+    // 紹介者（受益者）へルール分のマイルが届く。直接付与のマイルとは別行。
+    expect(
+      sqlite.prepare(
+        `SELECT mileage_rule_id, amount, source, source_event_id
+           FROM mileage_ledger WHERE mileage_rule_id = 'rule-aff'`,
+      ).all(),
+    ).toEqual([{
+      mileage_rule_id: 'rule-aff', amount: 40,
+      source: 'affiliate_conversion', source_event_id: 'ce-queue:2026-01-02',
+    }]);
+    expect(
+      (sqlite.prepare(
+        `SELECT beneficiary_friend_id FROM mileage_ledger WHERE mileage_rule_id = 'rule-aff'`,
+      ).get() as { beneficiary_friend_id: string }).beneficiary_friend_id,
+    ).toBe('friend-aff');
+
+    // 却下はきっかけに選べないのでキューへは入れない。
+    expect(await setConversionApproval(db, 'ce-queue', 'rejected')).toBe(true);
+    sqlite.prepare(`UPDATE conversion_events SET approved_at = '2026-01-04' WHERE id = 'ce-queue'`).run();
+    await syncAffiliateConversionMileage(db, 'ce-queue', 'rejected');
+    expect(
+      (sqlite.prepare(
+        `SELECT COUNT(*) AS count FROM mileage_event_queue q
+           JOIN engagement_events ee ON ee.id = q.engagement_event_id
+          WHERE ee.event_type = 'affiliate_conversion_rejected'`,
+      ).get() as { count: number }).count,
+    ).toBe(0);
   });
 
   test('generic events and ledger entries are idempotent', async () => {

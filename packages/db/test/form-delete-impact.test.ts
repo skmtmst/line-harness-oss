@@ -92,7 +92,14 @@ describe('回答フォームの削除影響と保管', () => {
       references: [],
       referenceCount: 0,
       answerUrl: 'https://liff.line.me/liff-account-1/?page=form&id=form-1',
+      // 影響の版。`form_accounts` への紐づけでトリガが進めるので 2 になる。
       revision: 2,
+      /*
+       * 編集の版(#723)。**1 のまま。**編集していないので進まない。
+       * ここが `revision` と同じ数になったら、編集の版が来訪や利用先の
+       * 出入りで動いていることになり、編集保存が誤って 409 になる。
+       */
+      contentRevision: 1,
       checkedAt: '2026-08-31T11:00:00.000',
       canDelete: true,
       canArchive: true,

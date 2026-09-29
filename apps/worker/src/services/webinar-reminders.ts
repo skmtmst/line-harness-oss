@@ -10,11 +10,18 @@ import {
   markWebinarRegistrationNotified,
   getFriendById,
   getLineAccountById,
+  isOperationCapabilityStopped,
+  isLineAccountTenantActive,
+  listLineAccountsWithTenantStatus,
   type Webinar,
 } from '@line-crm/db';
 import { addJitter, sleep } from './stealth.js';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
+import {
+  featureJobCanRun,
+} from './feature-enforcement.js';
 
 const LEAD_SECONDS = 300;
 
@@ -73,11 +80,32 @@ export async function processWebinarReminders(
 ): Promise<{ sent: number; failed: number }> {
   const now = Math.floor(Date.now() / 1000);
   const due = await getDueWebinarRegistrations(db, now, LEAD_SECONDS);
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   let sent = 0;
   let failed = 0;
   for (let i = 0; i < due.length; i++) {
     const reg = due[i];
     try {
+      if (reg.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(reg.account_id))) {
+        // notified_at is the terminal ledger for this legacy reminder path.
+        // Consuming it prevents an overdue send after the tenant is restored.
+        await markWebinarRegistrationNotified(db, reg.id);
+        continue;
+      }
+      if (!reg.account_id || !await featureJobCanRun(db, {
+        accountId: reg.account_id,
+        featureId: 'webinars',
+        job: 'webinar-reminders',
+      })) {
+        continue;
+      }
+      // 緊急停止 (#1050): reminder_dispatch が止まっている統括は通知済みにせず
+      // 未送信のまま残す。復旧すれば LEAD_SECONDS 内の予約が届く。
+      if (await isOperationCapabilityStopped(db, reg.account_id, 'reminder_dispatch')) {
+        continue;
+      }
       if (i > 0) await sleep(addJitter(50, 200));
       const friend = await getFriendById(db, reg.friend_id);
       if (!friend || !friend.is_following) {
@@ -100,7 +128,7 @@ export async function processWebinarReminders(
             `こちらから参加してください👇\n${buildWebinarUrl(liffId, reg.slug, reg.session_start_at)}` +
             `\n\n※この専用リンクは、閉じた後も何度でも開けます。`,
         },
-      ], reg.id, options.proxyDispatch);
+      ], reg.id, options.proxyDispatch, 'reminder_dispatch');
       // 実送信が成功した後だけ通知済みにする。失敗時は NULL のままなので次 tick で再試行。
       await markWebinarRegistrationNotified(db, reg.id);
       sent++;
@@ -119,8 +147,18 @@ export async function sendWebinarRegistrationConfirmation(
   friendId: string,
   sessionStartAt: number,
   options: WebinarProxyDeliveryOptions,
+  retryKey = crypto.randomUUID(),
+  followupLabel = '開始5分前',
 ): Promise<void> {
   try {
+    if (webinar.account_id && !await isLineAccountTenantActive(db, webinar.account_id)) {
+      return;
+    }
+    // 緊急停止 (#1050): reminder_dispatch 停止中は受付確認も送らない。
+    if (webinar.account_id &&
+        await isOperationCapabilityStopped(db, webinar.account_id, 'reminder_dispatch')) {
+      return;
+    }
     const friend = await getFriendById(db, friendId);
     if (!friend || !friend.is_following) return;
     const { accessToken, liffId } = await resolveDeliveryConfig(db, webinar.account_id, options);
@@ -133,10 +171,10 @@ export async function sendWebinarRegistrationConfirmation(
           `✅ ${fmtJstDateTime(sessionStartAt)} の回で受付しました\n\n` +
           `「${webinar.title}」\n\n` +
           `専用の入場リンクです👇\n${admissionUrl}\n\n` +
-          `開始5分前にも同じリンクをお送りします。` +
+          `${followupLabel}にも同じリンクをお送りします。` +
           `閉じた後も何度でも開けます。`,
       },
-    ], crypto.randomUUID(), options.proxyDispatch);
+    ], retryKey, options.proxyDispatch, 'reminder_dispatch');
   } catch (err) {
     console.error('webinar registration confirmation error:', err);
   }

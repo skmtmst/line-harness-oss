@@ -1,11 +1,33 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+/*
+ * 候補の欄は共通 Select（listbox）。ここで見たいのは描いた後の
+ * プロフィール候補の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { MergedPersonDetail } from '@line-crm/shared'
 import MergedDeliveryDialog from './merged-delivery-dialog'
+import MergedProfileDialog, {
+  emptyProfileCandidateDraft,
+  selectedProfileCandidateCount,
+} from './merged-profile-dialog'
 import {
   MergedAdminCard,
   MergedDeliveryCard,
@@ -17,6 +39,8 @@ import {
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const read = (path: string) => readFileSync(join(SRC, path), 'utf8')
+
+afterEach(() => vi.unstubAllGlobals())
 
 /**
  * 画面確認（`scripts/visual-qa/fixtures.mjs` の `MERGED_PERSON_DETAIL`）と
@@ -191,12 +215,70 @@ describe('配信元を変える窓', () => {
   })
 })
 
+describe('プロフィールの採用値を変える窓', () => {
+  const candidates = [{
+    fieldKey: 'display_name',
+    fieldLabel: 'LINE表示名',
+    options: [
+      {
+        candidateId: `pc_${'a'.repeat(64)}`,
+        sourceFriendId: 'friend-identity-left',
+        sourceLabel: '支店の友だち情報',
+        valuePreview: '田中 はなこ',
+        verified: false,
+      },
+      {
+        candidateId: `pc_${'b'.repeat(64)}`,
+        sourceFriendId: 'friend-identity-right',
+        sourceLabel: '本店の友だち情報',
+        valuePreview: '田中 花子',
+        verified: false,
+      },
+    ],
+  }]
+
+  it('候補を選ぶまで保存できず、画面にはマスク済み値と取得元だけを出す', () => {
+    // 共通 Select は Next.js の自動 JSX runtime 前提。SSR 単体試験でも同じ前提を置く。
+    vi.stubGlobal('React', React)
+    const draft = emptyProfileCandidateDraft(candidates)
+    const html = renderToStaticMarkup(
+      <MergedProfileDialog
+        open
+        candidates={candidates}
+        draft={draft}
+        revision={4}
+        busy={false}
+        onChange={() => {}}
+        onCancel={() => {}}
+        onSave={() => {}}
+      />,
+    )
+    expect(html).toContain('統合プロフィールを編集')
+    expect(html).toContain('田中 はなこ ／ 支店の友だち情報')
+    expect(html).toContain('読み込んだのは第4版です')
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>選んだ0項目を保存</)
+    expect(html).not.toContain(`pc_${'a'.repeat(64)}`)
+    expect(selectedProfileCandidateCount(candidates, draft)).toBe(0)
+  })
+
+  it('選んだ候補だけを保存対象にする', () => {
+    const draft = {
+      ...emptyProfileCandidateDraft(candidates),
+      display_name: { optionIndex: '1', updateMode: 'fixed' as const },
+    }
+    expect(selectedProfileCandidateCount(candidates, draft)).toBe(1)
+  })
+})
+
 describe('画面のつなぎ', () => {
   const detail = read('components/merged-person/merged-person-detail.tsx')
   const row = read('components/users/user-row.tsx')
   const page = read('app/users/page.tsx')
 
   it('撮影の押し口と対象面に印を付ける', () => {
+    // #748: 行の操作はメニュー部品経由になり、印は menuButtonProps で渡す形へ。
+    // ★V7（#748）：統合ユーザー詳細は名前から開く。撮影の仕組みは印を1回押して詳細を開くので、
+    // 「…」（メニューを開くだけ）ではなく、詳細を直接開く名前のボタンに印を付ける。
     expect(row).toContain('data-qa-open="w8W4Eh"')
     expect(detail).toContain('data-design-node="w8W4Eh"')
   })
@@ -209,6 +291,9 @@ describe('画面のつなぎ', () => {
 
   it('保存に読み込んだ版を付ける', () => {
     expect(detail).toContain('expectedRevision: person.revision')
+    expect(detail).toContain('api.mergedPeople.updateProfileValues')
+    expect(detail).toContain('api.mergedPeople.unlink')
+    expect(detail).toContain('元の友だちと過去の履歴は消さず')
   })
 
   it('同じ画面を二重に作らず、一覧の面を差し替える', () => {

@@ -7,56 +7,83 @@ const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(join(here, 'page.tsx'), 'utf8')
 
 describe('V6 シナリオ作成・配信方式 cCB7r', () => {
+  it('画面名を上部バーだけに置き、本文はパンくずとキャンセルから始める', () => {
+    expect(page).toContain("usePageTitle('シナリオを作成')")
+    expect(page).not.toContain("import Header from '@/components/layout/header'")
+    expect(page).not.toContain('<Header')
+    expect(page).toContain('<span>新規作成</span>')
+    expect(page).toContain('✕ キャンセル')
+  })
+
   it('Pencilの実Nodeと3段の進み方を表示する', () => {
     expect(page).toContain('data-design-node="cCB7r"')
     /*
-      段の見た目は共通部品（`components/shared/step-trail`）へ移した。
+      段の見た目は共通部品（`components/shared/stepper`）へ移した。
       **同じ形を2か所で別々に書かない**ため。`aria-label` と ✓ の出し方は
-      部品側の試験（`step-trail.test.tsx`）が見張る。ここでは
+      部品側の試験（`stepper.test.tsx`）が見張る。ここでは
       **この画面が3段を、正しい名前と状態で渡しているか**を見る。
     */
-    expect(page).toContain("import StepTrail from '@/components/shared/step-trail'")
+    expect(page).toContain("import Stepper from '@/components/shared/stepper'")
     expect(page).toContain('label="シナリオ作成の進み方"')
-    expect(page).toContain("{ label: 'シナリオ情報', state: 'done' }")
+    // id なし（新規）は名前と方式をこの画面でまとめて決めるので1段目は current。
+    // id あり（既存の下書きを開いた）は1段目は済んでいる（#949 N-055）。
+    expect(page).toContain("{ label: 'シナリオ情報', state: id ? 'done' : 'current' }")
     expect(page).toContain("{ label: '配信方式', state: 'current' }")
     expect(page).toContain("{ label: '1通目を設定', state: 'todo' }")
   })
 
   it('既存のシナリオ用フォルダを読み、名前と分類を同じ受け口へ保存する', () => {
-    expect(page).toContain("api.folders.list('scenario')")
+    /*
+     * SCENARIO-20: フォルダはシナリオ所属（共通なら選択中）のアカウントで
+     * 絞って取る。無指定だと別アカウントの候補が混ざる。
+     */
+    expect(page).toContain("api.folders.list('scenario', folderAccountId ?? undefined)")
     expect(page).toContain('folderId: nextFolder')
     expect(page).toContain('folderId: folderId || null')
     expect(page).toContain("setFolderId(res.data.folderId ?? '')")
-    expect(page).toContain('<option value="">未分類</option>')
-    expect(page).toContain('className="v6-select ')
+    expect(page).toContain("import Select from '@/components/shared/select'")
+    expect(page).toContain("{ value: '', label: '未分類' }")
+    expect(page).toContain("...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : [])")
+    expect(page).toContain("...folders.map((folder) => ({ value: folder.id, label: folder.name }))")
+    expect(page).toContain('aria-label="シナリオのフォルダ"')
+    expect(page).toContain('size="full"')
   })
 
   it('フォルダを取得できないとき未分類と決めつけず変更を止める', () => {
-    expect(page).toContain("useState<'loading' | 'ready' | 'error'>('loading')")
-    expect(page).toContain("disabled={!scenario || folderState !== 'ready' || detailsSaving || saving !== null}")
+    expect(page).toContain("useState<'loading' | 'ready' | 'error'>(\n    id ? 'loading' : 'ready',\n  )")
+    expect(page).toContain("disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}")
     expect(page).toContain('フォルダを確認できないため、いまは変更できません。')
     expect(page).toContain("folderState === 'error'")
-    expect(page).toContain("? '確認できません'")
+    expect(page).toContain("label: '名前を確認できません'")
     expect(page).toContain("folderState === 'loading'")
     expect(page).toContain("? '読み込み中…'")
   })
 
   it('選んだ配信方式とフォルダを保存してから3段目へ進む', () => {
     const choose = page.slice(page.indexOf('const choose = async'), page.indexOf('const continueAsDraft'))
+    // 既存（id あり）は保存してから進む。保存呼び出しは既存側の push より前。
     expect(choose.indexOf('api.scenarios.update(id, {')).toBeGreaterThan(-1)
     expect(choose.indexOf('api.scenarios.update(id, {')).toBeLessThan(
-      choose.indexOf('router.push(`/scenarios/first-step'),
+      choose.lastIndexOf('router.push(`/scenarios/first-step'),
     )
     expect(choose).toContain('folderId: folderId || null')
     expect(choose).toContain('deliveryMode: mode')
     expect(choose).toContain('router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)')
+    // 新規（id なし）はこの確定で初めて行を作り、できた id で3段目へ進む。
+    expect(choose).toContain('const createdId = await createNew(mode)')
+    expect(choose).toContain('router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)')
   })
 
   it('下書きで続ける場合も名前とフォルダの保存成功後だけ進む', () => {
     const start = page.indexOf('const continueAsDraft')
-    const draft = page.slice(start, page.indexOf("if (!id) {", start))
+    const draft = page.slice(start, page.indexOf('const selectedFolderName', start))
+    // id あり（既存）は保存してから進む。id なし（新規）はこの確定で初めて作る。
     expect(draft).toContain('const saved = await saveDetails()')
-    expect(draft).toContain('if (saved) router.push(`/scenarios/first-step')
+    // R172: 名前空欄の失敗時は進まず入力欄へ戻すため、`if (saved)` の中は
+    // 波括弧で続けている（1行のままではない）。
+    expect(draft).toContain('if (saved) {')
+    expect(draft).toContain('router.push(`/scenarios/first-step')
+    expect(draft).toContain("createNew('absolute_time')")
     expect(page).not.toContain('href={`/scenarios/first-step')
   })
 
@@ -67,11 +94,32 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
   })
 
   it('シナリオ読込中・失敗時に作成済みと表示せず方式の確定を止める', () => {
-    expect(page).toContain("useState<'loading' | 'ready' | 'error'>('loading')")
     expect(page).toContain('data-list-state={scenarioState}')
     expect(page).toContain("scenarioState === 'loading'")
     expect(page).toContain("scenarioState === 'ready' && scenario")
-    expect(page).toContain('disabled={!scenario || detailsSaving}')
-    expect(page).toContain('disabled={disabled || saving !== null}')
+    expect(page).toContain('disabled={(Boolean(id) && !scenario) || detailsSaving}')
+    // ★V7: 方式はカード全体を選ぶラジオ選択にし、確定は画面1つの主ボタン。
+    expect(page).toContain('type="radio"')
+    expect(page).toContain('name="delivery-mode"')
+    expect(page).toContain('disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}')
+  })
+
+  it('一覧の「作成」は行を作らず、この画面が確定の時点で初めて作る（#949 N-055）', () => {
+    /*
+     * 以前は一覧のボタンで POST /api/scenarios を打ち、方式選択や1通目の
+     * 設定を放り出されると名前も通も無い空の行が残った。作るのは
+     * この画面で方式（または「あとで決める」）を確定したときだけ。
+     */
+    expect(page).toContain('api.scenarios.create({')
+    const create = page.slice(page.indexOf('const createNew = async'), page.indexOf('const choose = async'))
+    expect(create).toContain('deliveryMode: mode')
+    expect(create).toContain('folderId: folderId || null')
+    // R172: 空欄の必須エラーは `rejectEmptyName` に寄せ、入力欄へ
+    // フォーカスとスクロールを移す。文言自体は変わらない。
+    expect(create).toContain('rejectEmptyName()')
+    expect(page).toContain('const rejectEmptyName')
+    expect(page).toContain('シナリオ名を入力してください')
+    // 途中で閉じても残らないことを画面でも断る。
+    expect(page).toContain('途中で閉じても一覧には残りません。')
   })
 })

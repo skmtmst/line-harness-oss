@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
+import { formatCampaignContent, formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
 
 describe('NEN配信の表示', () => {
   it('誕生日配信を発送後の負の日数として表示しない', () => {
@@ -11,12 +11,47 @@ describe('NEN配信の表示', () => {
     })).toBe('誕生日の3日前 10:00')
   })
 
-  it('購入後フォローはこれまでどおり発送完了からの日数を表示する', () => {
+  it('コラムは予約した日時と紹介文＋コラムで表示する(#728案C)', () => {
+    expect(formatCampaignTiming({
+      campaignKey: 'column',
+      delayDays: 0,
+      deliveryTime: '10:00',
+    })).toBe('予約した日時')
+  })
+
+  it('購入後フォローは設定の日数・時刻から表示する（監査 R64）', () => {
+    // 予約処理（scheduledAfter）と同じく「発送からN日後 HH:MM」で作る。
     expect(formatCampaignTiming({
       campaignKey: 'arrival_check',
-      delayDays: 5,
+      delayDays: 1,
       deliveryTime: '10:00',
-    })).toBe('発送完了から5日後 10:00')
+    })).toBe('発送から1日後 10:00')
+    expect(formatCampaignTiming({
+      campaignKey: 'review_request',
+      delayDays: 7,
+      deliveryTime: '20:00',
+    })).toBe('発送から7日後 20:00')
+    // 設定を変えたら表示も変わる（以前は固定文で変わらなかった）。
+    expect(formatCampaignTiming({
+      campaignKey: 'arrival_check',
+      delayDays: 20,
+      deliveryTime: '18:00',
+    })).toBe('発送から20日後 18:00')
+    expect(formatCampaignTiming({
+      campaignKey: 'cross_sell',
+      delayDays: 0,
+      deliveryTime: '10:00',
+    })).toBe('発送当日 10:00')
+  })
+
+  it('配信キーに対応する中身の種類を表示する', () => {
+    expect(formatCampaignContent({ campaignKey: 'arrival_check', buttonLabel: '見る' })).toBe('カルーセル 3枚')
+    // care_check は出さない・止めたキー(#728)。死んだ選択肢の表示は消し、
+    // 実キー5つだけを表に持つ。汎用文の動きは次の unknown で見る。
+    expect(formatCampaignContent({ campaignKey: 'care_check', buttonLabel: '答える' })).toBe('テキスト＋リンク')
+    expect(formatCampaignContent({ campaignKey: 'review_request', buttonLabel: '書く' })).toBe('リッチメッセージ')
+    expect(formatCampaignContent({ campaignKey: 'column', buttonLabel: 'コラムを読む' })).toBe('紹介文＋コラム')
+    expect(formatCampaignContent({ campaignKey: 'unknown', buttonLabel: null })).toBe('テキスト')
   })
 
   it('UTCの予定時刻を日本時間へ変換し、壊れた日時を生表示しない', () => {

@@ -110,7 +110,8 @@ export function ecFlexMessage(event: EcEvent, copy: EcNotificationCopy = {}): Me
       type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'sm',
       contents: [
         { type: 'text', text: '然', size: 'lg', weight: 'bold', color: '#B08D57', flex: 0 },
-        { type: 'text', text: 'NEN', size: 'xs', weight: 'bold', color: '#1B3A31', letterSpacing: '0.16em', flex: 0 },
+        // letterSpacing は LINE Flex の text に無い項目で、送信時に 400（未対応フィールド）になる（検証 2026-09-17）。
+        { type: 'text', text: 'NEN', size: 'xs', weight: 'bold', color: '#1B3A31', flex: 0 },
         { type: 'separator', color: '#D8C7A8' },
         ...(copy.test ? [{ type: 'text', text: 'TEST', size: 'xxs', weight: 'bold', color: '#9A6B2F', flex: 0 }] : []),
       ],

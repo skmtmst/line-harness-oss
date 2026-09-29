@@ -1,4 +1,5 @@
 import { ATTRIBUTION_WINDOW_DAYS } from './affiliate-attribution.js';
+import { boundedListLimit, nonNegativeListOffset } from './utils.js';
 
 // =============================================================================
 // Affiliate Report v2 + Journey aggregation (ASP)
@@ -39,6 +40,8 @@ export const FRIEND_ADD_WINNER_SUBQUERY = `
     JOIN affiliate_links al2 ON al2.ref_code = rt2.ref_code
     JOIN affiliates a2 ON a2.id = al2.affiliate_id
    WHERE rt2.friend_id = f.id
+     AND al2.line_account_id IS f.line_account_id
+     AND a2.line_account_id IS f.line_account_id
      AND julianday(rt2.created_at) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
      AND julianday(rt2.created_at) <= julianday(f.created_at)
      AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
@@ -75,11 +78,20 @@ export interface AffiliateReportV2 {
   /** revenue * commissionRate. */
   estimatedCommission: number;
   /**
-   * Confirmed reward: SUM over APPROVED attributed CVs of the offer reward_amount
-   * resolved via attributed_ref_code → affiliate_links.offer_id → affiliate_offers.
-   * Approved CVs through offer-less links contribute 0 (no reward configured).
+   * Confirmed reward: SUM over APPROVED attributed CVs of the frozen
+   * approval-time snapshot (affiliate_reward_calculations) only.
+   * 版が無い行は0(fail-closed)。支払い画面と同じ契約で、現在の案件額へ
+   * fallbackしない — レポートだけ現在値で膨らむことがないようにする。
+   * 案件に結びつかない承認済み(CV)の版は unlinkedReward に集めて含める。
    */
   confirmedReward: number;
+  /**
+   * 案件に結びつかない承認済みCVの確定額(版の合計)。byOfferに出ない分。
+   * 後から案件設定を変えても変わらない。
+   */
+  unlinkedReward: number;
+  /** 案件に結びつかない承認済みCVの件数。 */
+  unlinkedConversions: number;
   /** Per-offer breakdown for approved/pending CVs + confirmed reward. */
   byOffer: Array<{
     offerId: string;
@@ -96,6 +108,8 @@ export interface AffiliateReportV2 {
 export interface AffiliateReportOptions {
   startDate?: string;
   endDate?: string;
+  /** 所属外のlink・friend・offerを集計へ混ぜない。NULLはlegacy同士だけ一致。 */
+  lineAccountId?: string | null;
   /**
    * The canonical IDENTITY_KEY_SQL fragment (from the worker's lib/identity-key).
    * Passed in so packages/db stays decoupled from apps/worker while reusing the
@@ -114,16 +128,23 @@ export async function getAffiliateReportV2(
   opts: AffiliateReportOptions,
 ): Promise<AffiliateReportV2 | null> {
   const affiliate = await db
-    .prepare(`SELECT id, name, code, commission_rate FROM affiliates WHERE id = ?`)
+    .prepare(`SELECT id, name, code, commission_rate, line_account_id FROM affiliates WHERE id = ?`)
     .bind(affiliateId)
-    .first<{ id: string; name: string; code: string; commission_rate: number }>();
+    .first<{
+      id: string;
+      name: string;
+      code: string;
+      commission_rate: number;
+      line_account_id: string | null;
+    }>();
   if (!affiliate) return null;
 
   const { startDate, endDate, identityKeySql } = opts;
+  const lineAccountId = opts.lineAccountId ?? affiliate.line_account_id ?? null;
 
   // ── clicks: ref_tracking touches on this affiliate's links ─────────────────
-  const clickConds: string[] = ['al.affiliate_id = ?'];
-  const clickBinds: unknown[] = [affiliateId];
+  const clickConds: string[] = ['al.affiliate_id = ?', 'al.line_account_id IS ?'];
+  const clickBinds: unknown[] = [affiliateId, lineAccountId];
   if (startDate) {
     clickConds.push('julianday(rt.created_at) >= julianday(?)');
     clickBinds.push(startDate);
@@ -146,17 +167,20 @@ export async function getAffiliateReportV2(
   const linkClicksRow = await db
     .prepare(
       `SELECT COALESCE(SUM(click_count), 0) AS link_clicks
-         FROM affiliate_links WHERE affiliate_id = ?`,
+         FROM affiliate_links WHERE affiliate_id = ? AND line_account_id IS ?`,
     )
-    .bind(affiliateId)
+    .bind(affiliateId, lineAccountId)
     .first<{ link_clicks: number }>();
 
   // ── friendAdds: friends whose add-time last-touch is this affiliate ────────
   // Correlated subquery resolves each friend's winning affiliate at their
   // created_at; the outer WHERE keeps only friends won by this affiliate.
   // friends.created_at date filter (if given) bounds which adds are counted.
-  const friendAddConds: string[] = [`(${FRIEND_ADD_WINNER_SUBQUERY}) = ?`];
-  const friendAddBinds: unknown[] = [affiliateId];
+  const friendAddConds: string[] = [
+    `(${FRIEND_ADD_WINNER_SUBQUERY}) = ?`,
+    'f.line_account_id IS ?',
+  ];
+  const friendAddBinds: unknown[] = [affiliateId, lineAccountId];
   if (startDate) {
     friendAddConds.push('julianday(f.created_at) >= julianday(?)');
     friendAddBinds.push(startDate);
@@ -188,8 +212,20 @@ export async function getAffiliateReportV2(
   // is applied consistently.
   const STATUS_EXPR = `COALESCE(ce.approval_status, 'pending')`;
 
-  const cvConds: string[] = ['ce.affiliate_id = ?'];
-  const cvBinds: unknown[] = [affiliateId];
+  const cvConds: string[] = [
+    'ce.affiliate_id = ?',
+    `EXISTS (
+      SELECT 1 FROM friends cv_friend
+       WHERE cv_friend.id = ce.friend_id
+         AND cv_friend.line_account_id IS ?
+    )`,
+    `EXISTS (
+      SELECT 1 FROM conversion_points cv_point
+       WHERE cv_point.id = ce.conversion_point_id
+         AND cv_point.line_account_id IS ?
+    )`,
+  ];
+  const cvBinds: unknown[] = [affiliateId, lineAccountId, lineAccountId];
   if (startDate) {
     cvConds.push('julianday(ce.created_at) >= julianday(?)');
     cvBinds.push(startDate);
@@ -209,11 +245,13 @@ export async function getAffiliateReportV2(
               COALESCE(SUM(cp.value), 0) AS value
          FROM conversion_events ce
          JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-        WHERE ${cvWhere} AND ${STATUS_EXPR} != 'rejected'
+        WHERE ${cvWhere}
+          AND cp.line_account_id IS ?
+          AND ${STATUS_EXPR} != 'rejected'
         GROUP BY cp.id, cp.name
         ORDER BY count DESC`,
     )
-    .bind(...cvBinds)
+    .bind(...cvBinds, lineAccountId)
     .all<{ conversion_point_id: string; name: string; count: number; value: number }>();
 
   const conversionsByPoint = byPoint.results.map((r) => ({
@@ -247,28 +285,41 @@ export async function getAffiliateReportV2(
   // headline conversions excludes rejected.
   const conversions = conversionsPending + conversionsApproved;
 
-  // confirmedReward + byOffer: JOIN approved CVs → link → offer, SUM reward_amount.
-  // JOIN-based (no IN fan-out). Approved CVs whose link has no offer resolve to a
-  // NULL offer row → contribute 0 and never appear in byOffer (LEFT JOIN would
-  // add an off.id IS NULL bucket we don't want).
+  // confirmedReward + byOffer: JOIN approved CVs → link → offer.
+  // JOIN-based (no IN fan-out). Approved CVs whose link has no offer never
+  // appear in byOffer; 凍結した版の分は unlinkedReward に集める。
   //
-  // confirmedReward is computed as the byOffer sum so both stay consistent.
+  // 金額は承認時の版だけを使う: 確定額(confirmed)は承認後に案件の固定額を
+  // 編集しても変わらない。版が無い行は0(支払い画面と同じfail-closed契約。
+  // 現在の案件額へfallbackしない)。件数と1件あたりの表示額(rewardAmount)は
+  // 現在の設定値のままなので、編集後は confirmed と件数×単価が一致しない
+  // ことがある(版に凍結された証拠としてそのまま残す)。
   const offerRows = await db
     .prepare(
       `SELECT off.id AS offer_id,
               off.name AS offer_name,
               off.reward_amount AS reward_amount,
               SUM(CASE WHEN ${STATUS_EXPR} = 'approved' THEN 1 ELSE 0 END) AS approved,
-              SUM(CASE WHEN ${STATUS_EXPR} = 'pending' THEN 1 ELSE 0 END) AS pending
+              SUM(CASE WHEN ${STATUS_EXPR} = 'pending' THEN 1 ELSE 0 END) AS pending,
+              COALESCE(SUM(CASE WHEN ${STATUS_EXPR} = 'approved'
+                THEN COALESCE(calc.amount_minor, 0) ELSE 0 END), 0) AS confirmed
          FROM conversion_events ce
          JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
          JOIN affiliate_offers off ON off.id = al.offer_id
-        WHERE ${cvWhere} AND ${STATUS_EXPR} != 'rejected'
+         LEFT JOIN affiliate_reward_calculations calc
+           ON calc.conversion_event_id = ce.id
+          AND calc.formula IN ('rate', 'fixed', 'legacy')
+          AND calc.line_account_id IS ?
+          AND calc.affiliate_id IS ?
+        WHERE ${cvWhere}
+          AND al.line_account_id IS ?
+          AND off.line_account_id IS ?
+          AND ${STATUS_EXPR} != 'rejected'
         GROUP BY off.id, off.name, off.reward_amount
         ORDER BY approved DESC, off.name ASC`,
     )
-    .bind(...cvBinds)
-    .all<{ offer_id: string; offer_name: string; reward_amount: number; approved: number; pending: number }>();
+    .bind(lineAccountId, affiliateId, ...cvBinds, lineAccountId, lineAccountId)
+    .all<{ offer_id: string; offer_name: string; reward_amount: number; approved: number; pending: number; confirmed: number }>();
 
   const byOffer = offerRows.results.map((r) => ({
     offerId: r.offer_id,
@@ -276,9 +327,36 @@ export async function getAffiliateReportV2(
     rewardAmount: r.reward_amount,
     conversionsApproved: r.approved,
     conversionsPending: r.pending,
-    confirmedReward: r.approved * r.reward_amount,
+    confirmedReward: r.confirmed,
   }));
-  const confirmedReward = byOffer.reduce((s, o) => s + o.confirmedReward, 0);
+  // 案件に結びつかない承認済みCVの版(主にlinkなしrate)。byOfferに出ない
+  // 分をここで拾い、確定額へ足す。版が無い行は0(約束できない金額は盛らない)。
+  const unlinkedRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS n,
+              COALESCE(SUM(calc.amount_minor), 0) AS amt
+         FROM conversion_events ce
+         JOIN affiliate_reward_calculations calc
+           ON calc.conversion_event_id = ce.id
+          AND calc.formula IN ('rate', 'fixed', 'legacy')
+          AND calc.line_account_id IS ?
+          AND calc.affiliate_id IS ?
+        WHERE ${cvWhere}
+          AND ${STATUS_EXPR} = 'approved'
+          AND NOT EXISTS (
+            SELECT 1
+              FROM affiliate_links al
+              JOIN affiliate_offers off ON off.id = al.offer_id
+             WHERE al.ref_code = ce.attributed_ref_code
+               AND al.line_account_id IS ?
+               AND off.line_account_id IS ?
+          )`,
+    )
+    .bind(lineAccountId, affiliateId, ...cvBinds, lineAccountId, lineAccountId)
+    .first<{ n: number; amt: number }>();
+  const unlinkedReward = Math.round(Number(unlinkedRow?.amt ?? 0));
+  const unlinkedConversions = Number(unlinkedRow?.n ?? 0);
+  const confirmedReward = byOffer.reduce((s, o) => s + o.confirmedReward, 0) + unlinkedReward;
 
   // ── duplicateFlags: attributed friends sharing an identity_key ─────────────
   // "Attributed friend" here = friend whose add-time last-touch is this
@@ -291,12 +369,15 @@ export async function getAffiliateReportV2(
       `WITH attributed AS (
          SELECT friends.id AS friend_id, (${identityKeySql}) AS identity_key
            FROM friends
-          WHERE (
+          WHERE friends.line_account_id IS ?
+            AND (
             SELECT al2.affiliate_id
               FROM ref_tracking rt2
               JOIN affiliate_links al2 ON al2.ref_code = rt2.ref_code
               JOIN affiliates a2 ON a2.id = al2.affiliate_id
              WHERE rt2.friend_id = friends.id
+               AND al2.line_account_id IS friends.line_account_id
+               AND a2.line_account_id IS friends.line_account_id
                AND julianday(rt2.created_at) >= julianday(friends.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
                AND julianday(rt2.created_at) <= julianday(friends.created_at)
                AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
@@ -313,7 +394,7 @@ export async function getAffiliateReportV2(
          JOIN dup_keys d ON d.identity_key = a.identity_key
         ORDER BY a.identity_key, a.friend_id`,
     )
-    .bind(affiliateId)
+    .bind(lineAccountId, affiliateId)
     .all<{ friend_id: string; identity_key: string }>();
 
   const duplicateFlags = dupRows.results.map((r) => ({
@@ -337,6 +418,8 @@ export async function getAffiliateReportV2(
     revenue,
     estimatedCommission,
     confirmedReward,
+    unlinkedReward,
+    unlinkedConversions,
     byOffer,
     duplicateFlags,
   };
@@ -382,6 +465,7 @@ export interface AffiliateLinkStat {
 export async function getAffiliateLinkStats(
   db: D1Database,
   affiliateId: string,
+  lineAccountId?: string | null,
 ): Promise<Map<string, AffiliateLinkStat>> {
   const stats = new Map<string, AffiliateLinkStat>();
   const ensure = (refCode: string): AffiliateLinkStat => {
@@ -400,16 +484,20 @@ export async function getAffiliateLinkStats(
   // Approval-aware: rejected CVs are excluded from every count. `conversions`
   // is the non-rejected total (approved + pending) for backward compatibility;
   // NULL approval_status is treated as pending (historical rows).
+  const hasAccount = arguments.length >= 3;
   const cvRows = await db
     .prepare(
       `SELECT attributed_ref_code AS ref_code,
               SUM(CASE WHEN COALESCE(approval_status, 'pending') = 'approved' THEN 1 ELSE 0 END) AS approved,
               SUM(CASE WHEN COALESCE(approval_status, 'pending') = 'pending' THEN 1 ELSE 0 END) AS pending
-         FROM conversion_events
-        WHERE affiliate_id = ? AND attributed_ref_code IS NOT NULL
+         FROM conversion_events ce
+         JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
+         JOIN friends f ON f.id = ce.friend_id
+        WHERE ce.affiliate_id = ? AND ce.attributed_ref_code IS NOT NULL
+          ${hasAccount ? 'AND al.line_account_id IS ? AND f.line_account_id IS ?' : ''}
         GROUP BY attributed_ref_code`,
     )
-    .bind(affiliateId)
+    .bind(affiliateId, ...(hasAccount ? [lineAccountId ?? null, lineAccountId ?? null] : []))
     .all<{ ref_code: string; approved: number; pending: number }>();
   for (const r of cvRows.results) {
     const s = ensure(r.ref_code);
@@ -432,6 +520,8 @@ export async function getAffiliateLinkStats(
                JOIN affiliate_links al2 ON al2.ref_code = rt2.ref_code
                JOIN affiliates a2 ON a2.id = al2.affiliate_id
               WHERE rt2.friend_id = f.id
+                AND al2.line_account_id IS f.line_account_id
+                AND a2.line_account_id IS f.line_account_id
                 AND julianday(rt2.created_at) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
                 AND julianday(rt2.created_at) <= julianday(f.created_at)
                 AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
@@ -440,11 +530,12 @@ export async function getAffiliateLinkStats(
            ) AS winner_ref_code
              FROM friends f
             WHERE (${FRIEND_ADD_WINNER_SUBQUERY}) = ?
+              ${hasAccount ? 'AND f.line_account_id IS ?' : ''}
          )
         WHERE winner_ref_code IS NOT NULL
         GROUP BY winner_ref_code`,
     )
-    .bind(affiliateId)
+    .bind(affiliateId, ...(hasAccount ? [lineAccountId ?? null] : []))
     .all<{ ref_code: string; friend_adds: number }>();
   for (const r of faRows.results) {
     ensure(r.ref_code).friendAdds = r.friend_adds;
@@ -695,6 +786,42 @@ export interface ConversionApprovalRow {
    * duplicate heuristic reapplied per affiliate. Fraud-review signal only.
    */
   duplicateFlag: boolean;
+  /**
+   * 承認済みで案件の付帯動作(タグ付与・シナリオ開始)がまだ終わっていない行。
+   * runApprovedConversionOfferActions の「成功」と同じ判定を一覧時に計算する:
+   * タグは付与済みかつ台帳未完なし、シナリオは未完購読または
+   * 'conversion-offer:'+eventId の購読行(完了含む)があれば済み。
+   * 停止中の案件・動作未設定・未承認の行は false。
+   */
+  offerActionsIncomplete: boolean;
+  /**
+   * 成果地点が属するLINEアカウント。キューのアカウント絞り(N-218)は
+   * scope と同じ `cp.line_account_id` で数える。未割当の地点は null。
+   */
+  lineAccountId: string | null;
+  /** アカウント名。削除済み・未割当は null（画面側で未設定と出す）。 */
+  lineAccountName: string | null;
+  /**
+   * IDEA-16: 成果の起こりになった注文番号（記録時に metadata へ残した
+   * 根拠）。注文由来でない成果は null。検索と詳細の根拠表示に使う。
+   */
+  orderNumber: string | null;
+  /**
+   * 同じ注文番号でこのアカウントに届いている最新の注文状態
+   * （current/refunded/cancelled）。注文が見つからない・注文由来でない
+   * 成果は null。返金・取消済みの注文を承認しないための確認材料。
+   */
+  orderStatus: 'current' | 'refunded' | 'cancelled' | null;
+  /**
+   * 同じ注文番号・同じ成果地点の帰属成果がほかにもあるとき true。
+   * 同じ注文が別の出来事IDで届き直したときに立つ二重計上の候補。
+   * 自動で却下せず、根拠（注文番号）と一緒に人へ見せる。
+   */
+  sameOrderDuplicate: boolean;
+  /** 承認時に固定された報酬の版の金額。承認前・計算不可は null（未確定）。 */
+  rewardAmount: number | null;
+  /** 支払い確定（締めで起きた credit 行）の状態。settled/paid/reversed 等。無ければ null。 */
+  rewardEntryStatus: string | null;
 }
 
 /**
@@ -719,8 +846,8 @@ export async function getConversionApprovalQueue(
   },
 ): Promise<ConversionApprovalRow[]> {
   const { status, identityKeySql } = opts;
-  const limit = opts.limit ?? 200;
-  const offset = opts.offset ?? 0;
+  const limit = boundedListLimit(opts.limit, 200);
+  const offset = nonNegativeListOffset(opts.offset);
   const scopeCondition = opts.scope.allowedAccountIds.length > 0
     ? `(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`
     : opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0';
@@ -744,6 +871,29 @@ export async function getConversionApprovalQueue(
            FROM attributed_cv
           GROUP BY affiliate_id, identity_key
          HAVING COUNT(*) >= 2
+       ),
+       /*
+        * IDEA-16: 同じ注文番号・同じ成果地点へ帰属成果が2件以上ある組を
+        * 拾う。同じ注文が別の出来事IDで届き直すと冪等キーが違うため別の
+        * 成果が立ち、二重報酬の候補になる。番号は受信体で数値のことが
+        * あるため TEXT に寄せてから数える。
+        * 注文番号はアカウントを越えて同じ番号が来ることがあるため、
+        * 友だちの所属アカウントごとに数える。アカウントをまたぐ一致は
+        * 別店の注文なので、重複の候補には挙げない。
+        */
+       dup_orders AS (
+         SELECT ce2.conversion_point_id AS point_id,
+                CAST(json_extract(ce2.metadata, '$.orderNumber') AS TEXT) AS order_number,
+                f2.line_account_id AS line_account_id
+           FROM conversion_events ce2
+           JOIN friends f2 ON f2.id = ce2.friend_id
+          WHERE ce2.affiliate_id IS NOT NULL
+            AND json_valid(ce2.metadata)
+            AND json_extract(ce2.metadata, '$.orderNumber') IS NOT NULL
+          GROUP BY ce2.conversion_point_id,
+                   CAST(json_extract(ce2.metadata, '$.orderNumber') AS TEXT),
+                   f2.line_account_id
+         HAVING COUNT(*) >= 2
        )
        SELECT
          ce.id AS event_id,
@@ -759,13 +909,54 @@ export async function getConversionApprovalQueue(
          cp.value AS value,
          ce.approval_status AS approval_status,
          (${identityKeySql}) AS identity_key,
-         CASE WHEN dk.identity_key IS NOT NULL THEN 1 ELSE 0 END AS duplicate_flag
+         CASE WHEN dk.identity_key IS NOT NULL THEN 1 ELSE 0 END AS duplicate_flag,
+         CASE WHEN ce.approval_status = 'approved'
+                AND off.id IS NOT NULL AND off.is_active = 1
+                AND al.affiliate_id = ce.affiliate_id
+                AND (
+                  (off.tag_id IS NOT NULL AND (
+                      NOT EXISTS (SELECT 1 FROM friend_tags ft
+                                   WHERE ft.friend_id = ce.friend_id
+                                     AND ft.tag_id = off.tag_id)
+                      OR EXISTS (SELECT 1 FROM friend_tag_side_effect_runs tr
+                                  WHERE tr.friend_id = ce.friend_id
+                                    AND tr.tag_id = off.tag_id
+                                    AND tr.status != 'completed')))
+               OR (off.scenario_id IS NOT NULL
+                      AND NOT EXISTS (SELECT 1 FROM friend_scenarios fs
+                                       WHERE fs.friend_id = ce.friend_id
+                                         AND fs.scenario_id = off.scenario_id
+                                         AND fs.status != 'completed')
+                      AND NOT EXISTS (SELECT 1 FROM friend_scenarios fsd
+                                       WHERE fsd.id = 'conversion-offer:' || ce.id
+                                         AND fsd.friend_id = ce.friend_id
+                                         AND fsd.scenario_id = off.scenario_id)))
+              THEN 1 ELSE 0 END AS offer_actions_incomplete,
+         cp.line_account_id AS line_account_id,
+         la.name AS line_account_name,
+         CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT) AS order_number,
+         (SELECT eo.normalized_status
+            FROM ec_orders eo
+           WHERE eo.line_account_id = friends.line_account_id
+             AND eo.order_number = CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT)
+           ORDER BY eo.updated_at DESC, eo.id DESC LIMIT 1) AS order_status,
+         CASE WHEN od.order_number IS NOT NULL THEN 1 ELSE 0 END AS same_order_flag,
+         calc.amount_minor AS reward_amount_minor,
+         credit.status AS reward_entry_status
        FROM conversion_events ce
        JOIN friends ON friends.id = ce.friend_id
        LEFT JOIN affiliates a ON a.id = ce.affiliate_id
        JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+       LEFT JOIN line_accounts la ON la.id = cp.line_account_id
        LEFT JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+       LEFT JOIN affiliate_reward_calculations calc ON calc.conversion_event_id = ce.id
+       LEFT JOIN affiliate_reward_entries credit
+              ON credit.conversion_event_id = ce.id AND credit.entry_type = 'credit'
+       LEFT JOIN dup_orders od
+              ON od.point_id = ce.conversion_point_id
+             AND od.order_number = CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT)
+             AND od.line_account_id IS friends.line_account_id
        LEFT JOIN dup_keys dk
               ON dk.affiliate_id = ce.affiliate_id
              AND dk.identity_key = (${identityKeySql})
@@ -790,6 +981,14 @@ export async function getConversionApprovalQueue(
       value: number | null;
       approval_status: 'pending' | 'approved' | 'rejected';
       duplicate_flag: number;
+      offer_actions_incomplete: number;
+      line_account_id: string | null;
+      line_account_name: string | null;
+      order_number: string | null;
+      order_status: 'current' | 'refunded' | 'cancelled' | null;
+      same_order_flag: number;
+      reward_amount_minor: number | null;
+      reward_entry_status: string | null;
     }>();
 
   return result.results.map((r) => ({
@@ -806,5 +1005,13 @@ export async function getConversionApprovalQueue(
     value: r.value,
     approvalStatus: r.approval_status,
     duplicateFlag: r.duplicate_flag === 1,
+    offerActionsIncomplete: r.offer_actions_incomplete === 1,
+    lineAccountId: r.line_account_id,
+    lineAccountName: r.line_account_name,
+    orderNumber: r.order_number,
+    orderStatus: r.order_status,
+    sameOrderDuplicate: r.same_order_flag === 1,
+    rewardAmount: r.reward_amount_minor == null ? null : Number(r.reward_amount_minor),
+    rewardEntryStatus: r.reward_entry_status,
   }));
 }

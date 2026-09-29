@@ -1,5 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
+  countBroadcastMessageAssetsByKind,
   createBroadcastMessageAsset,
   deleteBroadcastMessageAsset,
   getBroadcastMessageAsset,
@@ -9,12 +10,84 @@ import {
   type BroadcastMessageAssetKind,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { validateAssetPayload } from '@line-crm/shared';
 import { requireRole } from '../middleware/role-guard.js';
 import { storeBroadcastMedia } from '../services/broadcast-media-storage.js';
+import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
+import { ensureFileScanForUpload } from './file-scan.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const broadcastMessageAssets = new Hono<Env>();
 const ASSET_KINDS = new Set<BroadcastMessageAssetKind>(['rich_message', 'card_message', 'coupon', 'research']);
+const BROADCAST_MEDIA_TYPES = {
+  'image/jpeg': { extensions: ['jpg', 'jpeg'], storedExtension: 'jpg' },
+  'image/png': { extensions: ['png'], storedExtension: 'png' },
+  'video/mp4': { extensions: ['mp4'], storedExtension: 'mp4' },
+} as const;
+
+type BroadcastMediaType = keyof typeof BROADCAST_MEDIA_TYPES;
+
+function safeDecodeFilename(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function detectedMediaType(bytes: Uint8Array): BroadcastMediaType | null {
+  if (bytes.length >= 8
+    && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+    && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a) {
+    return 'image/png';
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (bytes.length >= 12
+    && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    return 'video/mp4';
+  }
+  return null;
+}
+
+export function validateBroadcastMediaUpload(
+  bytes: Uint8Array,
+  declaredType: string,
+  encodedFilename: string | undefined,
+): { ok: true; mimeType: BroadcastMediaType; filename: string } | { ok: false; error: string } {
+  if (!(declaredType in BROADCAST_MEDIA_TYPES)) {
+    return { ok: false, error: 'JPEG・PNG・MP4のみアップロードできます' };
+  }
+  const actualType = detectedMediaType(bytes);
+  if (!actualType || actualType !== declaredType) {
+    return { ok: false, error: 'ファイルの内容と形式が一致しません' };
+  }
+  const filename = safeDecodeFilename(encodedFilename ?? '').trim();
+  const extension = filename.match(/\.([^.]+)$/)?.[1]?.toLowerCase();
+  if (
+    !extension ||
+    !(BROADCAST_MEDIA_TYPES[actualType].extensions as readonly string[]).includes(extension)
+  ) {
+    return { ok: false, error: 'ファイル名の拡張子と内容が一致しません' };
+  }
+  return { ok: true, mimeType: actualType, filename };
+}
+
+async function readPrefix(stream: ReadableStream<Uint8Array>, length: number): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const bytes: number[] = [];
+  try {
+    while (bytes.length < length) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes.push(...chunk.value.slice(0, length - bytes.length));
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  return Uint8Array.from(bytes);
+}
 
 async function adminAccountScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -46,16 +119,16 @@ function serialize(row: BroadcastMessageAsset) {
   };
 }
 
+/**
+ * 素材の保存時の形の検査。
+ *
+ * 枚数・必須項目の数え方は画面と Worker で1つ（`@line-crm/shared`）。
+ * 2か所に散ると、画面では10枚まで作れるのに API が9枚で止める、
+ * という作り終えてから保存できない形になる（監査 R141）。
+ */
 function validatePayload(kind: BroadcastMessageAssetKind, payload: unknown): string | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return 'payload must be an object';
-  const value = payload as Record<string, unknown>;
-  if (kind === 'card_message') {
-    if (!Array.isArray(value.cards) || value.cards.length < 1 || value.cards.length > 9) {
-      return 'カードは1〜9枚で設定してください';
-    }
-  }
-  if (kind === 'rich_message' && typeof value.imageUrl !== 'string') return '画像を設定してください';
-  return null;
+  return validateAssetPayload(kind, payload as Record<string, unknown>);
 }
 
 broadcastMessageAssets.get('/api/broadcast-message-assets', async (c) => {
@@ -71,6 +144,28 @@ broadcastMessageAssets.get('/api/broadcast-message-assets', async (c) => {
     ? scope.canSeeUnassigned
     : scope.allowedAccountIds.includes(row.line_account_id));
   return c.json({ success: true, data: rows.map(serialize) });
+});
+
+/*
+ * PERF-04: 種類ごとの件数だけを返す口。
+ * 一覧の初期表示は「種類の札の件数」だけで足りるのに、これまでは
+ * 各行の payload まで取って件数を数えていた。中身は種類を開いたとき
+ * 従来どおり /api/broadcast-message-assets?kind=… で取る。
+ * 数える範囲は一覧と同じ（アカウント可視範囲＋任意の lineAccountId 絞り込み）。
+ */
+broadcastMessageAssets.get('/api/broadcast-message-assets/counts', async (c) => {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const { scope, where } = await adminAccountScope(c);
+  const counts = await countBroadcastMessageAssetsByKind(
+    c.env.DB,
+    where,
+    scope.allowedAccountIds,
+    lineAccountId || undefined,
+  );
+  return c.json({ success: true, data: counts });
 });
 
 broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner', 'admin'), async (c) => {
@@ -113,30 +208,97 @@ broadcastMessageAssets.delete('/api/broadcast-message-assets/:id', requireRole('
     : c.json({ success: false, error: 'Not found' }, 404);
 });
 
+// LINEが取得する素材は認証外の経路で返す。保存時に検証した拡張子だけを許し、
+// R2メタデータを信用せず安全なContent-Typeを固定する。
+broadcastMessageAssets.get('/images/broadcast-media/:filename', async (c) => {
+  const filename = c.req.param('filename');
+  const match = filename.match(/^([0-9a-f-]{36})\.(jpg|png|mp4)$/i);
+  if (!match) return c.json({ success: false, error: 'Not found' }, 404);
+  const contentType = match[2].toLowerCase() === 'jpg'
+    ? 'image/jpeg'
+    : match[2].toLowerCase() === 'png'
+      ? 'image/png'
+      : 'video/mp4';
+  // 検査が終わるまで配信には出さない。記録が無い古いファイルは通す。
+  const broadcastGate = await checkKeyGate(c.env.DB, c.env.IMAGES, 'broadcast_asset', `broadcast-media/${filename}`);
+  if (!broadcastGate.allowed) {
+    return c.json({ success: false, code: broadcastGate.code, error: broadcastGate.message }, 409);
+  }
+  const object = await c.env.IMAGES.get(`broadcast-media/${filename}`);
+  if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': contentType,
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      ETag: object.etag,
+    },
+  });
+});
+
 broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole('owner', 'admin'), async (c) => {
-  const mimeType = (c.req.header('Content-Type') ?? '').split(';')[0];
+  const declaredType = (c.req.header('Content-Type') ?? '').split(';')[0];
   const contentLength = Number(c.req.header('Content-Length'));
-  const maxBytes = mimeType === 'video/mp4' ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
-  if (!['image/jpeg', 'image/png', 'video/mp4'].includes(mimeType)) {
+  const maxBytes = declaredType === 'video/mp4' ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (!(declaredType in BROADCAST_MEDIA_TYPES)) {
     return c.json({ success: false, error: 'JPEG・PNG・MP4のみアップロードできます' }, 400);
   }
   if (!Number.isFinite(contentLength) || contentLength <= 0) {
     return c.json({ success: false, error: 'Content-Length is required' }, 411);
   }
   if (contentLength > maxBytes) {
-    return c.json({ success: false, error: mimeType === 'video/mp4' ? '動画は200MB以下にしてください' : '画像は10MB以下にしてください' }, 400);
+    return c.json({ success: false, error: declaredType === 'video/mp4' ? '動画は200MB以下にしてください' : '画像は10MB以下にしてください' }, 400);
   }
   if (!c.req.raw.body) return c.json({ success: false, error: 'File body is required' }, 400);
+  const [inspectionBody, storageBody] = c.req.raw.body.tee();
+  const prefix = await readPrefix(inspectionBody, 16);
+  const validation = validateBroadcastMediaUpload(
+    prefix,
+    declaredType,
+    c.req.header('X-Filename'),
+  );
+  if (!validation.ok) {
+    await storageBody.cancel().catch(() => undefined);
+    return c.json({ success: false, error: validation.error }, 400);
+  }
+  // 先頭だけでも分かる脅威（実行ファイルの印）は保存の前に落とす。
+  const prefixCheck = builtinFileScan(prefix, {
+    filename: validation.filename,
+    mimeType: validation.mimeType,
+    sizeBytes: contentLength,
+    width: 1,
+    height: 1,
+  });
+  if (prefixCheck.verdict === 'quarantined'
+    && (prefixCheck.reasonCode === 'executable_signature' || prefixCheck.reasonCode === 'office_macro')) {
+    await storageBody.cancel().catch(() => undefined);
+    return c.json({ success: false, code: 'file_scan_blocked', error: '確認のため受け付けできません' }, 422);
+  }
   const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
   const stored = await storeBroadcastMedia({
     bucket: c.env.IMAGES,
-    body: c.req.raw.body,
+    body: storageBody,
     contentLength,
-    mimeType,
-    originalFilename: c.req.header('X-Filename'),
+    mimeType: validation.mimeType,
+    originalFilename: validation.filename,
     publicBaseUrl: workerUrl,
   });
-  return c.json({ success: true, data: stored }, 201);
+  // 全体の検査は保存の直後に回す。clean になるまで配信には出さない。
+  await ensureFileScanForUpload({
+    db: c.env.DB,
+    lineAccountId: null,
+    subjectKind: 'broadcast_asset',
+    subjectId: stored.key,
+    mediaId: null,
+    filename: validation.filename,
+    mimeType: validation.mimeType,
+    sizeBytes: stored.size,
+  }).catch((err) => console.error('broadcast asset scan record error:', stored.key, err));
+  return c.json({
+    success: true,
+    data: stored,
+  }, 201);
 });
 
 export { broadcastMessageAssets, validatePayload };

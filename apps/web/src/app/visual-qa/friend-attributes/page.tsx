@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, Palette, Pencil, Trash2 } from 'lucide-react'
 import TagEditorV4 from '@/components/friend-fields/tag-editor-v4'
 import TagsPageV4, { FRIEND_ATTRIBUTES_QA_GROUPS, FRIEND_ATTRIBUTES_QA_TAGS } from '@/components/friend-fields/tags-page-v4'
 import { DeleteDialog } from '@/components/friend-fields/edit-tag-page-v4'
+import type { TagDependencies } from '@/lib/api'
 import FolderEditor from '@/app/tags/folders/new/page'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import SearchField from '@/components/shared/search-field'
@@ -15,6 +16,7 @@ import Dialog from '@/components/shared/dialog'
 import Drawer from '@/components/shared/drawer'
 import Notice from '@/components/shared/notice'
 import NotificationPanel, { type NotificationItem } from '@/components/shared/notification-panel'
+import SampleScreenNotice from '@/components/ui/sample-screen-notice'
 
 const EXISTING_TAG = {
   ...FRIEND_ATTRIBUTES_QA_TAGS[2],
@@ -27,6 +29,34 @@ const EXISTING_TAG = {
   mileageMultiplierBps: 15000,
   mileageMultiplierPriority: 3,
   isStarred: false,
+}
+
+/*
+ * 削除確認の `delete` 状態に出す参照件数の固定表示。実画面では
+ * `api.tags.dependencies` の実値を渡す。絵がぶれないよう、
+ * 変更前の固定表示と同じ数(参照3件・自動1件・128人)にしている。
+ */
+const QA_TAG_DEPENDENCIES: TagDependencies = {
+  tag: { id: 'qa-existing', name: 'NEN会員（定期）', version: 1, status: 'active' },
+  friendCount: 128,
+  referenceCounts: {
+    broadcasts: 2, forms: 1, scenarios: 1, autoReplies: 0, savedSearches: 0,
+    automations: 0, commonActions: 0, richMenus: 0, templates: 0, webinars: 0,
+    reminders: 0, entryRoutes: 0, trackedLinks: 0, bookingMenus: 0,
+    affiliateOffers: 0, events: 0, analyticsFunnels: 0, friendAddSettings: 0,
+  },
+  references: [],
+  linkedActions: [],
+  pendingRunCount: 0,
+  mileageImpact: {
+    configured: false, self: 0, referrer: 0, multiplier: null,
+    priority: 3, reapplyPolicy: 'first_only', historyPreserved: true,
+  },
+  blockingReferenceCount: 0,
+  canArchive: true,
+  canDelete: true,
+  checkedAt: '2026-09-07T00:00:00.000Z',
+  revision: 'qa',
 }
 
 const LINKED_ACTIONS = [
@@ -105,7 +135,7 @@ function OverlaysVisualQa({ state }: { state: string }) {
         {state === 'overlays-dialog' ? <section data-qa-overlay="dialog" style={{ width: 844 }}><Dialog open={dialogOpen} modal={false} title="変更内容を保存しますか？" description="保存すると、この設定が次回の配信から反映されます。" onCancel={() => setDialogOpen(false)} onConfirm={noop} /></section> : null}
         {state === 'overlays-destructive' ? <section data-qa-overlay="destructive" style={{ width: 844 }}><Dialog open modal={false} tone="destructive" title="2人の友だち情報を統合しますか？" description="統合後は元に戻せません。残す情報と削除される情報を確認してください。" onCancel={noop} onConfirm={noop} confirmLabel="統合する" /></section> : null}
         {state === 'overlays-drawer' ? <section data-qa-overlay="drawer"><Drawer open={drawerOpen} modal={false} title="友だち詳細" details={[{ label: '表示名', value: 'Kenta Kawano' }, { label: '担当', value: '未設定' }, { label: '状態', value: '対応中' }]} onClose={() => setDrawerOpen(false)} /></section> : null}
-        {state === 'overlays-notices' ? <section data-qa-overlay="notices" className="grid gap-4" style={{ width: 844 }}>{noticeVisible ? <><Notice tone="success" message="保存しました" onClose={() => setNoticeVisible(false)} /><Notice tone="validation" message="入力内容を確認してください" onClose={noop} /><Notice tone="error" message="処理に失敗しました" onClose={noop} /></> : <button type="button" onClick={() => setNoticeVisible(true)}>通知を戻す</button>}</section> : null}
+        {state === 'overlays-notices' ? <section data-qa-overlay="notices" className="grid gap-4" style={{ width: 844 }}>{noticeVisible ? <><Notice tone="info" message="この画面の数は日本時間で数えます。" onClose={noop} /><Notice tone="success" message="保存しました" onClose={() => setNoticeVisible(false)} /><Notice tone="warn" message="入力内容を確認してください" onClose={noop} /><Notice tone="danger" message="処理に失敗しました。通信を確かめて、もう一度お試しください。" onClose={noop} /></> : <button type="button" onClick={() => setNoticeVisible(true)}>通知を戻す</button>}</section> : null}
         {state === 'overlays-menu' ? <section data-qa-overlay="menu"><ActionMenu open inline items={menuItems} note="削除しても、中の配信は未分類に残ります。" onClose={noop} /></section> : null}
         {state === 'overlays-notification-panel' ? <section data-qa-overlay="notification-panel"><NotificationPanel open inline items={QA_NOTIFICATIONS} filters={[{ id: 'all', label: 'すべて', count: 6 }, { id: 'error', label: 'エラー', count: 3 }, { id: 'update', label: 'アップデート', count: 3 }]} activeFilter={filter} unreadCount={3} onFilterChange={setFilter} onMarkAllRead={noop} /></section> : null}
       </div>
@@ -119,7 +149,7 @@ function VisualQaPageInner() {
   if (state.startsWith('overlays-')) return <OverlaysVisualQa state={state} />
   if (state === 'list') return <TagsPageV4 fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} />
   if (state === 'folder') return <FolderEditor />
-  if (state === 'delete') return <><TagsPageV4 fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} /><DeleteDialog tag={EXISTING_TAG} deleting={false} initialConfirmation={EXISTING_TAG.name} onCancel={() => {}} onDelete={() => {}} /></>
+  if (state === 'delete') return <><TagsPageV4 fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} /><DeleteDialog tag={EXISTING_TAG} dependencies={QA_TAG_DEPENDENCIES} dependenciesStatus="ready" deleting={false} initialConfirmation={EXISTING_TAG.name} onCancel={() => {}} onDelete={() => {}} /></>
 
   const edit = state === 'edit' || state === 'retroactive'
   const linked = state === 'linked' || state === 'drawer' || edit
@@ -155,5 +185,15 @@ function VisualQaPageInner() {
 }
 
 export default function FriendAttributesVisualQaPage() {
-  return <Suspense fallback={null}><VisualQaPageInner /></Suspense>
+  return (
+    <Suspense fallback={null}>
+      {/* #975 U101: 固定データの検証画面であることを直リンクでも判別できるようにする。 */}
+      <SampleScreenNotice
+        what="友だち属性画面の表示確認"
+        backHref="/tags"
+        backLabel="通常の友だち属性へ戻る"
+      />
+      <VisualQaPageInner />
+    </Suspense>
+  )
 }

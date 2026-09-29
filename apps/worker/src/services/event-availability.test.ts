@@ -22,9 +22,16 @@ interface BookingRow {
   slot_id: string;
   friend_id: string;
   status: string;
+  party_size: number;
 }
 
-function memDB(state: { slots: SlotRow[]; bookings: BookingRow[] }): D1Database {
+interface WaitlistRow {
+  slot_id: string;
+  status: string;
+  party_size: number;
+}
+
+function memDB(state: { slots: SlotRow[]; bookings: BookingRow[]; waitlist?: WaitlistRow[] }): D1Database {
   const db = {
     prepare(sql: string) {
       let bound: unknown[] = [];
@@ -65,14 +72,19 @@ function memDB(state: { slots: SlotRow[]; bookings: BookingRow[] }): D1Database 
           }
           if (sql.includes('FROM event_bookings') && sql.includes('GROUP BY slot_id')) {
             const all = bound as string[];
-            // first N are slot_ids, then 2 statuses
             const statusCount = 2;
-            const slotIds = all.slice(0, all.length - statusCount);
-            const statuses = all.slice(all.length - statusCount);
+            const slotCount = (all.length - statusCount) / 2;
+            const slotIds = all.slice(0, slotCount);
+            const statuses = all.slice(slotCount, slotCount + statusCount);
             const counts = new Map<string, number>();
             for (const b of state.bookings) {
               if (slotIds.includes(b.slot_id) && statuses.includes(b.status)) {
-                counts.set(b.slot_id, (counts.get(b.slot_id) ?? 0) + 1);
+                counts.set(b.slot_id, (counts.get(b.slot_id) ?? 0) + b.party_size);
+              }
+            }
+            for (const row of state.waitlist ?? []) {
+              if (slotIds.includes(row.slot_id) && (row.status === 'offered' || row.status === 'accepted')) {
+                counts.set(row.slot_id, (counts.get(row.slot_id) ?? 0) + row.party_size);
               }
             }
             const results = Array.from(counts.entries()).map(([slot_id, active_count]) => ({
@@ -111,6 +123,7 @@ function booking(over: Partial<BookingRow> = {}): BookingRow {
     slot_id: 's1',
     friend_id: 'f1',
     status: 'confirmed',
+    party_size: 1,
     ...over,
   };
 }
@@ -142,6 +155,27 @@ describe('getSlotsWithRemaining', () => {
     });
     const out = await getSlotsWithRemaining(db, 'e1');
     expect(out[0].remaining).toBe(0);
+  });
+
+  test('subtracts every seat in a multi-person booking', async () => {
+    const db = memDB({
+      slots: [slot({ id: 's1', capacity: 4 })],
+      bookings: [booking({ id: 'b1', slot_id: 's1', party_size: 3 })],
+    });
+    const out = await getSlotsWithRemaining(db, 'e1');
+    expect(out[0].remaining).toBe(1);
+    expect(out[0].active_count).toBe(3);
+  });
+
+  test('期限付き案内で保留した席も残席から引く', async () => {
+    const db = memDB({
+      slots: [slot({ id: 's1', capacity: 4 })],
+      bookings: [booking({ id: 'b1', slot_id: 's1', party_size: 1 })],
+      waitlist: [{ slot_id: 's1', status: 'offered', party_size: 2 }],
+    });
+    const out = await getSlotsWithRemaining(db, 'e1');
+    expect(out[0].remaining).toBe(1);
+    expect(out[0].active_count).toBe(3);
   });
 
   test('ignores cancelled / rejected / expired in count', async () => {

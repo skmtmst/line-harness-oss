@@ -1,16 +1,42 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
+import Select from '@/components/shared/select'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { MoreAction } from '@/components/shared/row-actions'
+import StatusBadge from '@/components/shared/status-badge'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { api, ApiError, describeSaveFailure, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
+import StaffAssetList from './staff-asset-list'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import MobileTableCards from '@/components/shared/mobile-table-cards'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import type { Folder } from '@line-crm/shared'
+import { validateFlexContent } from '@line-crm/shared'
+import {
+  createBlockedReason,
+  failureOf,
+  failureOfResponse,
+  listView,
+  type TemplatesFailure,
+} from './list-state-kind'
+import { templateDeleteDescription } from './template-delete-message'
+import { messageTypeText } from './template-message-type'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
 
 interface Template {
   id: string
@@ -18,11 +44,21 @@ interface Template {
   category: string
   messageType: string
   messageContent: string
+  /** R194: 最新の下書き本文。公開版だけのときは null。 */
+  draftMessageContent?: string | null
+  /** 置き場。未分類は null。一覧の口が返している。 */
+  folderId: string | null
   question: TemplateQuestion | null
   questionStatus: 'draft' | 'published'
   usageCount: number
   /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
   tapCount: number
+  monthlySendCount: number | null
+  totalSendCount: number | null
+  /** 347: 公開待ちの下書きがあるか。 */
+  hasDraft?: boolean
+  /** 347: 最後に公開した日時。未公開はnull。 */
+  publishedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -35,6 +71,15 @@ interface TemplateDetail {
   messageContent: string
   question: TemplateQuestion | null
   questionStatus: 'draft' | 'published'
+  folderId: string | null
+  /** 347: 公開待ちの下書きがあるか。撮影用モックには無いことがある。 */
+  hasDraft?: boolean
+  /** 347: 公開版の版番号。未公開は0。 */
+  publishedVersion?: number
+  /** 347: 最後に公開した日時。未公開はnull。 */
+  publishedAt?: string | null
+  /** 347: いまの下書き版。公開で0に戻る。 */
+  draftRevision?: number
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
@@ -42,27 +87,26 @@ interface TemplateDetail {
     reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
     richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
     trackedLinks: Array<{ id: string; name: string }>
+    /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。来ない古い応答では空扱い。 */
+    reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>
   }
   createdAt: string
   updatedAt: string
 }
 
-type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'question' | 'unused'
+/*
+ * R135: 種類タブ（メッセージ／質問）と絞り込み札（すべて／未使用など）は
+ * 別の状態で持つ。以前は1つの `typeFilter` で両方を表していたため、
+ * 質問タブで「未使用」を押すと種類が上書きされ、メッセージタブへ
+ * 切り替わって質問以外が混ざっていた。札は種類を変えない。
+ */
+type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'unused'
 
-const ASSET_KINDS: readonly BroadcastAssetKind[] = [
-  'card_message',
-  'rich_message',
-  'coupon',
-  'research',
-]
-
-const messageTypeLabels: Record<string, string> = {
-  text: 'テキスト',
-  image: '画像',
-  flex: 'Flex',
-  carousel: 'Carousel',
-  question: '質問',
-}
+/*
+ * 種類の名前は `./template-message-type` に一本化した。
+ * 一覧・詳細・引き出しで別の書き方をすると、片方だけ直って
+ * 「一覧は日本語・詳細は英語」のずれが起きる（#497 軽2）。
+ */
 
 const typeBadgeColor: Record<string, string> = {
   text: 'bg-canvas-sunken text-ink-secondary',
@@ -72,76 +116,158 @@ const typeBadgeColor: Record<string, string> = {
   question: 'bg-accent-soft text-accent-deep',
 }
 
+/** 種別の札。一覧の表とスマホのカードで同じ顔にする。 */
+function TemplateKindBadge({ kind }: { kind: string }) {
+  return (
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+      {messageTypeText(kind)}
+    </span>
+  )
+}
+
+/** 今年は「1月13日」、それ以外は「2025年1月13日」。時刻は title で見せる（★V7：1行に収める）。 */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(date)
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  const thisYear = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric' }).formatToParts(new Date()).find((part) => part.type === 'year')?.value
+  return get('year') === thisYear ? `${get('month')}月${get('day')}日` : `${get('year')}年${get('month')}月${get('day')}日`
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat('ja-JP').format(value)
+}
+
+/** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
+function normalizeTemplateSearchText(value: string): string {
+  return value.normalize('NFKC').toLocaleLowerCase('ja-JP').trim().replace(/\s+/gu, ' ')
 }
 
 export default function TemplatesPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  /*
+   * N-144: テンプレートの作成・編集・公開・削除は API が requireRole('owner',
+   * 'admin') で閉じている。staff へ操作を見せると押しても 403 になるだけ
+   * なので、ここで操作ごと出さない。閲覧（一覧・詳細の閲覧）は残す。
+   */
+  const [canMutateTemplates] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const activeAccountRef = useRef<string | null>(selectedAccountId)
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
+  /** 一覧を読み込めなかった理由。**取得失敗と権限不足を分ける。** */
+  const [failure, setFailure] = useState<TemplatesFailure | null>(null)
+  /** 操作（更新・削除）が失敗したときの帯。一覧の読み込み失敗とは別。 */
   const [error, setError] = useState('')
-  const [loadError, setLoadError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
-  const [nameQuery, setNameQuery] = useState('')
+  // 案内どおり、名前・本文・差し込んでいる項目を同じ検索欄で絞る。
+  const [templateQuery, setTemplateQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  /* R135: 質問タブが選ばれているか。絞り込み札とは独立に動く。 */
+  const [questionTab, setQuestionTab] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
+  /*
+    フォルダ。**`category`（テンプレートが持つ文字列）から組み立てるのを
+    やめ、本物のフォルダを読む。** 設計 `CzndJ` は「フォルダはアカウントで
+    1組」で、名前・色・並び順・削除を持つ。文字列から組み立てると、
+    空のフォルダが作れず、名前を直すと中身が散らばる。
+  */
+  const [folders, setFolders] = useState<Folder[]>([])
+  // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
+  // 来ないときは null（FolderPanel が「—」と出す）。
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
+  const [folderError, setFolderError] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  /** いま置き場を移している行。二重に押させない。 */
+  const [movingId, setMovingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
+  /**
+   * 削除の確認。ブラウザの `confirm()` は見た目がブラウザ任せで、
+   * 何が止まり・何が残るのかを本文で読ませられず、画像比較にも写らない。
+   * 共通の `ConfirmDialog` へ移した（設計 `H2S1T4` / `M9cij`）。
+   * 使用数も持たせて、本文を使用数で言い分ける。
+   */
+  const [pendingDelete, setPendingDelete] = useState<
+    { id: string; name: string; usageCount: number } | null
+  >(null)
+  /** U043: 行の「…」メニュー。開いている行は1つだけ。 */
+  const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [blockedDelete, setBlockedDelete] = useState<
+    { id: string; name: string; usageCount: number } | null
+  >(null)
 
   // Drawer
   const [drawerId, setDrawerId] = useState<string | null>(null)
+  // 削除できない案内の窓も共通の約束へ: Escapeで閉じる・Tabは窓の中・
+  // 閉じたら起点へ戻す。
+  const blockedPanelRef = useOverlayFocus(blockedDelete !== null, () => {
+    setBlockedDelete(null)
+    setDrawerId(null)
+  })
   const [drawerData, setDrawerData] = useState<TemplateDetail | null>(null)
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [drawerError, setDrawerError] = useState<string | null>(null)
   const [editContent, setEditContent] = useState<string | null>(null)
   const [editName, setEditName] = useState<string | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+  /** 独立審査(指摘6): 公開の実行中と失敗の帯。 */
+  const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
 
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
     setDrawerId(null)
     setShowCreate(false)
     setPendingDelete(null)
+    setOpenRowMenuId(null)
+    setBlockedDelete(null)
     setDeleteError('')
+    // フォルダはアカウント単位。切り替えたら前のアカウントの帯も
+    // 選択中のフォルダも残さない（N-147）。
+    setFolders([])
+    setUnfiledCount(null)
+    setSelectedCategory('all')
+    setFolderDialogOpen(false)
+    setEditingFolder(null)
+    setDeletingFolder(null)
+    setFolderError('')
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
       setTemplates([])
-      setLoadError('')
+      setFailure(null)
       setLoading(false)
       return
     }
     const accountId = selectedAccountId
     setLoading(true)
+    setError('')
+    setFailure(null)
+    // アカウントを切り替えたとき、前のアカウントの行を残さない。
     setTemplates([])
-    setLoadError('')
     try {
       const res = await api.templates.list(undefined, accountId)
       if (activeAccountRef.current !== accountId) return
       if (res.success) {
         setTemplates(res.data)
       } else {
-        setLoadError('テンプレートを読み込めませんでした。もう一度お試しください。')
+        setFailure(failureOfResponse())
       }
-    } catch {
+    } catch (e) {
       if (activeAccountRef.current === accountId) {
-        setLoadError('テンプレートの読み込みに失敗しました。')
+        // 権限不足を「読み込めませんでした」に混ぜない。
+        setFailure(failureOf(e))
       }
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
@@ -150,31 +276,44 @@ export default function TemplatesPage() {
 
   useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    let cancelled = false
-    if (!selectedAccountId) {
+  /*
+   * PERF-04: 種類タブの件数は集計専用の口で取る。
+   * 以前は4種類それぞれの素材一覧（各行のpayload込み）を取って
+   * 件数を数えていた。中身は種類の節を開いたとき loadAssets が取る。
+   *
+   * R135: 作った直後はタブの件数を取り直す。以前はアカウントを
+   * 切り替えるまで取り直さず、9枚のカルーセルを作ってもタブが
+   * 0件のままだった。素材の管理（`BroadcastAssetManager`）が
+   * 変わったことを `onChanged` で知らせる。
+   */
+  const loadAssetCounts = useCallback(async () => {
+    const accountId = selectedAccountId
+    if (!accountId) {
       setAssetCounts({})
-      return () => { cancelled = true }
+      return
     }
-    void Promise.all(
-      ASSET_KINDS.map(async (kind) => {
-        const result = await api.broadcastMessageAssets.list({ kind, accountId: selectedAccountId })
-        return [kind, result.success ? result.data.length : undefined] as const
-      }),
-    ).then((entries) => {
-      if (cancelled) return
-      setAssetCounts(Object.fromEntries(entries.filter((entry) => entry[1] !== undefined)))
-    })
-    return () => { cancelled = true }
+    try {
+      const result = await api.broadcastMessageAssets.counts({ accountId })
+      // 切り替えた後に前の要求が返ってきても採用しない（N-147）。
+      if (activeAccountRef.current !== accountId) return
+      if (result.success) setAssetCounts(result.data)
+    } catch {
+      /* 件数が取れなくても一覧は出す。黙って古い件数のままにする。 */
+    }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadAssetCounts()
+  }, [loadAssetCounts])
 
   // Drawer fetch
   useEffect(() => {
-    if (!drawerId) { setDrawerData(null); setDrawerError(null); return }
+    if (!drawerId) { setDrawerData(null); setDrawerError(null); setPublishError(null); return }
     let cancelled = false
     setDrawerLoading(true)
     setDrawerError(null)
     setDrawerData(null)
+    setPublishError(null)
     api.templates.get(drawerId).then((detailRes) => {
       if (cancelled) return
       if (detailRes.success && detailRes.data) {
@@ -194,24 +333,131 @@ export default function TemplatesPage() {
   // reset edits when drawer changes
   useEffect(() => { setEditContent(null); setEditName(null) }, [drawerId])
 
-  const filteredTemplates = templates.filter((t) => {
-    // 名前は手元で絞る。打つたびに取り直すと重い。
-    if (nameQuery.trim() && !t.name.toLowerCase().includes(nameQuery.trim().toLowerCase())) {
-      return false
-    }
-    if (selectedCategory !== 'all' && (t.category || '未分類') !== selectedCategory) return false
-    if (typeFilter === 'all') return true
-    if (typeFilter === 'unused') return t.usageCount === 0
-    if (typeFilter === 'question') return Boolean(t.question)
-    if (typeFilter === 'text') return t.messageType === 'text' && t.question === null
-    return t.messageType === typeFilter
-  })
+  /*
+    本文は最大5万字あり、一覧はページングされていない。入力のたびに全本文を
+    NFKC変換すると、1000件なら毎回5000万字を走査する。取得・変更で templates
+    が替わったときだけ検索索引を作り、入力中は正規化済み文字列だけを比べる。
+    差し込み項目の文字列は messageContent 自体に含まれるため、別の正規表現走査は不要。
+  */
+  /*
+    R194: 管理一覧の抜粋・検索は「いまの最新」を対象にする。公開版しか無い
+    テンプレートは公開版、編集中の下書きがあるものは下書きを読む
+    （送信で選ぶ側は公開版だけを見る決まりは変えない）。旧公開版にも
+    合うよう messageContent も索引に残す。
+  */
+  const latestContentOf = (t: Template) => t.draftMessageContent ?? t.messageContent
+  const templateSearchIndex = useMemo(() => templates.map((template) => ({
+    template,
+    normalizedSearchText: [template.name, template.messageContent, template.draftMessageContent ?? '']
+      .map(normalizeTemplateSearchText)
+      .join('\0'),
+  })), [templates])
+  const normalizedTemplateQuery = useMemo(
+    () => normalizeTemplateSearchText(templateQuery),
+    [templateQuery],
+  )
+  const filteredTemplates = useMemo(() => templateSearchIndex.flatMap(({ template: t, normalizedSearchText }) => {
+    // 一覧で受け取った名前・本文・差し込み項目を手元で絞る。打つたびに取り直さない。
+    if (normalizedTemplateQuery && !normalizedSearchText.includes(normalizedTemplateQuery)) return []
+    /*
+      フォルダで絞る。**`category` の文字列ではなく `folderId` で見る。**
+      `unfiled` は置き場の無いもの。
+    */
+    if (selectedCategory === 'unfiled' && t.folderId !== null) return []
+    if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return []
+    /* R135: 種類タブの絞り込み。メッセージタブに質問を混ぜない。 */
+    if (questionTab && !t.question) return []
+    if (!questionTab && t.question) return []
+    if (typeFilter === 'unused' && t.usageCount !== 0) return []
+    if (typeFilter === 'single' && (t.question !== null || t.messageType === 'carousel')) return []
+    const content = latestContentOf(t)
+    if (typeFilter === 'multiple' && t.messageType !== 'carousel' && !content.includes('\n\n')) return []
+    if (typeFilter === 'variables' && !content.includes('{{')) return []
+    return [t]
+  }), [normalizedTemplateQuery, questionTab, selectedCategory, templateSearchIndex, typeFilter])
 
-  const categoryCounts = templates.reduce<Record<string, number>>((counts, template) => {
-    const category = template.category || '未分類'
-    counts[category] = (counts[category] ?? 0) + 1
-    return counts
-  }, {})
+  /** フォルダを読み直す。並び順は API の `displayOrder` に従う。アカウント単位。 */
+  const loadFolders = useCallback(async () => {
+    if (!selectedAccountId) {
+      setFolders([])
+      setUnfiledCount(null)
+      return
+    }
+    const accountId = selectedAccountId
+    setFolderError('')
+    try {
+      const res = await api.folders.list('template', accountId)
+      // 切替後に前の要求が返ってきても採用しない（N-147）。
+      if (activeAccountRef.current !== accountId) return
+      if (res.success) {
+        setFolders(res.data)
+        setUnfiledCount(res.unfiledCount ?? null)
+      } else setFolderError('フォルダを読み込めませんでした。')
+    } catch {
+      if (activeAccountRef.current === accountId) setFolderError('フォルダを読み込めませんでした。')
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => { void loadFolders() }, [loadFolders])
+
+  /**
+   * 並び順を入れ替える。
+   *
+   * **隣と番号を交換する。** 全部に振り直すと、同時に触った人の並びを
+   * 上書きしてしまう。端の行には押し口を出さないので、隣は必ずある。
+   * 2つの更新はサーバが1回で行う（V6R-S2-c）。途中で片方だけ変わらない。
+   */
+  const moveFolder = async (index: number, direction: -1 | 1) => {
+    const target = folders[index]
+    const neighbor = folders[index + direction]
+    if (!target || !neighbor) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const res = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId ?? undefined)
+      if (!res.success) throw new Error(res.error)
+      await loadFolders()
+    } catch {
+      setFolderError('並び順を変えられませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const moveTemplate = async (template: { id: string; folderId: string | null }, folderId: string | null) => {
+    if (template.folderId === folderId) return
+    setMovingId(template.id)
+    setFolderError('')
+    try {
+      const res = await api.templates.update(template.id, { folderId })
+      if (!res.success) throw new Error(res.error ?? '移せませんでした')
+      setTemplates((prev) => prev.map((item) => item.id === template.id ? { ...item, folderId } : item))
+      setDrawerData((prev) => prev?.id === template.id ? { ...prev, folderId } : prev)
+      // R195: 移動元・移動先どちらの件数も変わるので、フォルダの数も読み直す。
+      await loadFolders()
+    } catch (cause) {
+      setFolderError(cause instanceof Error ? cause.message : '置き場を変えられませんでした。')
+    } finally {
+      setMovingId(null)
+    }
+  }
+
+  const removeFolder = async () => {
+    if (!deletingFolder) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const res = await api.folders.delete(deletingFolder.id, selectedAccountId ?? undefined)
+      if (!res.success) throw new Error(res.error ?? '削除できませんでした')
+      setDeletingFolder(null)
+      if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
+      await loadFolders()
+    } catch {
+      setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
 
   const handleCreate = async () => {
     if (!selectedAccountId) {
@@ -227,12 +473,14 @@ export default function TemplatesPage() {
       if (res.success) {
         setShowCreate(false)
         setForm({ name: '', category: 'general', messageType: 'text', messageContent: '' })
+        // R195: 新しく作った分、未分類の件数も増えるので合わせて読み直す。
         load()
+        void loadFolders()
       } else {
         setFormError(res.error)
       }
     } catch {
-      setFormError('作成に失敗しました')
+      setFormError('作成に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -259,48 +507,170 @@ export default function TemplatesPage() {
       setEditContent(null)
       setEditName(null)
       load()
-    } catch {
-      setError('更新に失敗しました')
+    } catch (e) {
+      // WRITE-01: 「失敗しました」だけだと権限不足・アカウント違いと
+      // 通信断が区別できない。安全な理由だけを運用者へ出す。
+      setError(describeSaveFailure(e))
     }
     setSavingEdit(false)
   }
 
+  /**
+   * 独立審査(指摘6): 表示中の版で公開する。他の人が先に直していたら
+   * サーバーが 409 で止めるので、状態を読み直してやり直してもらう。
+   * モック行（版なし）の公開ボタンは出ないので、ここでは弾かない。
+   */
+  const handlePublish = async (detail: TemplateDetail) => {
+    setPublishing(true)
+    setPublishError(null)
+    try {
+      const res = await api.templates.publish(detail.id, {
+        expectedVersion: detail.publishedVersion ?? 0,
+        expectedDraftRevision: detail.draftRevision ?? 0,
+      })
+      if (!res.success) throw new Error(res.error ?? '公開できませんでした')
+      const r = await api.templates.get(detail.id)
+      if (r.success && r.data) setDrawerData(r.data)
+      load()
+    } catch (e) {
+      const r = await api.templates.get(detail.id)
+      if (r.success && r.data) setDrawerData(r.data)
+      setPublishError(
+        e instanceof ApiError && e.status === 409
+          ? '他の人が先に更新したため、公開を止めました。最新の状態を確認して、もう一度お試しください。'
+          : '公開できませんでした。もう一度お試しください。',
+      )
+    }
+    setPublishing(false)
+  }
+
+  // 押しただけでは消さない。窓を開くだけにする。使用中なら使用先へ送る。
   const handleDelete = (template: Pick<Template, 'id' | 'name' | 'usageCount'>) => {
     const { id, name, usageCount } = template
     if (usageCount > 0) {
       setDrawerId(id)
-      setError(`${usageCount}件で使用中です。使用先を差し替えてから削除してください。`)
+      setBlockedDelete({ id, name, usageCount })
       return
     }
     setDeleteError('')
-    setPendingDelete({ id, name })
+    setPendingDelete({ id, name, usageCount })
   }
 
   const confirmDelete = async () => {
-    if (!pendingDelete) return
+    // 押している間は受け付けない。二度押しで2回目が404になり、
+    // 「削除できませんでした」とだけ出て消えている、という食い違いが起きる。
+    if (!pendingDelete || deleting) return
     const target = pendingDelete
     setDeleting(true)
     setDeleteError('')
     try {
-      const result = await api.templates.delete(target.id)
-      if (!result.success) {
-        setDeleteError('削除できませんでした。使用先を確認して、もう一度お試しください。')
-        return
-      }
+      const res = await api.templates.delete(target.id)
+      if (!res.success) throw new Error(res.error)
       setPendingDelete(null)
       if (drawerId === target.id) setDrawerId(null)
-      await load()
+      // R195: 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
+      await Promise.all([load(), loadFolders()])
     } catch {
-      setDeleteError('削除に失敗しました')
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
     }
   }
 
+  /*
+   * U043: 行の主操作は「編集」。それ以外（一斉配信・使用先・削除）は
+   * 行の「…」メニューへ。文字の操作を何個も横へ並べると、1440pxでも
+   * 3段に折れて行高が揃わなかった。
+   */
+  const rowMenuItems = (template: Template): ActionMenuItem[] => {
+    const items: ActionMenuItem[] = [
+      {
+        id: 'broadcast',
+        label: '一斉配信で使う',
+        onSelect: () =>
+          window.location.assign(`/broadcasts/new?templateId=${encodeURIComponent(template.id)}`),
+      },
+    ]
+    if (canMutateTemplates) {
+      items.push(
+        template.usageCount > 0
+          ? { id: 'usage', label: '使用先を見る', onSelect: () => handleDelete(template) }
+          : {
+              id: 'delete',
+              label: 'テンプレートを削除',
+              tone: 'danger',
+              dividerBefore: true,
+              onSelect: () => handleDelete(template),
+            },
+      )
+    }
+    return items
+  }
+
+  // 一覧に何を出すか。**読込中・取得失敗・権限不足・空・0件を混ぜない。**
+  const view = listView({
+    loading,
+    failure,
+    total: templates.length,
+    matched: filteredTemplates.length,
+  })
+  const createBlocked = createBlockedReason({ loading, failure })
+
   const scenarioStepUsages = drawerData?.usedBy.scenarioSteps ?? []
   const reminderStepUsages = drawerData?.usedBy.reminderSteps ?? []
   const richMenuAreaUsages = drawerData?.usedBy.richMenuAreas ?? []
   const trackedLinkUsages = drawerData?.usedBy.trackedLinks ?? []
+  const replacementDestinations = drawerData ? [
+    ...drawerData.usedBy.scenarioSteps.map((usage) => ({
+      key: `scenario-${usage.stepId}`,
+      href: `/scenarios/detail?id=${usage.scenarioId}`,
+      label: `シナリオ「${usage.scenarioName}」${usage.stepOrder}通目`,
+      icon: Workflow,
+    })),
+    ...drawerData.usedBy.autoReplies.map((usage) => ({
+      key: `auto-reply-${usage.id}`,
+      href: `/auto-replies/edit?id=${usage.id}`,
+      label: `自動応答「${usage.keyword}」の返信`,
+      icon: MessageCircle,
+    })),
+    ...drawerData.usedBy.automations.map((usage) => ({
+      key: `automation-${usage.id}`,
+      // 旧形式のオートメーション表の設定で、開ける画面が無い。
+      // /automations は新形式(automation_definitions)だけを出し、
+      // /automations/drafts は別のID空間なのでリンクにしない。
+      href: null as string | null,
+      label: usage.eventType === 'inbox_favorite'
+        ? '受信箱の「よく使う」（担当3人が登録）'
+        : `オートメーション「${usage.name}」（旧形式・画面からは開けません）`,
+      icon: usage.eventType === 'inbox_favorite' ? Star : Bot,
+    })),
+    ...drawerData.usedBy.reminderSteps.map((usage) => ({
+      key: `reminder-${usage.stepId}`,
+      href: `/reminders/edit?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」`,
+      icon: Workflow,
+    })),
+    // R347: 旧公開版に固定された登録は版と状態を出す。消すと本文が控えに変わる。
+    ...(drawerData.usedBy.reminderEnrollments ?? []).map((usage) => ({
+      key: `reminder-enrollment-${usage.enrollmentId}`,
+      href: `/reminders/detail?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」第${usage.versionNumber}版（${usage.enrollmentStatus === 'cancelled' ? '取消ずみ' : '送信待ち'}）`,
+      icon: Workflow,
+    })),
+    ...drawerData.usedBy.richMenuAreas.map((usage) => ({
+      key: `rich-menu-${usage.areaId}`,
+      href: `/rich-menus/edit?id=${usage.groupId}`,
+      label: `リッチメニュー「${usage.groupName}」${usage.pageName}`,
+      icon: Star,
+    })),
+    ...drawerData.usedBy.trackedLinks.map((usage) => ({
+      key: `tracked-link-${usage.id}`,
+      href: `/inflow-links/detail?id=${usage.id}`,
+      label: `流入リンク「${usage.name}」`,
+      icon: Workflow,
+    })),
+  ] : []
   const drawerUsageCount = drawerData
     ? drawerData.usedBy.autoReplies.length
       + drawerData.usedBy.automations.length
@@ -308,18 +678,19 @@ export default function TemplatesPage() {
       + reminderStepUsages.length
       + richMenuAreaUsages.length
       + trackedLinkUsages.length
+      + (drawerData.usedBy.reminderEnrollments ?? []).length
     : 0
 
   return (
-    <div>
+    <div data-design-node="W7LBc" className="flex flex-col gap-4">
       <div data-design="TypeTabs" data-design-node="W7LBc kcmGB">
         <Tabs
           items={[
             {
               label: 'メッセージ',
-              count: loading ? undefined : templates.length,
-              current: activeSection === 'message',
-              onClick: () => { setActiveSection('message'); setShowCreate(false) },
+              count: loading ? undefined : templates.filter((item) => !item.question).length,
+              current: activeSection === 'message' && !questionTab,
+              onClick: () => { setActiveSection('message'); setQuestionTab(false); setTypeFilter('all'); setShowCreate(false) },
             },
             {
               label: 'カルーセル',
@@ -332,6 +703,12 @@ export default function TemplatesPage() {
               count: assetCounts.rich_message,
               current: activeSection === 'rich_message',
               onClick: () => { setActiveSection('rich_message'); setShowCreate(false) },
+            },
+            {
+              label: '質問',
+              count: loading ? undefined : templates.filter((item) => Boolean(item.question)).length,
+              current: activeSection === 'message' && questionTab,
+              onClick: () => { setActiveSection('message'); setQuestionTab(true); setTypeFilter('all'); setShowCreate(false) },
             },
             {
               label: 'クーポン',
@@ -349,113 +726,160 @@ export default function TemplatesPage() {
         />
       </div>
 
-      {activeSection === 'message' && (
+      {/*
+        ★V7 `x63W5x`：一覧の失敗中は作成ボタンを出さない。
+        押せない主ボタンのまま置くと、消えたように読める。
+      */}
+      {activeSection === 'message' && canMutateTemplates && view !== 'error' && (
         <div
           className={`${styles.createActions} flex items-center justify-between`}
           data-design="CreateActions"
           data-design-node="W7LBc FuBeQ"
         >
           <div className="flex items-center gap-2">
+            {/* 押せない理由は本文に出す。押せないボタンを黙って置かない。 */}
             <Button
-              onClick={() => {
-                if (!selectedAccountId) {
-                  setError('上のバーでLINE公式アカウントを選んでください')
-                  return
-                }
-                setShowCreate(true)
-              }}
+              type="button"
               variant="primary"
+              disabled={createBlocked !== null}
+              aria-describedby={createBlocked ? 'tpl-create-blocked' : undefined}
+              onClick={() => window.location.assign('/templates/edit')}
             >
               テンプレートを作る
             </Button>
             <Button href="/templates/questions/new" variant="secondary">
               質問を作る
             </Button>
+            {createBlocked && (
+              <p id="tpl-create-blocked" className="text-ink-faint text-xs">
+                {createBlocked}
+              </p>
+            )}
           </div>
         </div>
+      )}
+      {activeSection === 'message' && !canMutateTemplates && (
+        <p className="text-ink-faint text-xs mb-3">
+          テンプレートの作成・変更・削除はオーナーと管理者だけができます。一覧と中身の閲覧はこのまま使えます。
+        </p>
       )}
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div className={styles.body} data-design="Body">
       {activeSection === 'message' ? <>
-      <div className={styles.contentLayout}>
-      <aside className={`${styles.folderRail} bg-canvas border-hairline shrink-0 rounded-card border p-3`} aria-label="テンプレートのフォルダ">
-        <div className="text-ink-secondary mb-2 flex items-center justify-between text-xs font-bold">
-          <span>フォルダ</span>
-          <span>{Object.keys(categoryCounts).length}</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSelectedCategory('all')}
-          className={`flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === 'all' ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+      <div className={styles.contentLayout} style={FOLDER_RAIL_STYLE}>
+      {/*
+        フォルダの帯。**本物のフォルダを出す。**
+        以前は `category`（テンプレートが持つ文字列）から組み立てていたので、
+        空のフォルダを作れず、名前を直すと中身が散らばった。
+      */}
+      <div className={`${styles.folderRail} shrink-0`}>
+        <FolderPanel
+          // 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。
+          activeId={selectedCategory}
+          onSelect={setSelectedCategory}
+          onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
+          rows={[
+            { id: 'all', label: 'すべて', count: view === 'ready' || view === 'empty' || view === 'no-match' ? templates.length : null },
+            ...folders.map((folder, index) => ({
+              id: folder.id,
+              label: folder.name,
+              // #721: フォルダ件数はAPI(itemCount)をそのまま出す。読み込み
+              // 済み範囲だけを数える計算は、黙って別の母集団にすり替わるため
+              // 廃止。来ないときは FolderPanel が「—」と出す。
+              count: folder.itemCount ?? null,
+              color: folder.color,
+              // 設計 `CzndJ` と同じ操作メニューを、文言に依存せず撮影する。
+              qaOpen: canMutateTemplates && folder.name === '予約' ? 'CzndJ' : undefined,
+              onEdit: canMutateTemplates ? () => setEditingFolder(folder) : undefined,
+              // 端の行には口を出さない。押せない矢印を置かない。
+              onMoveUp: canMutateTemplates && index > 0 ? () => void moveFolder(index, -1) : undefined,
+              onMoveDown: canMutateTemplates && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+              onDelete: canMutateTemplates ? () => setDeletingFolder(folder) : undefined,
+              deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
+            })),
+            {
+              id: 'unfiled',
+              label: '未分類',
+              count: view === 'ready' || view === 'empty' || view === 'no-match' ? unfiledCount : null,
+            },
+          ]}
         >
-          <span>すべて</span>
-          <span className="text-xs tabular-nums">{templates.length}</span>
-        </button>
-        {Object.entries(categoryCounts).map(([category, count]) => (
-          <button
-            key={category}
-            type="button"
-            onClick={() => setSelectedCategory(category)}
-            className={`mt-1 flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === category ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-            title={category}
-          >
-            <span className="min-w-0 truncate">{category}</span>
-            <span className="ml-2 shrink-0 text-xs tabular-nums">{count}</span>
-          </button>
-        ))}
-      </aside>
+          {/*
+            ★V7 `x63W5x`：補助のデータ（フォルダ）だけ取れないときは、
+            その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+          */}
+          {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
+          {canMutateTemplates ? (
+            <p className="text-ink-faint text-xs leading-relaxed">
+              テンプレートは一覧の「置き場」から移せます。フォルダは種類のタブをまたいで使えます。
+            </p>
+          ) : null}
+        </FolderPanel>
+      </div>
       <div className="min-w-0 flex-1">
 
-      <div className="bg-info-bg text-info mb-3 rounded-control px-3 py-2 text-xs">
-        一覧からテンプレートの中身・使われている場所・送信数を確認できます。
-      </div>
+      {/* ★V7：常に出ていた説明の帯は外し、フォルダ欄の下の説明へ短くまとめた。 */}
 
-      {/* 検索と並び順（設計 `Body` の上）。 */}
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-        <input
-          type="search"
-          placeholder="テンプレート名で検索"
-          aria-label="テンプレート名で検索"
-          value={nameQuery}
-          onChange={(e) => setNameQuery(e.target.value)}
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-      </div>
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目。#668 の「保存した検索」の飾りは
+        消したまま（仕組みができたら一斉配信と同じ選び口で置き直す）。
+        #615 の選び口も戻さない（ページ送りが無いので「20件表示」は嘘になる）。
+        一致した数は結果の側（2行目の右）に出す。
+      */}
+      <ListToolbar
+        search={{
+          placeholder: 'テンプレート名で検索（本文・差し込んでいる項目も対象）',
+          label: '名前・本文・差し込んでいる項目で検索',
+          value: templateQuery,
+          onChange: setTemplateQuery,
+        }}
+        filters={
+          <>
+            {([
+              { key: 'all', label: 'すべて' },
+              { key: 'single', label: '1通のみ' },
+              { key: 'multiple', label: '複数通' },
+              { key: 'variables', label: '差し込みあり' },
+              { key: 'unused', label: '未使用' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTypeFilter(key)}
+                /* #702: 選んだ札は濃い緑＋白文字(5.44:1)。明るいLINE緑だと白文字で2.26:1しかない。 */
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </>
+        }
+        trailing={
+          view === 'ready' ? (
+            <ListRange className="px-1 tabular-nums" total={filteredTemplates.length} first={filteredTemplates.length === 0 ? 0 : 1} last={filteredTemplates.length} />
+          ) : null
+        }
+      />
 
 
-      {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
+      {/*
+        ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。一覧の場所の
+        ListState error だけにまとめる。入力・保存の失敗の知らせは別に残す。
+      */}
+      {error && view !== 'error' && (
+        <div
+          className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
-      {/* Type filter */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {([
-          { key: 'all', label: '全て' },
-          { key: 'text', label: 'テキスト' },
-          { key: 'flex', label: 'Flex' },
-          { key: 'image', label: '画像' },
-          { key: 'question', label: '質問' },
-          { key: 'unused', label: '未使用' },
-        ] as const).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTypeFilter(key)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              typeFilter === key ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-            }`}
-            style={typeFilter === key ? { backgroundColor: 'var(--color-accent)' } : undefined}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {/* Create form */}
       {showCreate && (
-        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
+        <div className="bg-canvas rounded-card border border-hairline p-6">
           <h2 className="text-sm font-semibold text-ink mb-4">新規テンプレートを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
@@ -480,15 +904,7 @@ export default function TemplatesPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
-              <select
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas"
-                value={form.messageType}
-                onChange={(e) => setForm({ ...form, messageType: e.target.value })}
-              >
-                <option value="text">テキスト</option>
-                <option value="flex">Flex</option>
-                <option value="image">画像</option>
-              </select>
+              <Select aria-label="タイプ" value={form.messageType} onChange={(value) => setForm({ ...form, messageType: value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} size="full" />
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
@@ -551,43 +967,100 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* Table */}
-      {accountLoading || loading ? (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
-              <div className="h-5 bg-canvas-sunken rounded w-12" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-48" />
-                <div className="h-2 bg-canvas-sunken rounded w-32" />
-              </div>
-              <div className="h-3 bg-canvas-sunken rounded w-12" />
-              <div className="h-3 bg-canvas-sunken rounded w-24" />
-            </div>
-          ))}
-        </div>
+      {/*
+        一覧の状態。**「まだ1件も無い」「絞り込みに合わない」「読み込めない」
+        「権限がない」を言い分ける。** 以前は4つとも同じ1文だったので、
+        読み込みに失敗したときも、登録したものが消えたように見えていた。
+        アカウント未選択は development が足した5つ目の言い分け。**同じ文へ
+        まとめない。** 選ぶまでは読みに行っていないので、失敗ではない。
+      */}
+      {accountLoading || view === 'loading' ? (
+        <ListState kind="loading" title="読み込んでいます" />
       ) : !selectedAccountId ? (
-        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-          <p className="text-ink font-medium">
-            {accounts.length > 0
+        <ListState
+          kind="empty"
+          title={
+            accounts.length > 0
               ? '上のバーでLINE公式アカウントを選んでください'
-              : 'LINE公式アカウントが登録されていません'}
-          </p>
-        </div>
-      ) : loadError ? (
-        <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
-          <p className="text-danger font-medium">テンプレートを読み込めませんでした</p>
-          <p className="text-ink-secondary mt-2 text-sm">{loadError}</p>
-          <Button className="mt-4" variant="primary" onClick={() => void load()}>
-            もう一度読み込む
-          </Button>
-        </div>
-      ) : filteredTemplates.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">該当するテンプレートがありません</p>
-        </div>
+              : 'LINE公式アカウントが登録されていません'
+          }
+        />
+      ) : view === 'forbidden' ? (
+        <ListState kind="forbidden" title={failure?.title} description={failure?.description} />
+      ) : view === 'error' ? (
+        <ListState
+          kind="error"
+          title={failure?.title}
+          description={failure?.description}
+          onRetry={() => void load()}
+        />
+      ) : view === 'empty' ? (
+        <ListState
+          kind="empty"
+          title="まだテンプレートがありません"
+          description="よく送る文を登録しておくと、配信・自動応答から選べます。"
+        />
+      ) : view === 'no-match' ? (
+        <ListState
+          kind="empty"
+          title="条件に合うテンプレートはありません"
+          description={`${templates.length}件のうち0件が一致しました。検索語か絞り込みを変えてください。`}
+        />
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
+        <>
+        {/*
+          ★V7 監査の直し A（`LD96g`）：768px 以上は表、767px 以下は共通の
+          一覧カード（`MobileTableCards`）。以前のCSS畳み込みは、名前欄の
+          `max-w-0` が残って名前が消える原因だったのでやめる。
+        */}
+        <MobileTableCards
+          items={filteredTemplates.map((t) => ({
+            id: t.id,
+            name: t.name,
+            status: (
+              <span className="inline-flex items-center gap-1">
+                <TemplateKindBadge kind={t.question ? 'question' : t.messageType} />
+                {t.hasDraft && (
+                  <StatusBadge size="compact" tone={t.publishedAt == null ? 'warning' : 'info'}>
+                    {t.publishedAt == null ? '未公開' : '編集中'}
+                  </StatusBadge>
+                )}
+              </span>
+            ),
+            summary: `${latestContentOf(t).slice(0, 60)}${latestContentOf(t).length > 60 ? '...' : ''}`,
+            metric: typeof t.usageCount !== 'number' ? '使用先を確認できません' : t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`,
+            primaryAction: canMutateTemplates ? (
+              <Button
+                href={
+                  t.question
+                    ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
+                    : `/templates/edit?id=${encodeURIComponent(t.id)}`
+                }
+              >
+                編集
+              </Button>
+            ) : undefined,
+            moreAction: (
+              <span className="relative flex h-9 w-9 items-center justify-center">
+                <MoreAction
+                  label={`${t.name}のその他操作`}
+                  aria-expanded={openRowMenuId === t.id}
+                  onClick={() =>
+                    setOpenRowMenuId((current) => (current === t.id ? null : t.id))
+                  }
+                />
+                <ActionMenu
+                  open={openRowMenuId === t.id}
+                  ariaLabel={`${t.name}の操作`}
+                  onClose={() => setOpenRowMenuId(null)}
+                  items={rowMenuItems(t)}
+                />
+              </span>
+            ),
+            onSelect: () => setDrawerId(t.id),
+          }))}
+        />
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
@@ -604,53 +1077,97 @@ export default function TemplatesPage() {
                 {filteredTemplates.map((t) => (
                   <tr
                     key={t.id}
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`${t.name}の詳細を開く`}
                     onClick={() => setDrawerId(t.id)}
-                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
+                    onKeyDown={(event) => {
+                      // 行内のリンク・ボタンにフォーカスがあるときは行を開かない。
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setDrawerId(t.id)
+                      }
+                    }}
+                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors focus:bg-canvas-sunken focus:outline-none ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-ink">{t.name}</p>
-                      <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
-                        {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
+                    {/* 1列目は表の幅に合わせて縮む（以前は抜粋が最大 448px で、1440px でも表が右へはみ出した）。 */}
+                    <td className="w-2/5 max-w-0 px-4 py-3">
+                      <p className="truncate text-sm font-medium text-ink" title={t.name}>{t.name}</p>
+                      {/* R194: 抜粋は最新（下書きがあれば下書き）。どの版か分かるように札を添える。 */}
+                      <p className="text-micro text-ink-faint mt-0.5 flex min-w-0 items-center gap-1.5">
+                        {t.hasDraft && (
+                          <StatusBadge size="compact" tone={t.publishedAt == null ? 'warning' : 'info'}>
+                            {t.publishedAt == null ? '未公開' : '編集中'}
+                          </StatusBadge>
+                        )}
+                        <span className="truncate">
+                          {latestContentOf(t).slice(0, 60)}{latestContentOf(t).length > 60 ? '...' : ''}
+                        </span>
                       </p>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                        {messageTypeLabels[t.question ? 'question' : t.messageType] ?? t.messageType}
-                      </span>
-                      <p className="text-ink-faint mt-1 max-w-40 truncate text-[11px]" title={t.category}>{t.category || '未分類'}</p>
+                    <td className="px-3 py-3">
+                      <TemplateKindBadge kind={t.question ? 'question' : t.messageType} />
+                      {/*
+                        **`category` は内部の値**（`text` `general` など）。
+                        そのまま出すと、種類の欄に英語が2つ並ぶ。
+                        分け方はフォルダ（`folderId`）が受け持つので、
+                        ここには出さない。
+                      */}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
-                        {t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`}
+                        {/*
+                          **取れていないのを「0件」とも「undefined件」とも言わない。**
+                          `usageCount` が入っていないひな形で「undefined件で使用」と
+                          出ていた（一覧の20行すべて）。
+                        */}
+                        {typeof t.usageCount !== 'number' ? '使用先を確認できません' : t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-ink-faint text-sm" title="テンプレート別の送信数はまだ取得できません">—</span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                      <a
-                        href={`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="rounded-md border border-hairline px-2.5 py-1 text-xs font-bold text-accent hover:bg-accent-soft"
-                      >
-                        一斉配信で使う
-                      </a>
-                      {t.usageCount > 0 ? (
-                        <Button
-                          onClick={(e) => { e.stopPropagation(); setDrawerId(t.id) }}
+                    <td className="px-3 py-3 text-right">
+                      {typeof t.monthlySendCount === 'number' && typeof t.totalSendCount === 'number' ? (
+                        <span
+                          className="whitespace-nowrap text-xs font-medium text-ink"
+                          title={`累計 ${formatCount(t.totalSendCount)}通`}
                         >
-                          使用先を見る
-                        </Button>
+                          今月 {formatCount(t.monthlySendCount)}通
+                        </span>
                       ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
-                          className="hover:bg-danger-bg rounded-md px-2.5 py-1 text-xs font-medium text-red-500"
-                        >
-                          テンプレートを削除
-                        </button>
+                        <span className="text-ink-faint text-xs">送信数を確認できません</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap text-ink-faint tabular-nums" title={new Date(t.updatedAt).toLocaleString('ja-JP')}>{formatDate(t.updatedAt)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {/* 行のクリック（詳細を開く）へ伝えない。 */}
+                      <div
+                        className="relative flex items-center justify-end gap-1 whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {canMutateTemplates && (
+                          <Button
+                            href={
+                              t.question
+                                ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
+                                : `/templates/edit?id=${encodeURIComponent(t.id)}`
+                            }
+                          >
+                            編集
+                          </Button>
+                        )}
+                        <MoreAction
+                          label={`${t.name}のその他操作`}
+                          aria-expanded={openRowMenuId === t.id}
+                          onClick={() =>
+                            setOpenRowMenuId((current) => (current === t.id ? null : t.id))
+                          }
+                        />
+                        <ActionMenu
+                          open={openRowMenuId === t.id}
+                          ariaLabel={`${t.name}の操作`}
+                          onClose={() => setOpenRowMenuId(null)}
+                          items={rowMenuItems(t)}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -659,16 +1176,28 @@ export default function TemplatesPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* Drawer */}
-      {drawerId && (
+      {drawerId && !blockedDelete && (
         <>
+          {/*
+            ★V7 監査の直し：この面の重なり順は共通の最上層の器にそろえる。
+            固定のモバイル帯（`sidebar.module.css` の `.mobileHeader`・z 50）より
+            下（z-30/z-40）だったので、スマホで面いっぱいに開いたときに上の帯が
+            頭（×のある行）に被さっていた。共通の右面（`drawer.module.css` の
+            `.overlay`）と同じ 80 に上げ、閉じる操作をいつも見える所に残す。
+          */}
           <div
-            className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+            className="fixed inset-0 bg-black/30 lg:hidden"
+            style={{ zIndex: 80 }}
             onClick={() => setDrawerId(null)}
           />
-          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline z-40 overflow-y-auto">
+          <div
+            className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline overflow-y-auto"
+            style={{ zIndex: 80 }}
+          >
             <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-canvas z-10">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {editName !== null ? (
@@ -681,9 +1210,9 @@ export default function TemplatesPage() {
                   />
                 ) : (
                   <h3
-                    className="text-sm font-semibold truncate cursor-text"
-                    onClick={() => setEditName(drawerData?.name ?? '')}
-                    title="クリックで編集"
+                    className={`text-sm font-semibold truncate ${canMutateTemplates ? 'cursor-text' : ''}`}
+                    onClick={canMutateTemplates ? () => setEditName(drawerData?.name ?? '') : undefined}
+                    title={canMutateTemplates ? 'クリックで編集' : undefined}
                   >
                     {drawerData?.name ?? '読み込み中...'}
                   </h3>
@@ -705,10 +1234,10 @@ export default function TemplatesPage() {
                 <p className="text-xs text-ink-faint">{drawerError}</p>
               </div>
             ) : !drawerData ? null : (
-              <div className="p-4 space-y-5">
+              <div className="flex flex-col gap-4 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                    {messageTypeLabels[drawerData.question ? 'question' : drawerData.messageType] ?? drawerData.messageType}
+                    {messageTypeText(drawerData.question ? 'question' : drawerData.messageType)}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
                     {drawerData.category}
@@ -716,6 +1245,53 @@ export default function TemplatesPage() {
                   <span className="text-[10px] text-ink-faint">
                     更新: {formatDate(drawerData.updatedAt)}
                   </span>
+                  {/* 独立審査(指摘6): 公開状態と公開ボタン。版の確認つきで公開する。 */}
+                  <StatusBadge
+                    tone={drawerData.publishedAt == null ? 'warning' : drawerData.hasDraft ? 'info' : 'neutral'}
+                    size="compact"
+                  >
+                    {drawerData.publishedAt == null ? '未公開' : drawerData.hasDraft ? '編集中' : `公開版${drawerData.publishedVersion ?? ''}`}
+                  </StatusBadge>
+                  {drawerData.hasDraft && canMutateTemplates && (
+                    <Button
+                      variant="primary"
+                      onClick={() => void handlePublish(drawerData)}
+                      disabled={publishing}
+                    >
+                      {publishing ? '公開中...' : '公開する'}
+                    </Button>
+                  )}
+                </div>
+                {publishError && (
+                  <p role="alert" className="text-xs text-red-600">{publishError}</p>
+                )}
+
+                <div>
+                  {canMutateTemplates ? (
+                    <>
+                      <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
+                        置き場
+                      </label>
+                      <Select
+                        id="template-folder-select"
+                        aria-label="置き場"
+                        value={drawerData.folderId ?? ''}
+                        disabled={movingId === drawerData.id}
+                        onChange={(value) => void moveTemplate(
+                          drawerData,
+                          value === '' ? null : value,
+                        )}
+                        options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-ink-faint mb-1.5 text-xs font-medium">置き場</p>
+                      <p className="text-sm text-ink">
+                        {folders.find((folder) => folder.id === drawerData.folderId)?.name ?? '未分類'}
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Preview */}
@@ -727,24 +1303,43 @@ export default function TemplatesPage() {
                         {drawerData.question.intro && <p className="text-sm whitespace-pre-wrap">{drawerData.question.intro}</p>}
                         <p className="text-sm font-semibold whitespace-pre-wrap">{drawerData.question.text}</p>
                         {drawerData.question.choices.map((choice, index) => (
-                          <div key={index} className="border-hairline rounded-control border px-3 py-2 text-center text-xs font-semibold text-accent">
+                          <div key={index} className="border-hairline rounded-control border px-3 py-2 text-center text-xs font-semibold text-accent-deep">
                             {choice.label}
                           </div>
                         ))}
                       </div>
                     ) : drawerData.messageType === 'flex' ? (
                       (() => {
-                        try {
-                          return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
-                        } catch {
-                          return <p className="text-xs text-red-500">Flex JSON parse 失敗</p>
+                        /*
+                         * R249: 描画部品は壊れた内容でも例外を出さないので、
+                         * try/catch では形式の誤いを拾えない。検査で先に
+                         * 見分け、直し方（下の編集欄）と合わせて知らせる。
+                         */
+                        const flexError = validateFlexContent('flex', drawerData.messageContent)
+                        if (flexError) {
+                          return (
+                            <div role="alert">
+                              <p className="text-danger text-xs font-semibold">{flexError}</p>
+                              <p className="text-ink-secondary mt-1 text-xs">下の「内容 / JSON 編集」で直して保存してください。このままでは公開できません。</p>
+                            </div>
+                          )
                         }
+                        return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
                       })()
                     ) : drawerData.messageType === 'image' ? (
                       (() => {
                         try {
                           const parsed = JSON.parse(drawerData.messageContent)
-                          return <img src={parsed.originalContentUrl || parsed.previewImageUrl} alt="" className="max-w-full rounded" />
+                          const imageUrl = parsed.originalContentUrl || parsed.previewImageUrl
+                          /*
+                           * 入力された URL をそのまま出さない（#497 軽6）。
+                           * http(s) 以外は追跡用・巨大画像などの恐れがあるので
+                           * 代替表示にする。
+                           */
+                          if (typeof imageUrl !== 'string' || !/^https?:\/\//.test(imageUrl)) {
+                            return <p className="text-ink-faint text-xs">画像のURLを開けませんでした。http(s)から始まるURLを入れてください。</p>
+                          }
+                          return <img src={imageUrl} alt="" className="max-w-full rounded" />
                         } catch {
                           return <pre className="text-xs whitespace-pre-wrap">{drawerData.messageContent}</pre>
                         }
@@ -757,12 +1352,14 @@ export default function TemplatesPage() {
 
                 {/* Edit JSON / content */}
                 {drawerData.question ? (
-                  <Button
-                    href={`/templates/questions/new?id=${encodeURIComponent(drawerData.id)}`}
-                    variant="secondary"
-                  >
-                    質問を編集
-                  </Button>
+                  canMutateTemplates && (
+                    <Button
+                      href={`/templates/questions/new?id=${encodeURIComponent(drawerData.id)}`}
+                      variant="secondary"
+                    >
+                      質問を編集
+                    </Button>
+                  )
                 ) : <div>
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
@@ -770,15 +1367,17 @@ export default function TemplatesPage() {
                     className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
+                    readOnly={!canMutateTemplates}
+                    title={canMutateTemplates ? undefined : '変更はオーナー・管理者だけができます（閲覧のみ）'}
                   />
                 </div>}
 
-                {(editContent !== null || editName !== null) && (
+                {canMutateTemplates && (editContent !== null || editName !== null) && (
                   <div className="flex gap-2">
                     <button
                       onClick={handleSaveEdit}
                       disabled={savingEdit}
-                      className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                      className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                     >
                       {savingEdit ? '保存中...' : '保存'}
                     </button>
@@ -803,42 +1402,44 @@ export default function TemplatesPage() {
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
-                            <a href="/auto-replies" className="text-accent hover:underline">
+                            <a href={`/auto-replies/edit?id=${ar.id}`} className="text-action hover:underline">
                               自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
                         ))}
                         {drawerData.usedBy.automations.map((au) => (
                           <li key={`au-${au.id}`}>
-                            <a href="/automations" className="text-accent hover:underline">
-                              オートメーション: {au.name} <span className="text-ink-faint">({au.eventType})</span>
-                            </a>
+                            {/* 旧形式のオートメーションには開ける画面が無い。リンクにすると
+                                別のID空間の画面へ飛んで「見つかりません」になるだけ。 */}
+                            <span>
+                              オートメーション: {au.name} <span className="text-ink-faint">({au.eventType}・旧形式)</span>
+                            </span>
                           </li>
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
-                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-accent hover:underline">
+                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-action hover:underline">
                               シナリオ: {ss.scenarioName} <span className="text-ink-faint">#{ss.stepOrder}</span>
                             </a>
                           </li>
                         ))}
                         {reminderStepUsages.map((rs) => (
                           <li key={`rs-${rs.stepId}`}>
-                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-accent hover:underline">
+                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-action hover:underline">
                               リマインダ: {rs.reminderName}
                             </a>
                           </li>
                         ))}
                         {richMenuAreaUsages.map((area) => (
                           <li key={`rm-${area.areaId}`}>
-                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-accent hover:underline">
+                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-action hover:underline">
                               リッチメニュー: {area.groupName} / {area.pageName}{area.label ? ` / ${area.label}` : ''}
                             </a>
                           </li>
                         ))}
                         {trackedLinkUsages.map((link) => (
                           <li key={`tl-${link.id}`}>
-                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-accent hover:underline">
+                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-action hover:underline">
                               流入リンク: {link.name}
                             </a>
                           </li>
@@ -857,26 +1458,159 @@ export default function TemplatesPage() {
           </div>
         </>
       )}
+      {blockedDelete !== null ? (
+        <div className="fixed inset-0 flex items-center justify-center bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="M9cij">
+          <section ref={blockedPanelRef} className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
+            <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
+              <h2 id="blocked-template-title" className="text-lead font-bold text-ink">使用中のテンプレートは削除できません</h2>
+              <button
+                type="button"
+                aria-label="閉じる"
+                className="flex h-8 w-8 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken"
+                onClick={() => {
+                  setBlockedDelete(null)
+                  setDrawerId(null)
+                }}
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
+            </header>
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
+            <p className="flex items-start gap-2 text-xs font-bold">
+              <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+              このテンプレートは{drawerData ? drawerUsageCount : (blockedDelete?.usageCount ?? 0)}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
+            </p>
+            {drawerLoading ? (
+              <p className="mt-3 text-xs">使用先を読み込んでいます…</p>
+            ) : drawerError ? (
+              <p className="mt-3 text-xs font-bold">使用先を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
+            ) : (
+              <ul className="mt-3 space-y-2 text-xs font-semibold">
+                {replacementDestinations.map(({ key, label, href, icon: Icon }) => (
+                  <li key={key}>
+                    {href ? (
+                      <a
+                        href={href}
+                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-action hover:bg-canvas-sunken hover:underline"
+                      >
+                        <Icon size={15} className="shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">{label}</span>
+                        <ArrowRight size={14} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-2 px-1.5 py-1">
+                        <Icon size={15} className="shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">{label}</span>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-3 text-xs font-semibold">使用中は削除できません。差し替え後にもう一度この画面から操作してください。</p>
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
+                <Notice tone="success">
+                  <p className="text-sm font-bold">上の使用先を1か所ずつ開いて、別のテンプレートへ差し替えてください</p>
+                  <p className="mt-1 text-xs">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
+                </Notice>
+              </div>
+            </div>
+            <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
+              <p className="text-xs text-ink-faint">この操作は取り消せません</p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setBlockedDelete(null)
+                    setDrawerId(null)
+                  }}
+                >
+                  キャンセル
+                </Button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      ) : null}
       <div data-design-node="M9cij">
         <ConfirmDialog
           open={pendingDelete !== null}
-          title="テンプレートを削除しますか？"
-          description={`「${pendingDelete?.name ?? ''}」を削除します。この操作は元に戻せません。`}
-          confirmLabel="テンプレートを削除"
+          title={`テンプレート「${pendingDelete?.name ?? ''}」を削除しますか？`}
+          description={templateDeleteDescription(pendingDelete?.usageCount ?? 0)}
+          confirmLabel="削除する"
           destructive
           busy={deleting}
-          error={deleteError || undefined}
+          error={deleteError}
+          onConfirm={() => void confirmDelete()}
           onCancel={() => {
             if (deleting) return
             setPendingDelete(null)
             setDeleteError('')
           }}
-          onConfirm={() => void confirmDelete()}
         />
       </div>
+
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="template"
+          accountId={selectedAccountId}
+          note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
+          placeholder="例: 01_定期便"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => { setFolderDialogOpen(false); void loadFolders() }}
+        />
+      )}
+
+      {editingFolder && (
+        <FolderAddDialog
+          kind="template"
+          folder={editingFolder}
+          accountId={selectedAccountId}
+          note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
+          placeholder="例: 01_定期便"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void loadFolders() }}
+        />
+      )}
+
+      {/*
+        **消す前に、中身がどうなるかを本文で読ませる。**
+        設計 `CzndJ` の「削除しても、中のテンプレートは未分類に残ります。」。
+        吹き出しだけでは読めない。
+      */}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={`削除しても、中のテンプレートは未分類に残ります。いまこのフォルダに入っているのは${
+          deletingFolder ? templates.filter((t) => t.folderId === deletingFolder.id).length : 0
+        }件です。`}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
+        onConfirm={() => void removeFolder()}
+      />
       </div>
       </div>
-      </> : <BroadcastAssetManager kind={activeSection} />}
+      </> : canMutateTemplates ? (
+        <BroadcastAssetManager kind={activeSection} onChanged={() => void loadAssetCounts()} />
+      ) : (
+        /*
+         * N-144: 資産タブの作成・編集・削除APIも owner/admin 限定。
+         * BroadcastAssetManager は別領域の部品かつ変更系の操作を内蔵するため、
+         * staff へは閲覧専用の一覧だけを出す。
+         */
+        <div>
+          <p className="text-ink-faint text-xs mb-3">
+            カルーセル・リッチメッセージ・クーポン・リサーチの作成・変更・削除はオーナーと管理者だけができます。一覧の閲覧はこのまま使えます。
+          </p>
+          <StaffAssetList kind={activeSection} />
+        </div>
+      )}
       </div>
     </div>
   )

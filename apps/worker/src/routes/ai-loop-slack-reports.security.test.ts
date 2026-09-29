@@ -1,0 +1,113 @@
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { Hono } from 'hono';
+import type { Env } from '../index.js';
+import { signSupportRelay } from '../services/support-relay.js';
+import { aiLoopSlackReports } from './ai-loop-slack-reports.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+
+const payload = {
+  version: 1,
+  eventId: 'LOOP-143:started',
+  taskId: 'LOOP-143',
+  repository: 'skmtmst/nen-petfood-eccube',
+  title: 'Slack報告専用経路を接続する',
+  commander: 'codex',
+  executor: 'meta',
+  model: 'Muse Spark 1.3 Contributor',
+  status: 'started',
+  summary: '報告専用の接続テストを開始しました。',
+  taskUrl: 'https://github.com/skmtmst/nen-petfood-eccube/issues/143',
+  occurredAt: '2026-09-09T04:00:00.000Z',
+  revision: 1_788_927_600_000,
+};
+
+function app() {
+  const instance = new Hono<Env>();
+  instance.route('/', aiLoopSlackReports);
+  return instance;
+}
+
+function env(): Env['Bindings'] {
+  return {
+    DB: createTestD1().db,
+    IMAGES: {} as R2Bucket,
+    ASSETS: {} as Fetcher,
+    LINE_CHANNEL_SECRET: 'line-secret',
+    LINE_CHANNEL_ACCESS_TOKEN: 'line-token',
+    API_KEY: 'api-key',
+    LIFF_URL: 'https://liff.example.test',
+    LINE_CHANNEL_ID: 'line-channel',
+    LINE_LOGIN_CHANNEL_ID: 'login-channel',
+    LINE_LOGIN_CHANNEL_SECRET: 'login-secret',
+    WORKER_URL: 'https://worker.example.test',
+    AI_LOOP_SLACK_REPORT_SECRET: 'relay-secret',
+    SLACK_BOT_TOKEN: 'xoxb-test',
+    SLACK_AI_LOOP_CHANNEL_ID: 'C-AI-LOOP',
+  };
+}
+
+async function request(bodyValue: unknown, secret = 'relay-secret', bindings = env()) {
+  const body = JSON.stringify(bodyValue);
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  return app().request('/api/integrations/ai-loop/reports', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-nen-timestamp': timestamp,
+      'x-nen-signature': await signSupportRelay(secret, timestamp, body),
+    },
+    body,
+  }, bindings);
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('AI loop Slack report security boundary', () => {
+  test('accepts a signed report and never exposes an inbound control route', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, ts: '100.200' })));
+    vi.stubGlobal('fetch', fetcher);
+    const response = await request(payload);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, action: 'created' });
+    expect((await app().request('/api/integrations/ai-loop/actions', { method: 'POST' }, env())).status).toBe(404);
+  });
+
+  test('rejects invalid signatures', async () => {
+    const response = await request(payload, 'wrong-secret');
+    expect(response.status).toBe(401);
+  });
+
+  test('rejects unknown fields and non-GitHub links', async () => {
+    expect((await request({ ...payload, command: 'merge' })).status).toBe(400);
+    expect((await request({ ...payload, taskUrl: 'https://example.com/task/143' })).status).toBe(400);
+    expect((await request({ ...payload, revision: 10 })).status).toBe(400);
+    expect((await request(null)).status).toBe(400);
+  });
+
+  test('rejects oversized signed payloads before parsing', async () => {
+    expect((await request({ ...payload, summary: 'x'.repeat(9_000) })).status).toBe(413);
+  });
+
+  test('returns a safe 502 when Slack rejects the report', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: false, error: 'not_in_channel' })),
+    ));
+    const response = await request(payload);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ success: false, error: 'Slack report failed' });
+  });
+
+  test('fails closed when the dedicated report channel is missing', async () => {
+    const bindings = env();
+    delete bindings.SLACK_AI_LOOP_CHANNEL_ID;
+    expect((await request(payload, 'relay-secret', bindings)).status).toBe(503);
+  });
+
+  test('never falls back to the existing Codex relay secret', async () => {
+    const bindings = env();
+    delete bindings.AI_LOOP_SLACK_REPORT_SECRET;
+    bindings.CODEX_SLACK_RELAY_SECRET = 'relay-secret';
+    expect((await request(payload, 'relay-secret', bindings)).status).toBe(503);
+  });
+});

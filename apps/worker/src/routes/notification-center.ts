@@ -50,9 +50,14 @@ notificationCenter.get('/api/notifications/center', async (c) => {
     if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 100) {
       return c.json({ success: false, error: '表示件数は1〜100で指定してください' }, 400);
     }
+    // 通知一覧画面の「さらに読み込む」が使う。パネルは省略して先頭から読む。
+    const rawOffset = Number(c.req.query('offset') ?? '0');
+    if (!Number.isInteger(rawOffset) || rawOffset < 0 || rawOffset > 100000) {
+      return c.json({ success: false, error: '開始位置が正しくありません' }, 400);
+    }
     const staffId = c.get('staff').id;
     const [items, counts] = await Promise.all([
-      getNotificationCenter(c.env.DB, { lineAccountId, staffId, category, limit: rawLimit }),
+      getNotificationCenter(c.env.DB, { lineAccountId, staffId, category, limit: rawLimit, offset: rawOffset }),
       getNotificationCenterCounts(c.env.DB, { lineAccountId, staffId }),
     ]);
     return c.json({

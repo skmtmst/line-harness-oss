@@ -2,36 +2,79 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Circle } from 'lucide-react'
-import type { SupportMark } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, type SaveSupportMarkAutomationRule, type SupportMarkAutomationEvent, type SupportMarkListItem } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
+import Checkbox from '@/components/shared/checkbox'
 import Card from '@/components/shared/card'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
+import SupportMarkRulesPanel from './support-mark-rules-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import Notice from '@/components/shared/notice'
+import { EVENT_LABELS, eventLabel } from './support-mark-rules-view'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
 
-const COLORS = ['#EF4B55', '#B86A00', '#06C755', '#2563D4', '#6B56CF', '#707981']
-type MarkRow = SupportMark & { friendCount: number }
+const COLORS = [
+  { value: '#EF4B55', name: '赤' },
+  { value: '#B86A00', name: 'オレンジ' },
+  { value: '#06C755', name: '緑' },
+  { value: '#2563D4', name: '青' },
+  { value: '#6B56CF', name: '紫' },
+  { value: '#707981', name: 'グレー' },
+] as const
+const DESTINATIONS = ['受信箱の絞り込み', '友だち一覧の列と絞り込み', 'ダッシュボードの絞り込み', '配信の絞り込み条件', 'オートメーションの動作']
+type MarkRow = SupportMarkListItem
 
 export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const editing = Boolean(markId)
-  usePageTitle(editing ? '対応マークを編集' : '対応マークを追加')
+  usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')
 
   const [items, setItems] = useState<MarkRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [name, setName] = useState('')
-  const [color, setColor] = useState(COLORS[0])
-  const [displayOrder, setDisplayOrder] = useState(0)
+  const [name, setName] = useState('要確認')
+  const [color, setColor] = useState<string>(COLORS[0].value)
+  const [displayOrder, setDisplayOrder] = useState(4)
   const [isDefault, setIsDefault] = useState(false)
-  const [autoOnInbound, setAutoOnInbound] = useState(false)
+  /*
+    ATTR-06: 自動変更ルールは「作るだけで有効」にしない。
+    以前は初期値が true で、追加ボタンを押さなくても保存時に
+    isActive=true のルールと保護時間0分が黙って送られていた。
+    利用者が「＋ ルールを作る」を押したときだけ登録し、
+    外す・無効化する操作を同じ場所に置く。
+  */
+  const [createRule, setCreateRule] = useState(false)
+  const [ruleEvent, setRuleEvent] = useState<SupportMarkAutomationEvent>('staff_assigned')
+  const [ruleActive, setRuleActive] = useState(true)
+  const [ruleProtectionMinutes, setRuleProtectionMinutes] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * R176 監査：名前・色を変えたまま一覧へ移ると、確認なく入力が消える。
+   * 読み込んだ（新規は作りたての）姿との差を未保存とし、離れる操作では
+   * 確認を出す。保存の成功後は別画面へ送るため、確認が出ることはない。
+   */
+  const [baseline, setBaseline] = useState<{ name: string; color: string; displayOrder: number; isDefault: boolean } | null>(null)
   const selected = useMemo(() => items.find((mark) => mark.id === markId), [items, markId])
+  const dirty = baseline !== null && (
+    name !== baseline.name
+    || color !== baseline.color
+    || displayOrder !== baseline.displayOrder
+    || isDefault !== baseline.isDefault
+    // 新規の自動変更ルールは「作る」と押した時点で書きかけ。
+    || (!editing && (createRule || ruleEvent !== 'staff_assigned' || ruleActive !== true || ruleProtectionMinutes !== 0))
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  /* IDEA-04: 同名のマークがすでにあるとき、保存する前に知らせる（自分自身は外す）。 */
+  const nameDuplicates = useMemo(() => findDuplicateNames(items, name, markId ?? null), [items, name, markId])
   const currentUsages = selected ? [
     selected.friendCount > 0 ? `友だち ${selected.friendCount}人` : null,
     selected.usedIn?.broadcasts ? `配信 ${selected.usedIn.broadcasts}件` : null,
@@ -55,7 +98,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       .then((res) => {
         if (cancelled) return
         if (!res.success) throw new Error(res.error)
-        const rows = res.data as MarkRow[]
+        const rows = res.data
         setItems(rows)
         const current = rows.find((mark) => mark.id === markId)
         if (current) {
@@ -63,11 +106,14 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           setColor(current.color)
           setDisplayOrder(current.displayOrder)
           setIsDefault(current.isDefault)
-          setAutoOnInbound(current.autoOnInbound)
+          setBaseline({ name: current.name, color: current.color, displayOrder: current.displayOrder, isDefault: current.isDefault })
         } else if (editing) {
           setError('対応マークが見つかりません')
         } else {
+          // 新規は作りたての姿（名前「要確認」・先頭の色・末尾の順番）を
+          // 「保存済み」とし、触った分だけ未保存にする。
           setDisplayOrder(rows.length)
+          setBaseline({ name: '要確認', color: COLORS[0].value, displayOrder: rows.length, isDefault: false })
         }
       })
       .catch(() => setError('対応マークを読み込めませんでした'))
@@ -82,8 +128,11 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
     setError('')
     try {
       const result = editing && markId
-        ? await api.supportMarks.update(markId, selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
-        : await api.supportMarks.create(selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
+        ? await api.supportMarks.update(markId, selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound: selected?.autoOnInbound ?? false })
+        : await api.supportMarks.create(selectedAccountId, {
+            name: name.trim(), color, displayOrder, isDefault, autoOnInbound: false,
+            automationRules: createRule ? [{ name: `${name.trim()}：${eventLabel(ruleEvent)}`, event: ruleEvent, condition: null, priority: 0, manualProtectionMinutes: ruleProtectionMinutes, isActive: ruleActive } satisfies SaveSupportMarkAutomationRule] : [],
+          })
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
     } catch {
@@ -97,59 +146,135 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
   return (
     <div data-design-node="GMvBd">
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。ボタン枠のままでは分類案内の行き先リンクとずれる（自動点検 k=10）。 */}
       <div className="mb-4 flex items-center justify-between gap-4">
-        <Breadcrumb items={[{ label: '対応マーク', href: '/tags?tab=marks' }, { label: editing ? 'マークを編集' : 'マークを追加' }]} />
-        <Button href="/tags?tab=marks">対応マークへ</Button>
+        <Breadcrumb items={[{ label: '対応マーク', href: '/tags?tab=marks' }, { label: editing ? 'マークを編集' : 'マークを作る' }]} />
+        <Link href="/tags?tab=marks" className="text-status-info shrink-0 text-label font-semibold hover:underline">対応マークへ</Link>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <Notice tone="danger" className="mb-4">{error}</Notice> : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card padding="default">
+      {/*
+        グリッド子は `min-w-0` で縮める（#973 U020）。無いと中身の
+        最小幅がそのまま段の最小幅になり、狭い幅でカードの右端が切れる。
+      */}
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+        <Card padding="default" className="min-w-0">
           <h2 className="mb-4 text-sm font-bold text-ink">基本情報</h2>
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">マーク名</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" placeholder="例：要確認" />
+            <input value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-control border border-hairline px-3 text-sm" placeholder="例：要確認" />
+            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" />
           </label>
           <fieldset className="mb-4">
             <legend className="mb-2 text-xs font-semibold text-ink-secondary">色</legend>
             <div className="flex flex-wrap gap-2">
-              {COLORS.map((item) => <button key={item} type="button" onClick={() => setColor(item)} aria-label={`色 ${item}`} aria-pressed={color === item} className={`h-8 w-8 rounded-full ${color === item ? 'ring-2 ring-ink ring-offset-2' : ''}`} style={{ backgroundColor: item }} />)}
+              {COLORS.map((item) => <button key={item.value} type="button" onClick={() => setColor(item.value)} aria-label={item.name} title={item.name} aria-pressed={color === item.value} className={`h-8 w-8 rounded-full ${color === item.value ? 'ring-2 ring-ink ring-offset-2' : ''}`} style={{ backgroundColor: item.value }} />)}
             </div>
           </fieldset>
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">並び順</span>
-            <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className="h-10 w-28 rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" />
+            <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className="h-10 w-28 rounded-control border border-hairline px-3 text-sm" />
           </label>
-          <label className="flex items-center justify-between gap-3 border-t border-hairline pt-4 text-sm font-semibold text-ink">
-            <span>新着時の初期値にする<small className="mt-1 block font-normal text-ink-faint">初期値は1つだけ選べます</small></span>
-            <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-5 w-5 accent-accent" />
-          </label>
-          <label className="mt-4 flex items-center justify-between gap-3 border-t border-hairline pt-4 text-sm font-semibold text-ink">
-            <span>
-              メッセージ受信時にこのマークへ変更
-              <small className="mt-1 block font-normal text-ink-faint">現在接続済みの受信時設定だけを変更します</small>
-            </span>
-            <input type="checkbox" checked={autoOnInbound} onChange={(event) => setAutoOnInbound(event.target.checked)} className="h-5 w-5 accent-accent" />
-          </label>
+          {/*
+            説明文とチェックは別行にする（#973 U020）。1行に押し込むと
+            狭い幅でチェック欄がカードの外へ切れる。
+          */}
+          <div className="border-t border-hairline pt-4">
+            <Checkbox
+              checked={isDefault}
+              disabled={selected?.isDefault}
+              onCheckedChange={setIsDefault}
+            >新しい友だちに最初から付ける</Checkbox>
+            <p className="mt-1 text-xs font-normal leading-relaxed text-ink-faint">最初から付けるマークは1つだけ選べます</p>
+          </div>
+          {/* IDEA-04: 対応の状態管理なら対応マーク・印だけならタグ・値を持たせるなら情報欄という違いを、作る場所で確認できるようにする。 */}
+          <div className="mt-4"><AttributeKindGuide current="mark" /></div>
         </Card>
 
-        <Card padding="default">
+        {/* 設計 GMvBd は基本情報と自動変更を横並びで比較できる。 */}
+        {editing ? (
+          <Card padding="default" className="min-w-0">
+            <SupportMarkRulesPanel accountId={selectedAccountId} markId={markId ?? null} markName={name} />
+          </Card>
+        ) : (
+          <Card padding="default" className="min-w-0">
+            <h2 className="mb-2 text-sm font-bold text-ink">自動変更ルール</h2>
+            <p className="text-xs leading-relaxed text-ink-faint">受信・返信・担当割当・期限超過などをきっかけに自動変更できます。</p>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs font-semibold text-ink-secondary">このマークを作るときに登録するルール</p>
+              {createRule ? null : <Button type="button" onClick={() => setCreateRule(true)}>＋ ルールを作る</Button>}
+            </div>
+            {createRule ? (
+              /*
+                きっかけと変更先は縦に並べる（#973 U021）。横並びだと
+                狭い幅で選択肢も変更先も切れる。矢印は向きを示す飾り。
+                追加したあとは外せる。保存前に、いつ・何へ・どう守るかを
+                このカードで確認する（ATTR-06）。
+              */
+              <div className="mt-3 rounded-control border border-hairline p-3 text-sm">
+                <label className="block text-xs font-semibold text-ink-secondary">
+                  きっかけ
+                  <Select
+                    aria-label="きっかけ"
+                    value={ruleEvent}
+                    onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)}
+                    options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))}
+                    size="full"
+                    className="mt-1"
+                  />
+                </label>
+                <p aria-hidden="true" className="my-1 text-center text-ink-faint">↓</p>
+                <p className="min-w-0 break-words rounded-control bg-surface-soft px-3 py-2.5 font-semibold text-ink">「{name || 'このマーク'}」に変更</p>
+                <label className="mt-3 block text-xs font-semibold text-ink-secondary">
+                  手動で変更した直後の保護
+                  <Select
+                    aria-label="手動変更の保護時間"
+                    value={String(ruleProtectionMinutes)}
+                    onChange={(value) => setRuleProtectionMinutes(Number(value))}
+                    options={[
+                      { value: '0', label: '保護しない（次のきっかけですぐ変更）' },
+                      { value: '30', label: '30分は手動の変更を守る' },
+                      { value: '60', label: '1時間は手動の変更を守る' },
+                      { value: '1440', label: '1日は手動の変更を守る' },
+                    ]}
+                    size="full"
+                    className="mt-1"
+                  />
+                </label>
+                <Checkbox
+                  checked={ruleActive}
+                  onCheckedChange={setRuleActive}
+                  className="mt-3"
+                >このルールを有効にして登録する</Checkbox>
+                <div className="mt-3 flex justify-end">
+                  <Button type="button" onClick={() => setCreateRule(false)}>ルールを外す</Button>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs leading-relaxed text-ink-faint">今は自動変更しません。必要なときだけルールを追加してください。</p>
+            )}
+          </Card>
+        )}
+
+        <Card padding="default" className="min-w-0">
           <h2 className="mb-3 text-sm font-bold text-ink">どこで使われるか</h2>
-          {editing && currentUsages.length === 0 ? <p className="text-xs text-ink-faint">現在、参照している機能はありません。</p> : (
-            <ul className="space-y-2 text-xs text-ink">
-              {(editing ? currentUsages : ['作成後、受信箱や各機能の条件として選べます']).map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-accent" aria-hidden="true" /><span>{label}</span></li>)}
-            </ul>
-          )}
-          <p className="mt-4 text-xs leading-relaxed text-ink-faint">配信などの使用先がある間は保管できません。使用先を外すと、友だちは初期値へ移り、変更履歴は残ります。</p>
+          <ul className="space-y-2 text-xs text-ink">
+            {DESTINATIONS.map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-ink-faint" aria-hidden="true" /><span>{label}</span></li>)}
+          </ul>
+          {!editing ? <p className="mt-4 text-xs leading-relaxed text-ink-faint">受信箱・友だち一覧・友だち詳細のすべてに同じ順番で表示します。</p> : null}
+          {editing && currentUsages.length > 0 ? <p className="mt-4 text-xs font-semibold text-ink-secondary">現在の使用先：{currentUsages.join('、')}</p> : null}
+          <p className="mt-4 text-xs leading-relaxed text-ink-faint">配信などの使用先がある間は保管できません。使用先を外すと、友だちは最初から付けるマークへ移り、変更履歴は残ります。</p>
         </Card>
       </div>
 
       <StickyBar
         className="mt-4"
         status={editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください'}
-        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saving || !name.trim() || (editing && !selected)} onClick={() => void save()}>{saving ? '保存中…' : editing ? '変更を保存' : '対応マークを追加'}</Button></>}
+        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saving || !name.trim() || (editing && !selected)} onClick={() => void save()}>{saving ? '保存中…' : editing ? '変更を保存' : '対応マークを作る'}</Button></>}
       />
+      {/* R176 監査：名前・色などの書きかけがある間の離脱確認。 */}
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、マークへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

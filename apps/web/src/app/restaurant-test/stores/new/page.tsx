@@ -2,8 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
-import Header from '@/components/layout/header'
+import { cloneElement, isValidElement, useEffect, useId, useState, type ReactNode } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { MANUAL_LINKS } from '@/lib/manual-links'
@@ -11,6 +10,10 @@ import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import TermsConsent from './terms-consent'
 import { initialWizardStep, STEP } from './terms-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import Checkbox from '@/components/shared/checkbox'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
 
 const steps = [
   ['利用規約への同意', 'musuboの利用規約と、個人情報の取扱いをご確認ください。'],
@@ -34,9 +37,7 @@ function formatAgreementDate(value: string | null): string | null {
 }
 
 function ManualLink({ href, children }: { href: string; children: ReactNode }) {
-  if (!href) {
-    return <span aria-disabled="true" className="inline-flex cursor-not-allowed rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs font-semibold text-ink-faint">マニュアルは準備中です</span>
-  }
+  if (!href) return null
   return <a href={href} target="_blank" rel="noreferrer" className="inline-flex rounded-control border border-action px-3 py-2 text-xs font-semibold text-action">{children}</a>
 }
 
@@ -53,11 +54,29 @@ function Field({
   error?: string
   children: ReactNode
 }) {
+  /*
+   * R174: 見出しと入力を `htmlFor`・`id` で結ぶ。結ばないと4つの入力欄
+   * （店舗名・略称・チャネルID・チャネルシークレット）が読み上げ用の
+   * 項目名を持たない textbox になる。補足とエラーも `aria-describedby`
+   * で結ぶ（WCAG 3.3.2・1.3.1）。
+   */
+  const baseId = useId()
+  const inputId = `${baseId}-input`
+  const helpId = `${baseId}-help`
+  const errorId = `${baseId}-error`
+  const describedBy = error ? `${helpId} ${errorId}` : helpId
+  const field = isValidElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>(children)
+    ? cloneElement(children, {
+      id: inputId,
+      'aria-describedby': describedBy,
+      ...(error ? { 'aria-invalid': true as const } : null),
+    })
+    : children
   return <div>
-    <div className="mb-2 flex items-center gap-2"><label className="text-sm font-semibold text-ink">{label}</label><span className={`rounded-pill px-2 py-1 text-[10px] font-semibold ${required ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-secondary'}`}>{required ? '必須' : '任意'}</span></div>
-    {children}
-    <p className="mt-2 text-xs leading-5 text-ink-secondary">{help}</p>
-    {error && <p role="alert" className="mt-1 text-xs font-semibold text-danger">{error}</p>}
+    <div className="mb-2 flex items-center gap-2"><label htmlFor={inputId} className="text-sm font-semibold text-ink">{label}</label><span className={`rounded-pill px-2 py-1 text-[10px] font-semibold ${required ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-secondary'}`}>{required ? '必須' : '任意'}</span></div>
+    {field}
+    <p id={helpId} className="mt-2 text-xs leading-5 text-ink-secondary">{help}</p>
+    {error && <p id={errorId} role="alert" className="mt-1 text-xs font-semibold text-danger">{error}</p>}
   </div>
 }
 
@@ -76,6 +95,16 @@ export default function NewRestaurantStorePage() {
   const [connectionError, setConnectionError] = useState('')
   const [saving, setSaving] = useState(false)
   const [created, setCreated] = useState<{ id: string; storeName: string; lineAccountName: string } | null>(null)
+
+  /*
+   * R161 監査：店舗名などを入れたまま規約を別画面で読むと、戻ったときに
+   * 空欄へ戻る。登録が済むまで、入力が残っている間は未保存とし、
+   * 離れる操作では確認を出す。
+   */
+  const dirty = created === null && (
+    name !== '' || alias !== '' || officialAccountReady || channelId !== '' || channelSecret !== ''
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   useEffect(() => {
     let active = true
@@ -159,10 +188,17 @@ export default function NewRestaurantStorePage() {
     }
   }
 
-  return <div>
-    <Header description="利用規約の確認からLINE公式アカウントの接続まで、5つの手順で進めます。" action={<Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>} />
-    <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
-      <ol className="rounded-card border border-hairline bg-canvas p-4">{steps.map(([title, description], index) => {
+  return <div className="flex flex-col gap-4">
+    <div className="flex justify-end">
+      <Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>
+    </div>
+    {/*
+     * グリッドの子は既定で内容の最小幅までしか縮まない。1列のときも
+     * minmax(0,1fr) と子の min-w-0 をそろえないと、規約・手順パネルの
+     * 右側が画面外へ出る（U095）。
+     */}
+    <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+      <ol className="min-w-0 rounded-card border border-hairline bg-canvas p-4">{steps.map(([title, description], index) => {
         const number = index + 1
         const complete = number === STEP.TERMS
           ? Boolean(termsAgreedAt) || Boolean(created)
@@ -170,15 +206,15 @@ export default function NewRestaurantStorePage() {
         const current = number === step && !created
         return <li key={title} className="relative flex gap-3 pb-6 last:pb-0">
           {number < steps.length && <span className="absolute left-[15px] top-8 h-[calc(100%-1rem)] w-px bg-hairline" />}
-          <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${complete ? 'bg-accent text-on-accent' : current ? 'bg-ink text-canvas' : 'bg-canvas-sunken text-ink-faint'}`}>{complete ? '✓' : number}</span>
+          <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${complete ? 'bg-accent-deep text-on-accent' : current ? 'bg-ink text-canvas' : 'bg-canvas-sunken text-ink-faint'}`}>{complete ? '✓' : number}</span>
           <div>{number === STEP.TERMS && complete
             ? <Link href="/restaurant-test/terms" className="block"><p className="text-sm font-semibold text-success">{title}</p><p className="mt-1 text-xs leading-5 text-ink-faint">✓ 完了{agreementDate ? `（同意済み：${agreementDate}）` : ''}</p></Link>
             : <><p className={`text-sm font-semibold ${complete ? 'text-success' : current ? 'text-ink' : 'text-ink-faint'}`}>{title}</p><p className="mt-1 text-xs leading-5 text-ink-faint">{description}</p></>}</div>
         </li>
       })}</ol>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <main className="rounded-card border border-hairline bg-canvas p-5 sm:p-7">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 rounded-card border border-hairline bg-canvas p-5 sm:p-7">
           <p className="text-xs font-semibold text-ink-faint">ステップ {step} / 5</p>
           <h2 className="mt-2 text-xl font-bold text-ink">{steps[step - 1][0]}</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">{steps[step - 1][1]}</p>
@@ -192,7 +228,7 @@ export default function NewRestaurantStorePage() {
             <Field label="店舗の略称" required={false} help="管理画面で店舗を見分ける短い名前です。空欄の場合は店舗名を使います。">
               <input value={alias} onChange={(event) => setAlias(event.target.value)} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
             </Field>
-            <div className="flex justify-end"><button type="button" onClick={nextFromBasics} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button></div>
+            <StickyBar actions={<button type="button" onClick={nextFromBasics} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button>} />
           </div>}
 
           {step === STEP.OFFICIAL_ACCOUNT && <div className="mt-7 space-y-5">
@@ -200,8 +236,8 @@ export default function NewRestaurantStorePage() {
               <p className="font-semibold text-ink">まずはLINE公式アカウントの登録を行いましょう。</p>
               <p className="mt-2">LINE公式アカウントをお持ちでない方は、LINE for Businessから無料で店舗専用のアカウントを開設してください。作成後、この画面へ戻ってチェックを入れます。</p>
             </div>
-            <label className="flex cursor-pointer items-start gap-3 rounded-control border border-hairline px-4 py-3 text-sm font-semibold text-ink"><input type="checkbox" checked={officialAccountReady} onChange={(event) => setOfficialAccountReady(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />LINE公式アカウントを作成済みです</label>
-            <div className="flex justify-between gap-3"><button type="button" onClick={() => setStep(STEP.BASICS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">次へ</button></div>
+            <Checkbox checked={officialAccountReady} onCheckedChange={setOfficialAccountReady} className="rounded-control border border-hairline px-4 py-3">LINE公式アカウントを作成済みです</Checkbox>
+            <StickyBar actions={<><button type="button" onClick={() => setStep(STEP.BASICS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">次へ</button></>} />
           </div>}
 
           {step === STEP.CREDENTIALS && <div className="mt-7 space-y-6">
@@ -212,7 +248,7 @@ export default function NewRestaurantStorePage() {
             <Field label="チャネルシークレット" required help="同じ「チャネル基本設定」のチャネルシークレットをコピーしてください。保存後、この値は画面に表示されません。" error={errors.channelSecret}>
               <input type="password" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} autoComplete="new-password" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
             </Field>
-            <div className="flex justify-between gap-3"><button type="button" onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" onClick={nextFromCredentials} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button></div>
+            <StickyBar actions={<><button type="button" onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" onClick={nextFromCredentials} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button></>} />
           </div>}
 
           {step === STEP.CONNECT && <div className="mt-7">
@@ -220,17 +256,17 @@ export default function NewRestaurantStorePage() {
               <p className="text-lg font-bold text-success">接続できました</p>
               <p className="mt-2 text-sm leading-6 text-ink-secondary">「{created.storeName}」とLINE公式アカウント「{created.lineAccountName}」を登録しました。</p>
               {selectedAccountId
-                ? <button type="button" disabled={saving} onClick={() => void enterStore()} className="mt-5 rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:opacity-50">この店舗の管理画面へ</button>
+                ? <button type="button" disabled={saving} onClick={() => void enterStore()} className="mt-5 rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:opacity-50">この店舗の管理画面へ</button>
                 : <Link href="/hq" className="mt-5 inline-flex text-sm font-semibold text-action">統括の店舗一覧へ</Link>}
             </div> : <>
-              <div className="rounded-card bg-canvas-sunken p-5 text-sm leading-6 text-ink-secondary"><p className="font-semibold text-ink">以下のLINE公式アカウントのセットアップを行います。</p><p className="mt-1">トークンとボット表示名を取得できた場合だけ、店舗とLINE公式アカウントをまとめて登録します。</p><dl className="mt-4 grid gap-2"><div><dt className="text-xs text-ink-faint">店舗名</dt><dd className="font-semibold text-ink">{name}</dd></div><div><dt className="text-xs text-ink-faint">店舗の略称</dt><dd className="font-semibold text-ink">{alias || name}</dd></div></dl></div>
+              <div className="rounded-card bg-canvas-sunken p-5 text-sm leading-6 text-ink-secondary"><p className="font-semibold text-ink">以下のLINE公式アカウントのセットアップを行います。</p><p className="mt-1">トークンとボット表示名を取得できた場合だけ、店舗とLINE公式アカウントをまとめて登録します。</p><dl className="mt-4 grid gap-2"><div><dt className="text-xs text-ink-faint">店舗名</dt><dd className="break-words font-semibold text-ink">{name}</dd></div><div><dt className="text-xs text-ink-faint">店舗の略称</dt><dd className="break-words font-semibold text-ink">{alias || name}</dd></div></dl></div>
               {connectionError && <div role="alert" className="mt-4 rounded-control border border-danger bg-danger-bg px-4 py-3 text-sm leading-6 text-danger">{connectionError}</div>}
-              <div className="mt-5 flex justify-between gap-3"><button type="button" disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">戻る</button><button type="button" disabled={saving} onClick={() => void connect()} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</button></div>
+              <StickyBar className="mt-5" actions={<><button type="button" disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">戻る</button><button type="button" disabled={saving} onClick={() => void connect()} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</button></>} />
             </>}
           </div>}
-        </main>
+        </div>
 
-        <aside className="rounded-card border border-hairline bg-canvas p-5">
+        <aside className="min-w-0 rounded-card border border-hairline bg-canvas p-5">
           <h2 className="font-bold text-ink">わからないときは</h2>
           <p className="mt-2 text-xs leading-5 text-ink-secondary">今の手順に対応するマニュアルを確認できます。</p>
           <div className="mt-4 space-y-3">{step === STEP.TERMS ? <><p className="text-xs leading-5 text-ink-secondary">同意する前に、利用規約と個人情報の取扱いを最後まで確認してください。</p><Link href="/restaurant-test/terms" className="inline-flex rounded-control border border-action px-3 py-2 text-xs font-semibold text-action">利用規約を別画面で読む</Link></>
@@ -241,5 +277,7 @@ export default function NewRestaurantStorePage() {
         </aside>
       </div>
     </div>
+    {/* R161 監査：店舗名などの書きかけがある間の離脱確認。 */}
+    <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、入力した店舗の内容は保存されません。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </div>
 }

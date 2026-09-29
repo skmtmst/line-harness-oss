@@ -1,0 +1,38 @@
+-- フォームの編集の版(#723)。
+--
+-- ## なぜ forms.revision を使わないのか
+--
+-- `forms.revision` は**編集の版ではない**。migration 259 が作った15本の
+-- トリガが、次の5つの表への挿入・削除・更新で `revision` を増やす。
+--
+--   form_accounts / form_opens / form_submissions / rich_menu_areas / webinar_ctas
+--
+-- 259 のコメントがその意図をそのまま書いている。
+--   「削除影響を確認したあとに回答や利用先が増えた場合、古い確認結果で
+--     実行できないようフォームの版を進める。」
+--
+-- つまり `forms.revision` は「**削除影響の確認版**」で、保管・削除
+-- (archiveFormAtRevision / deleteFormAtRevision) がそのために使っている。
+-- 409 の文言が「影響が変わりました」なのも同じ理由。
+--
+-- **これを編集の楽観ロックに流用すると、公開フォームが1回開かれるだけで
+-- 版が進む。**手元の SQLite で測った実測値:
+--
+--   revision: 開く前=1 ／ 来訪1件(form_opens)の後=2 ／ 回答1件(form_submissions)の後=3
+--
+-- 編集は一度もしていない。流用すると、誰も編集していないのに 409 になり、
+-- 来訪のあるフォームほど保存できなくなる。しかも画面には「ほかの人が先に
+-- 保存しました」と出るので、運用者に原因が伝わらない。
+--
+-- ## この列の決めごと
+--
+-- `content_revision` は **updateForm だけが増やす**。来訪・回答・利用先の
+-- 出入りでは動かない。編集保存は `WHERE id = ? AND content_revision = ?` で
+-- 守り、取れなければ 409 を返す。
+--
+-- `forms.revision` の意味は変えない。保管・削除はそのまま `revision` を使う。
+-- 1つの表に版が2つ並ぶのは、見張っている対象が違うため。
+-- (トリガ無しの素の版を expectedVersion で突き合わせる形は、
+--  tags.version / conversion_definitions.version / common_vars.version と同じ)
+ALTER TABLE forms ADD COLUMN content_revision INTEGER NOT NULL DEFAULT 1
+  CHECK (content_revision >= 1);

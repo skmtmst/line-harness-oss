@@ -26,7 +26,14 @@ import {
   jstNow,
   getFriendAddScenarioIds,
   resolveLineCredential,
+  findOrCreateGlobalTag,
+  isLineAccountTenantActive,
 } from '@line-crm/db';
+import {
+  isStoppedEntryRouteRef,
+  recordStopSuppressionSafe,
+  ENTRY_ROUTE_STOPPED_HTML,
+} from '../services/entry-route-stop.js';
 import { buildIntroMessage } from '../services/intro-message.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
@@ -58,15 +65,45 @@ function decodeState(encoded: string): string {
 
 const liffRoutes = new Hono<Env>();
 
+const TENANT_UNAVAILABLE_RESPONSE = {
+  success: false,
+  code: 'TENANT_SUSPENDED',
+  error: '現在ご利用いただけません',
+} as const;
+
+async function stoppedLineAccountResponse(
+  c: Context<Env>,
+  lineAccountId: string | null | undefined,
+): Promise<Response | null> {
+  if (!lineAccountId) return null;
+  return await isLineAccountTenantActive(c.env.DB, lineAccountId)
+    ? null
+    : c.json(TENANT_UNAVAILABLE_RESPONSE, 503);
+}
+
+/**
+ * 呼び出し側の見えるアカウントに絞る WHERE 断片を作る。
+ * IDEA-18: 友だち(f)だけでなく注文(o)や相関副問合せの友だち(f2)にも
+ * 同じ条件を使うため、別名ごとの断片を `for(alias)` で作れるようにした。
+ * 既定の where/binds は従来どおり友だち別名 `f` のものを返す。
+ */
 async function analyticsAccountScope(c: Context<Env>, lineAccountId?: string) {
-  if (lineAccountId) return { where: 'AND f.line_account_id = ?', binds: [lineAccountId] };
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  const where = scope.allowedAccountIds.length
-    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
-    : scope.canSeeUnassigned
-      ? 'AND f.line_account_id IS NULL'
-      : 'AND 1 = 0';
-  return { where, binds: scope.allowedAccountIds };
+  if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+    return null;
+  }
+  const forAlias = (alias: string) => {
+    if (lineAccountId) {
+      return { where: `AND ${alias}.line_account_id = ?`, binds: [lineAccountId] };
+    }
+    const where = scope.allowedAccountIds.length
+      ? `AND (${alias}.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${alias}.line_account_id IS NULL` : ''})`
+      : scope.canSeeUnassigned
+        ? `AND ${alias}.line_account_id IS NULL`
+        : 'AND 1 = 0';
+    return { where, binds: scope.allowedAccountIds };
+  };
+  return { ...forAlias('f'), for: forAlias };
 }
 
 async function saveFriendAddCandidate(
@@ -80,6 +117,10 @@ async function saveFriendAddCandidate(
 ): Promise<void> {
   const refCode = input.refCode?.trim();
   if (!input.lineAccountId || !refCode || refCode.startsWith('xh:')) return;
+  // N-244: 停止した流入経路の ref は候補も残さない。入口表示後に停止して
+  // LIFF/OAuth直送で届いた場合も、共有 namespace の tracked/affiliate へ
+  // 落とさず止める。不存在 ref (Any が null) は従来どおり記録する。
+  if (await isStoppedEntryRouteRef(db, refCode)) return;
   try {
     const route = await getEntryRouteByRefCode(db, refCode);
     await recordFriendAddAttributionCandidate(db, {
@@ -248,6 +289,11 @@ async function applyRefAttribution(
   if (!ref || ref.startsWith('xh:')) return;
   const db = c.env.DB;
 
+  // N-244: 停止した流入経路の ref は、入口表示後の LIFF/OAuth 直送でも
+  // tracked/affiliate fallback・タグ/シナリオ開始をすべて止める。
+  // 不存在 ref は共有 namespace の正規フローのため従来どおり進める。
+  if (await isStoppedEntryRouteRef(db, ref)) return;
+
   const route = await getEntryRouteByRefCode(db, ref);
   let trackedLink: Awaited<ReturnType<typeof getTrackedLinkById>> = null;
   if (!route) {
@@ -353,6 +399,12 @@ async function applyRefAttribution(
  */
 liffRoutes.get('/auth/line', async (c) => {
   const ref = c.req.query('ref') || '';
+  // N-244差戻: 開始時にも停止判定する。停止前のページから停止後に押した
+  // 場合を拒否する。不存在 ref は共有 namespace の正規フローのため通す。
+  // DB 読取失敗は fail-closed (止める側) に倒す。
+  if (await isStoppedEntryRouteRef(c.env.DB, ref)) {
+    return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
+  }
   const redirect = c.req.query('redirect') || '';
   const formId = c.req.query('form') || '';
   const gclid = c.req.query('gclid') || '';
@@ -397,6 +449,8 @@ liffRoutes.get('/auth/line', async (c) => {
   if (!resolvedPool && accountParam) {
     // 2. ?account= explicit override
     const account = await getLineAccountByChannelId(c.env.DB, accountParam);
+    const stopped = await stoppedLineAccountResponse(c, account?.id);
+    if (stopped) return stopped;
     if (account?.login_channel_id) {
       channelId = account.login_channel_id;
     }
@@ -583,6 +637,11 @@ liffRoutes.get('/auth/line', async (c) => {
  */
 liffRoutes.get('/auth/oauth', async (c) => {
   const ref = c.req.query('ref') || '';
+  // N-244差戻: /auth/line と同じく開始時に停止判定する。停止前のページから
+  // 停止後に押した場合を拒否する。不存在 ref は正規フローのため通す。
+  if (await isStoppedEntryRouteRef(c.env.DB, ref)) {
+    return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
+  }
   const redirect = c.req.query('redirect') || '';
   const formId = c.req.query('form') || '';
   const gateParam = c.req.query('gate') || '';
@@ -606,6 +665,8 @@ liffRoutes.get('/auth/oauth', async (c) => {
   let channelId = c.env.LINE_LOGIN_CHANNEL_ID;
   if (accountParam) {
     const account = await getLineAccountByChannelId(c.env.DB, accountParam);
+    const stopped = await stoppedLineAccountResponse(c, account?.id);
+    if (stopped) return stopped;
     if (account?.login_channel_id) channelId = account.login_channel_id;
   } else {
     const poolSlug = c.req.query('pool') || 'main';
@@ -714,6 +775,8 @@ liffRoutes.get('/auth/callback', async (c) => {
     let loginLineAccountId: string | null = null;
     if (accountParam) {
       const account = await getLineAccountByChannelId(c.env.DB, accountParam);
+      const stopped = await stoppedLineAccountResponse(c, account?.id);
+      if (stopped) return stopped;
       if (account?.login_channel_id && account?.login_channel_secret) {
         loginChannelId = account.login_channel_id;
         loginChannelSecret = account.login_channel_secret;
@@ -812,12 +875,34 @@ liffRoutes.get('/auth/callback', async (c) => {
     });
 
     // OAuth型の追加導線は /api/liff/link を通らないため、ここでも今回リンクを記録する。
-    await saveFriendAddCandidate(db, {
-      lineAccountId: loginLineAccountId,
-      friendId: friend.id,
-      refCode: ref,
-      source: 'line_login',
-    });
+    // N-244: 停止 ref の候補は save 側でも止めるが、ここで求めた判定を使い回す。
+    const stoppedCallbackRef =
+      ref && !ref.startsWith('xh:') ? await isStoppedEntryRouteRef(db, ref) : false;
+    if (!stoppedCallbackRef) {
+      await saveFriendAddCandidate(db, {
+        lineAccountId: loginLineAccountId,
+        friendId: friend.id,
+        refCode: ref,
+        source: 'line_login',
+      });
+    } else {
+      // N-244差戻(台帳): 停止試行を抑止台帳へ引き継ぎ、後の別followが
+      // 自然流入扱いにならないようにする。保存・計測は抑止のまま。
+      // 記録の恒久失敗は握り潰さない (fail-closed)。外側catchは200を返すため
+      // ここで500にして、記録なしの完了扱いにしない。
+      try {
+        await recordStopSuppressionSafe(db, {
+          lineAccountId: loginLineAccountId,
+          lineUserId,
+          friendId: friend.id,
+          refCode: ref,
+          source: 'line_login',
+        });
+      } catch (err) {
+        console.error('Stop suppression record failed (fail-closed):', err);
+        return c.html(errorPage('Internal error'), 500);
+      }
+    }
 
     // IG cross-platform UUID linkage (OAuth path — new friends & returning users
     // going through /auth/callback). Existing friends who bypass OAuth hit the
@@ -859,7 +944,11 @@ liffRoutes.get('/auth/callback', async (c) => {
 
     // Attribution tracking
     // xh: refs are X Harness one-time tokens (the token IS the secret) — never persist as ref_code
-    if (ref && !ref.startsWith('xh:')) {
+    // N-244: 停止した流入経路の ref は、停止前に入口表示→停止後に連携完了の
+    // 場合も friends.ref_code 保存・tracking・帰属をすべて止める。apply 側も
+    // 二重に止めるが、ここで保存自体を止めないと数字が増える。不存在 ref は
+    // 共有 namespace の正規フローのため従来どおり進める。
+    if (ref && !ref.startsWith('xh:') && !stoppedCallbackRef) {
       // Save ref_code on the friend record (first touch wins — only set if not already set)
       await db
         .prepare(`UPDATE friends SET ref_code = ? WHERE id = ? AND ref_code IS NULL`)
@@ -902,7 +991,8 @@ liffRoutes.get('/auth/callback', async (c) => {
     if (utmMedium) adMeta.utm_medium = utmMedium;
     if (utmCampaign) adMeta.utm_campaign = utmCampaign;
 
-    if (Object.keys(adMeta).length > 0) {
+    // N-244差戻: 停止由来では広告ID・UTMを friends metadata へ新規保存しない。
+    if (!stoppedCallbackRef && Object.keys(adMeta).length > 0) {
       const existingMeta = await db
         .prepare('SELECT metadata FROM friends WHERE id = ?')
         .bind(friend.id)
@@ -946,8 +1036,13 @@ liffRoutes.get('/auth/callback', async (c) => {
     // friend_add scenarios (entry_routes.run_account_friend_add_scenarios = 0).
     const referralRouteForOverride =
       ref && !ref.startsWith('xh:') ? await getEntryRouteByRefCode(db, ref) : null;
+    // N-244差戻: 停止ref由来では unknown-route/アカウント共通の友だち追加
+    // シナリオを含めタグ・シナリオを一切開始しない。停止refを消した後は
+    // referralRouteForOverride が null になるため、従来の条件だけでは
+    // アカウント共通シナリオへ流れてしまう。ref 無しの自然流入は通す。
     const runAccountScenariosLiff =
-      !referralRouteForOverride || referralRouteForOverride.run_account_friend_add_scenarios !== 0;
+      !stoppedCallbackRef &&
+      (!referralRouteForOverride || referralRouteForOverride.run_account_friend_add_scenarios !== 0);
 
     try {
       // Resolve which account this friend belongs to
@@ -1025,7 +1120,10 @@ liffRoutes.get('/auth/callback', async (c) => {
         // xh: refs are X Harness one-time secret tokens — never put them on
         // liff.line.me URLs (third-party host). The same filter is applied
         // elsewhere in this file for QR codes / external LIFF URLs.
-        const externalRefForForm = ref && !ref.startsWith('xh:') ? ref : '';
+        // N-244: 停止 ref は案内文の URL にも載せない。下流の form 受付で
+        // 帰属が復活するのを止める。不存在 ref は従来どおり載せる。
+        const externalRefForForm =
+          ref && !ref.startsWith('xh:') && !stoppedCallbackRef ? ref : '';
         const formQuery = new URLSearchParams();
         formQuery.set('page', 'form');
         formQuery.set('id', formId);
@@ -1063,7 +1161,8 @@ liffRoutes.get('/auth/callback', async (c) => {
         // means existing friends cannot tamper with their attribution by
         // re-running this flow with a different ref.
         let introTemplate = null;
-        if (ref) {
+        // N-244: 停止 entry route の ref は tracked fallback へ落とさない。
+        if (ref && !stoppedCallbackRef) {
           const trackedLink = await getTrackedLinkById(db, ref);
           if (trackedLink) {
             try {
@@ -1076,6 +1175,19 @@ liffRoutes.get('/auth/callback', async (c) => {
               introTemplate = await getMessageTemplateById(db, trackedLink.intro_template_id);
             }
           }
+        }
+        // intro テンプレートの {{var.*}} は送信時点の値へ置き換える。
+        // 消えた共通情報があれば fail-closed で止める（この catch 節へ落ちる）。
+        if (introTemplate) {
+          const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+          introTemplate = {
+            ...introTemplate,
+            message_content: await expandSendCommonVars(
+              db, introTemplate.message_content,
+              { kind: 'liff', id: introTemplate.id },
+              { lineAccountId: friend.line_account_id, friendId: friend.id },
+            ),
+          };
         }
         const introMessage = buildIntroMessage(introTemplate, formLiffUrl);
 
@@ -1144,6 +1256,9 @@ liffRoutes.get('/api/liff/config', async (c) => {
       .bind(liffId)
       .first<{ id: string; name: string; channel_access_token: string; channel_access_token_encrypted: string | null }>();
 
+    const stopped = await stoppedLineAccountResponse(c, account?.id);
+    if (stopped) return stopped;
+
     // Fallback to default env account if liff_id not found in DB
     const accessToken = account
       ? await resolveLineCredential(
@@ -1188,6 +1303,8 @@ liffRoutes.post('/api/liff/profile', async (c) => {
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
+    const stopped = await stoppedLineAccountResponse(c, identity.lineAccountId);
+    if (stopped) return stopped;
 
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,
@@ -1218,6 +1335,8 @@ liffRoutes.post('/api/liff/friend-add-intent', async (c) => {
   try {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) return c.json({ success: false, error: 'Invalid ID token' }, 401);
+    const stopped = await stoppedLineAccountResponse(c, identity.lineAccountId);
+    if (stopped) return stopped;
     if (!identity.lineAccountId) {
       return c.json({ success: false, error: 'LINEアカウントを特定できません' }, 409);
     }
@@ -1240,8 +1359,26 @@ liffRoutes.post('/api/liff/friend-add-intent', async (c) => {
       identity.lineUserId,
       identity.lineAccountId,
     );
+    // N-244: 停止した流入経路への直送は候補を残さない。内部状態を漏らさない
+    // 汎用文で 410 にする。不存在 ref は共有 namespace の正規フローのため
+    // 従来どおり 200 で記録する。
+    // N-244差戻(台帳): 停止試行は抑止台帳へ引き継ぐ。友だち行が無い新規利用者
+    // でも記録し、後の別followが自然流入扱いにならないようにする。応答は変えない。
+    const stoppedIntentRef = await isStoppedEntryRouteRef(c.env.DB, refCode);
+    if (stoppedIntentRef) {
+      await recordStopSuppressionSafe(c.env.DB, {
+        lineAccountId: identity.lineAccountId,
+        lineUserId: identity.lineUserId,
+        friendId: friend?.id ?? null,
+        refCode,
+        source,
+      });
+    }
     if (!friend || friend.line_account_id !== identity.lineAccountId) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    if (stoppedIntentRef) {
+      return c.json({ success: false, error: 'このリンクは現在利用できません' }, 410);
     }
     const route = await getEntryRouteByRefCode(c.env.DB, refCode);
     const candidate = await recordFriendAddAttributionCandidate(c.env.DB, {
@@ -1322,9 +1459,26 @@ liffRoutes.post('/api/liff/link', async (c) => {
     const matchedAccount = matchedLoginChannelId
       ? dbAccounts.find((a) => a.login_channel_id === matchedLoginChannelId) ?? null
       : null;
+    const stopped = await stoppedLineAccountResponse(c, matchedAccount?.id);
+    if (stopped) return stopped;
     const friend = await getFriendByLineUserIdForAccount(
       db, lineUserId, matchedAccount?.id ?? null,
     );
+    // N-244差戻(再審査): 本番LIFFはfriend作成前にlinkのみ呼ぶ。404で返す前に
+    // 停止判定・抑止記録を済ませ、後のfollowが自然流入扱いにならないようにする。
+    // 応答は変えない (行なしは従来どおり 404)。
+    if (body.ref) {
+      const stoppedPreLinkRef = await isStoppedEntryRouteRef(db, body.ref);
+      if (stoppedPreLinkRef) {
+        await recordStopSuppressionSafe(db, {
+          lineAccountId: matchedAccount?.id ?? null,
+          lineUserId,
+          friendId: friend?.id ?? null,
+          refCode: body.ref,
+          source: 'liff',
+        });
+      }
+    }
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
@@ -1356,14 +1510,29 @@ liffRoutes.post('/api/liff/link', async (c) => {
     if (igLinkOk) await saveIgAccountMeta(db, friend.id, body.iga || '', body.igan || '');
 
     if (linkedUserId) {
-      await saveFriendAddCandidate(db, {
-        lineAccountId: matchedAccount?.id ?? null,
-        friendId: friend.id,
-        refCode: body.ref,
-        source: 'liff',
-      });
+      // N-244: 停止した流入経路への LIFF 直送は、連携済みでも raw ref 保存・
+      // 候補・tracking・帰属をすべて止める。apply 側も二重に止める。不存在
+      // ref は共有 namespace の正規フローのため従来どおり進める。
+      const stoppedLinkRef = await isStoppedEntryRouteRef(db, body.ref);
+      if (!stoppedLinkRef) {
+        await saveFriendAddCandidate(db, {
+          lineAccountId: matchedAccount?.id ?? null,
+          friendId: friend.id,
+          refCode: body.ref,
+          source: 'liff',
+        });
+      } else {
+        // N-244差戻(台帳): 停止試行を抑止台帳へ引き継ぐ。連携自体は通す。
+        await recordStopSuppressionSafe(db, {
+          lineAccountId: matchedAccount?.id ?? null,
+          lineUserId,
+          friendId: friend.id,
+          refCode: body.ref,
+          source: 'liff',
+        });
+      }
       // Still save ref even if already linked (but never persist xh: tokens as ref_code)
-      if (body.ref && !body.ref.startsWith('xh:')) {
+      if (body.ref && !body.ref.startsWith('xh:') && !stoppedLinkRef) {
         await db.prepare('UPDATE friends SET ref_code = ? WHERE id = ? AND ref_code IS NULL')
           .bind(body.ref, friend.id).run();
       }
@@ -1372,7 +1541,7 @@ liffRoutes.post('/api/liff/link', async (c) => {
       // would otherwise miss tracked-link campaigns triggered by /api/liff/link.
       // Mirror the new-link branch's recordRefTracking call so analytics
       // (/api/analytics/ref-summary) include LIFF hits from existing friends.
-      if (body.ref && !body.ref.startsWith('xh:')) {
+      if (body.ref && !body.ref.startsWith('xh:') && !stoppedLinkRef) {
         try {
           const route = await getEntryRouteByRefCode(db, body.ref);
           await recordRefTracking(db, {
@@ -1383,7 +1552,7 @@ liffRoutes.post('/api/liff/link', async (c) => {
           });
         } catch { /* silent */ }
       }
-      if (body.ref) {
+      if (body.ref && !stoppedLinkRef) {
         await applyRefAttribution(c, body.ref, friend, lineUserId, {
           accountChannelId: matchedAccount?.channel_id ?? null,
         });
@@ -1435,16 +1604,29 @@ liffRoutes.post('/api/liff/link', async (c) => {
 
     await linkFriendToUser(db, friend.id, userId);
 
-    await saveFriendAddCandidate(db, {
-      lineAccountId: matchedAccount?.id ?? null,
-      friendId: friend.id,
-      refCode: body.ref,
-      source: 'liff',
-    });
+    // N-244: 新規連携でも停止 ref の保存・計測・帰属は止める。
+    const stoppedNewLinkRef = await isStoppedEntryRouteRef(db, body.ref);
+    if (!stoppedNewLinkRef) {
+      await saveFriendAddCandidate(db, {
+        lineAccountId: matchedAccount?.id ?? null,
+        friendId: friend.id,
+        refCode: body.ref,
+        source: 'liff',
+      });
+    } else {
+      // N-244差戻(台帳): 停止試行を抑止台帳へ引き継ぐ。連携自体は通す。
+      await recordStopSuppressionSafe(db, {
+        lineAccountId: matchedAccount?.id ?? null,
+        lineUserId,
+        friendId: friend.id,
+        refCode: body.ref,
+        source: 'liff',
+      });
+    }
 
     // Save ref_code from LIFF (first touch wins)
     // xh: refs are X Harness one-time tokens — never persist as ref_code
-    if (body.ref && !body.ref.startsWith('xh:')) {
+    if (body.ref && !body.ref.startsWith('xh:') && !stoppedNewLinkRef) {
       await db.prepare('UPDATE friends SET ref_code = ? WHERE id = ? AND ref_code IS NULL')
         .bind(body.ref, friend.id).run();
 
@@ -1506,16 +1688,27 @@ liffRoutes.post('/api/liff/link', async (c) => {
 /**
  * GET /api/analytics/ref-summary — ref code analytics summary
  */
-liffRoutes.get('/api/analytics/ref-summary', async (c) => {
+liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const db = c.env.DB;
     const lineAccountId = c.req.query('lineAccountId');
     const accountScope = await analyticsAccountScope(c, lineAccountId);
+    if (!accountScope) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
 
     // friends 起点で集計することで、entry_routes に登録されていない ref
     // (例えば X Harness が発行する UUID ref) も summary に拾えるようにする。
     // 名前は entry_routes と LEFT JOIN して引く (未登録なら NULL → クライアン
     // ト側で「(未登録)」と表示)。
+    //
+    // IDEA-18: 購入・返金も同じ経路へ連結する。注文は「その経路で最初に来た
+    // 友だち(first-touch)」が起こした ec_orders だけを数える。友だちの絞り込み
+    // と同じ条件(相関副問合せの f2 に同じアカウント範囲)で数えるので、経路別の
+    // 購入件数と /api/analytics/ref/:refCode/orders の明細は同じ母集団になる。
+    // 同じ注文は ec_orders の (line_account_id, source_key, external_order_id)
+    // 一意制約で取り込み時に1行へ潰れているため、ここでは行数をそのまま数える。
+    const friendScope = accountScope.for('f2');
     const rows = await db
       .prepare(
         `SELECT
@@ -1523,7 +1716,18 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
           er.name as name,
           COUNT(DISTINCT f.id) as friend_count,
           COUNT(DISTINCT rt.id) as click_count,
-          MAX(f.created_at) as latest_at
+          MAX(f.created_at) as latest_at,
+          (SELECT COUNT(*) FROM ec_orders o
+             JOIN friends f2 ON f2.id = o.friend_id
+            WHERE f2.ref_code = f.ref_code ${friendScope.where}) as order_count,
+          (SELECT COUNT(*) FROM ec_orders o
+             JOIN friends f2 ON f2.id = o.friend_id
+            WHERE f2.ref_code = f.ref_code AND o.normalized_status = 'refunded'
+              ${friendScope.where}) as refunded_order_count,
+          (SELECT COUNT(*) FROM ec_orders o
+             JOIN friends f2 ON f2.id = o.friend_id
+            WHERE f2.ref_code = f.ref_code AND o.normalized_status = 'cancelled'
+              ${friendScope.where}) as cancelled_order_count
         FROM friends f
         LEFT JOIN entry_routes er ON er.ref_code = f.ref_code
         LEFT JOIN ref_tracking rt ON rt.ref_code = f.ref_code AND rt.friend_id = f.id
@@ -1532,13 +1736,21 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
         GROUP BY f.ref_code, er.name
         ORDER BY friend_count DESC`,
       )
-      .bind(...accountScope.binds)
+      .bind(
+        ...friendScope.binds,
+        ...friendScope.binds,
+        ...friendScope.binds,
+        ...accountScope.binds,
+      )
       .all<{
         ref_code: string;
         name: string;
         friend_count: number;
         click_count: number;
         latest_at: string | null;
+        order_count: number;
+        refunded_order_count: number;
+        cancelled_order_count: number;
       }>();
 
     const totalStmt = db
@@ -1550,6 +1762,34 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
       .prepare(`SELECT COUNT(*) as count FROM friends f WHERE ref_code IS NOT NULL AND ref_code != '' ${accountScope.where}`)
       .bind(...accountScope.binds);
     const friendsWithRefRes = await refStmt.first<{ count: number }>();
+
+    /*
+      IDEA-18: 未計測を「0件」と混ぜないための注文の内訳。
+      - attributed: 友だちに結びつき、その友だちに流入経路(ref)がある注文
+      - noRoute:    友だちには結びついたが流入経路が分からない注文
+      - unlinked:   LINEの友だちに結びついていない注文(会員のつき合わせ対象)
+      注文の範囲は注文自身の所属アカウント(o.line_account_id)で絞る。
+    */
+    const orderScope = accountScope.for('o');
+    const ordersRes = await db
+      .prepare(
+        `SELECT COUNT(*) AS orders_total,
+           SUM(CASE WHEN o.friend_id IS NOT NULL THEN 1 ELSE 0 END) AS orders_linked,
+           SUM(CASE WHEN f3.ref_code IS NOT NULL AND f3.ref_code != '' THEN 1 ELSE 0 END) AS orders_attributed,
+           SUM(CASE WHEN o.normalized_status = 'refunded' THEN 1 ELSE 0 END) AS orders_refunded,
+           SUM(CASE WHEN o.normalized_status = 'cancelled' THEN 1 ELSE 0 END) AS orders_cancelled
+         FROM ec_orders o
+         LEFT JOIN friends f3 ON f3.id = o.friend_id
+         WHERE 1 = 1 ${orderScope.where}`,
+      )
+      .bind(...orderScope.binds)
+      .first<{
+        orders_total: number;
+        orders_linked: number | null;
+        orders_attributed: number | null;
+        orders_refunded: number | null;
+        orders_cancelled: number | null;
+      }>();
 
     const totalFriends = totalFriendsRes?.count ?? 0;
     const friendsWithRef = friendsWithRefRes?.count ?? 0;
@@ -1563,10 +1803,20 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
           friendCount: r.friend_count,
           clickCount: r.click_count,
           latestAt: r.latest_at,
+          orderCount: r.order_count,
+          refundedOrderCount: r.refunded_order_count,
+          cancelledOrderCount: r.cancelled_order_count,
         })),
         totalFriends,
         friendsWithRef,
         friendsWithoutRef: totalFriends - friendsWithRef,
+        orders: {
+          total: ordersRes?.orders_total ?? 0,
+          linked: ordersRes?.orders_linked ?? 0,
+          attributed: ordersRes?.orders_attributed ?? 0,
+          refunded: ordersRes?.orders_refunded ?? 0,
+          cancelled: ordersRes?.orders_cancelled ?? 0,
+        },
       },
     });
   } catch (err) {
@@ -1578,10 +1828,15 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
 /**
  * GET /api/analytics/ref/:refCode — detailed friend list for a single ref code
  */
-liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
+liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const db = c.env.DB;
     const refCode = c.req.param('refCode');
+    const lineAccountId = c.req.query('lineAccountId');
+    const accountScope = await analyticsAccountScope(c, lineAccountId);
+    if (!accountScope) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
 
     // Look up the registered entry_route to surface the operator-facing name,
     // but do NOT 404 when missing. /inflow-links surfaces refs that exist in
@@ -1593,8 +1848,6 @@ liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
       .bind(refCode)
       .first<{ ref_code: string; name: string }>();
 
-    const lineAccountId = c.req.query('lineAccountId');
-    const accountScope = await analyticsAccountScope(c, lineAccountId);
     const binds = [refCode, refCode, ...accountScope.binds];
 
     const friends = await db
@@ -1603,6 +1856,7 @@ liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
           f.id,
           f.display_name,
           f.ref_code,
+          f.is_following,
           rt.created_at as tracked_at
         FROM friends f
         LEFT JOIN ref_tracking rt ON f.id = rt.friend_id AND rt.ref_code = ?
@@ -1614,6 +1868,7 @@ liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
         id: string;
         display_name: string;
         ref_code: string | null;
+        is_following: number | null;
         tracked_at: string | null;
       }>();
 
@@ -1622,15 +1877,136 @@ liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
       data: {
         refCode: routeRow?.ref_code ?? refCode,
         name: routeRow?.name ?? null,
+        // #514-8: 画面が読む欄のうち口が返せるのはいまの状態だけ
+        // (is_following を運用文言に寄せる)。はじめて見たページ・成果・
+        // マイルの集計口は無いので返さず、画面は「—」にする。
         friends: (friends.results ?? []).map((f) => ({
           id: f.id,
           displayName: f.display_name,
           trackedAt: f.tracked_at,
+          currentStatus: f.is_following === 0 ? 'ブロック済み' : '友だち中',
         })),
       },
     });
   } catch (err) {
     console.error('GET /api/analytics/ref/:refCode error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * GET /api/analytics/ref/:refCode/orders — その経路から来た友だちの注文明細
+ *
+ * IDEA-18: 経路別集計(ref-summary の orderCount)と同じ条件の明細を返し、
+ * 画面上で集計と注文をつき合わせられるようにする。
+ *
+ * 帰属ルールは first-touch: friends.ref_code がこの経路の友だちに結びついた
+ * ec_orders だけ。同じ注文は (line_account_id, source_key, external_order_id)
+ * の一意制約で取り込み時に1行へ潰れているので、再取込で二重に出ない。
+ * 友だちに結びついていない注文(未連携)や経路が分からない注文は
+ * ここには出ず、ref-summary の orders.total/attributed で未計測として数える。
+ */
+liffRoutes.get('/api/analytics/ref/:refCode/orders', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const db = c.env.DB;
+    const refCode = c.req.param('refCode');
+    const lineAccountId = c.req.query('lineAccountId');
+    const accountScope = await analyticsAccountScope(c, lineAccountId);
+    if (!accountScope) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+
+    const limitRaw = Number(c.req.query('limit') ?? '20');
+    const offsetRaw = Number(c.req.query('offset') ?? '0');
+    const limit = Number.isInteger(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
+    const offset = Number.isInteger(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
+
+    const where = `f.ref_code = ? ${accountScope.where}`;
+    const binds = [refCode, ...accountScope.binds];
+
+    const [items, countRes, summaryRes] = await Promise.all([
+      db
+        .prepare(
+          `SELECT o.id, o.order_number, o.normalized_status, o.provider_status,
+                  o.currency, o.total_amount_minor, o.refunded_amount_minor,
+                  o.ordered_at, o.detail_url,
+                  f.id AS friend_id, f.display_name AS friend_name
+             FROM ec_orders o
+             JOIN friends f ON f.id = o.friend_id
+            WHERE ${where}
+            ORDER BY o.ordered_at DESC, o.id DESC
+            LIMIT ? OFFSET ?`,
+        )
+        .bind(...binds, limit, offset)
+        .all<{
+          id: string;
+          order_number: string;
+          normalized_status: string;
+          provider_status: string;
+          currency: string;
+          total_amount_minor: number | null;
+          refunded_amount_minor: number | null;
+          ordered_at: string;
+          detail_url: string | null;
+          friend_id: string;
+          friend_name: string | null;
+        }>(),
+      db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM ec_orders o JOIN friends f ON f.id = o.friend_id
+            WHERE ${where}`,
+        )
+        .bind(...binds)
+        .first<{ count: number }>(),
+      db
+        .prepare(
+          `SELECT
+             SUM(CASE WHEN o.normalized_status = 'refunded' THEN 1 ELSE 0 END) AS refunded,
+             SUM(CASE WHEN o.normalized_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+             SUM(o.total_amount_minor) AS total_amount,
+             SUM(o.refunded_amount_minor) AS refunded_amount
+           FROM ec_orders o JOIN friends f ON f.id = o.friend_id
+          WHERE ${where}`,
+        )
+        .bind(...binds)
+        .first<{
+          refunded: number | null;
+          cancelled: number | null;
+          total_amount: number | null;
+          refunded_amount: number | null;
+        }>(),
+    ]);
+
+    return c.json({
+      success: true,
+      data: {
+        refCode,
+        total: countRes?.count ?? 0,
+        // 金額は取れていない注文があると合計が欠ける。0 ではなく null で
+        // 「額は未計測」を表す（画面側は「—」を出す）。
+        summary: {
+          refunded: summaryRes?.refunded ?? 0,
+          cancelled: summaryRes?.cancelled ?? 0,
+          totalAmount: summaryRes?.total_amount ?? null,
+          refundedAmount: summaryRes?.refunded_amount ?? null,
+        },
+        items: (items.results ?? []).map((row) => ({
+          id: row.id,
+          orderNumber: row.order_number,
+          status: row.normalized_status,
+          providerStatus: row.provider_status,
+          currency: row.currency,
+          totalAmount: row.total_amount_minor,
+          refundedAmount: row.refunded_amount_minor,
+          orderedAt: row.ordered_at,
+          detailUrl: row.detail_url,
+          friend: { id: row.friend_id, displayName: row.friend_name },
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/analytics/ref/:refCode/orders error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1815,19 +2191,7 @@ async function applyXHarnessActions(
   // Add tag if specified
   if (result.tag) {
     try {
-      // Find or create the tag by name
-      let tagRow = await db
-        .prepare('SELECT id FROM tags WHERE name = ?')
-        .bind(result.tag)
-        .first<{ id: string }>();
-      if (!tagRow) {
-        const tagId = crypto.randomUUID();
-        const { jstNow } = await import('@line-crm/db');
-        tagRow = await db
-          .prepare('INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?) RETURNING id')
-          .bind(tagId, result.tag, jstNow())
-          .first<{ id: string }>();
-      }
+      const tagRow = await findOrCreateGlobalTag(db, { name: result.tag });
       if (tagRow) {
         const { addTagToFriend } = await import('@line-crm/db');
         await addTagToFriend(db, friendId, tagRow.id);
@@ -1944,6 +2308,9 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
       }
     }
 
+    const stopped = await stoppedLineAccountResponse(c, verifiedLineAccountId);
+    if (stopped) return stopped;
+
     const db = c.env.DB;
     const friend = await getFriendByLineUserIdForAccount(
       db,
@@ -1965,7 +2332,11 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
     // URL is unreliable as a source of gate id).
     // xh: refs are X Harness one-time secret tokens — never put them on
     // liff.line.me URLs (third-party host).
-    const externalRefForForm = ref && !ref.startsWith('xh:') ? ref : '';
+    // N-244差戻: 停止 ref は再送しない (下流の form 受付で帰属が復活するのを
+    // 止める)。tracked 解決も後段で止める。不存在 ref は従来どおり載せる。
+    const stoppedFormRef = await isStoppedEntryRouteRef(db, ref);
+    const externalRefForForm =
+      ref && !ref.startsWith('xh:') && !stoppedFormRef ? ref : '';
     const formQuery = new URLSearchParams();
     formQuery.set('page', 'form');
     formQuery.set('id', formId);
@@ -1998,8 +2369,10 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
     }
     // Resolve intro template via tracked link (if ref provided).
     // Also pin the friend's first_tracked_link_id (idempotent — never overwrites).
+    // N-244差戻: 停止 entry route と同名の tracked link があっても fallback
+    // しない (帰属の復活を止める)。不存在 ref は従来どおり解決する。
     let introTemplate = null;
-    if (ref) {
+    if (ref && !stoppedFormRef) {
       const trackedLink = await getTrackedLinkById(c.env.DB, ref);
       if (trackedLink) {
         try {
@@ -2012,6 +2385,19 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
       if (trackedLink?.intro_template_id) {
         introTemplate = await getMessageTemplateById(c.env.DB, trackedLink.intro_template_id);
       }
+    }
+    // intro テンプレートの {{var.*}} は送信時点の値へ置き換える。
+    // 消えた共通情報があれば fail-closed で止める。
+    if (introTemplate) {
+      const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+      introTemplate = {
+        ...introTemplate,
+        message_content: await expandSendCommonVars(
+          c.env.DB, introTemplate.message_content,
+          { kind: 'liff', id: introTemplate.id },
+          { lineAccountId: (friend as any).line_account_id ?? null, friendId: friend.id },
+        ),
+      };
     }
     const introMessage = buildIntroMessage(introTemplate, formLiffUrl);
 

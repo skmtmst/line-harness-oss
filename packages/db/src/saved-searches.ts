@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { isSavedSearchOpAllowed } from '@line-crm/shared';
 import type {
   SavedSearchCondition as SearchCondition,
   SavedSearchConditions as SearchConditions,
@@ -35,6 +36,9 @@ export interface SavedSearch {
   is_shared: number;
   display_order: number;
   created_at: string;
+  revision?: number;
+  updated_by?: string | null;
+  updated_at?: string | null;
 }
 
 export interface SavedSearchAccess {
@@ -57,13 +61,26 @@ export interface SavedSearchReference {
   reference_id: string;
   reference_name: string;
   reference_mode: SavedSearchReferenceMode;
+  revision?: number | null;
   last_used_at: string | null;
   created_at: string;
+}
+
+export interface SavedSearchUsageCount {
+  saved_search_id: string;
+  call_count_this_month: number;
+}
+
+export interface SavedSearchReferenceUsageCount extends SavedSearchUsageCount {
+  reference_kind: string;
+  reference_id: string | null;
 }
 
 export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;
 export const INBOX_SAVED_VIEW_CHANNELS = ['line', 'email'] as const;
 export const INBOX_SAVED_VIEW_SORTS = ['newest', 'waiting_desc'] as const;
+export const INBOX_SAVED_VIEW_DUE = ['all', 'overdue'] as const;
+export const INBOX_SAVED_VIEW_QUICK_FILTERS = ['all', 'reply', 'overdue'] as const;
 
 /** 受信箱専用。友だち検索の AND/OR 条件と混ぜず、版を持って移行できる形にする。 */
 export interface InboxSavedViewConditions {
@@ -73,10 +90,16 @@ export interface InboxSavedViewConditions {
   statuses: Array<(typeof INBOX_SAVED_VIEW_STATUSES)[number]>;
   assignees: string[];
   unread: 'all' | 'mine';
+  /**
+   * 一覧上部の「すべて／要返信／期限超過」。N-020 で追加。
+   * 持たない古い行は due から復元する（overdue → 'overdue'）。
+   */
+  quickFilter: (typeof INBOX_SAVED_VIEW_QUICK_FILTERS)[number];
   messageTypes: string[];
   receivedFrom: string | null;
   receivedTo: string | null;
   sort: (typeof INBOX_SAVED_VIEW_SORTS)[number];
+  due: (typeof INBOX_SAVED_VIEW_DUE)[number];
 }
 
 const CONDITION_KINDS = new Set([
@@ -86,11 +109,18 @@ const CONDITION_KINDS = new Set([
   'form',
   'purchase',
   'mark',
+  'assignee',
   'scenario',
+  'event_booking',
+  'calendar_booking',
   'chat_status',
+  'last_activity',
+  'reminder',
+  'memo',
   'following',
   'status_message',
   'created_at',
+  'common_event',
 ]);
 
 /**
@@ -125,13 +155,36 @@ export function validateSearchConditions(
       if (typeof c.op !== 'string' || c.op === '') {
         return { ok: false, error: '条件に op がありません' };
       }
+      /*
+        実行側（saved-search-filter のSQL変換）が解釈できない op を
+        ここで断る。以前は「op が空でない」だけを見ていたため、
+        `field` + `gte` のような保存は通るが検索で拒否される条件が
+        作れた。保存した本人はもう画面を離れているので、形の検査で
+        実行可否まで一致させる（ATTR-13）。
+      */
+      if (!isSavedSearchOpAllowed(String(c.kind), c.op)) {
+        return {
+          ok: false,
+          error: `条件「${String(c.kind)}」では使えない比較方法です（${c.op}）`,
+        };
+      }
+      /*
+       * R183: 開始日より後の終了日（逆転期間）は0人になる設定ミス。
+       * 0人のまま保存・再利用されると「本当に該当者なし」と区別が
+       * 付かないため、保存の時点で断る。片側だけの期間は許容する。
+       * 日付は YYYY-MM-DD のため文字列比較で前後が分かる。
+       */
+      if ((c.kind === 'created_at' || c.kind === 'last_activity') && c.op === 'between') {
+        const range = (c.value ?? {}) as { from?: unknown; to?: unknown };
+        const from = typeof range.from === 'string' ? range.from.trim() : '';
+        const to = typeof range.to === 'string' ? range.to.trim() : '';
+        if (from && to && from > to) {
+          return { ok: false, error: '期間の開始日が終了日より後になっています' };
+        }
+      }
       list.push(c as unknown as SearchCondition);
     }
     out[group] = list;
-  }
-
-  if ((out.all?.length ?? 0) === 0 && (out.any?.length ?? 0) === 0) {
-    return { ok: false, error: '条件が1つもありません' };
   }
 
   if (obj.visibility !== undefined) {
@@ -139,6 +192,16 @@ export function validateSearchConditions(
       return { ok: false, error: '表示状態の指定が正しくありません' };
     }
     out.visibility = obj.visibility as SearchConditions['visibility'];
+  }
+
+  /*
+   * 「表示中のみ」「非表示のみ」はそれだけで意味のある絞り込みなので、
+   * all/any が空でも受け取る（#1010 FRIEND-01）。'all' は絞り込み無しと
+   * 同じなので、それだけの条件はこれまで通り弾く。
+   */
+  if ((out.all?.length ?? 0) === 0 && (out.any?.length ?? 0) === 0
+      && (out.visibility === undefined || out.visibility === 'all')) {
+    return { ok: false, error: '条件が1つもありません' };
   }
 
   if (obj.description !== undefined) {
@@ -281,6 +344,20 @@ export function validateInboxSavedViewConditions(
   if (!(INBOX_SAVED_VIEW_SORTS as readonly unknown[]).includes(input.sort)) {
     return { ok: false, error: '並び順が正しくありません' };
   }
+  const due = input.due === undefined ? 'all' : input.due;
+  if (!(INBOX_SAVED_VIEW_DUE as readonly unknown[]).includes(due)) {
+    return { ok: false, error: '期限条件が正しくありません' };
+  }
+  /*
+    quickFilter は N-020 で追加した軸。持たない古い行は due から復元する。
+    'overdue' は due='overdue' と同じ条件なので、保存時は両方を揃えて書く。
+  */
+  const quickFilter = input.quickFilter === undefined
+    ? (due === 'overdue' ? 'overdue' : 'all')
+    : input.quickFilter;
+  if (!(INBOX_SAVED_VIEW_QUICK_FILTERS as readonly unknown[]).includes(quickFilter)) {
+    return { ok: false, error: '絞り込み条件が正しくありません' };
+  }
   const query = typeof input.query === 'string' ? input.query.trim().slice(0, 200) : '';
   const receivedFrom = input.receivedFrom === null || typeof input.receivedFrom === 'string'
     ? input.receivedFrom as string | null
@@ -297,10 +374,12 @@ export function validateInboxSavedViewConditions(
       statuses: statuses as InboxSavedViewConditions['statuses'],
       assignees,
       unread: input.unread,
+      quickFilter: quickFilter as InboxSavedViewConditions['quickFilter'],
       messageTypes,
       receivedFrom,
       receivedTo,
       sort: input.sort as InboxSavedViewConditions['sort'],
+      due: due as InboxSavedViewConditions['due'],
     },
   };
 }
@@ -344,6 +423,40 @@ export async function getSavedSearchById(
     .first<SavedSearch>();
 }
 
+/**
+ * 画面から届いた「動かせる検索だけの新しい順」を、届いていない行の位置を
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03）。
+ *
+ * 動かせる範囲は PATCH と同じ：選択中アカウントの検索で、本人が作った
+ * もの（owner/admin は全部）。行ごとの PATCH だと、他人が作った検索への
+ * 404 で途中までしか並びが変わらない状態が残った。
+ */
+export async function reorderSavedSearches(
+  db: D1Database,
+  access: SavedSearchAccess,
+  ids: string[],
+): Promise<void> {
+  const current = await getSavedSearches(db, 'friends', access, 'search_v1');
+  const movable = new Set(
+    current
+      .filter((row) => row.line_account_id === access.lineAccountId
+        && (access.canManageAll || row.created_by === access.staffId))
+      .map((row) => row.id),
+  );
+  const requested = ids.filter((id) => movable.has(id));
+  if (requested.length < 2) return;
+  const requestedSet = new Set(requested);
+  let index = 0;
+  const nextOrder = current.map((row) =>
+    requestedSet.has(row.id) ? requested[index++] : row.id);
+  await db.batch(
+    nextOrder.flatMap((id, position) =>
+      movable.has(id)
+        ? [db.prepare(`UPDATE saved_searches SET display_order = ? WHERE id = ?`).bind(position, id)]
+        : []),
+  );
+}
+
 export async function countSavedSearches(
   db: D1Database,
   input: {
@@ -381,7 +494,7 @@ export async function getSavedSearchReferences(
   const result = await db
     .prepare(
       `SELECT saved_search_id, line_account_id, reference_kind, reference_id,
-              reference_name, reference_mode, last_used_at, created_at
+              reference_name, reference_mode, revision, last_used_at, created_at
          FROM saved_search_references
         WHERE line_account_id = ? AND saved_search_id IN (${placeholders})
         ORDER BY reference_kind ASC, reference_name ASC, reference_id ASC`,
@@ -401,18 +514,20 @@ export async function upsertSavedSearchReference(
     referenceId: string;
     referenceName: string;
     mode: SavedSearchReferenceMode;
+    revision?: number | null;
     lastUsedAt?: string | null;
   },
 ): Promise<void> {
   await db.prepare(
     `INSERT INTO saved_search_references
        (saved_search_id, line_account_id, reference_kind, reference_id,
-        reference_name, reference_mode, last_used_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        reference_name, reference_mode, revision, last_used_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(saved_search_id, reference_kind, reference_id) DO UPDATE SET
        line_account_id = excluded.line_account_id,
        reference_name = excluded.reference_name,
        reference_mode = excluded.reference_mode,
+       revision = excluded.revision,
        last_used_at = excluded.last_used_at`,
   ).bind(
     input.savedSearchId,
@@ -421,8 +536,92 @@ export async function upsertSavedSearchReference(
     input.referenceId,
     input.referenceName,
     input.mode,
+    input.revision ?? null,
     input.lastUsedAt ?? null,
     jstNow(),
+  ).run();
+}
+
+function savedSearchMonth(now = jstNow()): string {
+  return now.slice(0, 7);
+}
+
+/** 一覧の「今月の呼び出し」を検索ごとにまとめて返す。 */
+export async function getSavedSearchUsageCounts(
+  db: D1Database,
+  savedSearchIds: string[],
+  lineAccountId: string,
+  now = jstNow(),
+): Promise<Map<string, number>> {
+  const ids = [...new Set(savedSearchIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => '?').join(', ');
+  const result = await db.prepare(
+    `SELECT saved_search_id, COUNT(*) AS call_count_this_month
+       FROM saved_search_usage_events
+      WHERE line_account_id = ?
+        AND saved_search_id IN (${placeholders})
+        AND substr(used_at, 1, 7) = ?
+      GROUP BY saved_search_id`,
+  ).bind(lineAccountId, ...ids, savedSearchMonth(now)).all<SavedSearchUsageCount>();
+  return new Map(result.results.map((row) => [
+    row.saved_search_id,
+    Number(row.call_count_this_month),
+  ]));
+}
+
+/** 詳細の使用先ごとに、今月何回呼ばれたかを返す。 */
+export async function getSavedSearchReferenceUsageCounts(
+  db: D1Database,
+  savedSearchIds: string[],
+  lineAccountId: string,
+  now = jstNow(),
+): Promise<Map<string, number>> {
+  const ids = [...new Set(savedSearchIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => '?').join(', ');
+  const result = await db.prepare(
+    `SELECT saved_search_id, reference_kind, reference_id,
+            COUNT(*) AS call_count_this_month
+       FROM saved_search_usage_events
+      WHERE line_account_id = ?
+        AND saved_search_id IN (${placeholders})
+        AND substr(used_at, 1, 7) = ?
+      GROUP BY saved_search_id, reference_kind, reference_id`,
+  ).bind(lineAccountId, ...ids, savedSearchMonth(now)).all<SavedSearchReferenceUsageCount>();
+  return new Map(result.results.map((row) => [
+    `${row.saved_search_id}:${row.reference_kind}:${row.reference_id ?? ''}`,
+    Number(row.call_count_this_month),
+  ]));
+}
+
+/** 保存した検索を実際に使った時だけ追記する。 */
+export async function recordSavedSearchUsage(
+  db: D1Database,
+  input: {
+    savedSearchId: string;
+    lineAccountId: string;
+    revision: number;
+    referenceKind: 'friends' | SavedSearchReferenceKind;
+    referenceId?: string | null;
+    usedBy?: string | null;
+    usedAt?: string;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO saved_search_usage_events
+       (id, saved_search_id, line_account_id, revision, reference_kind,
+        reference_id, used_by, used_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    input.savedSearchId,
+    input.lineAccountId,
+    input.revision,
+    input.referenceKind,
+    input.referenceId ?? null,
+    input.usedBy ?? null,
+    input.usedAt ?? jstNow(),
   ).run();
 }
 
@@ -450,11 +649,14 @@ export async function createSavedSearch(
   },
 ): Promise<SavedSearch> {
   const id = crypto.randomUUID();
-  await db
-    .prepare(
+  const now = jstNow();
+  await db.batch([
+    db.prepare(
       `INSERT INTO saved_searches
-         (id, name, scope, condition_format, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, name, scope, condition_format, conditions_json, created_by,
+          line_account_id, is_shared, display_order, created_at, revision,
+          updated_by, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     )
     .bind(
       id,
@@ -466,10 +668,103 @@ export async function createSavedSearch(
       input.lineAccountId,
       input.isShared === false ? 0 : 1,
       input.displayOrder ?? 0,
-      jstNow(),
-    )
-    .run();
+      now,
+      input.createdBy ?? null,
+      now,
+    ),
+    db.prepare(
+      `INSERT INTO saved_search_revisions
+         (saved_search_id, line_account_id, revision, name, conditions_json,
+          is_shared, display_order, updated_by, created_at)
+       VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      id,
+      input.lineAccountId,
+      input.name,
+      JSON.stringify(input.conditions),
+      input.isShared === false ? 0 : 1,
+      input.displayOrder ?? 0,
+      input.createdBy ?? null,
+      now,
+    ),
+  ]);
   return (await getSavedSearchById(db, id, input.lineAccountId))!;
+}
+
+export type SavedSearchRevisionUpdateResult =
+  | { status: 'updated'; search: SavedSearch }
+  | { status: 'not_found' }
+  | { status: 'conflict'; current: SavedSearch };
+
+/** 読み込んだrevisionと同じ時だけ更新し、変更後の版を履歴へ残す。 */
+export async function updateSavedSearchWithRevision(
+  db: D1Database,
+  id: string,
+  access: SavedSearchAccess,
+  expectedRevision: number,
+  input: {
+    name?: string;
+    conditions?: SearchConditions | InboxSavedViewConditions | SavedSegmentConditions;
+    isShared?: boolean;
+    displayOrder?: number;
+  },
+): Promise<SavedSearchRevisionUpdateResult> {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    values.push(input.name);
+  }
+  if (input.conditions !== undefined) {
+    sets.push('conditions_json = ?');
+    values.push(JSON.stringify(input.conditions));
+  }
+  if (input.isShared !== undefined) {
+    sets.push('is_shared = ?');
+    values.push(input.isShared ? 1 : 0);
+  }
+  if (input.displayOrder !== undefined) {
+    sets.push('display_order = ?');
+    values.push(input.displayOrder);
+  }
+
+  const existing = await getSavedSearchById(db, id, access.lineAccountId);
+  if (!existing || (existing.created_by !== access.staffId && !access.canManageAll)) {
+    return { status: 'not_found' };
+  }
+  const currentRevision = Number(existing.revision ?? 1);
+  if (currentRevision !== expectedRevision) {
+    return { status: 'conflict', current: existing };
+  }
+  if (sets.length === 0) return { status: 'updated', search: existing };
+
+  const now = jstNow();
+  sets.push('revision = revision + 1', 'updated_by = ?', 'updated_at = ?');
+  values.push(access.staffId, now, id, access.lineAccountId, access.staffId,
+    access.canManageAll ? 1 : 0, expectedRevision);
+  const statements = [
+    db.prepare(
+      `UPDATE saved_searches SET ${sets.join(', ')}
+       WHERE id = ? AND line_account_id = ?
+         AND (created_by = ? OR ? = 1) AND revision = ?`,
+    ).bind(...values),
+    db.prepare(
+      `INSERT OR IGNORE INTO saved_search_revisions
+         (saved_search_id, line_account_id, revision, name, conditions_json,
+          is_shared, display_order, updated_by, created_at)
+       SELECT id, line_account_id, revision, name, conditions_json,
+              is_shared, display_order, updated_by, updated_at
+         FROM saved_searches
+        WHERE id = ? AND line_account_id = ? AND revision = ?`,
+    ).bind(id, access.lineAccountId, expectedRevision + 1),
+  ];
+  const [result] = await db.batch(statements);
+  if (Number(result?.meta?.changes ?? 0) === 0) {
+    const current = await getSavedSearchById(db, id, access.lineAccountId);
+    return current ? { status: 'conflict', current } : { status: 'not_found' };
+  }
+  const updated = await getSavedSearchById(db, id, access.lineAccountId);
+  return updated ? { status: 'updated', search: updated } : { status: 'not_found' };
 }
 
 export async function updateSavedSearch(
@@ -520,6 +815,21 @@ export async function deleteSavedSearch(
   id: string,
   access: SavedSearchAccess,
 ): Promise<boolean> {
+  /*
+   * R189: 一覧での呼び出し履歴（saved_search_usage_events）は閲覧の記録で、
+   * 生きている使用先ではない。RESTRICT の外部キーが残っていると、一度でも
+   * 一覧で開いた検索が「使用中」として消せなくなる。書き込むのは一覧表示
+   * だけなので（recordSavedSearchUsage の呼び出しは friends 一覧のみ）、
+   * 検索の削除に合わせて履歴も消す。配信・自動処理などの現用の参照は
+   * saved_search_references 側の検査が別に止める。
+   */
+  await db
+    .prepare(
+      `DELETE FROM saved_search_usage_events
+       WHERE saved_search_id = ? AND line_account_id = ?`,
+    )
+    .bind(id, access.lineAccountId)
+    .run();
   const result = await db
     .prepare(
       `DELETE FROM saved_searches

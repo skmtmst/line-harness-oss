@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Message } from '@line-crm/line-sdk';
+import type { FlexContainer, Message } from '@line-crm/line-sdk';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import {
   getOperators,
@@ -21,17 +21,28 @@ import {
   updateSavedSearch,
   deleteSavedSearch,
   validateInboxSavedViewConditions,
+  type InboxSavedViewConditions,
   type SavedSearch,
   type SavedSearchAccess,
+  createScheduledChatSend,
+  listPendingScheduledChatSends,
+  cancelScheduledChatSend,
+  updateScheduledChatSend,
+  normalizeScheduledAt,
+  type ScheduledChatSendRow,
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { listLimit } from './list-pagination.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
+  classifyLineOutboundFailure,
   completeOutboundSendStatement,
+  failOutboundSend,
   hashOutboundPayload,
   isValidIdempotencyKey,
+  listOutboundSendFailures,
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -42,10 +53,18 @@ import {
   acquireInboxReplyLease,
   releaseInboxReplyLease,
 } from '../services/inbox-events.js';
+import { fireEvent } from '../services/event-bus.js';
+import { findUnsupportedInterpolations } from '@line-crm/shared';
+import {
+  renderChatMessageContent,
+  unresolvedVariablesPayload,
+} from '../services/manual-send-interpolation.js';
 
 const chats = new Hono<Env>();
 
-async function inboxSavedViewAccess(c: Context<Env>): Promise<SavedSearchAccess | Response> {
+type InboxSavedViewAccess = SavedSearchAccess & { canSeeUnassigned: boolean };
+
+async function inboxSavedViewAccess(c: Context<Env>): Promise<InboxSavedViewAccess | Response> {
   const lineAccountId = c.req.query('lineAccountId');
   if (!lineAccountId) {
     return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
@@ -59,6 +78,7 @@ async function inboxSavedViewAccess(c: Context<Env>): Promise<SavedSearchAccess 
     lineAccountId,
     staffId: staff.id,
     canManageAll: staff.role === 'owner' || staff.role === 'admin',
+    canSeeUnassigned: scope.canSeeUnassigned,
   };
 }
 
@@ -127,7 +147,10 @@ type ChatLike = {
   revision: number;
 };
 
-function serializeInboxSavedView(row: SavedSearch) {
+function serializeInboxSavedView(
+  row: SavedSearch,
+  count?: { matchCount: number; matchCountCapped: boolean },
+) {
   return {
     id: row.id,
     name: row.name,
@@ -137,9 +160,197 @@ function serializeInboxSavedView(row: SavedSearch) {
     lineAccountId: row.line_account_id,
     isShared: Boolean(row.is_shared),
     displayOrder: row.display_order,
+    isFavorite: row.display_order < 0,
     createdAt: row.created_at,
+    matchCount: count?.matchCount ?? null,
+    matchCountCapped: count?.matchCountCapped ?? false,
   };
 }
+
+async function countInboxSavedViewMatches(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    staffId: string;
+    canSeeUnassigned: boolean;
+    conditions: InboxSavedViewConditions;
+  },
+): Promise<{ matchCount: number; matchCountCapped: boolean }> {
+  const where: string[] = [
+    'f.line_account_id = ?',
+    `(c.id IS NOT NULL OR EXISTS (
+      SELECT 1 FROM messages_log existing
+       WHERE existing.friend_id = f.id
+         AND (existing.delivery_type IS NULL OR existing.delivery_type != 'test')
+    ))`,
+  ];
+  const bindings: unknown[] = [input.lineAccountId];
+  const conditions = input.conditions;
+
+  if (conditions.statuses.length < 4) {
+    where.push(`COALESCE(c.status, 'resolved') IN (${conditions.statuses.map(() => '?').join(', ')})`);
+    bindings.push(...conditions.statuses);
+  }
+  if (conditions.assignees.length > 0) {
+    const named = conditions.assignees.filter((id) => id !== 'unassigned');
+    const clauses: string[] = [];
+    if (conditions.assignees.includes('unassigned')) clauses.push('c.operator_id IS NULL');
+    if (named.length > 0) {
+      clauses.push(`c.operator_id IN (${named.map(() => '?').join(', ')})`);
+      bindings.push(...named);
+    }
+    where.push(`(${clauses.join(' OR ')})`);
+  }
+  if (conditions.query) {
+    /*
+     * #625: LIKE ではなく instr() で部分一致する。
+     * D1 の LIKE/GLOB パターンは最大50バイトのため、長い検索語で500になっていた。
+     */
+    where.push(`(instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
+      SELECT 1 FROM messages_log searched
+       WHERE searched.friend_id = f.id
+         AND (searched.delivery_type IS NULL OR searched.delivery_type != 'test')
+         AND instr(lower(searched.content), lower(?)) > 0
+    ))`);
+    bindings.push(conditions.query, conditions.query);
+  }
+  if (conditions.unread === 'mine') {
+    where.push(`EXISTS (
+      SELECT 1 FROM messages_log incoming
+       WHERE incoming.friend_id = f.id AND incoming.direction = 'incoming'
+         AND (incoming.delivery_type IS NULL OR incoming.delivery_type != 'test')
+         AND (sr.last_read_at IS NULL OR incoming.created_at > sr.last_read_at)
+    )`);
+  }
+  if (conditions.messageTypes.length > 0) {
+    where.push(`(
+      SELECT latest.message_type FROM messages_log latest
+       WHERE latest.friend_id = f.id
+         AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
+       ORDER BY latest.created_at DESC LIMIT 1
+    ) IN (${conditions.messageTypes.map(() => '?').join(', ')})`);
+    bindings.push(...conditions.messageTypes);
+  }
+  if (conditions.receivedFrom) {
+    where.push(`EXISTS (
+      SELECT 1 FROM messages_log received
+       WHERE received.friend_id = f.id AND received.direction = 'incoming'
+         AND received.created_at >= ?
+         AND (received.delivery_type IS NULL OR received.delivery_type != 'test')
+    )`);
+    bindings.push(conditions.receivedFrom);
+  }
+  if (conditions.receivedTo) {
+    where.push(`EXISTS (
+      SELECT 1 FROM messages_log received
+       WHERE received.friend_id = f.id AND received.direction = 'incoming'
+         AND received.created_at <= ?
+         AND (received.delivery_type IS NULL OR received.delivery_type != 'test')
+    )`);
+    bindings.push(conditions.receivedTo);
+  }
+  // 「要返信」は一覧APIの quickFilter=reply と同じく対応状況=未対応で数える。
+  if (conditions.quickFilter === 'reply') {
+    where.push(`COALESCE(c.status, 'resolved') = 'unread'`);
+  }
+  // quickFilter=overdue と due=overdue は同じ条件。古い行は due だけを持つ。
+  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') {
+    where.push(`COALESCE(c.status, 'resolved') = 'unread'`);
+    where.push(`COALESCE(c.last_customer_message_at, c.last_message_at) < datetime('now', '-1 hour')`);
+  }
+
+  const lineRow = input.conditions.channels.includes('line') ? await db.prepare(
+    `SELECT COUNT(*) AS count FROM (
+       SELECT f.id
+         FROM friends f
+         LEFT JOIN chats c ON c.id = (
+           SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
+         )
+         LEFT JOIN inbox_staff_reads sr
+           ON sr.channel = 'line' AND sr.conversation_id = f.id AND sr.staff_id = ?
+        WHERE ${where.join(' AND ')}
+        LIMIT 1001
+     )`,
+  ).bind(input.staffId, ...bindings).first<{ count: number }>() : null;
+
+  const emailWhere: string[] = [];
+  const emailBindings: unknown[] = [];
+  if (conditions.statuses.length < 4) {
+    emailWhere.push(`t.status IN (${conditions.statuses.map(() => '?').join(', ')})`);
+    emailBindings.push(...conditions.statuses);
+  }
+  if (conditions.assignees.length > 0) {
+    const named = conditions.assignees.filter((id) => id !== 'unassigned');
+    const clauses: string[] = [];
+    if (conditions.assignees.includes('unassigned')) clauses.push('t.assigned_staff_id IS NULL');
+    if (named.length > 0) {
+      clauses.push(`t.assigned_staff_id IN (${named.map(() => '?').join(', ')})`);
+      emailBindings.push(...named);
+    }
+    emailWhere.push(`(${clauses.join(' OR ')})`);
+  }
+  if (conditions.query) {
+    // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+    emailWhere.push(`(instr(lower(t.customer_email), lower(?)) > 0
+      OR instr(lower(t.customer_name), lower(?)) > 0
+      OR instr(lower(t.subject), lower(?)) > 0
+      OR EXISTS (
+      SELECT 1 FROM support_email_messages searched
+       WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
+    ))`);
+    emailBindings.push(conditions.query, conditions.query, conditions.query, conditions.query);
+  }
+  if (conditions.unread === 'mine') {
+    emailWhere.push('(sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)');
+  }
+  if (conditions.messageTypes.length > 0 && !conditions.messageTypes.includes('text')) {
+    emailWhere.push('0=1');
+  }
+  if (conditions.receivedFrom) {
+    emailWhere.push('t.last_incoming_at >= ?');
+    emailBindings.push(conditions.receivedFrom);
+  }
+  if (conditions.receivedTo) {
+    emailWhere.push('t.last_incoming_at <= ?');
+    emailBindings.push(conditions.receivedTo);
+  }
+  if (conditions.quickFilter === 'reply') {
+    emailWhere.push(`t.status = 'unread'`);
+  }
+  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') {
+    emailWhere.push(`t.status = 'unread'`);
+    emailWhere.push(`t.last_incoming_at < datetime('now', '-1 hour')`);
+  }
+  const emailRow = input.conditions.channels.includes('email') && input.canSeeUnassigned
+    ? await db.prepare(
+      `SELECT COUNT(*) AS count FROM (
+         SELECT t.id
+           FROM support_email_threads t
+           LEFT JOIN inbox_staff_reads sr
+             ON sr.channel = 'email' AND sr.conversation_id = t.id AND sr.staff_id = ?
+          ${emailWhere.length > 0 ? `WHERE ${emailWhere.join(' AND ')}` : ''}
+          LIMIT 1001
+       )`,
+    ).bind(input.staffId, ...emailBindings).first<{ count: number }>()
+    : null;
+  const rawCount = Number(lineRow?.count ?? 0) + Number(emailRow?.count ?? 0);
+  return { matchCount: Math.min(rawCount, 1000), matchCountCapped: rawCount > 1000 };
+}
+
+const EMPTY_INBOX_SAVED_VIEW_CONDITIONS: InboxSavedViewConditions = {
+  version: 1,
+  query: '',
+  channels: ['line', 'email'],
+  statuses: ['unread', 'in_progress', 'on_hold', 'resolved'],
+  assignees: [],
+  unread: 'all',
+  quickFilter: 'all',
+  messageTypes: [],
+  receivedFrom: null,
+  receivedTo: null,
+  sort: 'newest',
+  due: 'all',
+};
 
 // id は chats.id もしくは friend.id のどちらか。friend.id のときは chats 行を遅延作成する。
 // push / broadcast / scenario 配信だけを受けた友だちもチャット画面に現れるため、ここで lazy create が必要。
@@ -183,6 +394,55 @@ async function resolveOrCreateChat(db: D1Database, id: string): Promise<ChatLike
     .first<ChatLike>())!;
 }
 
+type QuotedMessageRow = {
+  id: string;
+  direction: string;
+  message_type: string;
+  content: string;
+  quote_token: string | null;
+};
+
+/**
+ * 引用元の検証。同じfriend・同じLINEアカウント・取消されていない
+ * メッセージだけを引用できる。別アカウント・別friendの行を指定されても
+ * 「無い」と同じ扱いにし、存在自体を外へ漏らさない。
+ */
+async function resolveQuotedMessage(
+  db: D1Database,
+  input: {
+    friendId: string;
+    lineAccountId: string | null;
+    quotedMessageId: string;
+  },
+): Promise<QuotedMessageRow | null> {
+  return db
+    .prepare(
+      `SELECT id, direction, message_type, content, quote_token
+         FROM messages_log
+        WHERE id = ? AND friend_id = ?
+          AND line_account_id IS ?
+          AND unsent_at IS NULL
+          AND (delivery_type IS NULL OR delivery_type != 'test')`,
+    )
+    .bind(input.quotedMessageId, input.friendId, input.lineAccountId)
+    .first<QuotedMessageRow>();
+}
+
+/** 予約行を画面用の形へ写す。内部のlease情報は返さない。 */
+function scheduledSendResponse(row: ScheduledChatSendRow) {
+  return {
+    id: row.id,
+    messageType: row.message_type,
+    content: row.content,
+    quotedMessageId: row.quoted_message_id,
+    scheduledAt: row.scheduled_at,
+    status: row.status,
+    attemptCount: row.attempt_count,
+    lastErrorCode: row.last_error_code,
+    createdAt: row.created_at,
+  };
+}
+
 async function resolveFriendAndAccessToken(
   db: D1Database,
   friendId: string,
@@ -191,14 +451,14 @@ async function resolveFriendAndAccessToken(
 ) {
   const friend = await getFriendById(db, friendId);
   if (!friend) {
-    return { friend: null, accessToken: defaultAccessToken };
+    return { friend: null, accessToken: defaultAccessToken, liffId: null };
   }
 
   if (!friend.line_account_id) {
     return { friend, accessToken: resolveLineToken({
       accountToken: null, defaultToken: defaultAccessToken,
       accountId: friend.line_account_id, context,
-    }) };
+    }), liffId: null };
   }
 
   const account = await getLineAccountById(db, friend.line_account_id);
@@ -206,10 +466,10 @@ async function resolveFriendAndAccessToken(
     return { friend, accessToken: resolveLineToken({
       accountToken: null, defaultToken: defaultAccessToken,
       accountId: friend.line_account_id, context,
-    }) };
+    }), liffId: null };
   }
 
-  return { friend, accessToken: account.channel_access_token };
+  return { friend, accessToken: account.channel_access_token, liffId: account.liff_id ?? null };
 }
 
 // ========== オペレーターCRUD ==========
@@ -290,11 +550,264 @@ chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) 
   }
 });
 
+/**
+ * 受信箱のクイック絞り込み（すべて／要返信／1時間以上待ち）の件数。
+ *
+ * INBOX-09: 「すべて」は読み込み済みの行数、「要返信」は別の集計口を
+ * 見ていたため、表示された件数と押したときの結果が一致しなかった。
+ * ここでは一覧（GET /api/chats・GET /api/support/inbox?channel=email）と
+ * 同じ条件（アカウント・検索語・担当・未読・経路）を1回の応答へまとめ、
+ * ページに載った行数ではなく条件全体をサーバーで数える。
+ *
+ * quickFilter 自体は引数に取らない。各札の件数は「その札を押したときの
+ * 条件」をこちらで足して数える。返すのは選択中の経路（channel）で
+ * 画面に見える側だけの合計。
+ *
+ * :id より先に置く。あとに置くと 'quick-counts' が id として解釈される。
+ */
+chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const staff = c.get('staff');
+    const status = c.req.query('status') ?? undefined;
+    const operatorId = c.req.query('operatorId') ?? undefined;
+    const assignee = c.req.query('assignee') ?? operatorId;
+    const unreadOnly = c.req.query('unreadOnly') === '1' || c.req.query('unreadOnly') === 'true';
+    const channel = c.req.query('channel') || 'all';
+    if (channel !== 'all' && channel !== 'line' && channel !== 'email') {
+      return c.json({ success: false as const, error: 'invalid_channel' }, 400);
+    }
+    const lineAccountId = c.req.query('lineAccountId') ?? undefined;
+    const query = (c.req.query('q') ?? '').trim().slice(0, 200);
+    const scope = await getVisibleLineAccountScope(c.env.DB, staff);
+    if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false as const, error: '受信箱が見つかりません' }, 404);
+    }
+
+    // 「1時間以上待ち」の基準時刻。一覧の quickFilter=overdue と同じ定義:
+    // 対応状況が未対応で、表示される最後のメッセージ（受信・送信どちらでも）
+    // から1時間以上。対応期限の記録はまだ無い（INBOX-10）。
+    const overdueThreshold = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    let line = { all: 0, reply: 0, overdue: 0 };
+    let email = { all: 0, reply: 0, overdue: 0 };
+
+    if (channel !== 'email') {
+      // ── LINE 側。一覧クエリと同じ候補集合（messages_log ∪ chats）を
+      // 同じ条件で数える。preview 用の集約は不要なので CTE 2本だけ。 ──
+      const accountFilterBindings: string[] = [];
+      let accountFilterSql: string;
+      if (lineAccountId) {
+        accountFilterSql = `friend_id IN (SELECT id FROM friends WHERE line_account_id = ?)`;
+        accountFilterBindings.push(lineAccountId);
+      } else {
+        const accountClauses: string[] = [];
+        if (scope.allowedAccountIds.length > 0) {
+          accountClauses.push(
+            `line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`,
+          );
+          accountFilterBindings.push(...scope.allowedAccountIds);
+        }
+        if (scope.canSeeUnassigned) accountClauses.push('line_account_id IS NULL');
+        accountFilterSql = accountClauses.length > 0
+          ? `friend_id IN (SELECT id FROM friends WHERE ${accountClauses.join(' OR ')})`
+          : '0=1';
+      }
+
+      const conditions: string[] = [];
+      const conditionBindings: unknown[] = [];
+      if (status && status !== 'all') {
+        conditions.push(`COALESCE(c.status, 'resolved') = ?`);
+        conditionBindings.push(status);
+      }
+      if (operatorId) {
+        if (operatorId === 'unassigned') conditions.push('c.operator_id IS NULL');
+        else {
+          conditions.push('c.operator_id = ?');
+          conditionBindings.push(operatorId);
+        }
+      }
+      if (unreadOnly) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM messages_log incoming
+          LEFT JOIN inbox_staff_reads reads
+            ON reads.channel = 'line' AND reads.conversation_id = f.id AND reads.staff_id = ?
+          WHERE incoming.friend_id = f.id AND incoming.direction = 'incoming'
+            AND (incoming.delivery_type IS NULL OR incoming.delivery_type != 'test')
+            AND (reads.last_read_at IS NULL OR incoming.created_at > reads.last_read_at)
+        )`);
+        conditionBindings.push(staff.id);
+      }
+      if (lineAccountId) {
+        conditions.push('f.line_account_id = ?');
+        conditionBindings.push(lineAccountId);
+      }
+      if (query) {
+        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        conditions.push(`(
+          instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
+            SELECT 1 FROM messages_log mq
+            WHERE mq.friend_id = f.id
+              AND (mq.delivery_type IS NULL OR mq.delivery_type != 'test')
+              AND instr(lower(mq.content), lower(?)) > 0
+          )
+        )`);
+        conditionBindings.push(query, query);
+      }
+
+      const countsRow = await c.env.DB.prepare(`
+        WITH last_any AS MATERIALIZED (
+          SELECT friend_id, MAX(COALESCE(line_event_at, created_at)) AS last_message_at
+          FROM messages_log
+          WHERE (delivery_type IS NULL OR delivery_type != 'test')
+            AND ${accountFilterSql}
+          GROUP BY friend_id
+        ),
+        deduped AS MATERIALIZED (
+          SELECT friend_id, MAX(last_message_at) AS last_message_at FROM (
+            SELECT friend_id, last_message_at FROM last_any
+            UNION ALL
+            SELECT friend_id, last_message_at FROM chats WHERE ${accountFilterSql}
+          ) GROUP BY friend_id
+        )
+        SELECT
+          COUNT(*) AS all_count,
+          SUM(CASE WHEN COALESCE(c.status, 'resolved') = 'unread' THEN 1 ELSE 0 END) AS reply_count,
+          SUM(CASE WHEN COALESCE(c.status, 'resolved') = 'unread'
+                AND julianday(COALESCE((
+                  SELECT MAX(COALESCE(latest.line_event_at, latest.created_at)) FROM messages_log latest
+                  WHERE latest.friend_id = f.id
+                    AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
+                ), d.last_message_at)) <= julianday(?)
+              THEN 1 ELSE 0 END) AS overdue_count
+        FROM deduped d
+        INNER JOIN friends f ON f.id = d.friend_id
+        LEFT JOIN chats c ON c.id = (
+          SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
+        )
+        WHERE 1=1
+        ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
+      `).bind(
+        ...accountFilterBindings,
+        ...accountFilterBindings,
+        overdueThreshold,
+        ...conditionBindings,
+      ).first<{ all_count: number | null; reply_count: number | null; overdue_count: number | null }>();
+      line = {
+        all: countsRow?.all_count ?? 0,
+        reply: countsRow?.reply_count ?? 0,
+        overdue: countsRow?.overdue_count ?? 0,
+      };
+    }
+
+    /*
+     * ── メール側。一覧（/api/support/inbox?channel=email）と同じ
+     * 表示条件（デフォルトテナントのみ・同じ検索・担当・未読）で数える。
+     * メールは LINE アカウントに所属しないため、選択中のアカウントが
+     * あっても数える（一覧と同じ）。 ──
+     */
+    if (channel !== 'line' && scope.canSeeUnassigned) {
+      const statusSql = !status || status === 'all'
+        ? '1=1'
+        : status === 'resolved'
+          ? `t.status = 'resolved'`
+          : status === 'unread' || status === 'in_progress' || status === 'on_hold'
+            ? 't.status = ?'
+            : `t.status != 'resolved'`;
+      // SQL 上の placeholder 順は overdue閾値（SELECT内）→ staff_id（join）→ 条件値。
+      const bindings: Array<string | number> = [];
+      if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
+      let searchSql = '';
+      if (query) {
+        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        searchSql = `AND (
+          instr(lower(t.customer_email), lower(?)) > 0
+          OR instr(lower(t.customer_name), lower(?)) > 0
+          OR instr(lower(t.subject), lower(?)) > 0
+          OR EXISTS (
+            SELECT 1 FROM support_email_messages searched
+            WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
+          )
+        )`;
+        bindings.push(query, query, query, query);
+      }
+      if (assignee) {
+        if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
+        else {
+          searchSql += ' AND t.assigned_staff_id = ?';
+          bindings.push(assignee);
+        }
+      }
+      if (unreadOnly) {
+        searchSql += ' AND (sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)';
+      }
+      const emailCounts = await c.env.DB.prepare(
+        `SELECT COUNT(*) AS all_count,
+                SUM(CASE WHEN t.status = 'unread' THEN 1 ELSE 0 END) AS reply_count,
+                SUM(CASE WHEN t.status = 'unread'
+                      AND julianday(t.last_incoming_at) <= julianday(?)
+                    THEN 1 ELSE 0 END) AS overdue_count
+         FROM support_email_threads t
+         LEFT JOIN inbox_staff_reads sr
+           ON sr.channel = 'email'
+          AND sr.conversation_id = t.id
+          AND sr.staff_id = ?
+         WHERE ${statusSql} ${searchSql}`,
+      ).bind(overdueThreshold, staff.id, ...bindings)
+        .first<{ all_count: number | null; reply_count: number | null; overdue_count: number | null }>();
+      email = {
+        all: emailCounts?.all_count ?? 0,
+        reply: emailCounts?.reply_count ?? 0,
+        overdue: emailCounts?.overdue_count ?? 0,
+      };
+    }
+
+    return c.json({
+      success: true as const,
+      data: {
+        all: line.all + email.all,
+        reply: line.reply + email.reply,
+        overdue: line.overdue + email.overdue,
+        line,
+        email,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/chats/quick-counts error:', err);
+    return c.json({ success: false as const, error: '件数を取得できませんでした' }, 500);
+  }
+});
+
+/** 個別送信の失敗台帳。必ずLINEアカウントを指定し、担当範囲の中だけ返す。 */
+chats.get('/api/chats/outbound-failures', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: '送信失敗履歴が見つかりません' }, 404);
+    }
+    const failures = await listOutboundSendFailures(c.env.DB, {
+      lineAccountId,
+      limit: listLimit(c.req.query('limit'), 50, 100),
+    });
+    return c.json({ success: true, data: failures });
+  } catch (err) {
+    console.error('GET /api/chats/outbound-failures error:', err);
+    return c.json({ success: false, error: '送信失敗履歴を取得できませんでした' }, 500);
+  }
+});
+
 chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const staff = c.get('staff');
     const status = c.req.query('status') ?? undefined;
     const operatorId = c.req.query('operatorId') ?? undefined;
+    const unreadOnly = c.req.query('unreadOnly') === '1' || c.req.query('unreadOnly') === 'true';
+    const quickFilter = c.req.query('quickFilter');
+    if (quickFilter && quickFilter !== 'reply' && quickFilter !== 'overdue') {
+      return c.json({ success: false, error: 'invalid_quick_filter' }, 400);
+    }
     const lineAccountId = c.req.query('lineAccountId') ?? undefined;
     const query = (c.req.query('q') ?? '').trim().slice(0, 200);
     const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
@@ -304,14 +817,69 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     const unansweredOnly =
       c.req.query('unansweredOnly') === 'true' || c.req.query('unansweredOnly') === '1';
 
-    let unansweredMap: Map<string, { lastIncomingAt: string; lastIncomingContent: string; lastIncomingType: string }> | null = null;
     if (unansweredOnly) {
-      const { getUnansweredRowsMap } = await import('../services/unanswered-inbox.js');
-      unansweredMap = await getUnansweredRowsMap(c.env.DB);
-      // 空 Map のとき = 未対応ゼロ。早期 return で空配列を返す。
-      if (unansweredMap.size === 0) {
-        return c.json({ success: true, data: [] });
+      if (unreadOnly || quickFilter || operatorId === 'unassigned') {
+        return c.json({ success: false, error: 'incompatible_filters' }, 400);
       }
+      const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+      const limit = Number.isFinite(requestedLimit)
+        ? Math.min(200, Math.max(1, requestedLimit))
+        : 200;
+      const { computeUnansweredInbox } = await import('../services/unanswered-inbox.js');
+      const unanswered = await computeUnansweredInbox(c.env.DB, {
+        q: query || undefined,
+        account: lineAccountId,
+        status,
+        operatorId,
+        page: 1,
+        pageSize: limit,
+        allowedAccountIds: visibleScope.allowedAccountIds,
+        canSeeUnassigned: visibleScope.canSeeUnassigned,
+      });
+      if (unanswered.rows.length === 0) return c.json({ success: true, data: [] });
+
+      // 未対応サービスで確定した最大200人だけの会話メタ情報を取る。
+      // json_each へID配列を1 bindで渡すため、D1の100 bind上限にも当たらない。
+      const chatRows = await c.env.DB.prepare(
+        `SELECT f.id AS friend_id, f.display_name, f.picture_url,
+                c.operator_id, c.status, c.revision, c.notes,
+                CASE
+                  WHEN c.last_customer_message_at IS NOT NULL
+                   AND (sr.last_read_at IS NULL OR c.last_customer_message_at > sr.last_read_at)
+                  THEN 1 ELSE 0
+                END AS is_unread_for_staff,
+                c.created_at, c.updated_at
+           FROM friends f
+           INNER JOIN chats c ON c.friend_id = f.id
+           LEFT JOIN inbox_staff_reads sr
+             ON sr.channel = 'line'
+            AND sr.conversation_id = f.id
+            AND sr.staff_id = ?
+          WHERE f.id IN (SELECT value FROM json_each(?))`,
+      ).bind(staff.id, JSON.stringify(unanswered.rows.map((row) => row.friendId))).all<Record<string, unknown>>();
+      const byFriend = new Map(chatRows.results.map((row) => [row.friend_id as string, row]));
+      const data = unanswered.rows.flatMap((row) => {
+        const chat = byFriend.get(row.friendId);
+        if (!chat) return [];
+        return [{
+          id: row.friendId,
+          friendId: row.friendId,
+          friendName: row.displayName || '名前なし',
+          friendPictureUrl: row.pictureUrl,
+          operatorId: chat.operator_id,
+          status: chat.status,
+          revision: Number(chat.revision ?? 0),
+          notes: chat.notes,
+          lastMessageAt: row.lastIncomingAt,
+          lastMessageContent: row.lastIncomingType === 'text' ? row.lastIncomingContent : null,
+          lastMessageDirection: 'incoming' as const,
+          lastMessageType: row.lastIncomingType,
+          isUnread: Boolean(chat.is_unread_for_staff),
+          createdAt: chat.created_at,
+          updatedAt: chat.updated_at,
+        }];
+      });
+      return c.json({ success: true, data });
     }
 
     // List everyone who has any message history (incoming or outgoing — push/broadcast/scenario included)
@@ -327,8 +895,9 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     //   新実装は (a) ROW_NUMBER を argmax GROUP BY に置換 (SQLite の bare-column +
     //   単一 MAX() は max 行の値を返す documented 挙動)、(b) CTE を MATERIALIZED して
     //   二重評価を防止、(c) page CTE で先に対象 friend を limit 件に確定してから
-    //   preview を計算、(d) デフォルト LIMIT 300 (最終行は last_message_at DESC)。
-    //   同条件の本番実測: 459ms / 165k rows_read (LIMIT 300 時)。
+    //   preview を計算、(d) デフォルト LIMIT 200
+    //   (最終行は 未読 DESC, last_message_at DESC, friend_id DESC)。
+    //   同条件の本番実測: 459ms / 165k rows_read (旧 LIMIT 300 時)。
     //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
     //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
     //   - lineAccountId 指定時は messages_log スキャンを対象アカの friend に絞る。
@@ -351,21 +920,21 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         : '0=1';
     }
 
-    // unansweredOnly は取得後に unansweredMap と突合して絞るため全件必要。
-    // SQLite は LIMIT に負値を渡すと「無制限」になる (documented 挙動)。
-    const NO_LIMIT = -1;
-    const limitParam = Number.parseInt(c.req.query('limit') ?? '', 10);
-    const limit = unansweredOnly
-      ? NO_LIMIT
-      : Number.isFinite(limitParam)
-        ? Math.min(1000, Math.max(1, limitParam))
-        : 300;
-    // カーソルページング: (last_message_at, friend_id) の複合カーソルより古い行を返す。
-    // offset 方式は「取得の合間に新着で行が押し下げられた分が欠落する」構造問題が
-    // あるため採用しない。friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
+    // 不正値や負値を SQLite の「LIMIT 無制限」に渡さず、未対応絞り込みも含めて
+    // 1回の応答を最大200件に止める。未対応一覧は上の専用DBページングで扱う。
+    const limit = listLimit(c.req.query('limit'), 200);
+    // カーソルページング: (未読, last_message_at, friend_id) の複合カーソルより後の行を返す。
+    // 一覧は「未読が先 → 最新の受信・送信が新しい順」。offset 方式は「取得の合間に
+    // 新着で行が押し下げられた分が欠落する」構造問題があるため採用しない。
+    // friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
+    // beforeUnread が無い古い渡し方は、時刻だけの従来条件に倒す。
     const beforeAt = c.req.query('beforeAt') || undefined;
     const beforeId = c.req.query('beforeId') || undefined;
-    const useCursor = !unansweredOnly && Boolean(beforeAt && beforeId);
+    const beforeUnreadRaw = c.req.query('beforeUnread');
+    const beforeUnread = beforeUnreadRaw === '1' || beforeUnreadRaw === 'true'
+      ? 1
+      : beforeUnreadRaw === '0' || beforeUnreadRaw === 'false' ? 0 : null;
+    const useCursor = Boolean(beforeAt && beforeId);
 
     const conditions: string[] = [];
     const conditionBindings: unknown[] = [];
@@ -374,28 +943,57 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       conditionBindings.push(status);
     }
     if (operatorId) {
-      conditions.push('c.operator_id = ?');
-      conditionBindings.push(operatorId);
+      if (operatorId === 'unassigned') conditions.push('c.operator_id IS NULL');
+      else {
+        conditions.push('c.operator_id = ?');
+        conditionBindings.push(operatorId);
+      }
+    }
+    if (unreadOnly) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM messages_log incoming
+        LEFT JOIN inbox_staff_reads reads
+          ON reads.channel = 'line' AND reads.conversation_id = f.id AND reads.staff_id = ?
+        WHERE incoming.friend_id = f.id AND incoming.direction = 'incoming'
+          AND (incoming.delivery_type IS NULL OR incoming.delivery_type != 'test')
+          AND (reads.last_read_at IS NULL OR incoming.created_at > reads.last_read_at)
+      )`);
+      conditionBindings.push(staff.id);
+    }
+    if (quickFilter) {
+      conditions.push(`COALESCE(c.status, 'resolved') = 'unread'`);
+      if (quickFilter === 'overdue') {
+        // R111: 一覧に表示する最新時刻と同じ定義（受信時刻 line_event_at があれば
+        // そちらを正とし、無ければ保存時刻。件数側の overdue_count と共通）。
+        // created_at だけを見ると、遅れて届いた受信の待ち時間を短く数え、
+        // 札の件数を押しても対象が一覧に出なくなる。
+        conditions.push(`julianday(COALESCE((
+          SELECT MAX(COALESCE(latest.line_event_at, latest.created_at)) FROM messages_log latest
+          WHERE latest.friend_id = f.id
+            AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
+        ), d.last_message_at)) <= julianday(?)`);
+        conditionBindings.push(new Date(Date.now() - 60 * 60 * 1000).toISOString());
+      }
     }
     if (lineAccountId) {
       conditions.push('f.line_account_id = ?');
       conditionBindings.push(lineAccountId);
     }
     if (query) {
+      // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
       conditions.push(`(
-        f.display_name LIKE ? OR EXISTS (
+        instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
           SELECT 1 FROM messages_log mq
           WHERE mq.friend_id = f.id
             AND (mq.delivery_type IS NULL OR mq.delivery_type != 'test')
-            AND mq.content LIKE ?
+            AND instr(lower(mq.content), lower(?)) > 0
         )
       )`);
-      const like = `%${query}%`;
-      conditionBindings.push(like, like);
+      conditionBindings.push(query, query);
     }
     // status / operator filter は chats を参照するので、その時だけ page CTE 側でも
     // chats を lookup する (無条件時は 全friend × chats lookup を省く)。
-    const pageNeedsChats = Boolean(status || operatorId);
+    const pageNeedsChats = Boolean(status || operatorId || quickFilter);
 
     // preview は **最新の incoming (ユーザー発)** を優先する。auto_reply / scenario 等の
     // outbound が直後に書き込まれて preview を上書きすると「ユーザーが何と言ったか」が
@@ -407,9 +1005,20 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // 値を返す」という SQLite の documented 挙動で argmax として使っている。
     // 集約は page 確定後の friend に絞って実行する (全 friend 分の content を
     // materialize しない)。last_any は並び順決定専用のスリムな全走査 1 回のみ。
+    // 一覧の並びは「未読が先 → 最新の受信・送信が新しい順」。
+    // 未読は担当者ごとの既読位置で決まる (最後の受信より既読が古い = 未読)。
+    // page 確定の前に要るので、受信の最新は last_any の集計から取る。
+    // 最終段の is_unread_for_staff と同じ定義 (受信なしは既読扱い)。
+    const unreadExpr = `CASE
+      WHEN la.last_incoming_at IS NOT NULL
+       AND (sr.last_read_at IS NULL OR la.last_incoming_at > sr.last_read_at)
+      THEN 1 ELSE 0
+    END`;
     const sql = `
       WITH last_any AS MATERIALIZED (
-        SELECT friend_id, MAX(created_at) AS last_message_at
+        SELECT friend_id,
+          MAX(COALESCE(line_event_at, created_at)) AS last_message_at,
+          MAX(CASE WHEN direction = 'incoming' THEN created_at END) AS last_incoming_at
         FROM messages_log
         WHERE (delivery_type IS NULL OR delivery_type != 'test')
           AND ${accountFilterSql}
@@ -423,22 +1032,36 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         ) GROUP BY friend_id
       ),
       page AS MATERIALIZED (
-        SELECT d.friend_id, d.last_message_at
+        SELECT d.friend_id, d.last_message_at, ${unreadExpr} AS is_unread
         FROM deduped d
         INNER JOIN friends f ON f.id = d.friend_id
+        LEFT JOIN last_any la ON la.friend_id = d.friend_id
+        LEFT JOIN inbox_staff_reads sr
+          ON sr.channel = 'line'
+         AND sr.conversation_id = d.friend_id
+         AND sr.staff_id = ?
         ${pageNeedsChats ? `LEFT JOIN chats c ON c.id = (
           SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
         )` : ''}
         WHERE 1=1
         ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
-        ${useCursor ? 'AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))' : ''}
-        ORDER BY d.last_message_at DESC, d.friend_id DESC
+        ${useCursor
+          ? beforeUnread == null
+            ? 'AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))'
+            : `AND (${unreadExpr} < ? OR (${unreadExpr} = ? AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))))`
+          : ''}
+        ORDER BY is_unread DESC, d.last_message_at DESC, d.friend_id DESC
         LIMIT ?
       ),
       any_agg AS (
         SELECT friend_id,
-          CASE WHEN message_type = 'text' THEN SUBSTR(content, 1, 200) ELSE NULL END AS content,
-          direction, message_type,
+          CASE
+            WHEN unsent_at IS NOT NULL THEN NULL
+            WHEN message_type = 'text' THEN SUBSTR(content, 1, 200)
+            ELSE NULL
+          END AS content,
+          direction,
+          CASE WHEN unsent_at IS NOT NULL THEN 'unsent' ELSE message_type END AS message_type,
           MAX(created_at) AS created_at
         FROM messages_log
         WHERE (delivery_type IS NULL OR delivery_type != 'test')
@@ -504,20 +1127,26 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         ON sr.channel = 'line'
        AND sr.conversation_id = f.id
        AND sr.staff_id = ?
-      ORDER BY d.last_message_at DESC, d.friend_id DESC
+      ORDER BY is_unread_for_staff DESC, d.last_message_at DESC, d.friend_id DESC
     `;
 
     // placeholder 順 = SQL 出現順: last_any(account) → deduped 内 chats(account) →
-    // page 条件 → cursor (beforeAt ×2 + beforeId) → LIMIT。
+    // page の未読判定 (sr 用 staff) → page 条件 → cursor
+    // (beforeUnread あり: unread ×2 + beforeAt ×2 + beforeId / なし: beforeAt ×2 + beforeId) →
+    // LIMIT → 最終段の未読判定 (sr 用 staff)。
     // any_agg は page で friend が確定済みのため account filter 不要。
     const allBindings: unknown[] = [];
     allBindings.push(...accountFilterBindings, ...accountFilterBindings);
+    allBindings.push(staff.id);
     allBindings.push(...conditionBindings);
-    if (useCursor) allBindings.push(beforeAt, beforeAt, beforeId);
+    if (useCursor) {
+      if (beforeUnread == null) allBindings.push(beforeAt, beforeAt, beforeId);
+      else allBindings.push(beforeUnread, beforeUnread, beforeAt, beforeAt, beforeId);
+    }
     allBindings.push(limit, staff.id);
     const result = await c.env.DB.prepare(sql).bind(...allBindings).all();
 
-    let data = result.results.map((ch: Record<string, unknown>) => ({
+    const data = result.results.map((ch: Record<string, unknown>) => ({
       id: ch.id as string,
       friendId: ch.friend_id,
       friendName: ch.display_name || '名前なし',
@@ -534,28 +1163,6 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       createdAt: ch.created_at,
       updatedAt: ch.updated_at,
     }));
-
-    if (unansweredMap) {
-      // 未対応 row の preview / timestamp で上書きして Inbox と一貫させる
-      data = data
-        .filter((row) => unansweredMap!.has(row.id as string))
-        .map((row) => {
-          const u = unansweredMap!.get(row.id as string)!;
-          return {
-            ...row,
-            lastMessageAt: u.lastIncomingAt,
-            lastMessageContent: u.lastIncomingType === 'text' ? u.lastIncomingContent : null,
-            lastMessageDirection: 'incoming' as const,
-            lastMessageType: u.lastIncomingType,
-          };
-        })
-        // 上書きで lastMessageAt が変わったので resort
-        .sort((a, b) => {
-          const aAt = typeof a.lastMessageAt === 'string' ? a.lastMessageAt : '';
-          const bAt = typeof b.lastMessageAt === 'string' ? b.lastMessageAt : '';
-          return bAt.localeCompare(aAt);
-        });
-    }
 
     return c.json({ success: true, data });
   } catch (err) {
@@ -617,25 +1224,52 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
       // 壊れた任意項目があっても受信箱そのものは開ける。
     }
 
-    // 新しい1000件を取って昇順に戻す。LIMIT 200 ASC だと古い200件だけで broadcast/scenario 等の
-    // 新しい push が欠落していた（Shu で 481件中 281件欠落のバグあり）。一覧側と同様に test 配信は除外。
-    // 現状の最重量ユーザー(481件)の2倍バッファ。これ以上の履歴はページング未実装（Phase 2 TODO）。
+    // 直近から limit 件ずつ返すカーソルページング。全文一括(LIMIT 1000)だと長期の
+    // 会話で応答が重くなり、画像/Flex再描画時のスクロール追従も高コストになる。
+    // 1件多めに取って「続きがあるか」だけ見て捨てる(limit+1方式)。
+    const rawMessageLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const messageLimit = Number.isSafeInteger(rawMessageLimit)
+      ? Math.min(1000, Math.max(1, rawMessageLimit))
+      : 100;
+    const beforeAt = c.req.query('beforeAt') || undefined;
+    const beforeId = c.req.query('beforeId') || undefined;
+    const useMessageCursor = Boolean(beforeAt && beforeId);
+    const messageBindings: unknown[] = [resolvedFriendId];
+    if (useMessageCursor) messageBindings.push(beforeAt, beforeAt, beforeId);
+    messageBindings.push(messageLimit + 1);
     const messages = await c.env.DB
       .prepare(
-        `SELECT id, friend_id, direction, message_type, content, source, origin_kind,
-                sent_by_staff_id,
+        `SELECT messages_log.id, messages_log.friend_id, messages_log.direction, messages_log.message_type,
+                CASE WHEN messages_log.unsent_at IS NOT NULL THEN '' ELSE messages_log.content END AS content,
+                CASE WHEN messages_log.unsent_at IS NOT NULL THEN 1 ELSE 0 END AS is_unsent,
+                messages_log.source, messages_log.origin_kind,
+                messages_log.sent_by_staff_id,
                 (SELECT name FROM staff_members sm WHERE sm.id = messages_log.sent_by_staff_id) AS sent_by_staff_name,
                 (SELECT s.name FROM scenario_steps ss
                   JOIN scenarios s ON s.id = ss.scenario_id
                   WHERE ss.id = messages_log.scenario_step_id) AS scenario_name,
-                created_at
+                messages_log.quoted_message_id,
+                q.direction AS quoted_direction,
+                q.message_type AS quoted_message_type,
+                CASE WHEN q.unsent_at IS NOT NULL THEN '' ELSE q.content END AS quoted_content,
+                CASE WHEN q.unsent_at IS NOT NULL THEN 1 ELSE 0 END AS quoted_is_unsent,
+                q.created_at AS quoted_created_at,
+                messages_log.created_at,
+                messages_log.line_event_at,
+                COALESCE(messages_log.line_event_at, messages_log.created_at) AS sort_at
          FROM messages_log
-         WHERE friend_id = ? AND (delivery_type IS NULL OR delivery_type != 'test')
-         ORDER BY created_at DESC LIMIT 1000`,
+         LEFT JOIN messages_log q ON q.id = messages_log.quoted_message_id
+         WHERE messages_log.friend_id = ? AND (messages_log.delivery_type IS NULL OR messages_log.delivery_type != 'test')
+         ${useMessageCursor ? 'AND (COALESCE(messages_log.line_event_at, messages_log.created_at) < ? OR (COALESCE(messages_log.line_event_at, messages_log.created_at) = ? AND messages_log.id < ?))' : ''}
+         ORDER BY sort_at DESC, messages_log.id DESC LIMIT ?`,
       )
-      .bind(resolvedFriendId)
+      .bind(...messageBindings)
       .all();
-    messages.results = (messages.results as Record<string, unknown>[]).reverse();
+    // 新しい push の欠落を防ぐため DESC で取って昇順に戻す(従来どおり)。
+    const messageRows = messages.results as Record<string, unknown>[];
+    const hasMoreMessages = messageRows.length > messageLimit;
+    if (hasMoreMessages) messageRows.pop();
+    messageRows.reverse();
 
     return c.json({
       success: true,
@@ -652,17 +1286,31 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
         revision,
         lastMessageAt,
         createdAt,
-        messages: (messages.results as Record<string, unknown>[]).map((m) => ({
+        // 古い履歴が残っているか。画面は「前のメッセージ」ボタンで遡る。
+        hasMoreMessages,
+        messages: messageRows.map((m) => ({
           id: m.id,
           direction: m.direction,
           messageType: m.message_type,
           content: m.content,
+          isUnsent: Boolean(m.is_unsent),
           source: m.source || null,
           originKind: m.origin_kind || null,
           sentByStaffId: m.sent_by_staff_id || null,
           sentByStaffName: m.sent_by_staff_name || null,
           scenarioName: m.scenario_name || null,
+          quoted: m.quoted_message_id
+            ? {
+                id: m.quoted_message_id,
+                direction: m.quoted_direction,
+                messageType: m.quoted_message_type,
+                content: m.quoted_content,
+                isUnsent: Boolean(m.quoted_is_unsent),
+                createdAt: m.quoted_created_at,
+              }
+            : null,
           createdAt: m.created_at,
+          eventAt: (m.line_event_at as string | null) ?? null,
         })),
       },
     });
@@ -773,14 +1421,23 @@ chats.get('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asyn
   const access = await inboxSavedViewAccess(c);
   if (access instanceof Response) return access;
   const rows = await getSavedSearches(c.env.DB, 'chats', access);
+  const visibleRows = rows.filter((row) => row.scope === 'chats'
+    && (row.line_account_id === access.lineAccountId
+      ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
+      : row.line_account_id === null && row.created_by === access.staffId));
+  const counts = await Promise.all(visibleRows.map(async (row) => {
+    const parsed = validateInboxSavedViewConditions(JSON.parse(row.conditions_json) as unknown);
+    return countInboxSavedViewMatches(c.env.DB, {
+      lineAccountId: access.lineAccountId,
+      staffId: access.staffId,
+      canSeeUnassigned: access.canSeeUnassigned,
+      // 受信箱より前の `{ all, any }` 行は、画面と同じく「絞りなし」へ倒す。
+      conditions: parsed.ok ? parsed.value : EMPTY_INBOX_SAVED_VIEW_CONDITIONS,
+    });
+  }));
   return c.json({
     success: true,
-    data: rows
-      .filter((row) => row.scope === 'chats'
-        && (row.line_account_id === access.lineAccountId
-          ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
-          : row.line_account_id === null && row.created_by === access.staffId))
-      .map(serializeInboxSavedView),
+    data: visibleRows.map((row, index) => serializeInboxSavedView(row, counts[index])),
   });
 });
 
@@ -814,6 +1471,7 @@ chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asy
     createdBy: staff.id,
     lineAccountId: access.lineAccountId,
     isShared,
+    displayOrder: body.isFavorite === true ? -1 : 0,
   });
   return c.json({ success: true, data: serializeInboxSavedView(saved) }, 201);
 });
@@ -851,6 +1509,9 @@ chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff')
   if (body.isShared !== undefined) {
     if (staff.role === 'staff') return c.json({ success: false, error: '共有設定を変える権限がありません' }, 403);
     patch.isShared = body.isShared === true;
+  }
+  if (body.isFavorite !== undefined) {
+    patch.displayOrder = body.isFavorite === true ? -1 : 0;
   }
   const saved = await updateSavedSearch(c.env.DB, existing.id, access, patch);
   if (!saved) return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
@@ -993,6 +1654,20 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
           code: 'REVISION_CONFLICT',
         }, 409);
       }
+      if (body.operatorId !== undefined
+        && body.operatorId !== null
+        && body.operatorId !== resolved.operator_id) {
+        const assignedFriend = await getFriendById(c.env.DB, resolved.friend_id);
+        await fireEvent(c.env.DB, 'staff_assigned', {
+          sourceEventId: correlationId,
+          sourceKind: 'inbox_assignment',
+          occurredAt: now,
+          friendId: resolved.friend_id,
+          eventData: { staffId: body.operatorId },
+        }, undefined, assignedFriend?.line_account_id).catch((error) => {
+          console.error('staff_assigned automation error:', error);
+        });
+      }
     }
     const updated = await getChatById(c.env.DB, resolved.id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1064,7 +1739,13 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    const body = await c.req.json<{ messageType?: string; content: string; revision?: number }>();
+    // 壊れたJSONは外側catchの500に落とさない。運用者が原因を判別できるよう400で返す。
+    let body: { messageType?: string; content: string; revision?: number; quotedMessageId?: string };
+    try {
+      body = await c.req.json<{ messageType?: string; content: string; revision?: number; quotedMessageId?: string }>();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
     if (!body.content) return c.json({ success: false, error: 'content is required' }, 400);
     if (body.revision !== undefined && body.revision !== chat.revision) {
       return c.json({
@@ -1075,7 +1756,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       }, 409);
     }
 
-    const { friend, accessToken } = await resolveFriendAndAccessToken(
+    const { friend, accessToken, liffId } = await resolveFriendAndAccessToken(
       c.env.DB,
       chat.friend_id,
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -1089,6 +1770,31 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       [friend.line_account_id ?? null],
     )) {
       return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    // N-026: 差し込みは一斉配信と同じ解決器で置き換える。解決しきれない
+    // `{{…}}` が残るなら、LINE呼出し0・履歴書込み0のまま構造化して拒否する。
+    // lease・冪等予約より前に置くので、拒否時はDBへ何も書かない。
+    const rendered = await renderChatMessageContent(
+      c.env.DB, friend, body.messageType ?? 'text', body.content, liffId,
+      { kind: 'chat', id: friend.id },
+    );
+    if (rendered.unresolved.length > 0) {
+      return c.json({ success: false, ...unresolvedVariablesPayload(rendered.unresolved) }, 400);
+    }
+
+    // 引用元の検証は外部送信より前に行う。別friend・別アカウント・取消済みを
+    // 指定されてもここで止め、LINE呼び出しも保存もしない。
+    let quoted: QuotedMessageRow | null = null;
+    if (body.quotedMessageId) {
+      quoted = await resolveQuotedMessage(c.env.DB, {
+        friendId: friend.id,
+        lineAccountId: friend.line_account_id ?? null,
+        quotedMessageId: body.quotedMessageId,
+      });
+      if (!quoted) {
+        return c.json({ success: false, error: '引用元のメッセージが見つかりません' }, 404);
+      }
     }
 
     const leaseNow = new Date();
@@ -1116,15 +1822,35 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const messageType = body.messageType ?? 'text';
     let message: Message;
     if (messageType === 'text') {
-      message = { type: 'text', text: body.content };
+      // LINEのtext上限(5000字)を超える本文はここで止める。送ってから弾かれると
+      // 送信済みか未送信かが分からなくなり、運用者が二重送信しかねない。
+      // 差し込みは解決後の長さで判定する(展開で5000字を超え得る)。
+      if (rendered.content.length > 5000) {
+        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+      }
+      message = { type: 'text', text: rendered.content };
     } else if (messageType === 'flex') {
-      const contents = JSON.parse(body.content);
+      // 壊れたJSONは外側catchの500に落とさず400で返す(形式が合うJSONは従来どおり送る)。
+      let contents: FlexContainer;
+      try {
+        contents = JSON.parse(rendered.content) as FlexContainer;
+      } catch {
+        return c.json({ success: false, error: 'Flexメッセージの形式が正しくありません' }, 400);
+      }
       message = { type: 'flex', altText: extractFlexAltText(contents), contents };
     } else if (messageType === 'image') {
-      const parsed = JSON.parse(body.content) as {
+      let parsed: {
         originalContentUrl: string;
         previewImageUrl: string;
       };
+      try {
+        parsed = JSON.parse(rendered.content) as {
+          originalContentUrl: string;
+          previewImageUrl: string;
+        };
+      } catch {
+        return c.json({ success: false, error: '画像メッセージの形式が正しくありません' }, 400);
+      }
       message = {
         type: 'image',
         originalContentUrl: parsed.originalContentUrl,
@@ -1138,15 +1864,26 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       return c.json({ success: false, error: 'messageType is not supported' }, 400);
     }
 
+    // 引用元にLINEのquoteTokenが残っていれば、顧客側にも引用表示として届く。
+    if (quoted?.quote_token) message.quoteToken = quoted.quote_token;
+
     const payloadHash = await hashOutboundPayload(
-      JSON.stringify({ chatId: chat.id, friendId: friend.id, messageType, content: body.content }),
+      JSON.stringify({
+        chatId: chat.id,
+        friendId: friend.id,
+        messageType,
+        content: body.content,
+        quotedMessageId: quoted?.id ?? null,
+      }),
     );
     const reservation = await reserveOutboundSend(c.env.DB, {
       key: idempotencyKey,
       channel: 'line',
       resourceId: chat.id,
       payloadHash,
-      retryInProgress: true,
+      lineAccountId: friend.line_account_id ?? null,
+      // in_progress はLINE受理後の応答喪失を含み得るため、自動再送しない。
+      retryInProgress: false,
       now: new Date().toISOString(),
     });
     if (reservation.kind === 'conflict') {
@@ -1157,7 +1894,31 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     if (reservation.kind === 'in_progress') {
       await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
       leasedConversationId = null;
-      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+      return c.json({
+        success: false,
+        error: '同じメッセージを送信中か、送信結果を確認中です',
+        code: 'OUTBOUND_SEND_IN_PROGRESS',
+      }, 409);
+    }
+    if (reservation.kind === 'failed') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: reservation.retryable ? '再送できる時刻までお待ちください' : 'この送信は自動再送できません',
+        code: reservation.code,
+        data: { retryable: reservation.retryable, nextRetryAt: reservation.nextRetryAt },
+      }, 409);
+    }
+    if (reservation.kind === 'unknown') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: 'LINEへの送達結果を確認できないため、自動再送を停止しました',
+        code: reservation.code,
+        data: { retryable: false, nextRetryAt: null },
+      }, 409);
     }
     if (reservation.kind === 'replay') {
       await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
@@ -1176,32 +1937,84 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
 
     // LINE 側にも同じキーを渡す。DB保存前に通信が切れて再実行されても、
     // LINE API が同一リクエストを二重配信しない。
-    await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+    const outboundLeaseToken = reservation.leaseToken;
+    try {
+      await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      const failure = classifyLineOutboundFailure(error, failedAt);
+      await failOutboundSend(c.env.DB, {
+        key: idempotencyKey,
+        leaseToken: outboundLeaseToken,
+        status: failure.status,
+        code: failure.code,
+        retryable: failure.retryable,
+        nextRetryAt: failure.nextRetryAt,
+        now: failedAt,
+      });
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: failure.status === 'unknown'
+          ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
+          : 'LINEへ送信できませんでした',
+        code: failure.code,
+        data: { retryable: failure.retryable, nextRetryAt: failure.nextRetryAt },
+      }, failure.httpStatus);
+    }
 
     // メッセージログに記録
     const logId = idempotencyKey;
     const sentAt = jstNow();
-    await c.env.DB.batch([
-      c.env.DB
-        .prepare(`INSERT OR IGNORE INTO messages_log
-          (id, friend_id, direction, message_type, content, source, line_account_id,
-           sent_by_staff_id, created_at)
-          VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
-        .bind(
-          logId,
-          friend.id,
-          messageType,
-          body.content,
-          friend.line_account_id ?? null,
-          c.get('staff').id,
-          sentAt,
-        ),
-      completeOutboundSendStatement(c.env.DB, {
+    try {
+      await c.env.DB.batch([
+        c.env.DB
+          .prepare(`INSERT OR IGNORE INTO messages_log
+            (id, friend_id, direction, message_type, content, source, line_account_id,
+             sent_by_staff_id, created_at, quoted_message_id)
+            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?)`)
+          .bind(
+            logId,
+            friend.id,
+            messageType,
+            rendered.content,
+            friend.line_account_id ?? null,
+            c.get('staff').id,
+            sentAt,
+            quoted?.id ?? null,
+          ),
+        completeOutboundSendStatement(c.env.DB, {
+          key: idempotencyKey,
+          responseId: logId,
+          now: new Date().toISOString(),
+          leaseToken: outboundLeaseToken,
+        }),
+      ]);
+    } catch {
+      const failedAt = new Date().toISOString();
+      await failOutboundSend(c.env.DB, {
         key: idempotencyKey,
-        responseId: logId,
-        now: new Date().toISOString(),
-      }),
-    ]);
+        leaseToken: outboundLeaseToken,
+        status: 'unknown',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        retryable: false,
+        nextRetryAt: null,
+        now: failedAt,
+      });
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: 'LINEには受理された可能性がありますが、送信履歴を確定できませんでした',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        data: { retryable: false, nextRetryAt: null },
+      }, 503);
+    }
 
     // チャットの最終メッセージ日時を更新（chat.id を直接使う — friend_id で呼ばれても resolveOrCreateChat 済み）
     await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
@@ -1236,6 +2049,16 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       console.error('first_replied_at update error:', e);
     }
 
+    await fireEvent(c.env.DB, 'manual_reply_sent', {
+      sourceEventId: logId,
+      sourceKind: 'manual_reply',
+      occurredAt: sentAt,
+      friendId: friend.id,
+      eventData: { staffId: c.get('staff').id },
+    }, undefined, friend.line_account_id).catch((error) => {
+      console.error('manual_reply_sent automation error:', error);
+    });
+
     await releaseInboxReplyLease(c.env.DB, {
       channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
     });
@@ -1257,6 +2080,634 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       }).catch(() => undefined);
     }
     console.error('POST /api/chats/:id/send error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * POST /api/chats/:id/render-preview — 送信内容の差し込み解決プレビュー(N-026)。
+ *
+ * 送信口(`/send`)と同じ解決器を通した本文を返す。読み取りだけで
+ * LINE呼出し・履歴書込みはしない。`unresolved` に残る差し込みは
+ * 送信時にそのまま拒否されるので、画面はここで事前に見せられる。
+ */
+chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chat = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    let body: { messageType?: unknown; content?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
+    const content = typeof body.content === 'string' ? body.content : '';
+    if (!content) return c.json({ success: false, error: 'content is required' }, 400);
+    const messageType = typeof body.messageType === 'string' ? body.messageType : 'text';
+
+    const { friend, liffId } = await resolveFriendAndAccessToken(
+      c.env.DB, chat.friend_id, c.env.LINE_CHANNEL_ACCESS_TOKEN, 'chats.render-preview',
+    );
+    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!await canAccessAllLineAccounts(
+      c.env.DB, c.get('staff'), [friend.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    // 送信しないプレビュー。共通情報の厳格解決・台帳記録は行わない（lenient）。
+    const rendered = await renderChatMessageContent(
+      c.env.DB, friend, messageType, content, liffId,
+    );
+    return c.json({
+      success: true,
+      data: { content: rendered.content, unresolved: rendered.unresolved },
+    });
+  } catch (err) {
+    console.error('POST /api/chats/:id/render-preview error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * POST /api/chats/:id/send-combined — 画像と本文を1回の送信単位にする(N-022)。
+ *
+ * 単体送信口を2回呼ぶと、画像だけ届いて本文が落ちる部分送信になる。
+ * 結合口は画像URL・本文長・権限・所属を外部送信前にすべて検証し、
+ * LINEへは1回のpush要求のメッセージ配列として送る。片方の検証失敗時は
+ * LINE呼び出し0回・保存0件。冪等予約は単体口と共用する。
+ */
+chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  let leasedConversationId: string | null = null;
+  try {
+    const chatId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
+    const chat = await resolveOrCreateChat(c.env.DB, chatId);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; texts?: unknown; revision?: number; quotedMessageId?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
+    const image = body.image ?? null;
+    const text = typeof body.text === 'string' ? body.text : null;
+    // G-4: テンプレートパック。`texts` は `text` と並べて受け、
+    // 挿入順のまま1回のpushにまとめる。LINEのpush上限は1回5通。
+    const extraTexts = Array.isArray(body.texts)
+      ? body.texts.filter((t): t is string => typeof t === 'string' && t.length > 0)
+      : [];
+    const texts = [...(text ? [text] : []), ...extraTexts];
+    if (!image && texts.length === 0) return c.json({ success: false, error: 'content is required' }, 400);
+    if (texts.length + (image ? 1 : 0) > 5) {
+      return c.json({ success: false, error: 'まとめて送れるのは5通までです' }, 400);
+    }
+    if (body.revision !== undefined && body.revision !== chat.revision) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が先に更新しました。最新の会話を確認してください',
+        code: 'REVISION_CONFLICT',
+        data: { revision: chat.revision },
+      }, 409);
+    }
+
+    const { friend, accessToken, liffId } = await resolveFriendAndAccessToken(
+      c.env.DB,
+      chat.friend_id,
+      c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      'chats.manual-send',
+    );
+    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+
+    if (!await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [friend.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    // 引用元の検証は外部送信より前に行う(単体送信口と同じ境界)。
+    let quoted: QuotedMessageRow | null = null;
+    if (body.quotedMessageId) {
+      quoted = await resolveQuotedMessage(c.env.DB, {
+        friendId: friend.id,
+        lineAccountId: friend.line_account_id ?? null,
+        quotedMessageId: body.quotedMessageId,
+      });
+      if (!quoted) {
+        return c.json({ success: false, error: '引用元のメッセージが見つかりません' }, 404);
+      }
+    }
+
+    // 外部送信の前に両方を検証する。片方でも壊れていれば送らず保存しない。
+    let imagePart: { originalContentUrl: string; previewImageUrl: string } | null = null;
+    if (image) {
+      if (typeof image.originalContentUrl !== 'string' || !image.originalContentUrl
+        || typeof image.previewImageUrl !== 'string' || !image.previewImageUrl) {
+        return c.json({ success: false, error: '画像メッセージの形式が正しくありません' }, 400);
+      }
+      imagePart = {
+        originalContentUrl: image.originalContentUrl,
+        previewImageUrl: image.previewImageUrl,
+      };
+    }
+    const textParts: string[] = [];
+    for (const rawText of texts) {
+      // N-026: 差し込みは単体送信口と同じ解決器・同じ拒否。片方だけ
+      // 素通しだと、画像つき送信が `{{name}}` をそのまま相手へ出す。
+      const renderedText = await renderChatMessageContent(
+        c.env.DB, friend, 'text', rawText, liffId,
+        { kind: 'chat', id: friend.id },
+      );
+      if (renderedText.unresolved.length > 0) {
+        return c.json({ success: false, ...unresolvedVariablesPayload(renderedText.unresolved) }, 400);
+      }
+      // 上限は解決後の長さで判定する(展開で超え得る)。
+      if (renderedText.content.length > 5000) {
+        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+      }
+      textParts.push(renderedText.content);
+    }
+    const messages: Message[] = [
+      ...(imagePart ? [{ type: 'image', ...imagePart } as Message] : []),
+      ...textParts.map((part) => ({ type: 'text', text: part }) as Message),
+    ];
+    // 引用は先頭のメッセージに付ける(1送信要求につき1つの引用元)。
+    if (quoted?.quote_token && messages.length > 0) {
+      messages[0].quoteToken = quoted.quote_token;
+    }
+
+    const leaseNow = new Date();
+    const lease = await acquireInboxReplyLease(c.env.DB, {
+      channel: 'line',
+      conversationId: friend.id,
+      staffId: c.get('staff').id,
+      conversationRevision: chat.revision,
+      now: leaseNow.toISOString(),
+      expiresAt: new Date(leaseNow.getTime() + 60_000).toISOString(),
+    });
+    if (!lease.acquired) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が返信中です。送信せず、少し待って最新の会話を確認してください',
+        code: 'REPLY_LEASE_CONFLICT',
+        data: { staffId: lease.staffId, expiresAt: lease.expiresAt },
+      }, 409);
+    }
+    leasedConversationId = friend.id;
+
+    const payloadHash = await hashOutboundPayload(
+      JSON.stringify({
+        chatId: chat.id,
+        friendId: friend.id,
+        combined: true,
+        image: imagePart,
+        texts: textParts,
+        quotedMessageId: quoted?.id ?? null,
+      }),
+    );
+    const reservation = await reserveOutboundSend(c.env.DB, {
+      key: idempotencyKey,
+      channel: 'line',
+      resourceId: chat.id,
+      payloadHash,
+      lineAccountId: friend.line_account_id ?? null,
+      retryInProgress: false,
+      now: new Date().toISOString(),
+    });
+    if (reservation.kind === 'conflict') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
+    }
+    if (reservation.kind === 'in_progress') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: '同じメッセージを送信中か、送信結果を確認中です',
+        code: 'OUTBOUND_SEND_IN_PROGRESS',
+      }, 409);
+    }
+    if (reservation.kind === 'failed') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: reservation.retryable ? '再送できる時刻までお待ちください' : 'この送信は自動再送できません',
+        code: reservation.code,
+        data: { retryable: reservation.retryable, nextRetryAt: reservation.nextRetryAt },
+      }, 409);
+    }
+    if (reservation.kind === 'unknown') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: 'LINEへの送達結果を確認できないため、自動再送を停止しました',
+        code: reservation.code,
+        data: { retryable: false, nextRetryAt: null },
+      }, 409);
+    }
+    if (reservation.kind === 'replay') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
+      return c.json({
+        success: true,
+        data: {
+          sent: true,
+          messageId: reservation.responseId,
+          sentByStaffName: c.get('staff').name,
+          revision: chat.revision,
+          replayed: true,
+        },
+      });
+    }
+
+    // 1回のpush要求にまとめる。2回の独立pushにしない。
+    const { LineClient } = await import('@line-crm/line-sdk');
+    const lineClient = new LineClient(accessToken);
+    const outboundLeaseToken = reservation.leaseToken;
+    try {
+      await lineClient.pushMessage(friend.line_user_id, messages, idempotencyKey);
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      const failure = classifyLineOutboundFailure(error, failedAt);
+      await failOutboundSend(c.env.DB, {
+        key: idempotencyKey,
+        leaseToken: outboundLeaseToken,
+        status: failure.status,
+        code: failure.code,
+        retryable: failure.retryable,
+        nextRetryAt: failure.nextRetryAt,
+        now: failedAt,
+      });
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: failure.status === 'unknown'
+          ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
+          : 'LINEへ送信できませんでした',
+        code: failure.code,
+        data: { retryable: failure.retryable, nextRetryAt: failure.nextRetryAt },
+      }, failure.httpStatus);
+    }
+
+    const logBaseId = idempotencyKey;
+    const sentAt = jstNow();
+    const rows = [
+      ...(imagePart ? [{
+        id: `${logBaseId}:0`,
+        messageType: 'image',
+        content: JSON.stringify(imagePart),
+      }] : []),
+      ...textParts.map((part, index) => ({
+        id: `${logBaseId}:${index + (imagePart ? 1 : 0)}`,
+        messageType: 'text',
+        content: part,
+      })),
+    ];
+    try {
+      await c.env.DB.batch([
+        ...rows.map((row, index) =>
+          c.env.DB
+            .prepare(`INSERT OR IGNORE INTO messages_log
+              (id, friend_id, direction, message_type, content, source, line_account_id,
+               sent_by_staff_id, created_at, quoted_message_id)
+              VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?)`)
+            .bind(
+              row.id,
+              friend.id,
+              row.messageType,
+              row.content,
+              friend.line_account_id ?? null,
+              c.get('staff').id,
+              sentAt,
+              // 引用は先頭メッセージに付けたので、記録も先頭行にだけ持たせる。
+              index === 0 ? quoted?.id ?? null : null,
+            ),
+        ),
+        completeOutboundSendStatement(c.env.DB, {
+          key: idempotencyKey,
+          responseId: logBaseId,
+          now: new Date().toISOString(),
+          leaseToken: outboundLeaseToken,
+        }),
+      ]);
+    } catch {
+      const failedAt = new Date().toISOString();
+      await failOutboundSend(c.env.DB, {
+        key: idempotencyKey,
+        leaseToken: outboundLeaseToken,
+        status: 'unknown',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        retryable: false,
+        nextRetryAt: null,
+        now: failedAt,
+      });
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
+      return c.json({
+        success: false,
+        error: 'LINEには受理された可能性がありますが、送信履歴を確定できませんでした',
+        code: 'OUTBOUND_CONFIRMATION_FAILED',
+        data: { retryable: false, nextRetryAt: null },
+      }, 503);
+    }
+
+    await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
+    const updatedChat = await getChatById(c.env.DB, chat.id);
+    await inboxEventStatement(c.env.DB, {
+      channel: 'line',
+      conversationId: friend.id,
+      eventType: 'send',
+      before: null,
+      after: { messageId: logBaseId, status: 'in_progress', source: 'manual' },
+      actorStaffId: c.get('staff').id,
+      correlationId: idempotencyKey,
+      createdAt: sentAt,
+    }).run();
+
+    try {
+      await c.env.DB
+        .prepare(
+          `UPDATE chats SET first_replied_at = ?
+            WHERE id = ? AND first_replied_at IS NULL`,
+        )
+        .bind(jstNow(), chat.id)
+        .run();
+    } catch (e) {
+      console.error('first_replied_at update error:', e);
+    }
+
+    await fireEvent(c.env.DB, 'manual_reply_sent', {
+      sourceEventId: logBaseId,
+      sourceKind: 'manual_reply',
+      occurredAt: sentAt,
+      friendId: friend.id,
+      eventData: { staffId: c.get('staff').id },
+    }, undefined, friend.line_account_id).catch((error) => {
+      console.error('manual_reply_sent automation error:', error);
+    });
+
+    await releaseInboxReplyLease(c.env.DB, {
+      channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+    });
+    leasedConversationId = null;
+
+    return c.json({
+      success: true,
+      data: {
+        sent: true,
+        messageId: logBaseId,
+        messageIds: rows.map((row) => row.id),
+        sentByStaffName: c.get('staff').name,
+        revision: updatedChat?.revision ?? chat.revision + 1,
+      },
+    });
+  } catch (err) {
+    if (leasedConversationId) {
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
+      }).catch(() => undefined);
+    }
+    console.error('POST /api/chats/:id/send-combined error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// ========== 送信予約(N-025) ==========
+
+// 予約時刻は「いまより先」だけを受け付ける。画面のdatetime-localはJSTで
+// 入力されるが、保存はUTCへ正規化するため境界ずれは起きない。
+function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | { ok: false } {
+  if (typeof raw !== 'string' || !raw) return { ok: false };
+  let scheduledAt: string;
+  try {
+    scheduledAt = normalizeScheduledAt(raw);
+  } catch {
+    return { ok: false };
+  }
+  if (Date.parse(scheduledAt) <= Date.now()) return { ok: false };
+  return { ok: true, scheduledAt };
+}
+
+/**
+ * POST /api/chats/:id/schedule — 返信の予約作成。
+ * Idempotency-Keyは必須で、同じキーの再送は新しい予約を作らず既存を返す。
+ * 別キーでも「対象・内容・送信予定時刻」が一致する処理中の予約があれば
+ * 新しい行を作らず既存行を返す(#977)。replayed=true でどちらの再利用かは
+ * 区別せず、画面は返された予約1件だけを表示すればよい。
+ */
+chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chatId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
+    const chat = await resolveOrCreateChat(c.env.DB, chatId);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    let body: { content?: unknown; scheduledAt?: unknown; quotedMessageId?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
+    const content = typeof body.content === 'string' ? body.content : '';
+    if (!content) return c.json({ success: false, error: 'content is required' }, 400);
+    if (content.length > 5000) {
+      return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+    }
+    // N-026: 送信時に解決される差し込み(name/field/var/date等)は予約へ通すが、
+    // カタログに無い名前は将来も解決できないのでここで拒否する(予約行も作らない)。
+    const unsupported = findUnsupportedInterpolations(content);
+    if (unsupported.length > 0) {
+      return c.json({ success: false, ...unresolvedVariablesPayload(unsupported) }, 400);
+    }
+    const time = validateScheduledAt(body.scheduledAt);
+    if (!time.ok) {
+      return c.json({ success: false, error: '未来の日時を指定してください' }, 400);
+    }
+
+    const { friend } = await resolveFriendAndAccessToken(
+      c.env.DB,
+      chat.friend_id,
+      c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      'chats.schedule-send',
+    );
+    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [friend.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    // 引用元の検証は単体送信口と同じ境界。無効な引用は予約を作らない。
+    let quotedMessageId: string | null = null;
+    if (typeof body.quotedMessageId === 'string' && body.quotedMessageId) {
+      const quoted = await resolveQuotedMessage(c.env.DB, {
+        friendId: friend.id,
+        lineAccountId: friend.line_account_id ?? null,
+        quotedMessageId: body.quotedMessageId,
+      });
+      if (!quoted) {
+        return c.json({ success: false, error: '引用元のメッセージが見つかりません' }, 404);
+      }
+      quotedMessageId = quoted.id;
+    }
+
+    const { row, created } = await createScheduledChatSend(c.env.DB, {
+      id: crypto.randomUUID(),
+      friendId: friend.id,
+      lineAccountId: friend.line_account_id ?? null,
+      staffId: c.get('staff').id,
+      messageType: 'text',
+      content,
+      quotedMessageId,
+      idempotencyKey,
+      scheduledAt: time.scheduledAt,
+      now: new Date().toISOString(),
+    });
+
+    return c.json({
+      success: true,
+      data: { ...scheduledSendResponse(row), replayed: !created },
+    });
+  } catch (err) {
+    console.error('POST /api/chats/:id/schedule error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** GET /api/chats/:id/scheduled — 会話の待機中・送信中の予約一覧。 */
+chats.get('/api/chats/:id/scheduled', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chatId = c.req.param('id');
+    const chat = await getChatById(c.env.DB, chatId)
+      ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    const rows = await listPendingScheduledChatSends(c.env.DB, chat.friend_id);
+    return c.json({
+      success: true,
+      data: { scheduled: rows.map(scheduledSendResponse) },
+    });
+  } catch (err) {
+    console.error('GET /api/chats/:id/scheduled error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * PATCH /api/chats/:id/scheduled/:scheduleId — 予約の時刻・本文変更。
+ * scheduled の行だけCASで書き換える。sending以降は409。
+ */
+chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chatId = c.req.param('id');
+    const scheduleId = c.req.param('scheduleId');
+    const chat = await getChatById(c.env.DB, chatId)
+      ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    let body: { scheduledAt?: unknown; content?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
+    const updates: { scheduledAt?: string; content?: string } = {};
+    if (body.scheduledAt !== undefined) {
+      const time = validateScheduledAt(body.scheduledAt);
+      if (!time.ok) {
+        return c.json({ success: false, error: '未来の日時を指定してください' }, 400);
+      }
+      updates.scheduledAt = time.scheduledAt;
+    }
+    if (body.content !== undefined) {
+      if (typeof body.content !== 'string' || !body.content) {
+        return c.json({ success: false, error: 'content is required' }, 400);
+      }
+      if (body.content.length > 5000) {
+        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+      }
+      // N-026: 予約作成と同じく、カタログに無い差し込み名はここで拒否する。
+      const unsupported = findUnsupportedInterpolations(body.content);
+      if (unsupported.length > 0) {
+        return c.json({ success: false, ...unresolvedVariablesPayload(unsupported) }, 400);
+      }
+      updates.content = body.content;
+    }
+    if (updates.scheduledAt === undefined && updates.content === undefined) {
+      return c.json({ success: false, error: '変更する項目がありません' }, 400);
+    }
+
+    const result = await updateScheduledChatSend(c.env.DB, {
+      id: scheduleId,
+      friendId: chat.friend_id,
+      scheduledAt: updates.scheduledAt,
+      content: updates.content,
+      now: new Date().toISOString(),
+    });
+    if (result === 'not_found') {
+      return c.json({ success: false, error: '予約が見つかりません' }, 404);
+    }
+    if (result === 'locked') {
+      return c.json({
+        success: false,
+        error: '送信処理が始まったか、すでに処理済みの予約です',
+        code: 'SCHEDULE_LOCKED',
+      }, 409);
+    }
+    return c.json({ success: true, data: { updated: true } });
+  } catch (err) {
+    console.error('PATCH /api/chats/:id/scheduled/:scheduleId error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** DELETE /api/chats/:id/scheduled/:scheduleId — 予約の取消。scheduled の行だけCAS。 */
+chats.delete('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  try {
+    const chatId = c.req.param('id');
+    const scheduleId = c.req.param('scheduleId');
+    const chat = await getChatById(c.env.DB, chatId)
+      ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
+    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+
+    const result = await cancelScheduledChatSend(c.env.DB, {
+      id: scheduleId,
+      friendId: chat.friend_id,
+      staffId: c.get('staff').id,
+      now: new Date().toISOString(),
+    });
+    if (result === 'not_found') {
+      return c.json({ success: false, error: '予約が見つかりません' }, 404);
+    }
+    if (result === 'locked') {
+      return c.json({
+        success: false,
+        error: '送信処理が始まったか、すでに処理済みの予約です',
+        code: 'SCHEDULE_LOCKED',
+      }, 409);
+    }
+    return c.json({ success: true, data: { cancelled: true } });
+  } catch (err) {
+    console.error('DELETE /api/chats/:id/scheduled/:scheduleId error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

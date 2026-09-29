@@ -1,0 +1,18 @@
+/* V6 T4S2Qb / k8DFrR。共有Toggleの操作性を保ち、この画面の40×22に合わせる。 */
+.intervalToggle[role='switch'] {
+  width: 40px;
+  height: 22px;
+}
+
+.intervalToggle[role='switch']::after {
+  width: 18px;
+  height: 18px;
+}
+
+.intervalToggle[aria-checked='true'] {
+  background: var(--color-accent-deep);
+}
+
+.intervalToggle[aria-checked='true']::after {
+  transform: translateX(18px);
+}

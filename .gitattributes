@@ -1,0 +1,2 @@
+# 共通部品の利用先は1行1件。並行PRの追加行を両方残す。
+apps/web/design/design-impact-baseline.txt merge=union

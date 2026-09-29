@@ -5,6 +5,25 @@ type BroadcastInsight = {
   suppressedByAudienceSize: boolean
 } | null
 
+/**
+ * API の日時が欠けている・壊れているときに `Invalid Date` を画面へ出さない。
+ * 配信日時は保存も運用も日本時間を基準にしているので、閲覧端末の時差に依存させない。
+ */
+export function formatBroadcastDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
 function percent(value: number, base: number): string {
   return `${Math.round((value / base) * 1000) / 10}%`
 }

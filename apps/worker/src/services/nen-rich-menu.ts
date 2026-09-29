@@ -1,4 +1,5 @@
 import { getLineAccountById, jstNow } from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { LineClient } from '@line-crm/line-sdk';
 
 type RichMenuEnv = {
@@ -22,7 +23,7 @@ export async function installNenRichMenu(env: RichMenuEnv, accountId: string) {
     { x: 1667, width: 833 },
   ];
   const tabs = ['home', 'pets', 'health', 'orders', 'photos'];
-  const labels = ['ホーム', 'マイペット', '健康日記', '注文・定期', '投稿'];
+  const labels = ['マイページ', 'マイペット', '健康日記', '注文・定期', '投稿'];
   const areas = Array.from({ length: 6 }, (_, index) => ({
     bounds: {
       x: columns[index % 3].x,
@@ -66,6 +67,11 @@ export async function processPendingNenRichMenuJobs(env: RichMenuEnv) {
       WHERE status = 'pending' ORDER BY created_at LIMIT 1`,
   ).first<{ id: string; line_account_id: string; attempts: number }>();
   if (!job) return { processed: 0 };
+
+  // 機能オフ中はclaimせずpendingのまま残す。再オンで再開する。
+  if (!await featureJobCanRun(env.DB, { accountId: job.line_account_id, featureId: 'rich_menus', job: 'NEN rich menu jobs' })) {
+    return { processed: 0 };
+  }
 
   const claimed = await env.DB.prepare(
     `UPDATE nen_rich_menu_jobs

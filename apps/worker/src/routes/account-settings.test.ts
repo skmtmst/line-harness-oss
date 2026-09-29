@@ -32,6 +32,20 @@ function appForTenant(tenantId: string) {
   return tenantApp;
 }
 
+function appForRole(role: 'owner' | 'admin' | 'staff' | null) {
+  const roleApp = new Hono<Env>();
+  roleApp.use('*', async (c, next) => {
+    if (role) {
+      c.set('staff', {
+        id: role, name: role, role, readOnly: false, tenantId: 'tenant-a',
+      });
+    }
+    await next();
+  });
+  roleApp.route('/', accountSettings);
+  return roleApp;
+}
+
 describe('GET /api/account-settings/test-recipient-login-users', () => {
   test('accountIdがない場合はDBを読まない', async () => {
     const prepare = vi.fn();
@@ -177,25 +191,59 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
 });
 
 describe('PUT /api/account-settings/test-recipients', () => {
-  test('別統括のアカウントは保存前に403にする', async () => {
-    accessMocks.canAccess.mockResolvedValueOnce(false);
+  test.each(['owner', 'admin'] as const)('%sは同じアカウントの友だちを保存できる', async (role) => {
+    const testDb = createTestD1();
+    try {
+      insertFriend(testDb.raw, 'friend-1', { line_account_id: 'line-account-1' });
+
+      const response = await appForRole(role).request('/api/account-settings/test-recipients', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: 'line-account-1', friendIds: ['friend-1'] }),
+      }, { DB: testDb.db });
+
+      expect(response.status).toBe(200);
+      expect(testDb.raw.prepare(
+        `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
+      ).get('line-account-1')).toEqual({ value: JSON.stringify(['friend-1']) });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  test.each([
+    { role: 'staff' as const, label: 'staff' },
+    { role: null, label: '未認証ユーザー' },
+  ])('$labelは保存できない', async ({ role }) => {
     const prepare = vi.fn();
 
-    const response = await app.request('/api/account-settings/test-recipients', {
+    const response = await appForRole(role).request('/api/account-settings/test-recipients', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId: 'other-account', friendIds: [] }),
+      body: JSON.stringify({ accountId: 'line-account-1', friendIds: ['friend-1'] }),
     }, { DB: { prepare } });
 
     expect(response.status).toBe(403);
     expect(prepare).not.toHaveBeenCalled();
   });
 
-  test('別アカウントの友だちIDが混ざると保存前に400にする', async () => {
+  test('adminでも別統括のアカウントは保存前に403にする', async () => {
+    accessMocks.canAccess.mockResolvedValueOnce(false);
+    const prepare = vi.fn();
+
+    const response = await appForRole('admin').request('/api/account-settings/test-recipients', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'other-account', friendIds: ['friend-1'] }),
+    }, { DB: { prepare } });
+
+    expect(response.status).toBe(403);
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
+  test('adminでも別アカウントの友だちIDが混ざると保存前に400にする', async () => {
     const all = vi.fn(async () => ({ results: [{ id: 'friend-1' }] }));
     const bind = vi.fn(() => ({ all }));
     const prepare = vi.fn(() => ({ bind }));
 
-    const response = await app.request('/api/account-settings/test-recipients', {
+    const response = await appForRole('admin').request('/api/account-settings/test-recipients', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ accountId: 'line-account-1', friendIds: ['friend-1', 'friend-other'] }),
     }, { DB: { prepare } });

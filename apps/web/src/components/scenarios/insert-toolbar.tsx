@@ -15,8 +15,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { scenarioReferenceData } from './scenario-reference-data'
+import DateField from '@/components/shared/date-field'
+import MenuPortal from '@/components/shared/menu-portal'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
@@ -41,15 +44,21 @@ export interface InsertToolbarProps {
   targetRef: React.RefObject<HTMLTextAreaElement | HTMLInputElement | null>
   value: string
   onChange: (next: string) => void
+  /** 一斉配信の本文編集で、設計上の回答フォーム差し込み口を表示する。 */
+  includeAnswerForm?: boolean
 }
 
-export default function InsertToolbar({ targetRef, value, onChange }: InsertToolbarProps) {
+export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false }: InsertToolbarProps) {
   const { selectedAccountId } = useAccount()
+  // 友だち情報・共通情報は任意機能。オフのaccountでは差し込み口ごと出さない。
+  const featureVisibility = useFeatureVisibility(selectedAccountId)
+  const fieldsEnabled = featureVisibility.enabled('friend_fields')
+  const varsEnabled = featureVisibility.enabled('common_vars')
   const [open, setOpen] = useState<string | null>(null)
   const [fields, setFields] = useState<Option[]>([])
   const [vars, setVars] = useState<Option[]>([])
   const [targetDate, setTargetDate] = useState('')
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -58,8 +67,12 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
     }
     void (async () => {
       const [fieldRes, varRes] = await Promise.all([
-        api.friendFields.list(selectedAccountId),
-        api.commonVars.list(selectedAccountId),
+        fieldsEnabled
+          ? scenarioReferenceData.friendFields(selectedAccountId)
+          : Promise.resolve({ success: false as const }),
+        varsEnabled
+          ? scenarioReferenceData.commonVars(selectedAccountId)
+          : Promise.resolve({ success: false as const }),
       ])
       if (fieldRes.success) {
         setFields(fieldRes.data.map((f) => ({ token: `{{field.${f.fieldKey}}}`, label: f.name })))
@@ -68,17 +81,10 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
         setVars(varRes.data.map((v) => ({ token: `{{var.${v.varKey}}}`, label: v.name })))
       }
     })()
-  }, [selectedAccountId])
+  }, [selectedAccountId, fieldsEnabled, varsEnabled])
 
-  // 外を押したら閉じる。開いたままだと下の入力欄が押せない。
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(null)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
+  // 外を押したら閉じる扱いは MenuPortal に任せる（箱の中の押しで閉じない）。
+  // 開くボタンの押し直しはトグルになる。
 
   /**
    * カーソルの位置に入れる。
@@ -105,41 +111,55 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
     })
   }
 
-  const menuButton = (key: string, label: string) => (
+  const menuButton = (key: string, label: string, token?: string) => (
     <button
       type="button"
-      onClick={() => setOpen(open === key ? null : key)}
+      ref={(element) => {
+        buttonRefs.current[key] = element
+      }}
+      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
       aria-expanded={open === key}
       className={`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
-        open === key ? 'bg-accent-soft text-accent border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
+        open === key ? 'bg-accent-soft text-accent-deep border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
       }`}
     >
       {label}
     </button>
   )
 
-  const list = (items: Option[], empty: string) => (
-    <div className="border-hairline rounded-card absolute z-20 mt-1 max-h-64 w-64 overflow-y-auto border bg-white shadow-lg">
-      {items.length === 0 ? (
-        <p className="text-ink-faint px-3 py-4 text-center text-xs">{empty}</p>
-      ) : (
-        items.map((o) => (
-          <button
-            key={o.token}
-            type="button"
-            onClick={() => insert(o.token)}
-            className="hover:bg-canvas-sunken block w-full px-3 py-2 text-left text-xs"
-          >
-            <span className="text-ink block">{o.label}</span>
-            {o.hint && <span className="text-ink-faint block">{o.hint}</span>}
-          </button>
-        ))
-      )}
-    </div>
+  const list = (menuKey: string, items: Option[], empty: string) => (
+    <MenuPortal
+      open={open === menuKey}
+      align="start"
+      getAnchor={() => buttonRefs.current[menuKey] ?? null}
+      onClose={() => setOpen(null)}
+    >
+      <div
+        className="border-hairline rounded-card bg-canvas max-h-64 w-64 overflow-y-auto border shadow-lg"
+        // 最上層では absolute 指定を無効にする（位置は器が決める）。
+        style={{ position: 'static' }}
+      >
+        {items.length === 0 ? (
+          <p className="text-ink-faint px-3 py-4 text-center text-xs">{empty}</p>
+        ) : (
+          items.map((o) => (
+            <button
+              key={o.token}
+              type="button"
+              onClick={() => insert(o.token)}
+              className="hover:bg-canvas-sunken block w-full px-3 py-2 text-left text-xs"
+            >
+              <span className="text-ink block">{o.label}</span>
+              {o.hint && <span className="text-ink-faint block">{o.hint}</span>}
+            </button>
+          ))
+        )}
+      </div>
+    </MenuPortal>
   )
 
   return (
-    <div ref={wrapRef} className="relative flex flex-wrap items-center gap-1.5">
+    <div className="relative flex flex-wrap items-center gap-1.5">
       <span className="text-ink-faint text-xs">差し込み</span>
 
       <button
@@ -150,40 +170,54 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
         名前
       </button>
 
-      <div className="relative">
-        {menuButton('field', '友だち情報')}
-        {open === 'field' &&
-          list(fields, '友だち情報欄がまだありません')}
-      </div>
+      {fieldsEnabled && (
+        <div className="relative">
+          {menuButton('field', '友だち情報')}
+          {list('field', fields, '友だち情報欄がまだありません')}
+        </div>
+      )}
 
-      <div className="relative">
-        {menuButton('var', '共通情報')}
-        {open === 'var' && list(vars, '共通情報がまだありません')}
-      </div>
+      {varsEnabled && (
+        <div className="relative">
+          {menuButton('var', '共通情報')}
+          {list('var', vars, '共通情報がまだありません')}
+        </div>
+      )}
+
+      {includeAnswerForm && menuButton('answer-form', '回答フォーム', '{{answer_form}}')}
 
       <div className="relative">
         {menuButton('date', '配信日')}
-        {open === 'date' &&
-          list(
-            DATE_FORMATS.map((f) => ({ token: f.token, label: f.label, hint: f.example })),
-            '',
-          )}
+        {list(
+          'date',
+          DATE_FORMATS.map((f) => ({ token: f.token, label: f.label, hint: f.example })),
+          '',
+        )}
       </div>
 
       <div className="relative">
         {menuButton('other', 'その他')}
-        {open === 'other' && (
-          <div className="border-hairline rounded-card absolute z-20 mt-1 w-72 border bg-white p-3 shadow-lg">
+        <MenuPortal
+          open={open === 'other'}
+          align="start"
+          getAnchor={() => buttonRefs.current.other ?? null}
+          onClose={() => setOpen(null)}
+        >
+          <div
+            className="border-hairline rounded-card bg-canvas w-72 border p-3 shadow-lg"
+            // 最上層では absolute 指定を無効にする（位置は器が決める）。
+            style={{ position: 'static' }}
+          >
             <p className="text-ink text-xs font-bold">目標日までの日数</p>
             <p className="text-ink-faint mt-0.5 mb-2 text-xs leading-relaxed">
               「あと3日」のように出ます。配信のたびに数え直すので、書き換えは要りません。
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="date"
+              <DateField
                 value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                className="border-hairline rounded-control text-ink h-8 min-w-0 flex-1 border px-2 text-xs"
+                onChange={setTargetDate}
+                aria-label="目標日"
+                className="min-w-0 flex-1"
               />
               <button
                 type="button"
@@ -209,7 +243,7 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
               ))}
             </div>
           </div>
-        )}
+        </MenuPortal>
       </div>
     </div>
   )

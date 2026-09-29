@@ -1,6 +1,11 @@
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createFriendBulkRun, getFriendBulkRunDetail } from '@line-crm/db';
+import {
+  createFriendBulkRun,
+  createTemplate,
+  getFriendBulkRunDetail,
+  publishTemplate,
+} from '@line-crm/db';
 import { AutomationActionError, type AutomationActionExecutor } from './automation-engine';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import {
@@ -59,6 +64,46 @@ describe('V6 友だち一括操作', () => {
       { reason: '選んだ操作とLINE公式アカウントが異なります', count: 1 },
     ]));
     expect(result.targets).toEqual([{ friendId: 'friend-1', lineAccountId: 'account-1' }]);
+  });
+
+  it('未公開テンプレートは対象確定・一括実行を開始しない', async () => {
+    const template = await createTemplate(testDb.db, {
+      name: '編集中のお知らせ',
+      messageType: 'text',
+      messageContent: 'まだ公開していない本文',
+      lineAccountId: 'account-1',
+    });
+    const operation = { kind: 'send_message' as const, templateId: template.id };
+
+    await expect(previewFriendBulkRun(
+      testDb.db,
+      staff,
+      { kind: 'explicit', friendIds: ['friend-1'] },
+      operation,
+    )).rejects.toMatchObject({ code: 'template_not_published', status: 409 });
+    await expect(startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation,
+      idempotencyKey: crypto.randomUUID(),
+      confirmIrreversible: true,
+      now: NOW,
+    })).rejects.toMatchObject({ code: 'template_not_published', status: 409 });
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_bulk_runs`).get())
+      .toEqual({ count: 0 });
+
+    await publishTemplate(testDb.db, template.id, {
+      expectedVersion: 0,
+      expectedDraftRevision: 1,
+      idempotencyKey: 'friend-bulk-publish-1',
+    });
+    const started = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation,
+      idempotencyKey: crypto.randomUUID(),
+      confirmIrreversible: true,
+      now: NOW,
+    });
+    expect(started.run).toMatchObject({ targetCount: 1, status: 'queued' });
   });
 
   it('対象IDを固定してタグを冪等実行し、あとから増えた友だちは触らない', async () => {
@@ -306,5 +351,132 @@ describe('V6 友だち一括操作', () => {
       error_code: 'undo_conflict',
       error_message: '一括操作のあとに内容が変更されているため、この対象は取り消しませんでした',
     });
+  });
+});
+
+describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結する（#718）', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    addAccount(testDb.raw, 'account-1');
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
+    // N-263: 実装は地点作成時にアカウントの統括を tenant_id へ写す。
+    // 試験データも同じ形にする(account-1 は統括 'default')。
+    testDb.raw.prepare(
+      `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, version, tenant_id)
+       VALUES ('point-718', '成約', 'manual', 5000, 'account-1', 3, 'default')`,
+    ).run();
+  });
+
+  it('add_conversionで4列を控え、affiliate_idはNULLのまま件数と金額の両方に数える', async () => {
+    const created = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'add_conversion', conversionPointId: 'point-718' },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    });
+    expect(await processFriendBulkRun(testDb.db, created.run.id, { now: NOW }))
+      .toMatchObject({ status: 'success' });
+
+    const row = testDb.raw.prepare(
+      `SELECT point_name_snapshot, event_type_snapshot, value_snapshot,
+              point_version_snapshot, affiliate_id, tenant_id
+         FROM conversion_events WHERE conversion_point_id = 'point-718'`,
+    ).get() as {
+      point_name_snapshot: string | null;
+      event_type_snapshot: string | null;
+      value_snapshot: number | null;
+      point_version_snapshot: number | null;
+      affiliate_id: string | null;
+      tenant_id: string | null;
+    };
+    expect(row).toEqual({
+      point_name_snapshot: '成約',
+      event_type_snapshot: 'manual',
+      value_snapshot: 5000,
+      point_version_snapshot: 3,
+      affiliate_id: null,
+      // N-263: 記録した成果にも計測時の統括を写す。
+      tenant_id: 'default',
+    });
+
+    const total = testDb.raw.prepare(
+      `SELECT COUNT(*) AS netCount, SUM(COALESCE(value_snapshot, 0)) AS netValue
+         FROM conversion_events WHERE conversion_point_id = 'point-718'`,
+    ).get() as { netCount: number; netValue: number };
+    expect(total).toEqual({ netCount: 1, netValue: 5000 });
+  });
+
+  it('統括の違う地点と友だちの組合せでは成果を書かない(N-263)', async () => {
+    // 直接INSERTで来る経路なので、行を作る側の境界だけでなく
+    // 書き込み側でも閉じる。地点の統括が友だちの所属と違えば失敗にする。
+    testDb.raw.prepare(
+      `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, version, tenant_id)
+       VALUES ('point-cross', '越境', 'manual', 100, 'account-1', 1, 'other-tenant')`,
+    ).run();
+    const created = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'add_conversion', conversionPointId: 'point-cross' },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    });
+    expect(await processFriendBulkRun(testDb.db, created.run.id, { now: NOW }))
+      .toMatchObject({ status: 'failed' });
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS n FROM conversion_events WHERE conversion_point_id = 'point-cross'`,
+    ).get()).toEqual({ n: 0 });
+  });
+});
+
+describe('一括操作の友だち情報は型どおりに検証する（N-042）', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    addAccount(testDb.raw, 'account-1');
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
+    testDb.raw.prepare(
+      `INSERT INTO friend_fields (id, name, field_key, type, options_json, ec_is_master)
+       VALUES ('field-num', '頭数', 'head_count', 'number', NULL, 0),
+              ('field-sel', '犬種', 'breed', 'select',
+               '[{"id":"opt-1","label":"柴犬"},{"id":"opt-2","label":"猫"}]', 0)`,
+    ).run();
+  });
+
+  it('型に合わない値は操作の行を作る前に422で止める', async () => {
+    await expect(startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'set_friend_fields', values: { 'field-num': 'たくさん' } },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    })).rejects.toMatchObject({ code: 'friend_field_value_invalid', status: 422 });
+
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_bulk_runs`).get())
+      .toEqual({ count: 0 });
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_bulk_run_items`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('選択肢外は操作の行を作る前に422で止める', async () => {
+    await expect(startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'set_friend_fields', values: { 'field-sel': 'ドラゴン' } },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    })).rejects.toMatchObject({ code: 'friend_field_value_invalid', status: 422 });
+  });
+
+  it('通った値は正規化して実行時に保存する', async () => {
+    const created = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'set_friend_fields', values: { 'field-num': '1,000', 'field-sel': '柴犬' } },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    });
+    expect(await processFriendBulkRun(testDb.db, created.run.id, { now: NOW }))
+      .toMatchObject({ status: 'success' });
+
+    expect(testDb.raw.prepare(
+      `SELECT field_id, value FROM friend_field_values WHERE friend_id = 'friend-1' ORDER BY field_id`,
+    ).all()).toEqual([
+      { field_id: 'field-num', value: '1000' },
+      { field_id: 'field-sel', value: 'opt-1' },
+    ]);
   });
 });

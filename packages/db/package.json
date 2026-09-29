@@ -13,10 +13,12 @@
     "bootstrap.sql"
   ],
   "scripts": {
-    "pretest": "pnpm --filter @line-crm/shared build",
+    "build": "pnpm run generate:bootstrap",
+    "pretest": "pnpm --filter @line-crm/shared build && pnpm run generate:bootstrap",
     "test": "vitest run",
-    "pretypecheck": "pnpm --filter @line-crm/shared build",
+    "pretypecheck": "pnpm --filter @line-crm/shared build && pnpm run generate:bootstrap",
     "typecheck": "tsc --noEmit",
+    "prepack": "pnpm run generate:bootstrap",
     "generate:bootstrap": "node ./scripts/generate-bootstrap.mjs",
     "check:bootstrap": "node ./scripts/generate-bootstrap.mjs --check"
   },
@@ -24,9 +26,9 @@
     "@line-crm/shared": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241205.0",
+    "@cloudflare/workers-types": "4.20260317.1",
     "typescript": "^5.7.0",
-    "vitest": "^2.0.0",
+    "vitest": "^3.2.6",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.9.0"
   },

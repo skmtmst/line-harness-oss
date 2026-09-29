@@ -1,21 +1,32 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Copy, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Coins, Copy, Trash2, X } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
+import { api, type CommonActionResources, type TagDefinitionAction, type TagRetroactivePreview } from '@/lib/api'
+import Breadcrumb from '@/components/layout/breadcrumb'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Combobox from '@/components/shared/combobox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Drawer from '@/components/shared/drawer'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { notifyToast } from '@/components/shared/toast'
 import StickyBar from '@/components/shared/sticky-bar'
+import { RequiredBadge } from '@/components/shared/form-controls'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
 
 export type LinkedAction = {
   id: string
   type: string
   label: string
   timing: string
+  definition?: TagDefinitionAction
 }
 
 export type TagEditorValues = {
@@ -28,6 +39,7 @@ export type TagEditorValues = {
   multiplierBps: number | null
   multiplierPriority: number
   applyToExisting: boolean
+  reapplyPolicy: 'first_only' | 'every_time'
   actions: LinkedAction[]
 }
 
@@ -71,11 +83,46 @@ const ACTION_TYPES = [
   ['担当者通知', '通知'],
   ['マイル付与', 'マイル'],
 ] as const
+export type TagEditorActionLabel = (typeof ACTION_TYPES)[number][0]
+
+const ACTION_DEFINITIONS: Record<(typeof ACTION_TYPES)[number][0], { actionType: string; resource?: keyof CommonActionResources; paramKey?: string }> = {
+  'テキスト送信': { actionType: 'send_message' },
+  'テンプレート送信': { actionType: 'send_message', resource: 'templates', paramKey: 'templateId' },
+  'タグ追加': { actionType: 'add_tag', resource: 'tags', paramKey: 'tagId' },
+  'タグ解除': { actionType: 'remove_tag', resource: 'tags', paramKey: 'tagId' },
+  '友だち情報更新': { actionType: 'set_metadata', resource: 'friendFields', paramKey: 'fieldId' },
+  '対応マーク変更': { actionType: 'set_support_mark', resource: 'supportMarks', paramKey: 'markId' },
+  'シナリオ開始': { actionType: 'start_scenario', resource: 'scenarios', paramKey: 'scenarioId' },
+  'シナリオ停止': { actionType: 'stop_scenario', resource: 'scenarios', paramKey: 'scenarioId' },
+  'リマインダ開始': { actionType: 'start_reminder', resource: 'reminders', paramKey: 'reminderId' },
+  'リマインダ解除': { actionType: 'stop_reminder', resource: 'reminders', paramKey: 'reminderId' },
+  'リッチメニュー切替': { actionType: 'switch_rich_menu', resource: 'richMenus', paramKey: 'richMenuPageId' },
+  '担当者通知': { actionType: 'notify_staff', resource: 'notificationRules', paramKey: 'notificationRuleId' },
+  'マイル付与': { actionType: 'grant_mileage' },
+}
+
+const ACTION_PRESENTATION: Record<string, { label: string; category: string }> = Object.fromEntries(
+  ACTION_TYPES.map(([label, category]) => [ACTION_DEFINITIONS[label].actionType, { label, category }]),
+)
+
+export function linkedActionFromDefinition(action: TagDefinitionAction, saved?: NonNullable<Tag['linkedActions']>[number]): LinkedAction {
+  const presentation = ACTION_PRESENTATION[action.type] ?? { label: action.type, category: 'その他' }
+  const delayMinutes = Number(action.params.delayMinutes ?? 0)
+  const timing = delayMinutes <= 0 ? 'すぐに' : delayMinutes % 1440 === 0 ? `${delayMinutes / 1440}日後` : delayMinutes % 60 === 0 ? `${delayMinutes / 60}時間後` : `${delayMinutes}分後`
+  const content = typeof action.params.content === 'string' ? action.params.content : null
+  const amount = typeof action.params.amount === 'number' ? `${action.params.amount} mile` : null
+  const detailedType = action.type === 'send_message' && content ? 'テキスト送信' : presentation.label
+  return { id: action.id, type: detailedType, label: saved?.label ?? content ?? amount ?? presentation.label, timing: saved?.timing ?? timing, definition: action }
+}
+
+export function definitionsForSave(actions: LinkedAction[]): TagDefinitionAction[] {
+  return actions.flatMap((action) => action.definition ? [{ ...action.definition, id: action.id }] : [])
+}
 
 const cardClass =
   'rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
 const inputClass =
-  'w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
+  'w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink'
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (next: boolean) => void; label: string }) {
   return (
@@ -101,12 +148,49 @@ function StepTitle({ number, title, note }: { number: number; title: string; not
   )
 }
 
-function ActionDrawer({ onClose, onAdd, referenceState = false }: { onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean }) {
+function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, referenceState = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean }) {
   const [selected, setSelected] = useState<(typeof ACTION_TYPES)[number]>(referenceState ? ACTION_TYPES[1] : ACTION_TYPES[0])
   const [timing, setTiming] = useState<'immediate' | 'delay'>('immediate')
   const [delay, setDelay] = useState(referenceState ? '24' : '1')
   const [delayUnit, setDelayUnit] = useState<'minutes' | 'hours' | 'days'>(referenceState ? 'hours' : 'minutes')
+  // 共通Selectはvalue/onChange必須のため表示保持用の状態を持つ。元の素のselectも非制御で値はどこからも読まれていなかったので、動きは変えない。
+  const [position, setPosition] = useState('last')
   const [message, setMessage] = useState('ご登録ありがとうございます。')
+  const [amount, setAmount] = useState('100')
+  const [resources, setResources] = useState<CommonActionResources | null>(suppliedResources ?? null)
+  const [resourceId, setResourceId] = useState('')
+  const definition = ACTION_DEFINITIONS[selected[0]]
+  const choices = definition.resource
+    ? (resources?.[definition.resource] as Array<{ id: string; name: string }> | undefined) ?? []
+    : []
+  const unavailable = selected[0] === '友だち情報更新' || (allowedActionTypes ? !allowedActionTypes.includes(selected[0]) : false)
+  const needsResource = Boolean(definition.resource)
+
+  useEffect(() => {
+    if (suppliedResources !== undefined) { setResources(suppliedResources); return }
+    if (!accountId) return
+    let active = true
+    void api.commonActions.resources(accountId, undefined, 'tag.added').then((res) => {
+      if (active && res.success) setResources(res.data)
+    })
+    return () => { active = false }
+  }, [accountId, suppliedResources])
+
+  useEffect(() => { setResourceId('') }, [selected])
+
+  const add = () => {
+    const delayMinutes = timing === 'immediate' ? 0 : Math.max(1, Number(delay) || 1) * (delayUnit === 'minutes' ? 1 : delayUnit === 'hours' ? 60 : 1440)
+    const params: Record<string, unknown> = { delayMinutes, cancelIfTagRemoved: true }
+    if (selected[0] === 'テキスト送信') params.content = message.trim()
+    else if (selected[0] === 'マイル付与') params.amount = Math.max(1, Number(amount) || 1)
+    else if (definition.paramKey) params[definition.paramKey] = resourceId
+    if (selected[0] === '担当者通知') params.message = message.trim()
+    const resourceName = choices.find((item) => item.id === resourceId)?.name
+    const label = selected[0] === 'テキスト送信' ? message.trim()
+      : selected[0] === 'マイル付与' ? `${Math.max(1, Number(amount) || 1)} mile`
+        : resourceName ?? selected[0]
+    onAdd({ id: crypto.randomUUID(), type: selected[1], label, timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後`, definition: { id: crypto.randomUUID(), type: definition.actionType, params, onFailure: 'stop' } })
+  }
 
   return (
     <Drawer
@@ -119,8 +203,9 @@ function ActionDrawer({ onClose, onAdd, referenceState = false }: { onClose: () 
           <button type="button" onClick={onClose} className="rounded-control border border-hairline px-5 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
           <button
             type="button"
-            onClick={() => onAdd({ id: crypto.randomUUID(), type: selected[1], label: selected[0] === 'テキスト送信' ? message : selected[0], timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後` })}
-            className="rounded-control bg-accent px-5 py-2.5 text-sm font-bold text-on-accent hover:bg-accent-hover"
+            disabled={unavailable || (needsResource && !resourceId) || ((selected[0] === 'テキスト送信' || selected[0] === '担当者通知') && !message.trim())}
+            onClick={add}
+            className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-bold text-on-accent hover:brightness-92"
           >
             このアクションを追加
           </button>
@@ -134,8 +219,9 @@ function ActionDrawer({ onClose, onAdd, referenceState = false }: { onClose: () 
                 <button
                   key={action[0]}
                   type="button"
+                  disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))}
                   onClick={() => setSelected(action)}
-                  className={`rounded-control border px-3 py-3 text-left text-sm font-medium ${selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}
+                  className={`rounded-control border px-3 py-3 text-left text-sm font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}
                 >
                   {action[0]}
                 </button>
@@ -145,29 +231,34 @@ function ActionDrawer({ onClose, onAdd, referenceState = false }: { onClose: () 
 
           <section className="mt-7 border-t border-hairline pt-6">
             <h3 className="mb-3 text-sm font-bold text-ink">2. 実行するタイミング</h3>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <label className={`rounded-control border p-3 ${timing === 'immediate' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-                <input type="radio" name="timing" checked={timing === 'immediate'} onChange={() => setTiming('immediate')} className="mr-2 accent-accent" />
-                <span className="text-sm font-medium">すぐに実行</span>
-              </label>
-              <label className={`rounded-control border p-3 ${timing === 'delay' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-                <input type="radio" name="timing" checked={timing === 'delay'} onChange={() => setTiming('delay')} className="mr-2 accent-accent" />
-                <span className="text-sm font-medium">時間をあけて実行</span>
-              </label>
-            </div>
+            <RadioCardGroup legend="実行するタイミング" className="grid gap-2 sm:grid-cols-2">
+              <RadioCard name="timing" value="immediate" checked={timing === 'immediate'} onChange={() => setTiming('immediate')} title="すぐに実行" />
+              <RadioCard name="timing" value="delay" checked={timing === 'delay'} onChange={() => setTiming('delay')} title="時間をあけて実行" />
+            </RadioCardGroup>
               <div className={`mt-3 flex items-center gap-2 ${timing === 'immediate' ? 'opacity-55' : ''}`}>
                 <input type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} />
-                <select value={delayUnit} onChange={(event) => setDelayUnit(event.target.value as typeof delayUnit)} className={`${inputClass} max-w-32`}><option value="minutes">分後</option><option value="hours">時間後</option><option value="days">日後</option></select>
+                <Select
+                  aria-label="遅延の単位"
+                  value={delayUnit}
+                  onChange={(value) => setDelayUnit(value as typeof delayUnit)}
+                  options={[
+                    { value: 'minutes', label: '分後' },
+                    { value: 'hours', label: '時間後' },
+                    { value: 'days', label: '日後' },
+                  ]}
+                />
               </div>
             <p className="mt-2 text-xs leading-5 text-ink-faint">待機を挟むと、その時間が経ってから実行されます。待機中にタグが外れた場合は実行されません。</p>
           </section>
 
           <section className="mt-7 border-t border-hairline pt-6">
             <h3 className="mb-3 text-sm font-bold text-ink">3. {selected[0]}の内容</h3>
-            {selected[0] === 'テキスト送信' ? (
+            {selected[0] === 'テキスト送信' || selected[0] === '担当者通知' ? (
               <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={6} className={inputClass} />
+            ) : selected[0] === 'マイル付与' ? (
+              <input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} aria-label="付与マイル" />
             ) : (
-              <><select className={inputClass} defaultValue="sample"><option value="sample">{referenceState && selected[0] === 'テンプレート送信' ? '定期便スタートガイド' : `${selected[1]}を選択`}</option></select>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />画像1枚＋テキスト「定期便のご利用ありがとうございます。次回お届けは…」＋ボタン2つ</div>}</>
+              <><Combobox aria-label={`${selected[0]}に使う内容を選択`} placeholder={unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'} value={resourceId} onChange={setResourceId} disabled={unavailable || !resources} loading={!unavailable && !resources} options={choices.map((choice) => ({ value: choice.id, label: choice.name }))} className="w-full" />{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
             )}
             <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">
               <span className="font-semibold">実行内容の確認：</span> {selected[0]}を{timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後に`}実行します。
@@ -176,38 +267,97 @@ function ActionDrawer({ onClose, onAdd, referenceState = false }: { onClose: () 
 
           <section className="mt-7 border-t border-hairline pt-6">
             <label className="mb-1 block text-sm font-semibold text-ink">4. 追加する位置</label>
-            <select className={inputClass}><option>いちばん最後に追加</option><option>選択中のアクションの前</option></select>
+            <Select
+              aria-label="追加する位置"
+              value={position}
+              onChange={setPosition}
+              options={[
+                { value: 'last', label: 'いちばん最後に追加' },
+                { value: 'before', label: '選択中のアクションの前' },
+              ]}
+              size="full"
+            />
           </section>
     </Drawer>
   )
 }
 
-function RetroactiveDialog({ values, count, onCancel, onSave, referenceState = false }: { values: TagEditorValues; count: number; onCancel: () => void; onSave: () => void; referenceState?: boolean }) {
+/**
+ * 遡及実行の確認窓（N-047）。
+ *
+ * 人数・合計マイルはサーバーが数えたもの（/retroactive-preview）を出す。
+ * 画面で勝手に数えた値を見せると、実際に付与される対象と食い違う。
+ * 確認ボタンはサーバーの計算が返ってくるまで押せない。実行時は
+ * previewToken を保存APIへ渡し、サーバー側で対象の再計算と照合する。
+ */
+function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
   const [accepted, setAccepted] = useState(referenceState)
-  const referralTargets = Math.min(count, 34)
-  const rewardTotal = count * values.rewardMiles
-  const referralTotal = referralTargets * values.referralRewardMiles
+  const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
+  const [previewError, setPreviewError] = useState('')
+  // alertdialog にも共通の約束を合わせる: Escapeで戻る・Tabは窓の中・
+  // 閉じたら起点へ戻す・背面はスクロールしない。
+  const panelRef = useOverlayFocus(true, onCancel)
+
+  const fetchPreview = () => {
+    if (!tagId || !accountId) return
+    setPreviewError('')
+    void api.tags.retroactivePreview(tagId, accountId, {
+      self: values.rewardMiles,
+      referrer: values.referralRewardMiles,
+    }).then((res) => {
+      if (res.success) setPreview(res.data)
+      else setPreviewError(res.error || '対象を再計算できませんでした')
+    }).catch(() => setPreviewError('対象を再計算できませんでした'))
+  }
+
+  useEffect(() => {
+    // 固定表示（visual-qa）はAPIを呼ばず、設計確認用の固定数を出す。
+    if (referenceState) return
+    fetchPreview()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [referenceState, tagId, accountId, values.rewardMiles, values.referralRewardMiles])
+
+  const loading = !referenceState && !preview && !previewError
+  const selfTargets = preview ? preview.selfTargets : count
+  const referralTargets = preview ? preview.referralTargets : Math.min(count, 34)
+  const rewardTotal = preview ? preview.selfMiles : selfTargets * values.rewardMiles
+  const referralTotal = preview ? preview.referralMiles : referralTargets * values.referralRewardMiles
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4">
-      <section className="w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
-        <h2 className="text-xl font-bold text-ink">{count + referralTargets}人にさかのぼってマイルを積みますか？</h2>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">保存と同時に、すでにこのタグが付いている人へ未反映分を積みます。</p>
-        <div className="mt-5 overflow-hidden rounded-control border border-hairline">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4">
+      <section ref={panelRef} className="relative w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="tag-retroactive-title">
+        <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+          <X aria-hidden="true" className="h-5 w-5" />
+        </button>
+        <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true">
+          <Coins size={21} strokeWidth={2} />
+        </span>
+        <h2 id="tag-retroactive-title" className="text-xl font-bold text-ink">{selfTargets + referralTargets}人にさかのぼってマイルを積みますか？</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">「{values.name || 'このタグ'}」の変更を、いまこのタグが付いている人にも適用します。人数はサーバーで再計算した値です。</p>
+        <div className="mt-4 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">
-            <div className="grid grid-cols-[1fr_150px_140px] bg-canvas-sunken px-4 py-2 text-xs font-semibold text-ink-faint"><dt>対象</dt><dd>計算</dd><dd className="text-right">付与予定</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] px-4 py-3"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {count}人</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] px-4 py-3"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] bg-success-bg/40 px-4 py-3 font-bold"><dt>合計</dt><dd>{count + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] px-4 py-3"><dt>倍率 {values.multiplierBps ? `${values.multiplierBps / 10000}倍` : 'なし'}</dt><dd>さかのぼりません</dd><dd className="text-right">次回付与から</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] px-4 py-3"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {selfTargets}人{preview && preview.selfExcluded > 0 ? `（付与済み${preview.selfExcluded}人を除く）` : ''}</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人{preview && preview.referralExcluded > 0 ? `（付与済み${preview.referralExcluded}人を除く）` : ''}</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] bg-success-bg/40 px-4 py-2.5 font-bold"><dt>合計</dt><dd>{selfTargets + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>倍率 {values.multiplierBps ? `${values.multiplierBps / 10000}倍` : 'なし'}</dt><dd>さかのぼりません</dd><dd className="text-right">次回付与から</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
           </dl>
         </div>
-        <p className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm font-medium leading-6 text-danger">一度積んだマイルは、この画面から元に戻せません。人数と設定値を確認してください。</p>
-        <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 accent-accent" />内容を確認し、既存の友だちへ反映することを了承しました</label>
-        <div className="mt-6 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存</button>
-          <button type="button" disabled={!accepted} onClick={onSave} className="rounded-control bg-accent px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">さかのぼって反映して保存</button>
+        <div className="mt-3 rounded-control border border-danger/25 bg-danger-bg p-3 text-xs leading-5 text-danger">
+          <p className="font-bold">この操作は取り消せません</p>
+          <p>さかのぼって積んだマイルは自動では戻せません。取り消すにはマイル画面から手動で調整が必要です。</p>
         </div>
+        {previewError && (
+          <p role="alert" className="mt-3 rounded-control border border-danger/25 bg-danger-bg p-3 text-xs leading-5 text-danger">
+            {previewError}
+            <button type="button" onClick={fetchPreview} className="ml-2 font-semibold underline">再計算する</button>
+          </p>
+        )}
+        <Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox>
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存</button>
+          <button type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{loading ? '対象を計算中…' : 'さかのぼって反映して保存'}</button>
+        </div>
+        <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>
       </section>
     </div>
   )
@@ -217,6 +367,7 @@ export default function TagEditorV4({
   mode,
   groups,
   tag,
+  accountId = null,
   initialLinked = false,
   initialDrawerOpen = false,
   initialApplyToExisting = false,
@@ -230,10 +381,14 @@ export default function TagEditorV4({
   onCancel,
   onSave,
   onDelete,
+  embedded = false,
+  resources,
+  allowedActionTypes,
 }: {
   mode: 'create' | 'edit'
   groups: TagGroup[]
   tag?: Tag | null
+  accountId?: string | null
   initialLinked?: boolean
   initialDrawerOpen?: boolean
   initialApplyToExisting?: boolean
@@ -245,10 +400,19 @@ export default function TagEditorV4({
   error?: string
   notice?: string
   onCancel: () => void
-  onSave: (values: TagEditorValues, andAnother: boolean, applyRetroactive: boolean) => Promise<void>
+  onSave: (values: TagEditorValues, andAnother: boolean, applyRetroactive: boolean, previewToken?: string) => Promise<void>
   onDelete?: () => void
+  /** Hide store breadcrumbs/actions when the canonical editor is embedded in HQ. */
+  embedded?: boolean
+  /** HQ may supply a deliberately portable resource catalogue. */
+  resources?: CommonActionResources | null
+  allowedActionTypes?: readonly TagEditorActionLabel[]
 }) {
   usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')
+  // 親から渡る保存の知らせは、画面の中の文で出さず Toast（右下・4秒）へ送る。
+  useEffect(() => {
+    if (notice) notifyToast(notice)
+  }, [notice])
   const [name, setName] = useState(initialValues?.name ?? tag?.name ?? '')
   const [groupId, setGroupId] = useState(initialValues?.groupId ?? tag?.groupId ?? '')
   const [isStarred, setIsStarred] = useState(initialValues?.isStarred ?? tag?.isStarred ?? false)
@@ -260,11 +424,30 @@ export default function TagEditorV4({
   const [multiplier, setMultiplier] = useState(initialMultiplier == null ? '' : String(initialMultiplier))
   const [priority, setPriority] = useState(String(initialValues?.multiplierPriority ?? tag?.mileageMultiplierPriority ?? 0))
   const [applyToExisting, setApplyToExisting] = useState(initialValues?.applyToExisting ?? initialApplyToExisting)
-  const [reapplyMode, setReapplyMode] = useState<'once' | 'every'>('once')
+  const [reapplyMode, setReapplyMode] = useState<'once' | 'every'>((initialValues?.reapplyPolicy ?? tag?.reapplyPolicy) === 'every_time' ? 'every' : 'once')
   // マイル設定から連動アクションを推測しない。保存先が別なので、取得できた定義だけを出す。
-  const [actions, setActions] = useState<LinkedAction[]>(initialValues?.actions ?? [])
+  const [actions, setActions] = useState<LinkedAction[]>(initialValues?.actions ?? tag?.linkedActions ?? [])
   const [drawerOpen, setDrawerOpen] = useState(initialDrawerOpen)
   const [retroactiveOpen, setRetroactiveOpen] = useState(initialRetroactiveOpen)
+  /*
+   * IDEA-04: 同名のタグがすでにあるとき、保存する前に知らせる。
+   * 比べ方はサーバーの整理候補 `duplicate_name` と同じ正規化。
+   * 取れなかったときは注意を出さないだけ（保存自体は止めない）。
+   * HQ埋め込み（embedded）ではストアのタグ一覧を読まない。
+   */
+  const [siblingNames, setSiblingNames] = useState<Array<{ id: string; name: string }>>([])
+  useEffect(() => {
+    if (embedded || !accountId) return
+    let cancelled = false
+    void api.tags.list({ accountId })
+      .then((res) => { if (!cancelled && res.success) setSiblingNames(res.data.map((item) => ({ id: item.id, name: item.name }))) })
+      .catch(() => { /* 注意が出せないだけ。読み直しはしない */ })
+    return () => { cancelled = true }
+  }, [accountId, embedded])
+  const nameDuplicates = useMemo(
+    () => findDuplicateNames(siblingNames, name, tag?.id ?? null),
+    [siblingNames, name, tag?.id],
+  )
 
   const previewColor = groups.find((group) => group.id === groupId)?.color ?? '#3b82f6'
   const groupName = groups.find((group) => group.id === groupId)?.name ?? '未分類'
@@ -275,8 +458,27 @@ export default function TagEditorV4({
     multiplierBps: linked && multiplier ? Number(multiplier) : null,
     multiplierPriority: linked ? Number(priority) || 0 : 0,
     applyToExisting,
+    reapplyPolicy: reapplyMode === 'every' ? 'every_time' : 'first_only',
     actions: linked ? actions : [],
-  }), [name, groupId, isStarred, linked, reward, referralReward, multiplier, priority, applyToExisting, actions])
+  }), [name, groupId, isStarred, linked, reward, referralReward, multiplier, priority, applyToExisting, reapplyMode, actions])
+
+  /*
+   * N-047: 「いま付いている人への反映」の人数はサーバー側の事前計算で
+   * 出す。入力中のマイルで debounce しつつ数え直す。失敗しても保存は
+   * 止めない——実行前の確認窓で必ずもう一度計算する。
+   */
+  const [retroPreview, setRetroPreview] = useState<TagRetroactivePreview | null>(null)
+  useEffect(() => {
+    if (referenceRetroactiveState) return
+    if (mode !== 'edit' || !tag?.id || !accountId) { setRetroPreview(null); return }
+    const timer = setTimeout(() => {
+      void api.tags.retroactivePreview(tag.id, accountId, {
+        self: values.rewardMiles,
+        referrer: values.referralRewardMiles,
+      }).then((res) => { if (res.success) setRetroPreview(res.data) }).catch(() => {})
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [mode, tag?.id, accountId, values.rewardMiles, values.referralRewardMiles, referenceRetroactiveState])
 
   const requestSave = (andAnother: boolean) => {
     if (mode === 'edit' && applyToExisting && (tag?.friendCount ?? 0) > 0 && (values.rewardMiles > 0 || values.referralRewardMiles > 0)) {
@@ -287,7 +489,8 @@ export default function TagEditorV4({
   }
 
   const duplicateAction = (action: LinkedAction, index: number) => {
-    const copy = { ...action, id: crypto.randomUUID() }
+    const id = crypto.randomUUID()
+    const copy = { ...action, id, definition: action.definition ? { ...action.definition, id } : undefined }
     setActions((current) => [
       ...current.slice(0, index + 1),
       copy,
@@ -295,35 +498,59 @@ export default function TagEditorV4({
     ])
   }
 
-  return (
-    <div className="pb-24">
-      <nav className="mb-5 text-xs text-ink-faint"><Link href="/tags" className="text-action hover:underline">友だち属性</Link><span className="mx-2">›</span>{mode === 'create' ? 'タグを作る' : 'タグを編集'}</nav>
+  /*
+   * #670 28: つまみ(⋮⋮)のドラッグはマウス専用のため、キーボードだけでは
+   * 順番を変えられなかった。各行に「上へ」「下へ」を付けて同じ move で動かす。
+   */
+  const moveAction = (index: number, direction: -1 | 1) => {
+    setActions((current) => {
+      const next = index + direction
+      if (next < 0 || next >= current.length) return current
+      const reordered = [...current]
+      const [moved] = reordered.splice(index, 1)
+      reordered.splice(next, 0, moved)
+      return reordered
+    })
+  }
+  const [dragActionId, setDragActionId] = useState<string | null>(null)
 
-      {error && <Notice className="mb-4" tone="error" message={error} />}
-      {notice && <Notice className="mb-4" tone="success" message={notice} />}
+  return (
+    <div>
+      {!embedded && <div className="mb-5">
+        <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
+      </div>}
+
+      {error && <Notice className="mb-4" tone="danger" message={error} />}
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_470px]">
-        <main className="min-w-0 space-y-4">
+        <section className="min-w-0 space-y-4">
           <section className={cardClass}>
             <StepTitle number={1} title="どのタグか" />
+            {/*
+              R137: グリッドの子（欄）にも `min-w-0` を付ける。無いと中身の
+              最小幅が段の最小幅になり、390pxで所属フォルダとタグ名の欄の
+              右端が表示領域の外へ出る。
+            */}
             <div className="grid gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
-              <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">所属フォルダ</span><select value={groupId} onChange={(event) => setGroupId(event.target.value)} className={inputClass}><option value="">未分類</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
-              <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <span className="rounded bg-danger-bg px-1.5 py-0.5 text-[10px] text-danger">必須</span></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /></label>
+              <label className="min-w-0"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">所属フォルダ</span><Select aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]} size="full" /></label>
+              <label className="min-w-0"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <RequiredBadge /></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /><DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></label>
             </div>
             <p className="mt-3 text-xs leading-5 text-ink-faint">どの分類に入れるかを選びます。未選択なら「未分類」になります。フォルダの色がタグの印になります。</p>
-            <label className="mt-4 flex items-start gap-3"><input type="checkbox" checked={isStarred} onChange={(event) => setIsStarred(event.target.checked)} className="mt-1 accent-accent" /><span className="text-sm font-medium text-ink">友だち一覧に表示する（★）<span className="mt-0.5 block text-xs font-normal text-ink-faint">このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。</span></span></label>
+            {/* IDEA-04: 「タグ」を選んだ理由と、値を持たせるなら情報欄・対応状態なら対応マークという違いを、作る場所で確認できるようにする。 */}
+            <div className="mt-4"><AttributeKindGuide current="tag" /></div>
+            <Checkbox className="mt-4" checked={isStarred} onCheckedChange={setIsStarred} description="このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。">友だち一覧に表示する（★）</Checkbox>
           </section>
 
           <section className={cardClass}>
             <StepTitle number={2} title="自動で付ける条件" note="指定しない場合は、手動でのみ付けられます。" />
             <div className="rounded-control border border-hairline bg-canvas-sunken p-4">
               <p className="text-sm font-semibold text-ink">手動でのみ付ける</p>
-              <p className="mt-1 text-xs leading-5 text-ink-secondary">一覧やチャットから手で付けます。きっかけで付けたい場合は <Link href="/form-submissions" className="text-action hover:underline">回答フォーム</Link> か <Link href="/automations" className="text-action hover:underline">オートメーション</Link> の設定から指定してください。</p>
+              <p className="mt-1 text-xs leading-5 text-ink-secondary">一覧やチャットから手で付けます。きっかけで付けたい場合は <Link href="/form-submissions" className="text-action underline">回答フォーム</Link> か <Link href="/automations" className="text-action underline">オートメーション</Link> の設定から指定してください。</p>
             </div>
           </section>
 
           <section className={cardClass}>
-            <div className="flex items-start justify-between gap-4"><StepTitle number={3} title="タグが付いたときの連動" note="このタグが付いた瞬間に動かす処理をまとめて決めます。" /><div className="flex items-center gap-2"><span className={`text-xs font-bold ${linked ? 'text-accent' : 'text-ink-faint'}`}>{linked ? 'ON' : 'OFF'}</span><Toggle checked={linked} onChange={setLinked} label="タグ連動" /></div></div>
+            <div className="flex items-start justify-between gap-4"><StepTitle number={3} title="タグが付いたときの連動" note="このタグが付いた瞬間に動かす処理をまとめて決めます。" /><div className="flex items-center gap-2"><span className={`text-xs font-bold ${linked ? 'text-accent-deep' : 'text-ink-faint'}`}>{linked ? 'ON' : 'OFF'}</span><Toggle checked={linked} onChange={setLinked} label="タグ連動" /></div></div>
             {!linked ? (
               <div className="rounded-control border border-hairline bg-canvas-sunken p-4">
                 <p className="text-sm font-semibold text-ink">ONにすると、ここで次の設定ができます</p>
@@ -341,32 +568,32 @@ export default function TagEditorV4({
                 </ul>
               </div>
             ) : (
-              <div className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-5 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
-                  <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-5 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
-                  <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><select value={multiplier} onChange={(event) => setMultiplier(event.target.value)} className={inputClass}>{MULTIPLIERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span className="mt-1 block text-[11px] leading-5 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
-                  <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><select value={priority} onChange={(event) => setPriority(event.target.value)} className={inputClass}>{[0,1,2,3,4,5].map((value) => <option key={value} value={value}>{value === 0 ? '標準' : `優先度 ${value}`}</option>)}</select><span className="mt-1 block text-[11px] leading-5 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
+              <div className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {/* R137: 390pxで右へはみ出さないよう子の欄も縮める。 */}
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-4 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" /><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" /><span className="mt-1 block text-[11px] leading-4 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
                 </div>
-                <fieldset className="rounded-control border border-hairline bg-canvas-sunken p-4">
-                  <legend className="px-1 text-xs font-semibold text-ink-secondary">タグを外して付け直したときの扱い</legend>
-                  <label className="mt-2 flex items-start gap-2 text-sm text-ink"><input type="radio" name="reapplyMode" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} className="mt-1 accent-accent" /><span>最初の1回だけ積む<span className="block text-xs font-normal leading-5 text-ink-faint">誤操作や付け直しで、同じマイルが重複しません。</span></span></label>
-                  <label className="mt-3 flex items-start gap-2 text-sm text-ink"><input type="radio" name="reapplyMode" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} className="mt-1 accent-accent" /><span>付け直すたびに積む<span className="block text-xs font-normal leading-5 text-ink-faint">購入回数など、同じタグを繰り返し使う運用向けです。</span></span></label>
-                </fieldset>
-                <div className="border-t border-hairline pt-5">
-                  <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-medium text-action">＋ アクションを追加</button></div>
-                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <ol className="space-y-2">{actions.map((action, index) => <li key={action.id} className="grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm"><span className="cursor-grab text-ink-faint">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-canvas-sunken text-xs font-bold">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ' || action.type === 'マイル' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報' || action.type === '対応' || action.type === 'リマインダ' ? 'border-warning bg-warning-bg text-warning' : action.type === 'シナリオ' || action.type === 'リッチメニュー' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol>}
+                <RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
+                  <RadioCard name="reapplyMode" value="once" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} title="最初の1回だけ積む" note="誤操作や付け直しで、同じマイルが重複しません。" />
+                  <RadioCard name="reapplyMode" value="every" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} title="付け直すたびに積む" note="購入回数など、同じタグを繰り返し使う運用向けです。" />
+                </RadioCardGroup>
+                <div className="border-t border-hairline pt-3">
+                  <div className="mb-2 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで動かすか、↑↓ボタンで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-medium text-action">＋ アクションを追加</button></div>
+                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <div className="overflow-x-auto pb-1"><ol className="space-y-2">{actions.map((action, index) => <li key={action.id} draggable onDragStart={() => setDragActionId(action.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => { const fromId = dragActionId; setDragActionId(null); if (!fromId || fromId === action.id) return; setActions((current) => { const from = current.findIndex((item) => item.id === fromId); if (from < 0) return current; const reordered = current.filter((item) => item.id !== fromId); reordered.splice(Math.min(index, reordered.length), 0, current[from]); return reordered }) }} onDragEnd={() => setDragActionId(null)} className={`grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2 text-sm ${dragActionId === action.id ? 'opacity-50' : ''}`}><span className="cursor-grab text-ink-faint" title="ドラッグで順番を変更">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-canvas-sunken text-xs font-bold">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => moveAction(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目のアクションを上へ`} title="上へ"><ArrowUp size={15} aria-hidden /></IconButton><IconButton onClick={() => moveAction(index, 1)} disabled={index === actions.length - 1} aria-label={`${index + 1}番目のアクションを下へ`} title="下へ"><ArrowDown size={15} aria-hidden /></IconButton><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol></div>}
                 </div>
               </div>
             )}
-            <p className="mt-4 text-xs leading-5 text-ink-faint">OFFのままでも、タグの手動付与・配信の絞り込み・シナリオ条件には使えます。</p>
+            <p className="mt-2 text-xs leading-4 text-ink-faint">OFFのままでも、タグの手動付与・配信の絞り込み・シナリオ条件には使えます。</p>
             {/*
               **戻したときに何が戻らないかを言う。** OFFにすれば元通りだと
               読めてしまうが、すでに積んだマイルは戻らない（設計 `ee0sk`）。
               編集のときだけ出す——新規作成にはまだ積んだものが無い。
             */}
             {mode === 'edit' && linked ? (
-              <p className="mt-2 text-xs leading-5 text-ink-faint">
+              <p className="mt-1 text-xs leading-4 text-ink-faint">
                 OFFに戻すと、これ以降このタグが付いても連動は動きません。
                 すでに積んだマイルは取り消されません。
               </p>
@@ -376,15 +603,28 @@ export default function TagEditorV4({
           {mode === 'edit' && (
             <section className={cardClass}>
               <div className="flex items-start justify-between gap-4"><StepTitle number={4} title="すでに付いている人への反映" note="既存の友だちにも、今回のマイル設定をさかのぼって反映できます。" /><Toggle checked={applyToExisting} onChange={setApplyToExisting} label="遡及反映" /></div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">現在の対象者</p><p className="mt-1 text-xl font-bold">{tag?.friendCount ?? 0}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">本人マイル対象</p><p className="mt-1 text-xl font-bold">{tag?.friendCount ?? 0}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">紹介者対象</p><p className="mt-1 text-xl font-bold">{Math.min(tag?.friendCount ?? 0, 34)}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">倍率</p><p className="mt-1 text-sm font-bold">次回付与から</p></div></div>
+              {/* N-047: 対象人数はサーバーの事前計算。未計算の間は「—」で誤読させない（固定表示=visual-qaは従来の数）。 */}
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">現在の対象者</p><p className="mt-1 text-xl font-bold">{tag?.friendCount ?? 0}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">本人マイル対象</p><p className="mt-1 text-xl font-bold">{retroPreview ? retroPreview.selfTargets : referenceRetroactiveState ? (tag?.friendCount ?? 0) : '—'}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">紹介者対象</p><p className="mt-1 text-xl font-bold">{retroPreview ? retroPreview.referralTargets : referenceRetroactiveState ? Math.min(tag?.friendCount ?? 0, 34) : '—'}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">倍率</p><p className="mt-1 text-sm font-bold">次回付与から</p></div></div>
+              {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) && (
+                <p className="mt-3 text-xs leading-5 text-ink-faint">すでに付与済みの人（本人{retroPreview.selfExcluded}人・紹介者{retroPreview.referralExcluded}人）は対象から外れています。</p>
+              )}
               {applyToExisting && <p className="mt-4 rounded-control border border-warning/30 bg-warning-bg p-3 text-xs leading-5 text-warning">保存すると確認画面が開きます。確認を完了するまで既存の友だちへは反映されません。</p>}
             </section>
           )}
-        </main>
+        </section>
 
-        <aside className="space-y-4">
-          <section className={cardClass}><h2 className="text-sm font-bold text-ink">できあがるタグ</h2><div className="mt-4 flex items-center gap-2"><span className="inline-flex items-center gap-2 rounded-pill border border-hairline px-3 py-1.5 text-sm font-medium"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: previewColor }} />{name || 'タグ名'}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs text-ink-faint">{groupName}</span></div><p className="mt-4 text-xs leading-5 text-ink-secondary">このタグは、配信の絞り込み・シナリオの開始条件・自動応答の付与先として使えます。</p>{linked && <div className="mt-4 border-t border-hairline pt-4"><h3 className="text-xs font-bold text-ink">連動の要約</h3><dl className="mt-2 space-y-2 text-xs text-ink-secondary"><div className="flex justify-between"><dt>本人</dt><dd className="font-semibold">+{values.rewardMiles} mile</dd></div><div className="flex justify-between"><dt>紹介者</dt><dd className="font-semibold">+{values.referralRewardMiles} mile</dd></div><div className="flex justify-between"><dt>今後の獲得マイル</dt><dd className="font-semibold">{values.multiplierBps ? `${values.multiplierBps / 10000}倍（優先度${values.multiplierPriority}）` : '変更なし'}</dd></div><div className="flex justify-between"><dt>アクション</dt><dd className="font-semibold">{actions.length}件</dd></div></dl></div>}</section>
-          <section className={cardClass}><h2 className="text-sm font-bold text-ink">{mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'}</h2><ol className="mt-4 space-y-3 text-xs leading-5 text-ink-secondary"><li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-canvas-sunken font-bold">1</span>一覧・チャット・CSVから、このタグを手で付けられます。</li><li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-canvas-sunken font-bold">2</span>{linked ? `本人に${values.rewardMiles} mile、紹介者に${values.referralRewardMiles} mileを付与します。` : '連動はOFFなので、付いてもマイル付与やメッセージ送信は動きません。'}</li><li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-canvas-sunken font-bold">3</span>{actions.length > 0 ? `${actions.length}件の連動アクションを上から順に実行します。` : '配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます。'}</li></ol></section>
+        {/* R137: 長いタグ名で右欄が広がらないよう縮め、印の名前は省略と全文確認にする。 */}
+        <aside className="min-w-0 space-y-4">
+          <section className={cardClass}><h2 className="text-sm font-bold text-ink">できあがるタグ</h2><div className="mt-4 flex min-w-0 items-center gap-2"><span className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-pill border border-hairline px-3 py-1.5 text-sm font-medium"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: previewColor }} /><span className="min-w-0 flex-1 truncate" title={name || undefined}>{name || 'タグ名'}</span></span><span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-1 text-xs text-ink-faint">{groupName}</span></div><p className="mt-4 text-xs leading-5 text-ink-secondary">このタグは、配信の絞り込み・シナリオの開始条件・自動応答の付与先として使えます。</p>{linked && <div className="mt-4 border-t border-hairline pt-4"><h3 className="text-xs font-bold text-ink">連動の要約</h3><dl className="mt-2 space-y-2 text-xs text-ink-secondary"><div className="flex justify-between"><dt>本人</dt><dd className="font-semibold">+{values.rewardMiles} mile</dd></div><div className="flex justify-between"><dt>紹介者</dt><dd className="font-semibold">+{values.referralRewardMiles} mile</dd></div><div className="flex justify-between"><dt>今後の獲得マイル</dt><dd className="font-semibold">{values.multiplierBps ? `${values.multiplierBps / 10000}倍（優先度${values.multiplierPriority}）` : '変更なし'}</dd></div><div className="flex justify-between"><dt>アクション</dt><dd className="font-semibold">{actions.length}件</dd></div></dl></div>}</section>
+          <section className={cardClass}>
+            <h2 className="text-sm font-bold text-ink">{mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'}</h2>
+            <ol className="mt-4 space-y-3 text-xs leading-5 text-ink-secondary">
+              <li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-canvas-sunken font-bold">1</span>{mode === 'edit' ? `これから付く人には、本人へ${values.rewardMiles} mile・紹介者へ${values.referralRewardMiles} mileが積まれます。` : '一覧・チャット・CSVから、このタグを手で付けられます。'}</li>
+              <li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-canvas-sunken font-bold">2</span>{mode === 'edit' ? `いま付いている${tag?.friendCount ?? 0}人には、確認後に本人マイルだけをさかのぼって積みます。` : linked ? `付いた瞬間に、本人へ${values.rewardMiles} mile、紹介者へ${values.referralRewardMiles} mileを積みます。` : '連動はOFFなので、付いてもマイル付与やメッセージ送信は動きません。'}</li>
+              <li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-canvas-sunken font-bold">3</span>{values.multiplierBps ? `今後の獲得マイルは${values.multiplierBps / 10000}倍になります（優先度${values.multiplierPriority}）。` : '今後の獲得マイルは変わりません。'}</li>
+              <li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-canvas-sunken font-bold">4</span>{actions.length > 0 ? `${actions.length}件の連動アクションを上から順に実行します${mode === 'edit' ? '。過去分は送りません。' : '。'}` : '配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます。'}</li>
+            </ol>
+          </section>
           {mode === 'edit' ? (
             <section className="rounded-card border border-warning/40 bg-warning-bg p-5"><h2 className="text-sm font-bold text-warning">取り消せない操作です</h2><p className="mt-2 text-xs leading-5 text-warning">{applyToExisting ? '遡及反映を実行すると、既存の友だちへのマイル付与やメッセージ送信は自動で取り消されません。保存後の確認画面で対象人数を確認してください。' : '保存すると、今後このタグが付いたときの動きが新しい設定へ切り替わります。既存の友だちには反映されません。'}</p></section>
           ) : (
@@ -394,22 +634,22 @@ export default function TagEditorV4({
       </div>
 
       <StickyBar
-        className="sticky bottom-0 z-30 mt-4"
+        className="sticky bottom-0 z-30"
         status={mode === 'edit' && onDelete ? (
           <button type="button" onClick={onDelete} className="rounded-control border border-danger/25 px-3 py-2 text-sm font-medium text-danger hover:bg-danger-bg">タグを削除</button>
         ) : 'まだ保存していません'}
         actions={(
           <>
             <Button onClick={onCancel}>キャンセル</Button>
-            {mode === 'edit' ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して新規作成</Button> : null}
+            {mode === 'edit' && !embedded ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して新規作成</Button> : null}
             {mode === 'create' ? <Button disabled={saving} onClick={() => requestSave(true)}>保存して続けて作る</Button> : null}
             <Button variant="primary" disabled={saving} onClick={() => requestSave(false)}>{saving ? '保存中…' : mode === 'create' ? 'タグを作る' : 'タグを保存'}</Button>
           </>
         )}
       />
 
-      {drawerOpen && <ActionDrawer referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
-      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={() => { setRetroactiveOpen(false); void onSave(values, false, true) }} />}
+      {drawerOpen && <ActionDrawer accountId={accountId} suppliedResources={resources} allowedActionTypes={allowedActionTypes} referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
+      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}
     </div>
   )
 }

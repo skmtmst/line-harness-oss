@@ -74,6 +74,58 @@ trafficPools.get('/api/traffic-pools', async (c) => {
   }
 });
 
+// GET /api/traffic-pools/accounts?ids=pool-1,pool-2 — list members in one request
+trafficPools.get('/api/traffic-pools/accounts', async (c) => {
+  try {
+    const ids = [...new Set((c.req.query('ids') ?? '').split(',').map((id) => id.trim()).filter(Boolean))];
+    if (ids.length === 0) {
+      return c.json({ success: false, error: 'ids is required' }, 400);
+    }
+    if (ids.length > 200) {
+      return c.json({ success: false, error: 'ids must contain at most 200 traffic pools' }, 400);
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const pools = await c.env.DB.prepare(
+      `SELECT id, active_account_id FROM traffic_pools WHERE id IN (${placeholders})`,
+    ).bind(...ids).all<{ id: string; active_account_id: string }>();
+    if (pools.results.length !== ids.length
+      || !await canAccessAllLineAccounts(
+        c.env.DB,
+        c.get('staff'),
+        pools.results.map((pool) => pool.active_account_id),
+      )) {
+      return c.json({ success: false, error: 'Traffic pool not found' }, 404);
+    }
+
+    const accounts = await c.env.DB.prepare(
+      `SELECT
+         pa.id, pa.pool_id, pa.line_account_id, pa.is_active, pa.created_at,
+         la.name AS account_name, la.liff_id,
+         NULL AS login_channel_id, NULL AS login_channel_secret,
+         NULL AS channel_access_token, NULL AS channel_access_token_encrypted,
+         NULL AS channel_id
+       FROM pool_accounts pa
+       JOIN line_accounts la ON la.id = pa.line_account_id
+       WHERE pa.pool_id IN (${placeholders})
+       ORDER BY pa.pool_id, pa.created_at, pa.id`,
+    ).bind(...ids).all<PoolAccountWithDetails>();
+
+    return c.json({
+      success: true,
+      data: ids.map((poolId) => ({
+        poolId,
+        accounts: accounts.results
+          .filter((account) => account.pool_id === poolId)
+          .map(serializePoolAccount),
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/traffic-pools/accounts error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // POST /api/traffic-pools — create
 trafficPools.post('/api/traffic-pools', requireRole('owner'), async (c) => {
   try {

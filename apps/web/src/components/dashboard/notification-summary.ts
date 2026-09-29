@@ -26,16 +26,18 @@ export function dashboardNotificationFilters(
   ]
 }
 
-function notificationTime(createdAt: string): string {
+export function notificationTime(createdAt: string): string {
   const time = new Date(createdAt)
   if (Number.isNaN(time.getTime())) return '日時不明'
-  return time.toLocaleString('ja-JP', {
-    month: 'numeric',
+  // 「9月2日 10:04」。月は long（9月）、日は numeric（2日）で出す。
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'long',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+    hourCycle: 'h23',
+  }).format(time)
 }
 
 export function dashboardNotificationItems(
@@ -54,10 +56,24 @@ export function dashboardNotificationItems(
 
 export function dashboardNotificationDestination(
   item: NotificationCenterItem,
-): string | null {
+): string {
   if (item.eventType.startsWith('account_health_')) return '/emergency'
-  if (item.eventType === 'release' || item.eventType.startsWith('deployment_')) return '/updates'
-  return null
+  // 二者承認の通知は配信の詳細へ（承認・差し戻しをその場でできる）。
+  if (item.eventType.startsWith('broadcast.approval')) {
+    const broadcastId = item.metadata && typeof item.metadata.broadcastId === 'string'
+      ? item.metadata.broadcastId
+      : null
+    return broadcastId ? `/broadcasts/detail?id=${encodeURIComponent(broadcastId)}` : '/broadcasts'
+  }
+  // 一斉配信(送信枠不足を含む)の通知は配信一覧へ。
+  if (item.eventType.startsWith('broadcast')) return '/broadcasts'
+  // マニュアル導線の切断は正本表へ。直す場所が押してすぐ分かるようにする。
+  if (item.eventType === 'manual_link_broken') return '/settings/manual-links'
+  /*
+    知らない種類はお知らせ一覧へ。行き先なし(null)にすると、
+    押したのに何も起きない(既読だけ付く)死に tap になる。
+  */
+  return '/updates'
 }
 
 export function markDashboardNotificationRead(

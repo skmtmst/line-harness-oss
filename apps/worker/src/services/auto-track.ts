@@ -76,6 +76,7 @@ async function createTrackingMap(
   linkBase: string,
   lineAccountId?: string | null,
   templateId?: string | null,
+  broadcastId?: string | null,
 ): Promise<Map<string, { trackingUrl: string; originalUrl: string; label: string }>> {
   // Lookups are independent per URL, so run them concurrently — a carousel
   // can hold 10+ URIs and sequential D1 round-trips add up inside per-friend
@@ -88,12 +89,20 @@ async function createTrackingMap(
         originalUrl: url,
         lineAccountId: lineAccountId ?? null,
         templateId: templateId ?? null,
+        dedupScope: broadcastId ? `broadcast:${broadcastId}` : null,
       });
       // /t/ URL — Worker handles LINE app detection and LIFF redirect server-side.
       // Prefer the short code (linkBase may be a branded short domain).
       const trackingUrl = `${linkBase}/t/${link.short_code ?? link.id}`;
       const hostname = new URL(url).hostname.replace('www.', '');
       const label = hostname.length > 20 ? hostname.slice(0, 20) + '…' : hostname;
+      if (broadcastId) {
+        await db.prepare(
+          `INSERT INTO broadcast_tracked_links (broadcast_id, tracked_link_id, label, created_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(broadcast_id, tracked_link_id) DO UPDATE SET label = excluded.label`,
+        ).bind(broadcastId, link.id, label, new Date().toISOString()).run();
+      }
       return [url, { trackingUrl, originalUrl: url, label }] as const;
     }),
   );
@@ -176,6 +185,8 @@ export interface AutoTrackOptions {
   lineAccountId?: string | null;
   /** この本文が属するテンプレート（110）。クリックをテンプレート単位で数えるため。 */
   templateId?: string | null;
+  /** 配信別に短縮URLとクリック数を分ける。 */
+  broadcastId?: string | null;
 }
 
 /**
@@ -262,7 +273,7 @@ export async function autoTrackContent(
     // (無駄な link_clicks レコード防止)。
     const trackable = new Set([...urls].filter((u) => !isAppLinkDomain(u)));
     const urlMap = trackable.size > 0
-      ? await createTrackingMap(db, trackable, linkBase, options?.lineAccountId, options?.templateId)
+      ? await createTrackingMap(db, trackable, linkBase, options?.lineAccountId, options?.templateId, options?.broadcastId)
       : new Map<string, { trackingUrl: string; originalUrl: string; label: string }>();
 
     let result = content;
@@ -301,7 +312,7 @@ export async function autoTrackContent(
     [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes)),
   );
   if (trackableUris.size === 0) return { messageType, content };
-  const uriMap = await createTrackingMap(db, trackableUris, linkBase, options?.lineAccountId, options?.templateId);
+  const uriMap = await createTrackingMap(db, trackableUris, linkBase, options?.lineAccountId, options?.templateId, options?.broadcastId);
   rewriteActionUris(tree, (u) => {
     const tracked = uriMap.get(u);
     if (!tracked) return u;

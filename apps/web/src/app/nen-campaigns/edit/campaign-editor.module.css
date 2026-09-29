@@ -1,0 +1,22 @@
+.editorGrid {
+  display: grid;
+  align-items: start;
+  gap: 16px;
+}
+
+.timingGrid {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .timingGrid {
+    grid-template-columns: minmax(0, 1.3fr) 120px 140px 220px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .editorGrid {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+}

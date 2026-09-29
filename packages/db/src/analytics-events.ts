@@ -22,10 +22,16 @@ const DIMENSION_KEYS: Partial<Record<AnalyticsEventType, readonly string[]>> = {
   conversion_rejected: ['conversionPointId'],
   automation_completed: ['automationId', 'status'],
   'ec.order.confirmed': ['status'],
+  'ec.order.payment_received': ['status'],
+  'ec.order.bank_transfer_reminder': ['status'],
   'ec.order.shipped': ['status'],
+  'ec.order.cancelled': ['status'],
+  'ec.order.refunded': ['status'],
   'ec.subscription.upcoming': ['status'],
   'ec.subscription.payment_failed': ['status'],
+  'ec.subscription.card_updated': ['status'],
   'ec.subscription.cancelled': ['status'],
+  'ec.customer.profile_updated': ['status'],
 };
 
 export interface AnalyticsEvent {

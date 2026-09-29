@@ -73,7 +73,7 @@ export async function copyLineAccountSettings(
   }
 
   if (items.includes('autoReplies')) {
-    for (const row of await rows(db, 'SELECT * FROM auto_replies WHERE line_account_id = ?', sourceAccountId)) {
+    for (const row of await rows(db, 'SELECT * FROM auto_replies WHERE line_account_id = ? AND deleted_at IS NULL', sourceAccountId)) {
       statements.push(insertStatement(db, 'auto_replies', {
         ...row,
         id: crypto.randomUUID(),

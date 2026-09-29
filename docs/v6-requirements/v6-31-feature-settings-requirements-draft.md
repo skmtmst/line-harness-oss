@@ -215,7 +215,7 @@ V6の「34項目表示」は固定文言にせず、現在のカタログと有�
 ## 11. 権限と監査
 
 - 閲覧: owner/admin
-- 変更: owner/adminのうち`feature_settings.edit`
+- 変更: owner/adminのうち`settings.feature.edit`（命名は共通基盤 §3の`domain.resource.action`）
 - 契約変更: この画面では不可
 - 試験機能: 運営側entitlementも必要
 - 緊急停止: 運用状態の専用権限
@@ -263,7 +263,9 @@ V6の「34項目表示」は固定文言にせず、現在のカタログと有�
 
 ## 15. 完了条件
 
-- V6 2画面の操作と状態が実装される
+- V6 2画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 1440px・1920pxで横スクロールなし
 - required、entitlement、company setting、user permission、operations stateが分離される
 - オフ前に依存と稼働中件数を確認し、危険な変更を拒否する
@@ -275,7 +277,7 @@ V6の「34項目表示」は固定文言にせず、現在のカタログと有�
 - 新機能追加で保存済み順が壊れない
 - 全変更を監査できる
 - `準備中`ボタンがない
-- V6実Node、1920px設計画像、同幅実装画像をPRへ添付する
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
 ## 16. 実装順
 

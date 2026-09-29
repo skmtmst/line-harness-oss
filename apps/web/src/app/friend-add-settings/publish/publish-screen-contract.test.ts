@@ -1,20 +1,29 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import React from 'react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import Stepper from '@/components/shared/stepper'
+
+afterEach(() => cleanup())
 
 const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
 
 /** 友だち追加時配信の公開（設計 `ec9vg` 5-F ／ `quhg6` 5-G）。 */
 describe('友だち追加時配信の公開画面', () => {
   it('読込・空・失敗・権限不足を別の面にする', () => {
-    for (const kind of ['loading', 'empty', 'error', 'forbidden']) {
+    // 開き先がない3種は ★V7 TargetMissing、権限不足は ListState のまま。
+    for (const kind of ['unspecified', 'not-found', 'error']) {
       expect(PAGE).toContain(`kind="${kind}"`)
     }
+    expect(PAGE).toContain('kind="forbidden"')
     // 404は「下書きがない」。失敗と混ぜない。
     expect(PAGE).toContain('error.status === 404')
     expect(PAGE).toContain('error.status === 403')
     expect(PAGE).toContain('確認する下書きがありません')
+    expect(PAGE).toContain('公開する下書きが指定されていません')
   })
 
   it('設計のNodeと押し口に印を付ける', () => {
@@ -34,10 +43,25 @@ describe('友だち追加時配信の公開画面', () => {
     expect(PAGE).toContain('disabled={!ready}')
   })
 
-  it('公開前の対象見込みは validation の値を使う', () => {
+  it('公開前の対象見込みはルールの28日集計を優先し、旧契約にも戻せる', () => {
     // 公開後の返事を先取りしたり、設計の数字を置いたりしない。
-    expect(PAGE).toContain('audienceText(validation?.estimatedAudienceCount)')
+    // 過去28日の実績を未来の対象人数として見せない。
+    expect(PAGE).toContain('audienceText(matchedLast28Days)')
+    expect(PAGE).toContain('label="過去28日の該当"')
+    expect(PAGE).not.toContain('label="対象見込み"')
     expect(PAGE).not.toContain('214人')
+  })
+
+  it('確認は鍵で突き合わせ、説明文はサーバ値をそのまま出す', () => {
+    // 順番 (配列の位置) で割り振ると、行が欠ける・意味がずれる。
+    expect(PAGE).not.toContain('keys[index]')
+    expect(PAGE).toContain('{check.detail}')
+  })
+
+  it('idが無いときは固定値で開かず、空の面にする', () => {
+    // fixture の ID が無い環境で404・空画面になる。
+    expect(PAGE).not.toContain("?? 'rule-referral'")
+    expect(PAGE).toContain('if (!ruleId)')
   })
 
   it('実行結果へは、つながっているときだけリンクする', () => {
@@ -58,6 +82,8 @@ describe('友だち追加時配信の公開画面', () => {
     // 最後の試験は、下書きが持っている記録から読む。
     expect(PAGE).toContain('draft.lastTestStatus')
     expect(PAGE).toContain('draft.lastTestedAt')
+    expect(PAGE).toContain('ruleDetail?.rule.lastTestedByStaffId')
+    expect(PAGE).toContain('ruleDetail.rule.lastTestedByStaffName')
   })
 
   it('アカウントを変えたら前の結果を捨てる', () => {
@@ -71,9 +97,58 @@ describe('友だち追加時配信の公開画面', () => {
     }
   })
 
-  it('最終確認は5段目を現在地にする', () => {
-    expect(PAGE).toContain('current={5}')
-    expect(PAGE).not.toContain('current={4}')
+  it('最終確認は5段目を現在地にする', { timeout: 30000 }, () => {
+    // 新しい Stepper は数値の current ではなく、段ごとの state の並びで表す。
+    expect(PAGE).toContain('<Stepper')
+    expect(PAGE).toContain("const STEPS = ['基本設定', '流入条件', '初回案内', 'アクション', '確認']")
+    expect(PAGE).toContain("state: index + 1 < 5 ? 'done'")
+    expect(PAGE).toContain(": 'current'")
+    expect(PAGE).not.toContain('current={')
+    // 画面と同じ並びを描画して、5段目だけが現在地なのを確かめる。
+    const steps = ['基本設定', '流入条件', '初回案内', 'アクション', '確認'].map((label, index) => ({
+      label,
+      state: (index + 1 < 5 ? 'done' : 'current') as const,
+    }))
+    render(React.createElement(Stepper, { label: '設定の進み', steps }))
+    const nav = screen.getByRole('navigation', { name: '設定の進み' })
+    const items = nav.querySelectorAll('li')
+    expect(items).toHaveLength(5)
+    const current = nav.querySelector('[aria-current="step"]')
+    expect(current?.textContent).toContain('確認')
+    expect(nav.innerHTML).toContain('✓')
+  })
+
+  it('設計の最終確認に必要な時刻・プレビュー・監視状態を表示する', () => {
+    expect(PAGE).toContain('登録直後から5分以内')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(PAGE).toContain('<LinePreview')
+    expect(PAGE).toContain("ruleDetail?.staffNotification?.status === 'connected'")
+    expect(PAGE).toContain('ruleDetail?.rule.definition.messageText')
+  })
+
+  it('運用者向けの画面に内部の仕組みの名前を出さない', () => {
+    expect(PAGE).not.toContain('value="webhookの記録で防ぎます"')
+    expect(PAGE).not.toContain('value="有効（webhookの記録で判定）"')
+    // 確認の説明文はサーバ値をそのまま出す。画面に固定文を持たない
+    // (#542 点検 #501)。文言自体は Worker が返し、Worker の契約テストで守る。
+    expect(PAGE).not.toContain('同じ友だち追加通知は1回だけ処理します。')
+  })
+
+  it('有効化後に次の操作と監視対象を説明する', () => {
+    for (const label of [
+      '配信を一時停止',
+      '内容を編集する',
+      'テストを再送信',
+      '別の経路用に複製',
+      '未送信',
+      '二重送信',
+      '再追加の連続実行',
+      'シナリオ開始失敗',
+    ]) {
+      expect(PAGE).toContain(label)
+    }
+    expect(PAGE).toContain('未送信・二重送信・シナリオ開始失敗はSlackへ通知します。')
+    expect(PAGE).toContain('api.friendAddRules.stop(accountId, detail.rule.id, detail.rule.version)')
   })
 
   it('公開中にアカウントを変えられたら、返事を映さない', () => {

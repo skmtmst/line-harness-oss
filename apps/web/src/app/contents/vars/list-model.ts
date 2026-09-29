@@ -1,0 +1,39 @@
+import type { CommonVar } from '@line-crm/shared'
+
+export type CommonVarFilter = 'all' | 'empty' | 'scheduled' | 'unused' | 'draft' | 'stopped' | 'expired'
+export type CommonVarOrder = 'usage_desc' | 'updated_desc' | 'name_asc'
+
+export function filterAndSortCommonVars(
+  items: CommonVar[],
+  input: { query: string; folderId: string; ungroupedValue: string; filter: CommonVarFilter; order: CommonVarOrder },
+): CommonVar[] {
+  const needle = input.query.trim().toLocaleLowerCase('ja-JP')
+  return items
+    .filter((item) => {
+      if (input.folderId === input.ungroupedValue && item.folderId !== null) return false
+      if (input.folderId && input.folderId !== input.ungroupedValue && item.folderId !== input.folderId) return false
+      if (input.filter === 'empty' && item.value !== '') return false
+      /*
+       * 「期限つき」は有効期間（validFrom/validUntil）のこと（VAR-04、
+       * 要件 v6-14 §8-1）。値の切替予約（nextSchedule）も期限のある
+       * 動きなので拾い続ける。両方ないものだけを外す。
+       */
+      if (input.filter === 'scheduled'
+        && !item.nextSchedule && item.validFrom === null && item.validUntil === null) return false
+      if (input.filter === 'unused' && item.usageCount !== 0) return false
+      // Q: 状態（下書き・止めた・期限切れ）で絞る。サーバの計算した
+      // state をそのまま見る（期限切れは時刻からの計算済み）。
+      if ((input.filter === 'draft' || input.filter === 'stopped' || input.filter === 'expired')
+        && (item.state ?? 'active') !== input.filter) return false
+      if (!needle) return true
+      return [item.name, item.varKey, item.value]
+        .some((value) => value.toLocaleLowerCase('ja-JP').includes(needle))
+    })
+    .toSorted((left, right) => {
+      if (input.order === 'name_asc') return left.name.localeCompare(right.name, 'ja-JP')
+      if (input.order === 'updated_desc') return right.updatedAt.localeCompare(left.updatedAt)
+      const leftUsage = left.usageCount ?? -1
+      const rightUsage = right.usageCount ?? -1
+      return rightUsage - leftUsage || left.name.localeCompare(right.name, 'ja-JP')
+    })
+}

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useBrand } from '@/lib/use-brand'
+import { loadAdminVersion } from '@/lib/admin-version-cache'
+import { isRealVersion } from '@/lib/deploy-info'
 import styles from './sidebar-identity.module.css'
 
 /**
@@ -9,7 +11,7 @@ import styles from './sidebar-identity.module.css'
  *
  * ここには 2026-08-26 まで「現在のLINEアカウント」の切替カードがあった。
  * 切替は共通トップバーへ移したので、ここは**いまどの会社の管理画面を
- * 見ているか**だけを示す（Pencil `J33xq/V2WbXF`、`docs/v6-shell-contract.md` §8）。
+ * 見ているか**だけを示す（Pencil `J33xq/V2WbXF`、`docs/v6-common-rules.md` §1）。
  *
  * 枠も影も付けない。カードにすると、下のメニューと同じ重さに見えて、
  * 押せるものだと読み違える。ここは押せない。
@@ -20,14 +22,11 @@ export default function SidebarIdentity() {
 
   useEffect(() => {
     let cancelled = false
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    if (!apiUrl) return
+    // 更新案内の帯と同じ版番号を共有する（2回取らない）。
     ;(async () => {
       try {
-        const res = await fetch(`${apiUrl}/admin/version`)
-        if (!res.ok) return
-        const body = (await res.json()) as { version?: string }
-        if (!cancelled && body?.version) setVersion(body.version)
+        const { version } = await loadAdminVersion()
+        if (!cancelled && version) setVersion(version)
       } catch {
         // 取れなければ出さない。「Ver. -」のような穴埋めはしない。
       }
@@ -36,14 +35,14 @@ export default function SidebarIdentity() {
   }, [])
 
   const name = brand.name || '管理画面'
-  const initial = name.slice(0, 1)
+  const initial = name === '株式会社 然' ? '然' : name.slice(0, 1)
 
   return (
     <div className={styles.root} data-design-node="J33xq/V2WbXF">
       <span className={styles.mark} aria-hidden="true">{initial}</span>
       <span className={styles.text}>
         <span className={styles.name} title={name}>{name}</span>
-        {version && <span className={styles.version}>Ver. {version}</span>}
+        {isRealVersion(version) && <span className={styles.version}>Ver. {version.trim()}</span>}
       </span>
     </div>
   )

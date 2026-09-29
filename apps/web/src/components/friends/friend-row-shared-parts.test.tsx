@@ -5,7 +5,7 @@ import type { FriendListItem } from '@/lib/api'
 import FriendListRow from './friend-list-row'
 import type { FriendListColumn } from './friend-list-table'
 
-/* 画面のコードは行を押すと会話へ飛ぶ。描くだけなので遷移先は使わない。 */
+/* 画面のコードは行を押すと詳細へ飛ぶ。描くだけなので遷移先は使わない。 */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {} }),
 }))
@@ -32,7 +32,7 @@ const BASE: FriendListItem = {
   supportMark: null,
 }
 
-const COLUMNS = new Set<FriendListColumn>(['support', 'scenario', 'latest', 'tags', 'last'])
+const COLUMNS = new Set<FriendListColumn>(['support', 'scenario', 'latest', 'tags', 'source', 'last'])
 
 const render = (friend: FriendListItem) =>
   renderToStaticMarkup(
@@ -56,12 +56,19 @@ describe('友だち行の担当者とアバター（描画）', () => {
     expect(html).not.toContain('data-operator-avatar="unassigned"></span>')
   })
 
-  it('アバターは真円ではなく設計のr=18で描く', () => {
+  it('流入元は計測名を出し、無い人は「不明」と出す（N-038）', () => {
+    const tracked = render({ ...BASE, firstTrackedLinkName: '春のキャンペーンLP' })
+    expect(tracked).toContain('春のキャンペーンLP')
+    const unknown = render(BASE)
+    expect(unknown).toContain('>不明</p>')
+  })
+
+  // ★V7「友だちの顔」（KXDhj）：画像があれば画像、無ければ頭文字。どちらも共通 Avatar。
+  it('顔は共通 Avatar で、画像の有無どちらでも描く', () => {
     const withPicture = render({ ...BASE, pictureUrl: 'https://example.test/a.png' })
-    expect(withPicture).toContain('rounded-v6-large')
-    expect(withPicture).not.toContain('rounded-full bg-v6-avatar-bg')
+    expect(withPicture).toContain('data-avatar="image"')
 
     const withoutPicture = render(BASE)
-    expect(withoutPicture).toContain('rounded-v6-large')
+    expect(withoutPicture).toContain('data-avatar="initials"')
   })
 })

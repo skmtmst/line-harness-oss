@@ -23,9 +23,8 @@ describe('V6 リッチメニューのエラー表示', () => {
     for (const action of ['load', 'reorder', 'import']) {
       expect(PAGE).toContain(`richMenuError(e, '${action}')`)
     }
-    expect(PAGE).toContain(
-      "deleteTarget.kind === 'managed' ? 'delete' : 'externalDelete'",
-    )
+    expect(PAGE).toContain("deleteTarget.group.status === 'published' ? 'unpublish' : 'delete'")
+    expect(PAGE).toContain(": 'externalDelete'")
     expect(PAGE).toContain('setDeleteError(richMenuError(e, action))')
     expect(PAGE).toContain('リッチメニューを読み込めませんでした。')
     expect(PAGE).toContain('LINE上のリッチメニューを取り込めませんでした。')

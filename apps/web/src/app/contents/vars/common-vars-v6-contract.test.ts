@@ -28,6 +28,58 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).not.toContain('api.commonVars.schedules(item.id)')
   })
 
+  it('編集画面は詳細APIからメモ・版・履歴を読み、楽観ロック付きで保存する', () => {
+    expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain('setMemo(found.memo)')
+    expect(EDIT_PAGE).toContain('item.history.slice(0, 5)')
+    expect(EDIT_PAGE).toContain('expectedVersion: item.version')
+    expect(EDIT_PAGE).not.toContain('メモを読み書きするAPIがまだありません')
+    expect(EDIT_PAGE).not.toContain('変更者と変更前後を返す履歴APIがまだありません')
+  })
+
+  it('独立した詳細・フォルダ・予約の読み込みは並列に行う', () => {
+    expect(EDIT_PAGE).toContain('const [detail, folderList, scheduleList] = await Promise.all([')
+    expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain("api.folders.list('common_var')")
+    expect(EDIT_PAGE).toContain('api.commonVars.schedules(id, accountAtRequest)')
+  })
+
+  it('一覧は種別を出さず、Qで「状態」列を足した7列を固定する', () => {
+    const headings = [...PAGE.matchAll(/<Th[^>]*>([\s\S]*?)<\/Th>/g)]
+      .map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+      .slice(1)
+    expect(headings).toEqual([
+      '共通情報',
+      '差し込みキー',
+      '状態',
+      '中身',
+      '使われている場所',
+      '更新・次の変更',
+      '操作',
+    ])
+    expect(headings).not.toContain('種別')
+    expect(PAGE).not.toContain('VAR_TYPE_LABELS[item.type]')
+    expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
+    expect(PAGE).toContain('item.usageCount === 0')
+    expect(PAGE).toContain('formatListDate(item.updatedAt)')
+    // VAR-01: 差し込みキー列は実行時に効く {{var.<varKey>}} を出す。
+    // {表示名} は本文で置き換えられないので案内しない。
+    expect(PAGE).toContain('placeholderText(item.varKey)')
+    expect(PAGE).not.toContain('placeholderText(item.name)')
+    expect(EDIT_PAGE).toContain('placeholderText(item.varKey)')
+    expect(EDIT_PAGE).not.toContain('placeholderText(item.name)')
+  })
+
+  it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
+    expect(PAGE).toContain("setStateFilter(value)")
+    expect(PAGE).toContain("label: '使われている数が多い順'")
+    // N-192: CSVは端末生成から監査台帳つきのサーバ出力へ切り替えた。
+    expect(PAGE).toContain('VarsExportPanel')
+    expect(API).toContain('createExport')
+    expect(API).toContain('/api/common-vars/exports')
+    expect(PAGE).toContain('中身が空のまま使われているものが')
+  })
+
   it('初回空と検索0件を言い分ける', () => {
     expect(PAGE).toContain('まだ共通情報がありません')
     expect(PAGE).toContain('条件に合う共通情報はありません')
@@ -47,5 +99,30 @@ describe('V6共通情報一覧', () => {
     expect(API).toContain('accountId=${encodeURIComponent(accountId)}')
     expect(WORKER).toContain("c.req.query('accountId')")
     expect(WORKER).toContain('canAccessAllLineAccounts')
+    expect(WORKER).toContain('getCommonVarUsageSummaries')
+  })
+
+  it('新規・編集は未保存の入力を持ったまま出る操作を確認で止める（VAR-01 監査）', () => {
+    // リッチメニュー・ウェビナーと同じ useUnsavedGuard＋確認ダイアログの形。
+    // 「戻る」で確認なしに入力が捨てられないよう、両画面で同じ契約を固定する。
+    for (const [name, src] of [['新規', NEW_PAGE], ['編集', EDIT_PAGE]] as const) {
+      expect(src, name).toContain('useUnsavedGuard')
+      expect(src, name).toContain('保存していない変更があります')
+      expect(src, name).toContain('保存せずに移動')
+      expect(src, name).toContain('編集を続ける')
+    }
+    // 編集画面は影響確認（ImpactReview）へ切り替えた表示でも離脱確認が出る。
+    expect(EDIT_PAGE).toContain('{leaveConfirmDialog}')
+  })
+
+  it('一覧・新規・編集は共通情報キーのゲートの内側にある(#862)', () => {
+    for (const [name, src] of [['一覧', PAGE], ['新規', NEW_PAGE], ['編集', EDIT_PAGE]] as const) {
+      expect(src, name).toContain('FeatureGate')
+      expect(src, name).toContain('feature="common_vars"')
+    }
+    // 登録メディア一覧はメディアキーで閉じる（共通情報とは別キー）。
+    const mediaPage = readFileSync(join(HERE, '..', 'page.tsx'), 'utf8')
+    expect(mediaPage).toContain('FeatureGate')
+    expect(mediaPage).toContain('feature="media"')
   })
 })

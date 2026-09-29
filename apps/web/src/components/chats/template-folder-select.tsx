@@ -3,6 +3,7 @@
 import { Check, ChevronDown, ChevronRight, ChevronUp, Folder } from 'lucide-react'
 import { useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import MenuPortal from '@/components/shared/menu-portal'
 
 export type TemplateFolderOption = {
   value: string
@@ -50,6 +51,7 @@ export default function TemplateFolderSelect({
     >
       <div className={`rounded-control ${open ? 'ring-2 ring-accent/20' : ''}`}>
         <Button
+          size="field"
           aria-label="テンプレートのフォルダ"
           aria-haspopup="listbox"
           aria-expanded={open}
@@ -67,10 +69,21 @@ export default function TemplateFolderSelect({
       </div>
 
       {open && status === 'ready' ? (
+        <MenuPortal
+          open={open}
+          align="end"
+          matchWidth="min"
+          getAnchor={() => rootRef.current}
+          onClose={() => setOpen(false)}
+        >
         <ul
           role="listbox"
           aria-label="テンプレートのフォルダ"
-          className="absolute right-0 top-full z-50 mt-1.5 max-h-72 min-w-64 overflow-y-auto rounded-control border border-hairline bg-canvas p-1.5 shadow-lg"
+          className="max-h-72 min-w-64 overflow-y-auto rounded-control border border-hairline bg-canvas p-1.5 shadow-lg"
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          // 欄に焦点を残したまま押せるよう、押す前に焦点を移さない。
+          style={{ position: 'static' }}
+          onMouseDown={(event) => event.preventDefault()}
         >
           {options.map((option) => {
             const selectedOption = option.value === value
@@ -94,6 +107,7 @@ export default function TemplateFolderSelect({
             )
           })}
         </ul>
+        </MenuPortal>
       ) : null}
     </div>
   )

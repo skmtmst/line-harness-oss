@@ -1,4 +1,6 @@
 import type { Message } from '@line-crm/line-sdk';
+import type { OperationCapability } from '@line-crm/db';
+import { OPERATION_PROXY_CAPABILITY_HEADER } from './operation-send-paths.js';
 
 export type HarnessProxyDispatch = (request: Request) => Promise<Response>;
 
@@ -6,6 +8,10 @@ export type HarnessProxyDispatch = (request: Request) => Promise<Response>;
  * LINE の push は必ず Harness の互換プロキシを通す。
  * プロキシ側が送信履歴の記録も担当するため、呼び出し元で messages_log を
  * 二重に書かないこと。
+ *
+ * #1050: capability を渡すと X-Line-Harness-Capability として名乗り、
+ * プロキシの緊急停止判定がその停止対象を見る。省略時はプロキシ側で
+ * broadcast_dispatch (安全側) として扱われる。
  */
 export async function pushViaHarnessProxy(
   proxyBaseUrl: string,
@@ -14,12 +20,14 @@ export async function pushViaHarnessProxy(
   messages: Message[],
   retryKey?: string,
   dispatch?: HarnessProxyDispatch,
-): Promise<void> {
+  capability?: OperationCapability,
+): Promise<{ requestId: string | null }> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
   };
   if (retryKey) headers['X-Line-Retry-Key'] = retryKey;
+  if (capability) headers[OPERATION_PROXY_CAPABILITY_HEADER] = capability;
 
   const url = `${proxyBaseUrl.replace(/\/$/, '')}/line-api/v2/bot/message/push`;
   const init: RequestInit = {
@@ -34,10 +42,20 @@ export async function pushViaHarnessProxy(
   // 同じ retry key がすでに LINE に受理済みなら、再送の 409 も成功扱い。
   const alreadyAccepted =
     response.status === 409 && Boolean(response.headers.get('x-line-accepted-request-id'));
-  if (response.ok || alreadyAccepted) return;
+  if (response.ok || alreadyAccepted) {
+    return {
+      requestId: response.headers.get('x-line-request-id')
+        ?? response.headers.get('x-line-accepted-request-id'),
+    };
+  }
 
   const body = await response.text().catch(() => '');
-  throw new Error(
+  const error = new Error(
     `LINE Harness proxy error: ${response.status} ${response.statusText} — ${body.slice(0, 500)}`,
   );
+  Object.assign(error, {
+    status: response.status,
+    retryAfter: response.headers.get('retry-after'),
+  });
+  throw error;
 }

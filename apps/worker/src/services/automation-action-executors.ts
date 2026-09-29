@@ -1,4 +1,13 @@
-import { addTagToFriend, getLineAccountById, jstNow, removeTagFromFriend } from '@line-crm/db';
+import {
+  addTagToFriend,
+  getLineAccountById,
+  getSupportMarkById,
+  jstNow,
+  removeTagFromFriend,
+  recordRichMenuAssignment,
+  resolveWebhookSecret,
+  setFriendSupportMark,
+} from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   AutomationActionError,
@@ -11,12 +20,20 @@ import {
   reserveOutboundSend,
 } from './outbound-idempotency.js';
 import { buildMessage } from './line-message.js';
-import { recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
+import {
+  buildOutgoingWebhookBody,
+  buildOutgoingWebhookHeaders,
+  postWebhookSafely,
+  recordDeliveryOutcome,
+  type SafePostOutcome,
+  type WebhookDnsLookup,
+} from './outgoing-webhook-delivery.js';
 
 interface AutomationLineClient {
   pushMessage(to: string, messages: Message[], retryKey?: string): Promise<unknown>;
   linkRichMenuToUser(userId: string, richMenuId: string): Promise<unknown>;
   unlinkRichMenuFromUser(userId: string): Promise<unknown>;
+  getRichMenuIdOfUser?(userId: string): Promise<{ richMenuId: string }>;
 }
 
 export interface AutomationActionExecutorDependencies {
@@ -24,6 +41,7 @@ export interface AutomationActionExecutorDependencies {
   resolveLineAccessToken?: (db: D1Database, lineAccountId: string) => Promise<string | null>;
   createLineClient?: (accessToken: string) => AutomationLineClient;
   fetch?: typeof fetch;
+  lookupHost?: WebhookDnsLookup;
   now?: () => string;
 }
 
@@ -79,8 +97,11 @@ async function requireScopedResource(
   context: AutomationActionContext,
   input: { table: 'tags' | 'templates' | 'outgoing_webhooks'; id: string; code: string; label: string },
 ): Promise<void> {
+  // #939 N-368: 送信Webhookの削除は履歴を残す印なので、印のある行は
+  // 「見つからない」として扱う。他の表に deleted_at は無い。
+  const notDeleted = input.table === 'outgoing_webhooks' ? ' AND deleted_at IS NULL' : '';
   const row = await context.db.prepare(
-    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?`,
+    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?${notDeleted}`,
   ).bind(input.id, context.lineAccountId).first<{ id: string }>();
   if (!row) throw invalid(input.code, `${input.label}が見つからないか、別のLINE公式アカウントにあります`);
 }
@@ -112,6 +133,62 @@ function classifyLineError(error: unknown): AutomationActionError {
     permanent ? 'line_request_rejected' : 'line_temporary_failure',
     message,
     !permanent,
+  );
+}
+
+/**
+ * R363: メッセージ送信時の失敗分類。受理した可能性がある失敗は
+ * `delivery_unconfirmed`（照合待ち）にして自動返却・再送を止める。
+ *
+ * - 4xx拒否 … 未受理が確定。返却してよい失敗。
+ * - 429 … 処理されていない。再試行してよい失敗。
+ * - 5xx・応答なし（タイムアウト・通信断）・200のJSON読取失敗 …
+ *   受理した可能性がある。照合待ちに残す。
+ *
+ * `retryable` は他経路の再試行の目安として従来どおり true を保つ。
+ * マイル特典の配送はコードで照合待ちにし、返却も再送もしない。
+ */
+function classifyLinePushError(error: unknown): AutomationActionError {
+  if (error instanceof AutomationActionError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  const status = (error as { status?: unknown } | null)?.status;
+  const unconfirmed = (note: string): AutomationActionError => new AutomationActionError(
+    'delivery_unconfirmed',
+    note,
+    true,
+  );
+  if (typeof status === 'number') {
+    if (status === 429) {
+      return new AutomationActionError('line_temporary_failure', message, true);
+    }
+    if (status >= 400 && status < 500) {
+      return new AutomationActionError('line_request_rejected', message, false);
+    }
+    return unconfirmed('LINEの応答が不確定のため、送信結果を確認しています');
+  }
+  // 実SDKは status を付けるが、付けない呼び出しもあるため文面でも見る。
+  if (/LINE API error:\s*(400|401|403|404)\b/.test(message)) {
+    return new AutomationActionError('line_request_rejected', message, false);
+  }
+  if (/LINE API error:\s*(429)\b/.test(message)) {
+    return new AutomationActionError('line_temporary_failure', message, true);
+  }
+  if (/LINE API error:\s*5\d\d\b/.test(message)) {
+    return unconfirmed('LINEの応答が不確定のため、送信結果を確認しています');
+  }
+  if (error instanceof SyntaxError) {
+    // 200を受理した後のJSON読取失敗。送達は不明なので照合待ち。
+    return new AutomationActionError(
+      'delivery_unconfirmed',
+      'LINEの応答が不確定のため、送信結果を確認しています',
+      true,
+    );
+  }
+  // 応答が返らない（タイムアウト・通信断）。受理不明として照合待ち。
+  return new AutomationActionError(
+    'delivery_unconfirmed',
+    'LINEの応答が届かないため、送信結果を確認しています',
+    true,
   );
 }
 
@@ -164,7 +241,7 @@ function strictMessage(type: string, content: string, altText?: string): Message
 
 async function resolveMessage(
   context: AutomationActionContext,
-): Promise<{ message: Message; content: string }> {
+): Promise<{ type: string; content: string; altText?: string }> {
   const templateId = context.action.params.templateId ?? context.action.params.template_id;
   if (templateId !== undefined) {
     const id = requiredString(templateId, 'template_id_missing', 'テンプレート');
@@ -177,13 +254,14 @@ async function resolveMessage(
     ).bind(id, context.lineAccountId).first<{ message_type: string; message_content: string }>();
     if (!template) throw invalid('template_not_found', 'テンプレートが見つかりません');
     return {
-      message: strictMessage(template.message_type, template.message_content, optionalString(context.action.params.altText)),
+      type: template.message_type,
       content: template.message_content,
+      altText: optionalString(context.action.params.altText),
     };
   }
   const type = optionalString(context.action.params.messageType) ?? 'text';
   const content = requiredText(context.action.params.content, 'message_content_missing', 'メッセージ内容');
-  return { message: strictMessage(type, content, optionalString(context.action.params.altText)), content };
+  return { type, content, altText: optionalString(context.action.params.altText) };
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -195,7 +273,16 @@ async function tagExecutor(context: AutomationActionContext, operation: 'add' | 
   const tagId = requiredString(context.action.params.tagId, 'tag_id_missing', 'タグ');
   await requireScopedResource(context, { table: 'tags', id: tagId, code: 'tag_not_found', label: 'タグ' });
   if (operation === 'add') {
-    await addTagToFriend(context.db, friend.id, tagId);
+    /*
+     * R403: 受信Webhookの起点では連動処理（マイル・成果）の失敗を握りつぶさない。
+     * 受領は失敗状態で残り、同じ受信の再送で欠けた記録だけを復旧する
+     * （安定キーで二重計上しない）。自動化など他の起点は従来どおり。
+     */
+    const fromIncomingWebhook = context.automationId.startsWith('incoming-webhook:');
+    await addTagToFriend(context.db, friend.id, tagId, {
+      sourceEventId: context.sourceEventId,
+      strictSideEffects: fromIncomingWebhook,
+    });
   } else {
     await removeTagFromFriend(context.db, friend.id, tagId);
   }
@@ -232,6 +319,46 @@ async function metadataExecutor(context: AutomationActionContext): Promise<void>
   if ((result.meta?.changes ?? 0) !== 1) throw invalid('friend_update_failed', '友だち情報を更新できませんでした');
 }
 
+async function supportMarkExecutor(
+  context: AutomationActionContext,
+  dependencies: AutomationActionExecutorDependencies,
+): Promise<void> {
+  const friend = await requireFriend(context);
+  const markId = requiredString(context.action.params.markId, 'support_mark_id_missing', '対応マーク');
+  const account = await context.db.prepare(
+    `SELECT tenant_id FROM line_accounts WHERE id = ?`,
+  ).bind(context.lineAccountId).first<{ tenant_id: string }>();
+  if (!account) throw invalid('line_account_not_found', 'LINE公式アカウントが見つかりません');
+  const scope = { tenantId: account.tenant_id, lineAccountId: context.lineAccountId };
+  const mark = await getSupportMarkById(context.db, markId, scope);
+  if (!mark) {
+    throw invalid('support_mark_not_found', '対応マークが見つからないか、別のLINE公式アカウントにあります');
+  }
+
+  const protectionMinutes = Number(context.action.params.manualProtectionMinutes ?? 0);
+  if (Number.isFinite(protectionMinutes) && protectionMinutes > 0) {
+    const now = dependencies.now?.() ?? new Date().toISOString();
+    const protectedChange = await context.db.prepare(
+      `SELECT 1 AS ok
+         FROM operation_audit
+        WHERE target_kind = 'support_mark' AND action = 'changed'
+          AND friend_id = ? AND actor_id IS NOT NULL
+          AND datetime(created_at) >= datetime(?, ?)
+        LIMIT 1`,
+    ).bind(friend.id, now, `-${Math.floor(protectionMinutes)} minutes`).first<{ ok: number }>();
+    if (protectedChange) return;
+  }
+
+  const updated = await setFriendSupportMark(context.db, friend.id, mark.id, scope, null, {
+    source: 'automation',
+    automationId: context.automationId,
+    automationVersionId: context.automationVersionId,
+    sourceEventId: context.sourceEventId,
+    reason: typeof context.inputEvent.type === 'string' ? context.inputEvent.type : 'condition_matched',
+  });
+  if (!updated) throw invalid('support_mark_update_failed', '対応マークを変更できませんでした');
+}
+
 async function scenarioExecutor(context: AutomationActionContext): Promise<void> {
   const friend = await requireFriend(context);
   const scenarioId = requiredString(context.action.params.scenarioId, 'scenario_id_missing', 'シナリオ');
@@ -253,7 +380,9 @@ async function scenarioExecutor(context: AutomationActionContext): Promise<void>
 
   // 既存の登録規則（並行可否、初回配信日時）を保つため、DBヘルパーを使う。
   const { enrollFriendInScenario } = await import('@line-crm/db');
-  const enrolled = await enrollFriendInScenario(context.db, friend.id, scenario.id);
+  const enrolled = context.automationId.startsWith('incoming-webhook:')
+    ? await enrollFriendInScenario(context.db, friend.id, scenario.id, context.stepExecutionId)
+    : await enrollFriendInScenario(context.db, friend.id, scenario.id);
   if (!enrolled) throw invalid('scenario_enrollment_rejected', 'シナリオの開始条件を満たしていません');
 }
 
@@ -280,18 +409,49 @@ async function sendMessageExecutor(
   dependencies: AutomationActionExecutorDependencies,
 ): Promise<{ output: Record<string, unknown> }> {
   const friend = await requireFriend(context);
-  const { message, content } = await resolveMessage(context);
+  const resolved = await resolveMessage(context);
+  // テンプレート/直接本文に {{var.*}} が書かれていても、この経路は従来
+  // 差し込みを展開せず生のまま送っていた。消えた共通情報は fail-closed で
+  // 止め、解決できるものは送信時点の値へ置き換える。
+  let content: string;
+  try {
+    const { expandSendCommonVars } = await import('./interpolation-context.js');
+    content = await expandSendCommonVars(
+      context.db, resolved.content,
+      { kind: 'automation', id: context.action.id },
+      { lineAccountId: context.lineAccountId },
+    );
+  } catch (error) {
+    const { CommonVarResolutionFailedError } = await import('./interpolation-context.js');
+    if (error instanceof CommonVarResolutionFailedError) {
+      throw invalid(
+        'common_var_unresolved',
+        `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
+      );
+    }
+    throw error;
+  }
+  const message = strictMessage(resolved.type, content, resolved.altText);
   const payload = JSON.stringify({ to: friend.line_user_id, messages: [message] });
   if (await reserveLineOperation(context, payload) === 'replay') {
     return { output: { replayed: true } };
   }
+  const token = await resolveAccessToken(context, dependencies);
+  const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
+  // R363: 送信呼び出しと送信後の記録は分けて失敗を見る。
+  // 呼び出し前の失敗（resolve・検証・予約）は未送信の失敗、
+  // 呼び出し後の失敗（受理不明・記録失敗）は照合待ちにする。
+  // まとめて分類すると、受理済みの送信を未送信として返却・再送する。
+  let response: unknown;
   try {
-    const token = await resolveAccessToken(context, dependencies);
-    const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
-    const response = await client.pushMessage(friend.line_user_id, [message], context.idempotencyKey);
-    const now = dependencies.now?.() ?? jstNow();
-    const logId = crypto.randomUUID();
-    const source = context.inputEvent.source === 'friend_bulk_run' ? 'friend_bulk_run' : 'automation_v6';
+    response = await client.pushMessage(friend.line_user_id, [message], context.idempotencyKey);
+  } catch (error) {
+    throw classifyLinePushError(error);
+  }
+  const now = dependencies.now?.() ?? jstNow();
+  const logId = crypto.randomUUID();
+  const source = context.inputEvent.source === 'friend_bulk_run' ? 'friend_bulk_run' : 'automation_v6';
+  try {
     await context.db.batch([
       context.db.prepare(
         `INSERT INTO messages_log
@@ -305,10 +465,19 @@ async function sendMessageExecutor(
         now,
       }),
     ]);
-    return { output: { messageLogId: logId, replayed: false } };
-  } catch (error) {
-    throw classifyLineError(error);
+  } catch {
+    /*
+     * LINEは受理した後の記録だけ失敗した。未送信として送り直すと
+     * 二重に届くので、送達不明として投げる。呼び出し側は送らず
+     * 確定もせず、照合待ちに残す（Webhook経路と同じ扱い）。
+     */
+    throw new AutomationActionError(
+      'delivery_unconfirmed',
+      '送信後の記録に失敗しました',
+      true,
+    );
   }
+  return { output: { messageLogId: logId, replayed: false } };
 }
 
 function responseId(response: unknown, fallback: string): string {
@@ -351,49 +520,37 @@ async function richMenuExecutor(
   try {
     const token = await resolveAccessToken(context, dependencies);
     const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
-    if (operation === 'link') {
+    let alreadyApplied = false;
+    if (context.automationId.startsWith('incoming-webhook:') && client.getRichMenuIdOfUser) {
+      try {
+        const current = await client.getRichMenuIdOfUser(friend.line_user_id);
+        alreadyApplied = operation === 'link' && current.richMenuId === richMenuId;
+      } catch (error) {
+        if (/LINE API error:\s*404\b/.test(error instanceof Error ? error.message : String(error))) {
+          alreadyApplied = operation === 'unlink';
+        } else {
+          throw error;
+        }
+      }
+    }
+    if (!alreadyApplied && operation === 'link') {
       await client.linkRichMenuToUser(friend.line_user_id, richMenuId!);
-    } else {
+    } else if (!alreadyApplied) {
       await client.unlinkRichMenuFromUser(friend.line_user_id);
     }
+    await recordRichMenuAssignment(context.db, {
+      friendId: friend.id,
+      lineAccountId: context.lineAccountId,
+      lineRichMenuId: richMenuId,
+      reasonKind: 'automation',
+      reasonEventId: context.stepExecutionId,
+      idempotencyKey: context.stepExecutionId,
+    });
     await completeLineOperation(context, context.stepExecutionId);
     return { output: { replayed: false } };
   } catch (error) {
     throw classifyLineError(error);
   }
-}
-
-function isSafeWebhookUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== 'https:' || url.username || url.password) return false;
-    const host = url.hostname.toLowerCase().replace(/\.$/, '').replace(/^\[|\]$/g, '');
-    if (
-      host === 'localhost'
-      || host.endsWith('.localhost')
-      || host.endsWith('.local')
-      || host.endsWith('.internal')
-    ) return false;
-    if (/^(127\.|10\.|0\.|169\.254\.|192\.168\.)/.test(host)) return false;
-    const parts = host.split('.').map(Number);
-    if (parts.length === 4 && parts.every(Number.isInteger)) {
-      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
-      if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return false;
-    }
-    if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function signBody(secret: string, body: string): Promise<string> {
-  const bytes = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', bytes.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, bytes.encode(body));
-  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function webhookExecutor(
@@ -405,27 +562,45 @@ async function webhookExecutor(
     table: 'outgoing_webhooks', id: webhookId, code: 'webhook_not_found', label: '送信Webhook',
   });
   const webhook = await context.db.prepare(
-    `SELECT id, url, secret FROM outgoing_webhooks
-      WHERE id = ? AND line_account_id = ? AND is_active = 1`,
-  ).bind(webhookId, context.lineAccountId).first<{ id: string; url: string; secret: string | null }>();
+    `SELECT id, url, secret, secret_encrypted FROM outgoing_webhooks
+      WHERE id = ? AND line_account_id = ? AND is_active = 1 AND deleted_at IS NULL`,
+  ).bind(webhookId, context.lineAccountId).first<{ id: string; url: string; secret: string | null; secret_encrypted?: string | null }>();
   if (!webhook) throw invalid('webhook_not_active', '動作中の送信Webhookが見つかりません');
-  if (!isSafeWebhookUrl(webhook.url)) throw invalid('webhook_url_unsafe', '送信WebhookのURLが安全ではありません');
+  // 送り先の安全確認はpostWebhookSafelyが送信直前と転送先の各段で行う。
+  // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
+  // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり送る。
+  let sendSecret: string | null = null;
+  if (webhook.secret_encrypted || webhook.secret) {
+    try {
+      sendSecret = await resolveWebhookSecret(webhook, dependencies.credentialEncryptionKey);
+    } catch {
+      throw invalid('webhook_secret_unavailable', '送信Webhookのsecretを確認できませんでした');
+    }
+    if (!sendSecret) throw invalid('webhook_secret_unavailable', '送信Webhookのsecretを確認できませんでした');
+  }
 
-  const body = JSON.stringify({
-    eventId: context.sourceEventId,
-    friendId: context.friendId,
-    data: context.inputEvent,
+  // N-371/N-372: 本文は共通封筒（要件26 §6-2）、ヘッダは X-Harness-* の
+  // 共通契約に揃える。イベントIDは冪等キー（step.id）と同じ値なので、
+  // 自動化の再試行で同じ出来事を指し続ける。
+  const body = buildOutgoingWebhookBody({
+    eventId: context.idempotencyKey,
+    eventType: typeof context.inputEvent?.type === 'string' ? context.inputEvent.type : 'automation.send_webhook',
+    occurredAt: typeof context.inputEvent?.occurredAt === 'string'
+      ? context.inputEvent.occurredAt
+      : (dependencies.now?.() ?? new Date().toISOString()),
+    accountId: context.lineAccountId,
+    data: { friendId: context.friendId ?? null, event: context.inputEvent },
+    attempt: context.attemptNumber,
   });
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Idempotency-Key': context.idempotencyKey,
-  };
-  if (webhook.secret) headers['X-Webhook-Signature'] = await signBody(webhook.secret, body);
-  let response: Response;
+  const headers = await buildOutgoingWebhookHeaders({ eventId: context.idempotencyKey, body, secret: sendSecret });
+  // 送信直前の再検査は配送側と共有する。転送先の各段も送る前に確かめる。
+  let outcome: SafePostOutcome;
   try {
-    response = await (dependencies.fetch ?? fetch)(webhook.url, {
-      method: 'POST', headers, body, signal: AbortSignal.timeout(10_000),
-    });
+    outcome = await postWebhookSafely(
+      webhook.url,
+      { headers, body, signal: AbortSignal.timeout(10_000) },
+      { fetchImpl: dependencies.fetch ?? fetch, lookupHost: dependencies.lookupHost },
+    );
   } catch (error) {
     await recordDeliveryOutcome(context.db, webhook.id, false);
     throw new AutomationActionError(
@@ -434,6 +609,12 @@ async function webhookExecutor(
       true,
     );
   }
+  if ('blocked' in outcome) {
+    // 安全でない送り先。秘密値を残さず失敗台帳だけに記録する。
+    await recordDeliveryOutcome(context.db, webhook.id, false);
+    throw invalid('webhook_url_unsafe', '送信WebhookのURLが安全ではありません');
+  }
+  const response = outcome.response;
   if (!response.ok) {
     await recordDeliveryOutcome(context.db, webhook.id, false);
     throw new AutomationActionError(
@@ -442,7 +623,20 @@ async function webhookExecutor(
       response.status === 429 || response.status >= 500,
     );
   }
-  await recordDeliveryOutcome(context.db, webhook.id, true);
+  try {
+    await recordDeliveryOutcome(context.db, webhook.id, true);
+  } catch {
+    /*
+     * HTTP 200 は受けている。送ったあとの記録だけ失敗した。
+     * 失敗として送り直すと二重に届くので、送達不明として投げる。
+     * 呼び出し側は送らず確定もせず、照合待ちに残す。
+     */
+    throw new AutomationActionError(
+      'delivery_unconfirmed',
+      '送信後の記録に失敗しました',
+      false,
+    );
+  }
   return { output: { status: response.status } };
 }
 
@@ -453,6 +647,7 @@ export function createAutomationActionExecutors(
     add_tag: (context) => tagExecutor(context, 'add'),
     remove_tag: (context) => tagExecutor(context, 'remove'),
     set_metadata: metadataExecutor,
+    set_support_mark: (context) => supportMarkExecutor(context, dependencies),
     start_scenario: scenarioExecutor,
     stop_scenario: (context) => changeScenarioStatus(context, 'stop'),
     resume_scenario: (context) => changeScenarioStatus(context, 'resume'),

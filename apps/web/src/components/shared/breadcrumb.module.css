@@ -1,3 +1,4 @@
+@layer components {
 /*
  * パンくず。Pencil V6 の `R098Z`「共通 パンくず」。
  *
@@ -7,6 +8,7 @@
 
 .list {
   display: flex;
+  min-width: 0;
   align-items: center; /* alignItems: center */
   gap: 8px; /* gap: 8 */
   font-size: var(--text-caption); /* fontSize: $size-caption */
@@ -14,6 +16,8 @@
 }
 
 .link {
+  flex: none;
+  white-space: nowrap;
   color: var(--color-status-info); /* fill: $status-info */
 }
 
@@ -26,8 +30,17 @@
   outline-offset: 2px;
 }
 
-/* いま開いている場所。押せない。 */
+/*
+ * いま開いている場所。押せない。
+ *
+ * R177: 長い名前（情報欄名など）で操作ボタンが右へ押し出されていた。
+ * `layout/breadcrumb` と同じく、ここで省略し全文は `title` で確認する。
+ */
 .current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-ink); /* fill: $ink */
   font-weight: 700;
 }
@@ -37,4 +50,5 @@
   height: 13px; /* height: 13 */
   color: var(--color-ink-faint); /* fill: $ink-faint */
   flex: none;
+}
 }

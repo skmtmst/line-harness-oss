@@ -2,8 +2,13 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const UPLOAD = readFileSync(new URL('./media-upload-dialog.tsx', import.meta.url), 'utf8')
+const DETAIL = readFileSync(new URL('./media-detail-dialog.tsx', import.meta.url), 'utf8')
+const REPLACEMENT = readFileSync(new URL('./media-replacement-dialog.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts', import.meta.url), 'utf8')
+const DB = readFileSync(new URL('../../../../../packages/db/src/media.ts', import.meta.url), 'utf8')
+const GUIDANCE = readFileSync(new URL('./media-quota-guidance.tsx', import.meta.url), 'utf8')
 
 describe('V6 登録メディア一覧の契約', () => {
   it('V6の実Nodeと共通状態部品を使う', () => {
@@ -28,14 +33,14 @@ describe('V6 登録メディア一覧の契約', () => {
   it('使っていないメディアだけを一覧で絞り込める', () => {
     expect(PAGE).toContain("import FilterChip from '@/components/shared/filter-chip'")
     expect(PAGE).toContain('selected={showUnusedOnly}')
-    expect(PAGE).toContain('!showUnusedOnly || item.usageCount === 0')
+    expect(PAGE).toContain('unusedOnly: showUnusedOnly')
     expect(PAGE).toContain('使っていない')
   })
 
   it('既存の寸法・長さ・容量をカードへ出し、作り物の値で埋めない', () => {
     expect(PAGE).toContain('item.width != null && item.height != null')
     expect(PAGE).toContain('item.durationMs != null')
-    expect(PAGE).toContain('formatSize(item.sizeBytes)')
+    expect(PAGE).toContain('formatMediaSize(item.sizeBytes)')
     expect(PAGE).not.toContain("details.push('—')")
   })
 
@@ -43,19 +48,27 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain("const [sort, setSort] = useState<MediaSort>('newest')")
     expect(PAGE).toContain('入れた日が新しい順')
     expect(PAGE).toContain('使われている順')
-    expect(PAGE).toContain('right.usageCount == null')
+    expect(PAGE).toContain('sort,')
     expect(PAGE).toContain('const [pageSize, setPageSize] = useState(20)')
     expect(PAGE).toContain('PAGE_SIZE_OPTIONS')
-    expect(PAGE).toContain('filtered.slice((page - 1) * pageSize, page * pageSize)')
+    expect(PAGE).toContain('offset: (page - 1) * pageSize')
+    expect(PAGE).toContain('setTotal(res.data.total)')
   })
 
-  it('無い保存容量のバーを作らず、繋がっていないと言う', () => {
-    // 設計は使用量のバー（220×5）と実績（53×5）を描いているが、
-    // `/api/media` は保存容量も上限も返さない。作り物の帯は出さない。
-    expect(PAGE).toContain('保存容量')
-    expect(PAGE).toContain('まだ繋がっていません。保存容量が接続されると表示されます。')
-    // 作り物の帯を出さない。幅を持つ帯は `style={{ width` でしか描けない。
-    expect(PAGE).not.toContain('style={{ width')
+  it('保存容量APIの実値で使用量と上限付近を表示する', () => {
+    expect(PAGE).toContain('使っている容量')
+    expect(PAGE).toContain('api.media.quota(accountAtRequest)')
+    expect(PAGE).toContain('quota.usageBytes')
+    expect(PAGE).toContain('quota.limitBytes')
+    expect(PAGE).toContain('<MediaQuotaGuidance')
+    expect(PAGE).toContain('quota={quota}')
+    expect(PAGE).toContain('selected={showNearLimitOnly}')
+    expect(PAGE).toContain('nearLimitOnly: showNearLimitOnly')
+    // 棒と残量とstate別の案内は案内側に寄せている。
+    expect(GUIDANCE).toContain('quota.remainingBytes')
+    expect(GUIDANCE).toContain('style={{ width')
+    expect(GUIDANCE).toContain('80%以上')
+    expect(GUIDANCE).toContain('上限に達しました')
   })
 
   it('格子と一覧の切り替えを持つ', () => {
@@ -67,10 +80,16 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('設計の実測どおりの高さと文字にする', () => {
-    // アップロード: 高さ40・角丸8・左右14・13px/700。
-    expect(PAGE).toContain('rounded-control inline-flex h-10 cursor-pointer items-center px-3.5 text-label font-bold')
-    // 検索: 幅420まで。表示切替: 枠40・各44。
-    expect(PAGE).toContain('min-w-64 max-w-[420px] flex-1')
+    // アップロードは一覧へ常設せず、全面のモーダルで開く。
+    expect(PAGE).toContain('setUploadOpen(true)')
+    expect(UPLOAD).toContain('data-design-node="eXAJP"')
+    expect(UPLOAD).toContain('ここにファイルをドラッグ、または押して選ぶ')
+    expect(UPLOAD).toContain('LINEで送れる大きさ（超えると入れられません）')
+    // 検索: ★V7 `Xn1Mz` で共通 ListToolbar の1行目へそろえた（幅320・下限240は
+    // 部品が持つ）。独立した全幅の直書き行に戻さない。表示切替: 枠40・各44。
+    expect(PAGE).toContain('<ListToolbar')
+    expect(PAGE).toContain('search={{')
+    expect(PAGE).not.toContain('data-search-row')
     expect(PAGE).toContain('rounded-control flex h-10 items-center overflow-hidden border')
     expect(PAGE).toContain('flex h-full w-11 items-center justify-center')
     // カード: サムネイル112、ファイル名12/700、形式・容量10/600、使用状況10/700。
@@ -78,6 +97,80 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('truncate text-caption font-bold')
     expect(PAGE).toContain('text-ink-faint text-nano font-semibold tabular-nums')
     expect(PAGE).toContain('text-nano font-bold tabular-nums')
+  })
+
+  it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {
+    // #730: 選択中の1件に閉じた母集団で数えるよう、選択中IDを渡す。
+    expect(PAGE).toContain("api.folders.list('media', accountAtRequest)")
+    expect(PAGE).toContain("api.folders.create({ kind: 'media', name })")
+    expect(PAGE).toContain('folderId: folderFilter || undefined')
+    expect(PAGE).toContain('<FolderPanel')
+  })
+
+  it('詳細では取得済みメタデータと使用先を表示し、安全確認後に新版を追加する', () => {
+    expect(PAGE).toContain('<MediaDetailDialog')
+    expect(DETAIL).toContain('data-design-node="voJtX"')
+    expect(DETAIL).toContain('api.media.deleteImpact')
+    expect(DETAIL).toContain('名前と管理用URLを保ったまま新しい版を追加します。')
+    expect(DETAIL).toContain('api.media.prepareUploads')
+    expect(DETAIL).toContain('api.media.completeUpload')
+    expect(DETAIL).toContain('api.media.previewVersion')
+    expect(DETAIL).toContain('api.media.createVersion')
+    expect(DETAIL).toContain('変更理由')
+    expect(DETAIL).toContain('固定版は変わりません')
+  })
+
+  it('詳細を一覧上の小窓ではなく、設計の全面詳細として描く', () => {
+    expect(PAGE).toContain('if (detailsFor)')
+    expect(PAGE).toContain('<MediaDetailDialog')
+    expect(DETAIL).not.toContain("import Dialog from '@/components/shared/dialog'")
+    expect(DETAIL).toContain('xl:grid-cols-3')
+    expect(DETAIL).toContain('xl:col-span-2')
+    expect(DETAIL).toContain('この{item.kind === \'image\' ? \'画像\' : \'メディア\'}を差し替える')
+    expect(DETAIL).toContain('使われているあいだは削除できません')
+  })
+
+  it('署名URLへ直接送り、LINE上限・個別進捗・再試行を持つ', () => {
+    expect(UPLOAD).toContain("{ label: '音声', note: 'MP3・M4A ／ 200MBまで' }")
+    expect(UPLOAD).toContain("{ label: '動画', note: 'MP4 ／ 200MBまで' }")
+    expect(UPLOAD).toContain('api.media.prepareUploads')
+    expect(UPLOAD).toContain('putMediaFile')
+    expect(UPLOAD).toContain('api.media.completeUpload')
+    expect(UPLOAD).toContain('保存先へ直接送ります')
+    expect(UPLOAD).toContain('aria-live="polite"')
+    // 再試行は AttachmentRow の「選び直す」（onRetry）で行う。
+    // 失敗した1件だけを登録待ちに戻す。
+    expect(UPLOAD).toContain('onRetry')
+    expect(UPLOAD).toContain("state: 'ready'")
+    expect(UPLOAD).toContain("entry.state === 'uploading'")
+  })
+
+  it('既存メディアへの一括差し替えは影響確認後の版を渡して実行する', () => {
+    expect(PAGE).toContain('<MediaReplacementDialog')
+    expect(REPLACEMENT).toContain('api.media.replacementImpact')
+    expect(REPLACEMENT).toContain('api.media.replaceUsages')
+    expect(REPLACEMENT).toContain('expectedRevision: impact.revision')
+    expect(REPLACEMENT).toContain('disabled={busy || !impact?.canReplace}')
+  })
+
+  it('置換可能な箇所だけの部分実行は明示した範囲で選べる', () => {
+    // #918: ウェビナー等の未対応参照があっても全体を止めない。
+    // 全件・部分・何もしないをボタンで区別し、部分実行は件数入りの
+    // 専用ボタン（明示確認）と scope=replaceable で実行する。
+    expect(REPLACEMENT).toContain('impact?.canPartiallyReplace && !impact.canReplace')
+    expect(REPLACEMENT).toContain("replace('partial')")
+    expect(REPLACEMENT).toContain("scope: mode === 'partial' ? 'replaceable' : 'all'")
+    expect(REPLACEMENT).toContain('差し替え可能な${impact.replaceableCount}か所だけ差し替える')
+    expect(REPLACEMENT).toContain('impact.blockedCount > 0')
+    expect(REPLACEMENT).toContain('impact.blockedByKind')
+    expect(REPLACEMENT).toContain('skippedUsageCount')
+  })
+
+  it('差し替え候補も一覧の200件上限に依存しない', () => {
+    expect(REPLACEMENT).toContain('excludeId: source.id')
+    expect(REPLACEMENT).toContain('limit: 50')
+    // 次へ・前へ・番号は共通の Pagination が担い、候補の総件数から頁数を数える。
+    expect(REPLACEMENT).toContain('Math.ceil(candidateTotal / 50)')
   })
 
   it('使用中メディアの強制削除口を持たない', () => {
@@ -89,15 +182,15 @@ describe('V6 登録メディア一覧の契約', () => {
   it('使用先を取得できないメディアを未使用として選択・削除しない', () => {
     expect(PAGE).toContain('function isKnownUnused(item: MediaItem)')
     expect(PAGE).toContain('return item.usageCount === 0')
-    expect(PAGE).toContain('const removable = filtered.filter(isKnownUnused)')
-    expect(PAGE).toContain('disabled={!isKnownUnused(item)}')
+    expect(PAGE).toContain('isKnownUnused(item) && !item.archivedAt')
+    expect(PAGE).toContain('disabled={!isKnownUnused(item) || !!item.archivedAt}')
     expect(PAGE).toContain('使用先を確認できないため選べません')
     expect(PAGE).toContain('removableSelected.length !== selected.size')
     expect(PAGE).not.toContain('item.usageCount === undefined || item.usageCount === 0')
   })
 
   it('選択中のLINEアカウントを一覧・登録・変更・使用先・削除へ渡す', () => {
-    expect(PAGE).toContain('api.media.list(accountAtRequest)')
+    expect(PAGE).toContain('api.media.list(accountAtRequest, {')
     expect(PAGE).toContain('latestAccountRef.current')
     expect(API).toContain("q.set('accountId', accountId)")
     expect(WORKER).toContain("c.req.query('accountId')")
@@ -105,7 +198,53 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('ブラウザ申告だけでなく実ファイル形式を確認する', () => {
-    expect(WORKER).toContain('hasMediaSignature(bytes, mimeType)')
-    expect(WORKER).toContain('media orphan cleanup failed')
+    expect(WORKER).toContain('hasMediaSignature(signatureBytes, session.expected_mime)')
+    expect(WORKER).toContain('failMediaUploadSession')
+  })
+
+  it('既知の利用期限・同意情報を記録・表示し、未記録は「不明」と出す（IDEA-15）', () => {
+    // 詳細画面に専用の節を持ち、根拠のない権利情報を推定しない。
+    expect(DETAIL).toContain('利用期限・同意')
+    expect(DETAIL).toContain('不明（記録なし）')
+    expect(DETAIL).toContain('item.usageExpiresAt')
+    expect(DETAIL).toContain('item.usageConsentNote')
+    // 画面は PATCH で保存し、一覧を再取得して古い表示を残さない。
+    expect(DETAIL).toContain('api.media.update(item.id')
+    expect(DETAIL).toContain('usageExpiresAt')
+    expect(DETAIL).toContain('usageConsentNote')
+    expect(API).toContain('usageExpiresAt')
+    expect(API).toContain('usageConsentNote')
+    expect(WORKER).toContain('usage_expires_at')
+    expect(WORKER).toContain('usage_consent_note')
+    expect(DB).toContain('usage_expires_at')
+    expect(DB).toContain('usage_consent_note')
+  })
+
+  it('版ごとの実体を取り戻せ、第1版を元ファイルとして示す（IDEA-15）', () => {
+    expect(DETAIL).toContain('api.media.downloadVersion')
+    expect(DETAIL).toContain('元ファイル')
+    expect(API).toContain('downloadVersion')
+    expect(API).toContain('versions/${encodeURIComponent(versionNo)}/download')
+    expect(WORKER).toContain("/api/media/:id/versions/:versionNo/download")
+    expect(WORKER).toContain('getMediaVersionByNo')
+  })
+
+  it('退避・復帰は管理者口だけから理由付きで呼ぶ（N-201）', () => {
+    // 既定の一覧は退避済みを外し、明示の棚だけが archived=only を渡す。
+    expect(PAGE).toContain("archived: showArchivedOnly ? 'only' : undefined")
+    expect(API).toContain("q.set('archived', params.archived)")
+    // 画面側は必ず理由付きで呼ぶ。staff には押し口を出さない。
+    expect(API).toContain('body: JSON.stringify({ accountId, reason })')
+    // #976 U086: 必須の印は共通の「必須」札。見た目の文は「理由 必須（あとから…）」
+    expect(PAGE).toContain('理由<RequiredBadge />')
+    expect(PAGE).toContain('（あとから履歴で確認できます）')
+    expect(PAGE).toContain('{canManageMedia ? (')
+    // worker は owner/admin だけを通し、理由なしは 400、二重実行は 409。
+    expect(WORKER).toContain("contents.post('/api/media/:id/archive', requireRole('owner', 'admin')")
+    expect(WORKER).toContain("contents.post('/api/media/:id/restore', requireRole('owner', 'admin')")
+    expect(WORKER).toContain("code: 'media_reason_required'")
+    // 状態遷移と監査は db 側の条件付き UPDATE で行う。
+    expect(DB).toContain('archived_at IS NULL')
+    expect(DB).toContain('operation_audit')
   })
 })

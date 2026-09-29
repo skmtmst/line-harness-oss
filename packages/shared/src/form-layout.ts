@@ -207,6 +207,28 @@ export interface FormOptions {
   totalLimit?: { enabled: boolean; max?: number; message?: string };
   /** 送信できたあとに動かす動作 */
   afterActions?: FormAction[];
+  /** 回答者に見せるフォームの色・書体・角丸。任意のCSSは保存しない。 */
+  theme?: FormTheme;
+}
+
+export type FormFontFamily = "sans" | "serif";
+export type FormCornerRadius = "none" | "medium" | "round";
+
+/**
+ * フォームの見た目は5つの色の役割だけで持つ。
+ *
+ * CSS文字列を受け取らないことで、管理画面から任意のコードを公開画面へ
+ * 混ぜられないようにする。
+ */
+export interface FormTheme {
+  main: string;
+  sub: string;
+  accent: string;
+  error: string;
+  text: string;
+  fontFamily: FormFontFamily;
+  cornerRadius: FormCornerRadius;
+  backgroundImageUrl: string | null;
 }
 
 export interface FormLayout {
@@ -238,7 +260,7 @@ export const FORM_OPTIONS_DEFAULT: FormOptions = {
   thanksText: "ご回答ありがとうございました。",
   restorePrevious: false,
   pageTitle: null,
-  submitLabel: "送信",
+  submitLabel: "送信する",
   prevLabel: "前へ",
   nextLabel: "次へ",
   sectionHeader: "pageNumber",
@@ -247,6 +269,17 @@ export const FORM_OPTIONS_DEFAULT: FormOptions = {
   oncePerFriend: { enabled: false },
   totalLimit: { enabled: false },
   afterActions: [],
+};
+
+export const FORM_THEME_DEFAULT: FormTheme = {
+  main: "#008f3d",
+  sub: "#e8f8ee",
+  accent: "#175cd3",
+  error: "#e5484d",
+  text: "#1d1d1f",
+  fontFamily: "sans",
+  cornerRadius: "medium",
+  backgroundImageUrl: null,
 };
 
 /**
@@ -271,6 +304,58 @@ export function emptyLayout(): FormLayout {
     sections: [{ id: newBlockId("s"), name: "セクション1", blocks: [] }],
     options: { ...FORM_OPTIONS_DEFAULT },
   };
+}
+
+/**
+ * 回答が「未回答」か。空文字・空白だけの文字列・null/undefined・
+ * 中身が空の配列をすべて未回答として扱う。
+ * 公開側の必須判定と、送信側の「未回答なら登録先を更新しない」判定が
+ * 同じ意味を使うために1箇所に置く。
+ */
+export function isFormAnswerEmpty(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) {
+    return value.every(
+      (item) => item === undefined || item === null || String(item).trim() === "",
+    );
+  }
+  return false;
+}
+
+/** YYYY-MM-DD の形で、暦に存在する日付か（2/30 や 13/40 を通さない）。 */
+export function isCalendarDateString(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.getUTCFullYear() === Number(match[1]) &&
+    date.getUTCMonth() + 1 === Number(match[2]) &&
+    date.getUTCDate() === Number(match[3])
+  );
+}
+
+/** 「その他」の選択肢がある設問で、回答値が自由記入の値（どの選択肢ラベルでもない文字列）か。 */
+export function isOtherFreeText(block: FormInputBlock, value: string): boolean {
+  if (value === "") return false;
+  if (!(block.choices ?? []).some((choice) => choice.isOther)) return false;
+  return !(block.choices ?? []).some((choice) => choice.label === value);
+}
+
+/**
+ * 選択肢が回答で選ばれたか。ラベル一致に加えて、
+ * 「その他」の選択肢は自由記入の値でも選ばれた扱いにする。
+ * 分岐・動作・定員の判定が同じ一致ルールを使うための共有ヘルパー。
+ */
+export function formChoiceIsSelected(
+  block: FormInputBlock,
+  choice: FormChoice,
+  selected: string[],
+): boolean {
+  if (selected.includes(choice.label)) return true;
+  if (!choice.isOther) return false;
+  return selected.some((value) => isOtherFreeText(block, value));
 }
 
 // ---------------------------------------------------------------------------
@@ -496,6 +581,10 @@ export function normalizeLayout(input: unknown): FormLayout | null {
         }))
     : [];
 
+  const rawOptions = raw.options && typeof raw.options === "object"
+    ? (raw.options as Record<string, unknown>)
+    : {};
+
   return {
     version: 2,
     header: normalizeBlocks(raw.header),
@@ -504,11 +593,77 @@ export function normalizeLayout(input: unknown): FormLayout | null {
       : [{ id: newBlockId("s"), name: "セクション1", blocks: [] }],
     options: {
       ...FORM_OPTIONS_DEFAULT,
-      ...(raw.options && typeof raw.options === "object"
-        ? (raw.options as FormOptions)
-        : {}),
+      ...(rawOptions as FormOptions),
+      ...(rawOptions.theme === undefined
+        ? {}
+        : { theme: normalizeFormTheme(rawOptions.theme) }),
     },
   };
+}
+
+/** 保存前にテーマの値を許可した形へ絞る。 */
+export function normalizeFormTheme(input: unknown): FormTheme {
+  const raw = input && typeof input === "object"
+    ? (input as Record<string, unknown>)
+    : {};
+  const hex = (value: unknown, fallback: string) =>
+    typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fallback;
+  const backgroundImageUrl = typeof raw.backgroundImageUrl === "string"
+    && /^https:\/\//i.test(raw.backgroundImageUrl)
+    ? raw.backgroundImageUrl.slice(0, 2048)
+    : null;
+
+  return {
+    main: hex(raw.main, FORM_THEME_DEFAULT.main),
+    sub: hex(raw.sub, FORM_THEME_DEFAULT.sub),
+    accent: hex(raw.accent, FORM_THEME_DEFAULT.accent),
+    error: hex(raw.error, FORM_THEME_DEFAULT.error),
+    text: hex(raw.text, FORM_THEME_DEFAULT.text),
+    fontFamily: raw.fontFamily === "serif" ? "serif" : "sans",
+    cornerRadius: raw.cornerRadius === "none" || raw.cornerRadius === "round"
+      ? raw.cornerRadius
+      : "medium",
+    backgroundImageUrl,
+  };
+}
+
+/** 文字と背景の組み合わせに求めるコントラスト比（WCAG AA と同じ 4.5:1）。 */
+export const FORM_THEME_MIN_CONTRAST = 4.5;
+
+/**
+ * テーマの文字色と背景色の組み合わせが読めるか。
+ *
+ * P（回答フォームの読みにくい色）：お客さま画面は文字（text）を背景（sub）
+ * の上に置く（`apps/liff/src/pages/Form.tsx`・`form-preview.tsx`）。この2色の
+ * 差が 4.5:1 未満なら保存できない。測った比を文に入れて返す。問題なければ null。
+ */
+export function formThemeContrastError(theme: FormTheme): string | null {
+  const ratio = contrastRatio(theme.text, theme.sub);
+  if (ratio >= FORM_THEME_MIN_CONTRAST) return null;
+  const shown = Math.floor(ratio * 10) / 10;
+  return `文字と背景の色の組み合わせが読みにくいため保存できません（いま ${shown}:1、4.5:1以上が必要です）。文字か背景の色を変えてください`;
+}
+
+/** 主ボタンの背景に対して、4.5:1以上を優先して読みやすい文字色を返す。 */
+export function formThemeButtonText(theme: FormTheme): string {
+  const white = contrastRatio(theme.main, "#ffffff");
+  const body = contrastRatio(theme.main, theme.text);
+  if (white >= 4.5 && white >= body) return "#ffffff";
+  if (body >= 4.5) return theme.text;
+  return contrastRatio(theme.main, "#000000") >= white ? "#000000" : "#ffffff";
+}
+
+function contrastRatio(left: string, right: string): number {
+  const luminance = (hex: string) => {
+    const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255);
+    const [r, g, b] = channels.map((channel) =>
+      channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+    );
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const a = luminance(left);
+  const b = luminance(right);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
 function normalizeBlocks(input: unknown): FormBlock[] {
@@ -603,11 +758,7 @@ export function validateAnswer(
   block: FormInputBlock,
   value: unknown,
 ): string | null {
-  const isEmpty =
-    value === undefined ||
-    value === null ||
-    value === "" ||
-    (Array.isArray(value) && value.length === 0);
+  const isEmpty = isFormAnswerEmpty(value);
 
   if (block.required && isEmpty) {
     return `${block.label} は必須項目です`;
@@ -646,6 +797,9 @@ export function validateAnswer(
   if (block.type === "date") {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
       return `${block.label} は日付を選んでください`;
+    }
+    if (!isCalendarDateString(String(value))) {
+      return `${block.label} は存在しない日付です`;
     }
     return null;
   }
@@ -697,6 +851,10 @@ export function validateAnswers(
  *
  * 分岐は「先に書いてある選択肢が勝つ」。複数選択で行き先が2つ出たときに
  * どちらへ行くかを、画面と保存側で同じにするため。
+ *
+ * 分岐の起点にできるのは**セクション内の選択肢だけ**。共通ヘッダは
+ * すべてのページに出るので、ここでは見ない（編集画面では分岐欄自体を
+ * 出さず、公開前の検査 `validateFormForPublish` が残った設定を止める）。
  */
 export function nextSectionIndex(
   layout: FormLayout,
@@ -712,10 +870,350 @@ export function nextSectionIndex(
     const selected = Array.isArray(raw) ? raw.map(String) : [String(raw ?? "")];
     for (const choice of block.choices ?? []) {
       if (!choice.jumpToSectionId) continue;
-      if (!selected.includes(choice.label)) continue;
+      if (!formChoiceIsSelected(block, choice, selected)) continue;
       const to = layout.sections.findIndex((s) => s.id === choice.jumpToSectionId);
       if (to >= 0) return to;
     }
   }
   return currentIndex + 1;
+}
+
+// ---------------------------------------------------------------------------
+// フォーム定義の検証（保存時・公開時）
+// ---------------------------------------------------------------------------
+
+/** 選択肢の定員の上限。これを超える数は入力ミスとして止める。 */
+export const FORM_CHOICE_CAPACITY_MAX = 1_000_000;
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\/\S+$/.test(value);
+}
+
+/**
+ * 保存できるフォーム定義か。返すのは画面に出す文言で、問題なければ null。
+ *
+ * 管理画面の保存ボタンと、保存APIが同じ判定を使う。「画面では保存できた
+ * のにAPIで弾かれる」（逆も）を起こさないため、ここに置く。
+ * ここでは「定義として成り立つか」だけを見る。分岐の循環や設定途中の
+ * 動作のように、下書きは許すが公開では止めるものは
+ * `validateFormForPublish` が見る。
+ */
+export function validateFormDefinition(layout: FormLayout): string | null {
+  const seenNames = new Set<string>();
+  const groups: { where: string; blocks: FormBlock[] }[] = [
+    { where: "共通ヘッダ", blocks: layout.header },
+    ...layout.sections.map((section, index) => ({
+      where: section.name || `セクション${index + 1}`,
+      blocks: section.blocks,
+    })),
+  ];
+
+  for (const group of groups) {
+    let imageCount = 0;
+    for (const block of group.blocks) {
+      /*
+       * R197: 画像のURLと、押したときに開くURLもボタンのリンク先と
+       * 同じ決めごとで見る。空は「未指定」（下書きでは許す）とし、
+       * 入っているのにURLの形でないものだけ止める。
+       */
+      if (block.kind === "image") {
+        imageCount += 1;
+        const at = `「${group.where}」の${imageCount}枚目の画像`;
+        const mediaUrl = (block.mediaUrl ?? "").trim();
+        if (mediaUrl !== "" && !isHttpUrl(mediaUrl)) {
+          return `${at}のURLがURLの形ではありません`;
+        }
+        const linkUrl = (block.linkUrl ?? "").trim();
+        if (linkUrl !== "" && !isHttpUrl(linkUrl)) {
+          return `${at}を押したときに開くURLがURLの形ではありません`;
+        }
+        continue;
+      }
+      if (block.kind === "input") {
+        const title = block.label.trim() || block.name;
+        const at = `「${group.where}」の「${title}」`;
+        if (!block.label.trim()) return "タイトルが空のブロックがあります";
+        if (seenNames.has(block.name)) {
+          return `回答データの見出し「${block.name}」が重複しています`;
+        }
+        seenNames.add(block.name);
+
+        if (hasChoices(block)) {
+          const choices = block.choices ?? [];
+          if (choices.length === 0) return `${at}に選択肢がありません`;
+          if (choices.some((choice) => !choice.label.trim())) {
+            return `${at}に空の選択肢があります`;
+          }
+          if (
+            (block.type === "radio" || block.type === "select") &&
+            choices.filter((choice) => choice.defaultSelected).length > 1
+          ) {
+            return `${at}の「はじめから選んでおく」は1つまでにしてください`;
+          }
+          for (const choice of choices) {
+            if (!choice.capacity?.enabled) continue;
+            const limit = choice.capacity.limit;
+            if (
+              typeof limit !== "number" ||
+              !Number.isInteger(limit) ||
+              limit < 1 ||
+              limit > FORM_CHOICE_CAPACITY_MAX
+            ) {
+              return `${at}の選択肢「${choice.label}」の定員は1以上${FORM_CHOICE_CAPACITY_MAX}以下の整数にしてください`;
+            }
+          }
+          if (block.type === "checkbox" && block.selectionLimit) {
+            const { min, max } = block.selectionLimit;
+            if (min !== undefined && (!Number.isInteger(min) || min < 0)) {
+              return `${at}の「つ以上」は0以上の整数にしてください`;
+            }
+            if (max !== undefined && (!Number.isInteger(max) || max < 0)) {
+              return `${at}の「つまで」は0以上の整数にしてください`;
+            }
+            // 0 は「制限なし」の意味（回答側の判定も min>0 / max>0 で見ている）
+            const effMin = typeof min === "number" && min > 0 ? min : undefined;
+            const effMax = typeof max === "number" && max > 0 ? max : undefined;
+            if (effMin !== undefined && effMax !== undefined && effMin > effMax) {
+              return `${at}の選択数の下限が上限を超えています`;
+            }
+            if (effMin !== undefined && effMin > choices.length) {
+              return `${at}は選択肢が${choices.length}個しかないのに${effMin}つ以上選ぶ設定になっています`;
+            }
+          }
+        }
+
+        if (
+          (block.type === "text" || block.type === "textarea") &&
+          block.limit
+        ) {
+          const { min, max } = block.limit;
+          if (min !== undefined && (!Number.isInteger(min) || min < 0)) {
+            return `${at}の最小文字数は0以上の整数にしてください`;
+          }
+          if (max !== undefined && (!Number.isInteger(max) || max < 0)) {
+            return `${at}の最大文字数は0以上の整数にしてください`;
+          }
+          // 0 は「制限なし」の意味。両方に正の数があるときだけ大小を比べる
+          const effMin = typeof min === "number" && min > 0 ? min : undefined;
+          const effMax = typeof max === "number" && max > 0 ? max : undefined;
+          if (effMin !== undefined && effMax !== undefined && effMin > effMax) {
+            return `${at}の最小文字数が最大文字数を超えています`;
+          }
+        }
+      }
+
+      if (
+        block.kind === "button" &&
+        block.url.trim() !== "" &&
+        !isHttpUrl(block.url)
+      ) {
+        return `ボタン「${block.label}」のリンク先がURLの形ではありません`;
+      }
+    }
+  }
+
+  const thanksUrl = layout.options.thanksUrl?.trim() ?? "";
+  if (thanksUrl !== "" && !isHttpUrl(thanksUrl)) {
+    return "答えたあとに開くページがURLの形ではありません";
+  }
+  if (layout.options.deadline?.enabled) {
+    const endsAt = layout.options.deadline.endsAt?.trim() ?? "";
+    if (endsAt === "" || Number.isNaN(Date.parse(endsAt))) {
+      return "受付の期限が日時の形ではありません";
+    }
+  }
+  return null;
+}
+
+/** 動作1件が、公開して実際に実行できる状態か。問題があれば文言を返す。 */
+function formActionProblem(
+  action: FormAction,
+  where: string,
+): string | null {
+  switch (action.kind) {
+    case "send_text":
+      return action.text.trim() ? null : `${where}の「テキストを送る」に本文がありません`;
+    case "send_template":
+      return action.templateId ? null : `${where}の「テンプレートを送る」にテンプレートが選ばれていません`;
+    case "tag":
+      return action.tagIds.length
+        ? null
+        : `${where}の「タグを付ける・外す」にタグが選ばれていません`;
+    case "friend_field":
+      return action.fieldId ? null : `${where}の「友だち情報に書く」に情報欄が選ばれていません`;
+    case "scenario":
+      return action.scenarioId ? null : `${where}の「シナリオを開始・停止」にシナリオが選ばれていません`;
+    case "reminder":
+      return action.reminderId ? null : `${where}の「リマインダを開始」にリマインダが選ばれていません`;
+    default:
+      return null;
+  }
+}
+
+/**
+ * 設定途中の動作が残っていないか。
+ *
+ * 選ぶ先が空の動作は、保存は許すが公開では止める。公開後に
+ * 「選ばれたのに何も起きない」を作らないため。
+ */
+function validateFormActionsReady(layout: FormLayout): string | null {
+  const groups: { where: string; blocks: FormBlock[] }[] = [
+    { where: "共通ヘッダ", blocks: layout.header },
+    ...layout.sections.map((section, index) => ({
+      where: section.name || `セクション${index + 1}`,
+      blocks: section.blocks,
+    })),
+  ];
+  for (const group of groups) {
+    for (const block of group.blocks) {
+      if (block.kind !== "input") continue;
+      const at = `「${group.where}」の「${block.label.trim() || block.name}」`;
+      if (block.type === "date" && block.reminder && !block.reminder.reminderId) {
+        return `${at}の日付リマインダが選ばれていません`;
+      }
+      for (const choice of block.choices ?? []) {
+        for (const [index, action] of (choice.actions ?? []).entries()) {
+          const problem = formActionProblem(
+            action,
+            `${at}の選択肢「${choice.label}」の動作${index + 1}`,
+          );
+          if (problem) return problem;
+        }
+      }
+    }
+  }
+  for (const [index, action] of (layout.options.afterActions ?? []).entries()) {
+    const problem = formActionProblem(action, `回答後の動作${index + 1}番目`);
+    if (problem) return problem;
+  }
+  return null;
+}
+
+/**
+ * ページ分岐が壊れていないか（循環・消えた行き先・共通ヘッダの分岐）。
+ *
+ * 分岐先は「今のページより後ろ」だけを許す。こう決めると自己参照・
+ * ループが構造上作れず、「前のページへ戻る分岐」の半端な実装を
+ * 残さなくて済む。下書きの保存までは止めず、公開の直前で止める。
+ */
+function validateFormBranchGraph(layout: FormLayout): string | null {
+  // 共通ヘッダはすべてのページに出るため、分岐の起点にはできない。
+  // 昔の定義に残っていても無断で消さず、公開のときに文言で止める。
+  for (const block of layout.header) {
+    if (!isInputBlock(block)) continue;
+    const branched = (block.choices ?? []).find((choice) => choice.jumpToSectionId);
+    if (branched) {
+      return `共通ヘッダの「${block.label.trim() || block.name}」の選択肢「${branched.label}」にページ分岐が設定されています。共通ヘッダはすべてのページに出るため分岐には使えません。分岐したい質問は各ページに置いてください`;
+    }
+  }
+
+  const indexOf = new Map(layout.sections.map((section, i) => [section.id, i]));
+  const edges: Set<number>[] = layout.sections.map(() => new Set());
+  for (const [i, section] of layout.sections.entries()) {
+    // 行き先のない選択肢は次のページへ。末尾は「送信」を表す番号
+    edges[i].add(i + 1);
+    for (const block of section.blocks) {
+      if (!isInputBlock(block)) continue;
+      const title = block.label.trim() || block.name;
+      for (const choice of block.choices ?? []) {
+        if (!choice.jumpToSectionId) continue;
+        const to = indexOf.get(choice.jumpToSectionId);
+        if (to === undefined) {
+          return `「${section.name}」の「${title}」の選択肢「${choice.label}」は、もう無いページを指しています`;
+        }
+        if (to <= i) {
+          return `「${section.name}」の「${title}」の選択肢「${choice.label}」の分岐が循環します。分岐先はこのページより後ろのページにしてください`;
+        }
+        edges[i].add(to);
+      }
+    }
+  }
+
+  const end = layout.sections.length;
+  const reachable = new Set<number>([0]);
+  const queue = [0];
+  while (queue.length) {
+    const current = queue.pop();
+    if (current === undefined) break;
+    for (const next of edges[current] ?? []) {
+      if (next === end || reachable.has(next)) continue;
+      reachable.add(next);
+      queue.push(next);
+    }
+  }
+  const orphan = layout.sections.findIndex((_, i) => !reachable.has(i));
+  if (orphan >= 0) {
+    return `「${layout.sections[orphan].name}」へたどり着く経路がありません`;
+  }
+
+  // 前向き分岐だけなら起きないが、将来「戻る分岐」が入っても
+  // 送信へ辿れない経路はここで止める。
+  const canFinish = new Set<number>([end]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [i, targets] of edges.entries()) {
+      if (canFinish.has(i)) continue;
+      if ([...targets].some((target) => canFinish.has(target))) {
+        canFinish.add(i);
+        changed = true;
+      }
+    }
+  }
+  const stuck = layout.sections.findIndex(
+    (_, i) => reachable.has(i) && !canFinish.has(i),
+  );
+  if (stuck >= 0) {
+    return `「${layout.sections[stuck].name}」から送信へ進めない経路があります`;
+  }
+  return null;
+}
+
+/**
+ * 初期値が、その欄の回答の決まりに合っているか。
+ *
+ * R196: 空の初期値は「未設定」で許す。入っているのに型・選択肢・
+ * 入力制限に合わないものは、公開の直前で止める。そのまま公開すると
+ * 管理者が入れた初期値のせいで回答者が送信できなくなるため。
+ * 判定は回答検証 `validateAnswer` と同じものを使う（必須だけ外す。
+ * 初期値が空でも回答者が入れればよい）。
+ */
+function validateFormDefaultValues(layout: FormLayout): string | null {
+  const groups: { where: string; blocks: FormBlock[] }[] = [
+    { where: "共通ヘッダ", blocks: layout.header },
+    ...layout.sections.map((section, index) => ({
+      where: section.name || `セクション${index + 1}`,
+      blocks: section.blocks,
+    })),
+  ];
+
+  for (const group of groups) {
+    for (const block of group.blocks) {
+      if (block.kind !== "input") continue;
+      if (block.defaultValue === undefined || block.defaultValue === "") continue;
+      const title = block.label.trim() || block.name;
+      const at = `「${group.where}」の「${title}」`;
+      const error = validateAnswer({ ...block, required: false }, block.defaultValue);
+      if (error) return `${at}の初期値：${error}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * 公開できる状態か。返すのは画面に出す文言で、問題なければ null。
+ *
+ * 保存時の定義検証に加えて、下書きでは許すが公開では止めるものを見る:
+ * 分岐の循環・消えた行き先・共通ヘッダの分岐・選ぶ先が空の動作・
+ * 回答の決まりに合わない初期値。
+ * 管理画面の「公開して保存」と公開APIの両方から呼ぶ。
+ */
+export function validateFormForPublish(layout: FormLayout): string | null {
+  return (
+    validateFormDefinition(layout) ??
+    validateFormActionsReady(layout) ??
+    validateFormBranchGraph(layout) ??
+    validateFormDefaultValues(layout) ??
+    formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+  );
 }

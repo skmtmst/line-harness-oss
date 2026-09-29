@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { clickInsightDetail, openInsightDetail } from './broadcast-insight-display'
+import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from './broadcast-insight-display'
+
+describe('一斉配信の日時表示', () => {
+  it('日本時間で表示し、未取得や壊れた値をダッシュにする', () => {
+    expect(formatBroadcastDateTime('2026-08-20T03:00:00.000Z')).toBe('2026/08/20 12:00')
+    expect(formatBroadcastDateTime(null)).toBe('—')
+    expect(formatBroadcastDateTime('not-a-date')).toBe('—')
+  })
+})
 
 describe('一斉配信の開封集計', () => {
   it('LINE集計の到達数を母数として明記する', () => {

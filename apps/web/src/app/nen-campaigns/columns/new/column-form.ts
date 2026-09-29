@@ -1,4 +1,16 @@
+import type { Tag } from '@line-crm/shared'
 import type { NenColumnCreateInput } from '@/lib/api'
+
+/**
+ * このアカウントのタグだけを候補にする(点検 #512 の中4)。
+ *
+ * `GET /api/tags` は見える範囲の全タグを返す。保存口はこのアカウントの
+ * タグしか受け付けないので、他アカウントのものを選べると400で失敗する。
+ * 所属なし(null)は保存口が断るため、候補に入れない。
+ */
+export function visibleAccountTags(tags: Tag[], accountId: string): Tag[] {
+  return tags.filter((tag) => tag.lineAccountId === accountId)
+}
 
 /**
  * NENコラムの下書き作成（設計 `ymXJK` 21-1-E／契約 #618）。
@@ -21,10 +33,16 @@ export type ColumnDraft = {
   articleUrl: string
   imageUrl: string
   publishedAt: string
+  targetMode: 'all' | 'tag'
+  targetTagId: string
+  scheduledAt: string
+  completionEventName: string
+  completionTagId: string
 }
 
 export const EMPTY_DRAFT: ColumnDraft = {
   title: '', category: '', excerpt: '', articleUrl: '', imageUrl: '', publishedAt: '',
+  targetMode: 'all', targetTagId: '', scheduledAt: '', completionEventName: '', completionTagId: '',
 }
 
 /**
@@ -76,6 +94,14 @@ export function validateDraft(draft: ColumnDraft): FieldError[] {
   if (draft.publishedAt.trim() && publishedAtIso(draft.publishedAt) === null) {
     errors.push({ field: 'publishedAt', message: '公開日時は日付と時刻の両方を選んでください。' })
   }
+  if (draft.targetMode === 'tag' && !draft.targetTagId) {
+    errors.push({ field: 'targetTagId', message: '配信対象のタグを選んでください。' })
+  }
+  if (draft.scheduledAt.trim() && publishedAtIso(draft.scheduledAt) === null) {
+    errors.push({ field: 'scheduledAt', message: '配信日時は日付と時刻の両方を選んでください。' })
+  } else if (draft.scheduledAt.trim() && isPastScheduledAt(draft.scheduledAt)) {
+    errors.push({ field: 'scheduledAt', message: '配信日時はいまより先の日時を選んでください。' })
+  }
   return errors
 }
 
@@ -99,6 +125,17 @@ export function publishedAtIso(value: string): string | null {
   return `${match[1]}T${match[2]}${match[3] ?? ':00'}+09:00`
 }
 
+/*
+ * #935 N-304: 配信予約の日時は「いまより先」だけを通す。
+ * 過去を通すとWorkerの次のtickで即送され、「予約した」のに「今届いた」になる。
+ * Worker側の新規作成口・予約口も同じ判定で断る（ここは入力中の早い知らせ）。
+ */
+export function isPastScheduledAt(value: string, now = Date.now()): boolean {
+  const iso = publishedAtIso(value)
+  if (!iso) return false
+  return Date.parse(iso) <= now
+}
+
 export function toCreateInput(draft: ColumnDraft): NenColumnCreateInput {
   const optional = (value: string) => (value.trim() ? value.trim() : undefined)
   return {
@@ -108,6 +145,11 @@ export function toCreateInput(draft: ColumnDraft): NenColumnCreateInput {
     articleUrl: draft.articleUrl.trim(),
     imageUrl: optional(draft.imageUrl) ?? null,
     publishedAt: publishedAtIso(draft.publishedAt),
+    targetMode: draft.targetMode,
+    targetTagId: draft.targetMode === 'tag' ? draft.targetTagId : null,
+    scheduledAt: publishedAtIso(draft.scheduledAt),
+    completionEventName: optional(draft.completionEventName) ?? null,
+    completionTagId: optional(draft.completionTagId) ?? null,
   }
 }
 
@@ -118,6 +160,10 @@ const CODE_MESSAGE: Record<string, string> = {
   category_too_long: '分類を指定の文字数以内にしてください。',
   excerpt_too_long: '概要を指定の文字数以内にしてください。',
   published_at_invalid: '公開日時をタイムゾーン付きで入力してください。',
+  target_invalid: '配信対象のタグを選んでください。',
+  scheduled_at_invalid: '配信日時を日本時間で入力してください。',
+  past_datetime: '配信日時はいまより先の日時を選んでください。',
+  completion_invalid: '読了後の設定を確認してください。',
   payload_too_large: '入力内容が大きすぎます。本文は入力せず、外部記事のURLを指定してください。',
   column_already_exists: '同じ記事のコラムがすでにあります。一覧を読み直してください。',
   column_create_failed: '下書きを保存できませんでした。時間をおいて、もう一度お試しください。',

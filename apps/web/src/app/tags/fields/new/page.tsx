@@ -3,17 +3,27 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import type { FriendFieldType, Folder } from '@line-crm/shared'
+import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Notice from '@/components/shared/notice'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import Select from '@/components/shared/select'
+import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import DefaultValueInput from '@/components/friend-fields/default-value-input'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 const NEEDS_OPTIONS = new Set<FriendFieldType>(['select', 'multi_select'])
+const FILE_TYPES = new Set<FriendFieldType>(['image', 'pdf'])
 
 function suggestKey(name: string): string {
   const ascii = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
@@ -23,10 +33,7 @@ function suggestKey(name: string): string {
 
 function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (next: boolean) => void; label: string; hint: string }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 py-2">
-      <span><span className="block text-sm font-semibold text-ink">{label}</span><span className="block text-xs text-ink-faint">{hint}</span></span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="mt-1 h-4 w-4 accent-accent" />
-    </label>
+    <Checkbox checked={checked} onCheckedChange={onChange} description={hint} className="py-2">{label}</Checkbox>
   )
 }
 
@@ -43,19 +50,54 @@ function NewFriendFieldForm() {
   const [type, setType] = useState<FriendFieldType>('text')
   const [options, setOptions] = useState('')
   const [defaultValue, setDefaultValue] = useState('')
+  /* R139: 複数選択の既定値（選択肢名の配列）。文字列欄では指定できない。 */
+  const [defaultOptions, setDefaultOptions] = useState<string[]>([])
   const [isPersonal, setIsPersonal] = useState(false)
   const [isStarred, setIsStarred] = useState(true)
   const [ecIsMaster, setEcIsMaster] = useState(false)
   const [ecFieldPath, setEcFieldPath] = useState('')
   const [folderId, setFolderId] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
+  /*
+   * IDEA-04: 同名・同じ差し込み名の項目がすでにあるとき、保存する前に
+   * 知らせる。取れなかったときは注意を出さないだけ（保存は止めない）。
+   */
+  const [existing, setExisting] = useState<FriendField[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => { void api.folders.list('friend_field').then((res) => { if (res.success) setFolders(res.data) }) }, [])
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let cancelled = false
+    void api.friendFields.list(selectedAccountId)
+      .then((res) => { if (!cancelled && res.success) setExisting(res.data) })
+      .catch(() => { /* 注意が出せないだけ。読み直しはしない */ })
+    return () => { cancelled = true }
+  }, [selectedAccountId])
+
+  /*
+   * 入力がひとつでも入ったら未保存（作成系の他画面と同じ考え方）。
+   * この下書きはどこにも自動保存されないので、離脱前に必ず確認する。
+   */
+  const dirty = Boolean(
+    name || fieldKey || keyTouched || type !== 'text' || options || defaultValue || defaultOptions.length > 0
+      || isPersonal || !isStarred || ecIsMaster || ecFieldPath || folderId,
+  )
+  /*
+   * 未保存の入力がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * 左メニュー・「友だち情報欄へ」・戻る操作・再読込を同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const optionList = useMemo(() => options.split('\n').map((value) => value.trim()).filter(Boolean), [options])
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
+  const nameDuplicates = useMemo(() => findDuplicateNames(existing, name), [existing, name])
+  const keyOwners = useMemo(() => {
+    const key = fieldKey.trim()
+    if (!key) return []
+    return existing.filter((item) => item.fieldKey === key).map((item) => item.name)
+  }, [existing, fieldKey])
 
   const save = async () => {
     if (saving) return
@@ -64,12 +106,32 @@ function NewFriendFieldForm() {
     if (!fieldKey.trim()) return setError('差し込み名を入力してください')
     if (NEEDS_OPTIONS.has(type) && optionList.length === 0) return setError('選択肢を1つ以上入力してください')
     if (ecIsMaster && !ecFieldPath.trim()) return setError('EC側の項目名を入力してください')
+    /*
+     * R139: 選択肢を変えたあとに残った既定値は送る前に止める。
+     * サーバーの「存在しない選択肢」422を先に言葉にする。
+     */
+    if (type === 'multi_select') {
+      const missing = defaultOptions.filter((item) => !optionList.includes(item))
+      if (missing.length > 0) return setError(`既定値の「${missing[0]}」は選択肢にありません。選択肢か既定値を直してください`)
+    }
+    if (type === 'select' && defaultValue && !optionList.includes(defaultValue)) {
+      return setError(`既定値の「${defaultValue}」は選択肢にありません。選択肢か既定値を直してください`)
+    }
     setSaving(true); setError('')
     try {
       const res = await api.friendFields.create(selectedAccountId, {
         name: name.trim(), fieldKey: fieldKey.trim(), type, folderId: folderId || null,
         options: NEEDS_OPTIONS.has(type) ? optionList : null,
-        defaultValue: defaultValue.trim() || null, isPersonal, isStarred,
+        // 画像・PDFは既定値を送らない（#1014 ATTR-07）。種類切替で値は捨てているが、念のため送り側でも止める。
+        // R139: 複数選択は選択肢名の配列で渡す。文字列では422になる。
+        defaultValue: FILE_TYPES.has(type)
+          ? null
+          : type === 'multi_select'
+            ? (defaultOptions.length > 0 ? defaultOptions : null)
+            : type === 'select'
+              ? (defaultValue || null)
+              : defaultValue.trim() || null,
+        isPersonal, isStarred,
         ecIsMaster, ecFieldPath: ecIsMaster ? ecFieldPath.trim() : null,
       })
       if (!res.success) throw new Error(res.error)
@@ -80,48 +142,135 @@ function NewFriendFieldForm() {
   }
 
   return (
-    <div data-design-node="A1ZYeP">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を追加' }]} />
-        <Button href={back ?? '/tags?tab=fields'}>友だち情報欄へ</Button>
+    <div data-design-node="A1ZYeP" className="flex flex-col gap-4">
+      {/* R177: 同じ見出し行の形。パンくずを縮め、戻り先は残す。 */}
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。ボタン枠のままでは分類案内の行き先リンクとずれる（自動点検 k=10）。 */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を作る' }]} />
+        </div>
+        <Link href={back ?? '/tags?tab=fields'} className="text-status-info shrink-0 text-label font-semibold hover:underline">友だち情報欄へ</Link>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section data-design="Basic" className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <section data-design="Basic" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
           <h2 className="mb-4 text-base font-bold text-ink">基本情報</h2>
           <div className="space-y-4">
-            <label className="block text-sm font-semibold text-ink">項目名（必須）<input value={name} onChange={(event) => { setName(event.target.value); if (!keyTouched) setFieldKey(suggestKey(event.target.value)) }} placeholder="例：愛犬のお名前" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal outline-none focus:border-accent" /></label>
-            <label className="block text-sm font-semibold text-ink">差し込み名（必須）<input value={fieldKey} onChange={(event) => { setKeyTouched(true); setFieldKey(event.target.value) }} placeholder="pet_name" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal outline-none focus:border-accent" /></label>
-            <p className="font-mono text-xs font-semibold text-accent">{`{{field.${fieldKey || 'pet_name'}}}`}</p>
-            <label className="block text-sm font-semibold text-ink">種類<select value={type} onChange={(event) => setType(event.target.value as FriendFieldType)} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"><option value={type}>{FIELD_TYPE_LABELS[type]} — {FIELD_TYPE_HINTS[type]}</option>{TYPES.filter((item) => item !== type).map((item) => <option key={item} value={item}>{FIELD_TYPE_LABELS[item]} — {FIELD_TYPE_HINTS[item]}</option>)}</select></label>
-            <p className="text-xs text-ink-faint">{TYPES.map((item) => FIELD_TYPE_LABELS[item]).join(' ／ ')}</p>
-            {NEEDS_OPTIONS.has(type) ? <label className="block text-sm font-semibold text-ink">選択肢（1行に1つ）<textarea rows={5} value={options} onChange={(event) => setOptions(event.target.value)} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas p-3 font-normal" /></label> : null}
-            <label className="block text-sm font-semibold text-ink">フォルダ<select value={folderId} onChange={(event) => setFolderId(event.target.value)} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"><option value="">未分類</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select><span className="mt-1 block text-xs font-normal text-ink-faint">フォルダは友だち詳細のタブになります。</span></label>
+            {/* #976 U086: 必須項目は共通の「必須」札（Field required）にそろえる。 */}
+            <Field label="項目名" htmlFor="ff-name" required>
+              <TextInput id="ff-name" value={name} onChange={(event) => { setName(event.target.value); if (!keyTouched) setFieldKey(suggestKey(event.target.value)) }} placeholder="例：愛犬のお名前" />
+              <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" />
+            </Field>
+            <Field label="差し込み名" htmlFor="ff-key" required>
+              <TextInput id="ff-key" value={fieldKey} onChange={(event) => { setKeyTouched(true); setFieldKey(event.target.value) }} placeholder="pet_name" className="font-mono" />
+              {/* 差し込み名はサーバーが一意にする。先に教えておかないと保存して初めて断られる。 */}
+              {keyOwners.length > 0 ? <p className="mt-1.5 text-xs leading-5 text-status-warn-deep">この差し込み名はすでに「{keyOwners[0]}」で使われています。別の差し込み名にしてください。</p> : null}
+            </Field>
+            <p className="font-mono text-xs font-semibold text-ink-secondary">{`{{field.${fieldKey || 'pet_name'}}}`}</p>
+            <Field label="種類" htmlFor="ff-type" note={FIELD_TYPE_HINTS[type]}>
+              <Select
+                id="ff-type"
+                value={type}
+                onChange={(value) => {
+                  const next = value as FriendFieldType
+                  setType(next)
+                  /*
+                    ATTR-07: 種類を変えたら既定値は捨てる。
+                    入力欄は画像・PDFで無効化するだけだと、見えない古い値が
+                    そのまま送信されて422で弾かれていた。テキスト系に
+                    戻しても古い値を復活させない。R139: 選択式の既定値も捨てる。
+                  */
+                  setDefaultValue('')
+                  setDefaultOptions([])
+                }}
+                aria-label="友だち情報欄の種類"
+                size="full"
+                options={TYPES.map((item) => ({ value: item, label: FIELD_TYPE_LABELS[item] }))}
+              />
+            </Field>
+            {/*
+              ATTR-19: 13種すべての説明を1段落に流すと読めない。
+              選択中の種類の説明は上の note に出し、残りは開閉できる一覧へ。
+            */}
+            <details className="rounded-control border border-hairline bg-canvas px-3 py-2 text-xs text-ink-faint">
+              <summary className="cursor-pointer font-semibold text-ink-secondary">種類の選び方（{TYPES.length}種）</summary>
+              <dl className="mt-2 space-y-1">
+                {TYPES.map((item) => (
+                  <div key={item} className="flex gap-2">
+                    <dt className="w-24 shrink-0 font-semibold text-ink">{FIELD_TYPE_LABELS[item]}</dt>
+                    <dd>{FIELD_TYPE_HINTS[item]}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+            {NEEDS_OPTIONS.has(type) ? (
+              <Field label="選択肢（1行に1つ）" htmlFor="ff-options">
+                <TextArea id="ff-options" rows={5} value={options} onChange={(event) => setOptions(event.target.value)} />
+              </Field>
+            ) : null}
+            <Field label="フォルダ" htmlFor="ff-folder" note="フォルダは友だち詳細のタブになります。">
+              <Select id="ff-folder" value={folderId} onChange={(value) => setFolderId(value)} aria-label="友だち情報欄のフォルダ" size="full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+            </Field>
+            {/* IDEA-04: 「情報欄」を選んだ理由と、印だけならタグ・対応状態なら対応マークという違いを、作る場所で確認できるようにする。 */}
+            <AttributeKindGuide current="field" />
           </div>
         </section>
 
         <div className="space-y-4">
-          <section data-design="Value" className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+          <section data-design="Value" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
             <h2 className="mb-4 text-base font-bold text-ink">値の扱い</h2>
-            <label className="block text-sm font-semibold text-ink">既定値<input value={defaultValue} onChange={(event) => setDefaultValue(event.target.value)} placeholder="未設定" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal" /><span className="mt-1 block text-xs font-normal text-ink-faint">友だち情報が空欄のとき、この値が代わりに送信されます。</span></label>
+            <Field
+              label="既定値"
+              htmlFor="ff-default"
+              note={FILE_TYPES.has(type) ? '画像・PDFはファイルとして保存し、本文へ文字として差し込みません。' : '友だち情報が空欄のとき、この値が代わりに送信されます。'}
+            >
+              {/* R139: 複数選択は登録済みの選択肢から複数選ぶ。単一選択は一覧から1つ選ぶ。 */}
+              <DefaultValueInput
+                mode={FILE_TYPES.has(type) ? 'file' : type === 'multi_select' ? 'multi' : type === 'select' ? 'single' : type === 'textarea' ? 'longtext' : 'text'}
+                options={optionList}
+                textValue={defaultValue}
+                onTextChange={setDefaultValue}
+                singleValue={defaultValue}
+                onSingleChange={setDefaultValue}
+                multiValue={defaultOptions}
+                onMultiChange={setDefaultOptions}
+                inputId="ff-default"
+              />
+            </Field>
             <div className="mt-4 divide-y divide-hairline">
               <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に表示" hint="よく見る項目だけを列に追加" />
               <Toggle checked={isPersonal} onChange={setIsPersonal} label="個人情報として保護" hint="権限制限と閲覧履歴を有効化" />
               <Toggle checked={ecIsMaster} onChange={setEcIsMaster} label="EC側を正とする" hint="管理画面からの上書きを防ぐ" />
             </div>
-            {ecIsMaster ? <label className="mt-3 block text-sm font-semibold text-ink">EC側の項目名<input value={ecFieldPath} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal" /></label> : null}
+            {ecIsMaster ? (
+              <div className="mt-3">
+                <Field label="EC側の項目名" htmlFor="ff-ec-path">
+                  <TextInput id="ff-ec-path" value={ecFieldPath} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" className="font-mono" />
+                </Field>
+              </div>
+            ) : null}
           </section>
-          <section data-design="Immutable" className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"><h2 className="text-base font-bold text-ink">作成後に変更できないもの</h2><p className="mt-2 text-sm leading-6 text-ink-secondary">種類と差し込み名は、値やテンプレートを壊さないため固定します。変更したい場合は、新しい項目への移行プレビューを使います。</p><p className="mt-2 text-xs text-ink-faint">表示先：{destination} ／ {isStarred ? '友だち一覧' : '友だち詳細'} ／ テンプレート差し込み</p></section>
+          <section data-design="Immutable" className="rounded-card border border-hairline bg-canvas p-5 shadow-card"><h2 className="text-base font-bold text-ink">作成後に変更できないもの</h2><p className="mt-2 text-sm leading-6 text-ink-secondary">種類と差し込み名は、値やテンプレートを壊さないため固定します。変更したい場合は、新しい項目への移行プレビューを使います。</p><p className="mt-2 text-xs text-ink-faint">表示先：{destination} ／ {isStarred ? '友だち一覧' : '友だち詳細'} ／ テンプレート差し込み</p></section>
         </div>
       </div>
 
-      <StickyBar status={saving ? '項目を保存しています' : '未保存'} actions={<><Link href={back ?? '/tags?tab=fields'} className="rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink">キャンセル</Link><button type="button" disabled={saving} onClick={() => void save()} className="rounded-control bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-40">{saving ? '作成中…' : '項目を作成'}</button></>} />
+      {/* #976 U084/U085: 追従バーの操作は共通Button。左キャンセル→右確定の並びはStickyBarが持つ。 */}
+      <StickyBar status={saving ? '項目を保存しています' : '未保存'} actions={<><Button href={back ?? '/tags?tab=fields'}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '作成中…' : '項目を作成'}</Button></>} />
+      <ConfirmDialog primaryAction="cancel"
+        open={leaveTarget !== null}
+        title="入力中の内容があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="入力を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }
 
 export default function NewFriendFieldPage() {
-  return <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}><NewFriendFieldForm /></Suspense>
+  return <FeatureGate feature="friend_fields"><Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}><NewFriendFieldForm /></Suspense></FeatureGate>
 }

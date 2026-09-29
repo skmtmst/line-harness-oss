@@ -9,6 +9,7 @@ const dbMocks = {
   getMileageSelfInsights: vi.fn(),
   getMileageConnectedAccountsForFriend: vi.fn(),
   getFriends: vi.fn(),
+  recordSavedSearchUsage: vi.fn(),
   addTagToFriend: vi.fn(),
   removeTagFromFriend: vi.fn(),
   getFriendTags: vi.fn(),
@@ -98,7 +99,7 @@ describe('GET /api/friends/:id/mileage', () => {
     expect(dbMocks.getMileageHistoryForFriend).toHaveBeenCalledWith(
       env.DB,
       'friend-1',
-      { limit: 3 },
+      { limit: 3, visibleAccountIds: ['account-1'] },
     );
     expect(dbMocks.getMileageConnectedAccountsForFriend).toHaveBeenCalledWith(
       env.DB, 'friend-1', ['account-1'],
@@ -122,7 +123,7 @@ describe('GET /api/friends/:id/mileage', () => {
     expect(dbMocks.getMileageHistoryForFriend).toHaveBeenCalledWith(
       env.DB,
       'friend-1',
-      { limit: 100 },
+      { limit: 100, visibleAccountIds: ['account-1'] },
     );
   });
 

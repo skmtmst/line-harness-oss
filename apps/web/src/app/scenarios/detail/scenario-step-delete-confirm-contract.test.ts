@@ -30,7 +30,7 @@ describe('V6 dqFft シナリオの通を削除する確認', () => {
   it('成功したときだけ窓を閉じ、一覧と到達実績を読み直す', () => {
     expect(PAGE).toContain('if (!result.success) throw new Error(result.error)')
     expect(PAGE).toContain('setDeleteStepTarget(null)')
-    expect(PAGE).toContain('void loadScenario()')
+    expect(PAGE).toContain('void loadScenario(true)')
     expect(PAGE).toContain('void reloadStats()')
   })
 })

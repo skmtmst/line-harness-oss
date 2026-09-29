@@ -8,7 +8,12 @@ import { dbFor } from '../services/db-router.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const restaurantSources = [
   join(here, 'restaurant-test.ts'),
+  join(here, 'restaurant-google.ts'),
+  join(here, 'restaurant-google-profile.ts'),
   join(here, '../services/restaurant-test.ts'),
+  join(here, '../services/google-business.ts'),
+  join(here, '../services/google-business-profile.ts'),
+  join(here, '../services/jp-holidays.ts'),
   join(here, '../services/restaurant-email-intake.ts'),
   join(here, '../services/restaurant-reservation-email.ts'),
   join(here, '../services/inbound-email-router.ts'),

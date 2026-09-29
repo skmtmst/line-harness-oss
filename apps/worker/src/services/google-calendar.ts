@@ -18,6 +18,9 @@ export interface CreateEventInput {
   start: string;   // ISO datetime string
   end: string;     // ISO datetime string
   description?: string;
+  // こちらで採番したイベント ID。渡すと Google 側もこの ID で登録される。
+  // 外部作成とDB保存の間で障害が起きても再送が別 ID を生まない。
+  id?: string;
 }
 
 export class GoogleCalendarClient {
@@ -69,6 +72,7 @@ export class GoogleCalendarClient {
       description: event.description,
       start: { dateTime: event.start, timeZone: TIMEZONE },
       end: { dateTime: event.end, timeZone: TIMEZONE },
+      ...(event.id ? { id: event.id } : {}),
     };
 
     const res = await fetch(url, {
@@ -106,8 +110,10 @@ export class GoogleCalendarClient {
       },
     });
 
-    // 204 = success, 410 = already deleted — both are acceptable
-    if (!res.ok && res.status !== 410) {
+    // 204 = success, 404/410 = already gone — all acceptable for idempotent delete.
+    // 変更の delete+create では、前回作成が失敗していた予約や相手側で消えた
+    // 予定が 404 を返す。それを失敗と数えると再試行が永久に通らない。
+    if (!res.ok && res.status !== 410 && res.status !== 404) {
       const text = await res.text().catch(() => '');
       throw new Error(`Google Calendar deleteEvent error ${res.status}: ${text}`);
     }

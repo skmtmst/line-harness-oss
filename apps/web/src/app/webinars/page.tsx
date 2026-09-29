@@ -1,21 +1,55 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
+import ListRange from '@/components/ui/list-range'
+
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
+import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import FilterChip from '@/components/shared/filter-chip'
+import './webinars.css'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
-import { webinarApi, type Webinar } from '@/lib/api'
+import {
+  ApiError,
+  webinarApi,
+  type Webinar,
+  type WebinarFolder,
+  type WebinarListItem,
+  type WebinarListParams,
+  type WebinarListResponse,
+  type WebinarOverview,
+} from '@/lib/api'
+import KpiCollapse from '@/components/ui/kpi-collapse'
+import KpiCard from '@/components/shared/kpi-card'
+import { overviewCards } from './overview-view'
+import { publicationStateLabel } from '@/components/webinars/publication-label'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
 }
 
+/*
+ * #702: 札は「薄い同系背景＋濃い同系文字」のトークン規則へ統一。
+ * 生の Tailwind 灰・緑・黄はやめ、AA(4.5:1)を満たす組み合わせだけ使う。
+ * draft 6.94:1 / active 5.11:1 / archived 4.72:1（いずれも 11px 太字）。
+ */
 const STATUS_BADGE: Record<Webinar['status'], string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  active: 'bg-green-100 text-green-700',
-  archived: 'bg-amber-100 text-amber-700',
+  draft: 'bg-shell text-ink-secondary',
+  active: 'bg-success-bg text-success',
+  archived: 'bg-warning-bg text-warning',
 }
 
 function scheduleSummary(w: Webinar): string {
@@ -42,7 +76,7 @@ function scheduleSummary(w: Webinar): string {
   }
   otherRules.forEach((rule) => {
     if (rule.type === 'weekly') parts.push(`毎週${(rule.days ?? []).map((day) => DAYS[day]).join('・')} ${rule.time}`)
-    if (rule.type === 'once') parts.push(rule.at ? new Date(rule.at).toLocaleString('ja-JP') : '単発・日時未設定')
+    if (rule.type === 'once') parts.push(rule.at ? new Date(rule.at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '単発・日時未設定')
   })
   return parts.join(' / ')
 }
@@ -50,44 +84,493 @@ function scheduleSummary(w: Webinar): string {
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft'
 
-export default function WebinarsPage() {
+const UNFILED = '__unfiled__'
+
+function WebinarFolderDialog({
+  folder,
+  busy,
+  error,
+  onCancel,
+  onSave,
+}: {
+  folder: WebinarFolder | null
+  busy: boolean
+  error: string
+  onCancel: () => void
+  onSave: (name: string) => void
+}) {
+  const [name, setName] = useState(folder?.name ?? '')
+  // 保存中は×と同じくEscapeでも閉じない。共通の約束（初期フォーカス・
+  // Tabの循環・起点へのフォーカス復帰・背面スクロール停止）もそろえる。
+  const panelRef = useOverlayFocus(true, onCancel, busy)
+
+  return (
+    <div className="bg-ink/35 fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="webinar-folder-title">
+      <section ref={panelRef} className="bg-canvas rounded-card w-full max-w-md border border-hairline p-5 shadow-card">
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="webinar-folder-title" className="text-ink text-lg font-bold">
+            {folder ? 'フォルダ名を変更' : 'フォルダを追加'}
+          </h2>
+          <button type="button" onClick={onCancel} disabled={busy} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
+        <label className="text-ink mt-4 block text-sm font-semibold" htmlFor="webinar-folder-name">フォルダ名</label>
+        <input
+          id="webinar-folder-name"
+          autoFocus
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
+          }}
+          className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          placeholder="例: 商品説明"
+        />
+        {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
+          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy}>
+            {busy ? '保存中…' : '保存する'}
+          </Button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function measuredCount(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toLocaleString('ja-JP')}人`
+    : '—'
+}
+
+function publicationSummary(webinar: WebinarListItem): string {
+  /* 5枝の決まりは共有(`components/webinars/publication-label`)。ここは一覧だけの落としどころ。 */
+  return publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt)
+    ?? scheduleSummary(webinar)
+}
+
+function displayStatus(webinar: WebinarListItem): string {
+  if (webinar.publicationState === 'scheduled') return '公開予定'
+  if (webinar.publicationState === 'ended') return '非公開'
+  return STATUS_LABEL[webinar.status]
+}
+
+/** 検索入力を口へ渡すまでの待ち時間。1文字ごとの取り直しを束ねる。 */
+const WEBINAR_SEARCH_DEBOUNCE_MS = 300
+
+/** 最後の入力だけを検索へ渡す。呼び出し側は返した関数で前の予約を取り消す。 */
+function scheduleWebinarSearch(
+  query: string,
+  onReady: (query: string) => void,
+): () => void {
+  const timer = setTimeout(() => onReady(query), WEBINAR_SEARCH_DEBOUNCE_MS)
+  return () => clearTimeout(timer)
+}
+
+interface WebinarListSnapshot {
+  items: WebinarListItem[]
+  total: number
+  loadedAccountId: string | null
+}
+
+/*
+ * 取り直しの出し方を決める。
+ * 同じアカウントの検索直しは裏で取り、直前の一覧を消さない(N-124)。
+ * アカウントが変わったら全面読み込みにする（他アカウントの行を見せない）。
+ */
+function beginWebinarListRefresh(
+  snapshot: WebinarListSnapshot,
+  accountId: string,
+): 'initial' | 'background' {
+  return snapshot.loadedAccountId === accountId ? 'background' : 'initial'
+}
+
+/*
+ * 一覧の応答を当てはめる。古い応答なら null を返し、捨てる。
+ * 新しい検索結果を古い応答で上書きしない(N-124)。
+ */
+function commitWebinarListResponse(args: {
+  snapshot: WebinarListSnapshot
+  currentGeneration: number
+  generation: number
+  accountId: string
+  res: { data: { items: unknown; total: unknown } } | null | undefined
+}): WebinarListSnapshot | null {
+  if (args.currentGeneration !== args.generation) return null
+  const res = args.res
+  /*
+    **頁の器で来なかったら、そこで止める。**
+    器だけ違う返事が来ると `items.map is not a function` で
+    **一覧が白い画面になる**。読めなかったこととして扱えば、
+    理由と読み直しの口が出る。
+  */
+  if (!res || !res.data || !Array.isArray(res.data.items) || typeof res.data.total !== 'number') {
+    throw new ApiError(500, 'ウェビナーの一覧が読めない形で返りました')
+  }
+  return { items: res.data.items as WebinarListItem[], total: res.data.total, loadedAccountId: args.accountId }
+}
+
+/**
+ * 一覧APIを呼び、返った時点でも最新の要求だけを確定する。
+ * `list` を受け取る形にして、遅延・逆順応答を実APIと同じ非同期境界で試せるようにする。
+ */
+async function requestWebinarList(args: {
+  list: (accountId: string, params: WebinarListParams) => Promise<{ data: WebinarListResponse }>
+  snapshot: WebinarListSnapshot
+  generation: number
+  currentGeneration: () => number
+  accountId: string
+  params: WebinarListParams
+}): Promise<WebinarListSnapshot | null> {
+  const res = await args.list(args.accountId, args.params)
+  return commitWebinarListResponse({
+    snapshot: args.snapshot,
+    currentGeneration: args.currentGeneration(),
+    generation: args.generation,
+    accountId: args.accountId,
+    res,
+  })
+}
+
+/*
+ * アーカイブ確認の文面。
+ * 公開中は押す前に「先に停止」と次の操作を言う(N-129)。
+ * 止まっているものには出さない。
+ */
+function webinarArchiveDialogCopy(target: WebinarListItem): {
+  description: string
+  stopFirst: string | null
+} {
+  return {
+    description: `「${target.title}」は一覧から外れ、新しく使えなくなります。申込者・視聴履歴・CTA・分析結果は消えません。`,
+    stopFirst: target.status === 'active'
+      ? '公開中のウェビナーは、このままではアーカイブできません。先に公開を停止してから、もう一度アーカイブしてください。'
+      : null,
+  }
+}
+
+function WebinarArchiveConfirm({
+  target,
+  busy,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  target: WebinarListItem
+  busy: boolean
+  error: string | undefined
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const copy = webinarArchiveDialogCopy(target)
+  return (
+    <ConfirmDialog
+      open
+      designNode="LKuAQ"
+      title="ウェビナーをアーカイブしますか？"
+      description={copy.description}
+      confirmLabel="アーカイブする"
+      destructive
+      busy={busy}
+      error={error}
+      onCancel={onCancel}
+      onConfirm={copy.stopFirst ? undefined : onConfirm}
+    >
+      {copy.stopFirst ? (
+        <div className="rounded-control border border-amber-200 bg-amber-50 p-3 text-xs text-ink">
+          <p>{copy.stopFirst}</p>
+          <div className="mt-3">
+            <Button href={`/webinars/edit?id=${target.id}`}>編集画面で公開を停止する</Button>
+          </div>
+        </div>
+      ) : undefined}
+    </ConfirmDialog>
+  )
+}
+
+function WebinarListTable({
+  items,
+  onArchive,
+}: {
+  items: WebinarListItem[]
+  onArchive: (target: WebinarListItem) => void
+}) {
+  const router = useRouter()
+  return (
+    <>
+      <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
+        <span className="col-span-4">ウェビナー名</span><span className="col-span-2">状態</span><span>申込</span><span>視聴</span><span className="col-span-2">公開期間</span><span className="col-span-2">操作</span>
+      </div>
+      <div className="divide-hairline divide-y">
+        {items.map((w) => (
+          <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
+            <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="block truncate whitespace-nowrap text-sm font-semibold text-ink hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
+            <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{displayStatus(w)}</span></div>
+            <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
+            <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
+            <div className="text-ink-secondary truncate text-sm md:col-span-2" title={publicationSummary(w)}>{publicationSummary(w)}</div>
+            {/*
+              ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。アーカイブは
+              メニューの中へ。箱のアイコンだけのボタンは行に直に置かない。
+              撮影口（LKuAQ）は「…」ボタンへ移す（2段操作の1段目）。
+            */}
+            <div className="flex items-center gap-1.5 md:col-span-2"><RowActions
+              subjectName={w.title}
+              edit={{ href: `/webinars/edit?id=${w.id}` }}
+              menuItems={[
+                { id: 'participants', label: '参加者を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=participants`) },
+                { id: 'analytics', label: '分析を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=analytics`) },
+                { id: 'comments', label: 'コメント演出を開く', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=comments`) },
+                { id: 'archive', label: 'アーカイブする', onSelect: () => onArchive(w) },
+              ]}
+              menuButtonProps={{ 'data-qa-open': w.id === 'webinar-5' ? 'LKuAQ' : undefined }}
+            /></div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function WebinarListErrorNotice({
+  failure,
+  onRetry,
+}: {
+  failure: WebinarLoadFailure
+  onRetry: () => void
+}) {
+  return (
+    <div role="alert" className="border-hairline border-b px-4 py-3">
+      <p className="text-ink text-sm font-bold">{failure.title}</p>
+      <p className="text-ink-secondary mt-1 text-xs">{failure.description}</p>
+      {failure.retryable ? (
+        <div className="mt-2"><Button onClick={onRetry}>もう一度読み込む</Button></div>
+      ) : null}
+    </div>
+  )
+}
+
+/*
+  一覧の器(白い面)。**行があるときだけ包む。**
+  読込・空・失敗の1枚は ListState が自分で面と高さを持つので、
+  器に入れると白い余白と灰色の二重背景になる(監査 DETAIL-01)。
+  以前は最低360pxを付けていたが、1行だけのときに約350pxの
+  空領域が残るため外した(#670 10)。器は中身に吸着させる。
+  件数は器の内側の脚注へ入れ、枠外に孤立させない。
+*/
+function WebinarListCard({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
+  /*
+    高さは中身に任せる。以前は固定の最小高さがあって、1行だけの一覧でも
+    表の下に大きな空白帯ができ、その外に件数表示が取り残されて見えた
+    （監査 A8）。読込・空・失敗は ListState が自分の面を持つので、
+    ここで高さを決める必要はない。件数は footer で器の内側に出す。
+  */
+  return (
+    <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
+      {children}
+      {footer ? <div className="border-t border-hairline px-4 py-3">{footer}</div> : null}
+    </div>
+  )
+}
+
+function WebinarListContent({
+  accountLoading,
+  loading,
+  selectedAccountId,
+  accountsCount,
+  loadFailure,
+  visibleItems,
+  panelGrand,
+  refreshing,
+  onRetry,
+  onArchive,
+  footer,
+}: {
+  accountLoading: boolean
+  loading: boolean
+  selectedAccountId: string | null
+  accountsCount: number
+  loadFailure: WebinarLoadFailure | null
+  visibleItems: WebinarListItem[]
+  panelGrand: number
+  refreshing: boolean
+  onRetry: () => void
+  onArchive: (target: WebinarListItem) => void
+  footer?: ReactNode
+}) {
+  if (accountLoading || loading) return <ListState kind="loading" />
+  if (!selectedAccountId) {
+    return (
+      <WebinarListCard>
+        <div className="p-12 text-center text-sm font-medium text-ink">
+          {accountsCount > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}
+        </div>
+      </WebinarListCard>
+    )
+  }
+  if (loadFailure) {
+    return visibleItems.length > 0 ? (
+      <WebinarListCard footer={footer}>
+        <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} />
+        <WebinarListTable items={visibleItems} onArchive={onArchive} />
+      </WebinarListCard>
+    ) : (
+      <ListState
+        kind={loadFailure.kind}
+        title={loadFailure.title}
+        description={loadFailure.description}
+        action={loadFailure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : undefined}
+      />
+    )
+  }
+  if (visibleItems.length === 0) {
+    return panelGrand === 0 ? (
+      <ListState
+        kind="empty"
+        title="まだウェビナーがありません"
+        description="動画セミナーの申込と視聴を、ここで管理します。"
+        action={<Button variant="primary" href="/webinars/new">＋ ウェビナーを作る</Button>}
+      />
+    ) : (
+      <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字かよく使う絞り込みを変えてください。" />
+    )
+  }
+  return (
+    <WebinarListCard footer={footer}>
+      {refreshing ? <p role="status" className="text-ink-faint border-hairline border-b px-4 py-2 text-xs">検索中…</p> : null}
+      <WebinarListTable items={visibleItems} onArchive={onArchive} />
+    </WebinarListCard>
+  )
+}
+
+function WebinarsPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const requestGeneration = useRef(0)
-  const [items, setItems] = useState<Webinar[]>([])
+  const overviewRequestGeneration = useRef(0)
+  const folderRequestGeneration = useRef(0)
+  const [items, setItems] = useState<WebinarListItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [grandTotal, setGrandTotal] = useState(0)
+  const [grandAccountId, setGrandAccountId] = useState<string | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
+  const [overview, setOverview] = useState<WebinarOverview | null>(null)
+  const [loadedOverviewAccountId, setLoadedOverviewAccountId] = useState<string | null>(null)
+  const [overviewFailure, setOverviewFailure] = useState<WebinarLoadFailure | null>(null)
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updated')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
+  /*
+    取り直しの出し分けに使う直前の確定値。refで持つので、
+    `refresh` の依存に入れず、余計な取り直しを起こさない。
+  */
+  const listSnapshotRef = useRef<WebinarListSnapshot>({ items: [], total: 0, loadedAccountId: null })
+  const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
+  const [archiving, setArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
+  const [folders, setFolders] = useState<WebinarFolder[]>([])
+  const [selectedFolder, setSelectedFolder] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<WebinarFolder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<WebinarFolder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
 
   const visibleItems = loadedAccountId === selectedAccountId ? items : []
+  const visibleOverview = loadedOverviewAccountId === selectedAccountId ? overview : null
+  const visibleOverviewFailure = loadedOverviewAccountId === selectedAccountId ? overviewFailure : null
 
   const refresh = useCallback(async () => {
     const generation = ++requestGeneration.current
     if (!selectedAccountId) {
       setItems([])
+      setTotal(0)
       setLoadedAccountId(null)
-      setError(false)
+      setLoadFailure(null)
       setLoading(false)
+      setRefreshing(false)
       return
     }
     const accountId = selectedAccountId
-    setLoading(true)
-    setItems([])
-    setLoadedAccountId(null)
-    setError(false)
+    /*
+      N-124: 検索のたびに一覧を消さない。同じアカウントの取り直しは
+      裏で行い、直前の一覧を残す。全面の読込表示は初回だけ。
+    */
+    const mode = beginWebinarListRefresh(listSnapshotRef.current, accountId)
+    if (mode === 'initial') {
+      setLoading(true)
+      setItems([])
+      setLoadedAccountId(null)
+    } else {
+      setRefreshing(true)
+    }
+    setLoadFailure(null)
     try {
-      const res = await webinarApi.list(accountId)
-      if (requestGeneration.current !== generation) return
-      setItems(res.data)
-      setLoadedAccountId(accountId)
-    } catch {
-      if (requestGeneration.current === generation) setError(true)
+      /*
+        絞り・並び・頁はサーバーで行う(共通一覧契約の offset 方式)。
+        取った1頁を画面で絞り直すと件数や頁数が変わるので、来たまま出す。
+        入力中の1文字ごとは `debouncedQuery` で束ねる。
+      */
+      const next = await requestWebinarList({
+        list: webinarApi.list,
+        snapshot: listSnapshotRef.current,
+        generation,
+        currentGeneration: () => requestGeneration.current,
+        accountId,
+        params: {
+          page,
+          limit: pageSize,
+          q: debouncedQuery.trim() || undefined,
+          folder: selectedFolder || undefined,
+          status: savedFilter || undefined,
+          sort: sortKey,
+        },
+      })
+      /* 古い応答は捨てる。新しい検索結果を上書きしない。 */
+      if (next === null) return
+      setItems(next.items)
+      setTotal(next.total)
+      setLoadedAccountId(next.loadedAccountId)
+    } catch (err) {
+      /*
+        N-124: 裏の取り直しが落ちても直前の一覧は残す。
+        初回で何も無いときだけ、全体の失敗表示にする。
+      */
+      if (requestGeneration.current === generation) setLoadFailure(webinarLoadFailure(err))
     } finally {
-      if (requestGeneration.current === generation) setLoading(false)
+      if (requestGeneration.current === generation) {
+        if (mode === 'initial') setLoading(false)
+        else setRefreshing(false)
+      }
+    }
+  }, [selectedAccountId, page, pageSize, debouncedQuery, selectedFolder, savedFilter, sortKey])
+
+  const refreshOverview = useCallback(async () => {
+    const generation = ++overviewRequestGeneration.current
+    setOverview(null)
+    setLoadedOverviewAccountId(null)
+    setOverviewFailure(null)
+
+    if (!selectedAccountId) return
+
+    const accountId = selectedAccountId
+    try {
+      const res = await webinarApi.overview(accountId)
+      if (overviewRequestGeneration.current !== generation) return
+      setOverview(res.data)
+      setLoadedOverviewAccountId(accountId)
+    } catch (err) {
+      if (overviewRequestGeneration.current !== generation) return
+      setOverviewFailure(webinarLoadFailure(err))
+      setLoadedOverviewAccountId(accountId)
     }
   }, [selectedAccountId])
 
@@ -95,228 +578,379 @@ export default function WebinarsPage() {
     void refresh()
   }, [refresh])
 
-  const filtered = useMemo(() => {
-    // タイトルと slug の両方を見る。URLで探すこともあるため。
-    const q = query.trim()
-    const searched = q
-      ? visibleItems.filter((w) => w.title.includes(q) || w.slug.includes(q))
-      : visibleItems
-    const narrowed = savedFilter
-      ? searched.filter((w) => w.status === savedFilter)
-      : searched
-    return [...narrowed].sort((a, b) => {
-      if (sortKey === 'name') return a.title.localeCompare(b.title, 'ja')
-      if (sortKey === 'created') return b.createdAt.localeCompare(a.createdAt)
-      return b.updatedAt.localeCompare(a.updatedAt)
+  useEffect(() => {
+    listSnapshotRef.current = { items, total, loadedAccountId }
+  }, [items, total, loadedAccountId])
+
+  /*
+    N-124: 入力のたびに口を叩かない。300ms黙ったら検索をかけ直す。
+    連打中は直前の一覧を残す。
+  */
+  useEffect(() => {
+    return scheduleWebinarSearch(query, (nextQuery) => {
+      setPage(1)
+      setDebouncedQuery(nextQuery)
     })
-  }, [visibleItems, query, savedFilter, sortKey])
+  }, [query])
+
+  useEffect(() => {
+    void refreshOverview()
+  }, [refreshOverview])
+
+  /*
+    フォルダ欄の「すべて」「未分類」の件数。検索・絞りとは独立した
+    全体数なので、一覧とは別に1件だけ取って総件数だけ使う。
+  */
+  const refreshGrandTotal = useCallback(async () => {
+    if (!selectedAccountId) {
+      setGrandTotal(0)
+      setGrandAccountId(null)
+      return
+    }
+    const accountId = selectedAccountId
+    try {
+      const res = await webinarApi.list(accountId, { limit: 1 })
+      if (!res.data || typeof res.data.total !== 'number') return
+      setGrandTotal(res.data.total)
+      setGrandAccountId(accountId)
+    } catch {
+      /* 欄の件数だけの補助取得。失敗時は前値を残す。 */
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    void refreshGrandTotal()
+  }, [refreshGrandTotal])
+
+  const refreshFolders = useCallback(async () => {
+    const generation = ++folderRequestGeneration.current
+    setFolders([])
+    if (!selectedAccountId) return
+    try {
+      const response = await webinarApi.folders(selectedAccountId)
+      if (folderRequestGeneration.current === generation) {
+        setFolders(response.success ? response.data : [])
+      }
+    } catch {
+      if (folderRequestGeneration.current === generation) setFolders([])
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    setSelectedFolder('')
+    void refreshFolders()
+  }, [refreshFolders])
+
+  const saveFolder = async (name: string) => {
+    if (!selectedAccountId || folderBusy) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      if (editingFolder) {
+        await webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })
+      } else {
+        await webinarApi.createFolder(selectedAccountId, { name })
+      }
+      setEditingFolder(null)
+      setFolderDialogOpen(false)
+      await refreshFolders()
+      await refreshGrandTotal()
+    } catch {
+      setFolderError('フォルダを保存できませんでした。もう一度お試しください。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const moveFolder = async (index: number, direction: -1 | 1) => {
+    if (!selectedAccountId || folderBusy) return
+    const otherIndex = index + direction
+    const current = folders[index]
+    const other = folders[otherIndex]
+    if (!current || !other) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      await Promise.all([
+        webinarApi.updateFolder(selectedAccountId, current.id, { displayOrder: other.displayOrder }),
+        webinarApi.updateFolder(selectedAccountId, other.id, { displayOrder: current.displayOrder }),
+      ])
+      await refreshFolders()
+      await refreshGrandTotal()
+    } catch {
+      setFolderError('並び順を保存できませんでした。もう一度お試しください。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const removeFolder = async () => {
+    if (!selectedAccountId || !deletingFolder || folderBusy) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      await webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)
+      if (selectedFolder === deletingFolder.id) setSelectedFolder('')
+      setDeletingFolder(null)
+      await Promise.all([refresh(), refreshFolders(), refreshGrandTotal()])
+    } catch {
+      setFolderError('フォルダを削除できませんでした。もう一度お試しください。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  /** 数を出してよいのは、読めたときだけ。 */
+  const hasListData = !accountLoading && !loading && loadFailure === null && Boolean(selectedAccountId)
+
+  /*
+    絞り・並びはサーバー済み。取った1頁をそのまま出す。
+    総件数はサーバーの total を使う。
+  */
+  const visibleTotal = loadedAccountId === selectedAccountId ? total : 0
 
   useEffect(() => {
     setPage(1)
-  }, [query, savedFilter, sortKey, pageSize, selectedAccountId])
+  }, [selectedFolder, savedFilter, sortKey, pageSize, selectedAccountId])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const pageCount = Math.max(1, Math.ceil(visibleTotal / pageSize))
   const currentPage = Math.min(page, pageCount)
-  const visibleStart = (currentPage - 1) * pageSize
-  const visible = filtered.slice(visibleStart, visibleStart + pageSize)
+  const visible = visibleItems
+  /* 欄の全体数。検索・絞りで変わらない。 */
+  const panelGrand = grandAccountId === selectedAccountId ? grandTotal : 0
+  const unfiledCount = Math.max(0, panelGrand - folders.reduce((sum, folder) => sum + folder.count, 0))
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
+
+  const openArchive = useCallback((target: WebinarListItem) => {
+    setArchiveError('')
+    setArchiveTarget(target)
+  }, [])
+
+  const archiveSelected = async () => {
+    if (!archiveTarget || archiving) return
+    setArchiving(true)
+    setArchiveError('')
+    try {
+      await webinarApi.archive(archiveTarget.id)
+      setArchiveTarget(null)
+      await Promise.all([refresh(), refreshOverview(), refreshGrandTotal()])
+    } catch (error) {
+      setArchiveError(error instanceof ApiError && error.status === 409
+        ? '公開中のウェビナーは、先に公開を停止してください。'
+        : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
+    } finally {
+      setArchiving(false)
+    }
+  }
 
   return (
     <>
-      <div data-design="Head">
-        <Header
-          title="ウェビナー"
-          description="動画セミナーの申込から視聴、視聴後のフォロー配信までを管理します。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/webinars/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-              >
-                ウェビナーを作成
-              </Link>
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-            </div>
-          }
-        />
-      </div>
-
-      <div data-design="KPIs" className="mx-auto mb-4 grid max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ウェビナー</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {visibleItems.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {visibleItems.filter((w) => w.status === 'active').length}
-          </p>
-        </div>
-        {/* 申込・視聴の集計を返す口が無い。個別のウェビナーを開けば見られるが、
-            一覧でまとめて数える経路を持っていない。 */}
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">申込</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">一覧では数えられません</p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">平均視聴率</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">申込者のうち</p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">平均視聴時間</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">視聴ログの集計は未対応</p>
-        </div>
-      </div>
-      <div className="p-6 max-w-6xl mx-auto">
-        <div
-          data-design="Bar"
-          className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-        >
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="ウェビナー名で検索"
-            aria-label="ウェビナー名で検索"
-            className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+      {visibleOverviewFailure ? (
+        <div className="mb-4">
+          <ListState
+            kind={visibleOverviewFailure.kind}
+            title={visibleOverviewFailure.title}
+            description={visibleOverviewFailure.description}
+            action={
+              visibleOverviewFailure.retryable
+                ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button>
+                : undefined
+            }
           />
-          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-          <select
-            value={sortKey}
-            onChange={(event) => setSortKey(event.target.value as SortKey)}
-            aria-label="並び順"
-            className="border-hairline rounded-control border px-2 py-2 text-sm"
-          >
-            <option value="updated">更新が新しい順</option>
-            <option value="created">作成が新しい順</option>
-            <option value="name">名前順</option>
-          </select>
-          <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-          <select
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-            aria-label="表示件数"
-            className="border-hairline rounded-control border px-2 py-2 text-sm"
-          >
-            {[20, 50, 100].map((size) => (
-              <option key={size} value={size}>{size}件表示</option>
-            ))}
-          </select>
         </div>
-
-        <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-          {([
-            { key: 'active', label: '公開中のみ' },
-            { key: 'draft', label: '下書きのみ' },
-          ] as const).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setSavedFilter(savedFilter === key ? '' : key)}
-              aria-pressed={savedFilter === key}
-              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-                savedFilter === key
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {accountLoading || loading ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
-            読み込み中...
-          </div>
-        ) : !selectedAccountId ? (
-          <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-            <div className="text-ink font-medium">
-              {accounts.length > 0
-                ? '上のバーでLINE公式アカウントを選んでください'
-                : 'LINE公式アカウントが登録されていません'}
-            </div>
-          </div>
-        ) : error ? (
-          <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
-            <div className="text-danger font-medium">ウェビナーを読み込めませんでした</div>
-            <p className="text-ink-secondary mt-2 text-sm">通信状態を確認して、もう一度読み込んでください。</p>
-            <Button
-              variant="primary"
-              onClick={() => void refresh()}
-              className="mt-4"
-            >
-              もう一度読み込む
-            </Button>
-          </div>
-        ) : visibleItems.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <div className="text-gray-700 font-medium mb-2">ウェビナーがまだありません</div>
-            <p className="text-sm text-gray-500 mb-4">
-              録画動画をアップロードしてスケジュールを設定すると、友だちが毎回「今始まったばかり」の疑似ライブとして視聴できます。
-            </p>
-            <Link
-              href="/webinars/new"
-              className="inline-block px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-            >
-              最初のウェビナーを作成
-            </Link>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-            <div className="text-ink font-medium">条件に合うウェビナーはありません</div>
-            <p className="text-ink-faint mt-2 text-sm">検索文字か保存した条件を変えてください。</p>
-          </div>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {visible.map((w) => (
-              <Link
-                key={w.id}
-                href={`/webinars/edit?id=${w.id}`}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
-              >
-                <div className="flex items-start gap-4 p-5">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm">
-                    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2Z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <h2 className="line-clamp-2 font-bold leading-6 text-slate-900 group-hover:text-blue-700">{w.title}</h2>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{STATUS_LABEL[w.status]}</span>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-600">{scheduleSummary(w)}</p>
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                      <span className="font-mono text-[11px] text-slate-400">/{w.slug}</span>
-                      <span className="text-xs font-semibold text-blue-600">概要・分析を見る →</span>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-        {!loading && !error && selectedAccountId && filtered.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-ink-faint text-xs tabular-nums">
-              {visibleStart + 1}〜{Math.min(visibleStart + pageSize, filtered.length)}件 / 全{filtered.length}件
-            </p>
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              onPageChange={setPage}
-              ariaLabel="ウェビナー一覧のページ送り"
+      ) : (
+        <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/*
+            #1005: カードは共通KpiCardの3段（見出し・数値・短い状態）で出す。
+            取得できない詳しい理由は description として説明アイコンの中へ渡し、
+            長文で行全体の高さを伸ばさない。状態自体は detail に残す。
+          */}
+          {overviewCards(visibleOverview).map((card) => (
+            <KpiCard
+              key={card.key}
+              title={card.title}
+              value={null}
+              unit=""
+              valueText={card.view.text}
+              valueTone={card.view.available ? 'default' : 'faint'}
+              detail={[card.status, card.detail].filter(Boolean).join('・')}
+              description={card.description ?? undefined}
             />
-          </div>
-        )}
+          ))}
+        </KpiCollapse>
+      )}
+      {/* 外枠の余白は共通シェルが持つ。ここで px-6 を足すと左端がずれる。 */}
+      <div data-design-node="ZC13r" className="flex flex-col gap-4">
+        {/* 作る操作は一覧のすぐ上の左。右上には置かない。他の一覧と同じ置き場所。 */}
+        <div data-design="Head" className="flex flex-wrap justify-start gap-2">
+          <Button variant="primary" href="/webinars/new">＋ ウェビナーを作る</Button>
+        </div>
+
+        <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+          <FolderPanel
+            /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
+            activeId={selectedFolder}
+            onSelect={setSelectedFolder}
+            onAddFolder={() => { setFolderError(''); setFolderDialogOpen(true) }}
+            addFolderDisabled={!selectedAccountId}
+            rows={[
+              { id: '', label: 'すべて', count: panelGrand },
+              ...folders.map((folder, index) => ({
+                id: folder.id,
+                label: folder.name,
+                count: folder.count,
+                color: folder.color,
+                onEdit: () => { setFolderError(''); setEditingFolder(folder) },
+                onMoveUp: index > 0 ? () => void moveFolder(index, -1) : undefined,
+                onMoveDown: index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+                onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
+                deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
+              })),
+              { id: UNFILED, label: '未分類', count: unfiledCount },
+            ]}
+          />
+
+          <section className="min-w-0">
+            {/*
+              ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+              右端に並び順と表示件数。#636/#668 の並びの意図はそのまま。
+              設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+              1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
+            */}
+            <div data-design="Bar">
+            <div data-design="Saved">
+            <ListToolbar
+              search={{ placeholder: '名前・内容で検索', label: 'ウェビナー名で検索', value: query, onChange: setQuery }}
+              filters={
+                <>
+                  <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+                  {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
+                    <FilterChip key={key} selected={savedFilter === key} onChange={(next) => setSavedFilter(next ? key : '')}>{label}</FilterChip>
+                  ))}
+                </>
+              }
+              trailing={
+                <>
+                  <SortSelect
+                    value={sortKey}
+                    onChange={(value) => setSortKey(value as SortKey)}
+                    options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]}
+                  />
+                  <PageSizeSelect value={pageSize} onChange={setPageSize} />
+                </>
+              }
+            />
+            </div>
+            </div>
+
+            <WebinarListContent
+              accountLoading={accountLoading}
+              loading={loading}
+              selectedAccountId={selectedAccountId}
+              accountsCount={accounts.length}
+              loadFailure={loadFailure}
+              visibleItems={visibleItems}
+              panelGrand={panelGrand}
+              refreshing={refreshing}
+              onRetry={() => void refresh()}
+              onArchive={openArchive}
+              footer={hasListData && visibleTotal > 0 ? <ListRange total={visibleTotal} first={(currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /> : undefined}
+            />
+
+            {hasListData && visibleTotal > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-3"><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+            )}
+          </section>
+        </div>
       </div>
+      {archiveTarget ? <ArchiveReviewBackdrop target={archiveTarget} /> : null}
+      {archiveTarget ? (
+        <WebinarArchiveConfirm
+          target={archiveTarget}
+          busy={archiving}
+          error={archiveError || undefined}
+          onCancel={() => { if (!archiving) setArchiveTarget(null) }}
+          onConfirm={() => void archiveSelected()}
+        />
+      ) : null}
+      {(folderDialogOpen || editingFolder) ? (
+        <WebinarFolderDialog
+          folder={editingFolder}
+          busy={folderBusy}
+          error={folderError}
+          onCancel={() => {
+            if (folderBusy) return
+            setFolderDialogOpen(false)
+            setEditingFolder(null)
+            setFolderError('')
+          }}
+          onSave={(name) => void saveFolder(name)}
+        />
+      ) : null}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={`削除しても、中のウェビナーは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder?.count ?? 0}件です。`}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => {
+          if (folderBusy) return
+          setDeletingFolder(null)
+          setFolderError('')
+        }}
+        onConfirm={() => void removeFolder()}
+      />
     </>
   )
 }
+
+function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
+  /*
+   * #985 CHK-02: 左の256pxと上の56pxはPCのメニュー・ヘッダーが
+   * 実在する幅（1280px以上）だけ空ける。狭い幅では全幅を使い、
+   * overflow-hidden で説明と戻る操作を切り捨てず、縦に読めるようにする。
+   */
+  return (
+    <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-10 overflow-y-auto px-4 py-5 sm:px-10 xl:left-64 xl:top-14" data-design-node="LKuAQ">
+      <div className="mx-auto flex max-w-screen-2xl flex-col gap-4">
+        <p className="text-ink-faint text-xs font-bold">← ウェビナー一覧</p>
+        <div className="grid gap-4 xl:grid-cols-4">
+          <div className="space-y-4 xl:col-span-3">
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h2 className="text-base font-bold text-ink">アーカイブする対象</h2>
+              <p className="mt-1 text-xs text-ink-secondary">アーカイブするウェビナーを確認します。</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold text-ink-faint">ウェビナー</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{target.title}</p></div><div><p className="text-xs font-bold text-ink-faint">申込者</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{measuredCount(target.registrationCount)}</p></div></div>
+            </section>
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h2 className="text-base font-bold text-ink">アーカイブしたあと</h2>
+              <p className="mt-1 text-xs text-ink-secondary">アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。</p>
+              <div className="mt-4 space-y-3"><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">公開ページ</strong><p className="mt-1 text-xs text-ink-secondary">公開URLが無効になります</p></div><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">分析結果</strong><p className="mt-1 text-xs text-ink-secondary">視聴履歴とCTAの結果は消えません</p></div></div>
+            </section>
+          </div>
+          <aside className="space-y-4">
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
+            <div className="min-h-96"><LinePreview><div className="rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></LinePreview></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const WebinarsPageWithTestSupport = Object.assign(WebinarsPage, {
+  __testing: {
+    WEBINAR_SEARCH_DEBOUNCE_MS,
+    WebinarArchiveConfirm,
+    WebinarListContent,
+    WebinarListErrorNotice,
+    requestWebinarList,
+    scheduleWebinarSearch,
+  },
+})
+
+export default WebinarsPageWithTestSupport

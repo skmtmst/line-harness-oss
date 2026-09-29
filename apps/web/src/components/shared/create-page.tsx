@@ -5,8 +5,32 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
 import { ApiError } from '@/lib/api'
+
+const SAVE_FALLBACK = '保存に失敗しました。入力内容を確認して、もう一度お試しください。'
+
+export function createPageErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) return error.message
+  if (error instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) return error.message
+  return SAVE_FALLBACK
+}
+
+/**
+ * 保存後の戻り先に `highlight` を足す。
+ *
+ * 親URLは `/mileage?tab=earning-rules` のように既にクエリを持つことがある。
+ * `${url}?highlight=` と文字で連結すると `?tab=…?highlight=…` のように
+ * `?` が2つ並ぶ壊れたURLになり、タブ指定ごと読めなくなる（MILEAGE-09）。
+ * 既存のクエリとハッシュはそのまま保ち、`highlight` だけを書き換える。
+ */
+export function createPageReturnHref(parentHref: string, id: string | void): string {
+  if (!id) return parentHref
+  const url = new URL(parentHref, 'https://create-page.invalid')
+  url.searchParams.set('highlight', String(id))
+  return `${url.pathname}${url.search}${url.hash}`
+}
 
 /**
  * 作成画面の寸法の版。
@@ -40,6 +64,8 @@ export interface CreatePageProps {
   /** 保存する。作ったもののIDを返すと、一覧で目立たせる */
   onSave: () => Promise<string | void>
   /** 「保存して続けて作る」で入力を空に戻す。省略するとボタンを出さない */
+  /** 一覧以外へ続く作成フロー。IDを受けて次の画面を決める。 */
+  successHref?: (id: string | void) => string
   onReset?: () => void
   /** 保存前の確認。文字列を返すとその内容をエラーとして出し、保存しない */
   validate?: () => string | null
@@ -66,6 +92,7 @@ export default function CreatePage({
   description,
   parent,
   onSave,
+  successHref,
   onReset,
   validate,
   aside,
@@ -99,13 +126,9 @@ export default function CreatePage({
         return
       }
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
-      router.push(id ? `${parent[1]}?highlight=${id}` : parent[1])
+      router.push(successHref ? successHref(id) : createPageReturnHref(parent[1], id))
     } catch (e) {
-      if (e instanceof ApiError) {
-        setError(e.message)
-      } else {
-        setError(e instanceof Error ? e.message : '保存に失敗しました')
-      }
+      setError(createPageErrorMessage(e))
     } finally {
       setSaving(false)
     }
@@ -132,7 +155,7 @@ export default function CreatePage({
       <button
         onClick={() => run(false)}
         disabled={saving}
-        className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
       >
         {saving ? '保存中...' : (saveLabel ?? '保存')}
       </button>
@@ -175,7 +198,7 @@ export default function CreatePage({
         <div
           data-design="Left"
           className={`bg-canvas border-hairline border ${
-            v6 ? 'rounded-tile space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
+            v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
           {children}
@@ -222,14 +245,21 @@ export function FormSection({
   step,
   label,
   note,
+  help,
   children,
 }: {
   step: number
   label: string
   note?: string
+  /**
+   * 節の言葉の意味・仕様。見出しのすぐ右の「？」へ入れる
+   * （★V7・§2-1b）。警告・直し方は note のまま残す。
+   */
+  help?: ReactNode
   children: ReactNode
 }) {
   const v6 = useContext(VariantContext) === 'v6'
+  const hasHelp = help !== undefined && help !== null
   return (
     <section
       className={`border-hairline border-b last:border-b-0 last:pb-0 ${v6 ? 'pb-3' : 'pb-5'}`}
@@ -245,6 +275,7 @@ export function FormSection({
         <div>
           <h2 className={v6 ? 'text-ink text-lead font-bold' : 'text-ink text-sm font-semibold'}>
             {label}
+            {hasHelp ? <HelpTip label={`${label}の説明`}>{help}</HelpTip> : null}
           </h2>
           {note && (
             <p className={v6 ? 'text-ink-faint text-micro mt-0.5 font-medium' : 'text-ink-faint mt-0.5 text-xs'}>

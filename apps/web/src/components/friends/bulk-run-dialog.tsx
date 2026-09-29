@@ -1,9 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Combobox from '@/components/shared/combobox'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api } from '@/lib/api'
+import type { FriendListItem } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import type {
   FriendBulkOperation,
@@ -38,6 +42,7 @@ function wait(ms: number): Promise<void> {
 export default function BulkRunDialog({
   open,
   friendIds,
+  selectedFriends,
   tags,
   accountId,
   onClose,
@@ -45,6 +50,7 @@ export default function BulkRunDialog({
 }: {
   open: boolean
   friendIds: string[]
+  selectedFriends: FriendListItem[]
   tags: Array<{ id: string; name: string }>
   accountId: string | null
   onClose: () => void
@@ -306,13 +312,34 @@ export default function BulkRunDialog({
         ? operationLabel(detail.operation.kind)
         : '一括操作'
   const resultComplete = detail ? isRunComplete(detail.status) : false
+  const operationTiles = [
+    { kind: 'add_tag', label: 'タグを付ける', note: '友だちを分類します', icon: '◇', available: true },
+    { kind: 'start_scenario', label: 'シナリオを開始', note: 'ステップ配信を開始します', icon: '▷', available: false },
+    { kind: 'assign_operator', label: '担当者を変更', note: '担当者をまとめて変更します', icon: '♙', available: false },
+    { kind: 'set_support', label: '対応マークを変更', note: '対応状況を更新します', icon: '✓', available: false },
+    { kind: 'set_reminder', label: 'リマインダーを設定', note: '指定日時に通知します', icon: '♧', available: false },
+    { kind: 'send_message', label: 'メッセージを送る', note: '同じ内容をまとめて送ります', icon: '□', available: false },
+    { kind: 'run_common_action', label: 'アクションを実行', note: '登録済みのアクションを実行します', icon: 'ϟ', available: false },
+    { kind: 'remove_tag', label: 'タグを外す', note: '付いているタグをまとめて外します', icon: '◇', available: true },
+    { kind: 'stop_scenario', label: 'シナリオを停止', note: '進行中のステップ配信を止めます', icon: '▣', available: false },
+  ] as const
 
   return (
     <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="友だちを一括操作">
       <div className={styles.panel} data-design-node="IAf7j">
         <header className={styles.head}>
-          <h2 className={styles.title}>友だちを一括操作</h2>
-          <p className={styles.note}>{friendIds.length.toLocaleString('ja-JP')}人を選択中。対象を確認してから操作を選んでください。</p>
+          <h2 className={styles.screenTitle}>友だちを一括操作</h2>
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" className={styles.backButton} onClick={close}>← 友だち一覧へ戻る</button>
+            <button type="button" className="inline-flex items-center justify-center rounded-mini p-1.5 text-ink-secondary hover:bg-canvas hover:text-ink" onClick={close} aria-label="閉じる">
+              <X aria-hidden="true" size={20} />
+            </button>
+          </div>
+          <div className={styles.selectionBanner}>
+            <strong>✓　{friendIds.length.toLocaleString('ja-JP')}人を選択中</strong>
+            <span>対象を確認してから操作を選んでください</span>
+            <button type="button" onClick={close}>選択を解除</button>
+          </div>
         </header>
 
         {failure ? (
@@ -324,34 +351,48 @@ export default function BulkRunDialog({
 
         {phase === 'operation' ? (
           <div className={styles.body}>
-            <fieldset className={styles.field}>
-              <legend className={styles.label}>実行する操作を選択</legend>
+            <div className={styles.operationLayout}>
+            <fieldset className={styles.operationPanel}>
+              <legend className={styles.panelTitle}>実行する操作を選択</legend>
+              <div className={styles.categoryTabs}><strong>よく使う</strong><span>タグ</span><span>シナリオ</span><span>担当者・対応マーク</span><span>その他</span></div>
               <div className={styles.ops}>
-                {OPERATIONS.filter((o) => o.kind === 'add_tag' || o.kind === 'remove_tag').map((op) => (
+                {operationTiles.map((op) => (
                   <button
                     key={op.kind}
                     type="button"
                     role="radio"
                     aria-checked={operationKind === op.kind}
-                    onClick={() => setOperationKind(op.kind)}
+                    disabled={!op.available}
+                    title={op.available ? undefined : '入力項目と実行APIを接続後に利用できます'}
+                    onClick={() => op.available && setOperationKind(op.kind)}
                     className={operationKind === op.kind ? styles.opOn : styles.op}
                   >
+                    <span className={styles.opIcon}>{op.icon}</span>
                     <span className={styles.opLabel}>{op.label}</span>
                     <span className={styles.opNote}>{op.note}</span>
                   </button>
                 ))}
               </div>
-              {/* いま画面で組み立てられるのはタグの付け外しだけ。ほかは口の形が要る。 */}
-              <p className={styles.hint}>ほかの操作は準備中です。</p>
             </fieldset>
 
-            <label className={styles.field}>
+            <aside className={styles.executionPanel}>
+              <h3 className={styles.panelTitle}>実行内容</h3>
+              <dl className={styles.executionSummary}>
+                <div><dt>対象</dt><dd>選択した友だち {friendIds.length}人</dd></div>
+                <div><dt>操作</dt><dd>{operationLabel(operationKind)}</dd></div>
+                <div><dt>タグ</dt><dd>{tags.find((tag) => tag.id === tagId)?.name ?? '選択してください'}</dd></div>
+              </dl>
+            <div className={styles.field}>
               <span className={styles.label}>どのタグ</span>
-              <select aria-label="どのタグ" className={styles.input} value={tagId} onChange={(e) => setTagId(e.target.value)}>
-                <option value="">選んでください</option>
-                {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-              </select>
-            </label>
+              <Combobox
+                aria-label="どのタグ"
+                placeholder="選んでください"
+                value={tagId}
+                onChange={setTagId}
+                options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              />
+            </div>
+            <p className={styles.executionHint}>ⓘ 実行前に対象と操作内容を確認できます。</p>
 
             {previewState === 'loading' ? <ListState kind="loading" title="対象を数えています" /> : null}
             {previewState === 'error' ? (
@@ -359,7 +400,7 @@ export default function BulkRunDialog({
                 kind="error"
                 title="対象を数えられませんでした"
                 description="選んだ友だちは変わっていません。読み直してから、もう一度お試しください。"
-                action={<Button onClick={() => void loadPreview()}>数え直す</Button>}
+                onRetry={() => void loadPreview()}
               />
             ) : null}
             {previewState === 'forbidden' ? (
@@ -371,11 +412,27 @@ export default function BulkRunDialog({
             ) : null}
 
             <div className={styles.actions}>
-              <Button onClick={close}>キャンセル</Button>
               <Button variant="primary" disabled={!tagId || previewState === 'loading'} onClick={() => void loadPreview()}>
                 実行内容を確認
               </Button>
             </div>
+            </aside>
+            </div>
+
+            <section className={styles.selectedPanel}>
+              <div className={styles.selectedHead}><h3>選択した友だち</h3><strong>{friendIds.length}人</strong></div>
+              <div className={styles.selectedTable}>
+                <div className={styles.selectedRowHead}><span>名前</span><span>流入元</span><span>担当者</span><span>現在のタグ</span></div>
+                {selectedFriends.map((friend) => (
+                  <div className={styles.selectedRow} key={friend.id}>
+                    <strong>{friend.displayName}</strong>
+                    <span>{friend.firstTrackedLinkName ?? 'LINE'}</span>
+                    <span>{friend.operator?.name ?? '未割り当て'}</span>
+                    <span>{friend.tags.map((tag) => tag.name).join('・') || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         ) : null}
 
@@ -425,11 +482,10 @@ export default function BulkRunDialog({
             ) : null}
 
             {!reversible ? (
-              <label className={styles.confirm}>
-                <input type="checkbox" checked={irreversibleConfirmed} onChange={(e) => setIrreversibleConfirmed(e.target.checked)} />
+              <Checkbox checked={irreversibleConfirmed} onCheckedChange={setIrreversibleConfirmed}>
                 {/* 取り消せないことを窓の中に書く。 */}
                 この操作は取り消せません。{countText(preview.targetCount, '人')}に実行することを確認しました。
-              </label>
+              </Checkbox>
             ) : null}
 
             {blocked ? <p className={styles.hint}>{blocked}</p> : null}
@@ -490,17 +546,18 @@ export default function BulkRunDialog({
               </>
             ) : null}
 
-            <div className={styles.actions}>
-              <Button onClick={close} disabled={busy}>閉じる</Button>
-              {resultState === 'ready' && canUndo(detail) ? (
-                <Button onClick={() => void undo()} disabled={busy}>取り消す</Button>
-              ) : null}
-              {resultState === 'ready' && canRetry(detail) ? (
-                <Button variant="primary" onClick={() => void retry()} disabled={busy}>
-                  失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す
-                </Button>
-              ) : null}
-            </div>
+            {resultState === 'ready' && (canUndo(detail) || canRetry(detail)) ? (
+              <div className={styles.actions}>
+                {canUndo(detail) ? (
+                  <Button onClick={() => void undo()} disabled={busy}>取り消す</Button>
+                ) : null}
+                {canRetry(detail) ? (
+                  <Button variant="primary" onClick={() => void retry()} disabled={busy}>
+                    失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

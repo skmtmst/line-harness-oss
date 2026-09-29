@@ -7,7 +7,10 @@
  */
 
 .dialog {
+  margin-block: 44px;
+  height: 958px;
   max-width: 1240px;
+  background: var(--color-canvas);
 }
 
 /* 追加する動作の札。設計 h=58・角丸8。 */

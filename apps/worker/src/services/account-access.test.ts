@@ -2,17 +2,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LineAccount } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import {
+  _resetVisibleLineAccountScopeCacheForTest,
+  canAccessAllLineAccounts,
   canAccessLineAccount,
   filterVisibleLineAccounts,
   getVisibleLineAccountScope,
   validateAccountHierarchy,
 } from './account-access.js';
 
+const dbMocks = vi.hoisted(() => ({
+  getLineAccountScopeEntries: vi.fn(),
+  getLineAccounts: vi.fn(),
+  decryptLineAccountCredentials: vi.fn(),
+}));
+
 vi.mock('@line-crm/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@line-crm/db')>();
   return {
     ...actual,
-    getLineAccounts: vi.fn(async () => accounts),
+    getLineAccountScopeEntries: dbMocks.getLineAccountScopeEntries,
+    getLineAccounts: dbMocks.getLineAccounts,
+    decryptLineAccountCredentials: dbMocks.decryptLineAccountCredentials,
     getStaffById: vi.fn(async (_db: D1Database, id: string) => staffRows.get(id) ?? null),
     getStaffAccountScopeIds: vi.fn(async (_db: D1Database, id: string) => scopeIds.get(id) ?? []),
   };
@@ -25,10 +35,16 @@ function account(
   return {
     id, parent_line_account_id: options.parent ?? null, channel_id: id, name: id,
     channel_access_token: 'token', channel_secret: 'secret', login_channel_id: '1',
-    login_channel_secret: 'secret', liff_id: '1-X', is_active: 1, country: null,
+    login_channel_secret: 'secret', liff_id: '1-X', is_active: 1, is_default: 0,
+    archived_at: null, archived_by: null, archived_reason: null, country: null,
+    channel_access_token_updated_at: null, channel_secret_updated_at: null,
+    login_channel_secret_updated_at: null,
     role: null, display_order: 0, token_expires_at: null, og_site_name: null,
-    og_default_image_url: null, og_default_description: null, friend_capacity: null,
+    og_default_image_url: null, og_default_description: null, official_profile_url: null,
+    friend_capacity: null,
     capacity_warn_at: null, icon_url: null,
+    line_display_name: null, line_picture_url: null, line_basic_id: null,
+    line_profile_synced_at: null,
     tenant_id: options.tenantId === undefined ? DEFAULT_TENANT_ID : options.tenantId,
     created_at: '', updated_at: '',
   };
@@ -51,9 +67,14 @@ const staff = (tenantId: string | null = DEFAULT_TENANT_ID) => ({
 
 describe('filterVisibleLineAccounts', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     accounts = [...defaultAccounts, tenantBAccount];
     staffRows = new Map([['s', { account_scope: 'all' }]]);
     scopeIds = new Map();
+    dbMocks.getLineAccountScopeEntries.mockImplementation(async (_db, tenantId) =>
+      accounts.filter(
+        (item) => (item.tenant_id ?? DEFAULT_TENANT_ID) === tenantId,
+      ));
   });
   it('既定統括のスタッフには既定統括の3アカウントだけを返す', () => {
     expect(filterVisibleLineAccounts(accounts, staff()).map((item) => item.id))
@@ -68,6 +89,23 @@ describe('filterVisibleLineAccounts', () => {
   it('tenantIdがNULLのスタッフは既定統括として扱う', () => {
     expect(filterVisibleLineAccounts(accounts, staff(null)).map((item) => item.id))
       .toEqual(['parent', 'child', 'grandchild']);
+  });
+
+  it('匿名利用者には既定統括のアカウントを返さない', async () => {
+    expect(filterVisibleLineAccounts(accounts, undefined)).toEqual([]);
+    expect(canAccessLineAccount(accounts, undefined, 'parent')).toBe(false);
+    await expect(getVisibleLineAccountScope({} as D1Database, undefined)).resolves.toEqual({
+      accounts: [],
+      allowedAccountIds: [],
+      canSeeUnassigned: false,
+      ids: [],
+      isAccountScoped: true,
+    });
+  });
+
+  it('同一統括だけを許可し、別統括を許可しない', () => {
+    expect(canAccessLineAccount(accounts, staff(), 'parent')).toBe(true);
+    expect(canAccessLineAccount(accounts, staff('tenant-B'), 'parent')).toBe(false);
   });
 
   it('tenant_idがNULLのアカウントは既定統括から見える', () => {
@@ -87,6 +125,12 @@ describe('filterVisibleLineAccounts', () => {
       ids: ['parent', 'child', 'grandchild'],
       canSeeUnassigned: true,
     });
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledWith(
+      expect.anything(),
+      DEFAULT_TENANT_ID,
+    );
+    expect(dbMocks.getLineAccounts).not.toHaveBeenCalled();
+    expect(dbMocks.decryptLineAccountCredentials).not.toHaveBeenCalled();
   });
 
   it('既定統括以外は自分のアカウントだけを閲覧し、未割当行を閲覧できない', async () => {
@@ -94,6 +138,10 @@ describe('filterVisibleLineAccounts', () => {
       allowedAccountIds: ['tenant-b-account'],
       canSeeUnassigned: false,
     });
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledWith(
+      expect.anything(),
+      'tenant-B',
+    );
   });
 
   it('アカウントが0件の統括には空の一覧を返す', async () => {
@@ -148,6 +196,91 @@ describe('filterVisibleLineAccounts', () => {
       allowedAccountIds: ['parent', 'child', 'grandchild'],
       canSeeUnassigned: true,
     });
+  });
+
+  it('機能オフ middleware の一時範囲を通常のtenant・担当範囲へ重ねる', async () => {
+    const featureScoped = {
+      ...staff(),
+      featureEnabledLineAccountIds: ['child', 'tenant-b-account'],
+    };
+    await expect(getVisibleLineAccountScope({} as D1Database, featureScoped)).resolves.toMatchObject({
+      allowedAccountIds: ['child'],
+      ids: ['child'],
+      canSeeUnassigned: false,
+    });
+  });
+});
+
+describe('getVisibleLineAccountScope の同一要求メモ化(#633)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetVisibleLineAccountScopeCacheForTest();
+    accounts = [...defaultAccounts, tenantBAccount];
+    staffRows = new Map([['s', { account_scope: 'all' }]]);
+    scopeIds = new Map();
+    dbMocks.getLineAccountScopeEntries.mockImplementation(async (_db, tenantId) =>
+      accounts.filter(
+        (item) => (item.tenant_id ?? DEFAULT_TENANT_ID) === tenantId,
+      ));
+  });
+
+  it('同じstaff・同じdbの再計算はD1へ行かない', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    const first = await getVisibleLineAccountScope(db, member);
+    const second = await getVisibleLineAccountScope(db, member);
+    const viaAccess = await canAccessAllLineAccounts(db, member, ['parent']);
+    expect(second).toEqual(first);
+    expect(viaAccess).toBe(true);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(1);
+  });
+
+  it('同時に投げた解決は1回の読取に束ねる', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    const [a, b] = await Promise.all([
+      getVisibleLineAccountScope(db, member),
+      getVisibleLineAccountScope(db, member),
+    ]);
+    expect(a).toEqual(b);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(1);
+  });
+
+  it('別のstaffオブジェクトは別要求として再計算する', async () => {
+    const db = {} as D1Database;
+    await getVisibleLineAccountScope(db, staff());
+    await getVisibleLineAccountScope(db, staff());
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(2);
+  });
+
+  it('同じstaffでも別のdbは別要求として再計算する', async () => {
+    const member = staff();
+    await getVisibleLineAccountScope({} as D1Database, member);
+    await getVisibleLineAccountScope({} as D1Database, member);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(2);
+  });
+
+  it('失敗した解決は残さず、同じ要求内でやり直せる', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    dbMocks.getLineAccountScopeEntries
+      .mockRejectedValueOnce(new Error('d1 down'))
+      .mockImplementation(async (_db, tenantId) =>
+        accounts.filter((item) => (item.tenant_id ?? DEFAULT_TENANT_ID) === tenantId));
+    await expect(getVisibleLineAccountScope(db, member)).rejects.toThrow('d1 down');
+    await expect(getVisibleLineAccountScope(db, member)).resolves.toMatchObject({
+      allowedAccountIds: ['parent', 'child', 'grandchild'],
+    });
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(2);
+  });
+
+  it('テスト用resetで同じstaff・同じdbでも取り直せる', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    await getVisibleLineAccountScope(db, member);
+    _resetVisibleLineAccountScopeCacheForTest();
+    await getVisibleLineAccountScope(db, member);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(2);
   });
 });
 

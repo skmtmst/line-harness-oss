@@ -173,9 +173,18 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const channel = c.req.query('channel') || 'all';
+    const assignee = c.req.query('assignee');
+    const unreadOnly = c.req.query('unreadOnly') === '1' || c.req.query('unreadOnly') === 'true';
+    const quickFilter = c.req.query('quickFilter');
+    if (quickFilter && quickFilter !== 'reply' && quickFilter !== 'overdue') {
+      return c.json({ success: false, error: 'invalid_quick_filter' }, 400);
+    }
+    // These filters belong to the email list; LINE uses /api/chats.
+    if ((assignee || unreadOnly || quickFilter) && channel !== 'email') {
+      return c.json({ success: false, error: 'email_channel_required' }, 400);
+    }
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
-    const selectedLineAccountId = (c.req.query('lineAccountId') || '').trim();
     const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
     const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
     // LINEとメールを待ち時間順で統合してからページを切るため、要求ページの末尾まで
@@ -188,7 +197,9 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
 
     // Email threads have no account key in the legacy schema. Until a thread
     // is explicitly attributed, only the default tenant may view them.
-    if (channel !== 'line' && scope.canSeeUnassigned && !selectedLineAccountId) {
+    // メール問い合わせは LINE アカウントに所属しないため、選択中の
+    // LINE アカウントがあっても対象から外さない（件数の数え方と同じ）。
+    if (channel !== 'line' && scope.canSeeUnassigned) {
       const statusSql = status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -201,11 +212,37 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
-        searchSql = 'AND (t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ?)';
-        const like = `%${query}%`;
-        bindings.push(like, like, like);
+        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        searchSql = `AND (
+          instr(lower(t.customer_email), lower(?)) > 0
+          OR instr(lower(t.customer_name), lower(?)) > 0
+          OR instr(lower(t.subject), lower(?)) > 0
+          OR EXISTS (
+            SELECT 1 FROM support_email_messages searched
+            WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
+          )
+        )`;
+        bindings.push(query, query, query, query);
       }
-      bindings.push(fetchLimit);
+      if (assignee) {
+        if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
+        else {
+          searchSql += ' AND t.assigned_staff_id = ?';
+          bindings.push(assignee);
+        }
+      }
+      if (unreadOnly) {
+        searchSql += ' AND (sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)';
+      }
+      if (quickFilter) {
+        searchSql += " AND t.status = 'unread'";
+        if (quickFilter === 'overdue') {
+          searchSql += ' AND julianday(t.last_incoming_at) <= julianday(?)';
+          bindings.push(new Date(Date.now() - 60 * 60 * 1000).toISOString());
+        }
+      }
+      bindings.push(channel === 'email' ? limit : fetchLimit);
+      if (channel === 'email') bindings.push(offset);
       const emailRows = await c.env.DB.prepare(
         `SELECT t.id, t.customer_email, t.customer_name, t.subject, t.status, t.revision,
                 COUNT(*) OVER() AS total_count,
@@ -225,14 +262,10 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           AND sr.conversation_id = t.id
           AND sr.staff_id = ?
          WHERE ${statusSql} ${searchSql}
-         ORDER BY CASE t.status
-                    WHEN 'unread' THEN 0
-                    WHEN 'in_progress' THEN 1
-                    WHEN 'on_hold' THEN 2
-                    ELSE 3
-                  END,
-                  t.last_message_at DESC
-         LIMIT ?`,
+         /* 一覧の並びは LINE と同じく「未読が先 → 最新の受信・送信が新しい順」。
+            未読は赤い点と同じ定義 (担当者の既読位置より新しい受信がある)。 */
+         ORDER BY is_unread_for_staff DESC, t.last_message_at DESC, t.id DESC
+         LIMIT ? ${channel === 'email' ? 'OFFSET ?' : ''}`,
       ).bind(...bindings).all<EmailThreadRow>();
       emailTotal = emailRows.results[0]?.total_count ?? 0;
       emailUnread = emailRows.results[0]?.unread_count ?? 0;
@@ -285,14 +318,19 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       }
     }
 
-    const statusPriority = { unread: 0, in_progress: 1, on_hold: 2, resolved: 3 } as const;
-    items.sort((a, b) => {
-      const priority = statusPriority[a.status as keyof typeof statusPriority]
-        - statusPriority[b.status as keyof typeof statusPriority];
-      if (priority !== 0) return priority;
-      // 対応漏れを防ぐため、同じ状態では待ち時間が長い顧客を先頭にする。
-      return String(a.lastIncomingAt).localeCompare(String(b.lastIncomingAt));
-    });
+    // channel=email は受信箱の左の一覧に混ぜる分。口側の ORDER BY
+    // (未読が先・新しい順) のまま出し、ここでは並べ替えない。
+    // 混ぜた2出どころ (LINE は /api/chats) はどちらも同じ決まり。
+    if (channel !== 'email') {
+      const statusPriority = { unread: 0, in_progress: 1, on_hold: 2, resolved: 3 } as const;
+      items.sort((a, b) => {
+        const priority = statusPriority[a.status as keyof typeof statusPriority]
+          - statusPriority[b.status as keyof typeof statusPriority];
+        if (priority !== 0) return priority;
+        // 対応漏れを防ぐため、同じ状態では待ち時間が長い顧客を先頭にする。
+        return String(a.lastIncomingAt).localeCompare(String(b.lastIncomingAt));
+      });
+    }
     const oldest = items.reduce<string | null>((value, item) => {
       const at = String(item.lastIncomingAt || '');
       return !at ? value : value === null || at < value ? at : value;
@@ -300,7 +338,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     return c.json({
       success: true,
       data: {
-        items: paginateSupportInboxItems(items, offset, limit),
+        items: channel === 'email' ? items : paginateSupportInboxItems(items, offset, limit),
         summary: {
           total: lineTotal + emailTotal,
           line: lineTotal,
@@ -326,6 +364,20 @@ supportInbox.use('/api/support/email/*', async (c, next) => {
   return next();
 });
 
+/*
+ * PERF-11: メッセージの区切り位置。<created_at>~<id> の形で、
+ * 同じ created_at が並んでも id で順を切れる。
+ */
+function encodeMessageCursor(createdAt: string, id: string): string {
+  return `${createdAt}~${id}`;
+}
+function parseMessageCursor(raw: string | undefined): { createdAt: string; id: string } | null | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  const sep = raw.indexOf('~');
+  if (sep <= 0 || sep === raw.length - 1 || raw.length > 1024) return null;
+  return { createdAt: raw.slice(0, sep), id: raw.slice(sep + 1) };
+}
+
 supportInbox.get('/api/support/email/threads/:id', async (c) => {
   const id = c.req.param('id');
   const thread = await c.env.DB.prepare(
@@ -334,14 +386,76 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
      FROM support_email_threads WHERE id = ?`,
   ).bind(id).first();
   if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
-  const messages = await c.env.DB.prepare(
-    `SELECT id, direction, sender_email, sender_name, recipient_email, subject,
+  /*
+    PERF-11: 毎回全件は返さない。初回は新しい側から limit 件、
+    before= で古い履歴、after= で新着の差分を取る。
+    返す messages は常に created_at 昇順。
+  */
+  const parsedLimit = Number(c.req.query('limit'));
+  const limit = Number.isSafeInteger(parsedLimit) && parsedLimit > 0
+    ? Math.min(parsedLimit, 200)
+    : 100;
+  const before = parseMessageCursor(c.req.query('before'));
+  const after = parseMessageCursor(c.req.query('after'));
+  if (before === null || after === null || (before && after)) {
+    return c.json({ success: false, error: '続きの位置が正しくありません', code: 'cursor_invalid' }, 400);
+  }
+  const messageSelect = `SELECT id, direction, sender_email, sender_name, recipient_email, subject,
             body_text, sent_by_staff_id,
             (SELECT name FROM staff_members sm WHERE sm.id = support_email_messages.sent_by_staff_id) AS sent_by_staff_name,
             created_at
-     FROM support_email_messages WHERE thread_id = ? ORDER BY created_at ASC`,
-  ).bind(id).all();
-  return c.json({ success: true, data: { thread, messages: messages.results } });
+     FROM support_email_messages`;
+  type MessageRow = {
+    id: string; direction: string; sender_email: string; sender_name: string | null;
+    recipient_email: string; subject: string; body_text: string; sent_by_staff_id: string | null;
+    sent_by_staff_name: string | null; created_at: string;
+  };
+  let messages: MessageRow[];
+  let hasMoreOlder = false;
+  if (after) {
+    // 新着差分。上側で切れたら次の取り直しが newestCursor から続く。
+    const rows = await c.env.DB.prepare(
+      `${messageSelect}
+       WHERE thread_id = ? AND (created_at > ? OR (created_at = ? AND id > ?))
+       ORDER BY created_at ASC, id ASC LIMIT ?`,
+    ).bind(id, after.createdAt, after.createdAt, after.id, limit).all<MessageRow>();
+    messages = rows.results;
+    // 前の履歴が残っているかはここでは調べない。画面は開いたときの値を持つ。
+    const older = await c.env.DB.prepare(
+      `SELECT 1 AS x FROM support_email_messages
+       WHERE thread_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) LIMIT 1`,
+    ).bind(id, after.createdAt, after.createdAt, after.id).first();
+    hasMoreOlder = older !== null;
+  } else {
+    const cursorFilter = before
+      ? 'AND (created_at < ? OR (created_at = ? AND id < ?))'
+      : '';
+    const rows = await c.env.DB.prepare(
+      `${messageSelect}
+       WHERE thread_id = ? ${cursorFilter}
+       ORDER BY created_at DESC, id DESC LIMIT ?`,
+    ).bind(
+      id,
+      ...(before ? [before.createdAt, before.createdAt, before.id] : []),
+      limit + 1,
+    ).all<MessageRow>();
+    hasMoreOlder = rows.results.length > limit;
+    messages = rows.results.slice(0, limit).reverse();
+  }
+  const total = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS c FROM support_email_messages WHERE thread_id = ?',
+  ).bind(id).first<{ c: number }>();
+  return c.json({
+    success: true,
+    data: {
+      thread,
+      messages,
+      total: total?.c ?? messages.length,
+      hasMoreOlder,
+      oldestCursor: messages.length ? encodeMessageCursor(messages[0].created_at, messages[0].id) : null,
+      newestCursor: messages.length ? encodeMessageCursor(messages[messages.length - 1].created_at, messages[messages.length - 1].id) : null,
+    },
+  });
 });
 
 supportInbox.post(
@@ -462,7 +576,7 @@ supportInbox.patch(
 
     // 知らないIDを入れると、誰も見ていない担当になる。実在を確かめる。
     if (staffId) {
-      const exists = await c.env.DB.prepare(`SELECT 1 FROM users WHERE id = ?`)
+      const exists = await c.env.DB.prepare(`SELECT 1 FROM staff_members WHERE id = ? AND is_active = 1`)
         .bind(staffId)
         .first();
       if (!exists) return c.json({ success: false, error: '担当者が見つかりません' }, 400);

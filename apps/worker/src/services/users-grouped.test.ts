@@ -485,6 +485,42 @@ describe('computeUsersGrouped', () => {
     expect((await computeUsersGrouped(db, { q: 'no-hit' })).total).toBe(0);
   });
 
+  /*
+   * FRIEND-09: uid 絞り込みは「表示中の1ページ」ではなく全件へかけてから
+   * ページを切る。絞った集まりの2ページ目へも辿れ、total は絞った後の数。
+   */
+  test('uid 絞り込みはページネーションより先に全件へかかる（FRIEND-09）', async () => {
+    const mk = (i: number, kind: IdentRow['ident_kind'], key: string): IdentRow => ({
+      ...makeRow(i, key, [{ id: 'a1', name: 'L ①' }])[0],
+      ident_kind: kind,
+      updated_at: `2026-02-0${i}T00:00:00+09:00`,
+    });
+    const db = stubDB({
+      ident: [
+        mk(1, 'url_token', 't1'),
+        mk(2, 'uid', 'uid:k2'),
+        mk(3, 'url_token', 't3'),
+        mk(4, 'uid', 'uid:k4'),
+        mk(5, 'uid', 'uid:k5'),
+      ],
+      forms: [],
+    });
+
+    const linked = await computeUsersGrouped(db, { uid: 'linked' });
+    expect(linked.total).toBe(3);
+    expect(linked.rows.every((r) => r.identityKeyKind === 'uid')).toBe(true);
+
+    // 絞り込んだ集まり（3件）の2ページ目。先頭50件への後絞りでは辿れない。
+    const p2 = await computeUsersGrouped(db, { uid: 'linked', page: 2, pageSize: 2 });
+    expect(p2.total).toBe(3);
+    expect(p2.rows).toHaveLength(1);
+    expect(p2.rows[0].identityKeyKind).toBe('uid');
+
+    const unlinked = await computeUsersGrouped(db, { uid: 'unlinked' });
+    expect(unlinked.total).toBe(2);
+    expect(unlinked.rows.every((r) => r.identityKeyKind !== 'uid')).toBe(true);
+  });
+
   test('ページネーション: page と pageSize で切り出される', async () => {
     const ident: IdentRow[] = [];
     for (let i = 1; i <= 7; i++) {

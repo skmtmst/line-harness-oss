@@ -101,6 +101,16 @@ export interface Tag {
   displayOrder?: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
+  /** 選択中のLINE公式アカウント。V6の定義詳細で返る。 */
+  lineAccountId?: string | null;
+  description?: string | null;
+  manualAssignmentAllowed?: boolean;
+  reapplyPolicy?: "first_only" | "every_time";
+  linkedEnabled?: boolean;
+  status?: "active" | "archived";
+  /** 楽観ロックに使う定義版。 */
+  version?: number;
+  updatedAt?: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
   friendCount?: number;
   /** 自動付与のきっかけ。履歴から断定できない場合は省略する。 */
@@ -115,6 +125,13 @@ export interface Tag {
   };
   /** このタグが付いた後に動く、マイル以外のアクション数。0件なら省略する。 */
   otherActionCount?: number;
+  /** タグ編集画面で再表示する、保存済みの連動アクション。 */
+  linkedActions?: Array<{
+    id: string;
+    type: string;
+    label: string;
+    timing: string;
+  }>;
   /** タグ管理の整理候補に入る理由。withCounts=1 のときだけ返る。 */
   cleanupReasons?: Array<"unused" | "duplicate_name">;
 }
@@ -179,12 +196,15 @@ export type FriendFieldType =
   | "textarea"
   | "number"
   | "date"
+  | "datetime"
   | "select"
   | "multi_select"
   | "checkbox"
   | "url"
   | "tel"
-  | "email";
+  | "email"
+  | "image"
+  | "pdf";
 
 /**
  * 友だち情報欄の項目。
@@ -202,6 +222,12 @@ export interface FriendField {
   type: FriendFieldType;
   /** select / multi_select のときの選択肢 */
   options: string[] | null;
+  /**
+   * R139: 選択肢のIDと表示名の対応（サーバーが実行時に付けている）。
+   * 既定値（IDの配列・IDで保存）を表示名へ戻すときに使う。無いときは
+   * 表示名の突き合わせに倒す。追加のみで既存の形は変えない。
+   */
+  optionDefinitions?: Array<{ id: string; label: string }> | null;
   defaultValue: string | null;
   source: "manual" | "form" | "ec" | "automation";
   ecFieldPath: string | null;
@@ -213,11 +239,19 @@ export interface FriendField {
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
+  status?: "active" | "read_only" | "archived";
+  version?: number;
+  /** 画像・PDFは本文へ文字として差し込まない。 */
+  canInsertText?: boolean;
   /** GET /api/friends/:id/fields のときだけ付く */
   value?: string | null;
   updatedBy?: string | null;
   /** ?withUsage=1 のときだけ付く */
   usageCount?: number;
+  /** この項目へ回答を保存する回答フォーム数。未取得時は省略する。 */
+  formUsageCount?: number;
+  /** 一覧で運用者へ示す表示・利用先。未取得時は省略する。 */
+  displayTargets?: string[];
   /** 選択中アカウント専用でなく、移行前からある共通項目。 */
   isInherited?: boolean;
 }
@@ -246,6 +280,15 @@ export interface Folder {
   color: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * 選択中アカウントの可視範囲で数えた、このフォルダに属する件数（#631）。
+   *
+   * `kind` が件数の数え方（対応表・アカウント境界）を確立できていない種別
+   * （#730）や `kind` を指定しない呼び出しでは `undefined`。**`undefined`
+   * は「0件」ではなく「数えていない」を意味する。**画面はキャストで
+   * フォールバック計算をせず、そのまま「—」等を出すこと。
+   */
+  itemCount?: number;
 }
 
 /** 対応マーク */
@@ -257,6 +300,8 @@ export interface SupportMark {
   autoOnInbound: boolean;
   displayOrder: number;
   createdAt: string;
+  updatedAt?: string;
+  version?: number;
   /** 旧環境から共有されているマーク。編集時に選択中アカウントへ複製される。 */
   isInherited?: boolean;
   /** GET /api/support-marks の一覧で返る実参照数。省略は未取得、0は参照なし。 */
@@ -267,6 +312,10 @@ export interface SupportMark {
     savedSearches: number;
     automations: number;
   };
+  /** 一覧で示す自動変更の要約。未取得時は autoOnInbound だけで判定する。 */
+  automaticChangeLabel?: string;
+  /** このマークを選べる・確認できる画面。 */
+  displayTargets?: Array<"inbox" | "friend_list" | "friend_detail" | "dashboard" | "broadcast" | "automation">;
 }
 
 /** メディアライブラリの1件 */
@@ -283,7 +332,23 @@ export interface MediaItem {
   durationMs: number | null;
   url: string;
   uploadedBy: string | null;
+  /**
+   * 入れた人の表示名（R35）。uploadedBy は内部ID（UUID）のまま残し、
+   * 画面にはこちらを出す。退職・削除済みで引けないときは null。
+   */
+  uploadedByName?: string | null;
   createdAt: string;
+  /** アーカイブ済みなら退避した時刻・実行者・理由。使用中でも触れない消去ではない。 */
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+  archiveReason?: string | null;
+  /**
+   * 運用者が記録した利用期限（YYYY-MM-DD）。null/省略は未記録＝不明。
+   * 推定値は入れない（根拠のない権利情報を作らない）。
+   */
+  usageExpiresAt?: string | null;
+  /** 同意・権利について確認済みの記録メモ。null/省略は未記録＝不明。 */
+  usageConsentNote?: string | null;
   /** 0は未使用。省略は旧APIなどでまだ取得できていない状態。 */
   usageCount?: number;
 }
@@ -328,8 +393,66 @@ export interface MediaDeleteImpact {
   /** 7種類すべてを削除直前に読み切った時刻。0件でも必ず入る。 */
   checkedAt: string;
   lastScannedAt: string | null;
+  /**
+   * 7種類すべてを読み切れたか（R34）。表が無い環境などで一部を読めな
+   * かったときは false。false のとき usageCount 0 は「どこでも使って
+   * いない」ではなく「確かめられなかった」で、canDelete も false
+   * （確かめられないものは消させない）。
+   */
+  verified: boolean;
   canDelete: boolean;
   recommendedAction: "delete" | "review_references";
+}
+
+export type MediaReplacementBlocker =
+  | "same_media"
+  | "different_kind"
+  | "unavailable_reference"
+  | "shared_reference"
+  | "unsupported_reference";
+
+/** 一括差し替えの対象になる使用先。内部IDは画面へ返さない。 */
+export interface MediaReplacementReference extends MediaDeleteImpactReference {
+  replaceable: boolean;
+  blocker: MediaReplacementBlocker | null;
+  reason: string | null;
+}
+
+/** `GET /api/media/:id/replacement-impact` の返り値。 */
+export interface MediaReplacementImpact {
+  source: MediaDeleteImpact["media"];
+  replacement: MediaDeleteImpact["media"];
+  usageCount: number;
+  replaceableCount: number;
+  /** この画面からは差し替えられない使用先の件数。usageCount - replaceableCount と同じ。 */
+  blockedCount: number;
+  /** 差し替えられない使用先の種類別件数（ウェビナー何件・共有配信何件…）。 */
+  blockedByKind: Partial<Record<MediaDeleteImpactReferenceKind, number>>;
+  references: MediaReplacementReference[];
+  blockers: MediaReplacementBlocker[];
+  /** 全使用先をまとめて差し替えられるときだけ true。 */
+  canReplace: boolean;
+  /**
+   * 差し替え可能な使用先だけを選んで実行できるとき true。
+   * 差し替え元と先の組み合わせ自体が不正（同一・種類違い）な場合は false。
+   */
+  canPartiallyReplace: boolean;
+  checkedAt: string;
+  /** 影響確認後に使用先が変わっていないことを、実行直前に照合する値。 */
+  revision: string;
+}
+
+export interface MediaReplacementResult {
+  sourceId: string;
+  replacementId: string;
+  /** 全使用先を替えたか（all）、差し替え可能な箇所だけを替えたか（partial）。 */
+  mode: "all" | "partial";
+  replacedUsageCount: number;
+  /** 置換不可として元メディアを指したまま残した使用先の件数。 */
+  skippedUsageCount: number;
+  remainingUsageCount: number | null;
+  verification: "verified" | "partial" | "unavailable";
+  checkedAt: string;
 }
 
 /** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
@@ -339,8 +462,17 @@ export interface CommonVar {
   folderId: string | null;
   name: string;
   varKey: string;
-  type: "text" | "url" | "image" | "number";
+  type: "text" | "url" | "image" | "number" | "long_text" | "date" | "datetime" | "boolean";
   value: string;
+  validFrom: string | null;
+  validUntil: string | null;
+  fallbackValue: string | null;
+  expiryBehavior: "stop" | "fallback";
+  /** Q: 保存した状態（下書き draft / 使用中 active / 止めた stopped）。 */
+  status?: "draft" | "active" | "stopped";
+  /** 画面に出す状態。期限切れは時刻から計算した表示用の状態。 */
+  state?: "draft" | "active" | "stopped" | "expired";
+  stoppedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   nextSchedule?: {
@@ -348,6 +480,8 @@ export interface CommonVar {
     value: string;
   } | null;
   pendingScheduleCount?: number;
+  /** 一覧で確認する、差し込まれている場所の合計。 */
+  usageCount?: number;
 }
 
 /** 共通情報の日付での切り替え予約 */
@@ -396,6 +530,12 @@ export interface CommonVarDeleteImpact {
   total: number;
   blockingTotal: number;
   historicalTotal: number;
+  /**
+   * 配信中で、送信開始時に固定した値の写し（スナップショット）を持つ
+   * 使用先の件数。共通情報を直しても、その配信は固定済みの値のまま
+   * 送られる（IDEA-14）。
+   */
+  sendingFixedTotal: number;
   unscopedFormTotal: number;
   canDelete: boolean;
   byKind: Record<CommonVarUsageKind, number>;
@@ -405,6 +545,41 @@ export interface CommonVarDeleteImpact {
   recommendedAction: "delete" | "review_references";
 }
 
+/**
+ * 共通情報を**変える前**の1件（POST /api/common-vars/:id/impact-preview）。
+ *
+ * 削除前の1件に、保存すると何がどう変わるかを足したもの。
+ */
+export interface CommonVarChangeImpactItem extends CommonVarDeleteImpactItem {
+  /** 保存すると変わるか。**送信済みの記録と、送信開始時の値で固定済みの配信中は変わらない。** */
+  changesOnSave: boolean;
+  /** 差し込みの目印を本文から読み取れたか。読めないと変更後の文を作れない。 */
+  previewAvailable: boolean;
+  /** 変更後の文。作れないときは `null`。**空文字と混ぜない。** */
+  nextPreview: string | null;
+  currentCharacterCount: number;
+  /** 変更後の文字数。変更後の文を作れないときは `null`。**0と混ぜない。** */
+  nextCharacterCount: number | null;
+  /** LINEの本文になる使用先だけ上限がある。無いものは `null`。 */
+  characterLimit: number | null;
+  exceedsCharacterLimit: boolean;
+  /** 保存を止める理由。空なら止めない。 */
+  errors: string[];
+  /** 保存はできるが、目で確かめてほしいこと。 */
+  warnings: string[];
+}
+
+/** 共通情報の変更前確認（POST /api/common-vars/:id/impact-preview）。 */
+export interface CommonVarChangeImpact extends Omit<CommonVarDeleteImpact, "items" | "variable" | "recommendedAction"> {
+  variable: { id: string; name: string; varKey: string; currentValue: string; nextValue: string };
+  items: CommonVarChangeImpactItem[];
+  errorTotal: number;
+  warningTotal: number;
+  /** 1件でも `errors` があれば保存させない。 */
+  canSave: boolean;
+  recommendedAction: "fix_errors" | "confirm_changes" | "save";
+}
+
 export type SavedSearchConditionKind =
   | "name"
   | "tag"
@@ -412,11 +587,18 @@ export type SavedSearchConditionKind =
   | "form"
   | "purchase"
   | "mark"
+  | "assignee"
   | "scenario"
+  | "event_booking"
+  | "calendar_booking"
   | "chat_status"
+  | "last_activity"
+  | "reminder"
+  | "memo"
   | "following"
   | "status_message"
-  | "created_at";
+  | "created_at"
+  | "common_event";
 
 /** 保存した検索の条件1本。kind ごとに op / key / value の意味が変わる。 */
 export interface SavedSearchCondition {
@@ -502,6 +684,10 @@ export interface SavedSearch {
   isShared: boolean;
   displayOrder: number;
   createdAt: string;
+  conditionFormat?: "search_v1" | "segment_v1";
+  updatedBy?: string | null;
+  updatedAt?: string;
+  revision?: number;
   /** 現在の保存条件に一致する友だち数。評価不能・未取得は null。 */
   matchCount?: number | null;
   /** matchCount が null のとき、黙って0件にせず理由を返す。 */
@@ -510,6 +696,8 @@ export interface SavedSearch {
   usedIn?: SavedSearchUsage[];
   /** 使用先が無いとサーバーで確認できたときだけ true。 */
   canDelete?: boolean;
+  /** 今月、この保存条件が呼び出された回数。未取得時は省略する。 */
+  callCountThisMonth?: number;
 }
 
 /** 共通の配信対象として保存した条件。友だち検索とJSONの形を混ぜない。 */
@@ -544,6 +732,8 @@ export interface SavedSearchUsage {
   name: string;
   mode: SavedSearchReferenceMode;
   lastUsedAt: string | null;
+  revision?: number | null;
+  callCountThisMonth?: number;
 }
 
 /**
@@ -553,6 +743,8 @@ export interface SavedSearchUsage {
 export interface TagGroup {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 所有するLINE公式アカウント。移行前の共通分類だけ null。 */
+  accountId: string | null;
   /** 分類名 */
   name: string;
   /** 一覧での並び順。小さいほど上 */
@@ -906,6 +1098,12 @@ export interface LineAccount {
   channelId: string;
   /** アカウント名 */
   name: string;
+  /** LINE公式アカウントに設定された表示名。未同期時は運用名。 */
+  displayName?: string;
+  /** LINE公式アカウントの公開画像。 */
+  pictureUrl?: string | null;
+  /** LINE公式アカウントのベーシックID。 */
+  basicId?: string | null;
   /** 新しい値を保存するときだけ送る。保存後のレスポンスには含まれない。 */
   channelAccessToken?: string;
   /** 新しい値を保存するときだけ送る。保存後のレスポンスには含まれない。 */
@@ -924,6 +1122,26 @@ export interface LineAccount {
   liffId: string | null;
   /** 有効/無効 */
   isActive: boolean;
+  channelAccessTokenLast4: string | null;
+  channelAccessTokenUpdatedAt: string | null;
+  channelSecretLast4: string | null;
+  channelSecretUpdatedAt: string | null;
+  loginChannelSecretLast4: string | null;
+  loginChannelSecretUpdatedAt: string | null;
+  /** 統括内で最初に選ぶ既定アカウントか。 */
+  isDefault: boolean;
+  /** アーカイブ日時。null なら通常利用中。 */
+  archivedAt: string | null;
+  /** 止めた理由の区分（manual | ban_detected | credential_invalid）。動いていれば null。 */
+  inactiveReason?: string | null;
+  /** 止めた理由の本文。動いていれば null。 */
+  inactiveReasonDetail?: string | null;
+  /** 止めた日時。 */
+  inactivatedAt?: string | null;
+  /** 最後にWebhookを受け取った日時。届かない警告の判定に使う。 */
+  lastWebhookReceivedAt?: string | null;
+  /** Webhook届かない警告を出さないアカウントか。 */
+  webhookSilenceExempt?: boolean;
   /** 友だち数の上限。null なら上限を管理しない */
   friendCapacity?: number | null;
   /** 何人で警告を出すか。null なら警告しない */
@@ -954,6 +1172,21 @@ export interface LineAccount {
     actualUrl: string | null;
     active: boolean | null;
     status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
+  };
+  stats?: {
+    friendCount: number;
+    activeScenarios: number;
+    messagesThisMonth: number;
+    staffCount: number;
+  };
+  connection?: {
+    /** 一覧APIの最新接続判定。 */
+    status?: 'ok' | 'warn' | 'unknown';
+    checkedAt?: string | null;
+    /** 詳細APIのWebhook試験・受信履歴。 */
+    lastTestAt?: string | null;
+    lastTestStatus?: 'succeeded' | 'failed' | null;
+    lastReceivedAt?: string | null;
   };
 }
 
@@ -999,6 +1232,12 @@ export interface EntryRoute {
   introTemplateId: string | null;
   runAccountFriendAddScenarios: boolean;
   isActive: boolean;
+  /** 受付を止めた時刻。受付中・記録の無い古い行は null。 */
+  stoppedAt: string | null;
+  /** 止めた理由。受付中は null。 */
+  stoppedReason: string | null;
+  /** 所属するLINEアカウント。未割当の古い行では null のことがある。 */
+  lineAccountId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1021,6 +1260,8 @@ export interface CreateEntryRouteInput {
   introTemplateId?: string | null;
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
+  /** 作成時に所属させるLINEアカウント。Worker の必須検査と保存に使う。 */
+  lineAccountId?: string | null;
 }
 
 export interface EntryRouteFunnel {
@@ -1081,6 +1322,8 @@ export interface ConversionPoint {
   attributionDays?: number | null;
   /** 集計対象を1アカウントに絞る場合。null なら全アカウント */
   lineAccountId?: string | null;
+  /** 楽観ロック版。更新・停止にはこの版の一致が要る */
+  version: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }
@@ -1113,6 +1356,10 @@ export interface ConversionEvent {
 export interface Affiliate {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 所属テナント */
+  tenantId: string;
+  /** 所属LINE公式アカウント */
+  lineAccountId: string | null;
   /** アフィリエイト名 */
   name: string;
   /** トラッキングコード (ユニーク) */
@@ -1161,6 +1408,9 @@ export interface IncomingWebhook {
   // The raw secret is never exposed on list/get/update responses. Callers can
   // only know whether one is currently configured.
   hasSecret: boolean;
+  // S: while a rotation grace window is open, when the previous secret stops
+  // being accepted. Null once the window has passed or there is no previous key.
+  previousSecretUsableUntil?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -1200,6 +1450,18 @@ export interface OutgoingWebhookCreated extends Omit<OutgoingWebhook, 'hasSecret
 
 export type WebhookInteractionDirection = 'outgoing' | 'incoming';
 export type WebhookInteractionStatus = 'pending' | 'succeeded' | 'failed' | 'retried';
+/**
+ * 失敗理由の内部記号。'unknown' は「相手先へ届いたか分からない」失敗で、
+ * 無条件の再送をせず、相手先で確かめてから復旧する対象(IDEA-26)。
+ */
+export type WebhookInteractionFailureReason =
+  | 'connection_failed'
+  | 'response_4xx'
+  | 'response_429'
+  | 'response_5xx'
+  | 'processing_failed'
+  | 'unknown'
+  | 'secret_unavailable';
 
 /**
  * 外部連携の1回分の安全な表示。URL、シークレット、送受信本文は含めない。
@@ -1215,8 +1477,27 @@ export interface WebhookInteraction {
   responseStatus: number | null;
   attemptCount: number;
   durationMs: number | null;
+  /** 画面に出す日本語の失敗理由。 */
   failureReason: string | null;
+  /** 判定に使う失敗理由の記号。'unknown' は送り直し前に相手先での確認を要する。 */
+  failureReasonCode: WebhookInteractionFailureReason | null;
   canRetry: boolean;
+  /**
+   * 送り直せない理由(d23b R414)。canRetry=false のとき、なぜ直せないかを
+   * 画面へ出せるように返す。
+   *   webhook_deleted       送り先が削除された
+   *   webhook_inactive      送り先が止められている
+   *   auto_retry_scheduled  自動の送り直しが動いている（もう届いている途中）
+   *   already_delivered     自動の送り直しですでに届いた
+   */
+  retryBlockReason:
+    | 'webhook_deleted'
+    | 'webhook_inactive'
+    | 'auto_retry_scheduled'
+    | 'already_delivered'
+    | null;
+  /** 自動の送り直しの次回予定。予定が無いとき null。 */
+  autoRetryNextAt: string | null;
   startedAt: string;
   completedAt: string | null;
   retryOfId: string | null;
@@ -1228,6 +1509,12 @@ export interface WebhookInteractionSummary {
   incoming: number;
   succeeded: number;
   failed: number;
+  /** 失敗のうち「届いたか分からない」件数。まとめて再送の対象外(IDEA-26)。 */
+  resultUnknown: number;
+  /** 送信の失敗の総数(d23b R408)。受信の失敗と混ぜない。 */
+  outgoingFailed: number;
+  /** 送信の失敗のうち、今ここからまとめて送り直せる件数(d23b R408)。 */
+  retryable: number;
   averageDurationMs: number | null;
 }
 
@@ -1296,6 +1583,8 @@ export interface Reminder {
   triggerFieldId?: string | null;
   /** 154: 毎年くり返すか（誕生日なら true）。 */
   repeatYearly?: boolean;
+  /** 419: 2月29日が基準日の毎年くり返しで、平年にいつ扱うか。 */
+  leapYearPolicy?: 'feb28' | 'mar1' | 'skip';
   createdAt: string;
   updatedAt: string;
 }
@@ -1497,6 +1786,11 @@ export type AutomationEventType =
   | "message_received"
   | "postback_received"
   | "calendar_booked"
+  | "form_submitted"
+  | "link_clicked"
+  | "datetime"
+  | "daily"
+  | "weekly"
   | "ec.order.confirmed"
   | "ec.order.shipped"
   | "ec.subscription.upcoming"
@@ -1540,6 +1834,8 @@ export interface AutomationLog {
 // -----------------------------------------------------------------------------
 export interface StaffMember {
   id: string;
+  /** 認証済み本人APIが返すテナント識別子。古いAPI応答との互換のため任意。 */
+  tenantId?: string;
   name: string;
   email: string | null;
   role: 'owner' | 'admin' | 'staff' | 'viewer';
@@ -1558,6 +1854,14 @@ export interface StaffMember {
   /** 担当範囲。accounts の場合は scopedLineAccountIds に対象店舗が入る。 */
   accountScope?: 'all' | 'accounts';
   scopedLineAccountIds?: string[];
+  /** N-424: 役割bundle。role は初期値、こちらが監査・画面の共通語彙。 */
+  roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom';
+  /** N-424: 「見えるだけ」のキー（GET系のみ許可）。 */
+  permissionViewKeys?: string[];
+  /** N-424: 機能ごとの3択（none/view/edit）。編集画面の復元用。 */
+  permissionScope?: Record<string, 'edit' | 'view' | 'none'>;
+  /** N-424: この人が他者のメールをどう見るか（full=実値/masked=伏せ字/none=出さない）。 */
+  emailMask?: 'full' | 'masked' | 'none' | null;
 }
 
 export interface StaffProfile {
@@ -1771,7 +2075,7 @@ export const FRIEND_ADD_ROUTING_DEFAULT: FriendAddRouting = {
 /** V6の友だち追加履歴。Pencil共通デザインはこの契約だけを見て描画する。 */
 export type FriendAddEventKind = "first_time" | "returning";
 export type FriendAddEventAttributionStatus = "captured" | "unavailable";
-export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed";
+export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed" | "partial_failed";
 
 export interface FriendAddEventItem {
   id: string;
@@ -1812,3 +2116,425 @@ export type FriendAddEventViewState =
   | { status: "empty"; summary: FriendAddEventSummary }
   | { status: "ready"; data: FriendAddEventList }
   | { status: "error"; message: string };
+
+/** 自動応答の公開前に固定する編集内容。保存しても本番ルールは変わらない。 */
+export interface AutoReplyDraftInput {
+  keyword: string;
+  matchType: "exact" | "contains";
+  responseType: string;
+  responseContent: string;
+  templateId: string | null;
+  lineAccountId: string;
+  activeFrom: string | null;
+  activeUntil: string | null;
+  cooldownMinutes: number | null;
+  skipWhenOperatorActive: boolean;
+  priority: number;
+  messageKinds: string[] | null;
+  /** 受信経路。空は許さず、既存版は LINE として読む。 */
+  receiveSources: Array<"line" | "email">;
+  friendConditions: Record<string, unknown> | null;
+  actions: unknown[] | null;
+  responseWeekdays: number[] | null;
+  responseHolidayRule: "ignore" | "include" | "exclude" | null;
+  oncePerFriend: boolean;
+  keywords: Array<{
+    keyword: string;
+    matchType?: "exact" | "contains";
+    minLength?: number;
+    caseSensitive?: boolean;
+  }> | null;
+  respondToAll: boolean;
+  name: string | null;
+  keywordMatchMode: "any" | "all";
+  folderId: string | null;
+  /** 管理者だけが読む補足。友だちへ送る本文には含めない。 */
+  internalMemo: string | null;
+  /** 受信してから返信するまで待つ秒数。null は即時。 */
+  replyDelaySeconds: number | null;
+  /** 条件に一致しなかったときの後続処理。 */
+  unmatchedAction: Record<string, unknown> | null;
+}
+
+export interface AutoReplyDraftVersion {
+  autoReplyId: string;
+  versionId: string;
+  versionNumber: number;
+  status: "draft" | "published" | "retired";
+  settings: AutoReplyDraftInput;
+  lastTestStatus: "succeeded" | "failed" | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+  /** 過去28日の実測一致数。集計できなかったときは null。 */
+  matchedLast28Days?: number | null;
+}
+
+export type AutoReplyTestReasonCode =
+  | "message_kind_not_matched"
+  | "keyword_not_matched"
+  | "outside_active_window"
+  | "weekday_not_allowed"
+  | "operator_handling"
+  | "already_replied_once"
+  | "cooldown_active"
+  | "friend_conditions_not_met"
+  /** 同じ検証文に当たったが、先に動くルールがあるため実行されない。 */
+  | "higher_priority_won";
+
+export interface AutoReplyConflict {
+  autoReplyId: string;
+  name: string;
+  certainty: "certain" | "possible";
+  winnerAutoReplyId: string;
+  reason: string;
+}
+
+export interface AutoReplyValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  conflicts: AutoReplyConflict[];
+  lastTestStatus: "succeeded" | "failed" | null;
+}
+
+export interface AutoReplyDryRunResult {
+  matched: boolean;
+  draftWon: boolean;
+  /**
+   * 試した友だちのトークが「対応中」か。
+   * 有人対応の抑止が効く状態かを画面で説明するために返す。
+   */
+  operatorActive: boolean;
+  winner: {
+    autoReplyId: string;
+    name: string;
+    responseType: string;
+    responseContent: string;
+  } | null;
+  candidates: Array<{
+    autoReplyId: string;
+    name: string;
+    priority: number;
+    result: "not_matched" | "skipped" | "won";
+    reasonCodes: AutoReplyTestReasonCode[];
+    /** 「担当者が対応中のトークでは返さない」設定のルールか。抑止対象の明示に使う。 */
+    suppressWhenOperatorActive: boolean;
+  }>;
+  actions: Array<{ kind: string }>;
+  stateChanged: false;
+}
+
+export interface AutoReplyPublishResult {
+  autoReplyId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  acknowledgedConflictIds: string[];
+}
+
+export type ReminderLifecycleStatus = "draft" | "published" | "stopped";
+
+export interface ReminderStopConditions {
+  bookingCancelled: boolean;
+  supportMarkCompleted: boolean;
+  daysAfterTarget: number | null;
+  friendBlocked: boolean;
+}
+
+export interface ReminderDraftStep {
+  stableStepId: string;
+  offsetMinutes: number;
+  messageType: MessageType;
+  messageContent: string;
+  offsetDays?: number | null;
+  sendAtTime?: string | null;
+  templateId?: string | null;
+  targetCondition?: Record<string, unknown>;
+  action?: Record<string, unknown>;
+}
+
+/**
+ * リマインダの対象条件。一斉配信・シナリオと同じ絞り込みの形。
+ *
+ * settings_snapshot の JSON にだけ持つので列の追加は要らない。
+ * 空 (rules・groups ともに0件) は「絞り込みなし」と同じく扱う。
+ */
+export interface ReminderTargetCondition {
+  operator: 'AND' | 'OR';
+  rules: Array<{ type: string; value: unknown }>;
+  groups?: ReminderTargetCondition[];
+}
+
+export interface ReminderDraftSettings {
+  name: string;
+  description?: string | null;
+  lineAccountId: string;
+  triggerType: ReminderTriggerType;
+  deliveryMode: "time" | "countdown";
+  triggerFieldId?: string | null;
+  /** triggerType が 'event' のときの起点イベント。未指定(NULL)は全イベントが起点になる従来動作。 */
+  triggerEventId?: string | null;
+  repeatYearly?: boolean;
+  /** 419: 2月29日が基準日の毎年くり返しで、平年にいつ扱うか。既定 'feb28'。 */
+  leapYearPolicy?: 'feb28' | 'mar1' | 'skip';
+  triggerOffsetMinutes?: number | null;
+  sendAtTime?: string | null;
+  targetTagId?: string | null;
+  /** 対象の絞り込み条件。あるときは targetTagId よりこちらが勝つ。 */
+  targetCondition?: ReminderTargetCondition | null;
+  folderId?: string | null;
+  stopConditions: ReminderStopConditions;
+  steps: ReminderDraftStep[];
+}
+
+export interface ReminderDraftVersion {
+  reminderId: string;
+  versionId: string;
+  versionNumber: number;
+  status: "draft" | "published" | "superseded";
+  settings: ReminderDraftSettings;
+  lastTestStatus: "succeeded" | "failed" | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+  /**
+   * 版の更新時刻（R148 監査）。保存のたびに変わるため、開いたときの値と
+   * ずれていれば別の画面が先に保存したと分かる。保存時に送り返す。
+   */
+  updatedAt: string;
+}
+
+export interface ReminderValidationResult {
+  valid: boolean;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: "passed" | "failed" | "warning";
+    message: string;
+  }>;
+  audience: { matched: number | null; excluded: number | null };
+}
+
+export interface ReminderPreviewResult {
+  targetDate: string;
+  items: Array<{
+    stableStepId: string;
+    stepNumber: number;
+    scheduledAt: string;
+    label: string;
+    state: "scheduled" | "past" | "duplicate";
+  }>;
+  summary: {
+    audience: number | null;
+    next7Days: number | null;
+    next30Days: number | null;
+    duplicateCount: number;
+  };
+}
+
+export interface ReminderPublishResult {
+  reminderId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  audience: number | null;
+  plannedDeliveries: number | null;
+  nextScheduledAt: string | null;
+}
+
+/**
+ * テスト送信前に画面へ出す送信先の状態（N-070）。
+ * unset=未設定 / unavailable=設定済みだがこのアカウントで届けられない /
+ * ready=送信できる。送信本体と同じ判定を使うので表示と実送信がずれない。
+ *
+ * REMINDER-12: ready の送信先は「操作者本人のLINE（self）」と
+ * 「アカウント設定の登録済みテスト宛先（registered）」を区別する。
+ * 本人宛てはスタッフとの本人対応をサーバーで確認できた場合だけ名乗り、
+ * 登録宛先は画面・確認窓・要約で実名を明示する。
+ */
+export interface ReminderTestRecipientStatus {
+  state: "unset" | "unavailable" | "ready";
+  recipient: {
+    id: string;
+    displayName: string;
+    pictureUrl: string | null;
+  } | null;
+  /** ready のときだけ埋まる送信先の種別。それ以外は null。 */
+  recipientKind: "self" | "registered" | null;
+}
+
+/** 7機能の実行記録画面で共通に使う所有元。書込台帳は機能ごとに安全に保つ。 */
+export type ExecutionOwnerKind =
+  | "broadcast"
+  | "reminder"
+  | "scenario"
+  | "auto_reply"
+  | "manual"
+  | "user"
+  | "automation"
+  | "notification"
+  | "integration";
+
+export type ExecutionRunStatus =
+  | "succeeded"
+  | "failed"
+  | "partial"
+  | "skipped"
+  | "pending"
+  | "cancelled"
+  | "claimed"
+  | "permanent_failed";
+
+/** リマインダの書込台帳だけが持つ詳細状態。共通状態へ潰さず保存する。 */
+export type ReminderDeliveryRunStatus =
+  | "planned"
+  | "claimed"
+  | "succeeded"
+  | "skipped"
+  | "retry_wait"
+  | "permanent_failed"
+  | "cancelled";
+
+export interface ExecutionRunIdentity {
+  ownerKind: ExecutionOwnerKind;
+  ownerId: string;
+  lineAccountId: string | null;
+}
+
+/** 7機能の実行記録一覧が共通で読む9項目。 */
+export interface ExecutionRunListItem extends ExecutionRunIdentity {
+  occurredAt: string;
+  subject: string | null;
+  accountLabel: string | null;
+  triggerLabel: string;
+  reference: string | null;
+  status: ExecutionRunStatus;
+  detail: string | null;
+  durationMs: number | null;
+  canRetry: boolean;
+}
+
+export interface ReminderDeliveryRun extends ExecutionRunListItem {
+  id: string;
+  reminderId: string;
+  friendReminderId: string;
+  friendId: string;
+  friendName: string | null;
+  reminderStepId: string;
+  stepNumber: number;
+  scheduledAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  domainStatus: ReminderDeliveryRunStatus;
+  attemptCount: number;
+  nextRetryAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  /** LINEが返した要求ID。取れなかった場合はnullのままにし、作らない。 */
+  lineRequestId: string | null;
+  /** 実際に送った本文へ辿るためのmessages_log ID。成功前はnull。 */
+  messageLogId: string | null;
+}
+
+export interface ReminderDeliveryRunsResponse {
+  reminder: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    /** 公開版スナップショットのライフサイクル。旧API由来の行は 'published' 相当。 */
+    lifecycleStatus: "draft" | "published" | "stopped";
+    /** 公開版スナップショットの停止条件。公開版が無いときは null（未取得と区別する）。 */
+    stopConditions: ReminderStopConditions | null;
+    /**
+     * 公開版があるか（R146 監査）。無い下書きは「停止中」ではなく
+     * 「下書き」と出し、再開はさせない。
+     */
+    hasPublishedVersion: boolean;
+  };
+  summary: {
+    sent: number;
+    scheduled: number;
+    stopped: number;
+    errors: number;
+    targetCount: number;
+    nextScheduledAt: string | null;
+  };
+  steps: Array<{
+    id: string;
+    stepNumber: number;
+    offsetMinutes: number;
+    messageType: MessageType;
+    messageContent: string;
+    sent: number;
+    /** LINE Messaging APIは友だち単位の既読を返さないため、null。 */
+    openRate: number | null;
+    errors: number;
+  }>;
+  items: ReminderDeliveryRun[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
+/** 自動応答の書込台帳が持つ詳細状態。実行の途中と最終結果を混ぜない。 */
+export type AutoReplyEvaluationStatus =
+  | "received"
+  | "evaluated"
+  | "matched"
+  | "skipped"
+  | "reply_accepted"
+  | "reply_failed"
+  | "actions_running"
+  | "completed"
+  | "partial_failed"
+  | "failed";
+
+export interface AutoReplyRun extends ExecutionRunListItem {
+  id: string;
+  autoReplyId: string | null;
+  autoReplyName: string | null;
+  friendId: string;
+  friendName: string | null;
+  messageKind: string;
+  inputPreview: string | null;
+  matchedKeyword: string | null;
+  versionNumber: number | null;
+  domainStatus: AutoReplyEvaluationStatus;
+  replyStatus: "not_attempted" | "accepted" | "failed";
+  actionSummary: Record<string, number>;
+  lineRequestId: string | null;
+}
+
+export interface AutoReplyRunsResponse {
+  rule: {
+    id: string | null;
+    name: string;
+    isActive: boolean | null;
+    priorityPosition: number | null;
+  };
+  summary: {
+    monthHits: number;
+    totalHits: number;
+    handovers: number;
+    errors: number;
+    lastRunAt: string | null;
+    averageResponseMs: number | null;
+  };
+  handovers: {
+    waiting: number;
+    inProgress: number;
+    completed: number;
+  };
+  triggerBreakdown: Array<{
+    trigger: string;
+    count: number;
+    share: number | null;
+  }>;
+  items: AutoReplyRun[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}

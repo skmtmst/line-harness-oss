@@ -4,9 +4,8 @@ import {
   getLinkClickSummary,
   getTrackedLinkStats,
   getBroadcastSummary,
-  getTagFieldCross,
   buildFunnelResult,
-  getFunnels,
+  getFunnelsWithCurrentVersions,
   getLegacyFunnels,
   getFunnelById,
   getFunnelSteps,
@@ -15,11 +14,14 @@ import {
   countFunnelStep,
   createVersionedFunnel,
   createFunnelVersion,
+  getFunnelWithCurrentVersion,
+  setFunnelStatus,
   runChronologicalFunnel,
   getLatestFunnelRun,
   createFunnelResultAudience,
   createAnalyticsCrossRun,
   getAnalyticsCrossRun,
+  addConversionDefinitionUsage,
   createAnalyticsCrossAudience,
   getCurrentFunnelVersion,
   getAnalyticsFriendsOverview,
@@ -30,15 +32,33 @@ import {
   createSavedAnalyticsFromResult,
   getSavedAnalytics,
   getSavedAnalyticsSnapshots,
+  ANALYTICS_REPORT_SECTIONS,
+  createAnalyticsReportSchedule,
+  getAnalyticsReportRuns,
+  getAnalyticsReportSchedule,
+  getRecentOneTimeAnalyticsReportRuns,
+  getAnalyticsReportScheduleIncludingArchived,
+  getAnalyticsReportSchedules,
+  requeueOneTimeAnalyticsReportSchedule,
+  setAnalyticsReportScheduleStatus,
+  updateAnalyticsReportSchedule,
+  getStaffMembers,
+  getStaffAccountScopeIds,
   getLineAccountById,
+  DEFAULT_TENANT_ID,
   FUNNEL_STEP_KINDS,
   type Funnel,
   type FunnelStepKind,
   type AnalyticsOverviewContext,
+  type AnalyticsReportAlertRule,
+  type AnalyticsReportChannel,
+  type AnalyticsReportRecipient,
+  type AnalyticsReportSection,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { zonedWallTime } from '../services/zoned-time.js';
 
 /**
  * 集計。
@@ -153,6 +173,118 @@ function zonedDateStart(value: string, timeZone: string): string {
   return new Date(guess).toISOString();
 }
 
+function nextReportRun(input: {
+  cadence: 'weekly' | 'monthly'; weekday: number | null; monthDay: number | null;
+  sendTime: string; timeZone: string; now: Date;
+}): string {
+  // R458: 0時のUTC換算＋時分の加算は夏時間の切替日に1時間ずれる。
+  // その日のその時刻を壁時計として解き直す（services/zoned-time.ts）。
+  const currentDate = dateInZone(input.now, input.timeZone);
+  const candidateDate = new Date(`${currentDate}T00:00:00.000Z`);
+  if (input.cadence === 'weekly') {
+    const currentWeekday = new Date(`${currentDate}T12:00:00.000Z`).getUTCDay();
+    candidateDate.setUTCDate(candidateDate.getUTCDate() + ((input.weekday! - currentWeekday + 7) % 7));
+  } else {
+    candidateDate.setUTCDate(input.monthDay!);
+    if (candidateDate.toISOString().slice(0, 10) < currentDate) candidateDate.setUTCMonth(candidateDate.getUTCMonth() + 1);
+  }
+  const resolve = (date: Date) =>
+    Date.parse(zonedWallTime(date.toISOString().slice(0, 10), input.sendTime, input.timeZone));
+  let instant = resolve(candidateDate);
+  if (instant <= input.now.getTime()) {
+    if (input.cadence === 'weekly') {
+      candidateDate.setUTCDate(candidateDate.getUTCDate() + 7);
+      instant = resolve(candidateDate);
+    } else {
+      candidateDate.setUTCMonth(candidateDate.getUTCMonth() + 1);
+      instant = resolve(candidateDate);
+    }
+  }
+  return new Date(instant).toISOString();
+}
+
+function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
+}
+
+function parseReportBody(raw: unknown): { ok: true; value: {
+  name: string; sections: AnalyticsReportSection[]; savedAnalysisIds: string[];
+  cadence: 'weekly' | 'monthly'; weekday: number | null; monthDay: number | null;
+  sendTime: string; timeZone: string; periodDays: number;
+  recipients: AnalyticsReportRecipient[]; channels: AnalyticsReportChannel[];
+  alertRules: AnalyticsReportAlertRule[];
+} } | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, error: '入力内容が正しくありません' };
+  const body = raw as Record<string, unknown>;
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name || name.length > 120) return { ok: false, error: 'レポート名は1〜120文字で入力してください' };
+  const sections = Array.isArray(body.sections)
+    ? [...new Set(body.sections.filter((item): item is AnalyticsReportSection =>
+      typeof item === 'string' && (ANALYTICS_REPORT_SECTIONS as readonly string[]).includes(item)))]
+    : [];
+  const savedAnalysisIds = Array.isArray(body.savedAnalysisIds)
+    ? [...new Set(body.savedAnalysisIds.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map((item) => item.trim()))]
+    : [];
+  if (!sections.length && !savedAnalysisIds.length) return { ok: false, error: 'レポートに入れる項目を選んでください' };
+  const cadence = body.cadence === 'monthly' ? 'monthly' : body.cadence === 'weekly' ? 'weekly' : null;
+  const weekday = Number.isInteger(body.weekday) ? Number(body.weekday) : null;
+  const monthDay = Number.isInteger(body.monthDay) ? Number(body.monthDay) : null;
+  if (!cadence || (cadence === 'weekly' && (weekday === null || weekday < 0 || weekday > 6))
+    || (cadence === 'monthly' && (monthDay === null || monthDay < 1 || monthDay > 28))) {
+    return { ok: false, error: '送信間隔と日を確認してください' };
+  }
+  const sendTime = typeof body.sendTime === 'string' ? body.sendTime : '';
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) return { ok: false, error: '送信時刻を確認してください' };
+  const timeZone = typeof body.timeZone === 'string' ? body.timeZone.trim() : '';
+  try { new Intl.DateTimeFormat('ja-JP', { timeZone }).format(new Date()); } catch { return { ok: false, error: 'タイムゾーンが正しくありません' }; }
+  const periodDays = Number(body.periodDays);
+  if (!Number.isInteger(periodDays) || periodDays < 1 || periodDays > 397) return { ok: false, error: '集計期間は1〜397日で指定してください' };
+  const channels = Array.isArray(body.channels)
+    ? [...new Set(body.channels.filter((item): item is AnalyticsReportChannel => item === 'dashboard' || item === 'email' || item === 'line'))]
+    : [];
+  if (!channels.length) return { ok: false, error: '通知方法を選んでください' };
+  const recipients: AnalyticsReportRecipient[] = [];
+  // R228: 形が合わない宛先を黙って外さない。正しい宛先と混ざっていても、
+  // 不備のある行を示して止める（送ったつもりが届いていないを防ぐ）。
+  for (const item of Array.isArray(body.recipients) ? body.recipients : []) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { ok: false, error: '宛先に読み取れない行があります' };
+    }
+    const value = item as Record<string, unknown>;
+    const label = typeof value.label === 'string' ? value.label.trim().slice(0, 120) : '';
+    if (value.kind === 'staff') {
+      if (typeof value.staffId !== 'string' || !value.staffId.trim()) {
+        return { ok: false, error: '宛先のログインユーザーを読み取れませんでした' };
+      }
+      recipients.push({ kind: 'staff', staffId: value.staffId.trim(), label: label || 'ログインユーザー' });
+    } else if (value.kind === 'email') {
+      const email = typeof value.email === 'string' ? value.email.trim() : '';
+      if (!isEmail(email)) {
+        return { ok: false, error: `宛先のメールアドレス「${email || '(空)'}」は形が正しくありません` };
+      }
+      recipients.push({ kind: 'email', email: email.toLowerCase(), label: label || email });
+    } else {
+      return { ok: false, error: '宛先に読み取れない行があります' };
+    }
+  }
+  if (!recipients.length) return { ok: false, error: '受け取る人を選んでください' };
+  const alertRules = Array.isArray(body.alertRules) ? body.alertRules.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const value = item as Record<string, unknown>;
+    const metric = value.metric;
+    const operator = value.operator;
+    const threshold = Number(value.threshold);
+    const minimumSample = Number(value.minimumSample);
+    if ((metric !== 'block_rate' && metric !== 'friend_adds' && metric !== 'conversions')
+      || (operator !== 'greater_than' && operator !== 'decrease_percent' && operator !== 'zero_streak_days')
+      || !Number.isFinite(threshold) || threshold < 0
+      || !Number.isInteger(minimumSample) || minimumSample < 1) return [];
+    return [{ metric, operator, threshold, minimumSample } as AnalyticsReportAlertRule];
+  }) : [];
+  return { ok: true, value: { name, sections, savedAnalysisIds, cadence, weekday: cadence === 'weekly' ? weekday : null,
+    monthDay: cadence === 'monthly' ? monthDay : null, sendTime, timeZone, periodDays, recipients, channels, alertRules } };
+}
+
 export function readAnalyticsOverviewRange(
   query: (key: string) => string | undefined,
   timeZone: string,
@@ -209,6 +341,7 @@ function serializeFunnel(f: Funnel) {
     name: f.name,
     windowDays: f.window_days,
     createdAt: f.created_at,
+    status: f.status,
   };
 }
 
@@ -219,9 +352,10 @@ function explicitTimestamp(value: unknown, code: string): string {
   return parsed.toISOString();
 }
 
-function funnelErrorStatus(error: unknown): 404 | 422 | 500 {
+function funnelErrorStatus(error: unknown): 404 | 409 | 422 | 500 {
   const message = error instanceof Error ? error.message : '';
   if (message.endsWith('_not_found')) return 404;
+  if (message.endsWith('_conflict')) return 409;
   if (message.startsWith('analytics_funnel_')
       || message.startsWith('analytics_cross_')
       || message.startsWith('analytics_saved_')) return 422;
@@ -278,9 +412,12 @@ analytics.get('/api/analytics/url-clicks', async (c) => {
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
     }
+    // 監査 R72: 検索語はSQL側で絞る。取得済みの上位200件の中だけを探していた時期は、
+    // それより先のURLに辿り着けなかった。
+    const query = (c.req.query('query') ?? '').trim().slice(0, 200) || undefined;
     return c.json({
       success: true,
-      data: await getAnalyticsUrlClicksOverview(c.env.DB, context.value, limit),
+      data: await getAnalyticsUrlClicksOverview(c.env.DB, context.value, limit, query),
     });
   } catch (error) {
     console.error('GET /api/analytics/url-clicks error:', error);
@@ -362,21 +499,6 @@ analytics.get('/api/analytics/broadcasts', async (c) => {
   }
 });
 
-// GET /api/analytics/cross?fieldId=... — タグ × 情報欄の値
-analytics.get('/api/analytics/cross', async (c) => {
-  try {
-    const account = await resolveAccount(c);
-    if (!account.ok) return account.response;
-    const fieldId = c.req.query('fieldId');
-    if (!fieldId) return c.json({ success: false, error: 'fieldId が必要です' }, 400);
-    const cells = await getTagFieldCross(c.env.DB, account.accountId, fieldId);
-    return c.json({ success: true, data: cells });
-  } catch (err) {
-    console.error('GET /api/analytics/cross error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
 // V6: クロス分析はCronで非同期実行し、HTTPの処理時間とD1負荷を固定する。
 analytics.post('/api/analytics/cross/query', async (c) => {
   try {
@@ -384,6 +506,17 @@ analytics.post('/api/analytics/cross/query', async (c) => {
     if (!account.ok) return account.response;
     const selectedAccount = await getLineAccountById(c.env.DB, account.accountId);
     if (!selectedAccount) return c.json({ success: false, error: 'Not found' }, 404);
+    // 実行は重い。終わっていない自分の集計がある間は受け付けない。
+    // 実行ボタンは運用担当にも出しているので、権限ではなく間隔で守る。
+    const busy = await c.env.DB
+      .prepare(
+        `SELECT id FROM analytics_cross_runs
+          WHERE line_account_id = ? AND state IN ('pending', 'running')
+          LIMIT 1`,
+      )
+      .bind(account.accountId)
+      .first<{ id: string }>();
+    if (busy) return c.json({ success: false, error: 'analytics_cross_busy' }, 429);
     const body = await c.req.json<unknown>();
     const result = await createAnalyticsCrossRun(c.env.DB, {
       lineAccountId: account.accountId,
@@ -478,6 +611,283 @@ analytics.get('/api/analytics/saved/:id/snapshots', async (c) => {
   }
 });
 
+// ── 定期レポート ────────────────────────────────────────────
+
+async function reportRecipientOptions(c: Context<Env>, accountId: string) {
+  const signedIn = c.get('staff');
+  const members = await getStaffMembers(c.env.DB, signedIn.tenantId ?? DEFAULT_TENANT_ID);
+  const visible = [];
+  for (const member of members) {
+    if (!member.is_active || member.invite_status !== 'active') continue;
+    if (member.account_scope === 'accounts') {
+      const scope = await getStaffAccountScopeIds(c.env.DB, member.id);
+      if (!scope.includes(accountId)) continue;
+    }
+    visible.push({
+      id: member.id, name: member.name, role: member.role,
+      email: member.email, lineLinked: Boolean(member.line_user_id),
+    });
+  }
+  return visible;
+}
+
+analytics.get('/api/analytics/report-schedules', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const selected = await getLineAccountById(c.env.DB, account.accountId);
+    if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
+    const [items, savedAnalyses, recipients, recentOneTime] = await Promise.all([
+      getAnalyticsReportSchedules(c.env.DB, account.accountId),
+      getSavedAnalytics(c.env.DB, account.accountId),
+      reportRecipientOptions(c, account.accountId),
+      // R454: しまった1回送信の直近分も返す。一覧から消えても
+      // 失敗に気づき、依頼IDの結果へ進めるようにする。
+      getRecentOneTimeAnalyticsReportRuns(c.env.DB, account.accountId),
+    ]);
+    return c.json({
+      success: true,
+      data: {
+        items,
+        recentOneTime,
+        options: {
+          timeZone: selected.timezone || 'Asia/Tokyo',
+          savedAnalyses: savedAnalyses.map((item) => ({ id: item.id, name: item.name, kind: item.kind })),
+          recipients,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/analytics/report-schedules error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+async function validateReportPayload(
+  c: Context<Env>, accountId: string,
+  value: Extract<ReturnType<typeof parseReportBody>, { ok: true }>['value'],
+): Promise<string | null> {
+  const [saved, recipientOptions] = await Promise.all([
+    getSavedAnalytics(c.env.DB, accountId),
+    reportRecipientOptions(c, accountId),
+  ]);
+  const visibleSavedIds = new Set(saved.map((item) => item.id));
+  if (!value.savedAnalysisIds.every((id) => visibleSavedIds.has(id))) {
+    return '選べない保存済み分析が含まれています';
+  }
+  const staffById = new Map(recipientOptions.map((item) => [item.id, item]));
+  if (!value.recipients.every((recipient) => recipient.kind === 'email'
+    || Boolean(recipient.staffId && staffById.has(recipient.staffId)))) {
+    return 'このLINEアカウントを見られない宛先が含まれています';
+  }
+  if (value.channels.includes('email')) {
+    const hasEmail = value.recipients.some((recipient) => recipient.kind === 'email'
+      || Boolean(recipient.staffId && staffById.get(recipient.staffId)?.email));
+    if (!hasEmail) return 'メールを受け取れる宛先がありません';
+  }
+  if (value.channels.includes('line')) {
+    const hasLine = value.recipients.some((recipient) => recipient.kind === 'staff'
+      && Boolean(recipient.staffId && staffById.get(recipient.staffId)?.lineLinked));
+    if (!hasLine) return 'LINE連携済みの宛先がありません';
+  }
+  return null;
+}
+
+function expectedUpdatedAtOf(rawBody: unknown): string | null {
+  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) return null;
+  const value = (rawBody as Record<string, unknown>).expectedUpdatedAt;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+const REPORT_SCHEDULE_CONFLICT =
+  'この定期レポートは別の画面で先に更新されました。最新の内容を読み込み直してください';
+
+analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const rawBody = await c.req.json<unknown>();
+    const parsed = parseReportBody(rawBody);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+    const selected = await getLineAccountById(c.env.DB, account.accountId);
+    if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
+    if ((selected.timezone || 'Asia/Tokyo') !== parsed.value.timeZone) {
+      return c.json({ success: false, error: '選択中のLINEアカウントとタイムゾーンが一致しません' }, 422);
+    }
+    const validationError = await validateReportPayload(c, account.accountId, parsed.value);
+    if (validationError) return c.json({ success: false, error: validationError }, 422);
+    const now = new Date();
+    const sendOnce = Boolean(rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
+      && (rawBody as Record<string, unknown>).sendOnce === true);
+    const item = await createAnalyticsReportSchedule(c.env.DB, {
+      lineAccountId: account.accountId,
+      ...parsed.value,
+      nextRunAt: sendOnce ? now.toISOString() : nextReportRun({
+        cadence: parsed.value.cadence, weekday: parsed.value.weekday,
+        monthDay: parsed.value.monthDay, sendTime: parsed.value.sendTime,
+        timeZone: parsed.value.timeZone, now,
+      }),
+      createdBy: c.get('staff').id,
+      now: now.toISOString(),
+      isOneTime: sendOnce,
+    });
+    return c.json({ success: true, data: item }, 201);
+  } catch (error) {
+    console.error('POST /api/analytics/report-schedules error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+analytics.put('/api/analytics/report-schedules/:id', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const rawBody = await c.req.json<unknown>();
+    const parsed = parseReportBody(rawBody);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+    const expectedUpdatedAt = expectedUpdatedAtOf(rawBody);
+    if (!expectedUpdatedAt) {
+      return c.json({ success: false, error: 'expectedUpdatedAtを付けてください' }, 422);
+    }
+    const selected = await getLineAccountById(c.env.DB, account.accountId);
+    if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
+    if ((selected.timezone || 'Asia/Tokyo') !== parsed.value.timeZone) {
+      return c.json({ success: false, error: '選択中のLINEアカウントとタイムゾーンが一致しません' }, 422);
+    }
+    const existing = await getAnalyticsReportSchedule(c.env.DB, c.req.param('id'), account.accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.isOneTime) {
+      return c.json({ success: false, error: '1回だけ送る依頼は変更できません' }, 422);
+    }
+    const validationError = await validateReportPayload(c, account.accountId, parsed.value);
+    if (validationError) return c.json({ success: false, error: validationError }, 422);
+    const now = new Date();
+    const outcome = await updateAnalyticsReportSchedule(c.env.DB, {
+      id: existing.id, lineAccountId: account.accountId, expectedUpdatedAt,
+      ...parsed.value,
+      // 編集した内容の次回予定へそろえる。過去に積み残した回は送り直さない。
+      nextRunAt: nextReportRun({
+        cadence: parsed.value.cadence, weekday: parsed.value.weekday,
+        monthDay: parsed.value.monthDay, sendTime: parsed.value.sendTime,
+        timeZone: parsed.value.timeZone, now,
+      }),
+      now: now.toISOString(),
+    });
+    if (outcome === 'conflict') return c.json({ success: false, error: REPORT_SCHEDULE_CONFLICT }, 409);
+    if (outcome === 'missing') return c.json({ success: false, error: 'Not found' }, 404);
+    const item = await getAnalyticsReportSchedule(c.env.DB, existing.id, account.accountId);
+    return c.json({ success: true, data: item });
+  } catch (error) {
+    console.error('PUT /api/analytics/report-schedules/:id error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+analytics.put('/api/analytics/report-schedules/:id/status', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const rawBody = await c.req.json<unknown>().catch(() => null);
+    const expectedUpdatedAt = expectedUpdatedAtOf(rawBody);
+    if (!expectedUpdatedAt) {
+      return c.json({ success: false, error: 'expectedUpdatedAtを付けてください' }, 422);
+    }
+    const requested = rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
+      ? (rawBody as Record<string, unknown>).status : null;
+    if (requested !== 'paused' && requested !== 'active' && requested !== 'archived') {
+      return c.json({ success: false, error: 'statusにはpaused・active・archivedのどれかを指定してください' }, 422);
+    }
+    const existing = await getAnalyticsReportSchedule(c.env.DB, c.req.param('id'), account.accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.isOneTime) {
+      return c.json({ success: false, error: '1回だけ送る依頼は変更できません' }, 422);
+    }
+    if (existing.status === requested) {
+      // 同じ状態への再送はそのまま返す。一覧を二度押ししても壊れない。
+      return c.json({ success: true, data: existing });
+    }
+    const now = new Date();
+    const outcome = await setAnalyticsReportScheduleStatus(c.env.DB, {
+      id: existing.id, lineAccountId: account.accountId, status: requested,
+      expectedUpdatedAt,
+      // 再開はこれからの回だけにする。止まっていた間の回は送り直さず、
+      // 同じ予定時刻が二重に送られることもない。
+      nextRunAt: requested === 'active' ? nextReportRun({
+        cadence: existing.cadence, weekday: existing.weekday, monthDay: existing.monthDay,
+        sendTime: existing.sendTime, timeZone: existing.timeZone, now,
+      }) : undefined,
+      now: now.toISOString(),
+    });
+    if (outcome === 'conflict') return c.json({ success: false, error: REPORT_SCHEDULE_CONFLICT }, 409);
+    if (outcome === 'missing') return c.json({ success: false, error: 'Not found' }, 404);
+    const item = await getAnalyticsReportSchedule(c.env.DB, existing.id, account.accountId);
+    return c.json({ success: true, data: item });
+  } catch (error) {
+    console.error('PUT /api/analytics/report-schedules/:id/status error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// R454: 1回送信の依頼は送信後に一覧から消える（archived のため）。
+// 依頼IDから失敗理由・宛先別結果へ到達できるよう、履歴を返す。
+// しまったものも含めて引くが、別アカウントのIDは Not found にする。
+analytics.get('/api/analytics/report-schedules/:id/runs', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const schedule = await getAnalyticsReportScheduleIncludingArchived(
+      c.env.DB, c.req.param('id'), account.accountId,
+    );
+    if (!schedule) return c.json({ success: false, error: 'Not found' }, 404);
+    const runs = await getAnalyticsReportRuns(c.env.DB, {
+      scheduleId: schedule.id, lineAccountId: account.accountId,
+    });
+    return c.json({ success: true, data: { schedule, runs } });
+  } catch (error) {
+    console.error('GET /api/analytics/report-schedules/:id/runs error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// R454: 確定失敗の1回送信だけ送り直せる入口。一部でも届いたものは
+// 送り直さない（重複を防ぐ）。届いていないことの確認は最新履歴の
+// 宛先別結果で行い、送り直しは新しい実行記録として残す。
+analytics.post('/api/analytics/report-schedules/:id/retry', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const schedule = await getAnalyticsReportScheduleIncludingArchived(
+      c.env.DB, c.req.param('id'), account.accountId,
+    );
+    if (!schedule || !schedule.isOneTime || schedule.status !== 'archived') {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const runs = await getAnalyticsReportRuns(c.env.DB, {
+      scheduleId: schedule.id, lineAccountId: account.accountId, limit: 1,
+    });
+    const latest = runs[0] ?? null;
+    if (!latest || latest.state === 'running') {
+      return c.json({ success: false, error: '送信結果がまだ確定していません' }, 422);
+    }
+    const sent = latest.deliveryResults.some(
+      (item) => Boolean(item) && typeof item === 'object'
+        && (item as { status?: unknown }).status === 'sent',
+    );
+    if (sent) {
+      return c.json({ success: false, error: '一部は届いているため送り直せません' }, 422);
+    }
+    const outcome = await requeueOneTimeAnalyticsReportSchedule(c.env.DB, {
+      id: schedule.id, lineAccountId: account.accountId, now: new Date().toISOString(),
+    });
+    if (outcome === 'missing') return c.json({ success: false, error: 'Not found' }, 404);
+    const item = await getAnalyticsReportSchedule(c.env.DB, schedule.id, account.accountId);
+    return c.json({ success: true, data: item });
+  } catch (error) {
+    console.error('POST /api/analytics/report-schedules/:id/retry error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // ── ファネル ────────────────────────────────────────────────
 
 analytics.get('/api/funnels', async (c) => {
@@ -493,22 +903,104 @@ analytics.get('/api/funnels', async (c) => {
 });
 
 // V6: 作成時点の段・期間・比較条件を第1版として固定する。
+/**
+ * N-256/N-258: 段に「成果」が入ったファネルを保存したら、成果地点側の
+ * 「使う場所」台帳へこのファネルを実IDで記す。
+ *
+ * 段の中の conversionPointId は作る側で確かめ済み(同じアカウントの
+ * 実在する地点のみ通る)。台帳への記録は成果地点の版でCASするので、
+ * 途中で地点が編集されていたら版を読み直して1回だけやり直す。
+ * ここが失敗してもファネル自体は作れているので、ログを残して
+ * 作成の成功は変えない。
+ */
+/*
+ * CONVERSION-05: 段に置かれた成果地点への利用関係を必ず記す。
+ * 下書き・停止中の地点は手追加の口では弾くが、ファネルの段は実際に
+ * 参照している事実なので allowInactive で記す。登録に失敗した地点名を
+ * 返し、呼び出し側は応答へ載せる——作成は成功したのに利用先一覧へ
+ * 出ない、という静かな食い違いを作らない。
+ */
+async function registerFunnelConversionUsages(
+  db: D1Database,
+  lineAccountId: string,
+  funnelId: string,
+  refVersionId: string | null,
+  steps: ReadonlyArray<{ kind: string; match?: Record<string, string> }> | undefined,
+  staffId: string,
+): Promise<string[]> {
+  const pointIds = [...new Set(
+    (steps ?? [])
+      .filter((step) => step.kind === 'conversion' && typeof step.match?.conversionPointId === 'string')
+      .map((step) => step.match!.conversionPointId),
+  )];
+  const failed: string[] = [];
+  for (const pointId of pointIds) {
+    let pointName = pointId;
+    let registered = false;
+    for (let attempt = 0; attempt < 2 && !registered; attempt += 1) {
+      try {
+        const point = await db
+          .prepare('SELECT version, name FROM conversion_points WHERE id = ?')
+          .bind(pointId)
+          .first<{ version: number; name: string }>();
+        if (!point) break;
+        pointName = point.name || pointId;
+        await addConversionDefinitionUsage(db, {
+          conversionPointId: pointId,
+          lineAccountId,
+          expectedVersion: Number(point.version),
+          refKind: 'analytics',
+          refId: funnelId,
+          refVersionId,
+          staffId,
+          allowInactive: true,
+        });
+        registered = true;
+      } catch (error) {
+        // instanceof ではなく code を見る。テストでモジュールごと差し替わる
+        // 経路でも、版競合のやり直し1回だけが働く形にする。
+        const code = (error as { code?: string } | null)?.code;
+        if (code === 'version_conflict' && attempt === 0) {
+          continue;
+        }
+        console.error('conversion usage registration failed:', {
+          funnelId, conversionPointId: pointId,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    if (!registered) failed.push(pointName);
+  }
+  return failed;
+}
+
 analytics.get('/api/analytics/funnels', async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
-    const funnels = await getFunnels(c.env.DB, account.accountId);
-    const items = await Promise.all(funnels.map(async (funnel) => {
-      const version = await getCurrentFunnelVersion(c.env.DB, account.accountId, funnel.id);
-      return {
-        ...serializeFunnel(funnel),
-        currentVersion: version
-          ? { id: version.id, versionNumber: version.versionNumber, createdAt: version.createdAt }
-          : null,
-        migrationState: version ? 'ready' : 'needs_migration',
-      };
+    const page = Number(c.req.query('page') ?? 1);
+    const pageSize = Number(c.req.query('pageSize') ?? 200);
+    if (!Number.isInteger(page) || page < 1) {
+      return c.json({ success: false, error: 'ページは1以上の整数で指定してください' }, 400);
+    }
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 200) {
+      return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
+    }
+    const result = await getFunnelsWithCurrentVersions(
+      c.env.DB,
+      account.accountId,
+      { page, pageSize, includeInactive: c.req.query('includeInactive') === '1' },
+    );
+    const items = result.items.map((funnel) => ({
+      ...serializeFunnel(funnel),
+      currentVersion: funnel.currentVersion,
+      migrationState: funnel.currentVersion ? 'ready' : 'needs_migration',
     }));
-    return c.json({ success: true, data: items });
+    return c.json({
+      success: true,
+      data: items,
+      pagination: { page: result.page, pageSize: result.pageSize, total: result.total },
+    });
   } catch (error) {
     console.error('GET /api/analytics/funnels error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -533,11 +1025,43 @@ analytics.post('/api/analytics/funnels', requireRole('owner', 'admin'), async (c
       createdBy: c.get('staff').id,
       createdAt: new Date().toISOString(),
     });
-    return c.json({ success: true, data: created }, 201);
+    const usageWarnings = await registerFunnelConversionUsages(
+      c.env.DB,
+      account.accountId,
+      created.funnelId,
+      created.version.id,
+      created.version.steps,
+      c.get('staff').id,
+    );
+    return c.json({ success: true, data: { ...created, usageWarnings } }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/funnels error:', error);
     return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+  }
+});
+
+// 編集画面が現在の定義を丸ごと読む口。停止・保管中のファネルも中身は読める。
+analytics.get('/api/analytics/funnels/:id', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const found = await getFunnelWithCurrentVersion(
+      c.env.DB,
+      account.accountId,
+      c.req.param('id'),
+    );
+    if (!found) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({
+      success: true,
+      data: {
+        ...serializeFunnel(found.funnel),
+        currentVersion: found.currentVersion,
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/analytics/funnels/:id error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
@@ -547,6 +1071,7 @@ analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admi
     if (!account.ok) return account.response;
     const body = await c.req.json<{
       windowDays?: unknown; steps?: unknown; segment?: unknown; comparisonGroups?: unknown;
+      expectedVersionNumber?: unknown; name?: unknown;
     }>();
     const version = await createFunnelVersion(c.env.DB, {
       lineAccountId: account.accountId,
@@ -555,13 +1080,51 @@ analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admi
       steps: body.steps,
       segment: body.segment,
       comparisonGroups: body.comparisonGroups,
+      expectedVersionNumber: body.expectedVersionNumber === undefined
+        ? undefined
+        : Number(body.expectedVersionNumber),
+      name: typeof body.name === 'string' ? body.name : undefined,
       createdBy: c.get('staff').id,
       createdAt: new Date().toISOString(),
     });
-    return c.json({ success: true, data: version }, 201);
+    const usageWarnings = await registerFunnelConversionUsages(
+      c.env.DB,
+      account.accountId,
+      c.req.param('id'),
+      version.id,
+      version.steps,
+      c.get('staff').id,
+    );
+    return c.json({ success: true, data: { ...version, usageWarnings } }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/funnels/:id/versions error:', error);
+    return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+  }
+});
+
+// 停止・保管・再開。今の状態を expectedStatus で渡させ、二重操作や読み違えを 409 で弾く。
+analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const body = await c.req.json<{ status?: unknown; expectedStatus?: unknown }>();
+    const next = String(body.status ?? '');
+    const expected = String(body.expectedStatus ?? '');
+    if (!['active', 'stopped', 'archived'].includes(next)
+        || !['active', 'stopped', 'archived'].includes(expected)) {
+      return c.json({ success: false, error: 'analytics_funnel_status_invalid' }, 422);
+    }
+    const funnel = await setFunnelStatus(c.env.DB, {
+      lineAccountId: account.accountId,
+      funnelId: c.req.param('id'),
+      status: next as 'active' | 'stopped' | 'archived',
+      expectedStatus: expected as 'active' | 'stopped' | 'archived',
+    });
+    return c.json({ success: true, data: serializeFunnel(funnel) });
+  } catch (error) {
+    const status = funnelErrorStatus(error);
+    if (status === 500) console.error('PUT /api/analytics/funnels/:id/status error:', error);
     return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
   }
 });
@@ -572,6 +1135,21 @@ analytics.post('/api/analytics/funnels/:id/run', async (c) => {
     if (!account.ok) return account.response;
     const selectedAccount = await getLineAccountById(c.env.DB, account.accountId);
     if (!selectedAccount) return c.json({ success: false, error: 'Not found' }, 404);
+    // 再集計はHTTPの中で時系列計算を同期実行する。連打がD1負荷に直結するので、
+    // 同一ファネルは前回から60秒は受け付けない。再集計ボタンは運用担当にも
+    // 出しているので、権限ではなく間隔で守る。
+    const lastRun = await c.env.DB
+      .prepare(
+        `SELECT created_at FROM analytics_funnel_runs
+          WHERE line_account_id = ? AND funnel_id = ?
+          ORDER BY created_at DESC, id DESC
+          LIMIT 1`,
+      )
+      .bind(account.accountId, c.req.param('id'))
+      .first<{ created_at: string }>();
+    if (lastRun && Date.now() - Date.parse(lastRun.created_at) < 60_000) {
+      return c.json({ success: false, error: 'analytics_funnel_too_soon' }, 429);
+    }
     const body = await c.req.json<{ cohortFrom?: unknown; cohortTo?: unknown }>();
     const result = await runChronologicalFunnel(c.env.DB, {
       lineAccountId: account.accountId,
@@ -648,6 +1226,44 @@ analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'adm
   }
 });
 
+/*
+ * 一時対象者の詳細。配信作成が「audienceId だけを URL に載せ、人数・期限は
+ * ここで読み直す」ために使う。友だちIDは返さない。他アカウント・消えた
+ * 対象者は404、期限切れは410（friends の audienceId と同じ返し方）。
+ */
+analytics.get('/api/analytics/audiences/:id', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const row = await c.env.DB.prepare(
+      `SELECT id, source_kind, selection_key, member_count, expires_at, created_at
+         FROM analytics_result_audiences
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(c.req.param('id'), account.accountId).first<{
+      id: string; source_kind: string; selection_key: string | null;
+      member_count: number; expires_at: string; created_at: string;
+    }>();
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    if (row.expires_at <= new Date().toISOString()) {
+      return c.json({ success: false, error: 'この分析結果の対象者は24時間を過ぎました。もう一度集計してください' }, 410);
+    }
+    return c.json({
+      success: true,
+      data: {
+        id: row.id,
+        sourceKind: row.source_kind,
+        selectionKey: row.selection_key,
+        memberCount: row.member_count,
+        expiresAt: row.expires_at,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/analytics/audiences/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 analytics.post('/api/funnels', requireRole('owner', 'admin'), async (c) => {
   try {
     const account = await resolveAccount(c);
@@ -701,8 +1317,13 @@ analytics.delete('/api/funnels/:id', requireRole('owner', 'admin'), async (c) =>
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
+    const funnel = await getFunnelById(c.env.DB, account.accountId, c.req.param('id'));
     const version = await getCurrentFunnelVersion(c.env.DB, account.accountId, c.req.param('id'));
-    if (version) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!funnel || version) return c.json({ success: false, error: 'Not found' }, 404);
+    // 停止・保管したファネルの物理削除は受け付けない（再開してから消す運用に限定）
+    if (funnel.status !== 'active') {
+      return c.json({ success: false, error: 'analytics_funnel_not_active' }, 422);
+    }
     await deleteFunnel(c.env.DB, account.accountId, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
@@ -718,6 +1339,10 @@ analytics.get('/api/funnels/:id/result', async (c) => {
     if (!account.ok) return account.response;
     const funnel = await getFunnelById(c.env.DB, account.accountId, c.req.param('id'));
     if (!funnel) return c.json({ success: false, error: 'Not found' }, 404);
+    // 停止・保管したファネルのその場集計は新規runにあたるため拒否する
+    if (funnel.status !== 'active') {
+      return c.json({ success: false, error: 'analytics_funnel_not_active' }, 422);
+    }
 
     const range = readRange(c);
     if (!range.ok) return c.json({ success: false, error: range.error }, 400);

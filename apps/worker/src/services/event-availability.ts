@@ -85,20 +85,32 @@ export async function getActiveBookingCountsBySlot(
   const result = new Map<string, number>();
   if (slot_ids.length === 0) return result;
   const statusList = ACTIVE_BOOKING_STATUSES;
-  const slotPlaceholders = slot_ids.map(() => '?').join(',');
-  const statusPlaceholders = statusList.map(() => '?').join(',');
-  const rows = await db
-    .prepare(
-      `SELECT slot_id, COUNT(*) AS active_count
-         FROM event_bookings
-        WHERE slot_id IN (${slotPlaceholders})
-          AND status IN (${statusPlaceholders})
-        GROUP BY slot_id`,
-    )
-    .bind(...slot_ids, ...statusList)
-    .all<BookingCountRow>();
-  for (const r of rows.results ?? []) {
-    result.set(r.slot_id, r.active_count);
+  // slot IDを2回bindするので、D1の100 bind上限を超えない32件ずつに分ける。
+  for (let offset = 0; offset < slot_ids.length; offset += 32) {
+    const chunk = slot_ids.slice(offset, offset + 32);
+    const slotPlaceholders = chunk.map(() => '?').join(',');
+    const statusPlaceholders = statusList.map(() => '?').join(',');
+    const rows = await db
+      .prepare(
+        `SELECT slot_id, COALESCE(SUM(seats), 0) AS active_count
+           FROM (
+             SELECT slot_id, party_size AS seats
+               FROM event_bookings
+              WHERE slot_id IN (${slotPlaceholders})
+                AND status IN (${statusPlaceholders})
+             UNION ALL
+             SELECT slot_id, party_size AS seats
+               FROM event_waitlist
+              WHERE slot_id IN (${slotPlaceholders})
+                AND status IN ('offered', 'accepted')
+           )
+          GROUP BY slot_id`,
+      )
+      .bind(...chunk, ...statusList, ...chunk)
+      .all<BookingCountRow>();
+    for (const r of rows.results ?? []) {
+      result.set(r.slot_id, r.active_count);
+    }
   }
   return result;
 }

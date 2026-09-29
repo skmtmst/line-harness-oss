@@ -11,6 +11,7 @@ import type {
   IdentityConfidenceLabel,
   IdentityReprocessMode,
 } from '@line-crm/shared';
+import { resolveFriendProfileSelections } from './friend-profile-candidates.js';
 
 type CandidateRow = {
   id: string;
@@ -346,42 +347,95 @@ function listItem(row: CandidateRow): IdentityCandidateListItem {
   };
 }
 
+/**
+ * FRIEND-11: 候補の名前・一致した根拠をサーバー側で絞る。
+ * 取得済みの先頭ページだけを画面内検索すると、51件目以降にしか
+ * 無い名前へ辿れない。スナップショットの label と根拠の label を対象にする。
+ * LIKE の `%` `_` `\` は検索語から退避する。
+ */
+function likePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
 export async function listIdentityCandidates(
   db: D1Database,
   input: {
     tenantId: string;
     kind: IdentityCandidateKind;
-    status: IdentityCandidateStatus;
+    /** 'all' は状態で絞らない（画面の「すべて」）。 */
+    status: IdentityCandidateStatus | 'all';
     allowedAccountIds: string[];
     limit: number;
     offset: number;
+    q?: string;
   },
 ): Promise<IdentityCandidateList> {
   if (input.allowedAccountIds.length === 0) {
-    return { items: [], total: 0, limit: input.limit, offset: input.offset };
+    return {
+      items: [], total: 0, limit: input.limit, offset: input.offset,
+      statusCounts: {}, lowConfidenceCount: 0,
+    };
   }
   const placeholders = input.allowedAccountIds.map(() => '?').join(', ');
   const scopeSql = `left_line_account_id IN (${placeholders}) AND right_line_account_id IN (${placeholders})`;
-  const bindings = [
-    input.tenantId, input.kind, input.status,
+  const baseBindings = [
+    input.tenantId, input.kind,
     ...input.allowedAccountIds, ...input.allowedAccountIds,
   ];
-  const [rows, count] = await Promise.all([
+  const baseWhere = `tenant_id = ? AND kind = ? AND ${scopeSql}`;
+
+  const needle = input.q?.trim() ?? '';
+  const searchSql = needle
+    ? ` AND (
+        json_extract(left_snapshot_json, '$.label') LIKE ? ESCAPE '\\'
+        OR json_extract(right_snapshot_json, '$.label') LIKE ? ESCAPE '\\'
+        OR EXISTS (
+          SELECT 1 FROM json_each(identity_candidates.evidence_json) je
+          WHERE json_extract(je.value, '$.label') LIKE ? ESCAPE '\\'
+        )
+      )`
+    : '';
+  const searchBindings = needle ? [likePattern(needle), likePattern(needle), likePattern(needle)] : [];
+
+  const statusSql = input.status === 'all' ? '' : ' AND status = ?';
+  const statusBindings = input.status === 'all' ? [] : [input.status];
+
+  const [rows, count, countRows] = await Promise.all([
     db.prepare(
       `SELECT * FROM identity_candidates
-        WHERE tenant_id = ? AND kind = ? AND status = ? AND ${scopeSql}
+        WHERE ${baseWhere}${statusSql}${searchSql}
         ORDER BY detected_at DESC, id ASC LIMIT ? OFFSET ?`,
-    ).bind(...bindings, input.limit, input.offset).all<CandidateRow>(),
+    ).bind(...baseBindings, ...statusBindings, ...searchBindings, input.limit, input.offset).all<CandidateRow>(),
     db.prepare(
       `SELECT COUNT(*) AS count FROM identity_candidates
-        WHERE tenant_id = ? AND kind = ? AND status = ? AND ${scopeSql}`,
-    ).bind(...bindings).first<{ count: number }>(),
+        WHERE ${baseWhere}${statusSql}${searchSql}`,
+    ).bind(...baseBindings, ...statusBindings, ...searchBindings).first<{ count: number }>(),
+    /*
+      集計カードは「同じ検索条件・全状態」の母数で出す（FRIEND-11）。
+      状態の絞り込み自体は含めない。含めると「確認済み」を選んだ画面で
+      確認待ちの件数が 0 に見えてしまう。
+    */
+    db.prepare(
+      `SELECT status, COUNT(*) AS count,
+              SUM(CASE WHEN confidence_score < 50 THEN 1 ELSE 0 END) AS low_confidence
+         FROM identity_candidates
+        WHERE ${baseWhere}${searchSql}
+        GROUP BY status`,
+    ).bind(...baseBindings, ...searchBindings).all<{ status: IdentityCandidateStatus; count: number; low_confidence: number }>(),
   ]);
+  const statusCounts: Partial<Record<IdentityCandidateStatus, number>> = {};
+  let lowConfidenceCount = 0;
+  for (const row of countRows.results) {
+    statusCounts[row.status] = row.count;
+    lowConfidenceCount += row.low_confidence;
+  }
   return {
     items: rows.results.map(listItem),
     total: count?.count ?? 0,
     limit: input.limit,
     offset: input.offset,
+    statusCounts,
+    lowConfidenceCount,
   };
 }
 
@@ -476,6 +530,48 @@ async function linkedUserId(db: D1Database, row: CandidateRow): Promise<string> 
   return userIds[0] ?? crypto.randomUUID();
 }
 
+/*
+ * R397: 同時実行で負けた側は競合409にする。版ガードで大半は0件更新になるが、
+ * 実D1で書込みが重なったときの一意制約違反はここで409へ言い換える。
+ * DB本来の障害はそのまま投げ、500と区別する。
+ */
+function mapCandidateWriteError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('friend_identity_links.friend_id')) {
+    return new IdentityCandidateError(
+      409,
+      'IDENTITY_LINK_CONFLICT',
+      '別の人が先にこの友だちを結び付けました。最新の状態を読み直してください',
+    );
+  }
+  if (message.includes('identity_candidate_decisions')) {
+    return new IdentityCandidateError(
+      409,
+      'STALE_CANDIDATE',
+      '別の人が先に判定しました。最新の状態を読み直してください',
+    );
+  }
+  return error instanceof Error ? error : new Error(message);
+}
+
+/*
+ * 候補の確定文がすべて効いたか。判定の記録1件・最終の版更新1件は必須で、
+ * 友だち結びの文（friends更新・link追加）は結び付ける判定のときだけ必須。
+ * 版ガードで0件になった文がある＝別の人が先に変えた＝409にする。
+ * ガード付きで0件の文は何も書いていないので、409で変更0が成り立つ。
+ */
+function candidateBatchApplied(
+  results: Array<{ meta?: { changes?: number } }>,
+  friendUpdateIndexes: number[],
+  linkInsertIndexes: number[],
+): boolean {
+  const applied = (index: number): boolean =>
+    Number(results[index]?.meta?.changes ?? 0) === 1;
+  if (!applied(0)) return false;
+  if (!applied(results.length - 1)) return false;
+  return friendUpdateIndexes.every(applied) && linkInsertIndexes.every(applied);
+}
+
 export async function decideIdentityCandidate(
   db: D1Database,
   actor: IdentityActor,
@@ -500,21 +596,60 @@ export async function decideIdentityCandidate(
     throw new IdentityCandidateError(422, 'REASON_REQUIRED', '理由を3文字以上500文字以内で入力してください');
   }
   const reprocessJson = validateReprocess(row, request);
+  if (request.profileSelections?.length
+      && (row.kind !== 'friend_duplicate' || request.decision !== 'linked')) {
+    throw new IdentityCandidateError(
+      422,
+      'PROFILE_SELECTION_NOT_ALLOWED',
+      'プロフィールの採用値は友だち同士を結び付ける場合だけ指定できます',
+    );
+  }
+  let profileSelections: Awaited<ReturnType<typeof resolveFriendProfileSelections>> = [];
+  if (request.profileSelections?.length) {
+    try {
+      profileSelections = await resolveFriendProfileSelections(
+        db,
+        [row.left_subject_id, row.right_subject_id],
+        request.profileSelections,
+      );
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      throw new IdentityCandidateError(
+        422,
+        code === 'PROFILE_SELECTION_DUPLICATE'
+          ? 'PROFILE_SELECTION_DUPLICATE'
+          : 'PROFILE_SELECTION_NOT_FOUND',
+        code === 'PROFILE_SELECTION_DUPLICATE'
+          ? '同じプロフィール項目を複数回選べません'
+          : '採用するプロフィール値が現在の友だち情報に見つかりません',
+      );
+    }
+  }
   const now = isoNow();
   const nextVersion = row.version + 1;
+  /*
+   * R392/R397: 結び付きを変える文はすべて候補の版で守る。版が進んでいると
+   * 全文が0件になり、負けた側は何も書かず409になる。判定の記録INSERTも
+   * 版条件付きにし、同時実行の一意制約違反を起こさない。
+   */
+  const candidateGuard = `EXISTS (SELECT 1 FROM identity_candidates WHERE id = ? AND version = ?)`;
+  const versionBinds = [row.id, row.version] as const;
   const statements: D1PreparedStatement[] = [
     db.prepare(
       `INSERT INTO identity_candidate_decisions (
         id, candidate_id, candidate_version, from_status, to_status, actor_staff_id,
         actor_name, reason, evidence_fingerprint, impact_snapshot_json,
         reprocess_scope_json, decided_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${candidateGuard}`,
     ).bind(
       crypto.randomUUID(), row.id, nextVersion, row.status, request.decision,
       actor.id, actor.name, reason, row.evidence_fingerprint, row.impact_json,
-      reprocessJson, now,
+      reprocessJson, now, ...versionBinds,
     ),
   ];
+  /* 200/409 の判定に使う、件数が要る文の位置。 */
+  const friendUpdateIndexes: number[] = [];
+  const linkInsertIndexes: number[] = [];
 
   if (request.decision === 'linked' && row.kind === 'friend_duplicate') {
     const userId = await linkedUserId(db, row);
@@ -530,21 +665,81 @@ export async function decideIdentityCandidate(
       ).bind(userId, row.tenant_id, displayName, displayName, actor.id, now, now),
     );
     for (const friendId of [row.left_subject_id, row.right_subject_id]) {
+      linkInsertIndexes.push(statements.length);
       statements.push(
         db.prepare(
           `INSERT INTO friend_identity_links (
             id, tenant_id, candidate_id, user_id, friend_id, link_method,
             evidence_snapshot_json, confidence_score, linked_by, linked_at
           )
-          VALUES (?, ?, ?, ?, ?, 'operator_review', ?, ?, ?, ?)`,
+          SELECT ?, ?, ?, ?, ?, 'operator_review', ?, ?, ?, ? WHERE ${candidateGuard}`,
         ).bind(
           crypto.randomUUID(), row.tenant_id, row.id, userId, friendId,
           row.evidence_json, row.confidence_score, actor.id, now,
+          ...versionBinds,
         ),
       );
+      /*
+       * R392の裏返し: 別の人が同時に結び直した友だちは上書きしない。
+       * 未連携か、この判定と同じ結び先のときだけ付ける。
+       */
+      friendUpdateIndexes.push(statements.length);
       statements.push(
-        db.prepare('UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ?')
-          .bind(userId, now, friendId),
+        db.prepare(
+          `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ?
+            AND (user_id IS NULL OR user_id = ?) AND ${candidateGuard}`,
+        ).bind(userId, now, friendId, userId, ...versionBinds),
+      );
+    }
+    /*
+     * R392: 結び付きが変わるので本人の版を進める。後に開いた保存は409になり、
+     * 古い採用値・配信順位が再保存されない。新規作成の本人も+1されるが、
+     * 版は1から始まる連番であり支障はない。
+     */
+    statements.push(
+      db.prepare(
+        `UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ?
+          AND ${candidateGuard}`,
+      ).bind(now, userId, ...versionBinds),
+    );
+    for (const selection of profileSelections) {
+      statements.push(
+        db.prepare(
+          `UPDATE user_profile_values
+              SET is_active = 0, updated_at = ?
+            WHERE tenant_id = ? AND user_id = ? AND field_key = ? AND is_active = 1
+              AND ${candidateGuard}`,
+        ).bind(now, row.tenant_id, userId, selection.fieldKey, ...versionBinds),
+        db.prepare(
+          `INSERT INTO user_profile_values (
+            id, tenant_id, user_id, field_key, field_label, value_json, value_preview,
+            source_type, source_id, source_label, source_friend_id, verified_at,
+            selected_by, selected_by_name, selected_at, update_mode, is_active,
+            created_at, updated_at
+          ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?
+            WHERE ${candidateGuard}`,
+        ).bind(
+          crypto.randomUUID(), row.tenant_id, userId, selection.fieldKey,
+          selection.fieldLabel, JSON.stringify(selection.value), selection.valuePreview,
+          selection.sourceType, selection.sourceId, selection.sourceLabel,
+          selection.sourceFriendId, selection.verifiedAt, actor.id, actor.name, now,
+          selection.updateMode, now, now, ...versionBinds,
+        ),
+      );
+    }
+    if (profileSelections.length > 0) {
+      statements.push(
+        db.prepare(
+          `INSERT INTO identity_events (
+            id, tenant_id, user_id, candidate_id, event_type, summary,
+            before_json, after_json, actor_staff_id, actor_name, occurred_at, correlation_id
+          ) SELECT ?, ?, ?, ?, 'profile', ?, NULL, ?, ?, ?, ?, ? WHERE ${candidateGuard}`,
+        ).bind(
+          crypto.randomUUID(), row.tenant_id, userId, row.id,
+          `重複候補の確認でプロフィールの採用値を${profileSelections.length}件保存しました`,
+          JSON.stringify(profileSelections), actor.id, actor.name, now, crypto.randomUUID(),
+          ...versionBinds,
+        ),
       );
     }
   }
@@ -571,11 +766,11 @@ export async function decideIdentityCandidate(
           `INSERT INTO ec_identity_links (
             id, tenant_id, candidate_id, source_key, shop_key, external_customer_id,
             line_account_id, friend_id, linked_by, linked_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${candidateGuard}`,
         ).bind(
           crypto.randomUUID(), row.tenant_id, row.id, row.source_key, row.left_shop_key,
           row.external_customer_id, row.right_line_account_id, row.right_subject_id,
-          actor.id, now,
+          actor.id, now, ...versionBinds,
         ),
       );
     }
@@ -591,18 +786,16 @@ export async function decideIdentityCandidate(
       row.id, row.tenant_id, row.version,
     ),
   );
+  let results: Array<{ meta?: { changes?: number } }>;
   try {
-    await db.batch(statements);
+    results = await db.batch(statements) as Array<{ meta?: { changes?: number } }>;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('friend_identity_links.friend_id')) {
-      throw new IdentityCandidateError(
-        409,
-        'IDENTITY_LINK_CONFLICT',
-        '別の人が先にこの友だちを結び付けました。最新の状態を読み直してください',
-      );
-    }
-    throw error;
+    throw mapCandidateWriteError(error);
+  }
+  if (!candidateBatchApplied(results, friendUpdateIndexes, linkInsertIndexes)) {
+    throw new IdentityCandidateError(
+      409, 'STALE_CANDIDATE', '別の人が先に判定しました。最新の状態を読み直してください',
+    );
   }
   return getIdentityCandidate(db, actor.tenantId, id);
 }
@@ -627,45 +820,168 @@ export async function undoIdentityCandidate(
   }
   const now = isoNow();
   const nextVersion = row.version + 1;
+  const candidateGuard = `EXISTS (SELECT 1 FROM identity_candidates WHERE id = ? AND version = ?)`;
+  const versionBinds = [row.id, row.version] as const;
+  /*
+   * R394: この候補が付けた結び付きか、現在の本人と突き合わせる。
+   * 後に別の本人へ結び直した友だちがある場合は、古い取消で上書きせず
+   * 競合409で止める（変更0）。再連携は結び付き行を外す運用なので、
+   * 行が残っていても friends 側が動いていれば後続変更とみなす。
+   */
+  let detachGuard = candidateGuard;
+  const detachBinds: unknown[] = [...versionBinds];
+  let detachingUsers: string[] = [];
+  if (row.kind === 'friend_duplicate') {
+    const [activeLinks, currentFriends] = await Promise.all([
+      db.prepare(
+        `SELECT friend_id, user_id FROM friend_identity_links
+          WHERE candidate_id = ? AND unlinked_at IS NULL`,
+      ).bind(row.id).all<{ friend_id: string; user_id: string }>(),
+      db.prepare(
+        `SELECT id, user_id FROM friends WHERE id IN (?, ?)`,
+      ).bind(row.left_subject_id, row.right_subject_id)
+        .all<{ id: string; user_id: string | null }>(),
+    ]);
+    const linkUserOf = new Map(
+      activeLinks.results.map((link) => [link.friend_id, link.user_id] as const),
+    );
+    detachingUsers = [...new Set(activeLinks.results.map((link) => link.user_id))];
+    for (const friend of currentFriends.results) {
+      const linkedUser = linkUserOf.get(friend.id) ?? null;
+      if (friend.user_id !== null && linkedUser !== null && friend.user_id !== linkedUser) {
+        throw new IdentityCandidateError(
+          409,
+          'IDENTITY_RELINKED',
+          '別の担当が結び直した友だちがあるため取り消せません。現在の結び付きを確認してください',
+        );
+      }
+    }
+    if (detachingUsers.length > 0) {
+      const placeholders = detachingUsers.map(() => '?').join(', ');
+      detachGuard = `${candidateGuard} AND NOT EXISTS (
+        SELECT 1 FROM friends f
+         WHERE f.id IN (?, ?)
+           AND f.user_id IS NOT NULL
+           AND f.user_id NOT IN (${placeholders})
+      )`;
+      detachBinds.push(
+        row.left_subject_id, row.right_subject_id, ...detachingUsers,
+      );
+    }
+  }
   const statements: D1PreparedStatement[] = [
     db.prepare(
       `INSERT INTO identity_candidate_decisions (
         id, candidate_id, candidate_version, from_status, to_status, actor_staff_id,
         actor_name, reason, evidence_fingerprint, impact_snapshot_json, decided_at
-      ) VALUES (?, ?, ?, ?, 'invalidated', ?, ?, ?, ?, ?, ?)`,
+      ) SELECT ?, ?, ?, ?, 'invalidated', ?, ?, ?, ?, ?, ? WHERE ${detachGuard}`,
     ).bind(
       crypto.randomUUID(), row.id, nextVersion, row.status, actor.id, actor.name,
-      reason, row.evidence_fingerprint, row.impact_json, now,
+      reason, row.evidence_fingerprint, row.impact_json, now, ...detachBinds,
     ),
   ];
+  const friendUpdateIndexes: number[] = [];
   if (row.kind === 'friend_duplicate') {
     statements.push(
       db.prepare(
         `UPDATE friend_identity_links
             SET unlinked_by = ?, unlinked_at = ?, unlink_reason = ?
-          WHERE candidate_id = ? AND unlinked_at IS NULL`,
-      ).bind(actor.id, now, reason, row.id),
+          WHERE candidate_id = ? AND unlinked_at IS NULL AND ${detachGuard}`,
+      ).bind(actor.id, now, reason, row.id, ...detachBinds),
     );
+    /*
+     * R392の逆順: 取消で外れる友だち由来の設定はここで整理する。
+     * 配信先は利用対象外へ、情報源を失う採用値は無効化する。
+     * 外れる本人（detachingUsers）の行だけを対象にし、結び直し先で
+     * 作り直した設定には触らない。行は消さないので履歴は残る。
+     */
+    const detachingPlaceholders = detachingUsers.map(() => '?').join(', ');
     for (const friendId of [row.left_subject_id, row.right_subject_id]) {
+      if (detachingUsers.length > 0) {
+        statements.push(
+          db.prepare(
+            `UPDATE user_delivery_priorities
+                SET retired_at = ?, updated_at = ?
+              WHERE tenant_id = ? AND user_id IN (${detachingPlaceholders})
+                AND friend_id = ? AND retired_at IS NULL
+                AND ${detachGuard}`,
+          ).bind(now, now, row.tenant_id, ...detachingUsers, friendId, ...detachBinds),
+          db.prepare(
+            `UPDATE user_profile_values
+                SET is_active = 0, updated_at = ?
+              WHERE tenant_id = ? AND user_id IN (${detachingPlaceholders})
+                AND source_friend_id = ? AND is_active = 1
+                AND ${detachGuard}`,
+          ).bind(now, row.tenant_id, ...detachingUsers, friendId, ...detachBinds),
+        );
+      }
+      /*
+       * 有効な結び付き行は候補ごとに友だち1件なので、他に残る行は無い。
+       * 念のため残存行があればその結び先へ、無ければ未連携へ戻す。
+       * 現在値が読んだときと違う（再連携の競合）場合は触らない。
+       */
+      const restore = await db.prepare(
+        `SELECT user_id FROM friend_identity_links
+          WHERE friend_id = ? AND unlinked_at IS NULL AND candidate_id <> ?
+          ORDER BY linked_at DESC LIMIT 1`,
+      ).bind(friendId, row.id).first<{ user_id: string | null }>();
+      const restoreUserId = restore?.user_id ?? null;
+      const current = await db.prepare(
+        `SELECT user_id FROM friends WHERE id = ?`,
+      ).bind(friendId).first<{ user_id: string | null }>();
+      const expected = current?.user_id ?? null;
+      if (restoreUserId !== expected) {
+        friendUpdateIndexes.push(statements.length);
+        statements.push(
+          db.prepare(
+            `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?
+              AND ${detachGuard}`,
+          ).bind(restoreUserId, now, friendId, expected, ...detachBinds),
+        );
+      }
+    }
+    if (detachingUsers.length > 0) {
+      /*
+       * R392: 結び付きが変わるので外れる本人の版を進める。後に開いた
+       * プロフィール・配信順位の保存は409になり、解除済みの設定が
+       * 再保存されない。
+       */
+      const placeholders = detachingUsers.map(() => '?').join(', ');
       statements.push(
         db.prepare(
-          `UPDATE friends
-              SET user_id = (
-                SELECT user_id FROM friend_identity_links
-                 WHERE friend_id = ? AND unlinked_at IS NULL
-                 ORDER BY linked_at DESC LIMIT 1
-              ), updated_at = ?
-            WHERE id = ?`,
-        ).bind(friendId, now, friendId),
+          `UPDATE users SET revision = revision + 1, updated_at = ?
+            WHERE id IN (${placeholders}) AND ${detachGuard}`,
+        ).bind(now, ...detachingUsers, ...detachBinds),
       );
+      /*
+       * R391/R394: 取消の解除履歴を本人ごとに残す。結び付き0件の保管状態でも
+       * 履歴で本人を開け、誰が何を訂正したか追える。判定の記録とは別建て。
+       */
+      for (const detachedUserId of detachingUsers) {
+        statements.push(
+          db.prepare(
+            `INSERT INTO identity_events (
+              id, tenant_id, user_id, candidate_id, event_type, summary,
+              before_json, after_json, actor_staff_id, actor_name, occurred_at, correlation_id
+            ) SELECT ?, ?, ?, ?, 'unlink', ?, ?, ?, ?, ?, ?, ? WHERE ${detachGuard}`,
+          ).bind(
+            crypto.randomUUID(), row.tenant_id, detachedUserId, row.id,
+            '本人照合の取消で結び付きを解除しました',
+            JSON.stringify({ candidateId: row.id, friends: [row.left_subject_id, row.right_subject_id] }),
+            JSON.stringify({ candidateId: row.id, linked: false, reason }),
+            actor.id, actor.name, now, crypto.randomUUID(),
+            ...detachBinds,
+          ),
+        );
+      }
     }
   } else {
     statements.push(
       db.prepare(
         `UPDATE ec_identity_links
             SET unlinked_by = ?, unlinked_at = ?, unlink_reason = ?
-          WHERE candidate_id = ? AND unlinked_at IS NULL`,
-      ).bind(actor.id, now, reason, row.id),
+          WHERE candidate_id = ? AND unlinked_at IS NULL AND ${detachGuard}`,
+      ).bind(actor.id, now, reason, row.id, ...detachBinds),
     );
   }
   statements.push(
@@ -673,10 +989,38 @@ export async function undoIdentityCandidate(
       `UPDATE identity_candidates
           SET status = 'invalidated', version = ?, reviewed_by = ?, reviewed_at = ?,
               reason = ?, updated_at = ?
-        WHERE id = ? AND tenant_id = ? AND version = ?`,
-    ).bind(nextVersion, actor.id, now, reason, now, row.id, row.tenant_id, row.version),
+        WHERE id = ? AND tenant_id = ? AND version = ? AND ${detachGuard}`,
+    ).bind(
+      nextVersion, actor.id, now, reason, now, row.id, row.tenant_id, row.version,
+      ...detachBinds,
+    ),
   );
-  await db.batch(statements);
+  let results: Array<{ meta?: { changes?: number } }>;
+  try {
+    results = await db.batch(statements) as Array<{ meta?: { changes?: number } }>;
+  } catch (error) {
+    throw mapCandidateWriteError(error);
+  }
+  if (!candidateBatchApplied(results, friendUpdateIndexes, [])) {
+    /*
+     * 版か結び付きの条件で0件になった。後続の結び直しがある場合は
+     * そちらを案内し、それ以外は通常の競合にする。どちらも変更0。
+     */
+    const current = await db.prepare(
+      `SELECT id, user_id FROM friends WHERE id IN (?, ?)`,
+    ).bind(row.left_subject_id, row.right_subject_id)
+      .all<{ id: string; user_id: string | null }>();
+    const moved = detachingUsers.length > 0 && current.results.some(
+      (friend) => friend.user_id !== null && !detachingUsers.includes(friend.user_id),
+    );
+    throw new IdentityCandidateError(
+      409,
+      moved ? 'IDENTITY_RELINKED' : 'STALE_CANDIDATE',
+      moved
+        ? '別の担当が結び直した友だちがあるため取り消せません。現在の結び付きを確認してください'
+        : '別の人が先に変更しました。最新の状態を読み直してください',
+    );
+  }
   return getIdentityCandidate(db, actor.tenantId, id);
 }
 

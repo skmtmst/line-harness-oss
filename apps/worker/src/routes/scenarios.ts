@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import {
-  getScenarios,
   getScenarioById,
   createScenario,
   updateScenario,
@@ -10,8 +9,18 @@ import {
   updateScenarioStep,
   deleteScenarioStep,
   enrollFriendInScenario,
+  getFriendScenarioById,
+  pauseFriendScenarioManual,
+  resumeFriendScenarioById,
+  retryFailedFriendScenario,
+  moveFriendScenarioTo,
   getFriendById,
+  listMoveReferrers,
+  jstNow,
+  getScenarioPublishedVersion,
+  publishScenarioVersion,
   computeNextDeliveryAt,
+  validateScenarioActionReferences,
 } from '@line-crm/db';
 import { reorderScenarios } from '@line-crm/db';
 import { computeScenarioStats } from '../services/scenario-stats.js';
@@ -35,11 +44,95 @@ import type {
   DeliveryMode,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { requireRole, requirePermission } from '../middleware/role-guard.js';
+import { sha256Hex } from '../middleware/auth.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
+import {
+  getScenarioRuns,
+  saveScenarioDraft,
+  ScenarioContractError,
+  simulateFriendPlan,
+  simulateScenario,
+} from '../services/scenario-v6-contract.js';
+import { listLimit, listPage } from './list-pagination.js';
 
 const scenarios = new Hono<Env>();
+
+function scenarioPermission(
+  permission: 'view' | 'edit',
+) {
+  return async (c: Context<Env>, next: () => Promise<void>) => {
+    const staff = c.get('staff');
+    const allowed = staff && (
+      staff.role === 'owner'
+      || staff.role === 'admin'
+      || (permission === 'view'
+        ? staff.permissionKeys?.some((key) => key === '/scenarios' || key === 'scenario.version.view')
+        : staff.permissionKeys?.includes('scenario.definition.edit'))
+    );
+    if (!allowed) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    await next();
+  };
+}
+
+function scenarioContractError(c: Context<Env>, error: unknown): Response {
+  if (error instanceof ScenarioContractError) {
+    return c.json({
+      success: false,
+      code: error.code,
+      error: error.message,
+      ...(error.field ? { field: error.field } : {}),
+    }, error.status);
+  }
+  console.error(JSON.stringify({
+    event: 'scenario_v6_contract_failed',
+    path: c.req.path,
+    reason: error instanceof Error ? error.message : String(error),
+  }));
+  return c.json({ success: false, error: 'シナリオの情報を処理できませんでした' }, 500);
+}
+
+async function requireScenarioAccountScope(c: Context<Env>, lineAccountId: string): Promise<Response | null> {
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+  }
+  return null;
+}
+
+/**
+ * シナリオ変更の共通境界(N-051)。
+ *
+ * owner/adminは従来どおり通す。一般staffはシナリオ行のaccountをDB解決し、
+ * 共通土台へ渡す。表示権限だけのstaff・readOnly・範囲外は止める。
+ * 存在しない行はここでは通し、後段の404に任せる。
+ */
+const requireScenarioEditBoundary: MiddlewareHandler<Env> = async (c, next) => {
+  const staff = c.get('staff');
+  if (staff && (staff.role === 'owner' || staff.role === 'admin')) {
+    await next();
+    return;
+  }
+  const scenario = await getScenarioById(c.env.DB, c.req.param('id') ?? '');
+  if (!scenario) {
+    await next();
+    return;
+  }
+  const accountId = (scenario as { line_account_id?: string | null }).line_account_id ?? null;
+  const decision = await resolveRequestBoundary(c.env.DB, staff, accountId, {
+    requiredPermissionKey: 'scenario.definition.edit',
+  });
+  if (!decision.allowed) {
+    if (decision.reason === 'forbidden') {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    return c.json({ success: false, error: 'Scenario not found' }, 404);
+  }
+  await next();
+}
 
 async function requireVisibleScenario(c: Context<Env>, next: () => Promise<void>) {
   const scenario = await getScenarioById(c.env.DB, c.req.param('id')!);
@@ -173,6 +266,28 @@ function validateQuestionForStorage(
     if (!choice.label || choice.label.trim() === '') {
       return { ok: false, error: `選択肢${i + 1}の文字が空です。` };
     }
+    /*
+     * R214: 行き先（URL・電話・メール）の形を見る。not-a-url のような
+     * 値でも保存できると、設定済みに見えて実際は開けない通になる。
+     * 下書きでも通さず、公開・送信前の共通検査としてここで止める。
+     */
+    const behavior = (choice as { behavior?: string }).behavior ?? 'none';
+    if (behavior === 'url' || behavior === 'add_friend' || behavior === 'form') {
+      const url = ((choice as { url?: unknown }).url ?? '').toString().trim();
+      if (!/^https?:\/\/\S+$/.test(url)) {
+        return { ok: false, error: `選択肢${i + 1}のURLが正しくありません。https:// から始まるURLを入力してください。` };
+      }
+    } else if (behavior === 'tel') {
+      const tel = ((choice as { tel?: unknown }).tel ?? '').toString().trim();
+      if (!/[0-9]/.test(tel) || !/^[0-9+\-() ]+$/.test(tel)) {
+        return { ok: false, error: `選択肢${i + 1}の電話番号が正しくありません。数字で入力してください。` };
+      }
+    } else if (behavior === 'mail' || behavior === 'email') {
+      const email = ((choice as { email?: unknown }).email ?? '').toString().trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { ok: false, error: `選択肢${i + 1}のメールアドレスが正しくありません。` };
+      }
+    }
   }
   return { ok: true, json: JSON.stringify(question) };
 }
@@ -278,8 +393,18 @@ function serializeFriendScenario(row: DbFriendScenario) {
     status: row.status,
     startedAt: row.started_at,
     nextDeliveryAt: row.next_delivery_at,
+    // 開始時に固定した公開版。null は版より前の購読。
+    publishedVersionId: row.published_version_id ?? null,
+    // なぜ止まっているか（432）。画面はこれで「再開」と「失敗を再送」を
+    // 出し分ける。止まっていない行・古い行は null。
+    pauseReason: row.pause_reason ?? null,
     updatedAt: row.updated_at,
   };
+}
+
+/** 公開操作の確認キー。自動応答の公開口と同じ基準。 */
+function validScenarioPublishKey(value: string | undefined): value is string {
+  return Boolean(value && value.length >= 8 && value.length <= 200 && /^[A-Za-z0-9._:-]+$/.test(value));
 }
 
 /**
@@ -306,28 +431,72 @@ scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), async (
 });
 
 // GET /api/scenarios - list all
-scenarios.get('/api/scenarios', async (c) => {
+scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
-    let items: DbScenarioWithStepCount[];
+    const limit = listLimit(c.req.query('limit'), 50, 200);
+    const page = listPage(c.req.query('page'));
+    const offset = (page - 1) * limit;
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+    }
+
+    const clauses: string[] = [];
+    const binds: unknown[] = [];
     if (lineAccountId) {
-      // NULL line_account_id = global scenario (webhook.ts:211 / liff.ts:878 fire it for every
-      // account). Include both account-bound and global rows so the list mirrors the engine.
-      const result = await c.env.DB
-        .prepare(
-          `SELECT s.*, COUNT(ss.id) as step_count
+      const accountClauses = ['s.line_account_id = ?'];
+      binds.push(lineAccountId);
+      if (scope.canSeeUnassigned) accountClauses.push('s.line_account_id IS NULL');
+      clauses.push(`(${accountClauses.join(' OR ')})`);
+    } else {
+      const accountClauses: string[] = [];
+      if (scope.allowedAccountIds.length > 0) {
+        accountClauses.push(`s.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})`);
+        binds.push(...scope.allowedAccountIds);
+      }
+      if (scope.canSeeUnassigned) accountClauses.push('s.line_account_id IS NULL');
+      clauses.push(accountClauses.length > 0 ? `(${accountClauses.join(' OR ')})` : '0 = 1');
+    }
+    const query = c.req.query('query')?.trim();
+    if (query) {
+      /*
+       * #625: LIKE ではなく instr() で部分一致する。
+       * D1 は LIKE/GLOB パターンを最大50バイトに制限するため、
+       * `%<検索語>%` を束縛すると48バイト超の検索語で500になっていた。
+       * 記号はワイルドカードとして効かず文字どおり探す点は ESCAPE 版と同じ。
+       */
+      clauses.push(`instr(lower(s.name), lower(?)) > 0`);
+      binds.push(query);
+    }
+    if (c.req.query('active') === '0') clauses.push('s.is_active = 0');
+    const createdFrom = c.req.query('createdFrom')?.trim();
+    if (createdFrom) {
+      clauses.push('s.created_at >= ?');
+      binds.push(createdFrom);
+    }
+    const folderId = c.req.query('folderId');
+    if (folderId === '__unfiled__') clauses.push('s.folder_id IS NULL');
+    else if (folderId) {
+      clauses.push('s.folder_id = ?');
+      binds.push(folderId);
+    }
+    const where = `WHERE ${clauses.join(' AND ')}`;
+    const [rows, count] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT s.*, COUNT(ss.id) as step_count
            FROM scenarios s
            LEFT JOIN scenario_steps ss ON s.id = ss.scenario_id
-           WHERE s.line_account_id IS NULL OR s.line_account_id = ?
-           GROUP BY s.id
-           ORDER BY s.created_at DESC`,
-        )
-        .bind(lineAccountId)
-        .all<DbScenarioWithStepCount>();
-      items = result.results;
-    } else {
-      items = await getScenarios(c.env.DB);
-    }
+           ${where}
+          GROUP BY s.id
+          ORDER BY s.created_at DESC, s.id DESC
+          LIMIT ? OFFSET ?`,
+      ).bind(...binds, limit, offset).all<DbScenarioWithStepCount>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS total FROM scenarios s ${where}`)
+        .bind(...binds).first<{ total: number }>(),
+    ]);
+    const items = rows.results;
+    const total = Number(count?.total ?? 0);
 
     /*
      * 購読中と読了済の人数。
@@ -339,20 +508,30 @@ scenarios.get('/api/scenarios', async (c) => {
      */
     const counts = new Map<string, { active: number; completed: number }>();
     try {
-      const rows = await c.env.DB
-        .prepare(
+      const scenarioIds = items.map((item) => item.id);
+      const accountIds = lineAccountId ? [lineAccountId] : scope.allowedAccountIds;
+      if (scenarioIds.length > 0 && accountIds.length > 0) {
+        const scenarioPlaceholders = scenarioIds.map(() => '?').join(',');
+        const accountPlaceholders = accountIds.map(() => '?').join(',');
+        const rows = await c.env.DB
+          .prepare(
           `SELECT scenario_id,
                   SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
                   SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count
-             FROM friend_scenarios
+             FROM friend_scenarios fs
+             INNER JOIN friends f ON f.id = fs.friend_id
+            WHERE fs.scenario_id IN (${scenarioPlaceholders})
+              AND f.line_account_id IN (${accountPlaceholders})
             GROUP BY scenario_id`,
-        )
-        .all<{ scenario_id: string; active_count: number; completed_count: number }>();
-      for (const r of rows.results) {
-        counts.set(r.scenario_id, {
-          active: Number(r.active_count ?? 0),
-          completed: Number(r.completed_count ?? 0),
-        });
+          )
+          .bind(...scenarioIds, ...accountIds)
+          .all<{ scenario_id: string; active_count: number; completed_count: number }>();
+        for (const r of rows.results) {
+          counts.set(r.scenario_id, {
+            active: Number(r.active_count ?? 0),
+            completed: Number(r.completed_count ?? 0),
+          });
+        }
       }
     } catch {
       // 数えられなくても一覧は出す。人数だけ 0 になる。
@@ -360,12 +539,20 @@ scenarios.get('/api/scenarios', async (c) => {
 
     return c.json({
       success: true,
-      data: items.map((row) => ({
-        ...serializeScenario(row),
-        stepCount: row.step_count,
-        subscriberCount: counts.get(row.id)?.active ?? 0,
-        completedCount: counts.get(row.id)?.completed ?? 0,
-      })),
+      data: {
+        items: items.map((row) => ({
+          ...serializeScenario(row),
+          stepCount: row.step_count,
+          subscriberCount: counts.get(row.id)?.active ?? 0,
+          completedCount: counts.get(row.id)?.completed ?? 0,
+        })),
+        total,
+        limit,
+        sort: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'desc' },
+        ],
+      },
     });
   } catch (err) {
     console.error('GET /api/scenarios error:', err);
@@ -376,9 +563,9 @@ scenarios.get('/api/scenarios', async (c) => {
 // GET /api/scenarios/:id - get with steps
 scenarios.use('/api/scenarios/:id', requireVisibleScenario);
 scenarios.use('/api/scenarios/:id/*', requireVisibleScenario);
-scenarios.get('/api/scenarios/:id', async (c) => {
+scenarios.get('/api/scenarios/:id', scenarioPermission('view'), async (c) => {
   try {
-    const id = c.req.param('id');
+    const id = c.req.param('id')!;
     const scenario = await getScenarioById(c.env.DB, id);
 
     if (!scenario) {
@@ -410,6 +597,7 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
       lineAccountId?: string | null;
       deliveryMode?: string;
       allowConcurrent?: boolean;
+      folderId?: string | null;
     }>();
 
     if (!body.name || !body.triggerType) {
@@ -449,6 +637,13 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
       if (updated) scenario = updated;
     }
 
+    // フォルダは create の中身に入っていないので、指定があればここで付ける
+    // （#949 N-055: 新規作成画面が名前・フォルダ・方式をまとめて送る）。
+    if (body.folderId !== undefined) {
+      const updated = await updateScenario(c.env.DB, scenario.id, { folder_id: body.folderId });
+      if (updated) scenario = updated;
+    }
+
     return c.json({ success: true, data: serializeScenario(scenario) }, 201);
   } catch (err) {
     console.error('POST /api/scenarios error:', err);
@@ -457,7 +652,7 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
 });
 
 // PUT /api/scenarios/:id - update (accepts camelCase fields from clients)
-scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => {
+scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -557,13 +752,48 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
   }
 });
 
+// GET /api/scenarios/:id/move-referrers - 終了後の移動先にしているシナリオの一覧
+//
+// R250: 消す前に「どのシナリオの終了後の処理が変わるか」を確認窓で見せる
+// ための読み取り。消したあとは参照元の終了後の処理が「一時停止」へ戻る
+// （deleteScenario が原子で直す）ので、この一覧は消す前の案内専用。
+scenarios.get('/api/scenarios/:id/move-referrers', scenarioPermission('view'), async (c) => {
+  try {
+    const id = c.req.param('id')!;
+    const scenario = await getScenarioById(c.env.DB, id);
+    if (!scenario) {
+      return c.json({ success: false, error: 'Scenario not found' }, 404);
+    }
+    // 見える範囲だけに絞る。見えないアカウントの名前は数えない。
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const referrers = await listMoveReferrers(c.env.DB, id);
+    const items = referrers
+      .filter((r) => r.lineAccountId === null
+        ? scope.canSeeUnassigned
+        : scope.allowedAccountIds.includes(r.lineAccountId))
+      .map(({ id: referrerId, name }) => ({ id: referrerId, name }));
+    return c.json({ success: true, data: { items, total: items.length } });
+  } catch (err) {
+    console.error('GET /api/scenarios/:id/move-referrers error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // DELETE /api/scenarios/:id - delete
+//
+// R250: 終了後の移動先にされていた場合、参照元の終了後の処理は
+// 「一時停止」へ戻る（deleteScenario が同じ batch で直す）。
+// 「移動先のない移動」は残らない。
 scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     await deleteScenario(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
+    const code = err instanceof Error ? err.message : '';
+    if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
+      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
+    }
     console.error('DELETE /api/scenarios/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1006,19 +1236,30 @@ scenarios.post('/api/scenarios/:id/steps/reorder', requireRole('owner', 'admin')
 // GET /api/scenarios/:id/preview - timeline preview (deterministic, no jitter)
 const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
-scenarios.get('/api/scenarios/:id/preview', async (c) => {
+scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c) => {
   try {
+    // simulate と同じく開始日の正しさを見る。無いと NaN 時刻の予定が
+    // 返るか 500 になる（#495 軽15）。
+    const startParam = c.req.query('startAt');
+    if (startParam && !Number.isFinite(new Date(startParam).getTime())) {
+      return c.json({
+        success: false,
+        code: 'start_at_invalid',
+        error: '開始日時が正しくありません',
+        field: 'startAt',
+      }, 400);
+    }
     const scenarioId = c.req.param('id');
     const scenarioRow = await c.env.DB
-      .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
+      .prepare(`SELECT delivery_mode, line_account_id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
-      .first<{ delivery_mode: DeliveryMode }>();
+      .first<{ delivery_mode: DeliveryMode; line_account_id: string | null }>();
     if (!scenarioRow) return c.json({ success: false, error: 'Scenario not found' }, 404);
 
     const stepsResult = await c.env.DB
       .prepare(
         `SELECT id, step_order, delay_minutes, offset_days, offset_minutes, delivery_time,
-                template_id, message_type, message_content, question_json
+                template_id, message_type, message_content, question_json, is_draft
          FROM scenario_steps WHERE scenario_id = ? ORDER BY step_order ASC`,
       )
       .bind(scenarioId)
@@ -1033,14 +1274,16 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
         message_type: string;
         message_content: string;
         question_json: string | null;
+        is_draft: number | null;
       }>();
     const steps = stepsResult.results;
 
     // 配信時と同じ resolveStepContent を呼んで、template_id があれば templates から
     // 最新内容を取って preview に返す。これで配信と preview の表示が一致する。
+    // シナリオの line_account_id を渡し、配信時と同じく公開版・同一アカウントだけを解決する。
     const resolvedSteps = await Promise.all(
       steps.map(async (step) => {
-        const resolved = await resolveStepContent(c.env.DB, step);
+        const resolved = await resolveStepContent(c.env.DB, step, scenarioRow.line_account_id);
         return { step, resolved };
       }),
     );
@@ -1048,7 +1291,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
     // computeNextDeliveryAt は「JST clock-time を UTC として表現する Date」前提。
     // クエリの startParam は "+09:00" 付き ISO で本物の UTC instant として parse されるため、
     // +9h ずらして JST clock-time 表現に揃える。default の now も同様にずらして表現する。
-    const startParam = c.req.query('startAt');
+    // （正しさは入口で見ているので、ここでは読むだけ。）
     const startAt = startParam
       ? new Date(new Date(startParam).getTime() + 9 * 60 * 60_000)
       : new Date(Date.now() + 9 * 60 * 60_000);
@@ -1082,6 +1325,18 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
         messageType: resolved.messageType,
         messageContent: resolved.messageContent,
         question: parseQuestion(resolved.questionJson),
+        // R212: 下書きの通も並ぶが、実際は送られない。送られる通と
+        // 見分けられるよう別を付ける（友だち別の予定は下書きを除く）。
+        isDraft: Number(step.is_draft ?? 0) !== 0,
+        /*
+         * R237: 公開版・通の控えのどれを表示しているかを出す。
+         * template 参照があるのに控えのときは、未反映の理由も付ける
+         * （保存と公開を取り違えると、確認すべき場所を誤る）。
+         */
+        contentSource: resolved.templateIdAtSend != null
+          ? 'template' as const
+          : (step.template_id != null ? 'step-fallback' as const : 'step' as const),
+        fallbackReason: resolved.fallbackReason,
       };
     });
 
@@ -1099,9 +1354,9 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
 });
 
 // GET /api/scenarios/:id/stats - reach rate dashboard
-scenarios.get('/api/scenarios/:id/stats', async (c) => {
+scenarios.get('/api/scenarios/:id/stats', scenarioPermission('view'), async (c) => {
   try {
-    const scenarioId = c.req.param('id');
+    const scenarioId = c.req.param('id')!;
     const scenario = await c.env.DB
       .prepare(`SELECT id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
@@ -1114,6 +1369,118 @@ scenarios.get('/api/scenarios/:id/stats', async (c) => {
   } catch (err) {
     console.error('GET /api/scenarios/:id/stats error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/scenarios/:id/simulate — 実データを数えるが、送信・購読は行わない。
+scenarios.post('/api/scenarios/:id/simulate', scenarioPermission('view'), async (c) => {
+  const body = await c.req.json<{
+    lineAccountId?: unknown;
+    startAt?: unknown;
+  }>().catch(() => ({} as { lineAccountId?: unknown; startAt?: unknown }));
+  const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  try {
+    const data = await simulateScenario(c.env.DB, {
+      scenarioId: c.req.param('id')!,
+      lineAccountId,
+      startAt: typeof body.startAt === 'string' ? body.startAt : undefined,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return scenarioContractError(c, error);
+  }
+});
+
+// GET /api/scenarios/:id/runs — 購読・テスト送信・送信枠を同じ応答で返す。
+scenarios.get('/api/scenarios/:id/runs', scenarioPermission('view'), async (c) => {
+  const lineAccountId = (c.req.query('lineAccountId') ?? '').trim();
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  try {
+    const data = await getScenarioRuns(c.env.DB, {
+      scenarioId: c.req.param('id')!,
+      lineAccountId,
+      status: c.req.query('status'),
+      cursor: c.req.query('cursor'),
+      limit: listLimit(c.req.query('limit'), 50, 100),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return scenarioContractError(c, error);
+  }
+});
+
+/*
+ * GET /api/scenarios/:id/friends/:friendId/plan — 選んだ友だちへの配信予定を
+ * 副作用なしで試算する（IDEA-05 / B段階導入）。
+ *
+ * 「シナリオ確認」の中から検証用の友だちを選んで、配信予定・待機・分岐理由を
+ * 見る口。送信・購読登録・タグ更新は一切行わない（応答の sideEffects:false）。
+ * 友だち側のアカウント境界も見る（手動登録と同じ。担当外の友だちは404で隠す）。
+ */
+scenarios.get('/api/scenarios/:id/friends/:friendId/plan', scenarioPermission('view'), async (c) => {
+  const lineAccountId = (c.req.query('lineAccountId') ?? '').trim();
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  try {
+    const friend = await getFriendById(c.env.DB, c.req.param('friendId')!);
+    const friendAccountId = (friend as { line_account_id?: string | null } | null)
+      ?.line_account_id ?? null;
+    if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId])) {
+      return c.json({ success: false, error: '友だちが見つかりません' }, 404);
+    }
+    const startAt = c.req.query('startAt');
+    const data = await simulateFriendPlan(c.env.DB, {
+      scenarioId: c.req.param('id')!,
+      lineAccountId,
+      friendId: c.req.param('friendId')!,
+      ...(startAt ? { startAt } : {}),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return scenarioContractError(c, error);
+  }
+});
+
+// PUT /api/scenarios/:id/draft — compare-and-set で送信後アクションを保存する。
+scenarios.put('/api/scenarios/:id/draft', scenarioPermission('edit'), async (c) => {
+  const body = await c.req.json<{
+    lineAccountId?: unknown;
+    expectedVersion?: unknown;
+    afterActions?: unknown;
+  }>().catch(() => ({} as {
+    lineAccountId?: unknown;
+    expectedVersion?: unknown;
+    afterActions?: unknown;
+  }));
+  const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  try {
+    const data = await saveScenarioDraft(c.env.DB, {
+      scenarioId: c.req.param('id')!,
+      lineAccountId,
+      expectedVersion: Number(body.expectedVersion),
+      afterActions: body.afterActions,
+      staffId: c.get('staff').id,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return scenarioContractError(c, error);
   }
 });
 
@@ -1137,6 +1504,36 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
+    /*
+     * 手動登録は本物の購読を作る。IDを直接渡されても、見えない友だちや
+     * 別アカウントの友だちを混ぜない（点検 #495 中12）。
+     * テスト送信と同じく、友だち側のアカウント一致を見る。
+     */
+    const friendAccountId = (friend as { line_account_id?: string | null }).line_account_id ?? null;
+    if (!await canAccessAllLineAccounts(db, c.get('staff'), [friendAccountId])) {
+      return c.json({ success: false, error: '登録する友だちが見つかりません。' }, 404);
+    }
+    if (scenario.line_account_id && friendAccountId !== scenario.line_account_id) {
+      return c.json(
+        { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' },
+        422,
+      );
+    }
+    if ((friend as { is_following?: number | null }).is_following !== 1) {
+      return c.json({ success: false, error: 'ブロック中の友だちは登録できません。' }, 422);
+    }
+    /*
+     * 未公開・停止中の契約はここで正直に返す。enrollFriendInScenario は
+     * webhook 経路の副作用でも使うので null に倒すだけだが、手動登録では
+     * 理由を 422 で返す（N-050 / #644）。
+     */
+    if (!scenario.is_active) {
+      return c.json({ success: false, error: '停止中のシナリオには登録できません。' }, 422);
+    }
+    if (!await getScenarioPublishedVersion(db, scenarioId)) {
+      return c.json({ success: false, error: 'まだ公開されていないため登録できません。先に公開してください。' }, 422);
+    }
+
     const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
     if (!enrollment) {
       return c.json({ success: false, error: 'Already enrolled in this scenario' }, 409);
@@ -1148,12 +1545,60 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
   }
 });
 
+// POST /api/scenarios/:id/publish — いまの下書きを公開版として固定する。
+//
+// 下書きの編集は公開するまで配信へ混入しない。購読は開始時の版へ固定され、
+// 開始後の編集は次に公開した版の購読から使う（N-050 / #644）。
+// アカウント境界は /api/scenarios/:id 系の共通ミドルウェアで 404 にする。
+scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, async (c) => {
+  try {
+    const requestKey = c.req.header('Idempotency-Key');
+    if (!validScenarioPublishKey(requestKey)) {
+      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+    }
+    const published = await publishScenarioVersion(c.env.DB, c.req.param('id'), {
+      staffId: c.get('staff')?.id ?? null,
+      idempotencyKey: requestKey,
+    });
+    return c.json({
+      success: true,
+      data: {
+        scenarioId: c.req.param('id'),
+        versionId: published.id,
+        versionNumber: Number(published.version_number),
+        publishedAt: published.published_at,
+      },
+    });
+  } catch (err) {
+    const code = err instanceof Error ? err.message : '';
+    if (code === 'SCENARIO_NOT_FOUND') {
+      return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+    }
+    if (code === 'SCENARIO_PUBLISH_KEY_CONFLICT') {
+      return c.json({ success: false, error: '同じ確認キーが別の内容・別の公開操作で使われています' }, 409);
+    }
+    if (code === 'SCENARIO_PUBLISH_CONFLICT') {
+      return c.json({ success: false, error: '同時公開が競合しました。もう一度公開してください' }, 409);
+    }
+    if (code === 'SCENARIO_PUBLISH_CYCLE') {
+      // モック化されたDBでも壊れないよう、型ではなく userMessage の有無で見る。
+      const reason = err instanceof Error && 'userMessage' in err
+          && typeof (err as { userMessage?: unknown }).userMessage === 'string'
+        ? (err as { userMessage: string }).userMessage
+        : '分岐または完了後の移動が循環しているため公開できません';
+      return c.json({ success: false, error: reason, code: 'PUBLISH_CYCLE' }, 409);
+    }
+    console.error('POST /api/scenarios/:id/publish error:', err);
+    return c.json({ success: false, error: 'シナリオを公開できませんでした' }, 500);
+  }
+});
+
 // ============================================================
 // アクション（Lステップの「アクション設定」にあたる）
 // ============================================================
 
 const VALID_ACTION_HOOKS = ['step_sent', 'scenario_completed', 'choice_selected'] as const;
-const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var'] as const;
+const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var', 'send_message', 'send_template', 'reminder', 'event_booking'] as const;
 
 interface ActionBody {
   hook?: string;
@@ -1242,13 +1687,25 @@ function validateActionConfig(
         return { ok: false, error: '共通情報の操作は加算か減算です。' };
       }
       return { ok: true };
+    case 'send_message':
+      if (c.content !== undefined && typeof c.content !== 'string') return { ok: false, error: '本文が不正です。' };
+      return { ok: true };
+    case 'send_template':
+      if (c.templateId !== undefined && typeof c.templateId !== 'string') return { ok: false, error: 'テンプレートの指定が不正です。' };
+      return { ok: true };
+    case 'reminder':
+      if (c.reminderId !== undefined && typeof c.reminderId !== 'string') return { ok: false, error: 'リマインダの指定が不正です。' };
+      return { ok: true };
+    case 'event_booking':
+      if (c.eventId !== undefined && typeof c.eventId !== 'string') return { ok: false, error: 'イベント予約の指定が不正です。' };
+      return { ok: true };
     default:
       return { ok: false, error: `知らないアクション種別です: ${actionType}` };
   }
 }
 
 // GET /api/scenarios/:id/actions — シナリオのアクションを全部返す
-scenarios.get('/api/scenarios/:id/actions', async (c) => {
+scenarios.get('/api/scenarios/:id/actions', scenarioPermission('view'), async (c) => {
   try {
     const rows = await c.env.DB.prepare(
       `SELECT id, scenario_id, hook, step_id, choice_index, sort_order,
@@ -1303,6 +1760,19 @@ scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), asyn
     if (!configCheck.ok) return c.json({ success: false, error: configCheck.error }, 400);
     const conditionCheck = validateConditionForStorage(body.condition, 'アクションの実行');
     if (!conditionCheck.ok) return c.json({ success: false, error: conditionCheck.error }, 400);
+
+    // N-053: 参照先の存在と所属を保存前に確かめる。幽霊・他アカウントは
+    // 1行も書かず 400 で返す。実行時の読み飛ばしに頼らない。
+    const scenarioRow = await c.env.DB.prepare(
+      `SELECT line_account_id FROM scenarios WHERE id = ?`,
+    )
+      .bind(scenarioId)
+      .first<{ line_account_id: string | null }>();
+    if (!scenarioRow) return c.json({ success: false, error: 'シナリオが見つかりません。' }, 404);
+    const refCheck = await validateScenarioActionReferences(
+      c.env.DB, scenarioRow.line_account_id, actionType, body.config,
+    );
+    if (!refCheck.ok) return c.json({ success: false, error: refCheck.issue.message }, 400);
 
     // 並び順を渡されなければ、同じ発火点の末尾に置く。
     let sortOrder = body.sortOrder;
@@ -1371,6 +1841,18 @@ scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admi
     if (body.config !== undefined) {
       const check = validateActionConfig(existing.action_type, body.config);
       if (!check.ok) return c.json({ success: false, error: check.error }, 400);
+      // N-053: 新しく保存する設定だけ確かめる。並び順だけの変更や既存の
+      // 幽霊参照には触らない（既存データの読み・実行を壊さない）。
+      const scenarioRow = await c.env.DB.prepare(
+        `SELECT line_account_id FROM scenarios WHERE id = ?`,
+      )
+        .bind(scenarioId)
+        .first<{ line_account_id: string | null }>();
+      if (!scenarioRow) return c.json({ success: false, error: 'シナリオが見つかりません。' }, 404);
+      const refCheck = await validateScenarioActionReferences(
+        c.env.DB, scenarioRow.line_account_id, existing.action_type, body.config,
+      );
+      if (!refCheck.ok) return c.json({ success: false, error: refCheck.issue.message }, 400);
       fields.push('config_json = ?');
       values.push(JSON.stringify(body.config));
     }
@@ -1494,8 +1976,15 @@ async function runTestSend(
       friendId,
       scenario.line_account_id,
       c.env.WORKER_URL || new URL(c.req.url).origin,
+      // N-057: 送信先×対象（全通 or 1通）で短い間隔の重複実送信を止める。
+      { dedupeKey: `${scenarioId}:${stepId ?? 'all'}` },
     );
-    if (!result.ok) return c.json({ success: false, error: result.error }, 400);
+    if (!result.ok) {
+      return c.json(
+        { success: false, error: result.error },
+        result.deduped ? 409 : 400,
+      );
+    }
     return c.json({ success: true, data: { sent: result.sent } });
   } catch (err) {
     console.error('scenario test-send error:', err);
@@ -1530,9 +2019,9 @@ scenarios.post(
  * 友だち追加時の配信から開始できるので、それが手動と同じ意味になる。
  */
 
-scenarios.get('/api/scenarios/:id/triggers', async (c) => {
+scenarios.get('/api/scenarios/:id/triggers', scenarioPermission('view'), async (c) => {
   try {
-    const rows = await getScenarioTriggers(c.env.DB, c.req.param('id'));
+    const rows = await getScenarioTriggers(c.env.DB, c.req.param('id')!);
     return c.json({
       success: true,
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
@@ -1543,12 +2032,12 @@ scenarios.get('/api/scenarios/:id/triggers', async (c) => {
   }
 });
 
-scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), async (c) => {
+scenarios.post('/api/scenarios/:id/triggers', requireScenarioEditBoundary, async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{ kind?: string; tagId?: string | null }>();
     const kind = String(body.kind ?? '');
-    if (kind !== 'friend_add' && kind !== 'tag_added') {
+    if (!['friend_add', 'tag_added', 'form_answer', 'booking_confirmed'].includes(kind)) {
       return c.json({ success: false, error: 'きっかけの種類が不正です。' }, 400);
     }
     if (kind === 'tag_added' && !body.tagId) {
@@ -1567,7 +2056,7 @@ scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), asy
       if (!tag) return c.json({ success: false, error: 'タグが見つかりません。' }, 400);
     }
 
-    await addScenarioTrigger(c.env.DB, scenarioId, kind, body.tagId ?? null);
+    await addScenarioTrigger(c.env.DB, scenarioId, kind as 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed', body.tagId ?? null);
     const rows = await getScenarioTriggers(c.env.DB, scenarioId);
     return c.json({
       success: true,
@@ -1579,6 +2068,23 @@ scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), asy
   }
 });
 
+// GET /api/scenarios/:id/draft — 編集画面を開いたときの下書き読み返し。
+scenarios.get('/api/scenarios/:id/draft', scenarioPermission('view'), async (c) => {
+  const lineAccountId = (c.req.query('lineAccountId') ?? '').trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  const row = await c.env.DB.prepare(
+    `SELECT scenario_id, line_account_id, version, after_actions_json, updated_by, updated_at
+       FROM scenario_drafts WHERE scenario_id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), lineAccountId).first<{ scenario_id: string; line_account_id: string; version: number; after_actions_json: string; updated_by: string; updated_at: string }>();
+  if (!row) return c.json({ success: true, data: null });
+  return c.json({ success: true, data: {
+    scenarioId: row.scenario_id, lineAccountId: row.line_account_id, version: row.version,
+    afterActions: parseJson(row.after_actions_json), updatedBy: row.updated_by, updatedAt: row.updated_at,
+  }});
+});
+
 scenarios.delete(
   '/api/scenarios/:id/triggers/:triggerId',
   requireRole('owner', 'admin'),
@@ -1588,6 +2094,312 @@ scenarios.delete(
       return c.json({ success: true });
     } catch (err) {
       console.error('DELETE /api/scenarios/:id/triggers/:triggerId error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// ============================================================
+// 友だち単位の購読操作（#949 N-054 / 機能05）
+//
+// 画面は「いま届いている・止まっている購読1行」に対して止める・再開する・
+// 別のシナリオへ移す・失敗を再送する。対象は friend_scenarios の id で
+// 指す。友だちの所属アカウントが見える範囲外なら 404 で存在を隠す。
+//
+// 全部で Idempotency-Key を必須にする。同じキーの再送は残っている結果を
+// そのまま返し、別の購読・別の操作・別の本体への使い回しは 409 にする
+// （friend_scenario_op_keys / 432・434）。
+// ============================================================
+
+type FriendScenarioOp = 'pause' | 'resume' | 'move' | 'retry';
+
+interface FriendOpOutcome {
+  status: 200 | 201 | 400 | 404 | 409 | 422;
+  body: { success: boolean; data?: unknown; error?: string };
+}
+
+/**
+ * 購読操作の共通骨組み。
+ *
+ * 1. 確認キー（Idempotency-Key）の形を見る。無ければ 400。
+ * 2. 購読行と友だちを読み、友だちの所属アカウントが範囲外なら 404。
+ * 3. 台帳へキーを予約する（INSERT OR IGNORE）。先に入っているなら、
+ *    同じ購読・同じ操作・同じ本体の結果をそのまま返し、別の使い回しは 409。
+ * 4. 操作を走らせ、**成功した結果だけ**を台帳へ残す。一時的な失敗
+ *    （配信中の 409 や検証の 422 など）を残すと、Web は失敗時にキーを
+ *    回さないため同じ応答が永遠に返り続ける。失敗時と例外時は予約を外す。
+ */
+async function runFriendScenarioOp(
+  c: Context<Env>,
+  op: FriendScenarioOp,
+  run: (subscription: DbFriendScenario) => Promise<FriendOpOutcome>,
+): Promise<Response> {
+  const key = c.req.header('Idempotency-Key');
+  if (!validScenarioPublishKey(key)) {
+    return c.json({ success: false, error: '操作の確認キーが必要です' }, 400);
+  }
+  const db = c.env.DB;
+  const subscriptionId = c.req.param('subscriptionId') ?? '';
+
+  // 操作本体（リクエスト）の写し。move の移し先のように本体に引数を持つ
+  // 操作は、同じキーでも本体が違えば別操作として 409 にするため台帳へ残す
+  // （scenario_publish_keys の content_snapshot と同じ考え方）。
+  // Hono は読んだ本体を写しとして持つので、handler 側の c.req.json() は
+  // このあとも普通に動く。
+  const requestFingerprint = await sha256Hex(await c.req.text());
+
+  const subscription = await getFriendScenarioById(db, subscriptionId);
+  if (!subscription) {
+    return c.json({ success: false, error: '購読が見つかりません' }, 404);
+  }
+  const friend = await getFriendById(db, subscription.friend_id);
+  const friendAccountId = (friend as { line_account_id?: string | null } | null)?.line_account_id ?? null;
+  if (!friend || !await canAccessAllLineAccounts(db, c.get('staff'), [friendAccountId])) {
+    return c.json({ success: false, error: '購読が見つかりません' }, 404);
+  }
+
+  const claimed = await db.prepare(
+    `INSERT OR IGNORE INTO friend_scenario_op_keys
+       (op_idempotency_key, friend_scenario_id, op, request_fingerprint, response_json, created_at)
+     VALUES (?, ?, ?, ?, 'PENDING', ?)`,
+  ).bind(key, subscriptionId, op, requestFingerprint, jstNow()).run();
+
+  if ((claimed.meta.changes ?? 0) === 0) {
+    const existing = await db.prepare(
+      `SELECT friend_scenario_id, op, request_fingerprint, response_json
+        FROM friend_scenario_op_keys
+        WHERE op_idempotency_key = ?`,
+    ).bind(key).first<{
+      friend_scenario_id: string;
+      op: string;
+      request_fingerprint: string | null;
+      response_json: string;
+    }>();
+    // 本体の写しが違う同キー再送（例: move の移し先だけ変えた再送）も
+    // 別操作への使い回しとして 409 にする。既存行の写しが NULL（434 より
+    // 前に残った行）なら不一致に倒す。
+    if (
+      !existing
+      || existing.friend_scenario_id !== subscriptionId
+      || existing.op !== op
+      || existing.request_fingerprint !== requestFingerprint
+    ) {
+      return c.json(
+        { success: false, error: '同じ確認キーが別の操作で使われています' },
+        409,
+      );
+    }
+    if (existing.response_json === 'PENDING') {
+      return c.json(
+        { success: false, error: '同じ操作を処理中です。しばらく待ってからやり直してください' },
+        409,
+      );
+    }
+    const stored = JSON.parse(existing.response_json) as FriendOpOutcome;
+    return c.json(stored.body, stored.status);
+  }
+
+  try {
+    const outcome = await run(subscription);
+    if (outcome.status >= 200 && outcome.status < 300) {
+      // 成功した結果だけを pin する。同じキーの再送はこの応答を再生する。
+      await db.prepare(
+        `UPDATE friend_scenario_op_keys SET response_json = ?
+          WHERE op_idempotency_key = ?`,
+      ).bind(JSON.stringify(outcome), key).run();
+    } else {
+      // 失敗応答は pin しない。予約を外して、同じキーでも新しいキーでも
+      // やり直せるようにする。
+      await db.prepare(
+        `DELETE FROM friend_scenario_op_keys WHERE op_idempotency_key = ?`,
+      ).bind(key).run();
+    }
+    return c.json(outcome.body, outcome.status);
+  } catch (err) {
+    // 台帳に失敗を pin しない。予約だけ外して例外を上へ返す。
+    await db.prepare(
+      `DELETE FROM friend_scenario_op_keys WHERE op_idempotency_key = ?`,
+    ).bind(key).run();
+    throw err;
+  }
+}
+
+// POST /api/scenario-subscriptions/:subscriptionId/pause — 手動で止める
+scenarios.post(
+  '/api/scenario-subscriptions/:subscriptionId/pause',
+  requirePermission('scenario.subscription.edit'),
+  async (c) => {
+    try {
+      return await runFriendScenarioOp(c, 'pause', async (subscription) => {
+        if (subscription.status === 'paused') {
+          return {
+            status: 200,
+            body: { success: true, data: serializeFriendScenario(subscription) },
+          };
+        }
+        if (subscription.status === 'delivering') {
+          return {
+            status: 409,
+            body: { success: false, error: 'いま配信を処理中です。少し待ってから止めてください' },
+          };
+        }
+        const paused = await pauseFriendScenarioManual(c.env.DB, subscription.id);
+        if (!paused) {
+          return {
+            status: 409,
+            body: { success: false, error: 'すでに終わっている購読は止められません' },
+          };
+        }
+        const row = await getFriendScenarioById(c.env.DB, subscription.id);
+        return {
+          status: 200,
+          body: { success: true, data: serializeFriendScenario(row ?? subscription) },
+        };
+      });
+    } catch (err) {
+      console.error('POST /api/scenario-subscriptions/:id/pause error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// POST /api/scenario-subscriptions/:subscriptionId/resume — 止まっている購読を再開する
+scenarios.post(
+  '/api/scenario-subscriptions/:subscriptionId/resume',
+  requirePermission('scenario.subscription.edit'),
+  async (c) => {
+    try {
+      return await runFriendScenarioOp(c, 'resume', async (subscription) => {
+        if (subscription.status === 'active') {
+          return {
+            status: 200,
+            body: { success: true, data: serializeFriendScenario(subscription) },
+          };
+        }
+        if (subscription.status === 'delivering') {
+          return {
+            status: 409,
+            body: { success: false, error: 'いま配信を処理中です。少し待ってから再開してください' },
+          };
+        }
+        if (subscription.status === 'completed') {
+          return {
+            status: 409,
+            body: { success: false, error: '終わった購読は再開できません' },
+          };
+        }
+        const resumed = await resumeFriendScenarioById(c.env.DB, subscription.id);
+        if (!resumed) {
+          return {
+            status: 409,
+            body: { success: false, error: 'この購読は再開できません（シナリオ停止・続きの通なし）' },
+          };
+        }
+        return { status: 200, body: { success: true, data: serializeFriendScenario(resumed) } };
+      });
+    } catch (err) {
+      console.error('POST /api/scenario-subscriptions/:id/resume error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// POST /api/scenario-subscriptions/:subscriptionId/retry — 配信失敗で止まった購読を失敗した通から送り直す
+scenarios.post(
+  '/api/scenario-subscriptions/:subscriptionId/retry',
+  requirePermission('scenario.step_run.retry'),
+  async (c) => {
+    try {
+      return await runFriendScenarioOp(c, 'retry', async (subscription) => {
+        if (subscription.status === 'active') {
+          return {
+            status: 200,
+            body: { success: true, data: serializeFriendScenario(subscription) },
+          };
+        }
+        if (subscription.pause_reason !== 'delivery_failed') {
+          return {
+            status: 409,
+            body: { success: false, error: '配信失敗で止まっている購読だけを再送できます' },
+          };
+        }
+        const retried = await retryFailedFriendScenario(c.env.DB, subscription.id);
+        if (!retried) {
+          return {
+            status: 409,
+            body: { success: false, error: 'この購読は再送できません' },
+          };
+        }
+        return { status: 200, body: { success: true, data: serializeFriendScenario(retried) } };
+      });
+    } catch (err) {
+      console.error('POST /api/scenario-subscriptions/:id/retry error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// POST /api/scenario-subscriptions/:subscriptionId/move — 別のシナリオへ移す
+scenarios.post(
+  '/api/scenario-subscriptions/:subscriptionId/move',
+  requirePermission('scenario.subscription.edit'),
+  async (c) => {
+    try {
+      return await runFriendScenarioOp(c, 'move', async (subscription) => {
+        const body = await c.req.json<{ targetScenarioId?: unknown }>().catch(() => null);
+        const targetScenarioId = typeof body?.targetScenarioId === 'string'
+          ? body.targetScenarioId.trim()
+          : '';
+        if (!targetScenarioId) {
+          return {
+            status: 400,
+            body: { success: false, error: '移し先のシナリオを選んでください' },
+          };
+        }
+        if (subscription.status === 'delivering') {
+          return {
+            status: 409,
+            body: { success: false, error: 'いま配信を処理中です。少し待ってから移してください' },
+          };
+        }
+        if (subscription.status === 'completed') {
+          return {
+            status: 409,
+            body: { success: false, error: '終わった購読は移せません' },
+          };
+        }
+
+        const target = await getScenarioById(c.env.DB, targetScenarioId);
+        const targetAccountId = (target as { line_account_id?: string | null } | null)?.line_account_id ?? null;
+        if (!target || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [targetAccountId])) {
+          return { status: 404, body: { success: false, error: '移し先のシナリオが見つかりません' } };
+        }
+        if (!target.is_active) {
+          return {
+            status: 422,
+            body: { success: false, error: '停止中のシナリオには移せません' },
+          };
+        }
+        const friend = await getFriendById(c.env.DB, subscription.friend_id);
+        const friendAccountId = (friend as { line_account_id?: string | null } | null)?.line_account_id ?? null;
+        if (targetAccountId && friendAccountId !== targetAccountId) {
+          return {
+            status: 422,
+            body: { success: false, error: '移し先と同じLINEアカウントの友だちにだけ移せます' },
+          };
+        }
+
+        const moved = await moveFriendScenarioTo(c.env.DB, subscription.id, targetScenarioId);
+        if (!moved) {
+          return {
+            status: 409,
+            body: { success: false, error: 'この友だちは移し先にすでに入っているか、移し先が受け付けません' },
+          };
+        }
+        return { status: 200, body: { success: true, data: serializeFriendScenario(moved) } };
+      });
+    } catch (err) {
+      console.error('POST /api/scenario-subscriptions/:id/move error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },

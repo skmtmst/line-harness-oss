@@ -13,7 +13,13 @@ export interface EntryRoute {
   intro_template_id: string | null;
   run_account_friend_add_scenarios: number;
   is_active: number;
+  /** 476: 受付を止めた時刻。受付中・止めた記録が無い古い行は null。 */
+  stopped_at: string | null;
+  /** 476: 止めた理由。受付中は null。 */
+  stopped_reason: string | null;
   tenant_id: string | null;
+  /** migration 308 より前の互換行は未割当のため null。 */
+  line_account_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,8 +39,34 @@ export interface RefTracking {
   utm_campaign: string | null;
   user_agent: string | null;
   ip_address: string | null;
+  line_account_id: string | null;
+  ad_conversion_consent_at: string | null;
   created_at: string;
 }
+
+export type AdClickIdType = 'fbclid' | 'gclid' | 'twclid' | 'ttclid';
+
+export type AdClickSelection =
+  | {
+      status: 'eligible';
+      refTrackingId: string;
+      clickId: string;
+      clickIdType: AdClickIdType;
+      recordedAt: string;
+      expiresAt: string;
+      consentAt: string;
+      ipAddress: string | null;
+      userAgent: string | null;
+    }
+  | {
+      status: 'missing_consent' | 'expired';
+      refTrackingId: string;
+      clickId: string;
+      clickIdType: AdClickIdType;
+      recordedAt: string;
+      expiresAt: string;
+    }
+  | { status: 'missing_click_id'; clickIdType: AdClickIdType };
 
 export interface CreateEntryRouteInput {
   refCode: string;
@@ -48,6 +80,11 @@ export interface CreateEntryRouteInput {
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
   tenantId?: string;
+  /**
+   * R39: 作成時に所属させるLINEアカウント。migration 308 の
+   * line_account_id 列へ保存する。未指定は未割当のまま残す。
+   */
+  lineAccountId?: string | null;
 }
 
 export interface EntryRouteFunnel {
@@ -77,6 +114,21 @@ export async function getEntryRouteByRefCode(
     .first<EntryRoute>();
 }
 
+/**
+ * N-244: ref 名前空間の所有確認用。is_active を問わず行を返す。
+ * 停止した経路を「存在しない」と区別し、公開URL受付を止めるために使う。
+ * 返す行の redirect_url / pool_id / tag_id 等を公開応答に含めてはならない。
+ */
+export async function getEntryRouteByRefCodeAny(
+  db: D1Database,
+  refCode: string,
+): Promise<EntryRoute | null> {
+  return db
+    .prepare(`SELECT * FROM entry_routes WHERE ref_code = ?`)
+    .bind(refCode)
+    .first<EntryRoute>();
+}
+
 export async function createEntryRoute(
   db: D1Database,
   input: CreateEntryRouteInput,
@@ -94,8 +146,8 @@ export async function createEntryRoute(
       `INSERT INTO entry_routes
          (id, ref_code, genre, name, tag_id, scenario_id, redirect_url,
           pool_id, intro_template_id, run_account_friend_add_scenarios,
-          is_active, tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_active, tenant_id, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -110,6 +162,7 @@ export async function createEntryRoute(
       runAccount,
       isActive,
       input.tenantId ?? DEFAULT_TENANT_ID,
+      input.lineAccountId ?? null,
       now,
       now,
     )
@@ -141,7 +194,7 @@ export async function createEntryRoute(
 export async function updateEntryRoute(
   db: D1Database,
   id: string,
-  input: Partial<CreateEntryRouteInput>,
+  input: Partial<CreateEntryRouteInput> & { stoppedReason?: string | null },
 ): Promise<EntryRoute | null> {
   const now = jstNow();
   const fields: string[] = ['updated_at = ?'];
@@ -161,7 +214,24 @@ export async function updateEntryRoute(
     fields.push('run_account_friend_add_scenarios = ?');
     values.push(input.runAccountFriendAddScenarios ? 1 : 0);
   }
-  if (input.isActive !== undefined) { fields.push('is_active = ?'); values.push(input.isActive ? 1 : 0); }
+  if (input.isActive !== undefined) {
+    fields.push('is_active = ?');
+    values.push(input.isActive ? 1 : 0);
+    if (!input.isActive) {
+      // 受付停止はいつ・なぜ止めたかを残す。QRダイアログの停止表示が読む。
+      fields.push('stopped_at = ?');
+      values.push(now);
+      const reason = input.stoppedReason?.trim() || null;
+      fields.push('stopped_reason = ?');
+      values.push(reason);
+    } else {
+      // 受付再開で停止の記録を消す。古い停止表示が残らないようにする。
+      fields.push('stopped_at = ?');
+      values.push(null);
+      fields.push('stopped_reason = ?');
+      values.push(null);
+    }
+  }
 
   values.push(id);
 
@@ -176,8 +246,53 @@ export async function updateEntryRoute(
     .first<EntryRoute>();
 }
 
-export async function deleteEntryRoute(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM entry_routes WHERE id = ?`).bind(id).run();
+export type DeleteEntryRouteResult = 'deleted' | 'not_found' | 'name_mismatch' | 'in_use';
+
+/**
+ * 取り消せない完全削除は、現在名の一致と利用履歴0件をDBのDELETE条件にも入れる。
+ * route取得後にクリック等が増えた場合も、確認と削除の間で履歴だけを孤立させない。
+ */
+export async function deleteEntryRoute(
+  db: D1Database,
+  id: string,
+  expectedName: string,
+): Promise<DeleteEntryRouteResult> {
+  const result = await db.prepare(
+    `DELETE FROM entry_routes
+      WHERE id = ?
+        AND name = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM ref_tracking rt
+           WHERE rt.entry_route_id = ? OR rt.ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM friends f
+           WHERE f.ref_code = entry_routes.ref_code OR f.last_ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM friend_add_events fae
+           WHERE fae.entry_route_id = ? OR fae.ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM friend_add_attribution_candidates fac
+           WHERE fac.entry_route_id = ? OR fac.ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM conversion_events ce
+           WHERE ce.attributed_ref_code = entry_routes.ref_code
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM entry_route_stop_suppressions ers
+           WHERE ers.ref_code = entry_routes.ref_code
+        )`,
+  ).bind(id, expectedName, id, id, id).run();
+
+  if ((result.meta.changes ?? 0) > 0) return 'deleted';
+
+  const existing = await getEntryRouteById(db, id);
+  if (!existing) return 'not_found';
+  if (existing.name !== expectedName) return 'name_mismatch';
+  return 'in_use';
 }
 
 export async function getEntryRouteById(
@@ -316,6 +431,12 @@ export async function recordRefTracking(
     utmCampaign?: string | null;
     userAgent?: string | null;
     ipAddress?: string | null;
+    /**
+     * 広告媒体への送信同意を実際に取得した時刻。
+     * LINE Login / LIFFの完了は広告送信への同意ではないため、
+     * 未指定は同意なし(null)としてfail-closedにする。
+     */
+    adConversionConsentAt?: string | null;
   },
 ): Promise<RefTracking> {
   const id = crypto.randomUUID();
@@ -326,8 +447,9 @@ export async function recordRefTracking(
       `INSERT INTO ref_tracking
        (id, ref_code, friend_id, entry_route_id, source_url,
         fbclid, gclid, twclid, ttclid, utm_source, utm_medium, utm_campaign,
-        user_agent, ip_address, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        user_agent, ip_address, line_account_id, ad_conversion_consent_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         (SELECT line_account_id FROM friends WHERE id = ?), ?, ?)`,
     )
     .bind(
       id,
@@ -344,6 +466,8 @@ export async function recordRefTracking(
       opts.utmCampaign ?? null,
       opts.userAgent ?? null,
       opts.ipAddress ?? null,
+      opts.friendId ?? null,
+      opts.adConversionConsentAt ?? null,
       now,
     )
     .run();
@@ -359,6 +483,94 @@ export async function recordRefTracking(
     .prepare(`SELECT * FROM ref_tracking WHERE id = ?`)
     .bind(id)
     .first<RefTracking>())!;
+}
+
+const CLICK_COLUMN_BY_PLATFORM = {
+  meta: 'fbclid',
+  google: 'gclid',
+  x: 'twclid',
+  tiktok: 'ttclid',
+} as const;
+
+/**
+ * 媒体ごとに、同じaccountで直近の利用可能なクリックIDを選ぶ。
+ * 期限は [記録時刻, 記録時刻+日数) とし、満了時刻ちょうどは期限切れ。
+ */
+export async function selectAdClickForPlatform(
+  db: D1Database,
+  input: {
+    friendId: string;
+    lineAccountId: string;
+    platformName: keyof typeof CLICK_COLUMN_BY_PLATFORM;
+    validityDays: number;
+    now?: Date;
+  },
+): Promise<AdClickSelection> {
+  const clickIdType = CLICK_COLUMN_BY_PLATFORM[input.platformName];
+  const now = input.now ?? new Date();
+  const rows = await db
+    .prepare(
+      `SELECT id, ${clickIdType} AS click_id, created_at,
+              strftime('%Y-%m-%dT%H:%M:%fZ', created_at, '+' || ? || ' days') AS expires_at,
+              ad_conversion_consent_at, ip_address, user_agent
+       FROM ref_tracking
+       WHERE friend_id = ? AND line_account_id = ?
+         AND ${clickIdType} IS NOT NULL AND TRIM(${clickIdType}) <> ''
+       ORDER BY
+         CASE
+           WHEN ad_conversion_consent_at IS NOT NULL
+             AND julianday(created_at, '+' || ? || ' days') > julianday(?) THEN 0
+           WHEN ad_conversion_consent_at IS NULL
+             AND julianday(created_at, '+' || ? || ' days') > julianday(?) THEN 1
+           ELSE 2
+         END,
+         julianday(created_at) DESC, id DESC
+       LIMIT 1`,
+    )
+    .bind(
+      input.validityDays,
+      input.friendId,
+      input.lineAccountId,
+      input.validityDays,
+      now.toISOString(),
+      input.validityDays,
+      now.toISOString(),
+    )
+    .all<{
+      id: string;
+      click_id: string;
+      created_at: string;
+      expires_at: string | null;
+      ad_conversion_consent_at: string | null;
+      ip_address: string | null;
+      user_agent: string | null;
+    }>();
+  const row = rows.results[0];
+  if (!row) return { status: 'missing_click_id', clickIdType };
+
+  const recordedAtMs = new Date(row.created_at).getTime();
+  const expiresAt = row.expires_at ?? row.created_at;
+  const expiresAtMs = new Date(expiresAt).getTime();
+  const common = {
+    refTrackingId: row.id,
+    clickId: row.click_id,
+    clickIdType,
+    recordedAt: row.created_at,
+    expiresAt,
+  };
+  if (!row.ad_conversion_consent_at && expiresAtMs > now.getTime()) {
+    return { status: 'missing_consent', ...common };
+  }
+  if (!Number.isFinite(recordedAtMs) || expiresAtMs <= now.getTime()) {
+    return { status: 'expired', ...common };
+  }
+  return {
+    status: 'eligible',
+    ...common,
+    consentAt: row.ad_conversion_consent_at!,
+    ipAddress: row.ip_address,
+    userAgent: row.user_agent,
+  };
 }
 
 export async function getRefTrackingWithClickIds(

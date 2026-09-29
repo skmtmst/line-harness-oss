@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getTrafficPoolById: vi.fn(),
   createScenario: vi.fn(),
   createReminder: vi.fn(),
+  deleteReminder: vi.fn(),
   getReminderById: vi.fn(),
   getScenarioById: vi.fn(),
   getFolderById: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
   getTrafficPoolById: mocks.getTrafficPoolById,
   createScenario: mocks.createScenario,
   createReminder: mocks.createReminder,
+  deleteReminder: mocks.deleteReminder,
   getReminderById: mocks.getReminderById,
   getScenarioById: mocks.getScenarioById,
   getFolderById: mocks.getFolderById,
@@ -35,12 +37,12 @@ const [{ ecCommerce }, { trafficPools }, { scenarios }, { reminders }] = await P
   import('./ec-commerce.js'), import('./traffic-pools.js'), import('./scenarios.js'), import('./reminders.js'),
 ]);
 
-function app(route: Hono<any>) {
+function app(route: Hono<any>, role: 'owner' | 'admin' | 'staff' = 'owner') {
   const instance = new Hono<any>();
   instance.use('*', async (c, next) => {
     const statement = { bind: () => statement, first: vi.fn(async () => null), run: vi.fn(async () => ({})), all: vi.fn(async () => ({ results: [] })) };
     c.env = { DB: { prepare: () => statement } as unknown as D1Database };
-    c.set('staff' as never, { id: 'owner', role: 'owner', tenantId: 'tenant-a' } as never);
+    c.set('staff' as never, { id: 'staff-1', role, tenantId: 'tenant-a' } as never);
     await next();
   });
   instance.route('/', route);
@@ -62,6 +64,7 @@ beforeEach(() => {
   mocks.getTrafficPoolById.mockResolvedValue({ id: 'pool', active_account_id: 'own' });
   mocks.createScenario.mockResolvedValue(scenarioRow);
   mocks.createReminder.mockResolvedValue({ id: 'reminder', name: 'test', created_at: '' });
+  mocks.deleteReminder.mockResolvedValue(undefined);
   mocks.getReminderById.mockResolvedValue({ id: 'reminder', line_account_id: 'own' });
   mocks.getScenarioById.mockResolvedValue({ ...scenarioRow, line_account_id: 'own', steps: [] });
   mocks.getFolderById.mockResolvedValue(null);
@@ -134,5 +137,21 @@ describe('A-5 body account tenant scope', () => {
     );
     expect(response.status).toBe(201);
     expect(mocks.createReminder).toHaveBeenCalled();
+  });
+
+  test('reminder delete is limited to owner/admin and remains tenant-scoped', async () => {
+    const staffResponse = await app(reminders, 'staff').request('/api/reminders/reminder', { method: 'DELETE' });
+    expect(staffResponse.status).toBe(403);
+    expect(mocks.deleteReminder).not.toHaveBeenCalled();
+
+    mocks.canAccess.mockResolvedValue(false);
+    const otherTenantResponse = await app(reminders).request('/api/reminders/reminder', { method: 'DELETE' });
+    expect(otherTenantResponse.status).toBe(404);
+    expect(mocks.deleteReminder).not.toHaveBeenCalled();
+
+    mocks.canAccess.mockResolvedValue(true);
+    const ownerResponse = await app(reminders).request('/api/reminders/reminder', { method: 'DELETE' });
+    expect(ownerResponse.status).toBe(200);
+    expect(mocks.deleteReminder).toHaveBeenCalledWith(expect.anything(), 'reminder');
   });
 });

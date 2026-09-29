@@ -4,12 +4,18 @@ import type { Env } from '../index.js';
 
 const mocks = {
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(),
+  getLineAccountsByIds: vi.fn(),
   getLineAccountById: vi.fn(),
   createLineAccount: vi.fn(),
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
   updateLineAccountOrder: vi.fn(),
-  deleteLineAccount: vi.fn(),
+  deleteUncommittedLineAccount: vi.fn(),
+  getLineAccountArchiveBlockers: vi.fn(),
+  setDefaultLineAccount: vi.fn(),
+  archiveLineAccount: vi.fn(),
+  restoreLineAccount: vi.fn(),
   countFriendsByLineAccount: vi.fn(),
   getStaffById: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
@@ -63,6 +69,10 @@ function patch(body: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getLineAccounts.mockResolvedValue([{ ...ACCOUNT, parent_line_account_id: null }]);
+  mocks.getLineAccountScopeEntries.mockResolvedValue([
+    { ...ACCOUNT, parent_line_account_id: null, tenant_id: null },
+  ]);
+  mocks.getLineAccountsByIds.mockResolvedValue([{ ...ACCOUNT, parent_line_account_id: null }]);
   mocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   mocks.getStaffAccountScopeIds.mockResolvedValue([]);
   mocks.getLineAccountById.mockResolvedValue(ACCOUNT);
@@ -114,10 +124,10 @@ describe('友だち数の上限', () => {
     expect((await patch({ friendCapacity: 1.5 })).status).toBe(400);
   });
 
-  it('上限に触れないリクエストでは現在値を引かない', async () => {
-    // 有効・無効の切り替えだけで毎回 SELECT が増えるのは無駄。
+  it('上限に触れないリクエストでもアーカイブ・既定状態を検査する', async () => {
+    // ライフサイクル制約を守るため、更新前の状態を1回だけ確認する。
     await patch({ isActive: false });
-    expect(mocks.getLineAccountById).not.toHaveBeenCalled();
+    expect(mocks.getLineAccountById).toHaveBeenCalledTimes(1);
   });
 });
 

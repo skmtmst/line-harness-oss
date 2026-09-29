@@ -7,21 +7,36 @@ import {
   listAffiliateLinks,
   countAffiliateLinks,
   generateRefSlug,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getAffiliateLinkStats,
   listAffiliateOffers,
+  getCurrentOfferVersion,
+  getOfferCapStatus,
   enrollAffiliateInOffer,
   getMileageSummaryForFriend,
   getMileageHistoryForFriend,
   getMileageSelfInsights,
   getMileageEarningOpportunitiesForFriend,
+  listMileageRewards,
+  getMileageRewardRedemptionCounts,
+  reserveMileageRewardRedemption,
+  MileageRewardError,
+  encryptCredential,
+  getAffiliateBankProfile,
+  saveAffiliateBankProfile,
+  listAffiliateStatementsForSelf,
+  getAffiliateStatementDownload,
   type Affiliate,
   type AffiliateLink,
   type AffiliateLinkStat,
 } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
 import type { Env } from '../index.js';
+import { sha256Hex } from '../middleware/auth.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
 
 /**
  * Self-serve affiliate API for LIFF clients.
@@ -40,7 +55,12 @@ const affiliateSelfRoutes = new Hono<Env>();
 /** Max self-issued links per affiliate. The 21st issuance is a 400. */
 const MAX_SELF_LINKS = 20;
 
-type ResolvedFriend = { id: string; display_name: string; user_id: string | null };
+type ResolvedFriend = {
+  id: string;
+  display_name: string;
+  user_id: string | null;
+  line_account_id: string | null;
+};
 
 /**
  * Verify a LINE access token and resolve the backing friend row.
@@ -57,7 +77,8 @@ async function resolveFriendFromLineToken(
 ): Promise<
   | { status: 'invalid_token' }
   | { status: 'no_friend' }
-  | { status: 'ok'; friend: ResolvedFriend }
+  | { status: 'tenant_suspended' }
+  | { status: 'ok'; friend: ResolvedFriend; lineAccountId: string | null; tenantId: string }
 > {
   const db = env.DB;
   const v = await fetch(
@@ -80,7 +101,7 @@ async function resolveFriendFromLineToken(
 
   const allowedChannelIds = new Set<string>();
   if (env.LINE_LOGIN_CHANNEL_ID) allowedChannelIds.add(env.LINE_LOGIN_CHANNEL_ID);
-  const dbAccounts = await getLineAccounts(db);
+  const dbAccounts = await listLineAccountsWithTenantStatus(db);
   for (const acct of dbAccounts) {
     if (acct.login_channel_id) allowedChannelIds.add(acct.login_channel_id);
   }
@@ -94,19 +115,38 @@ async function resolveFriendFromLineToken(
   const { userId } = await prof.json<{ userId: string }>();
   if (!userId) return { status: 'invalid_token' };
 
-  const lineAccountId = dbAccounts.find(
+  const lineAccount = dbAccounts.find(
     (account) => account.login_channel_id === tokenClientId,
-  )?.id ?? null;
+  );
+  if (lineAccount && lineAccount.tenant_status !== 'active') {
+    return { status: 'tenant_suspended' };
+  }
+  const lineAccountId = lineAccount?.id ?? null;
   const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
   if (!friend) return { status: 'no_friend' };
-  return { status: 'ok', friend: friend as unknown as ResolvedFriend };
+  return {
+    status: 'ok',
+    friend: friend as unknown as ResolvedFriend,
+    lineAccountId,
+    tenantId: lineAccount?.tenant_id ?? DEFAULT_TENANT_ID,
+  };
 }
 
 /** Map a non-ok resolution to its JSON error response. */
 function unresolvedResponse(
   c: Context<Env>,
-  result: { status: 'invalid_token' } | { status: 'no_friend' },
+  result:
+    | { status: 'invalid_token' }
+    | { status: 'no_friend' }
+    | { status: 'tenant_suspended' },
 ) {
+  if (result.status === 'tenant_suspended') {
+    return c.json({
+      success: false,
+      code: 'TENANT_SUSPENDED',
+      error: '現在ご利用いただけません',
+    }, 503);
+  }
   if (result.status === 'invalid_token') {
     return c.json({ success: false, error: 'Invalid LINE access token' }, 401);
   }
@@ -145,8 +185,14 @@ function serializeLink(
  * offer-scoped links without an N+1 fetch. Includes inactive offers so an
  * already-issued link's name still resolves after its offer is deactivated.
  */
-async function loadOfferNames(db: D1Database): Promise<Map<string, string>> {
-  const offers = await listAffiliateOffers(db, { activeOnly: false });
+async function loadOfferNames(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<Map<string, string>> {
+  const offers = await listAffiliateOffers(db, {
+    activeOnly: false,
+    lineAccountIds: [lineAccountId],
+  });
   return new Map(offers.map((o) => [o.id, o.name]));
 }
 
@@ -208,6 +254,112 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
   }
 });
 
+/** Published mileage uses for the verified friend. Unknown numbers stay null. */
+affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
+  try {
+    const token = c.req.query('lineAccessToken');
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    // 紹介機能のlegacy fallbackは維持するが、残高を動かすマイル交換では
+    // トークンのLINE Loginチャネルと友だちの所属が一致しない限り閉じる。
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const [rewards, mileage, redemptionCounts] = await Promise.all([
+      listMileageRewards(c.env.DB, {
+        lineAccountId: resolved.lineAccountId,
+        customerVisible: true,
+      }),
+      getMileageSummaryForFriend(c.env.DB, resolved.friend.id),
+      getMileageRewardRedemptionCounts(c.env.DB, {
+        lineAccountId: resolved.lineAccountId,
+        friendId: resolved.friend.id,
+      }),
+    ]);
+    return c.json({
+      success: true,
+      availableMiles: mileage.available,
+      rewards: rewards.map((reward) => {
+        const version = reward.currentVersion;
+        const outOfCodes = reward.rewardKind === 'coupon' && reward.availableCodeCount === 0;
+        const enoughMileage = version ? mileage.available >= version.requiredMiles : false;
+        const friendLimitReached = Boolean(
+          version?.perFriendLimit
+          && (redemptionCounts.byRewardId.get(reward.id) ?? 0) >= version.perFriendLimit,
+        );
+        const stockLimitReached = Boolean(
+          version?.stockLimit != null
+          && (redemptionCounts.byVersionId.get(version.id) ?? 0) >= version.stockLimit,
+        );
+        return {
+          ...reward,
+          canRedeem: Boolean(version) && enoughMileage && !outOfCodes
+            && !friendLimitReached && !stockLimitReached,
+          unavailableReason: !version
+            ? '交換条件を確認できません'
+            : !enoughMileage
+              ? '必要なマイルが足りません'
+              : outOfCodes
+                ? '在庫切れです'
+                : friendLimitReached
+                  ? 'この使い道の交換上限に達しています'
+                  : stockLimitReached
+                    ? '在庫切れです'
+                    : null,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('GET /api/liff/mileage/rewards error:', error);
+    return c.json({ success: false, error: '使い道を読み込めませんでした' }, 500);
+  }
+});
+
+affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', async (c) => {
+  try {
+    const body = await c.req.json<{ lineAccessToken?: unknown }>()
+      .catch((): { lineAccessToken?: unknown } => ({}));
+    const token = typeof body.lineAccessToken === 'string' ? body.lineAccessToken : '';
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const rewardId = c.req.param('id');
+    const requestFingerprint = await sha256Hex(
+      `${resolved.lineAccountId}\n${resolved.friend.id}\n${rewardId}`,
+    );
+    const reserved = await reserveMileageRewardRedemption(c.env.DB, {
+      lineAccountId: resolved.lineAccountId,
+      friendId: resolved.friend.id,
+      rewardId,
+      idempotencyKey,
+      requestFingerprint,
+    });
+    const delivery = await deliverMileageReward(c.env.DB, reserved.redemption.id, {
+      credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    });
+    return c.json({
+      success: delivery.status === 'succeeded',
+      replayed: reserved.kind === 'existing',
+      redemptionId: reserved.redemption.id,
+      ...delivery,
+    }, delivery.status === 'succeeded' ? 200 : 202);
+  } catch (error) {
+    if (error instanceof MileageRewardError) {
+      return c.json({ success: false, error: error.message, code: error.code }, error.status as 400);
+    }
+    console.error('POST /api/liff/mileage/rewards/:id/redeem error:', error);
+    return c.json({ success: false, error: '交換を受け付けられませんでした' }, 500);
+  }
+});
+
 /**
  * POST /api/liff/affiliate/register — idempotent self-registration.
  * Body: { lineAccessToken }. If already registered, returns the existing
@@ -229,13 +381,18 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const existing = await getAffiliateByFriendId(db, friend.id);
+    const existing = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (existing) {
-      const links = await listAffiliateLinks(db, existing.id);
+      const links = await listAffiliateLinks(db, existing.id, {
+        lineAccountId: resolved.lineAccountId,
+      });
       const baseUrl = await resolveLinkBaseUrl(db, c.env);
-      const stats = await getAffiliateLinkStats(db, existing.id);
-      const offerNames = await loadOfferNames(db);
+      const stats = await getAffiliateLinkStats(db, existing.id, resolved.lineAccountId);
+      const offerNames = await loadOfferNames(db, resolved.lineAccountId);
       return c.json({
         affiliate: serializeAffiliate(existing),
         links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
@@ -248,6 +405,8 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', async (c) => {
         name: friend.display_name || 'Affiliate',
         code: generateRefSlug(),
         friendId: friend.id,
+        tenantId: resolved.tenantId,
+        lineAccountId: resolved.lineAccountId,
       });
     } catch (createErr) {
       // Concurrent double-register: two requests both passed the getAffiliateBy-
@@ -255,19 +414,24 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', async (c) => {
       // the loser throw — recover by returning the winner's row so register stays
       // idempotent even under a race. Re-throw anything that isn't the expected
       // uniqueness collision.
-      const raced = await getAffiliateByFriendId(db, friend.id);
+      const raced = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
       if (!raced) throw createErr;
-      const links = await listAffiliateLinks(db, raced.id);
+      const links = await listAffiliateLinks(db, raced.id, {
+        lineAccountId: resolved.lineAccountId,
+      });
       const baseUrl = await resolveLinkBaseUrl(db, c.env);
-      const stats = await getAffiliateLinkStats(db, raced.id);
-      const offerNames = await loadOfferNames(db);
+      const stats = await getAffiliateLinkStats(db, raced.id, resolved.lineAccountId);
+      const offerNames = await loadOfferNames(db, resolved.lineAccountId);
       return c.json({
         affiliate: serializeAffiliate(raced),
         links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
       });
     }
     // Auto-issue the first link on registration.
-    const firstLink = await createAffiliateLink(db, { affiliateId: affiliate.id });
+    const firstLink = await createAffiliateLink(db, {
+      affiliateId: affiliate.id,
+      lineAccountId: resolved.lineAccountId,
+    });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
     return c.json({
       affiliate: serializeAffiliate(affiliate),
@@ -296,16 +460,21 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const affiliate = await getAffiliateByFriendId(db, friend.id);
+    const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (!affiliate) {
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
 
-    const links = await listAffiliateLinks(db, affiliate.id);
+    const links = await listAffiliateLinks(db, affiliate.id, {
+      lineAccountId: resolved.lineAccountId,
+    });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
-    const stats = await getAffiliateLinkStats(db, affiliate.id);
-    const offerNames = await loadOfferNames(db);
+    const stats = await getAffiliateLinkStats(db, affiliate.id, resolved.lineAccountId);
+    const offerNames = await loadOfferNames(db, resolved.lineAccountId);
     return c.json({
       affiliate: serializeAffiliate(affiliate),
       links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
@@ -313,6 +482,149 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
   } catch (err) {
     console.error('GET /api/liff/affiliate/me error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** 本人の振込先。口座番号は復号せず、末尾4桁だけを返す。 */
+affiliateSelfRoutes.get('/api/liff/affiliate/bank', async (c) => {
+  try {
+    const token = c.req.query('lineAccessToken');
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
+    if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
+    const data = await getAffiliateBankProfile(c.env.DB, {
+      tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId, affiliateId: affiliate.id,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    console.error('GET /api/liff/affiliate/bank error:', error);
+    return c.json({ success: false, error: '振込先を確認できませんでした' }, 500);
+  }
+});
+
+/** LINEへtokenを再照合した本人だけが振込先を登録・変更できる。 */
+affiliateSelfRoutes.put('/api/liff/affiliate/bank', async (c) => {
+  try {
+    const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+    type BankBody = {
+      lineAccessToken?: unknown; bankCode?: unknown; bankName?: unknown;
+      branchCode?: unknown; branchName?: unknown; accountType?: unknown;
+      accountNumber?: unknown; accountHolderName?: unknown; expectedVersion?: unknown;
+    };
+    const body = await c.req.json<BankBody>().catch((): BankBody => ({}));
+    if (!isValidIdempotencyKey(key) || typeof body.lineAccessToken !== 'string'
+      || typeof body.bankCode !== 'string' || !/^\d{4}$/.test(body.bankCode)
+      || typeof body.bankName !== 'string' || !body.bankName.trim() || body.bankName.length > 100
+      || typeof body.branchCode !== 'string' || !/^\d{3}$/.test(body.branchCode)
+      || typeof body.branchName !== 'string' || !body.branchName.trim() || body.branchName.length > 100
+      || (body.accountType !== 'ordinary' && body.accountType !== 'checking')
+      || typeof body.accountNumber !== 'string' || !/^\d{1,8}$/.test(body.accountNumber)
+      || typeof body.accountHolderName !== 'string' || !body.accountHolderName.trim()
+      || body.accountHolderName.length > 64 || !Number.isInteger(body.expectedVersion)
+      || Number(body.expectedVersion) < 0) {
+      return c.json({ success: false, error: '振込先、版、再実行キーを確認してください' }, 400);
+    }
+    const resolved = await resolveFriendFromLineToken(c.env, body.lineAccessToken);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
+    if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
+    const canonical = {
+      bankCode: body.bankCode, bankName: body.bankName.trim(), branchCode: body.branchCode,
+      branchName: body.branchName.trim(), accountType: body.accountType as 'ordinary' | 'checking',
+      accountNumber: body.accountNumber, accountHolderName: body.accountHolderName.trim(),
+      expectedVersion: Number(body.expectedVersion),
+    };
+    const result = await saveAffiliateBankProfile(c.env.DB, {
+      tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId,
+      affiliateId: affiliate.id, ...canonical,
+      encryptedAccountNumber: await encryptCredential(body.accountNumber, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
+      accountLast4: body.accountNumber.slice(-4),
+      accountFingerprint: await sha256Hex(body.accountNumber),
+      idempotencyKey: key,
+      requestFingerprint: await sha256Hex(JSON.stringify(canonical)),
+    });
+    if (result.kind === 'changed') {
+      return c.json({ success: false, error: '振込先が更新されています', code: 'VERSION_CONFLICT' }, 409);
+    }
+    if (result.kind === 'idempotency_conflict') {
+      return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
+    }
+    console.log(JSON.stringify({
+      tag: 'audit', action: 'affiliate.bank.update', actorId: affiliate.id,
+      actorRole: 'affiliate-self', targetKind: 'affiliate-bank-profile', targetId: affiliate.id,
+      at: new Date().toISOString(),
+    }));
+    return c.json({ success: true, data: result.profile }, result.kind === 'created' ? 201 : 200);
+  } catch (error) {
+    console.error('PUT /api/liff/affiliate/bank error:', error);
+    return c.json({ success: false, error: '振込先を保存できませんでした' }, 500);
+  }
+});
+
+/** 本人の支払明細一覧。 */
+affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
+  try {
+    const token = c.req.query('lineAccessToken');
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
+    if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
+    const data = await listAffiliateStatementsForSelf(c.env.DB, {
+      tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId, affiliateId: affiliate.id,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    console.error('GET /api/liff/affiliate/statements error:', error);
+    return c.json({ success: false, error: '支払明細を確認できませんでした' }, 500);
+  }
+});
+
+/** 本人の有効な明細だけをR2から返す。 */
+affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c) => {
+  try {
+    const token = c.req.query('lineAccessToken');
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
+    if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
+    const file = await getAffiliateStatementDownload(c.env.DB, {
+      tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId,
+      affiliateId: affiliate.id, statementId: c.req.param('id'),
+    });
+    if (!file) return c.json({ success: false, error: '支払明細が見つからないか期限切れです' }, 404);
+    const object = await c.env.IMAGES.get(file.objectKey);
+    if (!object) return c.json({ success: false, error: '支払明細が見つかりません' }, 404);
+    console.log(JSON.stringify({
+      tag: 'audit', action: 'affiliate.statement.download', actorId: affiliate.id,
+      actorRole: 'affiliate-self', targetKind: 'affiliate-statement', targetId: file.statement.id,
+      at: new Date().toISOString(),
+    }));
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="affiliate-statement-${file.statement.id}.pdf"`,
+        'Cache-Control': 'private, no-store',
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/liff/affiliate/statements/:id/download error:', error);
+    return c.json({ success: false, error: '支払明細を取得できませんでした' }, 500);
   }
 });
 
@@ -346,8 +658,11 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const affiliate = await getAffiliateByFriendId(db, friend.id);
+    const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (!affiliate) {
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
@@ -366,12 +681,17 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
     const offerId = typeof body.offerId === 'string' && body.offerId ? body.offerId : null;
     let offerLineAccountId: string | null = null;
     if (offerId) {
-      const activeOffers = await listAffiliateOffers(db, { activeOnly: true });
+      const activeOffers = await listAffiliateOffers(db, {
+        activeOnly: true,
+        lineAccountIds: [resolved.lineAccountId],
+      });
       const offer = activeOffers.find((o) => o.id === offerId);
       if (!offer) {
         return c.json({ success: false, error: 'Offer not found' }, 404);
       }
-      const existingLinks = await listAffiliateLinks(db, affiliate.id);
+      const existingLinks = await listAffiliateLinks(db, affiliate.id, {
+        lineAccountId: resolved.lineAccountId,
+      });
       const enrolled = existingLinks.some((l) => l.offer_id === offerId);
       if (!enrolled) {
         return c.json({ success: false, error: '先に案件に参加してください' }, 400);
@@ -387,7 +707,9 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
       lineAccountId: offerLineAccountId,
     });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
-    const offerNames = offerId ? await loadOfferNames(db) : undefined;
+    const offerNames = offerId
+      ? await loadOfferNames(db, resolved.lineAccountId)
+      : undefined;
     return c.json({ link: serializeLink(link, baseUrl, undefined, offerNames) });
   } catch (err) {
     console.error('POST /api/liff/affiliate/links error:', err);
@@ -416,14 +738,22 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const affiliate = await getAffiliateByFriendId(db, friend.id);
+    const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (!affiliate) {
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
 
-    const offers = await listAffiliateOffers(db, { activeOnly: true });
-    const links = await listAffiliateLinks(db, affiliate.id);
+    const offers = await listAffiliateOffers(db, {
+      activeOnly: true,
+      lineAccountIds: [resolved.lineAccountId],
+    });
+    const links = await listAffiliateLinks(db, affiliate.id, {
+      lineAccountId: resolved.lineAccountId,
+    });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
 
     // Map offerId → the earliest link for this affiliate scoped to that offer.
@@ -435,19 +765,30 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
       if (l.offer_id) linkByOffer.set(l.offer_id, l);
     }
 
-    const data = offers.map((o) => {
+    // 案件の決まり(今の版)と上限の残りを添える(#823)。上限に達した受付の
+    // 自動停止は、紹介した人の画面にも出す。
+    const data = [];
+    for (const o of offers) {
       const link = linkByOffer.get(o.id);
-      return {
+      const version = await getCurrentOfferVersion(db, o.id);
+      const status = await getOfferCapStatus(db, o.id, { affiliateId: affiliate.id });
+      data.push({
         id: o.id,
         name: o.name,
         description: o.description,
-        rewardAmount: o.reward_amount,
-        rewardMiles: o.reward_miles ?? 0,
+        rewardAmount: version?.reward_amount ?? o.reward_amount,
+        rewardMiles: version?.reward_miles ?? o.reward_miles ?? 0,
+        windowDays: version?.window_days ?? 30,
+        receptionFrom: version?.reception_from ?? null,
+        receptionTo: version?.reception_to ?? null,
+        halted: status.capped,
+        totalRemaining: status.totalRemaining,
+        monthlyRemaining: status.monthlyRemaining,
         enrolled: Boolean(link),
         refCode: link ? link.ref_code : null,
         url: link ? `${baseUrl}/${link.ref_code}` : null,
-      };
-    });
+      });
+    }
 
     return c.json({ offers: data });
   } catch (err) {
@@ -478,8 +819,11 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const affiliate = await getAffiliateByFriendId(db, friend.id);
+    const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (!affiliate) {
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
@@ -487,10 +831,20 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', async (c) => {
     // Guard on active offers only. Enrolling in a hidden/inactive offer must not
     // be possible from the self-serve LIFF surface. (enrollAffiliateInOffer
     // itself throws on a truly-missing offer; the activeOnly list is the gate.)
-    const activeOffers = await listAffiliateOffers(db, { activeOnly: true });
+    const activeOffers = await listAffiliateOffers(db, {
+      activeOnly: true,
+      lineAccountIds: [resolved.lineAccountId],
+    });
     const offer = activeOffers.find((o) => o.id === c.req.param('id'));
     if (!offer) {
       return c.json({ success: false, error: 'Offer not found' }, 404);
+    }
+
+    // 上限に達した案件の受付は自動で止める(#823)。参加済みの人の紹介リンクは
+    // 残るが、新しい参加と成果の付与は止まる。
+    const capStatus = await getOfferCapStatus(db, offer.id, { affiliateId: affiliate.id });
+    if (capStatus.capped) {
+      return c.json({ success: false, error: 'この案件の受付は上限に達したため終了しました' }, 409);
     }
 
     const { link } = await enrollAffiliateInOffer(db, {

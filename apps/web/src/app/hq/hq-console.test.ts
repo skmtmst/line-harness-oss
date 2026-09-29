@@ -8,18 +8,42 @@ const openPage = readFileSync(new URL('./open/page.tsx', import.meta.url), 'utf8
 const shell = readFileSync(new URL('../../components/app-shell.tsx', import.meta.url), 'utf8')
 const sidebar = readFileSync(new URL('../../components/layout/sidebar.tsx', import.meta.url), 'utf8')
 const topBar = readFileSync(new URL('../../components/shell/app-top-bar.tsx', import.meta.url), 'utf8')
+const templatePage = readFileSync(new URL('./templates/page.tsx', import.meta.url), 'utf8')
+const sharedTemplatePage = readFileSync(new URL('./hq-template-page.tsx', import.meta.url), 'utf8')
 
 describe('統括コンソール', () => {
-  it('既存のLINEアカウント一覧APIだけで店舗一覧を作る', () => {
+  it('既存のLINEアカウント一覧APIだけでアカウント一覧を作る', () => {
     expect(page).toContain('api.lineAccounts.list()')
     expect(page).not.toContain('restaurantTestApi')
     expect(page).toContain('<HqAccountList')
     expect(accountList).toContain('pictureUrl')
     expect(accountList).toContain('stats?.friendCount')
-    expect(accountList).toContain('webhook?.status')
+    expect(accountList).toContain('connection?.status')
+    expect(accountList).toContain('stats?.staffCount')
+    for (const label of ['アカウント', '友だち数', '今月の配信数', '接続状態', '担当者数', '状態', '操作']) {
+      expect(accountList).toContain(label)
+    }
+    for (const node of ['MjMCg', 'x5Tkb6', 'w7yY6']) expect(page).toContain(node)
+    expect(accountList).toContain('vLMQ5')
   })
 
-  it('各店舗の設定から既存編集モーダルを開き、保存後に一覧を再読込する', () => {
+  it('LINE IDと接続状態を明示操作で一括更新し、結果を再読込する', () => {
+    expect(page).toContain('LINE ID・接続状態を更新')
+    expect(page).toContain('/connection-checks')
+    expect(page).toContain("'Idempotency-Key'")
+    expect(page).toContain('const expectedRevision = account.revision')
+    expect(page).toContain('body: JSON.stringify({ expectedRevision })')
+    expect(page).toContain('if (checkingConnections || accounts.length === 0) return')
+    expect(page).toContain('await Promise.all([load(), refreshAccounts()])')
+    expect(accountList).toContain('LINE ID未取得')
+  })
+
+  it('LINE公式アカウントの説明バーを表示しない', () => {
+    expect(page).not.toContain('NoteBar')
+    expect(page).not.toContain('LINE公式アカウントごとに管理画面へ入れます。')
+  })
+
+  it('各アカウントの設定から既存編集モーダルを開き、保存後に一覧を再読込する', () => {
     expect(page).toContain('AccountEditModal')
     expect(page).toContain('onSettings={setEditingAccount}')
     expect(page).toContain('initialChannelId={editingAccount.channelId}')
@@ -28,14 +52,17 @@ describe('統括コンソール', () => {
     expect(accountList).toContain('設定')
   })
 
-  it('ログインは選択中アカウントを保存して識別子なしのトップへ移動する', () => {
+  it('ログインは選択中アカウントを保存し、戻り先があれば元の画面へ戻る', () => {
     expect(page).toContain('setSelectedAccountId(accountId)')
-    expect(page).toContain("router.push('/')")
+    // 店舗未選択ゲートから来たときは return の画面へ戻す（NEXT-07）。
+    // 外部URLなどを受け付けないよう、検証は resolveStoreReturnPath 1か所。
+    expect(page).toContain('resolveStoreReturnPath')
+    expect(page).toContain("router.push(back ?? '/')")
     expect(page).not.toContain('?account')
     expect(page).not.toContain('?store')
   })
 
-  it('統括へ戻る道と着地点ゲートを全店舗画面に置く', () => {
+  it('統括へ戻る道と着地点ゲートを全アカウント画面に置く', () => {
     // 2026-08-26: 本文に浮いていた「統括」ボタンは、共通トップバーの
     // 権限バッジへ畳んだ。同じ言葉が画面に2つ出ていたため。
     // 戻れること自体は変えていないので、置き場所を見張る先だけ移す。
@@ -43,26 +70,32 @@ describe('統括コンソール', () => {
     expect(shell).not.toContain('<HqReturnButton />')
     expect(topBar).toContain("router.push('/hq')")
     expect(topBar).toContain('clearSelectedAccountId')
-    expect(shell).toContain('<RootLandingGate><StoreSelectionGate>{children}</StoreSelectionGate></RootLandingGate>')
+    expect(shell).toContain('<RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>')
   })
 
-  it('統括と店舗のサイドバーを分け、採用フローを作らない', () => {
+  it('統括とアカウントのサイドバーを分け、採用フローを作らない', () => {
     expect(sidebar).toContain('HQ_MENU_SECTIONS')
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.label)).toEqual([
-      '店舗管理', 'タグ', 'テンプレート管理', 'リッチメニュー管理', '回答フォーム管理', '設定',
+      'アカウント', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成',
     ])
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([
       '/hq',
-      '/hq/open?target=tags',
-      '/hq/open?target=templates',
-      '/hq/open?target=rich-menus',
-      '/hq/open?target=form-submissions',
-      '/hq/settings',
+      '/hq/friend-attributes',
+      '/hq/templates',
+      '/hq/rich-menus',
+      '/hq/form-submissions',
+      '/hq/banners',
     ])
+    // 「設定」は左下のアカウントメニュー（メンバー管理）へ移した。★V6 36-1。
+    expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.href === '/hq/settings')).toBe(false)
+    expect(sidebar).toContain('<HqAccountMenu />')
+    expect(templatePage).toContain('HqTemplatePage')
+    expect(sharedTemplatePage).toContain('HQ_TEMPLATE_DISTRIBUTION_ENABLED')
+    expect(sharedTemplatePage).toContain('hqOpenHref(target)')
   })
 
-  it('統括の4項目は同じ店舗一覧を流用し、選択後に識別子なしで遷移する', () => {
+  it('アカウントを開く既存導線は残り、選択後に識別子なしで遷移する', () => {
     expect(openPage).toContain('<HqAccountList')
     expect(openPage).toContain('setSelectedAccountId(accountId)')
     expect(openPage).toContain('router.push(target.destination)')
@@ -71,7 +104,7 @@ describe('統括コンソール', () => {
     expect(openPage).not.toContain('?store')
   })
 
-  it('旧店舗一覧画面は残して統括へ転送し、店舗サイドバーから外す', () => {
+  it('旧アカウント一覧画面は残して統括へ転送し、アカウントサイドバーから外す', () => {
     // D-3: 旧URLの互換性を残しながら一覧の正本を /hq に限定する。
     expect(MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.href === '/restaurant-test/stores')).toBe(false)
     expect(readFileSync(new URL('../restaurant-test/stores/page.tsx', import.meta.url), 'utf8')).toContain("redirect('/hq')")

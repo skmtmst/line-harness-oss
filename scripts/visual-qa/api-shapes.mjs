@@ -94,9 +94,24 @@ export function readArrayGetPaths(source = readFileSync(API_TS, 'utf8')) {
       **本文が丸ごと「画面を表示できませんでした」に置き換わる**。撮ると空の絵になる。
       `ApiResponse<` の対になる `>` を数えて中身を取り、その先が `&` で続くのは許す。
     */
-    if (!type.startsWith('ApiResponse<')) continue
-    const innerEnd = matchEnd(type, 'ApiResponse<'.length, '<', '>')
-    const inner = type.slice('ApiResponse<'.length, innerEnd - 1).trim()
+    /*
+      **`ApiResponse<X[]>` と書かない口がある。**
+        fetchApi<{ data: Webinar[] }>(`/api/webinars…`)
+      中身は `ApiResponse<Webinar[]>` と同じなのに、ここが名前しか見ていなかった
+      ので拾えず、既定の器 `{items:[],total:0}` が返っていた。
+      `/webinars` は `[...narrowed]` で **`narrowed is not iterable` を投げて
+      画面が丸ごと「画面を表示できませんでした」になっていた**。
+      ウェビナーの4つの口がこの書き方。両方を同じに扱う。
+    */
+    const bare = /^\{\s*data:\s*/.exec(type)
+    if (!type.startsWith('ApiResponse<') && !bare) continue
+    const prefix = bare ? bare[0] : 'ApiResponse<'
+    const innerEnd = bare
+      ? matchEnd(type, 0, '{', '}')
+      : matchEnd(type, prefix.length, '<', '>')
+    const inner = bare
+      ? type.slice(prefix.length, innerEnd - 1).trim().replace(/;$/, '').trim()
+      : type.slice(prefix.length, innerEnd - 1).trim()
     const rest = type.slice(innerEnd).trim()
     // 交差型（`& { … }`）だけを許す。知らない続きは形が決められないので見送る。
     if (rest && !rest.startsWith('&')) continue

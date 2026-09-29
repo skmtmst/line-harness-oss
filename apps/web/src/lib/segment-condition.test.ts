@@ -17,3 +17,10 @@ describe('行動スコアの共通絞り込み', () => {
     })).toBeNull()
   })
 })
+
+describe('シナリオ購読の共通絞り込み', () => {
+  it('シナリオを選ぶ前は保存せず、選択後だけ保存する', () => {
+    expect(isRuleComplete({ type: 'scenario_subscribed', value: '' })).toBe(false)
+    expect(isRuleComplete({ type: 'scenario_subscribed', value: 'scenario-1' })).toBe(true)
+  })
+})

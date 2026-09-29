@@ -113,7 +113,7 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
 });
 
 // PUT /api/account-settings/test-recipients
-accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'), async (c) => {
+accountSettings.put('/api/account-settings/test-recipients', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ accountId: string; friendIds: string[] }>();
   if (!body.accountId) return c.json({ success: false, error: 'accountId required' }, 400);
   if (!Array.isArray(body.friendIds)) {

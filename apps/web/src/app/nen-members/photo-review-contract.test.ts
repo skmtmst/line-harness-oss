@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 const page = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8');
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8');
+const helper = readFileSync(join(import.meta.dirname, 'photo-text.ts'), 'utf8');
+const detail = readFileSync(join(import.meta.dirname, 'photo-review-detail.tsx'), 'utf8');
 
 describe('V6 photo review contract', () => {
   it('uses only the common top bar for the page title', () => {
@@ -13,10 +15,27 @@ describe('V6 photo review contract', () => {
   });
 
   it('loads and reviews photos for the selected LINE account', () => {
-    expect(page).toContain('api.nenMembers.photos(selectedAccountId)');
+    // 一覧は続きを取れるよう offset 付きで呼ぶ（#666）。絞り込み語も渡す（#931 N-308）。
+    expect(page).toContain('fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, 0, searchQuery))');
+    expect(page).toContain("`/api/nen-members/photos?${params.toString()}`");
     expect(page).toContain('accountId: selectedAccountId');
     expect(page).toContain('loadSequence.current');
     expect(api).toContain('/api/nen-members/photos?accountId=');
+  });
+
+  it('loads review metrics and shows unknown values as unknown', () => {
+    expect(page).toContain('api.nenMembers.photoReviewMetrics(selectedAccountId)');
+    expect(page).toContain('reviewMetrics.pendingCount');
+    expect(page).toContain('reviewMetrics.attentionCount');
+    expect(page).toContain('averageReviewDurationText(reviewMetrics?.averageReviewMinutes)');
+    expect(page).toContain("if (minutes == null || !Number.isFinite(minutes)) return null");
+  });
+
+  it('loads derivative status with the detail and can regenerate the review image', () => {
+    expect(page).toContain('api.nenMembers.photoAssetStatus(id, accountId)');
+    expect(page).toContain('api.nenMembers.photoDerivatives(id, accountId)');
+    expect(page).toContain('api.nenMembers.processPhotoAssets(id, {');
+    expect(page).toContain("operation: 'review'");
   });
 
   it('separates loading, empty and failed states without making zero counts', () => {
@@ -24,26 +43,42 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('kind="loading"');
     expect(page).toContain('kind="empty"');
     expect(page).toContain('kind="error"');
-    expect(page).toContain('写真を再読み込み');
-    expect(page).toContain("countsReady ? counts.pending : '—'");
+    expect(page).toContain('kind="forbidden"');
+    expect(page).toContain('onRetry={() => void load()}');
+    expect(page).toContain("countsReady ? counts.pending : null");
     expect(page).toContain("countsReady ? counts[value] : '—'");
   });
 
   it('requires a reason and previews the submitter message', () => {
-    expect(page).toContain('写真を戻す理由を選ぶ');
-    expect(page).toContain('投稿者に届く内容');
+    expect(page).toContain("'N2J629'");
+    expect(page).toContain('この写真を見送りますか？');
+    expect(page).toContain('お客様にはこう届きます');
     expect(page).toContain("reasonCode === 'other' && !reasonNote.trim()");
-    for (const code of ['quality', 'privacy', 'unrelated', 'duplicate', 'other']) {
+    for (const code of ['quality', 'privacy', 'unrelated', 'other']) {
       expect(page).toContain(`value: '${code}'`);
     }
-    expect(page).toContain('投稿者へ：今回は「{reason.label}」のため、掲載を見送らせていただきました。');
-    expect(page).toContain('投稿者に届く補足（直せます）');
+    expect(page).toContain('うしろに他のお客様が写っているようです。もう一度お願いできますか。');
+    expect(page).toContain('商品の名前が入っていない写真をいただけますか。');
+    expect(page).toContain('明るいところで、もう一度お願いできますか。');
+    expect(page).toContain('お客様に届く補足（直せます）');
+    expect(page).toContain('お客様にはこう届きます（直せます）');
+    expect(page).toContain('見送っても、この方のマイルは減りません。');
   });
 
   it('uses one set of operator words for reviewed states', () => {
-    expect(page).toContain("['adopted', '通したもの']");
-    expect(page).toContain("['rejected', '戻したもの']");
-    expect(page).toContain('通して5pt付与');
+    expect(page).toContain('data-design-node="cqWo8"');
+    expect(page).toContain("['adopted', '採用']");
+    expect(page).toContain("['rejected', '見送り']");
+    expect(page).toContain("['pending', '審査待ち']");
+    expect(page).toContain("{ label: '公式サイト掲載'");
+    expect(page).toContain("reviewing === photo.id ? '処理中...' : '採用する'");
+    expect(page).toContain('response.data.awardedPoints');
+    expect(page).toContain('付与するマイル');
+    // #817: 合計は固定の5ptではなく、その時点で使っている報酬の決まりの版を見る。未取得は「—」。
+    expect(page).toContain("合計 {policyPoints == null ? '—' : `${selectedPendingPhotos.length * policyPoints}マイル`}");
+    expect(page).not.toContain('ポイント');
+    expect(page).not.toContain('通しました');
+    expect(page).not.toContain('戻しました');
     expect(page).not.toContain('承認済');
     expect(page).not.toContain('採用済み');
   });
@@ -51,7 +86,7 @@ describe('V6 photo review contract', () => {
   it('shows whose photo and when before sending the rejection', () => {
     expect(page).toContain("text(rejectingPhoto.owner_name) || 'お名前は未取得'");
     expect(page).toContain('formatPhotoReceivedAt(rejectingPhoto.created_at)');
-    expect(page).toContain('この方を前に戻した回数は未取得です');
+    expect(page).toContain('この方を以前に見送った回数は未取得です');
   });
 
   it('does not claim a photo is public without consent', () => {
@@ -71,5 +106,65 @@ describe('V6 photo review contract', () => {
   it('shows the received time in Japan time instead of slicing UTC text', () => {
     expect(page).toContain('formatPhotoReceivedAt(photo.created_at)');
     expect(page).not.toContain("text(photo.created_at).replace('T', ' ').slice(0, 16)");
+  });
+
+  it('shows bulk notification failures with resend paths instead of a fixed message (#639)', () => {
+    // 一括審査の口は審査の確定と通知の送達を分けて返す。失敗件数・対象を
+    // 出し、審査保存済みと通知だけの再送導線（移動・再送）を添える。
+    expect(page).toContain('notificationFailures');
+    expect(page).toContain('通知だけ再送できます');
+    expect(page).toContain('LINE通知を送れなかった写真');
+    expect(page).toContain('大きく見る');
+    expect(page).toContain('setBulkFailed');
+    expect(page).not.toContain('（通知は順次送信）');
+  });
+
+  it('types the bulk review result with per-photo delivery outcomes (#639)', () => {
+    expect(api).toContain('PhotoBulkReviewResult');
+    expect(api).toContain('notificationFailures: Array<{ photoId: string; error: string }>');
+    expect(api).toContain("notificationStatus: 'sent' | 'failed'");
+  });
+
+  it('sends an integer review version so a broken value does not become a 400 (#580)', () => {
+    // 版が読めない値は初版に倒し、サーバの版競合フローに載せる。
+    expect(page).toContain('reviewVersionOf(');
+    expect(page).not.toContain('Number(photo.review_version ?? 1)');
+    expect(page).not.toContain('Number(detailPhoto.review_version ?? 1)');
+    expect(helper).toContain('Number.isInteger(version)');
+  });
+
+  it('lets the user reload derivative status after a quiet failure (#580)', () => {
+    expect(page).toContain('assetsFailed={detailAssetsFailed}');
+    expect(page).toContain('onReloadAssets={() => {');
+    expect(detail).toContain('assetsFailed');
+    expect(detail).toContain('状態を読み直す');
+  });
+
+  /*
+   * PHOTO-06 (#1079): 止まったマイル手続きの復旧口。
+   * 派生状態を同じ言葉で出し、stale / failed_retryable のときだけ
+   * 再試行とEC照合の入口を見せる。入口は冪等なPOST 2本。
+   */
+  it('shows stuck point procedures with retry and reconcile entries (PHOTO-06)', () => {
+    expect(api).toContain('/point-retry');
+    expect(api).toContain('/point-reconcile');
+    expect(api).toContain('NenPhotoRewardActionResult');
+    expect(detail).toContain("['stale', 'failed_retryable'].includes(text(reward.state))");
+    expect(detail).toContain('マイル手続きをもう一度送る');
+    expect(detail).toContain('EC側と照合する');
+    expect(detail).toContain("onPointAction('retry')");
+    expect(detail).toContain("onPointAction('reconcile')");
+    expect(page).toContain('onPointAction={pointAction}');
+    expect(page).toContain('pointActionBusy={pointActionBusy}');
+    // 照合でEC付与済みが分かったときは、その旨を運用者へ伝える。
+    expect(page).toContain('すでに付与済みでした');
+  });
+
+  it('labels the derived reward states the same way in list and detail (PHOTO-06)', () => {
+    expect(helper).toContain("case 'stale': return 'マイルの手続きが止まっています'");
+    expect(helper).toContain("case 'failed_retryable': return 'マイルの手続きに失敗（再試行できます）'");
+    // 詳細はサーバーの派生状態を優先し、古い応答は生のstatusへ倒す。
+    expect(detail).toContain('text(reward.state) || reward.status');
+    expect(detail).toContain('reward.reason_label');
   });
 });

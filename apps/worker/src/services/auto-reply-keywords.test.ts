@@ -226,4 +226,47 @@ describe('すべてにマッチ', () => {
     };
     expect(keywordMatches(rule, '関係ない話')).toBe(true);
   });
+
+  /*
+   * R257: 異なる2語の完全一致を all にすると、どんな受信文にも当たらない。
+   * 1つの文が2つの異なる文言と完全には一致しないため。判定は正しく
+   * false を返す（直さない）。画面側がこの不成立を案内する。
+   */
+  it('R257 異なる語の完全一致allは成立しない', () => {
+    const rule = {
+      keyword: '',
+      match_type: 'exact',
+      keywords_json: JSON.stringify([
+        { keyword: '予約', matchType: 'exact' },
+        { keyword: 'キャンセル', matchType: 'exact' },
+      ]),
+      keyword_match_mode: 'all',
+    };
+    expect(keywordMatches(rule, '予約')).toBe(false);
+    expect(keywordMatches(rule, 'キャンセル')).toBe(false);
+    expect(keywordMatches(rule, '予約キャンセル')).toBe(false);
+    expect(keywordMatches(rule, '予約をキャンセルしたい')).toBe(false);
+  });
+
+  it('R257 同じ1語の完全一致all・部分一致all・完全一致anyは成立する', () => {
+    const sameExact = {
+      keyword: '',
+      match_type: 'exact',
+      keywords_json: JSON.stringify([
+        { keyword: '予約', matchType: 'exact' },
+        { keyword: '予約', matchType: 'exact' },
+      ]),
+      keyword_match_mode: 'all',
+    };
+    expect(keywordMatches(sameExact, '予約')).toBe(true);
+    expect(keywordMatches(sameExact, '予約したい')).toBe(false);
+    // 部分一致allは絞り込みとして成立する（既存の契約）。
+    const partialAll = {
+      keyword: '',
+      match_type: 'exact',
+      keywords_json: twoKeywords,
+      keyword_match_mode: 'all',
+    };
+    expect(keywordMatches(partialAll, '予約をキャンセルしたい')).toBe(true);
+  });
 });

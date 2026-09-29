@@ -6,6 +6,7 @@ import {
   idempotencyKeyFor,
   monitoringLink,
   NOT_AVAILABLE,
+  suppressionNote,
   testResultText,
 } from './publish-flow'
 
@@ -100,6 +101,21 @@ describe('テストの結果', () => {
   it('シナリオ名が無ければ「—（未取得）」', () => {
     const text = testResultText({ kind: 'first_time', scenarioName: null, suppressed: false, actionCount: 1 })
     expect(text).toContain(NOT_AVAILABLE)
+  })
+})
+
+describe('再追加時の制限の説明', () => {
+  it('設定値をそのまま出し、固定の「24時間に1回」にしない', () => {
+    // 0/24/168 どれを選んでも確認画面が実設定と一致する(#946 N-109 同类)。
+    expect(suppressionNote(24)).toContain('24時間に1回')
+    expect(suppressionNote(168)).toContain('7日に1回')
+    expect(suppressionNote(undefined)).toContain('24時間に1回')
+  })
+
+  it('制限しない設定では「防ぎます」と言わない', () => {
+    expect(suppressionNote(0)).toContain('制限はありません')
+    expect(suppressionNote(0)).not.toContain('24時間')
+    expect(suppressionNote(0)).not.toContain('二重送信を防ぎます')
   })
 })
 

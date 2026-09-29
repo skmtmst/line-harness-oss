@@ -1,9 +1,44 @@
+import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { ANALYTICS_EVENT_TYPES, type AnalyticsEventType } from './analytics-event-types.js';
 
 const DAY_MS = 86_400_000;
 const MAX_AXIS_VALUES_PER_FRIEND = 20;
 const MAX_MEMBER_ROWS = 200_000;
 const MAX_ACCOUNT_FRIENDS = 50_000;
+
+// クロス分析の実行間隔(表示用の目安だけ)。処理頻度そのものは変えない。
+// 実行器は全テナントFIFOで5分ごと(frequentHeavy Cron '1-56/5 * * * *')に進むが、
+// 他アカウントの件数・存在は漏らせないため、待ち順・目安は同一アカウント内だけで数える。
+// queuePosition/pendingAheadは「このLINEアカウント内の順番」であり、全体の絶対順位ではない。
+// estimatedWaitMsは正確な全体値ではなく最短目安(次回cronまでの残り + 同一アカウント内
+// 待機件数×5分)。実行中の1件はその場で処理中のため未来の枠に数えない。実行中は
+// 目安を出さずnullにする(実行中と待機中で分ける)。
+export const ANALYTICS_CROSS_QUEUE_INTERVAL_MS = 5 * 60_000;
+
+export interface AnalyticsCrossQueueStatus {
+  /** このLINEアカウント内の順番(1始まり)。全体の絶対順位ではない。 */
+  queuePosition: number | null;
+  /** 同一アカウント内で自分の前にいる件数。他アカウントは含めない。 */
+  pendingAhead: number;
+  /** 最短目安の待ち時間ms。他の処理状況で延びる。 */
+  estimatedWaitMs: number | null;
+  nextTickAt: string | null;
+}
+
+// 次回の処理目安(UTCで分が1 mod 5の時刻)。Cron式の表示用で、実行頻度は変えない。
+export function nextAnalyticsCrossTick(now: Date = new Date()): string {
+  const base = new Date(now.getTime());
+  base.setUTCSeconds(0, 0);
+  for (let step = 0; step <= 6; step += 1) {
+    const candidate = new Date(base.getTime() + step * 60_000);
+    if (candidate.getTime() > now.getTime() && candidate.getUTCMinutes() % 5 === 1) {
+      return candidate.toISOString();
+    }
+  }
+  const fallback = new Date(base.getTime() + 6 * 60_000);
+  fallback.setUTCSeconds(0, 0);
+  return fallback.toISOString();
+}
 
 export type AnalyticsCrossAxis =
   | { kind: 'route' }
@@ -737,6 +772,7 @@ async function loadRunRow(
   id: string; line_account_id: string; query_json: string; state: string;
   result_json: string; error_code: string | null; period_from: string; period_to: string;
   time_zone: string; data_cutoff_at: string; created_at: string;
+  lease_generation: number; result_generation: number | null;
 } | null> {
   const sql = lineAccountId
     ? `SELECT * FROM analytics_cross_runs WHERE id = ? AND line_account_id = ?`
@@ -772,17 +808,110 @@ export async function createAnalyticsCrossRun(
   return { id, state: 'pending' };
 }
 
+export async function claimAnalyticsCrossRun(
+  db: D1Database,
+  runId: string,
+): Promise<{ leaseGeneration: number }> {
+  // 実行権の付与は世代を1つ進める。期限切れ回収でpendingへ戻るときも世代を
+  // 進めるため、旧実行の世代では完了・失敗を書き込めない。
+  const claimed = await db.prepare(
+    `UPDATE analytics_cross_runs
+        SET state = 'running', started_at = ?, lease_generation = lease_generation + 1
+      WHERE id = ? AND state = 'pending'`,
+  ).bind(new Date().toISOString(), runId).run();
+  if (Number(claimed.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_not_pending');
+  const row = await db.prepare(
+    `SELECT lease_generation FROM analytics_cross_runs WHERE id = ?`,
+  ).bind(runId).first<{ lease_generation: number }>();
+  if (!row) throw new Error('analytics_cross_run_not_found');
+  return { leaseGeneration: Number(row.lease_generation ?? 0) };
+}
+
+export async function touchAnalyticsCrossRunLease(
+  db: D1Database,
+  runId: string,
+  leaseGeneration: number,
+): Promise<void> {
+  // 長時間の集計中に実行権が生きていることを示す。started_atを「最後の生存確認」
+  // として延ばすため、期限回収(10分無応答)は誤回収しない。世代が奪われていたら
+  // 旧実行はここで止まる(lease_stolen)。完了・失敗の世代条件と対になる。
+  const touched = await db.prepare(
+    `UPDATE analytics_cross_runs SET started_at = ?
+      WHERE id = ? AND state = 'running' AND lease_generation = ?`,
+  ).bind(new Date().toISOString(), runId, leaseGeneration).run();
+  if (Number(touched.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
+}
+
+// 対象者行はclaimで得た世代のstagingへ書く。期限回収で生き返った旧実行が同じ
+// runへ書き込んでも、世代が違うため主キーが衝突せず、互いの行を消さない。
+// 読み取り(対象者の作成)は確定した世代(result_generation)だけを見る。
+async function clearAnalyticsCrossStaging(
+  db: D1Database,
+  runId: string,
+  leaseGeneration: number,
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM analytics_cross_run_members WHERE run_id = ? AND lease_generation = ?`,
+  ).bind(runId, leaseGeneration).run();
+}
+
+export async function completeAnalyticsCrossRun(
+  db: D1Database,
+  runId: string,
+  leaseGeneration: number,
+  result: AnalyticsCrossResult,
+): Promise<void> {
+  // 確定は1文のCAS。結果と「どの世代の対象者行を採用したか」を同時に書くため、
+  // 読み手が結果だけ新しく対象者行だけ古い、という組み合わせを見ることはない。
+  const done = await db.prepare(
+    `UPDATE analytics_cross_runs
+        SET state = ?, result_json = ?, error_code = NULL, completed_at = ?,
+            result_generation = ?
+      WHERE id = ? AND state = 'running' AND lease_generation = ?`,
+  ).bind(
+    result.state, JSON.stringify(result), new Date().toISOString(),
+    leaseGeneration, runId, leaseGeneration,
+  ).run();
+  if (Number(done.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
+  // 勝った後の片付け。負けた世代のstagingを消す。ここで落ちても読み取りは
+  // result_generationで絞るため、結果が汚れることはない。
+  await db.prepare(
+    `DELETE FROM analytics_cross_run_members WHERE run_id = ? AND lease_generation <> ?`,
+  ).bind(runId, leaseGeneration).run();
+}
+
+export async function failAnalyticsCrossRun(
+  db: D1Database,
+  runId: string,
+  leaseGeneration: number,
+  errorCode: string,
+): Promise<void> {
+  const done = await db.prepare(
+    `UPDATE analytics_cross_runs SET state = 'failed', error_code = ?, completed_at = ?
+      WHERE id = ? AND state = 'running' AND lease_generation = ?`,
+  ).bind(errorCode, new Date().toISOString(), runId, leaseGeneration).run();
+  if (Number(done.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
+  // 失敗で終わったrunに採用する結果はない。どの世代のstagingも残さない。
+  await db.prepare(
+    `DELETE FROM analytics_cross_run_members WHERE run_id = ?`,
+  ).bind(runId).run();
+}
+
 export async function processAnalyticsCrossRun(
   db: D1Database,
   runId: string,
 ): Promise<AnalyticsCrossResult> {
-  const claimed = await db.prepare(
-    `UPDATE analytics_cross_runs SET state = 'running', started_at = ?
-      WHERE id = ? AND state = 'pending'`,
-  ).bind(new Date().toISOString(), runId).run();
-  if (Number(claimed.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_not_pending');
+  const { leaseGeneration } = await claimAnalyticsCrossRun(db, runId);
   const row = await loadRunRow(db, runId);
   if (!row) throw new Error('analytics_cross_run_not_found');
+  // 再実行の安全: 書き込み先はこの世代のstagingだけにする。期限回収で生き返った
+  // 旧実行の途中書き込みは別の世代にあるので触らない(旧実行が後から書いても
+  // 主キーは衝突しない)。この世代に残骸があれば消してから書き直す。
+  await clearAnalyticsCrossStaging(db, runId, leaseGeneration);
+  // 長時間の集計でも期限回収に誤って戻されないよう、重い工程の合間で生存確認する。
+  const heartbeat = async (): Promise<void> => {
+    await touchAnalyticsCrossRunLease(db, runId, leaseGeneration);
+  };
   try {
     const query = validateAnalyticsCrossQuery(JSON.parse(row.query_json));
     const before = previousRange(query);
@@ -795,10 +924,7 @@ export async function processAnalyticsCrossRun(
         dataCutoffAt: row.data_cutoff_at, state: 'unavailable',
         stateReason: '集計時点が対象期間より前です',
       };
-      await db.prepare(
-        `UPDATE analytics_cross_runs SET state = 'unavailable', result_json = ?, completed_at = ?
-          WHERE id = ? AND state = 'running'`,
-      ).bind(JSON.stringify(result), new Date().toISOString(), runId).run();
+      await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
       return result;
     }
     const cutoffPartial = row.data_cutoff_at < query.periodTo;
@@ -823,13 +949,11 @@ export async function processAnalyticsCrossRun(
         previousPeriodFrom: before.from, previousPeriodTo: before.to,
         dataCutoffAt: row.data_cutoff_at, state: 'unavailable', stateReason: coverage.reason,
       };
-      await db.prepare(
-        `UPDATE analytics_cross_runs SET state = 'unavailable', result_json = ?, completed_at = ?
-          WHERE id = ? AND state = 'running'`,
-      ).bind(JSON.stringify(result), new Date().toISOString(), runId).run();
+      await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
       return result;
     }
     const loadedFriends = await loadFriendIds(db, row.line_account_id);
+    await heartbeat();
     if (loadedFriends.exceedsLimit) {
       const result: AnalyticsCrossResult = {
         lineAccountId: row.line_account_id, timeZone: query.timeZone,
@@ -839,10 +963,7 @@ export async function processAnalyticsCrossRun(
         dataCutoffAt: row.data_cutoff_at, state: 'unavailable',
         stateReason: `対象人数が上限${MAX_ACCOUNT_FRIENDS.toLocaleString('ja-JP')}人を超えています（${loadedFriends.total.toLocaleString('ja-JP')}人）`,
       };
-      await db.prepare(
-        `UPDATE analytics_cross_runs SET state = 'unavailable', result_json = ?, completed_at = ?
-          WHERE id = ? AND state = 'running'`,
-      ).bind(JSON.stringify(result), new Date().toISOString(), runId).run();
+      await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
       return result;
     }
     const friendIds = loadedFriends.ids;
@@ -877,12 +998,18 @@ export async function processAnalyticsCrossRun(
       previousRow, previousColumn, previousFilters,
       measureByFriend: measure, previousMeasureByFriend: previousMeasure,
     });
+    await heartbeat();
     for (let index = 0; index < evaluated.memberRows.length; index += 90) {
       await db.batch(evaluated.memberRows.slice(index, index + 90).map((member) => db.prepare(
         `INSERT INTO analytics_cross_run_members (
-           run_id, line_account_id, row_key, col_key, friend_id
-         ) VALUES (?, ?, ?, ?, ?)`,
-      ).bind(runId, row.line_account_id, member.rowKey, member.columnKey, member.friendId)));
+           run_id, line_account_id, lease_generation, row_key, col_key, friend_id
+         ) VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        runId, row.line_account_id, leaseGeneration,
+        member.rowKey, member.columnKey, member.friendId,
+      )));
+      // 対象者が多い集計ほど書き込みが長引くため、10束ごとに生存確認する。
+      if ((index / 90) % 10 === 0) await heartbeat();
     }
     const result: AnalyticsCrossResult = {
       lineAccountId: row.line_account_id,
@@ -904,19 +1031,20 @@ export async function processAnalyticsCrossRun(
         cutoffPartial ? `対象期間の途中です（${row.data_cutoff_at} まで）` : null,
       ].filter(Boolean).join(' / ') || null,
     };
-    await db.prepare(
-      `UPDATE analytics_cross_runs SET state = ?, result_json = ?, completed_at = ?
-        WHERE id = ? AND state = 'running'`,
-    ).bind(result.state, JSON.stringify(result), new Date().toISOString(), runId).run();
+    await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
     return result;
   } catch (error) {
-    await db.prepare(
-      `UPDATE analytics_cross_runs SET state = 'failed', error_code = ?, completed_at = ?
-        WHERE id = ? AND state = 'running'`,
-    ).bind(
-      error instanceof Error ? error.message.slice(0, 160) : 'analytics_cross_failed',
-      new Date().toISOString(), runId,
-    ).run();
+    try {
+      await failAnalyticsCrossRun(
+        db, runId, leaseGeneration,
+        error instanceof Error ? error.message.slice(0, 160) : 'analytics_cross_failed',
+      );
+    } catch (rejected) {
+      // 世代を奪われていた(期限回収→新実行が確定した)場合。勝った世代の結果と
+      // 対象者行には触れず、この実行が書いた自分の世代のstagingだけ片付ける。
+      await clearAnalyticsCrossStaging(db, runId, leaseGeneration);
+      throw rejected;
+    }
     throw error;
   }
 }
@@ -926,18 +1054,31 @@ export async function processPendingAnalyticsCrossRuns(
   limit = 2,
 ): Promise<{ processed: number; failed: number }> {
   const safeLimit = Math.max(1, Math.min(Math.floor(limit), 5));
+  // 機能オフ中のアカウントの行は LIMIT を数える前に外す。後で弾くと、
+  // オフの古い行が先頭を占めたままON中の他アカウントが永久に回らない。
   const rows = await db.prepare(
-    `SELECT id FROM analytics_cross_runs WHERE state = 'pending'
+    `SELECT id, line_account_id FROM analytics_cross_runs WHERE state = 'pending'
+        AND NOT ${accountFeatureOffExclusionSql('analytics_cross_runs.line_account_id', 'analytics')}
       ORDER BY created_at, id LIMIT ?`,
-  ).bind(safeLimit).all<{ id: string }>();
+  ).bind(safeLimit).all<{ id: string; line_account_id: string }>();
   let processed = 0;
   let failed = 0;
   for (const row of rows.results) {
+    // 機能オフ中はclaim(状態更新)も集計もしない。pendingのまま残し、
+    // 再オンで再開する。
+    if (!await isAccountFeatureEnabled(db, row.line_account_id, 'analytics')) {
+      continue;
+    }
     try {
       await processAnalyticsCrossRun(db, row.id);
       processed += 1;
     } catch (error) {
-      if (error instanceof Error && error.message === 'analytics_cross_run_not_pending') continue;
+      // 他の実行が先にclaimした・世代を奪った場合は取りこぼしに数えない。
+      if (
+        error instanceof Error &&
+        (error.message === 'analytics_cross_run_not_pending' ||
+          error.message === 'analytics_cross_run_lease_stolen')
+      ) continue;
       failed += 1;
     }
   }
@@ -949,27 +1090,79 @@ export async function recoverStalledAnalyticsCrossRuns(
   now: Date,
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - 10 * 60_000).toISOString();
+  // 回収も世代を1つ進める。旧実行の完了・失敗は古い世代では書き込めない。
+  // 機能オフ中のアカウントの行は状態を戻さない。OFF中は不変のまま残す。
   const result = await db.prepare(
     `UPDATE analytics_cross_runs
-        SET state = 'pending', started_at = NULL, error_code = NULL
-      WHERE state = 'running' AND started_at < ?`,
+        SET state = 'pending', started_at = NULL, error_code = NULL,
+            lease_generation = lease_generation + 1
+      WHERE state = 'running' AND started_at < ?
+        AND NOT ${accountFeatureOffExclusionSql('analytics_cross_runs.line_account_id', 'analytics')}`,
   ).bind(cutoff).run();
   return Number(result.meta?.changes ?? 0);
+}
+
+export async function getAnalyticsCrossQueueStatus(
+  db: D1Database,
+  lineAccountId: string,
+  runId: string,
+  now: Date = new Date(),
+): Promise<AnalyticsCrossQueueStatus> {
+  const row = await loadRunRow(db, runId, lineAccountId);
+  if (!row) {
+    return { queuePosition: null, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null };
+  }
+  if (row.state === 'running') {
+    // 実行中はその場で処理しているため、待ち時間の目安は出さない(待機中と分ける)。
+    return { queuePosition: 1, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null };
+  }
+  if (row.state === 'pending') {
+    const running = await db.prepare(
+      `SELECT COUNT(*) AS count FROM analytics_cross_runs
+        WHERE line_account_id = ? AND state = 'running' AND id != ?`,
+    ).bind(lineAccountId, runId).first<{ count: number }>();
+    const earlier = await db.prepare(
+      `SELECT COUNT(*) AS count FROM analytics_cross_runs
+        WHERE line_account_id = ? AND state = 'pending'
+          AND (created_at < ? OR (created_at = ? AND id < ?))`,
+    ).bind(lineAccountId, row.created_at, row.created_at, row.id).first<{ count: number }>();
+    const waitingAhead = Number(earlier?.count ?? 0);
+    const pendingAhead = Number(running?.count ?? 0) + waitingAhead;
+    const queuePosition = pendingAhead + 1;
+    // 最短目安 = 次回cronまでの残り + 同一アカウント内待機件数×5分。
+    // 実行中の1件はその場で処理中のため未来の枠に足さない(足すと最短を過大表示する)。
+    // 全体の混雑(他アカウント)は含めないため、延びることがある。
+    const nextTickAt = nextAnalyticsCrossTick(now);
+    const remainMs = Math.max(0, new Date(nextTickAt).getTime() - now.getTime());
+    return {
+      queuePosition,
+      pendingAhead,
+      estimatedWaitMs: remainMs + waitingAhead * ANALYTICS_CROSS_QUEUE_INTERVAL_MS,
+      nextTickAt,
+    };
+  }
+  return { queuePosition: null, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null };
 }
 
 export async function getAnalyticsCrossRun(
   db: D1Database,
   lineAccountId: string,
   runId: string,
+  now: Date = new Date(),
 ): Promise<{
   id: string;
   state: string;
   errorCode: string | null;
   result: AnalyticsCrossResult | null;
   createdAt: string;
+  queuePosition: number | null;
+  pendingAhead: number;
+  estimatedWaitMs: number | null;
+  nextTickAt: string | null;
 } | null> {
   const row = await loadRunRow(db, runId, lineAccountId);
   if (!row) return null;
+  const queue = await getAnalyticsCrossQueueStatus(db, lineAccountId, runId, now);
   return {
     id: row.id,
     state: row.state,
@@ -978,6 +1171,7 @@ export async function getAnalyticsCrossRun(
       ? JSON.parse(row.result_json) as AnalyticsCrossResult
       : null,
     createdAt: row.created_at,
+    ...queue,
   };
 }
 
@@ -1002,10 +1196,17 @@ export async function createAnalyticsCrossAudience(
   if (!result.cells.some((cell) => cell.rowKey === rowKey && cell.columnKey === columnKey)) {
     throw new Error('analytics_cross_cell_not_found');
   }
+  // 対象者は確定した世代のstagingだけから作る。期限回収で生き返った旧実行が
+  // 同じrunへ書いた行(別の世代)は数にも中身にも入れない。移行前に完了していた
+  // runはresult_generationがNULLで、既存行の世代0と対応する。
+  const publishedGeneration = Number(run.result_generation ?? 0);
   const count = await db.prepare(
     `SELECT COUNT(*) AS count FROM analytics_cross_run_members
-      WHERE run_id = ? AND line_account_id = ? AND row_key = ? AND col_key = ?`,
-  ).bind(input.runId, input.lineAccountId, rowKey, columnKey).first<{ count: number }>();
+      WHERE run_id = ? AND line_account_id = ? AND lease_generation = ?
+        AND row_key = ? AND col_key = ?`,
+  ).bind(
+    input.runId, input.lineAccountId, publishedGeneration, rowKey, columnKey,
+  ).first<{ count: number }>();
   const id = crypto.randomUUID();
   const createdAt = input.now.toISOString();
   const expiresAt = new Date(input.now.getTime() + DAY_MS).toISOString();
@@ -1022,8 +1223,9 @@ export async function createAnalyticsCrossAudience(
     db.prepare(
       `INSERT INTO analytics_result_audience_members (audience_id, friend_id)
        SELECT ?, friend_id FROM analytics_cross_run_members
-        WHERE run_id = ? AND line_account_id = ? AND row_key = ? AND col_key = ?`,
-    ).bind(id, input.runId, input.lineAccountId, rowKey, columnKey),
+        WHERE run_id = ? AND line_account_id = ? AND lease_generation = ?
+          AND row_key = ? AND col_key = ?`,
+    ).bind(id, input.runId, input.lineAccountId, publishedGeneration, rowKey, columnKey),
   ]);
   return { id, memberCount: Number(count?.count ?? 0), expiresAt };
 }

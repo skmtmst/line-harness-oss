@@ -49,6 +49,37 @@ describe('common variable usage impact', () => {
     raw.close();
   });
 
+  /*
+    IDEA-14: 送信を始めた配信は送信開始時点の値の写し（snapshot）を持ち、
+    共通情報を直してもその配信は変わらない。「配信中だから変わる」と
+    数えると画面の説明と処理がずれるので、写しの有無で分ける。
+  */
+  it('送信を始めた配信は値の写しの有無で「変わる側」と分ける', async () => {
+    const raw = new Database(':memory:');
+    raw.exec(readFileSync(join(process.cwd(), 'bootstrap.sql'), 'utf8'));
+    raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('a1','c1','A1','t','s');
+      INSERT INTO broadcasts
+        (id, title, message_type, message_content, target_type, status, line_account_id,
+         common_var_snapshot)
+      VALUES
+        ('b-fixed','固定済み','text','{{var.shop_hours}}です','all','sending','a1',
+         '{"values":{"shop_hours":"10-18"}}'),
+        ('b-live','写しなし','text','{{var.shop_hours}}です','all','sending','a1',NULL),
+        ('b-scheduled','予約中','text','{{var.shop_hours}}です','all','scheduled','a1',NULL);
+    `);
+
+    const impact = await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a1');
+
+    expect(impact).toMatchObject({ total: 3, blockingTotal: 2, sendingFixedTotal: 1 });
+    const statusById = new Map(impact.items.map((item) => [item.source_id, item.source_status]));
+    expect(statusById.get('b-fixed')).toBe('sending_fixed');
+    expect(statusById.get('b-live')).toBe('sending');
+    expect(statusById.get('b-scheduled')).toBe('scheduled');
+    raw.close();
+  });
+
   it('does not hide a failed scan as zero usages', async () => {
     const db = {
       prepare: vi.fn(() => ({

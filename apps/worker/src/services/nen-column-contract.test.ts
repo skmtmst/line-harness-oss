@@ -52,8 +52,30 @@ describe('NEN column create contract', () => {
         imageUrl: 'https://cdn.example.com/guide.jpg',
         publishedAt: '2026-08-31T01:30:00.000Z',
         slug: 'NEN-Guide',
+        targetMode: 'all',
+        targetTagId: null,
+        scheduledAt: null,
+        completionEventName: null,
+        completionTagId: null,
+        sourceColumnId: null,
       },
     });
+  });
+
+  it('validates targeting, schedule and completion settings', () => {
+    // #935 N-304 で過去日時は拒否するようになったため、固定の未来日時を使う
+    const futureIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    expect(validateNenColumnCreateBody({
+      title: '秋の食事', articleUrl: 'https://example.com/columns/autumn',
+      targetMode: 'tag', targetTagId: 'tag-1', scheduledAt: futureIso,
+      completionEventName: '秋の食事を読了', completionTagId: 'tag-read',
+    })).toMatchObject({ ok: true, value: {
+      targetMode: 'tag', targetTagId: 'tag-1', scheduledAt: futureIso,
+      completionEventName: '秋の食事を読了', completionTagId: 'tag-read',
+    } });
+    expect(validateNenColumnCreateBody({
+      title: '秋の食事', articleUrl: 'https://example.com/columns/autumn', targetMode: 'tag',
+    })).toEqual({ ok: false, error: 'target_invalid' });
   });
 
   it('keeps omitted publication and image values null instead of inventing them', () => {

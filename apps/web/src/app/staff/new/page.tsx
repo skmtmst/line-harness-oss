@@ -4,10 +4,13 @@ import { useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { AsideCard, FormSection, Field } from '@/components/shared/create-page'
+import Checkbox from '@/components/shared/checkbox'
+import Notice from '@/components/shared/notice'
 import { TextInput } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { useAccount } from '@/contexts/account-context'
+import { CONVERSION_APPROVAL_EDIT_KEY, normalizeStaffPermissionKeys, toggleStaffPermissionKey } from '../permission-labels'
 
 type Role = 'admin' | 'staff' | 'viewer'
 type Channel = { email: boolean; line: boolean }
@@ -22,7 +25,7 @@ const PERMISSION_GROUPS = [
   { label: '基本', items: [['/', 'ダッシュボード'], ['/chats', '受信箱'], ['/friends', '友だち'], ['/tags', '友だち属性']] },
   { label: '配信', items: [['/scenarios', 'シナリオ配信'], ['/broadcasts', '一斉配信'], ['/reminders', 'リマインダ'], ['/auto-replies', '自動応答'], ['/friend-add-settings', '友だち追加時の配信'], ['/webinars', 'ウェビナー']] },
   { label: 'コンテンツ', items: [['/templates', 'テンプレート'], ['/rich-menus', 'リッチメニュー'], ['/form-submissions', '回答フォーム'], ['/contents/vars', '共通情報'], ['/contents', '登録メディア一覧']] },
-  { label: '成果と分析', items: [['/conversions', '成果とアフィリエイト'], ['/mileage', 'マイル'], ['/inflow-links', '流入と計測'], ['/analytics', '分析']] },
+  { label: '成果と分析', items: [['/conversions', '成果とアフィリエイト'], [CONVERSION_APPROVAL_EDIT_KEY, '成果を承認・却下する'], ['/mileage', 'マイル'], ['/inflow-links', '流入と計測'], ['/analytics', '分析']] },
   { label: '自動化・予約', items: [['/automations', 'オートメーション'], ['/webhooks', '外部連携'], ['/booking/bookings', '予約管理'], ['/booking/menus', '予約設定'], ['/events', 'イベント予約']] },
   { label: 'NEN運用', items: [['/ec-commerce', 'ECデータ連携'], ['/line-notifications', 'LINE通知'], ['/nen-campaigns', 'フォロー配信'], ['/nen-members', '投稿写真審査']] },
 ] as const
@@ -42,11 +45,12 @@ export default function NewStaffPage() {
   const [permissionKeys, setPermissionKeys] = useState<string[]>([])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [assignedLineAccountId, setAssignedLineAccountId] = useState('')
+  const [inheritAccounts, setInheritAccounts] = useState(false)
   const [notifications, setNotifications] = useState<Record<string, Channel>>({
     operations: { email: true, line: true }, emergency: { email: true, line: true },
     security: { email: true, line: false }, updates: { email: false, line: true },
   })
-  const togglePermission = (key: string) => setPermissionKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])
+  const togglePermission = (key: string) => setPermissionKeys((current) => toggleStaffPermissionKey(current, key))
   const toggleChannel = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
   useEffect(() => {
     void api.lineAccounts.list().then((response) => {
@@ -60,14 +64,15 @@ export default function NewStaffPage() {
     parent={['ログインユーザー', '/staff?tab=members']}
     saveLabel="招待メールを送る"
     showHeader={false}
-    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
-    onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys, notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: true, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
+    variant="v6"
+    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? '正しいメールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
+    onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: inheritAccounts, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
-      <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-accent">1.</b> 招待メールでアドレスを確認</li><li><b className="text-accent">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-accent">3.</b> 連携完了後はLINEでログイン</li></ol></AsideCard>
+      <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-ink">1.</b> 招待メールでアドレスを確認</li><li><b className="text-ink">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-ink">3.</b> 連携完了後はLINE認証でログイン</li></ol></AsideCard>
       <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${permissionKeys.length}件` : 'すべて'}</dd></div></dl></AsideCard>
     </>}
   >
-    <p className="rounded-control bg-info-bg px-4 py-3 text-sm text-ink-secondary">{selectedAccount?.name ? `${selectedAccount.name}の担当として追加されます。` : 'この店舗の担当として追加されます。'}</p>
+    <Notice tone="info">{selectedAccount?.name ? `${selectedAccount.name}の担当として追加されます。` : 'この店舗の担当として追加されます。'}</Notice>
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="名前" htmlFor="staff-name" required><TextInput id="staff-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
@@ -76,7 +81,7 @@ export default function NewStaffPage() {
     </FormSection>
 
     <FormSection step={2} label="役割" note="役割を選ぶと、できることの範囲が決まります。">
-      <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-full border-2 ${role === item.value ? 'border-accent bg-accent shadow-[inset_0_0_0_3px_white]' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block whitespace-nowrap text-xs text-ink-secondary">{item.note}</span></button>)}</div>
+      <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-full border-2 ${role === item.value ? 'border-accent bg-accent shadow-[inset_0_0_0_3px_white]' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block text-xs leading-relaxed text-ink-secondary">{item.note}</span></button>)}</div>
     </FormSection>
 
     <FormSection step={3} label="最初に表示するLINEアカウント" note="ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。">
@@ -93,10 +98,14 @@ export default function NewStaffPage() {
           ]}
         />
       </Field>
+      <Checkbox checked={inheritAccounts} onCheckedChange={setInheritAccounts} className="mt-4">
+        この店舗より下のアカウントにも権限を付ける
+      </Checkbox>
+      <p className="mt-2 text-xs text-ink-faint">担当範囲は{selectedAccount?.name ? `${selectedAccount.name}のみ` : 'この店舗のみ'}です。上のチェックを入れない限り、下のアカウントは付きません。</p>
     </FormSection>
 
     {role === 'staff' && <FormSection step={4} label="スタッフに表示する機能" note="選択した機能だけが左のメニューに表示され、操作できます。">
-      <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-control border p-2.5 text-sm ${permissionKeys.includes(key) ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}><input type="checkbox" checked={permissionKeys.includes(key)} onChange={() => togglePermission(key)} className="accent-green-500" />{label}</label>)}</div></div>)}</div>
+      <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <Checkbox key={key} checked={permissionKeys.includes(key)} onCheckedChange={() => togglePermission(key)}>{label}</Checkbox>)}</div></div>)}</div>
     </FormSection>}
 
     <FormSection step={role === 'staff' ? 5 : 4} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">

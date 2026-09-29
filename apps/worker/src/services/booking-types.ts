@@ -82,9 +82,18 @@ export interface BookingRow {
 }
 
 export interface AvailabilitySlot {
-  date: string;  // YYYY-MM-DD JST
-  start: string; // HH:MM JST
-  end: string;   // HH:MM JST
+  date: string;  // YYYY-MM-DD（店舗タイムゾーンの暦日）
+  start: string; // HH:MM（店舗タイムゾーンの壁時刻）
+  end: string;   // HH:MM（店舗タイムゾーンの壁時刻）
+  /** 店舗タイムゾーン名（例 Asia/Tokyo）。表示・送信はこの zone で読む。 */
+  timeZone: string;
+  /** 開始 instant（offset 付き ISO。fold 日の重複壁時刻も一意になる）。 */
+  startUtc: string;
+  /** 終了 instant（開始＋所要分。offset 付き ISO）。 */
+  endUtc: string;
+  capacity: number;
+  remaining: number;
+  state: 'available' | 'limited' | 'full' | 'closed';
 }
 
 export interface AvailabilityByStaff {
@@ -104,6 +113,9 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
 };
 
 export const SLOT_GRANULARITY_MINUTES = 30;
+
+/** 予約枠の間隔の候補（分）。店舗設定・DB CHECK と同じ顔ぶれ。 */
+export const SLOT_GRANULARITY_CHOICES = [5, 10, 15, 30, 60] as const;
 export const REQUEST_TTL_HOURS = 24;
 export const IDEMPOTENCY_TTL_MINUTES = 5;
 export const REMINDER_MAX_RETRY = 3;

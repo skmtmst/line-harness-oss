@@ -1,0 +1,358 @@
+export const ANALYTICS_REPORT_SECTIONS = [
+  'friends', 'reactions', 'routes', 'usage', 'mileage',
+] as const;
+export type AnalyticsReportSection = (typeof ANALYTICS_REPORT_SECTIONS)[number];
+export type AnalyticsReportCadence = 'weekly' | 'monthly';
+export type AnalyticsReportChannel = 'dashboard' | 'email' | 'line';
+export type AnalyticsReportRecipient = {
+  kind: 'staff' | 'email';
+  staffId?: string;
+  email?: string;
+  label: string;
+};
+export type AnalyticsReportAlertRule = {
+  metric: 'block_rate' | 'friend_adds' | 'conversions';
+  operator: 'greater_than' | 'decrease_percent' | 'zero_streak_days';
+  threshold: number;
+  minimumSample: number;
+};
+
+export interface AnalyticsReportSchedule {
+  id: string;
+  lineAccountId: string;
+  name: string;
+  sections: AnalyticsReportSection[];
+  savedAnalysisIds: string[];
+  cadence: AnalyticsReportCadence;
+  weekday: number | null;
+  monthDay: number | null;
+  sendTime: string;
+  timeZone: string;
+  periodDays: number;
+  recipients: AnalyticsReportRecipient[];
+  channels: AnalyticsReportChannel[];
+  alertRules: AnalyticsReportAlertRule[];
+  status: 'active' | 'paused' | 'archived';
+  isOneTime: boolean;
+  nextRunAt: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type ScheduleRow = {
+  id: string; line_account_id: string; name: string; sections_json: string;
+  saved_analysis_ids_json: string; cadence: AnalyticsReportCadence; weekday: number | null;
+  month_day: number | null; send_time: string; time_zone: string; period_days: number;
+  recipients_json: string; channels_json: string; alert_rules_json: string;
+  status: AnalyticsReportSchedule['status']; is_one_time: number; next_run_at: string; created_by: string | null;
+  created_at: string; updated_at: string;
+};
+
+function parseJson<T>(value: string): T { return JSON.parse(value) as T; }
+function serialize(row: ScheduleRow): AnalyticsReportSchedule {
+  return {
+    id: row.id, lineAccountId: row.line_account_id, name: row.name,
+    sections: parseJson(row.sections_json), savedAnalysisIds: parseJson(row.saved_analysis_ids_json),
+    cadence: row.cadence, weekday: row.weekday, monthDay: row.month_day,
+    sendTime: row.send_time, timeZone: row.time_zone, periodDays: row.period_days,
+    recipients: parseJson(row.recipients_json), channels: parseJson(row.channels_json),
+    alertRules: parseJson(row.alert_rules_json), status: row.status,
+    isOneTime: Boolean(row.is_one_time), nextRunAt: row.next_run_at,
+    createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+export async function getAnalyticsReportSchedules(db: D1Database, lineAccountId: string) {
+  const result = await db.prepare(
+    `SELECT * FROM analytics_report_schedules
+      WHERE line_account_id = ? AND status != 'archived'
+      ORDER BY created_at DESC, id DESC`,
+  ).bind(lineAccountId).all<ScheduleRow>();
+  return result.results.map(serialize);
+}
+
+/**
+ * 直近にしまった1回送信の一覧（R454）。
+ *
+ * 1回送信は送信後に archived になるため通常の一覧に出ない。
+ * 失敗に気づけるよう、直近分だけ依頼と最新履歴を返す。
+ */
+export async function getRecentOneTimeAnalyticsReportRuns(
+  db: D1Database, lineAccountId: string, limit = 5,
+): Promise<Array<{ schedule: AnalyticsReportSchedule; lastRun: AnalyticsReportRun | null }>> {
+  const rows = await db.prepare(
+    `SELECT * FROM analytics_report_schedules
+      WHERE line_account_id = ? AND status = 'archived' AND is_one_time = 1
+      ORDER BY updated_at DESC, id DESC LIMIT ?`,
+  ).bind(lineAccountId, limit).all<ScheduleRow>();
+  const items: Array<{ schedule: AnalyticsReportSchedule; lastRun: AnalyticsReportRun | null }> = [];
+  for (const row of rows.results) {
+    const schedule = serialize(row);
+    const runs = await getAnalyticsReportRuns(db, {
+      scheduleId: schedule.id, lineAccountId, limit: 1,
+    });
+    items.push({ schedule, lastRun: runs[0] ?? null });
+  }
+  return items;
+}
+
+export async function getAnalyticsReportSchedule(db: D1Database, id: string, lineAccountId: string) {
+  const row = await db.prepare(
+    `SELECT * FROM analytics_report_schedules
+      WHERE id = ? AND line_account_id = ? AND status != 'archived'`,
+  ).bind(id, lineAccountId).first<ScheduleRow>();
+  return row ? serialize(row) : null;
+}
+
+/**
+ * しまった依頼も含めて1件引く（R454）。
+ *
+ * 1回送信の依頼は送信後に archived になる。一覧・詳細から消えるが、
+ * 失敗理由と宛先別結果を確認・再試行できるよう履歴の入口にする。
+ * 別アカウントのIDは返さない。
+ */
+export async function getAnalyticsReportScheduleIncludingArchived(
+  db: D1Database, id: string, lineAccountId: string,
+): Promise<AnalyticsReportSchedule | null> {
+  const row = await db.prepare(
+    `SELECT * FROM analytics_report_schedules WHERE id = ? AND line_account_id = ?`,
+  ).bind(id, lineAccountId).first<ScheduleRow>();
+  return row ? serialize(row) : null;
+}
+
+/**
+ * 失敗した1回送信をもう一度送れる状態へ戻す（R454）。
+ *
+ * 一部でも届いたものは送り直さない（重複を防ぐ）。呼び出し側で
+ * 最新履歴の宛先別結果を確かめてから使う。
+ */
+export async function requeueOneTimeAnalyticsReportSchedule(db: D1Database, input: {
+  id: string; lineAccountId: string; now: string;
+}): Promise<'requeued' | 'missing'> {
+  const result = await db.prepare(
+    `UPDATE analytics_report_schedules SET status = 'active', next_run_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status = 'archived' AND is_one_time = 1`,
+  ).bind(input.now, input.now, input.id, input.lineAccountId).run();
+  return Number(result.meta.changes ?? 0) ? 'requeued' : 'missing';
+}
+
+export async function updateAnalyticsReportSchedule(db: D1Database, input: {
+  id: string; lineAccountId: string; expectedUpdatedAt: string;
+  name: string; sections: AnalyticsReportSection[]; savedAnalysisIds: string[];
+  cadence: AnalyticsReportCadence; weekday: number | null; monthDay: number | null;
+  sendTime: string; timeZone: string; periodDays: number;
+  recipients: AnalyticsReportRecipient[]; channels: AnalyticsReportChannel[];
+  alertRules: AnalyticsReportAlertRule[]; nextRunAt: string; now: string;
+}): Promise<'updated' | 'conflict' | 'missing'> {
+  const existing = await db.prepare(
+    `SELECT updated_at FROM analytics_report_schedules
+      WHERE id = ? AND line_account_id = ? AND status != 'archived'`,
+  ).bind(input.id, input.lineAccountId).first<{ updated_at: string }>();
+  if (!existing) return 'missing';
+  const result = await db.prepare(
+    `UPDATE analytics_report_schedules SET
+       name = ?, sections_json = ?, saved_analysis_ids_json = ?, cadence = ?,
+       weekday = ?, month_day = ?, send_time = ?, time_zone = ?, period_days = ?,
+       recipients_json = ?, channels_json = ?, alert_rules_json = ?,
+       next_run_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status != 'archived' AND updated_at = ?`,
+  ).bind(
+    input.name, JSON.stringify(input.sections), JSON.stringify(input.savedAnalysisIds),
+    input.cadence, input.weekday, input.monthDay, input.sendTime, input.timeZone,
+    input.periodDays, JSON.stringify(input.recipients), JSON.stringify(input.channels),
+    JSON.stringify(input.alertRules), input.nextRunAt, input.now,
+    input.id, input.lineAccountId, input.expectedUpdatedAt,
+  ).run();
+  return Number(result.meta.changes ?? 0) ? 'updated' : 'conflict';
+}
+
+export async function setAnalyticsReportScheduleStatus(db: D1Database, input: {
+  id: string; lineAccountId: string; status: 'active' | 'paused' | 'archived';
+  expectedUpdatedAt: string; nextRunAt?: string; now: string;
+}): Promise<'updated' | 'conflict' | 'missing'> {
+  const existing = await db.prepare(
+    `SELECT status, next_run_at FROM analytics_report_schedules
+      WHERE id = ? AND line_account_id = ? AND status != 'archived'`,
+  ).bind(input.id, input.lineAccountId).first<{ status: string; next_run_at: string }>();
+  if (!existing) return 'missing';
+  const result = await db.prepare(
+    `UPDATE analytics_report_schedules SET status = ?, next_run_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status != 'archived' AND updated_at = ?`,
+  ).bind(
+    input.status, input.nextRunAt ?? existing.next_run_at, input.now,
+    input.id, input.lineAccountId, input.expectedUpdatedAt,
+  ).run();
+  return Number(result.meta.changes ?? 0) ? 'updated' : 'conflict';
+}
+
+export async function createAnalyticsReportSchedule(db: D1Database, input: {
+  lineAccountId: string; name: string; sections: AnalyticsReportSection[];
+  savedAnalysisIds: string[]; cadence: AnalyticsReportCadence; weekday: number | null;
+  monthDay: number | null; sendTime: string; timeZone: string; periodDays: number;
+  recipients: AnalyticsReportRecipient[]; channels: AnalyticsReportChannel[];
+  alertRules: AnalyticsReportAlertRule[]; nextRunAt: string; createdBy: string; now: string;
+  isOneTime?: boolean;
+}) {
+  const id = crypto.randomUUID();
+  await db.prepare(
+    `INSERT INTO analytics_report_schedules (
+       id, line_account_id, name, sections_json, saved_analysis_ids_json, cadence,
+       weekday, month_day, send_time, time_zone, period_days, recipients_json,
+       channels_json, alert_rules_json, status, is_one_time, next_run_at, created_by, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+  ).bind(
+    id, input.lineAccountId, input.name, JSON.stringify(input.sections),
+    JSON.stringify(input.savedAnalysisIds), input.cadence, input.weekday, input.monthDay,
+    input.sendTime, input.timeZone, input.periodDays, JSON.stringify(input.recipients),
+    JSON.stringify(input.channels), JSON.stringify(input.alertRules), input.isOneTime ? 1 : 0, input.nextRunAt,
+    input.createdBy, input.now, input.now,
+  ).run();
+  const row = await db.prepare('SELECT * FROM analytics_report_schedules WHERE id = ?')
+    .bind(id).first<ScheduleRow>();
+  return serialize(row!);
+}
+
+export async function claimDueAnalyticsReportSchedules(db: D1Database, now: string, limit = 10) {
+  const rows = await db.prepare(
+    `SELECT * FROM analytics_report_schedules
+      WHERE status = 'active' AND next_run_at <= ?
+      ORDER BY next_run_at ASC LIMIT ?`,
+  ).bind(now, limit).all<ScheduleRow>();
+  return rows.results.map(serialize);
+}
+
+export type AnalyticsReportRunState = 'running' | 'available' | 'partial' | 'unavailable' | 'failed';
+
+export interface AnalyticsReportRun {
+  id: string;
+  scheduleId: string;
+  lineAccountId: string;
+  scheduledFor: string;
+  periodFrom: string;
+  periodTo: string;
+  timeZone: string;
+  dataCutoffAt: string;
+  state: AnalyticsReportRunState;
+  result: unknown;
+  deliveryResults: unknown[];
+  errorCode: string | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+type RunRow = {
+  id: string; schedule_id: string; line_account_id: string; scheduled_for: string;
+  period_from: string; period_to: string; time_zone: string; data_cutoff_at: string;
+  state: AnalyticsReportRunState; result_json: string; delivery_results_json: string;
+  error_code: string | null; started_at: string; completed_at: string | null;
+};
+
+function serializeRun(row: RunRow): AnalyticsReportRun {
+  return {
+    id: row.id, scheduleId: row.schedule_id, lineAccountId: row.line_account_id,
+    scheduledFor: row.scheduled_for, periodFrom: row.period_from, periodTo: row.period_to,
+    timeZone: row.time_zone, dataCutoffAt: row.data_cutoff_at, state: row.state,
+    result: parseJson(row.result_json), deliveryResults: parseJson(row.delivery_results_json),
+    errorCode: row.error_code, startedAt: row.started_at, completedAt: row.completed_at,
+  };
+}
+
+/**
+ * 同じ予定時刻の実行記録を1件引く（R450）。
+ *
+ * 次回予定の更新だけ失敗すると、完了済みのrunが残ったまま予定が
+ * 古い時刻に止まる。begin は UNIQUE で null を返し続けるので、
+ * ここで完了済みかどうかを見分けて予定の補修に使う。
+ */
+export async function getAnalyticsReportRun(db: D1Database, input: {
+  scheduleId: string; scheduledFor: string;
+}): Promise<AnalyticsReportRun | null> {
+  const row = await db.prepare(
+    `SELECT * FROM analytics_report_runs WHERE schedule_id = ? AND scheduled_for = ?`,
+  ).bind(input.scheduleId, input.scheduledFor).first<RunRow>();
+  return row ? serializeRun(row) : null;
+}
+
+/**
+ * 1件の定期レポートの実行履歴を新しい順に返す（R454）。
+ *
+ * 1回送信の失敗は一覧から消える（archived のため）。依頼IDから
+ * 結果へ到達できるよう、履歴は保存失敗時も残す。
+ */
+export async function getAnalyticsReportRuns(db: D1Database, input: {
+  scheduleId: string; lineAccountId: string; limit?: number;
+}): Promise<AnalyticsReportRun[]> {
+  const result = await db.prepare(
+    `SELECT * FROM analytics_report_runs
+      WHERE schedule_id = ? AND line_account_id = ?
+      ORDER BY scheduled_for DESC, started_at DESC LIMIT ?`,
+  ).bind(input.scheduleId, input.lineAccountId, input.limit ?? 20).all<RunRow>();
+  return result.results.map(serializeRun);
+}
+
+/**
+ * 取り残された実行中（running）の記録を回収する（R450）。
+ *
+ * Worker が送信の途中で止まると running 行が残り、同じ予定時刻の
+ * begin がずっと null になる。開始から一定時間を過ぎたものだけを
+ * 「中断」とみなして failed にし、次回以降の実行を止めない。
+ * 送達が不明な経路は delivery_results_json を空にせず残す。
+ * 正常に動いている同時実行（開始直後の running）は触らない。
+ */
+export async function reclaimStaleAnalyticsReportRuns(db: D1Database, cutoff: string): Promise<number> {
+  const result = await db.prepare(
+    `UPDATE analytics_report_runs
+        SET state = 'failed', error_code = 'worker_interrupted', completed_at = ?
+      WHERE state = 'running' AND started_at < ?`,
+  ).bind(cutoff, cutoff).run();
+  return Number(result.meta.changes ?? 0);
+}
+
+export async function beginAnalyticsReportRun(db: D1Database, input: {
+  scheduleId: string; lineAccountId: string; scheduledFor: string; periodFrom: string;
+  periodTo: string; timeZone: string; dataCutoffAt: string;
+}) {
+  const id = crypto.randomUUID();
+  const result = await db.prepare(
+    `INSERT OR IGNORE INTO analytics_report_runs (
+       id, schedule_id, line_account_id, scheduled_for, period_from, period_to,
+       time_zone, data_cutoff_at, state, result_json, started_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'running', '{}', ?)`,
+  ).bind(id, input.scheduleId, input.lineAccountId, input.scheduledFor, input.periodFrom,
+    input.periodTo, input.timeZone, input.dataCutoffAt, input.dataCutoffAt).run();
+  return Number(result.meta.changes ?? 0) ? id : null;
+}
+
+export async function finishAnalyticsReportRun(db: D1Database, input: {
+  id: string; state: 'available' | 'partial' | 'unavailable' | 'failed'; result: unknown;
+  deliveryResults: unknown[]; errorCode?: string | null; completedAt: string;
+}) {
+  await db.prepare(
+    `UPDATE analytics_report_runs SET state = ?, result_json = ?, delivery_results_json = ?,
+       error_code = ?, completed_at = ? WHERE id = ? AND state = 'running'`,
+  ).bind(input.state, JSON.stringify(input.result), JSON.stringify(input.deliveryResults),
+    input.errorCode ?? null, input.completedAt, input.id).run();
+}
+
+export async function advanceAnalyticsReportSchedule(
+  db: D1Database, id: string, previousNextRunAt: string, nextRunAt: string, now: string,
+) {
+  await db.prepare(
+    `UPDATE analytics_report_schedules SET next_run_at = ?, updated_at = ?
+      WHERE id = ? AND next_run_at = ?`,
+  ).bind(nextRunAt, now, id, previousNextRunAt).run();
+}
+
+export async function archiveAnalyticsReportSchedule(db: D1Database, id: string, now: string) {
+  await db.prepare(
+    `UPDATE analytics_report_schedules SET status = 'archived', updated_at = ?
+      WHERE id = ? AND is_one_time = 1`,
+  ).bind(now, id).run();
+}
+
+export async function purgeExpiredAnalyticsReportRuns(db: D1Database, cutoff: string) {
+  const result = await db.prepare('DELETE FROM analytics_report_runs WHERE scheduled_for < ?')
+    .bind(cutoff).run();
+  return Number(result.meta.changes ?? 0);
+}

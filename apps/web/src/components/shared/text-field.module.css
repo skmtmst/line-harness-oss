@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 入力欄。Pencil V5 の `ytG7l`「共通 入力欄」（102回）と
  * `keKe3`「共通 入力欄（複数行）」（22回）。
@@ -14,7 +15,11 @@
   border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-ink); /* fill: $ink */
-  font-size: var(--text-label); /* fontSize: $size-label */
+  /*
+   * #976 U079: 入力文字は `$size-body`(14px)。検索欄・プルダウン・ボタンと
+   * 同じ大きさにそろえる（以前は `$size-label` の13pxで小さかった）。
+   */
+  font-size: var(--text-body);
   font-weight: 400; /* fontWeight: normal */
   font-family: inherit;
 }
@@ -30,7 +35,7 @@
 }
 
 .field:focus-visible {
-  outline: 2px solid var(--color-status-info);
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 
@@ -51,4 +56,19 @@
 /* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
 .invalid {
   border-color: var(--color-status-danger);
+}
+
+/*
+ * #976 U079/U083: タッチ端末は入力文字16px・欄の高さ44px。
+ * 16px未満だとiOSがフォーカス時に画面を拡大し、入力中にレイアウトが動く。
+ */
+@media (pointer: coarse) {
+  .field {
+    font-size: var(--text-lead);
+  }
+
+  .single {
+    height: 44px;
+  }
+}
 }

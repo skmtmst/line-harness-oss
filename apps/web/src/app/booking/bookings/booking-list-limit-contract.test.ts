@@ -1,0 +1,73 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+
+const LIST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const DETAIL = readFileSync(new URL('./detail/page.tsx', import.meta.url), 'utf8')
+const API = readFileSync(new URL('../../../lib/api.ts', import.meta.url), 'utf8')
+
+describe('予約管理の一覧上限', () => {
+  it('一覧を表示ページだけ取得し、総件数でページ数を決める', () => {
+    expect(LIST).toContain('offset: (page - 1) * PAGE_SIZE')
+    expect(LIST).toContain('setTotal(r.total)')
+    expect(LIST).toContain('Math.ceil(total / PAGE_SIZE)')
+    expect(API).toContain('requests: BookingRequest[]; total: number')
+  })
+
+  it('詳細は一覧全件から探さず単票APIを使う', () => {
+    // DEEP-18: 取得は「要求時のアカウント×予約ID」で固定し、
+    // 世代が古い応答は画面へ反映しない。
+    expect(DETAIL).toContain('bookingApi.getBooking(accountId, bookingId)')
+    expect(DETAIL).toContain('loadGeneration.current !== generation')
+    expect(DETAIL).not.toContain("bookingApi.listRequests(selectedAccountId, 'all')")
+  })
+
+  it('LINE未連携の電話予約をnullとして扱いリンクを作らない', () => {
+    expect(API).toContain('friend_id: string | null')
+    expect(DETAIL).toContain('detail.customer.friendId ? (')
+    expect(LIST).toContain('b.friend_id ? <Button')
+  })
+
+  it('LINE未連携の予約に「届きます」系文言を出さない (N-390 独立審査必修2)', () => {
+    // 一覧ドロワー・確定窓は「連携済みか」で文言を分ける。
+    expect(LIST).toContain('const isLinked = detail?.customer.isLineLinked ?? Boolean(b.friend_id)')
+    expect(LIST).toContain('LINEと結びついていないため、お客様への自動連絡はありません')
+    // 未連携でも無条件に出る文言が残っていないこと
+    expect(LIST).not.toContain('>ここでの状態変更は、お客様のLINEにも自動で知らせます。<')
+    // R88: 受付経路の文言は source で分ける（担当者の代理入力をLINEにしない）。
+    // 文言の分け方自体（N-390）は残す。
+    expect(LIST).toContain("isLineBooking(b) ? 'LINEから入りました。' : '電話・店頭で受け付けました。'")
+  })
+
+  it('「準備中」の変更ボタンを残さず詳細ページの変更フォームへ誘導する (N-389 独立審査必修2)', () => {
+    expect(LIST).not.toContain('日時変更は準備中です')
+    expect(LIST).not.toContain('disabled>変更を保存する')
+    expect(LIST).toContain('href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`} variant="secondary">時間や担当を変える')
+  })
+
+  it('集計の失敗は0表示と分け、理由と再試行を出す(点検#516の中2)', () => {
+    expect(LIST).toContain('summaryError')
+    expect(LIST).toContain('集計を読み込めませんでした。一覧はそのまま使えます。')
+    expect(LIST).toContain('もう一度読み込む')
+    expect(LIST).toContain('setSummarySeq')
+  })
+
+  it('承認文面はWorkerの送信文面と同じ要素を持つ(点検#516の中7)', () => {
+    // 実際に送るのは booking-notifier.ts の renderNotificationText('approved')。
+    // 6要素(確定文・メニュー・担当・日時・空行・変更案内)がずれると二重管理になる。
+    expect(DETAIL).toContain("'予約が確定しました。'")
+    expect(DETAIL).toContain('`メニュー: ${b.menu_name}`')
+    expect(DETAIL).toContain('`担当: ${b.staff_name}`')
+    expect(DETAIL).toContain('`日時: ${jst}`')
+    expect(DETAIL).toContain("'変更・キャンセルはお店に直接ご連絡ください。'")
+    expect(DETAIL).toContain("renderNotificationText('approved'")
+  })
+
+  it('不正な日時はInvalid Dateを出さず「—」にし、コピー済みタイマーは外す(点検#516軽6)', () => {
+    expect(LIST).toContain('Number.isNaN(new Date(iso).getTime())')
+    expect(LIST).toContain('copyTimer')
+    expect(LIST).toContain('clearTimeout(copyTimer.current)')
+  })
+
+  // 点検#516の中8(メニュー棚のFolderPanel寄せ)は列車側で移行済みのため、
+  // このPRでは重複して扱わない。移行の契約は booking-folder-panel-contract.test.ts が持つ。
+})

@@ -8,9 +8,12 @@ const workflow = readFileSync(
 );
 
 describe('Deploy Cloudflare Staging workflow', () => {
-  it('is manual-only and defaults to dry-run', () => {
+  it('supports a gated development push and still defaults manual runs to dry-run', () => {
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toMatch(/^\s+push:/m);
+    expect(workflow).toMatch(/^\s+push:/m);
+    expect(workflow).toMatch(/branches:\s*\n\s*- codex\/development/);
+    expect(workflow).toContain("vars.NEN_STAGING_DELIVERY_MODE == 'dry-run'");
+    expect(workflow).toContain("vars.NEN_STAGING_DELIVERY_MODE == 'apply'");
     expect(workflow).toContain('default: dry-run');
     expect(workflow).toContain('default: all');
   });
@@ -23,10 +26,20 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toContain('apps/worker/wrangler.toml');
   });
 
-  it('requires an exact deploy lock before apply', () => {
-    expect(workflow).toContain('if [ "$MODE" = "apply" ]');
+  it('acquires an exact deploy lock for apply and releases only after success', () => {
+    expect(workflow).toContain('id: staging_lock');
+    expect(workflow).toContain("if: env.DELIVERY_MODE == 'apply'");
+    expect(workflow).toContain('pnpm deploy:lock acquire staging');
     expect(workflow).toContain(
       'pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin',
+    );
+    expect(workflow).toContain("if: success() && steps.staging_lock.outcome == 'success'");
+    expect(workflow).toContain('pnpm deploy:lock release staging --remote origin');
+    expect(workflow.indexOf('pnpm deploy:lock acquire staging')).toBeLessThan(
+      workflow.indexOf('npx wrangler deploy --config apps/worker/wrangler.staging.toml'),
+    );
+    expect(workflow.indexOf('pnpm deploy:lock release staging')).toBeGreaterThan(
+      workflow.indexOf('npx wrangler pages deploy apps/web/out'),
     );
   });
 
@@ -35,6 +48,12 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain('CLOUDFLARE_ACCOUNT_ID');
     expect(workflow).toContain('apps/worker/wrangler.staging.toml');
     expect(workflow).not.toContain('echo "$CLOUDFLARE_ACCOUNT_ID"');
+  });
+
+  it('passes the staging Turnstile site key to the admin build', () => {
+    expect(workflow).toContain(
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}',
+    );
   });
 
   it('uses separate Worker and Pages credentials with safe fallbacks', () => {
@@ -52,9 +71,9 @@ describe('Deploy Cloudflare Staging workflow', () => {
   });
 
   it('can deploy Worker and Admin independently', () => {
-    expect(workflow).toContain("inputs.target != 'admin'");
-    expect(workflow).toContain("inputs.target != 'worker'");
-    expect(workflow).toContain('TARGET: ${{ inputs.target }}');
+    expect(workflow).toContain("env.DELIVERY_TARGET != 'admin'");
+    expect(workflow).toContain("env.DELIVERY_TARGET != 'worker'");
+    expect(workflow).toContain("inputs.target || 'all'");
     expect(workflow).toContain(
       'pnpm --filter @line-harness/update-engine build',
     );
@@ -64,5 +83,40 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain("grep -q '^\\[triggers\\]'");
     expect(workflow).not.toContain('d1 migrations apply');
     expect(workflow).not.toContain('apply-d1-migrations');
+  });
+
+  it('counts staging D1 migrations and blocks apply while any are pending', () => {
+    expect(workflow).toContain('name: Count pending staging D1 migrations');
+    expect(workflow).toContain('--command "SELECT name FROM _migrations" --json');
+    expect(workflow).toContain('pending_count=$((pending_count + 1))');
+    expect(workflow).toContain('検証D1の未適用マイグレーション: ${pending_count} 件');
+    expect(workflow).toContain('if [ "$DELIVERY_MODE" = "apply" ] && [ "$pending_count" -ne 0 ]');
+    expect(workflow).toContain('Migrate D1を先に実行してください。');
+    expect(workflow).not.toContain('CREATE TABLE IF NOT EXISTS _migrations');
+  });
+
+  it('can replay only the current staging config on the already deployed Worker source', () => {
+    expect(workflow).toContain('worker_config_replay:');
+    expect(workflow).toContain('worker_source_sha:');
+    expect(workflow).toContain('expected_worker_version_id:');
+    expect(workflow).toContain('test "$DELIVERY_TARGET" = "worker"');
+    expect(workflow).toContain('test "$active_version" = "$EXPECTED_WORKER_VERSION_ID"');
+    expect(workflow).toContain('git merge-base --is-ancestor "$WORKER_SOURCE_SHA" "$GITHUB_SHA"');
+    expect(workflow).toContain('git worktree add --detach "$worker_root" "$WORKER_SOURCE_SHA"');
+    expect(workflow).toContain(
+      'cp apps/worker/wrangler.staging.toml "$worker_root/apps/worker/wrangler.staging.toml"',
+    );
+    expect(workflow).toContain('[ "$WORKER_CONFIG_REPLAY" != "true" ]');
+  });
+
+  it('verifies the active Version ID and Google write setting after Worker deploy', () => {
+    expect(workflow).toContain('id: worker_deploy');
+    expect(workflow).toContain('Current Version ID:');
+    expect(workflow).toContain('/versions/$version_id');
+    expect(workflow).toContain('test "$active_version" = "$version_id"');
+    expect(workflow).toContain('GOOGLE_BUSINESS_WRITE_ENABLED');
+    expect(workflow).toContain(
+      'test "$actual" = "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED"',
+    );
   });
 });

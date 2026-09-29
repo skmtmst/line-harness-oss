@@ -1,12 +1,16 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TextArea, TextInput } from './form-controls'
 import SearchField from './search-field'
 import Select from './select'
+
+afterEach(() => cleanup())
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..', '..')
@@ -49,21 +53,24 @@ describe('V5 B3 入力・検索・選択部品', () => {
       { value: 'all', label: 'すべて' },
       { value: 'active', label: '有効' },
     ]
-    const html = renderToStaticMarkup(
+    const { container } = render(
       <div>
         <Select aria-label="状態" value="all" options={options} onChange={vi.fn()} />
         <Select aria-label="表示件数" value="all" options={options} onChange={vi.fn()} size="page-size" />
         <Select aria-label="開いた状態" label="状態" value="active" options={options} onChange={vi.fn()} defaultOpen name="status" />
       </div>,
     )
+    const html = container.innerHTML
     expect(html).toContain('data-design-node="rpot9"')
     expect(html).toContain('data-design-node="niGPF"')
     expect(html).toContain('data-design-node="Gfsb4"')
-    expect(html).toContain('role="listbox"')
-    expect(html).toContain('aria-expanded="true"')
-    expect(html).toContain('状態：有効')
-    expect(html).toContain('aria-selected="true"')
-    expect(html).toContain('type="hidden" name="status" value="active"')
+    // 開いた中身は最上層（MenuPortal→document.body）に出る。静的書き出しには載らない。
+    expect(screen.getByRole('listbox')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '開いた状態' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('状態：有効')).toBeTruthy()
+    expect(document.body.innerHTML).toContain('aria-selected="true"')
+    const hidden = container.querySelector('input[type="hidden"][name="status"]')
+    expect(hidden?.getAttribute('value')).toBe('active')
   })
 
   it('代表画面は直書きではなく共通入力・検索・選択を使う', () => {
@@ -71,16 +78,30 @@ describe('V5 B3 入力・検索・選択部品', () => {
     expect(readSource('app/staff/new/page.tsx')).toMatch(/TextInput/)
     expect(readSource('app/reminders/new/page.tsx')).toMatch(/TextArea/)
     expect(readSource('components/shared/list-toolbar.tsx')).toMatch(/SearchField/)
-    expect(readSource('components/shared/list-toolbar.tsx')).toMatch(/Select/)
+    // 一覧の帯から Select は外した。並び順・表示件数は仕組みができるまで描かない
+    // （§2-2「使えないプルダウンを完成画面に置かない」）。共通 Select を使っている
+    // 証拠は上の `app/staff/new/page.tsx` が持つ。
+    expect(readSource('components/shared/list-toolbar.tsx')).not.toMatch(/<Select/)
   })
 
   it('CSSモジュールは生の色とローカル変数を持たず、フォーカス輪郭を消さない', () => {
+    // 2026-09-25・使いやすさ点検 §8: 入力欄の輪郭は `2px・action 色・offset 2px`
+    // にそろえた（緑は「正常」の意味）。`outline: revert`（ブラウザ既定）と
+    // 同等以上に見える輪郭なので、ここでは両方を保証として認める。
+    // 複合部品のうち外枠の `:focus-within` を正本にするものは、中の input の
+    // `outline: none` をその場合だけ許す（二重の輪郭を避けるため）。
+    // SearchField は外枠ではなく中の input 自身に輪郭を出す（2026-09-25）。
     for (const name of ['form-controls.module.css', 'search-field.module.css', 'select.module.css']) {
       const css = withoutComments(read(name))
       expect(css, `${name} に生の色がある`).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(css, `${name} がローカル変数を定義している`).not.toMatch(/^\s*--(?!tw-)[a-z-]+:/m)
-      expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)/)
-      expect(css, `${name} がfocus-visibleを保証していない`).toMatch(/:focus-visible[^{]*\{[^}]*outline:\s*revert;/s)
+      const hasOuterRing = /:focus-within\s*\{[^}]*outline:\s*2px solid var\(--color-action\)/.test(css)
+      if (!hasOuterRing) {
+        expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)/)
+      }
+      expect(css, `${name} がfocus-visibleを保証していない`).toMatch(
+        /:focus-visible[^{]*\{[^}]*outline:\s*(?:revert|2px solid var\(--color-action\))/s,
+      )
     }
   })
 

@@ -53,8 +53,8 @@ describe('A-8b omitted account scope', () => {
 
     expect(response.status).toBe(200);
     expect(records).toHaveLength(1);
-    expect(records[0].sql).toContain('f.line_account_id IN (?,?)');
-    expect(records[0].binds).toEqual(['account-a', 'account-b', 100, 0]);
+    expect(records[0].sql).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(records[0].binds).toEqual(['["account-a","account-b"]', 100, 0]);
   });
 
   test('ref-summary applies the same scope and binds to the list and both totals', async () => {
@@ -64,8 +64,16 @@ describe('A-8b omitted account scope', () => {
     });
 
     expect(response.status).toBe(200);
-    expect(records).toHaveLength(3);
-    for (const record of records) {
+    // IDEA-18: 友だち側3件(経路別一覧+総数+ref有り数)に、注文の計測範囲
+    // (ec_orders側の口)が1件増えて計4件。
+    expect(records).toHaveLength(4);
+    expect(records[3].sql).toContain('FROM ec_orders');
+    expect(records[3].sql).toContain('o.line_account_id IN (?,?)');
+    expect(records[3].binds).toEqual(['account-a', 'account-b']);
+    // 経路別一覧は注文の相関副問合せ(f2)ぶんも同じアカウント範囲で束縛する
+    expect(records[0].sql).toContain('f.line_account_id IN (?,?)');
+    expect(records[0].binds).toEqual(Array(8).fill('account-a', 0, 8).map((_, i) => (i % 2 === 0 ? 'account-a' : 'account-b')));
+    for (const record of records.slice(1, 3)) {
       expect(record.sql).toContain('f.line_account_id IN (?,?)');
       expect(record.binds).toEqual(['account-a', 'account-b']);
     }
@@ -81,5 +89,29 @@ describe('A-8b omitted account scope', () => {
     const friendQuery = records[1];
     expect(friendQuery.sql).toContain('f.line_account_id IN (?,?)');
     expect(friendQuery.binds).toEqual(['campaign-a', 'campaign-a', 'account-a', 'account-b']);
+  });
+
+  test.each([
+    '/api/analytics/ref-summary?lineAccountId=account-hidden',
+    '/api/analytics/ref/campaign-a?lineAccountId=account-hidden',
+  ])('explicit account selection rejects an invisible account before any analytics query: %s', async (path) => {
+    const records: RecordedQuery[] = [];
+    const response = await app(liffRoutes).request(path, {}, { DB: database(records) });
+
+    expect(response.status).toBe(403);
+    expect(records).toHaveLength(0);
+  });
+
+  test('explicit visible account keeps the existing filtered response', async () => {
+    const records: RecordedQuery[] = [];
+    const response = await app(liffRoutes).request(
+      '/api/analytics/ref-summary?lineAccountId=account-a', {}, { DB: database(records) },
+    );
+
+    expect(response.status).toBe(200);
+    // IDEA-18: 注文の計測範囲クエリ(o.line_account_id)が増えて計4件。口は全て同じアカウント。
+    expect(records).toHaveLength(4);
+    expect(records.every((record) => record.sql.includes('line_account_id = ?'))).toBe(true);
+    expect(records.every((record) => record.binds[0] === 'account-a')).toBe(true);
   });
 });

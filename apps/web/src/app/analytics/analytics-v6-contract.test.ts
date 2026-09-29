@@ -27,6 +27,7 @@ describe('V6 機能20 分析', () => {
     ]) expect(API).toContain(path)
     expect(PAGE).toContain('api.analytics.v6Funnels.list')
     expect(PAGE).toContain('api.analytics.runCross')
+    expect(API).not.toContain('`/api/analytics/cross?account_id=')
     expect(PAGE).not.toContain('api.funnels.create')
     expect(PAGE).not.toContain('api.funnels.result')
   })
@@ -47,7 +48,10 @@ describe('V6 機能20 分析', () => {
     expect(API).toContain('/api/analytics/saved/${id}/snapshots?account_id=')
     expect(PAGE).toContain('条件の定義と集計結果を分けて保存しています')
     expect(PAGE).toContain('保存時点の結果は書き換わりません')
-    expect(PAGE).toContain('定期レポートは現在「なし」です')
+    expect(PAGE).toContain('定期レポートはこの下の一覧で止めたり変えたりできます')
+    expect(PAGE).toContain('api.analytics.reportSchedules')
+    expect(PAGE).toContain('REPORT_SCHEDULE_STATUS_LABELS[schedule.status]')
+    expect(PAGE).toContain('`/analytics/reports/new?id=${schedule.id}`')
     expect(PAGE).not.toContain('保存した分析はまだ接続されていません')
     expect(PAGE).toContain('DateTimeMetricCell metric={item.lastUsedAt}')
     expect(PAGE).toContain('<Th>集計状態</Th>')
@@ -70,5 +74,58 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('結果の保存と個人一覧への移動は、統括・管理者だけが行えます。')
     expect(PAGE).toContain('canManage && <Button onClick={() => void prepareCrossAudience()}')
     expect(PAGE).toContain('canManage && <Button onClick={() => void prepareFunnelAudience()}')
+  })
+
+  it('結果待ちは打ち切りと間隔延長があり、無限に叩かない(点検#508の中2)', () => {
+    expect(PAGE).not.toContain('setInterval')
+    // board #633独立差し戻し: 2分で止めず5分cronを待つ。打ち切りは最短目安+余裕(上限あり)。
+    // board #633独立審査: 確認失敗のbackoffを積む前にも打ち切りを見る。
+    expect(PAGE).toContain('stopIfDeadlinePassed')
+    expect(PAGE).toContain('Date.now() < deadline')
+    expect(PAGE).toContain('CROSS_AUTO_POLL_MAX_MS')
+    // board #633独立再審査: 打ち切り後もrunを保持し再接続する。新規の送り直しは促さない。
+    expect(PAGE).toContain('自動の確認を止めました')
+    expect(PAGE).toContain('結果をもう一度確認')
+    expect(PAGE).not.toContain('時間切れです。条件をゆるめて集計し直してください')
+    expect(PAGE).toContain('attempts < 10 ? 3000 : 10000')
+  })
+
+  it('クロス分析は「数えるもの」を選べ、期間・棒・段は読み上げに届く(#951)', () => {
+    // N-276: 人数だけでなく、記録が「取得可能」なイベントの回数でも数えられる。
+    expect(API).toContain('AnalyticsCrossMeasure')
+    expect(PAGE).toContain("id=\"cross-measure\"")
+    expect(PAGE).toContain("id=\"cross-measure-event\"")
+    expect(PAGE).toContain("kind: 'events'")
+    // N-288: 期間切替は選択状態を持ち、棒・段は名前を持つ。
+    expect(PAGE).toContain('aria-pressed={days === range}')
+    expect(PAGE).toContain('aria-describedby={`funnel-step-')
+  })
+
+  it('一覧の取得失敗は空表示と分け、再読込の導線と実行制限は運用の言葉で出す(点検#508の中3・中4)', () => {
+    expect(PAGE).toContain('友だち情報欄を読み込めませんでした。')
+    expect(PAGE).toContain('ファネルを読み込めませんでした。')
+    // 開き直ししかできなかったエラー面には、同じ条件で読み直す導線を付ける。
+    // ★V7 `x63W5x`：ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
+    expect(PAGE).toContain('onRetry')
+    expect(PAGE).toContain('fieldsReload')
+    expect(PAGE).toContain('funnelsReload')
+    expect(PAGE).toContain('savedReload')
+    expect(PAGE).toContain('snapshotReload')
+    expect(PAGE).toContain('menuReload')
+    expect(PAGE).toContain('analytics_cross_busy')
+    expect(PAGE).toContain('他の集計が動いています。終わってからもう一度押してください')
+    expect(PAGE).toContain('analytics_funnel_too_soon')
+    expect(PAGE).toContain('さきほど集計したばかりです。少し待ってから押してください')
+  })
+
+  it('200件で切れるときは注意を出し、CSVも範囲内と書く(点検#508の中5)', () => {
+    expect(PAGE).toContain('overview.hasMore')
+    // 監査 R72: 検索は200件の外へも届くようになったので、注意文もその旨に更新した。
+    expect(PAGE).toContain('条件に合うもののうち200件までを表示しています。探す言葉で絞るとこの中だけではなく全体から探します。CSVの書き出しも、表示している範囲だけが入ります。')
+  })
+
+  it('未集計のファネルは壊れた表示にせず案内を出す(点検#508軽13)', () => {
+    expect(PAGE).toContain('setNoRun')
+    expect(PAGE).toContain('まだ集計がありません。「この{funnelDays}日を再集計」を押してください')
   })
 })

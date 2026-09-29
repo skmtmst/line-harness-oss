@@ -105,6 +105,14 @@ export interface IdentityCandidateList {
   total: number;
   limit: number;
   offset: number;
+  /**
+   * FRIEND-11: 同じ検索条件（状態の絞り込みは除く）で数えた状態別件数。
+   * 一覧が1ページ分しか載らなくても、集計カードは全件の母数を指せる。
+   * 古い worker とのローリング中は省かれることがある（optional）。
+   */
+  statusCounts?: Partial<Record<IdentityCandidateStatus, number>>;
+  /** 同じ検索条件で数えた「根拠が弱い（confidence < 50）」候補の件数。 */
+  lowConfidenceCount?: number;
 }
 
 export interface DetectIdentityCandidatesResult {
@@ -118,6 +126,12 @@ export interface DecideIdentityCandidateRequest {
   expectedVersion: number;
   decision: IdentityCandidateDecision;
   reason: string;
+  /** 友だち同士を結び付けるとき、どの値を採用したかも同じ監査単位で保存する。 */
+  profileSelections?: Array<{
+    fieldKey: string;
+    sourceFriendId: string;
+    updateMode: "auto" | "fixed";
+  }>;
   /** EC照合だけで使用する。指定が無ければ過去イベントへ副作用を起こさない。 */
   reprocess?: {
     mode: IdentityReprocessMode;
@@ -130,3 +144,14 @@ export interface UndoIdentityCandidateRequest {
   expectedVersion: number;
   reason: string;
 }
+
+/**
+ * 計量キーの正本(#517 軽4)。
+ *
+ * 保存済みの `impact_json` を読む2か所(集計 `potentialRevenue` と画面表示)で
+ * 共有する。キー名がずれると画面が黙って「—(未取得)」になり、型でも守れない
+ * (`IdentityCandidateImpactMetric.key` は `string`)ため、手書きの重複を持たない。
+ * 未知のキーは両側の試験(webの見本キー洗い・dbの未知キー除外)が捕まえる。
+ */
+export const ORDER_IMPACT_KEYS: readonly string[] = ['orders', 'order_count'];
+export const REVENUE_IMPACT_KEYS: readonly string[] = ['sales', 'revenue', 'order_amount'];

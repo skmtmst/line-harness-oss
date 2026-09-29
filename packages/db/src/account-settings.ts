@@ -4,6 +4,12 @@
  * The table stores arbitrary key/value pairs keyed by (line_account_id, key).
  * Each setting is a JSON-encoded string so the column type never changes.
  */
+import { featureCatalogEntry, type FeatureId } from '@line-crm/shared';
+
+// SQL だけを組み立てる関数は D1 の型に触れないよう別ファイルへ置く。
+// scripts の型検査は Workers 型を読み込まないため、この表から
+// 直接 import されると壊れる。従来の import 先はそのまま使える。
+export { accountFeatureOffExclusionSql } from './account-feature-sql.js';
 
 /**
  * Retrieve a raw setting value (JSON string) for an account.
@@ -19,6 +25,30 @@ export async function getAccountSetting(
     .bind(accountId, key)
     .first<{ value: string }>();
   return row?.value ?? null;
+}
+
+/**
+ * Retrieve several raw setting values for an account in one round trip.
+ *
+ * 管理APIが機能設定の束を読むとき、キーごとに getAccountSetting を投げると
+ * 往復が本数分だけかかる(#633)。まとめて取って欠けたキーは「未設定」と
+ * 同じ扱いにする（返値へキーが出ない）。
+ */
+export async function getAccountSettings(
+  db: D1Database,
+  accountId: string,
+  keys: readonly string[],
+): Promise<Record<string, string>> {
+  const unique = [...new Set(keys)];
+  if (unique.length === 0) return {};
+  const result = await db
+    .prepare(
+      `SELECT key, value FROM account_settings
+       WHERE line_account_id = ? AND key IN (${unique.map(() => '?').join(',')})`,
+    )
+    .bind(accountId, ...unique)
+    .all<{ key: string; value: string }>();
+  return Object.fromEntries(result.results.map((row) => [row.key, row.value]));
 }
 
 /**
@@ -43,6 +73,125 @@ export async function setAccountSetting(
     )
     .bind(id, accountId, key, value, now, now, value, now)
     .run();
+}
+
+export interface VersionedAccountSetting<T> {
+  version: number;
+  data: T;
+}
+
+export type SaveVersionedAccountSettingResult<T> =
+  | { status: 'saved'; setting: VersionedAccountSetting<T> }
+  | { status: 'conflict'; current: VersionedAccountSetting<T> | null };
+
+/**
+ * Save one logical settings bundle with optimistic locking.
+ *
+ * Keeping the version in the same row lets D1 reject a stale writer with one
+ * conditional UPDATE instead of partially saving several independent keys.
+ */
+export async function saveVersionedAccountSetting<T>(
+  db: D1Database,
+  input: {
+    accountId: string;
+    key: string;
+    expectedVersion: number;
+    data: T;
+  },
+): Promise<SaveVersionedAccountSettingResult<T>> {
+  const current = await getVersionedAccountSetting<T>(db, input.accountId, input.key);
+  if ((current?.version ?? 0) !== input.expectedVersion) {
+    return { status: 'conflict', current };
+  }
+
+  const next: VersionedAccountSetting<T> = {
+    version: input.expectedVersion + 1,
+    data: input.data,
+  };
+  const value = JSON.stringify(next);
+  const now = new Date(Date.now() + 9 * 60 * 60_000)
+    .toISOString()
+    .replace('Z', '+09:00');
+
+  if (current) {
+    const updated = await db.prepare(
+      `UPDATE account_settings
+          SET value = ?, updated_at = ?
+        WHERE line_account_id = ? AND key = ?
+          AND json_valid(value)
+          AND CAST(json_extract(value, '$.version') AS INTEGER) = ?`,
+    ).bind(value, now, input.accountId, input.key, input.expectedVersion).run();
+    if ((updated.meta?.changes ?? 0) !== 1) {
+      return {
+        status: 'conflict',
+        current: await getVersionedAccountSetting<T>(db, input.accountId, input.key),
+      };
+    }
+  } else {
+    const inserted = await db.prepare(
+      `INSERT OR IGNORE INTO account_settings
+        (id, line_account_id, key, value, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(crypto.randomUUID(), input.accountId, input.key, value, now, now).run();
+    if ((inserted.meta?.changes ?? 0) !== 1) {
+      return {
+        status: 'conflict',
+        current: await getVersionedAccountSetting<T>(db, input.accountId, input.key),
+      };
+    }
+  }
+
+  return { status: 'saved', setting: next };
+}
+
+/**
+ * このアカウントで機能が有効か。worker の accountFeatureIsEnabled と
+ * 同じ順序(一括設定→個別設定→カタログ初期値)で読む。正本は worker 側に
+ * あり、ここは cron 処理が db 層だけで止めるための最小複製。
+ */
+export async function isAccountFeatureEnabled(
+  db: D1Database,
+  accountId: string,
+  featureId: string,
+): Promise<boolean> {
+  const bundle = await getVersionedAccountSetting<{ features?: Record<string, unknown> }>(
+    db,
+    accountId,
+    'feature.settings_bundle_v1',
+  );
+  const bundled = bundle?.data.features?.[featureId];
+  if (typeof bundled === 'boolean') return bundled;
+
+  const legacy = await getAccountSetting(db, accountId, `feature.${featureId}`);
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy) as boolean | { enabled?: unknown };
+      if (typeof parsed === 'boolean') return parsed;
+      if (typeof parsed.enabled === 'boolean') return parsed.enabled;
+    } catch {
+      // 壊れた旧値はカタログの既定値へ戻す。設定画面の読取と同じ扱い。
+    }
+  }
+  const entry = featureCatalogEntry(featureId as FeatureId);
+  return entry?.defaultEnabled ?? true;
+}
+
+export async function getVersionedAccountSetting<T>(
+  db: D1Database,
+  accountId: string,
+  key: string,
+): Promise<VersionedAccountSetting<T> | null> {
+  const raw = await getAccountSetting(db, accountId, key);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<VersionedAccountSetting<T>>;
+    if (!Number.isInteger(parsed.version) || Number(parsed.version) < 1 || parsed.data === undefined) {
+      return null;
+    }
+    return { version: Number(parsed.version), data: parsed.data };
+  } catch {
+    return null;
+  }
 }
 
 // ── URL settings (link_base_url / tracked_link_base_url) ─────────────────────

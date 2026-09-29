@@ -7,6 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const dbMocks = {
   // eager module-load deps (mirror other route tests)
   getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
+  getAccountSetting: vi.fn().mockResolvedValue(null),
+  getVersionedAccountSetting: vi.fn().mockResolvedValue({
+    version: 1,
+    data: { features: { affiliates: true } },
+  }),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
@@ -36,6 +42,8 @@ vi.mock('@line-crm/db', () => dbMocks);
 const worker = (await import('../index.js')).default;
 
 const API_KEY = 'test-owner-key';
+const TENANT_ID = '00000000-0000-4000-8000-000000000001';
+const ACCOUNT_ID = 'account-1';
 const env = {
   DB: {} as D1Database,
   LINE_LOGIN_CHANNEL_ID: '2000000000',
@@ -44,21 +52,23 @@ const env = {
 } as unknown as import('../index.js').Env['Bindings'];
 
 function get(path: string) {
+  const separator = path.includes('?') ? '&' : '?';
   const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, { method: 'GET', headers }),
+    new Request(`https://worker.example.com${path}${separator}accountId=${ACCOUNT_ID}`, { method: 'GET', headers }),
     env,
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
   );
 }
 
 function post(path: string, body: unknown) {
+  const separator = path.includes('?') ? '&' : '?';
   const headers = new Headers({
     Authorization: `Bearer ${API_KEY}`,
     'Content-Type': 'application/json',
   });
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, {
+    new Request(`https://worker.example.com${path}${separator}accountId=${ACCOUNT_ID}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -69,9 +79,25 @@ function post(path: string, body: unknown) {
 }
 
 function remove(path: string) {
+  const separator = path.includes('?') ? '&' : '?';
   const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, { method: 'DELETE', headers }),
+    new Request(`https://worker.example.com${path}${separator}accountId=${ACCOUNT_ID}`, { method: 'DELETE', headers }),
+    env,
+    { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
+  );
+}
+
+function put(path: string, body: unknown) {
+  const separator = path.includes('?') ? '&' : '?';
+  const headers = new Headers({
+    Authorization: `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json',
+  });
+  return worker.fetch(
+    new Request(`https://worker.example.com${path}${separator}accountId=${ACCOUNT_ID}`, {
+      method: 'PUT', headers, body: JSON.stringify(body),
+    }),
     env,
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
   );
@@ -84,7 +110,9 @@ const UNIQUE_FRIEND_ERR = new Error(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([
+    { id: ACCOUNT_ID, tenant_id: TENANT_ID },
+  ]);
   dbMocks.getLinkBaseUrl.mockResolvedValue(null); // fall back to WORKER_URL/r
 });
 
@@ -112,6 +140,8 @@ describe('POST /api/affiliates — random-code create', () => {
     // No friendId + no explicit issueInitialLink → no link issued by default.
     expect(body.link).toBeNull();
     expect(dbMocks.createAffiliateWithRandomCode).toHaveBeenCalledWith(env.DB, {
+      tenantId: TENANT_ID,
+      lineAccountId: ACCOUNT_ID,
       name: 'Alice',
       commissionRate: 10,
       friendId: null,
@@ -123,7 +153,9 @@ describe('POST /api/affiliates — random-code create', () => {
 
 describe('POST /api/affiliates — friend binding', () => {
   it('issues an initial link and uses friend.display_name when name omitted', async () => {
-    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', display_name: 'Bob' });
+    dbMocks.getFriendById.mockResolvedValue({
+      id: 'friend-1', display_name: 'Bob', line_account_id: ACCOUNT_ID,
+    });
     dbMocks.createAffiliateWithRandomCode.mockResolvedValue({
       id: 'aff-2',
       name: 'Bob',
@@ -158,6 +190,8 @@ describe('POST /api/affiliates — friend binding', () => {
     expect(body.link.refCode).toBe('Ef5tSr');
     expect(body.link.url).toBe('https://worker.example.com/r/Ef5tSr');
     expect(dbMocks.createAffiliateWithRandomCode).toHaveBeenCalledWith(env.DB, {
+      tenantId: TENANT_ID,
+      lineAccountId: ACCOUNT_ID,
       name: 'Bob',
       commissionRate: undefined,
       friendId: 'friend-1',
@@ -172,7 +206,9 @@ describe('POST /api/affiliates — friend binding', () => {
   });
 
   it('409s when the friend is already an affiliate', async () => {
-    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', display_name: 'Bob' });
+    dbMocks.getFriendById.mockResolvedValue({
+      id: 'friend-1', display_name: 'Bob', line_account_id: ACCOUNT_ID,
+    });
     dbMocks.createAffiliateWithRandomCode.mockRejectedValue(UNIQUE_FRIEND_ERR);
     dbMocks.getAffiliateByFriendId.mockResolvedValue({
       id: 'aff-existing',
@@ -213,6 +249,8 @@ describe('POST /api/affiliates — legacy explicit code (back-compat)', () => {
     const body = (await res.json()) as { success: boolean; data: { code: string } };
     expect(body.data.code).toBe('promo2026');
     expect(dbMocks.createAffiliate).toHaveBeenCalledWith(env.DB, {
+      tenantId: TENANT_ID,
+      lineAccountId: ACCOUNT_ID,
       name: 'Legacy',
       code: 'promo2026',
       commissionRate: 5,
@@ -300,8 +338,59 @@ describe('GET /api/affiliates/:id/links — offer_name enrichment', () => {
   });
 });
 
+describe('紹介者APIの所属境界', () => {
+  it('一覧取得へテナントとLINEアカウントの範囲を渡す', async () => {
+    dbMocks.getAffiliates.mockResolvedValue([]);
+    expect((await get('/api/affiliates')).status).toBe(200);
+    expect(dbMocks.getAffiliates).toHaveBeenCalledWith(env.DB, {
+      tenantId: TENANT_ID,
+      allowedLineAccountIds: [ACCOUNT_ID],
+      includeUnassigned: true,
+    });
+  });
+
+  it('所属外IDは詳細・更新・停止・関連情報の全てで404にする', async () => {
+    dbMocks.getAffiliateById.mockResolvedValue(null);
+    const responses = await Promise.all([
+      get('/api/affiliates/other'),
+      put('/api/affiliates/other', { isActive: false }),
+      remove('/api/affiliates/other'),
+      get('/api/affiliates/other/report'),
+      get('/api/affiliates/other/journeys'),
+      get('/api/affiliates/other/links'),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual([404, 404, 404, 404, 404, 404]);
+    expect(dbMocks.updateAffiliate).toHaveBeenCalledWith(
+      env.DB,
+      'other',
+      expect.anything(),
+      expect.objectContaining({
+        tenantId: TENANT_ID,
+        allowedLineAccountIds: [ACCOUNT_ID],
+      }),
+    );
+    expect(dbMocks.getAffiliateReportV2).not.toHaveBeenCalled();
+    expect(dbMocks.getAffiliateJourneys).not.toHaveBeenCalled();
+    expect(dbMocks.listAffiliateLinks).not.toHaveBeenCalled();
+  });
+
+  it('所属外アカウントを指定した作成は断る（R348: query と body が食い違う入力は 403）', async () => {
+    const response = await post('/api/affiliates', {
+      name: '越境',
+      lineAccountId: 'account-other',
+    });
+    // query=account-1・body=account-other の食い違いは middleware が 403 で断り、
+    // 存在の有無を route まで届けない。作成は起きない。
+    expect(response.status).toBe(403);
+    expect(dbMocks.createAffiliateWithRandomCode).not.toHaveBeenCalled();
+  });
+});
+
 describe('紹介者の停止と履歴保持', () => {
   it('DELETEでは物理削除せず、停止操作を案内する', async () => {
+    dbMocks.getAffiliateById.mockResolvedValue({
+      id: 'aff-1', tenant_id: TENANT_ID, line_account_id: ACCOUNT_ID,
+    });
     const res = await remove('/api/affiliates/aff-1');
     expect(res.status).toBe(405);
     const body = (await res.json()) as { code: string; error: string };
@@ -323,5 +412,40 @@ describe('紹介者の停止と履歴保持', () => {
     const res = await post('/api/affiliates/click', { code: 'stopped1' });
     expect(res.status).toBe(404);
     expect(dbMocks.recordAffiliateClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('報酬率の範囲検査（#554 点検#505中2）', () => {
+  it.each([101, 1000, -1, Number.NaN, 'high'])('commissionRate=%s の作成を400で弾く', async (rate) => {
+    const res = await post('/api/affiliates', { name: 'Alice', commissionRate: rate });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('0から100');
+    expect(dbMocks.createAffiliateWithRandomCode).not.toHaveBeenCalled();
+    expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 100])('commissionRate=%s の作成は通す', async (rate) => {
+    dbMocks.createAffiliateWithRandomCode.mockResolvedValue({
+      id: 'aff-1', name: 'Alice', code: 'Ab3xYz', commission_rate: rate,
+      is_active: 1, created_at: '2026-07-07T00:00:00.000+09:00', friend_id: null,
+    });
+    const res = await post('/api/affiliates', { name: 'Alice', commissionRate: rate });
+    expect(res.status).toBe(201);
+  });
+
+  it('更新で100超を400で弾き、保存しない', async () => {
+    const res = await put('/api/affiliates/aff-1', { commissionRate: 10000 });
+    expect(res.status).toBe(400);
+    expect(dbMocks.updateAffiliate).not.toHaveBeenCalled();
+  });
+
+  it('更新で100は通す', async () => {
+    dbMocks.updateAffiliate.mockResolvedValue({
+      id: 'aff-1', name: 'Alice', code: 'Ab3xYz', commission_rate: 100,
+      is_active: 1, created_at: '2026-07-07T00:00:00.000+09:00', friend_id: null,
+    });
+    const res = await put('/api/affiliates/aff-1', { commissionRate: 100 });
+    expect(res.status).toBe(200);
   });
 });

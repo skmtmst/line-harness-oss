@@ -110,6 +110,13 @@ function memDB(state: { rows: ReminderRow[] }): D1Database {
         async run() {
           if (sql.startsWith('INSERT INTO event_booking_reminders')) {
             const [id, booking_id, kind, scheduled_at] = bound as [string, string, string, string];
+            if (state.rows.some((row) => (
+              row.booking_id === booking_id
+              && row.kind === kind
+              && row.scheduled_at === scheduled_at
+            ))) {
+              return { success: true, meta: { changes: 0 } };
+            }
             state.rows.push({ id, booking_id, kind, scheduled_at, status: 'pending', retry_count: 0 });
             return { success: true, meta: { changes: 1 } };
           }
@@ -150,6 +157,20 @@ describe('insertRemindersForBooking', () => {
     const db = memDB(state);
     await insertRemindersForBooking(db, 'b1', []);
     expect(state.rows).toHaveLength(0);
+  });
+
+  test('同じ予約の同じ通知を再登録しても重複しない', async () => {
+    const state = { rows: [] as ReminderRow[] };
+    const db = memDB(state);
+    const reminders = [
+      { kind: 'day_before' as const, scheduled_at: '2099-05-31T09:00:00.000Z' },
+      { kind: 'hours_before' as const, scheduled_at: '2099-06-01T08:00:00.000Z' },
+    ];
+
+    await insertRemindersForBooking(db, 'b1', reminders);
+    await insertRemindersForBooking(db, 'b1', reminders);
+
+    expect(state.rows).toHaveLength(2);
   });
 });
 
@@ -227,10 +248,13 @@ function dueDB(state: { rows: DueRow[] }): D1Database {
             if (r) { r.status = 'sent'; r.sent_at = sent_at; }
             return { success: true, meta: { changes: 1 } };
           }
-          if (sql.startsWith('UPDATE event_booking_reminders SET status = ?, last_error = ?')) {
-            const [status, last_error, id] = bound as [string, string, string];
+          // 失敗記録は retry_count も書き戻す。fence の前で投げた場合
+          // (資格情報が復号できない等) は claim が走っておらず、ここで
+          // 数えないと上限に届かず failed のまま滞留するため。
+          if (sql.startsWith('UPDATE event_booking_reminders SET status = ?, retry_count = ?, last_error = ?')) {
+            const [status, retry_count, last_error, id] = bound as [string, number, string, string];
             const r = state.rows.find((x) => x.id === id);
-            if (r) { r.status = status; r.last_error = last_error; }
+            if (r) { r.status = status; r.retry_count = retry_count; r.last_error = last_error; }
             return { success: true, meta: { changes: 1 } };
           }
           return { success: true, meta: {} };

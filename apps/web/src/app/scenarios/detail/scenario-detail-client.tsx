@@ -5,16 +5,22 @@ import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError, type ScenarioRuns } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import TargetMissing from '@/components/shared/target-missing'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview'
+import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
 import MessageKindFields, {
   emptyMessageKindState,
+  messageKindProblem,
   parseMessageKind,
   serializeMessageKind,
   type MessageKind,
@@ -26,18 +32,24 @@ function isStructuredKind(type: MessageType): boolean {
   return type === 'location' || type === 'video' || type === 'audio' || type === 'sticker'
 }
 import QuestionEditor, {
+  deadAnswerSettings,
   emptyQuestion,
+  isUriOnlyBehavior,
+  planChoiceActionRemap,
+  validateChoiceUris,
+  withChoiceKeys,
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import {
   ConditionDialog,
+  MoveReferrersNotice,
   OnCompleteDialog,
   TestSendDialog,
   ON_COMPLETE_LABEL,
   describeCondition,
   type OnCompleteMode,
 } from '@/components/scenarios/scenario-dialogs'
-import type { SegmentCondition } from '@/components/shared/condition-builder'
+import { findInvalidRangeIssue, type SegmentCondition } from '@/components/shared/condition-builder'
 import ScheduleInput, {
   emptySchedule,
   buildSchedulePayload,
@@ -45,14 +57,28 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StatusChip from '@/components/shared/status-chip'
+import Notice from '@/components/shared/notice'
+import { Th } from '@/components/shared/table'
+import Select from '@/components/shared/select'
 import {
   scenarioReachBarWidth,
   scenarioReachCountLabel,
   scenarioReachPercent,
   scenarioReachPercentLabel,
 } from './scenario-reach-display'
+import { describeAfterSend, describeStepAudience, stepKindLabel, stepListTitle } from './scenario-step-audience'
+import {
+  scenarioSimulationKey,
+  simulationForKey,
+  type ScenarioSimulationResult,
+} from './scenario-simulation-refresh'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -116,7 +142,9 @@ function formatScheduleLabel(mode: DeliveryMode | undefined, step: ScenarioStep)
     return `購読開始から${parts.join('')}後`
   }
   // absolute_time
-  return `購読開始から${step.offsetDays ?? 0}日後の ${step.deliveryTime ?? '00:00'}`
+  // R235: 時刻を消したまま「○日後の 」と出すと、設定が済んだように見える。未設定とはっきり言う。
+  if (!step.deliveryTime) return '時刻を入力してください'
+  return `購読開始から${step.offsetDays ?? 0}日後の ${step.deliveryTime}`
 }
 
 interface StepFormState {
@@ -135,6 +163,51 @@ interface StepFormState {
   question: ScenarioQuestion | null
   /** 下書き。1 なら配信しない。 */
   isDraft: boolean
+}
+
+/*
+ * 次の通番号。通を足す3箇所（直書き・質問・テンプレ）で同じ式にすると、
+ * 片方だけ直って番号がずれる（#495 軽18）。
+ */
+function nextStepOrder(steps: ReadonlyArray<{ stepOrder: number }>): number {
+  return steps.length > 0 ? Math.max(...steps.map((s) => s.stepOrder)) + 1 : 1
+}
+
+/*
+ * SCENARIO-09: 複製の途中で止まったことを、作りかけのコピーと
+ * 一緒に運ぶ印。stage は「どの段階で止まったか」を運用者の言葉で持つ。
+ */
+class DuplicateAborted extends Error {
+  constructor(
+    readonly copyId: string,
+    readonly stage: string,
+    cause?: unknown,
+  ) {
+    super(cause instanceof Error && cause.message ? cause.message : '複製できませんでした')
+  }
+}
+
+/*
+ * R216: 複製で送る時刻の欄は、配信方式ごとに必要なものだけにする。
+ * 全部送ると、口（validateStepSchedule）が余分な欄を見て 400 で止める。
+ * 経過時間なのに delayMinutes を送ると、1通目で止まって作りかけの
+ * コピーが残る。保存の buildSchedulePayload と同じ分け方にする。
+ */
+function stepScheduleForClone(
+  mode: DeliveryMode,
+  step: Pick<ScenarioStep, 'delayMinutes' | 'offsetDays' | 'offsetMinutes' | 'deliveryTime'>,
+): { delayMinutes?: number; offsetDays?: number; offsetMinutes?: number; deliveryTime?: string } {
+  if (mode === 'relative') return { delayMinutes: step.delayMinutes }
+  if (mode === 'elapsed') {
+    return {
+      offsetDays: step.offsetDays ?? 0,
+      offsetMinutes: step.offsetMinutes ?? 0,
+    }
+  }
+  return {
+    offsetDays: step.offsetDays ?? 0,
+    deliveryTime: step.deliveryTime ?? '09:00',
+  }
 }
 
 function emptyStepForm(stepOrder: number): StepFormState {
@@ -212,11 +285,14 @@ function SettingCard({
   label,
   action,
   onAction,
+  qaOpen,
   children,
 }: {
   label: string
   action?: string
   onAction?: () => void
+  /** 画面確認で、同じ文言の別ボタンを誤って押さないための安定した入口。 */
+  qaOpen?: string
   children: React.ReactNode
 }) {
   return (
@@ -226,8 +302,9 @@ function SettingCard({
         {action && onAction && (
           <button
             type="button"
+            data-qa-open={qaOpen}
             onClick={onAction}
-            className="text-accent shrink-0 text-xs hover:underline"
+            className="text-action shrink-0 text-xs hover:underline"
           >
             {action}
           </button>
@@ -238,6 +315,49 @@ function SettingCard({
   )
 }
 
+/**
+ * 通の編集の1段。
+ *
+ * 設計では「配信タイミング」「メッセージ」「この通の配信対象」「送信後の
+ * アクション」がそれぞれ別の面になっている。実装は1枚に全部入っていて、
+ * 到達タグ・配信後・絞り込み・下書きが「到達時のアクション」という1つの
+ * 見出しの下にまとめて並んでいた。**どれがどの面の話なのかが読めない。**
+ *
+ * 段に分けて、段ごとに設計のNodeを持たせる。1枚ずつ直すと同じ画面を
+ * 4回触ることになるので、区切りは一度に入れる。
+ */
+function FormSection({
+  node,
+  title,
+  description,
+  action,
+  children,
+}: {
+  node?: string
+  title: string
+  description?: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      data-design-node={node}
+      className="bg-canvas border-hairline rounded-card border p-4"
+    >
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <div className="min-w-0">
+          <h4 className="text-ink text-sm font-bold">{title}</h4>
+          {description && (
+            <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">{description}</p>
+          )}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
 export default function ScenarioDetailClient({
   scenarioId,
   showStarted = false,
@@ -245,30 +365,85 @@ export default function ScenarioDetailClient({
   scenarioId: string
   showStarted?: boolean
 }) {
-  usePageTitle('シナリオ詳細')
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
+  /* ★V7: コンテンツ表の操作は「編集＋…」の1行に収める。…の中身は行ごとに開く。 */
+  const [stepMenuId, setStepMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [scenarioMissing, setScenarioMissing] = useState(false)
 
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true, folderId: '' })
   const [folders, setFolders] = useState<Folder[]>([])
+  const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const { selectedAccountId } = useAccount()
 
+  /*
+   * SCENARIO-20: フォルダはアカウント単位。無指定で全権限範囲を取ると、
+   * 別アカウントの同名フォルダを選んで保存してしまう。シナリオの所属
+   * アカウント（共通なら選択中のアカウント）の候補だけを出し、
+   * アカウントが切り替わったら取り直す。候補を取り直せなかったときは
+   * 「未分類」と決めつけず、いまは変更できない旨を示す。
+   */
+  const folderAccountId = scenario?.lineAccountId ?? selectedAccountId
   useEffect(() => {
     let cancelled = false
-    void api.folders.list('scenario').then((res) => {
-      if (!cancelled && res.success) setFolders(res.data)
-    })
+    setFolderState('loading')
+    void api.folders.list('scenario', folderAccountId ?? undefined)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setFolders(res.data)
+          setFolderState('ready')
+        } else {
+          setFolderState('error')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFolderState('error')
+      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [folderAccountId])
+
+  /*
+   * 保存済みのフォルダが、このアカウントの候補に無いか（SCENARIO-20）。
+   * 無いまま「未分類」と見せると、別範囲の値を黙って上書きしてしまう。
+   * 候補に無い保存値は、理由を示したうえで値そのものは保持する。
+   */
+  const editFolderMissing = Boolean(
+    editForm.folderId && !folders.some((f) => f.id === editForm.folderId),
+  )
+  const scenarioFolderName = !scenario?.folderId
+    ? '未分類'
+    : folderState === 'loading'
+      ? '読み込み中…'
+      : folderState === 'error'
+        ? '確認できません'
+        : (folders.find((f) => f.id === scenario.folderId)?.name ?? '名前を確認できません')
   const [saving, setSaving] = useState(false)
 
   const router = useRouter()
   const [duplicating, setDuplicating] = useState(false)
+  /*
+   * SCENARIO-09: 複製が途中で止まったとき、作りかけのコピーが残る。
+   * 残っているコピーの所在・どこで止まったかを保持し、窓から
+   * 「続きからやり直す」「コピーを削除する」「コピーを開いて見る」を
+   * 選べるようにする。
+   */
+  const [duplicateRemainder, setDuplicateRemainder] = useState<{
+    copyId: string
+    copyName: string
+    stage: string
+    detail: string
+  } | null>(null)
+  const [discardDuplicateOpen, setDiscardDuplicateOpen] = useState(false)
+  const [discardingDuplicate, setDiscardingDuplicate] = useState(false)
+  const [discardDuplicateError, setDiscardDuplicateError] = useState('')
   /** 表の行で開いている1通ぶんのプレビュー。設計の「プレビュー」。 */
   const [previewStepId, setPreviewStepId] = useState<string | null>(null)
   const [duplicatingStepId, setDuplicatingStepId] = useState<string | null>(null)
@@ -283,6 +458,7 @@ export default function ScenarioDetailClient({
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
+  usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ詳細')
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
 
@@ -315,16 +491,35 @@ export default function ScenarioDetailClient({
   const [previewOpen, setPreviewOpen] = useState(false)
 
   const [stats, setStats] = useState<ScenarioStats | null>(null)
+  /*
+   * SCENARIO-15: 試算は「いま保存されている設定」に対する結果。
+   * 結果は計算した設定の鍵と一緒に持ち、設定が変わって鍵が合わなく
+   * なった旧値は確定値として出さない（取り直し中は計算中と出す）。
+   */
+  const [simulationResult, setSimulationResult] = useState<ScenarioSimulationResult | null>(null)
+  const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   const [templates, setTemplates] = useState<TemplateOpt[]>([])
   const [tags, setTags] = useState<TagOpt[]>([])
 
   const deliveryMode: DeliveryMode = (scenario?.deliveryMode ?? 'relative') as DeliveryMode
+  const latestStartedAt = runs?.subscriptions[0]?.startedAt ?? null
+  const latestStartedLabel = latestStartedAt
+    ? new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(latestStartedAt))
+    : null
 
-  const loadScenario = useCallback(async () => {
+  const loadScenario = useCallback(async (fresh = false) => {
     setLoading(true)
     setError('')
+    setScenarioMissing(false)
     try {
-      const res = await api.scenarios.get(id)
+      const res = await scenarioReferenceData.scenario(id, fresh)
       if (res.success) {
         setScenario(res.data)
         setEditForm({
@@ -338,8 +533,12 @@ export default function ScenarioDetailClient({
       } else {
         setError(res.error)
       }
-    } catch {
-      setError('シナリオの読み込みに失敗しました')
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setScenarioMissing(true)
+      } else {
+        setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -351,12 +550,12 @@ export default function ScenarioDetailClient({
 
   // 並列で stats / templates / tags を取得（リグレッションを起こさないよう失敗は無視）
   useEffect(() => {
-    if (!id) return
+    if (!id || !scenario) return
     let cancelled = false
     Promise.all([
-      api.scenarios.stats(id).catch(() => null),
-      api.templates.list().catch(() => null),
-      api.tags.list().catch(() => null),
+      scenarioReferenceData.stats(id).catch(() => null),
+      scenarioReferenceData.templates(scenario?.lineAccountId).catch(() => null),
+      scenarioReferenceData.tags(scenario?.lineAccountId).catch(() => null),
     ]).then(([statsRes, tplRes, tagRes]) => {
       if (cancelled) return
       if (statsRes && statsRes.success) setStats(statsRes.data)
@@ -377,7 +576,7 @@ export default function ScenarioDetailClient({
       }
     })
     return () => { cancelled = true }
-  }, [id])
+  }, [id, scenario?.lineAccountId])
 
   /**
    * 通ごとのアクション件数。行に「アクション 2」と出すために引く。
@@ -403,6 +602,55 @@ export default function ScenarioDetailClient({
     if (id) reloadActionCounts()
   }, [id, reloadActionCounts])
 
+  /*
+   * SCENARIO-15: 試算の元になる設定を1つの鍵にまとめる。
+   * 対象条件・同時購読・開始のきっかけ・各通の順番/時刻/絞り込みが
+   * 変わると鍵が変わり、下の effect が取り直す。保存後の再読込では
+   * id と lineAccountId が変わらないので、鍵を見ないと古い人数が
+   * 残り続ける（以前の挙動）。
+   */
+  const simulationKey = scenarioSimulationKey(scenario, triggerCount)
+  /** 今の設定に対する試算。旧鍵の結果は確定値として出さない。 */
+  const simulation = simulationForKey(simulationResult, simulationKey)
+  /** 設定が変わって取り直し中か（初回の取得中も true）。 */
+  const simulationRefreshing =
+    Boolean(simulationKey && scenario?.lineAccountId) &&
+    simulationResult?.key !== simulationKey
+
+  /**
+   * 機能5 V6の開始前試算と運用記録。互いに独立した読取なので並列で取得する。
+   * 失敗時は旧集計を残し、0件とは表示しない。
+   *
+   * SCENARIO-15: 依存に simulationKey を含める。設定を保存し直すと
+   * scenario が読み直されて鍵が変わり、試算を取り直す。世代の掃除
+   * （cancelled）で遅れて届いた旧応答は捨てるので、遅い旧試算が
+   * 新しい版を上書きしない。
+   */
+  useEffect(() => {
+    const lineAccountId = scenario?.lineAccountId
+    if (!id || !lineAccountId || !simulationKey) {
+      setSimulationResult(null)
+      setRuns(null)
+      return
+    }
+    let cancelled = false
+    const key = simulationKey
+    void Promise.all([
+      api.scenarios.simulate(id, lineAccountId).catch(() => null),
+      api.scenarios.runs(id, lineAccountId, { limit: 50 }).catch(() => null),
+    ]).then(([simulationResponse, runsResponse]) => {
+      if (cancelled) return
+      setSimulationResult({
+        key,
+        value: simulationResponse?.success ? simulationResponse.data : null,
+      })
+      setRuns(runsResponse?.success ? runsResponse.data : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [id, scenario?.lineAccountId, simulationKey])
+
   useEffect(() => {
     if (!id) return
     api.scenarios.triggers
@@ -414,7 +662,7 @@ export default function ScenarioDetailClient({
   }, [id])
 
   const reloadStats = useCallback(() => {
-    api.scenarios.stats(id).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
+    scenarioReferenceData.stats(id, true).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
   }, [id])
 
   /**
@@ -428,7 +676,7 @@ export default function ScenarioDetailClient({
     setError('')
     try {
       const res = await api.scenarios.update(id, { allowConcurrent: allow })
-      if (res.success) loadScenario()
+      if (res.success) loadScenario(true)
       else setError(res.error)
     } catch {
       setError('重複購読の設定を変更できませんでした')
@@ -446,36 +694,194 @@ export default function ScenarioDetailClient({
     if (!scenario || duplicating) return
     setDuplicating(true)
     setError('')
+    const copyName = `${scenario.name} のコピー`
+    /*
+     * SCENARIO-09: 途中で失敗したあと新しく作り直すと、不完全なコピーが
+     * 1つ増えるだけ。前回作りかけのコピーが残っていれば新しく作らず、
+     * その続きから写す。
+     */
+    let copyId = duplicateRemainder?.copyId ?? null
     try {
-      const created = await api.scenarios.create({
-        name: `${scenario.name} のコピー`,
-        description: scenario.description,
-        triggerType: scenario.triggerType,
-        triggerTagId: scenario.triggerTagId,
-        lineAccountId: scenario.lineAccountId,
-        isActive: false,
-        deliveryMode: scenario.deliveryMode,
-        allowConcurrent: scenario.allowConcurrent,
-      })
-      if (!created.success) throw new Error(created.error)
+      if (!copyId) {
+        const created = await api.scenarios.create({
+          name: copyName,
+          description: scenario.description,
+          triggerType: scenario.triggerType,
+          triggerTagId: scenario.triggerTagId,
+          lineAccountId: scenario.lineAccountId,
+          isActive: false,
+          deliveryMode: scenario.deliveryMode,
+          allowConcurrent: scenario.allowConcurrent,
+          folderId: scenario.folderId ?? null,
+        })
+        if (!created.success) throw new Error(created.error)
+        copyId = created.data.id
+      }
+      const copy = copyId
+
+      /*
+       * SCENARIO-08: シナリオ全体の配信対象と、最後まで届いた人の行き先
+       * （終了後の処理）も写す。通だけ写すと、同じ名前でまったく別の
+       * 動きをするコピーができてしまう。create はこれらを受けないので
+       * 直後の update で入れる。
+       */
+      try {
+        const updated = await api.scenarios.update(copy, {
+          audienceCondition: scenario.audienceCondition ?? null,
+          onCompleteMode: scenario.onCompleteMode ?? 'pause',
+          onCompleteScenarioId: scenario.onCompleteScenarioId ?? null,
+        })
+        if (!updated.success) throw new Error(updated.error)
+      } catch (cause) {
+        throw new DuplicateAborted(copy, 'シナリオ全体の設定（配信対象・終了後の処理）', cause)
+      }
+
+      /*
+       * 再開でも同じ通を二重に足さないよう、コピーに既にある通の番号を
+       * 読む。読めないと「どこまで写ったか」が分からないので止める。
+       */
+      const existing = await api.scenarios.get(copy).catch(() => null)
+      if (!existing?.success) {
+        throw new DuplicateAborted(
+          copy,
+          'コピー済みの内容の確認',
+          new Error(existing && !existing.success ? existing.error : 'コピーの内容を読めませんでした'),
+        )
+      }
+      const existingByOrder = new Map(existing.data.steps.map((s) => [s.stepOrder, s.id]))
+      const stepIdMap = new Map<string, string>()
       // 通は順に足す。まとめて入れる口が無い。
+      // 時刻・絞り込み・質問・下書きの別まで写す。落とすと別物の流れに
+      // なる。時刻は方式に合う欄だけ送る（余分な欄があると 400 で止まる）。
       for (const step of sortedSteps) {
-        await api.scenarios.addStep(created.data.id, {
+        const already = existingByOrder.get(step.stepOrder)
+        if (already) {
+          stepIdMap.set(step.id, already)
+          continue
+        }
+        const copied = await api.scenarios.addStep(copy, {
           stepOrder: step.stepOrder,
-          offsetMinutes: step.offsetMinutes ?? 0,
+          ...stepScheduleForClone(deliveryMode, step),
           messageType: step.messageType,
           messageContent: step.messageContent,
           templateId: step.templateId ?? null,
           onReachTagId: step.onReachTagId ?? null,
           // 複製先でも同じところで止まる。止まる位置が変わると流れが別物になる。
           afterSend: step.afterSend ?? 'continue',
-        })
+          targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
+          question: (step.question as ScenarioQuestion | null) ?? null,
+          isDraft: step.isDraft === true,
+        }).catch((cause) => ({ success: false as const, error: cause instanceof Error && cause.message ? cause.message : '通をコピーできませんでした' }))
+        // 途中で止める。続けると通が欠けた別物の流れが残る。
+        if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder}通目のコピー`, new Error(copied.error))
+        stepIdMap.set(step.id, copied.data.id)
       }
-      router.push(`/scenarios/detail?id=${created.data.id}`)
-    } catch {
-      setError('複製に失敗しました')
+
+      /*
+       * SCENARIO-08: 開始のきっかけ。写さないと「複製したのに
+       * 始まらない」コピーになる。再開時は既にあるものを足さない。
+       */
+      try {
+        const [sourceTriggers, copyTriggers] = await Promise.all([
+          api.scenarios.triggers.list(id),
+          api.scenarios.triggers.list(copy),
+        ])
+        if (!sourceTriggers.success) throw new Error(sourceTriggers.error)
+        if (!copyTriggers.success) throw new Error(copyTriggers.error)
+        const have = new Set(copyTriggers.data.map((t) => `${t.kind}:${t.tagId ?? ''}`))
+        for (const trigger of sourceTriggers.data) {
+          if (have.has(`${trigger.kind}:${trigger.tagId ?? ''}`)) continue
+          const added = await api.scenarios.triggers.add(copy, trigger.kind, trigger.tagId)
+          if (!added.success) throw new Error(added.error)
+        }
+      } catch (cause) {
+        throw new DuplicateAborted(copy, '開始のきっかけ', cause)
+      }
+
+      /*
+       * SCENARIO-08: アクション（通を送ったとき・選択肢を押したとき・
+       * 配り終えたとき）。通にぶら下がるものは写した先の通へ張り替える。
+       */
+      try {
+        const [sourceActions, copyActions] = await Promise.all([
+          api.scenarios.actions.list(id),
+          api.scenarios.actions.list(copy),
+        ])
+        if (!sourceActions.success) throw new Error(sourceActions.error)
+        if (!copyActions.success) throw new Error(copyActions.error)
+        const keyOf = (
+          hook: string,
+          stepId: string | null,
+          choiceIndex: number | null,
+          actionType: string,
+          sortOrder: number,
+        ) => `${hook}:${stepId ?? ''}:${choiceIndex ?? ''}:${actionType}:${sortOrder}`
+        const have = new Set(
+          copyActions.data.map((a) => keyOf(a.hook, a.stepId, a.choiceIndex, a.actionType, a.sortOrder)),
+        )
+        for (const action of sourceActions.data) {
+          const mappedStepId = action.stepId === null ? null : stepIdMap.get(action.stepId) ?? null
+          if (action.stepId !== null && mappedStepId === null) {
+            // 写せなかった通にぶら下がるアクションは足さない。
+            continue
+          }
+          const key = keyOf(action.hook, mappedStepId, action.choiceIndex, action.actionType, action.sortOrder)
+          if (have.has(key)) continue
+          const createdAction = await api.scenarios.actions.create(copy, {
+            hook: action.hook,
+            stepId: mappedStepId,
+            choiceIndex: action.choiceIndex,
+            actionType: action.actionType,
+            config: action.config,
+            condition: action.condition,
+            repeatOnRefire: action.repeatOnRefire,
+            sortOrder: action.sortOrder,
+          })
+          if (!createdAction.success) throw new Error(createdAction.error)
+          have.add(key)
+        }
+      } catch (cause) {
+        throw new DuplicateAborted(copy, 'アクション', cause)
+      }
+
+      setDuplicateRemainder(null)
+      router.push(`/scenarios/detail?id=${copy}`)
+    } catch (e) {
+      if (e instanceof DuplicateAborted) {
+        // SCENARIO-09: 不完全なコピーが残っていることを隠さない。
+        // 所在・止まった段階・やり直し/削除の窓を出す。
+        setDuplicateRemainder({
+          copyId: e.copyId,
+          copyName,
+          stage: e.stage,
+          detail: e.message,
+        })
+        setError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが残っています。`)
+      } else {
+        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。')
+      }
     } finally {
       setDuplicating(false)
+    }
+  }
+
+  /*
+   * SCENARIO-09: 途中まで作られたコピーを捨てる。元のシナリオは
+   * 触らない。失敗したら窓の中に理由を出して開いたままにする。
+   */
+  const handleDiscardDuplicate = async () => {
+    if (!duplicateRemainder || discardingDuplicate) return
+    setDiscardingDuplicate(true)
+    setDiscardDuplicateError('')
+    try {
+      const res = await api.scenarios.delete(duplicateRemainder.copyId)
+      if (!res.success) throw new Error(res.error)
+      setDiscardDuplicateOpen(false)
+      setDuplicateRemainder(null)
+    } catch {
+      setDiscardDuplicateError('作りかけのコピーを削除できませんでした。コピーを開いて状態を確認し、もう一度お試しください。')
+    } finally {
+      setDiscardingDuplicate(false)
     }
   }
 
@@ -509,19 +915,19 @@ export default function ScenarioDetailClient({
       })
       if (res.success) {
         setEditing(false)
-        loadScenario()
+        loadScenario(true)
       } else {
         setError(res.error)
       }
     } catch {
-      setError('保存に失敗しました')
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
   }
 
   const openAddStep = () => {
-    const nextOrder = scenario ? (scenario.steps.length > 0 ? Math.max(...scenario.steps.map(s => s.stepOrder)) + 1 : 1) : 1
+    const nextOrder = nextStepOrder(scenario?.steps ?? [])
     setStepForm(emptyStepForm(nextOrder))
     setEditingStepId(null)
     setShowStepForm(true)
@@ -543,11 +949,7 @@ export default function ScenarioDetailClient({
    * question_json があればそちらを組み立てる。
    */
   const openAddQuestionStep = () => {
-    const nextOrder = scenario
-      ? scenario.steps.length > 0
-        ? Math.max(...scenario.steps.map((s) => s.stepOrder)) + 1
-        : 1
-      : 1
+    const nextOrder = nextStepOrder(scenario?.steps ?? [])
     setStepForm({ ...emptyStepForm(nextOrder), question: emptyQuestion() })
     setEditingStepId(null)
     setShowStepForm(true)
@@ -556,11 +958,7 @@ export default function ScenarioDetailClient({
   }
 
   const openAddTemplateStep = () => {
-    const nextOrder = scenario
-      ? scenario.steps.length > 0
-        ? Math.max(...scenario.steps.map(s => s.stepOrder)) + 1
-        : 1
-      : 1
+    const nextOrder = nextStepOrder(scenario?.steps ?? [])
     setStepForm({ ...emptyStepForm(nextOrder), inputMode: 'template' })
     setEditingStepId(null)
     setShowStepForm(true)
@@ -601,7 +999,8 @@ export default function ScenarioDetailClient({
       afterSend: step.afterSend ?? 'continue',
       inputMode: step.templateId ? 'template' : 'direct',
       targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
-      question: (step.question as ScenarioQuestion | null) ?? null,
+      /* R246: 開くときに鍵を振る。削除・追加の追跡に使う。 */
+      question: step.question ? withChoiceKeys(step.question as ScenarioQuestion) : null,
       isDraft: step.isDraft === true,
     })
     // 専用の欄で書く種別は、保存されている JSON を欄の形に戻す。
@@ -623,7 +1022,56 @@ export default function ScenarioDetailClient({
     setStepError('')
   }
 
+  /*
+   * R246: 選択肢別アクションの紐づけを、位置ではなく選択肢の鍵で付け替える。
+   * 口に choiceIndex の書き換えが無いため、移動は「消して作り直し」で行う
+   * （中身・条件・繰り返しは引き継ぐ）。失敗時は文を返し、呼び出し側が
+   * 画面を閉じずに知らせる。成功・対象なしは null。
+   */
+  const remapChoiceActions = async (
+    stepId: string,
+    nextQuestion: ScenarioQuestion | null,
+  ): Promise<string | null> => {
+    const prevStep = scenario?.steps.find((step) => step.id === stepId)
+    const prevQuestion = (prevStep?.question as ScenarioQuestion | null) ?? null
+    if (!prevQuestion && !nextQuestion) return null
+    const list = await api.scenarios.actions.list(id)
+    if (!list.success) return '選択肢の動作を読み直せませんでした。画面を開き直して対応を確認してください。'
+    const rows = list.data.filter(
+      (action) => action.hook === 'choice_selected' && (action.stepId ?? null) === stepId,
+    )
+    if (rows.length === 0) return null
+    const plan = planChoiceActionRemap(prevQuestion?.choices ?? [], nextQuestion?.choices ?? [], rows)
+    if (plan.removeIds.length === 0 && plan.moveTo.length === 0) return null
+    const moveById = new Map(plan.moveTo.map((move) => [move.id, move.choiceIndex]))
+    for (const row of rows) {
+      const moveTo = moveById.get(row.id)
+      if (moveTo === undefined && !plan.removeIds.includes(row.id)) continue
+      const removed = await api.scenarios.actions.remove(id, row.id)
+      if (!removed.success) return '選択肢の動作の付け替えに失敗しました。画面を開き直して対応を確認してください。'
+      if (moveTo !== undefined) {
+        const recreated = await api.scenarios.actions.create(id, {
+          hook: row.hook,
+          stepId: row.stepId,
+          choiceIndex: moveTo,
+          actionType: row.actionType,
+          config: row.config ?? {},
+          condition: row.condition ?? null,
+          repeatOnRefire: row.repeatOnRefire,
+          sortOrder: row.sortOrder,
+        })
+        if (!recreated.success) return '選択肢の動作の付け替えに失敗しました。画面を開き直して対応を確認してください。'
+      }
+    }
+    return null
+  }
+
   const handleSaveStep = async () => {
+    /*
+     * SCENARIO-21: 質問・直接入力・テンプレートはそれぞれ独立して検査する。
+     * 以前は質問がある通も else に流れてテンプレート必須判定にかかり、
+     * 直接作った質問が保存できなかった。
+     */
     if (stepForm.question) {
       if (!stepForm.question.text.trim()) {
         setStepError('質問文を入力してください')
@@ -633,10 +1081,46 @@ export default function ScenarioDetailClient({
         setStepError('すべての選択肢に文字を入力してください')
         return
       }
-    }
-    // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
-    if (!stepForm.question && stepForm.inputMode === 'direct') {
+      /*
+       * SCENARIO-22: URLなどを開くだけの挙動に、届かない通知を待つ設定
+       * （返信・タグ・友だち情報）が残っていると保存を止める。消すか
+       * 「何もしない」に変えるかは本人に選ばせ、黙って消さない。
+       */
+      const deadIndex = stepForm.question.choices.findIndex(
+        (choice) => isUriOnlyBehavior(choice.behavior) && deadAnswerSettings(choice).length > 0,
+      )
+      if (deadIndex >= 0) {
+        const dead = deadAnswerSettings(stepForm.question.choices[deadIndex])
+        setStepError(
+          `選択肢${deadIndex + 1}はURLなどを開くだけの挙動のため、設定されている${dead.join('・')}は実行されません。設定を消すか、挙動を「何もしない」に変えてください。`,
+        )
+        return
+      }
+      /*
+       * R214: 行き先（URL・電話・メール）の形を見る。not-a-url のような
+       * 値でも保存できると、設定済みに見えて実際は開けない通になる。
+       * 下書きでも通さず、その場で直せるよう選択肢番号で名指しする。
+       */
+      const uriError = validateChoiceUris(stepForm.question)
+      if (uriError) {
+        setStepError(uriError)
+        return
+      }
+    } else if (stepForm.inputMode === 'direct') {
+      // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
       if (!stepForm.messageContent.trim()) {
+        /*
+         * R234: 専用欄（音声・スタンプなど）で「入っているが送れない」値の
+         * ときは、どこが悪いかをはっきり言う。「入力してください」だけだと
+         * 空欄と区別がつかず、足しても足しても通らない。
+         */
+        if (isStructuredKind(stepForm.messageType)) {
+          const problem = messageKindProblem(stepForm.messageType as MessageKind, kindState)
+          if (problem) {
+            setStepError(problem)
+            return
+          }
+        }
         setStepError('メッセージ内容を入力してください')
         return
       }
@@ -657,6 +1141,24 @@ export default function ScenarioDetailClient({
         setStepError('テンプレートを選択してください')
         return
       }
+    }
+    /*
+     * R235: 時刻指定なのに時刻が空のまま送ると、サーバーが 400 で断る。
+     * 投げる前に時刻の欄へ戻す。時刻の欄の場所（「購読開始から ○日後の
+     * ○に配信」）も文に入れ、どこを直すか分かるようにする。
+     */
+    if (deliveryMode === 'absolute_time' && !isDeliveryTimeSet(stepForm.schedule.deliveryTime)) {
+      setStepError('配信する時刻を入力してください（「購読開始から ○日後の ○に配信」の時刻の欄）')
+      return
+    }
+    /*
+     * R247: 1通の配信条件の不正範囲（上下限の逆転など）は落とさず、
+     * 欄の下で知らせて止める。保存済みの条件は維持する。
+     */
+    const rangeIssue = findInvalidRangeIssue(stepForm.targetCondition ?? null)
+    if (rangeIssue) {
+      setStepError(rangeIssue)
+      return
     }
     setStepSaving(true)
     setStepError('')
@@ -679,6 +1181,8 @@ export default function ScenarioDetailClient({
           payloadMessageContent = tpl.messageContent || ' '
         }
       }
+      /* R246: 保存直前にも鍵を振る。削除・追加の追跡に使う。 */
+      const keyedQuestion = stepForm.question ? withChoiceKeys(stepForm.question) : null
       const payload = {
         stepOrder: stepForm.stepOrder,
         ...schedulePayload,
@@ -690,13 +1194,24 @@ export default function ScenarioDetailClient({
         // null を渡すと「絞り込みなし」に戻る。undefined だと据え置きになるので、
         // 外したつもりが残るのを防ぐために必ず値を送る。
         targetCondition: stepForm.targetCondition,
-        question: stepForm.question,
+        question: keyedQuestion,
         isDraft: stepForm.isDraft,
       }
       if (editingStepId) {
         const res = await api.scenarios.updateStep(id, editingStepId, payload)
         if (!res.success) {
           setStepError(res.error)
+          return
+        }
+        /*
+         * R246: 質問と動作の更新を一緒に確定する。選択肢の削除・追加で
+         * 位置がずれても、残る選択肢の動作を保持し、消えた選択肢の動作
+         * だけを消す。新しい選択肢は行が無い（0件から始める）。
+         */
+        const remapError = await remapChoiceActions(editingStepId, keyedQuestion)
+        if (remapError) {
+          setStepError(remapError)
+          await loadScenario(true)
           return
         }
       } else {
@@ -713,7 +1228,7 @@ export default function ScenarioDetailClient({
             const orders = moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 }))
             const moved = await api.scenarios.reorderSteps(id, orders)
             if (!moved.success) {
-              setStepError('あいだに入れるための並べ替えに失敗しました')
+              setStepError('あいだに入れるための並べ替えに失敗しました。通信を確かめて、もう一度お試しください。')
               return
             }
           }
@@ -725,10 +1240,17 @@ export default function ScenarioDetailClient({
         }
       }
       closeStepForm()
-      loadScenario()
+      loadScenario(true)
       reloadStats()
-    } catch {
-      setStepError('ステップの保存に失敗しました')
+    } catch (error) {
+      /*
+       * R235: 入力の不備（400番台）と通信・サーバーの失敗を分ける。
+       * 時刻の空などの入力エラーまで「通信を確かめて」と出すと、
+       * 直せるものを直せず再試行を繰り返すことになる。
+       */
+      setStepError(error instanceof ApiError && error.status >= 400 && error.status < 500
+        ? '入力内容に不備があります。時刻・本文を確かめて、もう一度お試しください。'
+        : 'ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setStepSaving(false)
     }
@@ -743,23 +1265,48 @@ export default function ScenarioDetailClient({
   const handleDuplicateStep = async (step: ScenarioStep) => {
     if (duplicatingStepId) return
     setDuplicatingStepId(step.id)
+    setStepError('')
     try {
-      await api.scenarios.addStep(id, {
+      /*
+       * あいだに差し込むので、後ろの通を先に1つずつ送る。
+       * 送らずに同じ番号で足すと、並び順が重なってどちらが先か決まらない。
+       * 後ろから順に動かすのは、途中で番号がぶつからないようにするため。
+       * （handleSaveStep の insertAfter 経路と同じ）
+       */
+      const moving = sortedSteps
+        .filter((st) => st.stepOrder > step.stepOrder)
+        .sort((a, b) => b.stepOrder - a.stepOrder)
+      if (moving.length > 0) {
+        const moved = await api.scenarios.reorderSteps(
+          id,
+          moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 })),
+        )
+        if (!moved.success) {
+          setStepError('あいだに入れるための並べ替えに失敗しました。通信を確かめて、もう一度お試しください。')
+          return
+        }
+      }
+      const res = await api.scenarios.addStep(id, {
         stepOrder: step.stepOrder + 1,
         messageType: step.messageType,
         messageContent: step.messageContent,
-        delayMinutes: step.delayMinutes,
-        offsetDays: step.offsetDays ?? undefined,
-        offsetMinutes: step.offsetMinutes ?? undefined,
-        deliveryTime: step.deliveryTime ?? undefined,
+        // 方式に合う時刻の欄だけ送る。余分な欄があると口が 400 で止める。
+        ...stepScheduleForClone(deliveryMode, step),
         templateId: step.templateId ?? null,
         onReachTagId: step.onReachTagId ?? null,
         afterSend: step.afterSend,
+        targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
+        question: (step.question as ScenarioQuestion | null) ?? null,
+        isDraft: step.isDraft === true,
       })
-      loadScenario()
+      if (!res.success) {
+        setStepError(res.error)
+        return
+      }
+      loadScenario(true)
       reloadStats()
     } catch {
-      setError('この通を複製できませんでした')
+      setStepError('この通を複製できませんでした')
     } finally {
       setDuplicatingStepId(null)
     }
@@ -775,7 +1322,7 @@ export default function ScenarioDetailClient({
       if (!result.success) throw new Error(result.error)
       if (editingStepId === stepId) closeStepForm()
       setDeleteStepTarget(null)
-      void loadScenario()
+      void loadScenario(true)
       void reloadStats()
     } catch {
       setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -797,22 +1344,39 @@ export default function ScenarioDetailClient({
         { stepId: a.id, stepOrder: b.stepOrder },
         { stepId: b.id, stepOrder: a.stepOrder },
       ])
-      loadScenario()
+      loadScenario(true)
       // 到達率バッジは stepOrder ベースでマッチングするので、並び替え後は stats も再取得
       reloadStats()
     } catch {
-      setError('並び替えに失敗しました')
+      setError('並び替えに失敗しました。通信を確かめて、もう一度お試しください。')
     }
   }
+
+  /*
+   * 通の編集フォームの右の柱（「配信の流れ」「設定サマリー」）へ渡す
+   * 日・時間・分。方式ごとの持ち方（relative の合計分 / elapsed の
+   * 日・時間・分）を previewOffsets 1か所でそろえる。分だけ渡し忘れると、
+   * 設定内容は「1分後」なのにプレビューが「すぐに」のまま残る（#616 SC-02b）。
+   */
+  const stepFormPreview = previewOffsets(deliveryMode, stepForm.schedule)
 
   // 新規追加（上部）とステップ編集（行直下インライン）の両方で使うフォーム。
   // 同時に開くのは常に片方だけなので、state は stepForm を共有する。
   const renderStepForm = () => (
-    <div className={`${editingStepId ? 'mt-3' : 'mb-6'} border-hairline rounded-card bg-canvas-sunken border p-4`}>
-      <h4 className="text-sm font-medium text-ink-secondary mb-3">
-        {editingStepId ? 'ステップを編集' : '新しいステップを追加'}
-      </h4>
-      <div className="space-y-3 max-w-lg">
+    <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}>
+      {!editingStepId && (
+        <h4 className="text-sm font-medium text-ink-secondary mb-3">新しいステップを追加</h4>
+      )}
+      {/* 左が編集、右が「いまどの通を触っているか」。任意値の桁指定ではなく
+          3列の標準段で組む（2:1）。直書きの数を増やさない。 */}
+      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="min-w-0 space-y-4 lg:col-span-2">
+        <FormSection
+          node="xfYLn"
+          title="配信タイミング"
+          description="いつ送るか。送ったあと次の通へ進むかどうかも、設計どおりここでそろえて決めます。"
+        >
+          <div className="space-y-3">
         <div>
           <label className="block text-xs font-medium text-ink-secondary mb-1">ステップ順序</label>
           <input
@@ -828,28 +1392,55 @@ export default function ScenarioDetailClient({
           value={stepForm.schedule}
           onChange={(schedule) => setStepForm({ ...stepForm, schedule })}
         />
+        {/*
+          送ったあと止めるかどうか。体調の記録をお願いして返事を待つ、と
+          いった流れで要る。止めておけば、返事が来てから人が再開できる。
 
+          設計（xfYLn）はこれを配信タイミングの4つ目の口として並べる。
+          以前は画面のいちばん下、到達タグと同じ束に置いていたので、
+          「いつ送るか」を決めているときに目に入らなかった。
+        */}
+        <div>
+          <label className="block text-xs font-medium text-ink-secondary mb-1">送信後</label>
+          <Select
+            aria-label="送信後"
+            value={stepForm.afterSend}
+            onChange={(value) =>
+              setStepForm({ ...stepForm, afterSend: value as 'continue' | 'pause' })
+            }
+            options={[
+              { value: 'continue', label: '送信後：次のステップへ進む' },
+              { value: 'pause', label: '送信後：ここで一時停止する' },
+            ]}
+            size="full"
+          />
+          <p className="text-xs text-ink-faint mt-0.5">
+            一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
+          </p>
+        </div>
+          </div>
+        </FormSection>
+
+        <FormSection title="メッセージ" description="LINEへ届く中身です。">
+          <div className="space-y-3">
         {/* 入力モード切替: 直接入力 / テンプレート参照 */}
         <div className="space-y-2">
-          <label className="block text-xs font-medium text-ink-secondary">メッセージの指定方法</label>
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                checked={stepForm.inputMode === 'direct'}
-                onChange={() => setStepForm({ ...stepForm, inputMode: 'direct', templateId: null })}
-              />
-              <span>直接入力</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                checked={stepForm.inputMode === 'template'}
-                onChange={() => setStepForm({ ...stepForm, inputMode: 'template' })}
-              />
-              <span>テンプレートを使う</span>
-            </label>
-          </div>
+          <RadioCardGroup legend="メッセージの指定方法" className="grid gap-2 sm:grid-cols-2">
+            <RadioCard
+              name="step-input-mode"
+              value="direct"
+              checked={stepForm.inputMode === 'direct'}
+              onChange={() => setStepForm({ ...stepForm, inputMode: 'direct', templateId: null })}
+              title="直接入力"
+            />
+            <RadioCard
+              name="step-input-mode"
+              value="template"
+              checked={stepForm.inputMode === 'template'}
+              onChange={() => setStepForm({ ...stepForm, inputMode: 'template' })}
+              title="テンプレートを使う"
+            />
+          </RadioCardGroup>
         </div>
 
         {/*
@@ -902,27 +1493,32 @@ export default function ScenarioDetailClient({
         {!stepForm.question && stepForm.inputMode === 'template' && (
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></label>
-            <select
-              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            <Select
+              aria-label="テンプレート"
               value={stepForm.templateId ?? ''}
-              onChange={(e) => {
-                const templateId = e.target.value || null
+              onChange={(value) => {
+                const templateId = value || null
                 const template = templates.find((item) => item.id === templateId)
                 setStepForm({
                   ...stepForm,
                   templateId,
-                  question: template?.question ? structuredClone(template.question) : null,
+                  question: template?.question
+                    ? withChoiceKeys(structuredClone(template.question) as ScenarioQuestion)
+                    : null,
                   messageType: (template?.messageType as MessageType | undefined) ?? stepForm.messageType,
                   messageContent: template?.messageContent ?? stepForm.messageContent,
                 })
               }}
-            >
-              <option value="">-- 選択してください --</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}{t.category ? ` (${t.category})` : ''}</option>
-              ))}
-            </select>
-            <p className="text-xs text-amber-700 mt-1">
+              options={[
+                { value: '', label: '-- 選択してください --' },
+                ...templates.map((t) => ({
+                  value: t.id,
+                  label: `${t.name}${t.category ? ` (${t.category})` : ''}`,
+                })),
+              ]}
+              size="full"
+            />
+            <p className="text-xs text-warning mt-1">
               ⓘ テンプレートが修正されると、このステップの内容も自動で同期されます
             </p>
           </div>
@@ -932,15 +1528,13 @@ export default function ScenarioDetailClient({
           <>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージタイプ</label>
-              <select
-                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              <Select
+                aria-label="メッセージタイプ"
                 value={stepForm.messageType}
-                onChange={(e) => setStepForm({ ...stepForm, messageType: e.target.value as MessageType })}
-              >
-                {messageTypeOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                onChange={(value) => setStepForm({ ...stepForm, messageType: value as MessageType })}
+                options={messageTypeOptions}
+                size="full"
+              />
             </div>
             {/*
               位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
@@ -997,86 +1591,103 @@ export default function ScenarioDetailClient({
           </>
         )}
 
-        {/* 到達時のアクション */}
-        <div className="pt-3 border-t border-hairline space-y-2">
-          <h4 className="text-xs font-semibold text-ink-secondary">到達時のアクション</h4>
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
-            <select
-              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              value={stepForm.onReachTagId ?? ''}
-              onChange={(e) => setStepForm({ ...stepForm, onReachTagId: e.target.value || null })}
-            >
-              <option value="">-- なし --</option>
-              {tags.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <p className="text-xs text-ink-faint mt-0.5">
-              このステップが配信完了したら、選んだタグを友だちに付与します
-            </p>
           </div>
+        </FormSection>
 
-          {/*
-            送ったあと止めるかどうか。体調の記録をお願いして返事を待つ、と
-            いった流れで要る。止めておけば、返事が来てから人が再開できる。
-            以前は送ったら必ず次へ進み、返事を待つあいだにも次の通が届いていた。
-          */}
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">配信後</label>
-            <select
-              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              value={stepForm.afterSend}
-              onChange={(e) =>
-                setStepForm({ ...stepForm, afterSend: e.target.value as 'continue' | 'pause' })
-              }
-            >
-              <option value="continue">次の通へ進む</option>
-              <option value="pause">送信後 一時停止する</option>
-            </select>
-            <p className="text-xs text-ink-faint mt-0.5">
-              一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
-            </p>
-          </div>
+        {/*
+          1通ごとの配信対象。シナリオ全体の絞り込みとは別。対象から外れた人は
+          この通だけ飛ばして次へ進む（止めない）。
 
-          {/*
-            1通ごとの配信対象。シナリオ全体の絞り込みとは別。対象から外れた人は
-            この通だけ飛ばして次へ進む（止めない）。
-          */}
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">配信対象の絞り込み</label>
+          設計（r6Gzsu）では独立した面。以前は到達タグ・配信後・下書きと
+          同じ束に埋まっていて、「この通だけ誰に送るか」を決める場所だと
+          読み取れなかった。
+        */}
+        <FormSection
+          node="r6Gzsu"
+          title="この通の配信対象"
+          description="条件に合わない人には、この通だけ送りません。次の通へはそのまま進みます。"
+          action={
             <button
               type="button"
               onClick={() => setStepTargetOpen(true)}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 w-full border px-3 text-left text-sm"
+              className="text-action shrink-0 text-xs hover:underline"
             >
-              {stepForm.targetCondition
-                ? describeCondition(stepForm.targetCondition)
-                : 'シナリオ購読中の全員に配信する'}
+              条件を編集
             </button>
-            <p className="text-xs text-ink-faint mt-0.5">
-              条件に合わない人には、この通だけ送りません。次の通へはそのまま進みます。
-            </p>
+          }
+        >
+          <p className="text-ink text-sm font-bold">
+            {describeStepAudience(stepForm.targetCondition, tags)}
+          </p>
+        </FormSection>
+
+        {/*
+          送信後のアクション。設計（hz9ti）では独立した面。ここでは段の枠だけ
+          作り、中の並びは触っていない（別担当の受け持ち）。
+        */}
+        <FormSection
+          node="hz9ti"
+          title="送信後のアクション"
+          description="この通が届いたあとに動かすものです。"
+          action={
+            editingStepId ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setActionTarget({
+                    hook: 'step_sent',
+                    stepId: editingStepId,
+                    choiceIndex: null,
+                    title: `${stepForm.stepOrder}通目を送ったあと`,
+                  })
+                }
+                className="text-action shrink-0 text-xs hover:underline"
+              >
+                ＋ アクションを追加
+              </button>
+            ) : undefined
+          }
+        >
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
+              <Select
+                aria-label="到達したらタグ付与"
+                value={stepForm.onReachTagId ?? ''}
+                onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
+                options={[
+                  { value: '', label: '-- なし --' },
+                  ...tags.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+                size="full"
+              />
+              <p className="text-xs text-ink-faint mt-0.5">
+                このステップが配信完了したら、選んだタグを友だちに付与します
+              </p>
+            </div>
+            {!editingStepId && (
+              <p className="text-ink-faint text-xs">
+                そのほかのアクションは、この通を保存してから設定できます。
+              </p>
+            )}
           </div>
+        </FormSection>
 
-          {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
-          <label className="text-ink-secondary flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={stepForm.isDraft}
-              onChange={(e) => setStepForm({ ...stepForm, isDraft: e.target.checked })}
-            />
-            下書きにする（配信されません。テスト送信では送れます）
-          </label>
-        </div>
+        {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
+        <Checkbox
+          checked={stepForm.isDraft}
+          onCheckedChange={(checked) => setStepForm({ ...stepForm, isDraft: checked })}
+        >
+          下書きにする（配信されません。テスト送信では送れます）
+        </Checkbox>
 
-        {stepError && <p className="text-xs text-red-600">{stepError}</p>}
+        {stepError && <p className="text-danger text-xs">{stepError}</p>}
 
         <div className="flex gap-2">
           <button
             onClick={handleSaveStep}
             disabled={stepSaving}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
+ className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
           >
             {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加'}
           </button>
@@ -1087,6 +1698,75 @@ export default function ScenarioDetailClient({
             キャンセル
           </button>
         </div>
+      </div>
+
+      {/*
+        設計（xfYLn）の右の柱。いま何通目を触っているのか、その通が誰に
+        どう届くのかを、編集の手を止めずに読めるようにする。
+        以前は編集を閉じて表へ戻らないと、前後の通が見えなかった。
+      */}
+      <aside data-design-node="xfYLn" className="min-w-0 space-y-4">
+        <StepPreview
+          deliveryMode={deliveryMode}
+          stepOrder={stepForm.stepOrder}
+          offsetDays={stepFormPreview.offsetDays}
+          deliveryTime={stepForm.schedule.deliveryTime}
+          offsetHours={stepFormPreview.offsetHours}
+          offsetMinutes={stepFormPreview.offsetMinutes}
+          kind={(stepForm.question
+            ? 'question'
+            : stepForm.messageType === 'flex'
+              ? 'text'
+              : stepForm.messageType) as StepMessageKind}
+          templateName={
+            stepForm.templateId
+              ? templates.find((template) => template.id === stepForm.templateId)?.name
+              : null
+          }
+          body={stepForm.messageContent}
+          imageUrl={null}
+          question={stepForm.question}
+          kindState={kindState}
+          audienceLabel={describeStepAudience(stepForm.targetCondition, tags)}
+        />
+
+        <div className="bg-canvas border-hairline rounded-card border p-4">
+          <h4 className="text-ink text-sm font-bold">設定内容</h4>
+          <dl className="mt-3 space-y-2 text-xs">
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-faint shrink-0">配信対象</dt>
+              <dd className="text-ink min-w-0 text-right font-semibold">
+                {describeStepAudience(stepForm.targetCondition, tags)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-faint shrink-0">配信日時</dt>
+              <dd className="text-ink min-w-0 text-right font-semibold">
+                {formatScheduleLabel(deliveryMode, {
+                  delayMinutes: stepForm.schedule.delayMinutes,
+                  ...buildSchedulePayload(deliveryMode, stepForm.schedule),
+                } as unknown as ScenarioStep)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-faint shrink-0">送信後</dt>
+              <dd className="text-ink min-w-0 text-right font-semibold">
+                {describeAfterSend(stepForm.afterSend).label}
+              </dd>
+            </div>
+            {/* 「送信枠を超えていません」「テスト送信が未完了です」は設計にあるが、
+                残りの送信枠もテスト送信の済み／未済も**数える口が無い**。
+                数を作らずに、繋がっていないことをそのまま書く。 */}
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-faint shrink-0">配信前チェック</dt>
+              <dd className="text-ink-faint min-w-0 text-right">—</dd>
+            </div>
+          </dl>
+          <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+            配信前チェックはまだ繋がっていません。残りの送信枠とテスト送信の記録を返す取得口が接続されると表示されます。
+          </p>
+        </div>
+      </aside>
       </div>
     </div>
   )
@@ -1104,17 +1784,26 @@ export default function ScenarioDetailClient({
     )
   }
 
+  if (!scenario && (scenarioMissing || !error)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このシナリオは見つかりません"
+        description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+        backHref="/scenarios"
+        backLabel="シナリオ一覧へ戻る"
+      />
+    )
+  }
+
   if (!scenario) {
     return (
-      <div>
-
-        <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
-          <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
-          <Link href="/scenarios" className="text-accent hover:text-accent-hover mt-4 inline-block text-sm">
-            ← シナリオ一覧に戻る
-          </Link>
-        </div>
-      </div>
+      <TargetMissing
+        kind="error"
+        title="シナリオを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void loadScenario(true)}
+      />
     )
   }
 
@@ -1149,32 +1838,41 @@ export default function ScenarioDetailClient({
   const modeBadge = modeBadgeStyle[deliveryMode]
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/scenarios" className="hover:underline">
-          シナリオ配信
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>{scenario.name}</span>
-      </nav>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className={editingStepId ? 'flex items-center justify-between gap-4' : ''}>
+        <nav data-design="Crumb" className="text-ink-faint text-xs">
+          <Link href="/scenarios" className="hover:underline">
+            シナリオ配信
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>{scenario.name}</span>
+          {editingStepId ? <><span className="mx-1.5">/</span><span>{stepForm.stepOrder}通目を編集</span></> : null}
+        </nav>
+        {editingStepId ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={closeStepForm}>編集を閉じる</Button>
+            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving}>
+              {stepSaving ? '保存中…' : '変更を保存'}
+            </Button>
+          </div>
+        ) : null}
+      </div>
 
-      <div data-design="Head">
-        <Header
-          title="シナリオ編集"
-          description="配信のタイミングと内容を並べます。作成しただけでは配信されません。開始するには友だち追加時の配信やアクションから呼び出します。"
-          action={
-            /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
-               一覧へ戻る導線は設計では最下部にあり、ここには置かない
-               （下の「シナリオ一覧に戻る」がそれ）。 */
-            <div className="flex flex-wrap items-center gap-2">
+      {!editingStepId ? (
+        <div data-design="Head">
+          {/*
+            SCENARIO-24: 本文に画面名の題と説明は置かない。画面名は
+            上部バーが1つだけ持つ。本文は操作と案内だけ。
+          */}
+          <Header
+            action={
+              /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
+                 一覧へ戻る導線は設計では最下部にあり、ここには置かない
+                 （下の「シナリオ一覧に戻る」がそれ）。 */
+              <div className="flex flex-wrap items-center gap-2">
               <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
+              {/* ★V7 C6: 押せない「マニュアル」は飾りなので出さない。 */}
               <button
                 onClick={() => setPreviewOpen(true)}
                 disabled={sortedSteps.length === 0}
@@ -1197,77 +1895,72 @@ export default function ScenarioDetailClient({
                 onClick={handleSaveScenario}
                 disabled={!editing || saving}
                 title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}
-                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40"
+                className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40"
               >
                 {saving ? '保存中…' : '保存'}
               </button>
-            </div>
-          }
-        />
-      </div>
+              </div>
+            }
+          />
+        </div>
+      ) : null}
 
+      {editingStepId ? (
+        <section data-design-node="xfYLn">
+          {renderStepForm()}
+        </section>
+      ) : (
+      <>
       {showStarted ? (
         <div
           data-design-node="NrBkW"
-          className="border-success bg-success-bg text-success mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3 text-sm"
+          className="border-success bg-success-bg text-success flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3 text-sm"
           role="status"
         >
           <p className="font-semibold">
-            配信を開始しました。条件を満たした友だちから順に配信します。
+            配信を開始しました。
+            {simulationRefreshing
+              ? '予約中の人数を計算しています…'
+              : simulation
+                ? `予約中${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人へ、条件を満たした時点から順に配信します。`
+                : '条件を満たした友だちから順に配信します。'}
           </p>
           <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
-            開始後の結果を見る
+            開始履歴を確認
           </Link>
         </div>
       ) : null}
 
       {/*
-        同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
-
-        右で切り替えられる。これまでは文だけ置いて「許可しない」と書いて
-        いたが、実際は列（allow_concurrent）で持っていて、作るときにしか
-        決められなかった。読むだけの説明の隣に、それを決める場所が無い。
+        設計（bV5Vs）はこれを帯で置く。以前は見出し下の説明文へ混ぜていて、
+        ほかの説明と同じ重さで流れ、**作っただけで配信されると思われていた**。
+        始め方の入口も同じ帯に置く。読んだ直後に次の一手へ進める。
       */}
-      <section className="bg-info-bg rounded-card mb-4 flex flex-wrap items-start gap-4 p-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
-          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-            別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。
-          </p>
-        </div>
-        <div className="border-hairline bg-canvas rounded-control flex shrink-0 overflow-hidden border">
-          {[
-            { value: false, label: '重複を許可しない' },
-            { value: true, label: '許可する' },
-          ].map((opt) => {
-            const on = (scenario.allowConcurrent ?? true) === opt.value
-            return (
-              <button
-                key={opt.label}
-                type="button"
-                onClick={() => void handleConcurrentChange(opt.value)}
-                aria-pressed={on}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  on ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
-                }`}
-              >
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>
+      <section
+        data-design-node="bV5Vs"
+        className="border-warning bg-warning-bg rounded-card flex flex-wrap items-center gap-x-3 gap-y-1 border px-4 py-3"
+        role="note"
+      >
+        <p className="text-warning text-sm font-semibold">
+          作成しただけでは配信されません。開始条件を設定し、テスト送信後に配信を開始してください。
+        </p>
+        {/* 設計はここに「配信を始める方法」の入口を描くが、案内の行き先が
+            まだ無い（上の「マニュアル」も準備中のまま）。行き先の無い青字を
+            置くと押されて何も起きないので、次の一手を言葉で書く。 */}
+        <span className="text-ink-secondary text-xs">
+          このすぐ下の「開始のきっかけ」から設定できます。
+        </span>
       </section>
 
       {error && (
-        <div className="bg-danger-bg text-danger rounded-card mb-4 p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} className="mb-4" />
       )}
 
       {/* Scenario Info */}
-      <div className="bg-canvas rounded-card border border-hairline p-6 mb-6">
+      <div className="bg-canvas rounded-card border border-hairline p-6">
         {editing ? (
-          <div className="space-y-4 max-w-lg">
+          /* ★V7: 編集フォームもカードの幅いっぱいに広げる。1920px で右が大きく空く。 */
+          <div className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">シナリオ名 <span className="text-danger">*</span></label>
               <input
@@ -1288,63 +1981,71 @@ export default function ScenarioDetailClient({
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">フォルダ</label>
-              <select
-                className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full"
+              {/*
+                SCENARIO-20: 候補はシナリオ所属アカウントのものだけ。
+                取得できないあいだは変更を止める（候補外の値を
+                黙って保存しないため）。保存済みの値が候補に無いときは
+                値を消さず、名前を確認できない旨の選択肢として残す。
+              */}
+              <Select
+                aria-label="フォルダ"
                 value={editForm.folderId}
-                onChange={(e) => setEditForm({ ...editForm, folderId: e.target.value })}
-              >
-                <option value="">未分類</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
+                disabled={folderState !== 'ready'}
+                onChange={(value) => setEditForm({ ...editForm, folderId: value })}
+                options={[
+                  { value: '', label: '未分類' },
+                  ...(editFolderMissing
+                    ? [{ value: editForm.folderId, label: '名前を確認できません' }]
+                    : []),
+                  ...folders.map((f) => ({ value: f.id, label: f.name })),
+                ]}
+                size="full"
+              />
               <p className="text-ink-faint mt-1 text-xs">一覧の左のパネルで、この分類ごとに絞り込めます。</p>
+              {folderState !== 'ready' ? (
+                <p className="text-ink-faint mt-1 text-xs">
+                  {folderState === 'loading'
+                    ? 'フォルダを読み込んでいます。'
+                    : 'フォルダを確認できないため、いまは変更できません。'}
+                </p>
+              ) : editFolderMissing ? (
+                <p className="text-warning mt-1 text-xs">
+                  選択中のフォルダはこのアカウントの候補にありません（別アカウントのものか、削除済みです）。保存済みの分類はそのまま残ります。
+                </p>
+              ) : null}
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">トリガー</label>
-              <select
-                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              <Select
+                aria-label="トリガー"
                 value={editForm.triggerType}
-                onChange={(e) => setEditForm({ ...editForm, triggerType: e.target.value as ScenarioTriggerType })}
-              >
-                {triggerOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                onChange={(value) => setEditForm({ ...editForm, triggerType: value as ScenarioTriggerType })}
+                options={triggerOptions}
+                size="full"
+              />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="editIsActive"
+              <Checkbox
                 checked={editForm.isActive}
-                onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                className="h-4 w-4 rounded border-hairline text-accent focus:ring-accent"
-              />
-              <label htmlFor="editIsActive" className="text-sm text-ink-secondary">有効</label>
+                onCheckedChange={(checked) => setEditForm({ ...editForm, isActive: checked })}
+              >
+                稼働する
+              </Checkbox>
             </div>
             <div className="border-hairline rounded-card border p-3">
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="checkbox"
-                  checked={!editForm.allowConcurrent}
-                  onChange={(e) => setEditForm({ ...editForm, allowConcurrent: !e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-hairline text-accent focus:ring-accent"
-                />
-                <span className="text-ink-secondary text-sm">
-                  他のシナリオが動いている人は登録しない
-                  <span className="text-ink-faint block text-xs leading-relaxed">
-                    既定では、1人が複数のシナリオに同時に入れます。
-                    ここをチェックすると、他のシナリオが動いている人はこのシナリオに入りません。
-                    すでに入っている人には影響しません。
-                  </span>
-                </span>
-              </label>
+              <Checkbox
+                checked={!editForm.allowConcurrent}
+                onCheckedChange={(checked) => setEditForm({ ...editForm, allowConcurrent: !checked })}
+                description="既定では、1人が複数のシナリオに同時に入れます。ここをチェックすると、他のシナリオが動いている人はこのシナリオに入りません。すでに入っている人には影響しません。"
+              >
+                他のシナリオが動いている人は登録しない
+              </Checkbox>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handleSaveScenario}
                 disabled={saving}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
+ className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
               >
                 {saving ? '保存中...' : '保存'}
               </button>
@@ -1379,7 +2080,7 @@ export default function ScenarioDetailClient({
                 {/* 置き場は scenarios.folder_id（099）。一覧の左のパネルで
                     絞り込む先になる。 */}
                 <p className="text-ink-faint mt-0.5 truncate text-xs">
-                  フォルダ：{folders.find((f) => f.id === scenario.folderId)?.name ?? '未分類'}
+                  フォルダ：{scenarioFolderName}
                 </p>
               </SettingCard>
 
@@ -1388,13 +2089,44 @@ export default function ScenarioDetailClient({
                 <p className="text-ink-faint mt-0.5 text-xs">作ったあとは変えられません</p>
               </SettingCard>
 
-              <SettingCard label="状態" action="変更" onAction={() => setEditing(true)}>
-                <p className={`text-sm font-bold ${scenario.isActive ? 'text-ink' : 'text-warning'}`}>
-                  {scenario.isActive ? '配信可' : '一時停止中'}
-                </p>
+              <SettingCard label="状態" action={showStarted ? '停止・変更' : '変更'} onAction={() => setEditing(true)}>
+                {/* 状態の札は共通の StatusChip（設計 B）。動いているものはどれも稼働中。 */}
+                <StatusChip
+                  status={showStarted || scenario.isActive ? 'running' : 'paused'}
+                  size="default"
+                  withHelp
+                />
                 <p className="text-ink-faint mt-0.5 text-xs">
-                  {scenario.isActive ? '配信を一時停止する' : '配信を再開する'}
+                  {showStarted
+                    ? latestStartedLabel
+                      ? `${latestStartedLabel} 開始`
+                      : '開始日時を取得できませんでした'
+                    : scenario.isActive
+                      ? '配信を一時停止する'
+                      : '配信を再開する'}
                 </p>
+                {/*
+                  現在値とヘルプを一致させる（U007）。以前は許可中でも
+                  「別シナリオを開始すると停止」と固定で、実挙動（他の
+                  シナリオが動いている人は登録しない、の逆）と食い違って
+                  いた。編集フォームの文言（「他のシナリオが動いている人は
+                  登録しない」）と同じ意味で、今の状態と切り替え後の影響を
+                  分けて書く。
+                */}
+                <button
+                  type="button"
+                  onClick={() => void handleConcurrentChange(!(scenario.allowConcurrent ?? true))}
+                  title={
+                    (scenario.allowConcurrent ?? true)
+                      ? 'いまは同時購読を許しています。他のシナリオが動いている人にも、このシナリオを並行して流します。押すと「同時に1つだけ」へ変わり、他のシナリオが動いている人はこのシナリオに入らなくなります。'
+                      : 'いまは同時に1つだけです。他のシナリオが動いている人はこのシナリオに入りません。すでに入っている人には影響しません。押すと同時購読を許すようになります。'
+                  }
+                  className="text-info mt-1 text-left text-xs hover:underline"
+                >
+                  {(scenario.allowConcurrent ?? true)
+                    ? '同時購読を許可中'
+                    : '同時に購読できるシナリオは 1つ'}
+                </button>
               </SettingCard>
 
               {/*
@@ -1405,7 +2137,10 @@ export default function ScenarioDetailClient({
                 開始のきっかけ。1本に複数持てる（128）。0本は「止まっている」
                 ではなく「外から呼ばれたときだけ流れる」なので、そう書く。
               */}
-              <SettingCard label="開始のきっかけ">
+              {/* 設計（bV5Vs）はこの札に「設定」の入口を出し、押すと開始条件の
+                  面（EvVO5）が開く。値そのものを押す形だけだと、読むだけの札と
+                  見分けが付かない。 */}
+              <SettingCard label="開始のきっかけ" action="設定" qaOpen="EvVO5" onAction={() => setTriggerOpen(true)}>
                 <button type="button" onClick={() => setTriggerOpen(true)} className="text-left">
                   <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
                     {triggerCount === null
@@ -1415,23 +2150,25 @@ export default function ScenarioDetailClient({
                         : `${triggerCount} 件`}
                   </span>
                   <span className="text-ink-faint mt-0.5 block text-xs">
-                    {triggerCount === 0 ? 'アクションなどから開始できます' : '押すと足せます'}
+                    {/*
+                      SCENARIO-15: 設定を変えて取り直しているあいだは、
+                      古い人数を確定値として出さず「計算しています」と出す。
+                    */}
+                    {simulationRefreshing
+                      ? '予約中の人数を計算しています…'
+                      : simulation
+                        ? `予約中 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人`
+                        : triggerCount === 0
+                          ? 'アクションなどから開始できます'
+                          : '押すと足せます'}
                   </span>
                 </button>
-              </SettingCard>
-
-              <SettingCard label="対象の絞り込み">
                 <button
                   type="button"
                   onClick={() => setAudienceOpen(true)}
-                  className="text-left"
+                  className="text-info mt-1 block text-left text-xs hover:underline"
                 >
-                  <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
-                    {describeCondition((scenario.audienceCondition as SegmentCondition | null) ?? null)}
-                  </span>
-                  <span className="text-ink-faint mt-0.5 block text-xs">
-                    押すと条件を組み立てられます
-                  </span>
+                  対象：{describeCondition((scenario.audienceCondition as SegmentCondition | null) ?? null)}
                 </button>
               </SettingCard>
 
@@ -1440,11 +2177,21 @@ export default function ScenarioDetailClient({
                   <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
                     {ON_COMPLETE_LABEL[(scenario.onCompleteMode ?? 'pause') as OnCompleteMode]}
                   </span>
-                  <span className="text-ink-faint mt-0.5 block text-xs">
-                    {actionCounts['__complete__']
-                      ? `アクション ${actionCounts['__complete__']} 件`
-                      : '読み終えた人を次のシナリオへ送ることもできます'}
-                  </span>
+                  {/*
+                    R250: 移動先のない「次のシナリオへ移動」は保存できない設定。
+                    削除などで欠けたまま残っていることがあるので、札でも知らせる。
+                  */}
+                  {(scenario.onCompleteMode ?? 'pause') === 'move' && !scenario.onCompleteScenarioId ? (
+                    <span className="text-warning mt-0.5 block text-xs font-medium">
+                      移動先が選ばれていません。開いて選び直してください。
+                    </span>
+                  ) : (
+                    <span className="text-ink-faint mt-0.5 block text-xs">
+                      {actionCounts['__complete__']
+                        ? `アクション ${actionCounts['__complete__']} 件`
+                        : '読み終えた人を次のシナリオへ送ることもできます'}
+                    </span>
+                  )}
                 </button>
               </SettingCard>
             </div>
@@ -1466,7 +2213,7 @@ export default function ScenarioDetailClient({
       {stats && stats.enrolledTotal > 0 && (
         <div
           data-design="KPIs"
-          className="bg-canvas rounded-card border-hairline mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
+          className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
         >
           <div>
             <p className="text-ink-faint text-xs">購読中</p>
@@ -1547,27 +2294,36 @@ export default function ScenarioDetailClient({
             タイミング・種別・到達人数を上下で見比べられなかった。
             桁をそろえると、上から下へ人数が減っていくのがそのまま見える。
           */
+          /*
+            幅は中身に任せる（#949 N-058）。1040px で固定すると、
+            サイドメニューを引いた残りが 1040px 未満の画面でページ全体が
+            横スクロールした。桁のほうは「内容」列だけ truncate で縮み、
+            操作列は折り返すので、狭い画面でも読める。どうしても収まら
+            ない幅だけ overflow-x-auto で表の内側に逃がす。
+          */
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px]">
+            <table className="w-full">
               <thead>
+                {/* 見出しは共通の Th（Pencil `tPTMp`）。直書きの見出しを7個
+                    置いていたので、表の桁の高さ・色・太さがこの画面だけ他と
+                    ずれていた。 */}
                 <tr className="border-hairline border-b">
-                  <th className="w-16 px-2 py-2" aria-label="並び" />
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    タイミング
-                  </th>
-                  <th className="text-ink-faint w-full max-w-0 px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    内容
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    種別
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    到達人数
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    配信後
-                  </th>
-                  <th className="px-3 py-2" aria-label="操作" />
+                  <Th className="w-16" aria-label="並び" />
+                  <Th>タイミング</Th>
+                  <Th className="w-full max-w-0">内容</Th>
+                  <Th>種別</Th>
+                  {/* 設計（bV5Vs）の桁。誰に送る通なのかが、開かなくても読める。 */}
+                  <Th>配信対象</Th>
+                  <Th>到達人数</Th>
+                  <Th>配信後</Th>
+                  {/*
+                    SCENARIO-23: 操作列に幅の下限となる希望幅を持たせる。
+                    指定が無いと「内容」列（w-full）へ全部持っていかれて
+                    36px まで潰れ、操作名が1文字ずつ縦に折れた。
+                    幅が足りない画面ではセルは希望幅より縮み、中のボタンが
+                    flex-wrap でボタン単位に折り返す。
+                  */}
+                  <Th className="w-40" aria-label="操作" />
                 </tr>
               </thead>
               <tbody>
@@ -1578,22 +2334,24 @@ export default function ScenarioDetailClient({
                   const tpl = step.templateId
                     ? templates.find((t) => t.id === step.templateId)
                     : null
-                  const kindLabel = tpl
-                    ? 'テンプレート'
-                    : (messageTypeOptions.find((o) => o.value === step.messageType)?.label ??
-                      step.messageType)
                   // 内容の桁は見出しだけ出す。中身はプレビューで開く。
                   // 本文をそのまま桁に入れると、行の高さが通ごとに変わって
                   // 上下の見比べができなくなる。
-                  const title =
-                    tpl?.name ??
-                    (step.messageContent || '').split('\n')[0].slice(0, 60) ??
-                    '（空）'
+                  // R215: 質問の通は messageContent が空（' '）のまま残る。
+                  // 本文で代用すると空のボタン・種別「テキスト」になり、
+                  // どの質問か一覧で分からない。質問文を見出しにする。
+                  const kindLabel = stepKindLabel(
+                    step,
+                    tpl?.name ?? null,
+                    messageTypeOptions.find((o) => o.value === step.messageType)?.label ??
+                      step.messageType,
+                  )
+                  const title = stepListTitle(step, tpl?.name ?? null)
                   return (
                     <Fragment key={step.id}>
                       {idx > 0 && (
                         <tr className="group">
-                          <td colSpan={7} className="px-0 py-0">
+                          <td colSpan={8} className="px-0 py-0">
                             {/*
                               通と通のあいだに差し込む入口。末尾にしか足せないと、
                               3通目と4通目のあいだに1通入れたいときに後ろを
@@ -1604,7 +2362,7 @@ export default function ScenarioDetailClient({
                               <button
                                 type="button"
                                 onClick={() => openInsertStep(sortedSteps[idx - 1].stepOrder)}
-                                className="text-ink-faint hover:text-accent px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
+                                className="text-ink-faint hover:text-action px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
                               >
                                 ＋ ここに挿入
                               </button>
@@ -1643,18 +2401,26 @@ export default function ScenarioDetailClient({
                           {formatScheduleLabel(deliveryMode, step)}
                         </td>
                         <td className="w-full max-w-0 px-3 py-3 align-top">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              editingStepId === step.id ? closeStepForm() : openEditStep(step)
-                            }
-                            className="text-info block w-full truncate text-left text-sm hover:underline"
-                            title={title}
-                          >
-                            {title}
-                          </button>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                editingStepId === step.id ? closeStepForm() : openEditStep(step)
+                              }
+                              className="text-info block min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                              title={title}
+                            >
+                              {title}
+                            </button>
+                            {/*
+                              R212: 下書きの通は送られないのに、通常の通と
+                              同じ見た目だった。配信される通とされない通を
+                              見分けられるよう、共通の StatusChip で名指しする。
+                            */}
+                            {step.isDraft === true && <StatusChip status="draft" />}
+                          </span>
                           {step.onReachTagId && (
-                            <p className="text-accent mt-0.5 truncate text-xs">
+                            <p className="text-ink-faint mt-0.5 truncate text-xs">
                               到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}
                             </p>
                           )}
@@ -1664,13 +2430,19 @@ export default function ScenarioDetailClient({
                             {kindLabel}
                           </span>
                         </td>
+                        {/* 誰に送る通か。絞り込みが無い通は `—` ではなく
+                            「購読中の全員」。決まっている値なので、取れて
+                            いない印と混ぜない。 */}
+                        <td className="text-ink-secondary px-3 py-3 align-top text-sm whitespace-nowrap">
+                          {describeStepAudience(step.targetCondition, tags)}
+                        </td>
                         <td className="px-3 py-3 align-top whitespace-nowrap">
                           {stat ? (
                             <span className="inline-flex items-center gap-2">
                               {reachBarWidth === null ? null : (
                                 <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
                                   <span
-                                    className="bg-accent block h-full rounded-full"
+                                    className="bg-ink-faint block h-full rounded-full"
                                     style={{ width: reachBarWidth }}
                                   />
                                 </span>
@@ -1687,86 +2459,62 @@ export default function ScenarioDetailClient({
                           )}
                         </td>
                         <td className="px-3 py-3 align-top whitespace-nowrap">
-                          {step.afterSend === 'pause' ? (
-                            <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs font-medium">
-                              送信後 一時停止
-                            </span>
-                          ) : (
-                            <span className="text-ink-faint text-sm">—</span>
-                          )}
+                          {(() => {
+                            const after = describeAfterSend(step.afterSend)
+                            return after.paused ? (
+                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs font-medium">
+                                {after.label}
+                              </span>
+                            ) : (
+                              <span className="text-ink-secondary text-sm">{after.label}</span>
+                            )
+                          })()}
                         </td>
-                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2 text-xs">
+                        <td className="px-3 py-3 text-right align-top">
+                          {/*
+                            操作は6つある。1行に並べ切れない幅では折り返す
+                            （#949 N-058）。無理に1行へ押さえると、表全体が
+                            その幅ぶん広がって横スクロールの元になる。
+
+                            SCENARIO-23: 各ボタンは whitespace-nowrap で
+                            単語の途中では折らない。折り返すのはボタン単位
+                            まで。日本語は文字のどこでも折れるため、印が
+                            無いと「プレビュー」が1文字ずつ縦に並んだ。
+                          */}
+                          <span className="relative inline-flex items-center gap-2 text-xs">
                             <button
                               type="button"
                               onClick={() =>
                                 editingStepId === step.id ? closeStepForm() : openEditStep(step)
                               }
-                              className="text-info hover:underline"
+                              className="text-info whitespace-nowrap hover:underline"
                             >
                               {editingStepId === step.id ? '閉じる' : '編集'}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setPreviewStepId(previewStepId === step.id ? null : step.id)}
-                              className="text-info hover:underline"
-                            >
-                              プレビュー
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` })
-                              }
-                              className="text-info hover:underline"
-                            >
-                              テスト
-                            </button>
-                            {/* この通を送ったあとに動かすアクション。件数を出すのは、
-                                設定済みを忘れて二重に足すのを防ぐため。 */}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setActionTarget({
-                                  hook: 'step_sent',
-                                  stepId: step.id,
-                                  choiceIndex: null,
-                                  title: `${step.stepOrder}通目を送ったあと`,
-                                })
-                              }
-                              className="text-info hover:underline"
-                            >
-                              アクション
-                              {actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDuplicateStep(step)}
-                              disabled={duplicatingStepId === step.id}
-                              title="この通を複製する"
-                              aria-label="この通を複製する"
-                              className="text-ink-faint hover:text-ink-secondary disabled:opacity-40"
-                            >
-                              複製
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDeleteStepError('')
-                                setDeleteStepTarget(step)
-                              }}
-                              title="この通を削除する"
-                              aria-label="この通を削除する"
-                              className="text-ink-faint hover:text-danger"
-                            >
-                              削除
-                            </button>
-                          </div>
+                            <MoreAction
+                              label={`${step.stepOrder}通目のその他操作`}
+                              aria-expanded={stepMenuId === step.id}
+                              onClick={() => setStepMenuId((current) => (current === step.id ? null : step.id))}
+                            />
+                            <ActionMenu
+                              open={stepMenuId === step.id}
+                              ariaLabel={`${step.stepOrder}通目の操作`}
+                              onClose={() => setStepMenuId(null)}
+                              items={[
+                                { id: 'preview', label: 'プレビュー', onSelect: () => setPreviewStepId(previewStepId === step.id ? null : step.id) },
+                                { id: 'test', label: 'テスト', onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` }) },
+                                /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
+                                { id: 'action', label: `アクション${actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}`, onSelect: () => setActionTarget({ hook: 'step_sent', stepId: step.id, choiceIndex: null, title: `${step.stepOrder}通目を送ったあと` }) },
+                                { id: 'duplicate', label: duplicatingStepId === step.id ? '複製中…' : '複製', disabled: duplicatingStepId === step.id, disabledReason: 'この通を複製しています', onSelect: () => { void handleDuplicateStep(step) } },
+                                { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteStepError(''); setDeleteStepTarget(step) } },
+                              ]}
+                            />
+                          </span>
                         </td>
                       </tr>
                       {previewStepId === step.id && (
                         <tr className="border-hairline border-b">
-                          <td colSpan={7} className="px-3 pb-3">
+                          <td colSpan={8} className="px-3 pb-3">
                             <div className="text-ink-secondary bg-canvas-sunken rounded-card px-3 py-2 text-sm">
                               {(() => {
                                 // テンプレ参照時は「いまのテンプレの中身」を見せる。
@@ -1782,7 +2530,7 @@ export default function ScenarioDetailClient({
                       )}
                       {editingStepId === step.id && (
                         <tr>
-                          <td colSpan={7} className="px-3 pb-3">
+                          <td colSpan={8} className="px-3 pb-3">
                             {renderStepForm()}
                           </td>
                         </tr>
@@ -1797,20 +2545,80 @@ export default function ScenarioDetailClient({
       </div>
 
       {/*
+        SCENARIO-09: 途中まで作られたコピーが残っているとき、その所在と
+        やり直し・削除・確認の導線を出す。黙って残すと、どこまで写ったか
+        分からないシナリオが一覧に増える。
+      */}
+      {duplicateRemainder && (
+        <div className="border-warning bg-warning-bg rounded-card border px-4 py-3" role="alert">
+          <p className="text-warning text-sm font-bold">
+            複製が「{duplicateRemainder.stage}」の途中で止まりました
+          </p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            途中まで作成されたコピー「{duplicateRemainder.copyName}」が残っています。
+            {duplicateRemainder.detail ? `（${duplicateRemainder.detail}）` : ''}
+            続きから複製をやり直すか、作りかけのコピーを削除してください。
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <button
+              type="button"
+              onClick={() => void handleDuplicate()}
+              disabled={duplicating}
+              className="text-info font-medium hover:underline disabled:opacity-40"
+            >
+              {duplicating ? '複製中...' : '続きから複製をやり直す'}
+            </button>
+            <Link
+              href={`/scenarios/detail?id=${encodeURIComponent(duplicateRemainder.copyId)}`}
+              className="text-ink-secondary hover:text-ink"
+            >
+              作りかけのコピーを開く
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setDiscardDuplicateError('')
+                setDiscardDuplicateOpen(true)
+              }}
+              className="text-danger font-medium hover:underline"
+            >
+              作りかけのコピーを削除
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/*
         画面のいちばん下。設計もこの位置。
 
         削除は右端に離して置く。編集の流れの途中にあると、保存のつもりで
         押し間違える。複製は左、戻るは中。
       */}
-      <div className="border-hairline mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
-        <button
-          type="button"
-          onClick={() => void handleDuplicate()}
-          disabled={duplicating}
-          className="text-ink-secondary hover:text-ink text-sm font-medium disabled:opacity-40"
-        >
-          {duplicating ? '複製中...' : 'このシナリオを複製'}
-        </button>
+      <div className="border-hairline flex flex-wrap items-center gap-3 border-t pt-4">
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleDuplicate()}
+            disabled={duplicating}
+            className="text-ink-secondary hover:text-ink text-sm font-medium disabled:opacity-40"
+          >
+            {duplicating ? '複製中...' : duplicateRemainder ? '続きから複製をやり直す' : 'このシナリオを複製'}
+          </button>
+          {/*
+            SCENARIO-08: 何を写すか・何を写さないかを、押す前に見える
+            場所に書く。写らないもの（配信履歴・購読中の人）まで写った
+            と思って開始されると困る。
+          */}
+          <details className="text-ink-faint text-xs">
+            <summary className="cursor-pointer hover:text-ink-secondary">複製に含まれるもの</summary>
+            <p className="mt-1 max-w-prose leading-relaxed">
+              名前・説明・置き場・配信対象の条件・終了後の処理・開始のきっかけ・すべての通
+              （内容・配信タイミング・配信対象・質問・下書きの別）・アクションを写し、
+              停止した状態で作ります。配信履歴と購読中の友だちは写りません。
+              複製しただけでは配信されません。
+            </p>
+          </details>
+        </span>
         <Link href="/scenarios" className="text-ink-secondary hover:text-ink ml-auto text-sm">
           シナリオ一覧に戻る
         </Link>
@@ -1826,6 +2634,8 @@ export default function ScenarioDetailClient({
           このシナリオを削除
         </button>
       </div>
+      </>
+      )}
 
       <BulkPreviewModal
         open={previewOpen}
@@ -1874,6 +2684,28 @@ export default function ScenarioDetailClient({
           setDeleteScenarioOpen(false)
           setDeleteScenarioError('')
         }}
+      >
+        {/* R250: 終了後の移動先にされていると、削除で参照元の設定が変わる。件数が取れたときだけ出す。 */}
+        <div className="text-ink-secondary mt-3 space-y-2 text-sm">
+          <MoveReferrersNotice scenarioId={id} />
+        </div>
+      </ConfirmDialog>
+
+      {/* SCENARIO-09: 複製が途中で止まったときの、作りかけコピーの削除確認 */}
+      <ConfirmDialog
+        open={discardDuplicateOpen && duplicateRemainder !== null}
+        title={duplicateRemainder ? `作りかけのコピー「${duplicateRemainder.copyName}」を削除しますか？` : ''}
+        description={`複製が「${duplicateRemainder?.stage ?? ''}」の途中で止まったため、内容が欠けた状態で残っています。削除しても元のシナリオは変わりません。この操作は取り消せません。`}
+        confirmLabel="作りかけのコピーを削除"
+        destructive
+        busy={discardingDuplicate}
+        error={discardDuplicateError}
+        onConfirm={() => void handleDiscardDuplicate()}
+        onCancel={() => {
+          if (discardingDuplicate) return
+          setDiscardDuplicateOpen(false)
+          setDiscardDuplicateError('')
+        }}
       />
 
       {/* シナリオ全体の配信対象 */}
@@ -1884,7 +2716,7 @@ export default function ScenarioDetailClient({
           value={(scenario.audienceCondition as SegmentCondition | null) ?? null}
           onSave={async (next) => {
             const res = await api.scenarios.update(id, { audienceCondition: next } as never)
-            if (res.success) await loadScenario()
+            if (res.success) await loadScenario(true)
           }}
           onClose={() => setAudienceOpen(false)}
         />
@@ -1902,7 +2734,7 @@ export default function ScenarioDetailClient({
               onCompleteScenarioId: target,
             } as never)
             if (!res.success) return res.error
-            await loadScenario()
+            await loadScenario(true)
             return null
           }}
           onClose={() => setOnCompleteOpen(false)}
@@ -1939,6 +2771,18 @@ export default function ScenarioDetailClient({
           lineAccountId={scenario?.lineAccountId ?? null}
           stepId={testSend.stepId}
           stepLabel={testSend.label}
+          steps={(testSend.stepId
+            ? sortedSteps.filter((row) => row.id === testSend.stepId)
+            : sortedSteps
+          ).map((row) => ({
+            id: row.id,
+            stepOrder: row.stepOrder,
+            timing: formatScheduleLabel(deliveryMode, row),
+            kind:
+              (row.templateId ? templates.find((t) => t.id === row.templateId)?.name : null) ??
+              (messageTypeOptions.find((o) => o.value === row.messageType)?.label ??
+                row.messageType),
+          }))}
           onClose={() => setTestSend(null)}
         />
       )}
@@ -1949,6 +2793,9 @@ export default function ScenarioDetailClient({
           scenarioId={id}
           onClose={() => setTriggerOpen(false)}
           onChanged={setTriggerCount}
+          audienceCondition={scenario.audienceCondition}
+          activeNow={stats?.activeNow ?? null}
+          lineAccountId={scenario.lineAccountId}
         />
       )}
 

@@ -4,8 +4,19 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
-import EditDialog, { toDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import Notice from '@/components/shared/notice'
+import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import './issue481-height.css'
+
+/*
+ * 作成の手順。ウェビナー作成・イベント作成などと同じ共通部品で出す
+ * （U049: 画面ごとに違う手順表示を1つのStepperへ寄せる）。
+ * この部品を編集ダイアログの内側に置くと、手順を持たない一覧画面にも
+ * 「Steps」の節が混入するため、ページ側で描く。
+ */
+const STEP_LABELS = ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認'] as const
 
 /**
  * 自動応答の編集を、URL で開けるようにする。
@@ -17,6 +28,11 @@ function AutoReplyEditInner() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id')
+  const requestedStep = params.get('step')
+  const step = requestedStep === 'trigger' || requestedStep === 'response' ? requestedStep : 'basic'
+  const currentStep = step === 'basic' ? 0 : step === 'trigger' ? 1 : 2
+  const stepLabel = step === 'basic' ? '基本設定' : step === 'trigger' ? 'どんなときに動くか' : '何を返すか'
+  usePageTitle(`自動応答ルールを作成・${stepLabel}`)
 
   const [draft, setDraft] = useState<AutoReplyDraft | null>(null)
   const [templates, setTemplates] = useState<
@@ -26,9 +42,18 @@ function AutoReplyEditInner() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let active = true
     void (async () => {
       try {
-        const tplRes = await api.templates.list()
+        const [draftRes, liveRes] = await Promise.all([
+          id ? api.autoReplies.getDraft(id) : Promise.resolve(null),
+          id ? api.autoReplies.get(id).catch(() => null) : Promise.resolve(null),
+        ])
+        if (!active) return
+        // R23横展開: 返す文の候補は、この応答のアカウントだけ。新規は全体。
+        const draftAccountId = draftRes?.success ? draftRes.data.settings.lineAccountId : null
+        const tplRes = await api.templates.list(undefined, draftAccountId ?? undefined)
+        if (!active) return
         if (tplRes.success) {
           setTemplates(
             tplRes.data.map((t) => ({
@@ -40,11 +65,19 @@ function AutoReplyEditInner() {
           )
         }
         if (id) {
-          const res = await api.autoReplies.get(id)
-          if (res.success) {
-            setDraft(toDraft(res.data))
+          if (draftRes?.success) {
+            const [conflictRes, summaryRes] = await Promise.all([
+              api.autoReplies.conflicts(id).catch(() => null),
+              api.autoReplies.summary(draftRes.data.settings.lineAccountId).catch(() => null),
+            ])
+            if (!active) return
+            setDraft(toVersionDraft(draftRes.data, {
+              isActive: liveRes?.success ? liveRes.data.isActive : true,
+              conflictAttentionCount: conflictRes?.success ? conflictRes.data.conflicts.length : null,
+              receiveSourceCounts: summaryRes?.success ? summaryRes.data.receiveSourceCounts : null,
+            }))
           } else {
-            setError(res.error)
+            setError(draftRes?.error ?? '下書きを読み込めませんでした')
           }
         } else {
           setDraft({
@@ -54,26 +87,25 @@ function AutoReplyEditInner() {
             responseContent: '',
             templateId: null,
             lineAccountId: null,
-            isActive: true,
+            // AUTOREPLY-08: 新しい応答は止まった状態で作る。
+            isActive: false,
             priority: 0,
             messageKinds: null,
           })
         }
       } catch {
-        setError('読み込みに失敗しました')
+        if (active) setError('読み込みに失敗しました。もう一度読み込んでください。')
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     })()
+    return () => {
+      active = false
+    }
   }, [id])
 
   return (
-    <div>
-      <Header
-        title={id ? '自動応答を編集' : '自動応答を作る'}
-        description="決めた言葉が届いたときに、自動で返します。"
-      />
-
+    <div data-issue481-height>
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/auto-replies" className="hover:underline">
           自動応答
@@ -83,9 +115,7 @@ function AutoReplyEditInner() {
       </nav>
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {loading ? (
@@ -93,12 +123,31 @@ function AutoReplyEditInner() {
           読み込み中...
         </div>
       ) : draft ? (
+        <>
+        <Stepper
+          label="自動応答を作る進み方"
+          steps={STEP_LABELS.map(
+            (label, index): StepperStep => ({
+              label,
+              state: index < currentStep ? 'done' : index === currentStep ? 'current' : 'todo',
+            }),
+          )}
+        />
         <EditDialog
+          page
+          step={step}
           draft={draft}
           templates={templates}
           onClose={() => router.push('/auto-replies')}
           onSaved={() => router.push('/auto-replies')}
+          onStepChange={(nextStep) => {
+            const query = new URLSearchParams()
+            if (id) query.set('id', id)
+            query.set('step', nextStep)
+            router.replace(`/auto-replies/edit?${query.toString()}`)
+          }}
         />
+        </>
       ) : null}
     </div>
   )

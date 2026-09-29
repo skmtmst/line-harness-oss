@@ -1,183 +1,229 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Header from '@/components/layout/header'
-import InboxFilters from '@/components/inbox/inbox-filters'
-import InboxList from '@/components/inbox/inbox-list'
-import InboxSummaryBar from '@/components/inbox/inbox-summary-bar'
+/*
+ * 通知一覧（V6 1-1 ダッシュボードの通知パネルからの全件行き先）。
+ *
+ * パネルは先頭100件までしか読まない。ここは「さらに読み込む」で
+ * 古い通知まで辿れる一覧にする。行を押すと既読にして詳しい画面へ送る
+ * 動きはパネルと同じ（notification-summary の行き先判定を共有）。
+ */
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { AlertTriangle, Download } from 'lucide-react'
+import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import type { InboxRowData } from '@/components/inbox/inbox-row'
+import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import Card from '@/components/shared/card'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { STATE_TEXT } from '@/components/shared/not-connected'
+import { Tabs } from '@/components/shared/tabs'
+import ListState from '@/components/shared/list-state'
+import {
+  dashboardNotificationDestination,
+  isDashboardNotificationData,
+  notificationTime,
+  type DashboardNotificationFilter,
+} from '@/components/dashboard/notification-summary'
 
 const PAGE_SIZE = 50
-const POLL_INTERVAL_MS = 30_000
-// 全件 fetch の上限。worker 側 MAX_PAGE_SIZE と一致させる。222 件規模で
-// 余裕を持って 1〜2 年の運用カバー。これを超えるとサマリーに警告を出す
-// (Codex Round 1 指摘: サイレント切り捨て防止)。
-const FETCH_PAGE_SIZE = 2000
 
-interface AccountOption {
-  id: string
-  name: string
-}
-
-export default function InboxPage() {
-  const [allRows, setAllRows] = useState<InboxRowData[]>([])
-  // サーバが返す真の総件数 (2000件超のとき allRows は capped されるので別途保持)。
-  // Codex Round 2 指摘: summary.total を allRows.length から取ると under-report。
-  const [serverTotal, setServerTotal] = useState(0)
-  const [truncated, setTruncated] = useState(false)
-  const [page, setPage] = useState(1)
-  const [q, setQ] = useState('')
-  const [account, setAccount] = useState('')
-  const [overdueOnly, setOverdueOnly] = useState(false)
+function NotificationsPageInner() {
+  usePageTitle('通知')
+  const router = useRouter()
+  const params = useSearchParams()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const categoryParam = params.get('category')
+  const filter: DashboardNotificationFilter =
+    categoryParam === 'error' || categoryParam === 'update' ? categoryParam : 'all'
+  const [items, setItems] = useState<NotificationCenterItem[]>([])
+  // R16: 未読・未対応を扱う一覧は「未読が先・新しい順」。口は作成日降順のみの
+  // ため、読んだ分はここで並べ替える（Workerの口は数の直し以外触らない）。
+  const orderedItems = useMemo(
+    () => [...items].sort((a, b) => {
+      if (a.isRead !== b.isRead) return a.isRead ? 1 : -1
+      return b.createdAt.localeCompare(a.createdAt)
+    }),
+    [items],
+  )
+  const [counts, setCounts] = useState<NotificationCenterData['counts'] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
+  const requestId = useRef(0)
 
-  // 重複 polling で古いレスポンスが新しいデータを上書きしないように世代管理
-  // (Codex Round 1 指摘: race condition)。
-  const requestSeqRef = useRef(0)
+  const selectFilter = (next: DashboardNotificationFilter) => {
+    const query = new URLSearchParams(params.toString())
+    if (next === 'all') query.delete('category')
+    else query.set('category', next)
+    const text = query.toString()
+    router.replace(text ? `/notifications?${text}` : '/notifications')
+  }
 
-  // 検索/account/overdue を変えたらページを1に戻す
-  useEffect(() => {
-    setPage(1)
-  }, [q, account, overdueOnly])
-
-  // Active なアカウントを候補に出す
-  useEffect(() => {
-    api.lineAccounts.list().then((res) => {
-      if (res.success) {
-        setAccountOptions(
-          res.data
-            .filter((a) => a.isActive)
-            .map((a) => ({ id: a.id, name: a.name }))
-            .sort((x, y) => x.name.localeCompare(y.name)),
-        )
-      }
-    })
-  }, [])
-
-  const loadAll = useCallback(async () => {
-    const seq = ++requestSeqRef.current
+  const load = useCallback(async (offset: number, append: boolean) => {
+    const id = ++requestId.current
+    if (accountLoading) return
+    if (!selectedAccountId) {
+      setItems([])
+      setCounts(null)
+      setError('LINEアカウントを選択してください')
+      setLoading(false)
+      return
+    }
     setLoading(true)
-    setError('')
+    if (!append) setError('')
     try {
-      const res = await api.inbox.unanswered.list({
-        page: 1,
-        pageSize: FETCH_PAGE_SIZE,
+      const response = await api.notifications.center.list(selectedAccountId, {
+        category: filter,
+        limit: PAGE_SIZE,
+        offset,
       })
-      // 古いリクエストが新しいリクエストの後に到着したら破棄
-      if (seq !== requestSeqRef.current) return
-      if (res.success) {
-        setAllRows(res.data.rows)
-        setServerTotal(res.data.total)
-        // rows.length < total なら上限ヒット (capped)。バナーで明示。
-        setTruncated(res.data.total > res.data.rows.length)
-      } else {
-        setError('取得に失敗しました')
-        // allRows は前回値を保持して stale-while-error
-      }
+      if (id !== requestId.current) return
+      if (!response.success) throw new Error(response.error)
+      if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
+      setItems((current) => append ? [...current, ...response.data.items] : response.data.items)
+      setCounts(response.data.counts)
     } catch {
-      if (seq !== requestSeqRef.current) return
-      setError('取得に失敗しました')
+      if (id !== requestId.current) return
+      if (!append) {
+        setItems([])
+        setCounts(null)
+      }
+      setError(`通知を${STATE_TEXT.error}`)
     } finally {
-      if (seq === requestSeqRef.current) setLoading(false)
+      if (id === requestId.current) setLoading(false)
     }
-  }, [])
+  }, [accountLoading, filter, selectedAccountId])
 
-  useEffect(() => {
-    loadAll()
-    const id = setInterval(loadAll, POLL_INTERVAL_MS)
-    return () => clearInterval(id)
-  }, [loadAll])
+  useEffect(() => { void load(0, false) }, [load])
 
-  // ── client-side filter ──
-  const filteredRows = useMemo(() => {
-    const qLower = q.trim().toLowerCase()
-    const cutoff = overdueOnly ? Date.now() - 60 * 60_000 : null
-    return allRows.filter((r) => {
-      if (account && r.accountId !== account) return false
-      if (cutoff !== null && new Date(r.lastIncomingAt).getTime() > cutoff) return false
-      if (qLower && !(r.displayName?.toLowerCase().includes(qLower) ?? false)) return false
-      return true
-    })
-  }, [allRows, q, account, overdueOnly])
-
-  // ── サマリー集計（allRows 全体から計算、フィルタ無視）──
-  const summary = useMemo(() => {
-    const byAccountMap = new Map<string, { accountName: string; count: number }>()
-    let oldest: string | null = null
-    for (const r of allRows) {
-      const existing = byAccountMap.get(r.accountId)
-      if (existing) existing.count++
-      else byAccountMap.set(r.accountId, { accountName: r.accountName, count: 1 })
-      if (oldest === null || r.lastIncomingAt < oldest) oldest = r.lastIncomingAt
+  const markRead = async (item: NotificationCenterItem) => {
+    if (!selectedAccountId) return
+    if (item.isRead) return
+    try {
+      const response = await api.notifications.center.markRead(item.id, selectedAccountId)
+      if (!response.success) throw new Error(response.error)
+      setItems((current) => current.map((row) => row.id === item.id ? { ...row, isRead: true } : row))
+      setCounts((current) => current ? { ...current, unread: Math.max(0, current.unread - 1) } : current)
+    } catch {
+      setError('通知を既読にできませんでした。')
     }
-    const byAccount = [...byAccountMap.entries()]
-      .map(([accountId, v]) => ({ accountId, accountName: v.accountName, count: v.count }))
-      .sort((a, b) => b.count - a.count)
-    const oldestWaitMinutes =
-      oldest !== null
-        ? Math.max(0, Math.floor((Date.now() - new Date(oldest).getTime()) / 60_000))
-        : null
-    // total はサーバ由来 (capped 時も真の総件数を表示する)。
-    // byAccount / oldestWaitMinutes は allRows 集計なので capped 時は近似値、
-    // truncated バナーで補足する。
-    return { total: serverTotal, byAccount, oldestWaitMinutes }
-  }, [allRows, serverTotal])
+  }
 
-  // ── pagination ──
-  const total = filteredRows.length
-  const pagedRows = useMemo(
-    () => filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filteredRows, page],
-  )
+  const openNotification = (item: NotificationCenterItem) => {
+    void markRead(item)
+    router.push(dashboardNotificationDestination(item))
+  }
 
+  const markAllRead = async () => {
+    if (!selectedAccountId || !counts || counts.unread === 0) return
+    try {
+      const response = await api.notifications.center.markAllRead(selectedAccountId, filter)
+      if (!response.success) throw new Error(response.error)
+      await load(0, false)
+    } catch {
+      setError('通知をまとめて既読にできませんでした。')
+    }
+  }
+
+  const filters: Array<{ id: DashboardNotificationFilter; label: string; count: number | null }> = [
+    { id: 'all', label: 'すべて', count: counts?.all ?? null },
+    { id: 'error', label: 'エラー', count: counts?.error ?? null },
+    { id: 'update', label: 'アップデート', count: counts?.update ?? null },
+  ]
+  const total = counts ? (filter === 'error' ? counts.error : filter === 'update' ? counts.update : counts.all) : 0
+  const hasMore = items.length < total
+
+  /* ★V7: 画面側で狭い中央寄せをしない。中身の幅は共通の枠が持つ。 */
   return (
-    <div className="space-y-6">
-      <Header
-        title="未対応インボックス"
-        description="人間が返事してない LINE 会話の triage。auto_reply は人間の返事に数えない。"
-      />
-
-      <InboxSummaryBar
-        total={summary.total}
-        byAccount={summary.byAccount}
-        oldestWaitMinutes={summary.oldestWaitMinutes}
-      />
-
-      <InboxFilters
-        q={q}
-        account={account}
-        overdueOnly={overdueOnly}
-        accountOptions={accountOptions}
-        onChange={(next) => {
-          if (next.q !== undefined) setQ(next.q)
-          if (next.account !== undefined) setAccount(next.account)
-          if (next.overdueOnly !== undefined) setOverdueOnly(next.overdueOnly)
-        }}
-      />
-
-      {error && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          {error}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          items={filters.map((entry) => ({
+            label: entry.label,
+            count: entry.count ?? undefined,
+            current: filter === entry.id,
+            onClick: () => selectFilter(entry.id),
+          }))}
+        />
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => { void markAllRead() }} disabled={!counts || counts.unread === 0}>
+            すべて既読にする
+          </Button>
+          <Button variant="secondary" href="/line-notifications?tab=operator">
+            通知設定
+          </Button>
         </div>
-      )}
+      </div>
 
-      {truncated && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-          未対応が {FETCH_PAGE_SIZE} 件の表示上限に到達しました。古いデータが見えていない可能性があります。サーバ側ページネーション復帰を検討してください。
+      {error ? (
+        <Notice
+          tone="danger"
+          message={error}
+          action={<button type="button" onClick={() => void load(0, false)} className="shrink-0 font-medium underline">もう一度読み込む</button>}
+        />
+      ) : null}
+
+      <Card overflow="hidden">
+        {items.length === 0 && !loading ? (
+          <ListState
+            kind="empty"
+            title="通知はまだありません"
+            description="お知らせが届くと、ここに並びます。"
+          />
+        ) : (
+          <ul className="divide-hairline divide-y">
+            {orderedItems.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => openNotification(item)}
+                  className="hover:bg-canvas-sunken flex w-full items-start gap-3 px-5 py-4 text-left"
+                >
+                  {item.category === 'error' ? (
+                    <AlertTriangle aria-hidden="true" className="text-danger mt-0.5 h-4 w-4 shrink-0" />
+                  ) : item.category === 'update' ? (
+                    <Download aria-hidden="true" className="text-ink-faint mt-0.5 h-4 w-4 shrink-0" />
+                  ) : null}
+                  {item.isRead ? (
+                    <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" />
+                  ) : (
+                    <span aria-hidden="true" className="bg-action mt-1.5 h-2 w-2 shrink-0 rounded-full" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className={item.isRead ? 'text-ink block truncate text-sm' : 'text-ink block truncate text-sm font-semibold'}>
+                      {item.title}
+                      {!item.isRead ? <span className="sr-only">（未読）</span> : null}
+                    </span>
+                    <span className="text-ink-faint mt-0.5 block truncate text-xs">{item.body}</span>
+                  </span>
+                  <span className="text-ink-faint shrink-0 text-xs">{notificationTime(item.createdAt)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {loading ? (
+          <p className="text-ink-faint px-5 py-4 text-center text-xs">{STATE_TEXT.loading}…</p>
+        ) : null}
+      </Card>
+
+      {hasMore ? (
+        <div className="flex justify-center">
+          <Button variant="secondary" onClick={() => { void load(items.length, true) }} disabled={loading}>
+            さらに読み込む（残り {total - items.length} 件）
+          </Button>
         </div>
-      )}
-
-      <InboxList
-        rows={pagedRows}
-        total={total}
-        page={page}
-        pageSize={PAGE_SIZE}
-        loading={loading}
-        onPageChange={setPage}
-      />
+      ) : null}
     </div>
+  )
+}
+
+export default function NotificationsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={null}>
+      <NotificationsPageInner />
+    </Suspense>
   )
 }

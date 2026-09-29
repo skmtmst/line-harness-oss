@@ -78,6 +78,90 @@ describe('computeDuplicatesStats', () => {
     expect(() => new Date(stats.computed_at)).not.toThrow();
   });
 
+  test('accountIds で可視アカウントだけに絞る (#496-14)', async () => {
+    const seen: Array<{ sql: string; binds: unknown[] }> = [];
+    const db = {
+      prepare(sql: string) {
+        const entry = { sql, binds: [] as unknown[] };
+        seen.push(entry);
+        const isPairwise = sql.includes('dup_keys');
+        return {
+          first: async () => ({ total_following: 10, duplicate_groups: 1, friend_dups: 2 }),
+          all: async () => ({ results: isPairwise ? [] : [] }),
+          bind(...binds: unknown[]) {
+            entry.binds = binds;
+            return this;
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    await computeDuplicatesStats(db, { accountIds: ['account-a'] });
+
+    // 3本の問い合わせすべてに絞りが入る。
+    expect(seen).toHaveLength(3);
+    for (const query of seen) {
+      expect(query.sql).toContain('IN (?)');
+      expect(query.sql).not.toContain('1 = 0');
+    }
+    // TOTALS と perAccount は絞りを2か所に持つ。
+    expect(seen[0].binds).toEqual(['account-a', 'account-a']);
+    expect(seen[1].binds).toEqual(['account-a', 'account-a']);
+    expect(seen[2].binds).toEqual(['account-a']);
+  });
+
+  test('accountIds 未指定は従来どおり絞り無し、空配列は0件の集計', async () => {
+    const seen: string[] = [];
+    const db = {
+      prepare(sql: string) {
+        seen.push(sql);
+        const isPairwise = sql.includes('dup_keys');
+        return {
+          first: async () => ({ total_following: 10, duplicate_groups: 0, friend_dups: 0 }),
+          all: async () => ({ results: isPairwise ? [] : [] }),
+          bind() {
+            return this;
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    await computeDuplicatesStats(db);
+    expect(seen.join('\n')).not.toContain('IN (?)');
+
+    seen.length = 0;
+    await computeDuplicatesStats(db, { accountIds: [], forceRefresh: true });
+    expect(seen.join('\n')).toContain('1 = 0');
+  });
+
+  test('キャッシュは範囲ごとに分ける', async () => {
+    let callCount = 0;
+    const db = {
+      prepare(sql: string) {
+        const isPairwise = sql.includes('dup_keys');
+        return {
+          first: async () => {
+            callCount++;
+            return { total_following: 10, duplicate_groups: 0, friend_dups: 0 };
+          },
+          all: async () => ({ results: isPairwise ? [] : [] }),
+          bind() {
+            return this;
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    await computeDuplicatesStats(db, { accountIds: ['account-a'] });
+    const afterFirst = callCount;
+    // 同じ範囲はキャッシュが効く。
+    await computeDuplicatesStats(db, { accountIds: ['account-a'] });
+    expect(callCount).toBe(afterFirst);
+    // 違う範囲は計算し直す（別アカウントの計数を見せない）。
+    await computeDuplicatesStats(db, { accountIds: ['account-b'] });
+    expect(callCount).toBeGreaterThan(afterFirst);
+  });
+
   test('forceRefresh bypasses the in-isolate cache', async () => {
     let callCount = 0;
     const db = {

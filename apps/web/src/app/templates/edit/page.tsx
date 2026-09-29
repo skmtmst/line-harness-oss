@@ -1,322 +1,706 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
+import Select from '@/components/shared/select'
+import React, { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { type Folder, validateFlexContent } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
+import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import TemplateAssetEditor from '../template-asset-editor'
+import {
+  EMPTY_TEMPLATE_REFERENCES,
+  MessageTemplateEditor,
+  TemplateInsertControls,
+  buildTemplatePreview,
+  previewDateValue,
+  type TemplateReferences,
+  type TemplateReferenceState,
+} from '@/components/templates/message-template-editor'
 
-const TYPES = [
-  { value: 'text', label: 'テキスト' },
-  { value: 'flex', label: 'Flex（JSON）' },
-  { value: 'image', label: '画像' },
-]
+interface ReferenceLoaders {
+  friendFields: (accountId: string) => ReturnType<typeof api.friendFields.list>
+  commonVars: (accountId: string) => ReturnType<typeof api.commonVars.list>
+}
+
+async function loadTemplateReferences(
+  accountId: string,
+  loaders: ReferenceLoaders = {
+    friendFields: (id) => api.friendFields.list(id, undefined, { suppressFeatureDisabledEvent: true }),
+    commonVars: (id) => api.commonVars.list(id, undefined, { suppressFeatureDisabledEvent: true }),
+  },
+): Promise<TemplateReferences> {
+  /*
+    友だち情報・共通情報は任意機能。機能オフの403でテンプレート編集そのものを
+    止めないよう、その失敗だけ「候補なし」として扱う。
+  */
+  const emptyOnDisabled = (error: unknown) => {
+    if (error instanceof ApiError && error.code === 'FEATURE_DISABLED') {
+      return { success: true as const, data: [] }
+    }
+    throw error
+  }
+  const [fieldResponse, varResponse] = await Promise.all([
+    loaders.friendFields(accountId).catch(emptyOnDisabled),
+    loaders.commonVars(accountId).catch(emptyOnDisabled),
+  ])
+  if (!fieldResponse.success || !varResponse.success) {
+    throw new Error('差し込み項目を読み込めませんでした')
+  }
+  return {
+    friendFields: fieldResponse.data.filter((field) => field.canInsertText !== false),
+    commonVars: varResponse.data,
+  }
+}
+
+const EMPTY_REFERENCES = EMPTY_TEMPLATE_REFERENCES
+
+/**
+ * 編集画面が見ている LINE 公式アカウントの組み合わせ。
+ *
+ * 「上のバーで選んでいるもの」と「開いているテンプレートの所属」は別物。
+ * この2つを1つの変数で扱うと、切り替えた瞬間に取り違える。
+ */
+interface TemplateAccountBinding {
+  templateId: string | null
+  /**
+   * **いま画面にある中身が、その `templateId` のものとして確定しているか。**
+   *
+   * `ready` 以外は、所属アカウントも本文も、この id のものだと言えない。
+   * URL の id を A から B へ替えた直後がまさにそれで、画面には A の本文が
+   * 残ったまま送り先だけ B になっている。
+   */
+  templateStatus: TemplateLoadStatus
+  templateAccountId: string | null
+  selectedAccountId: string | null
+}
+
+type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
+
+const ACCOUNT_MISMATCH_MESSAGE =
+  '別のLINE公式アカウントに切り替わっています。上のバーでこのテンプレートのアカウントへ戻すと保存できます。'
+
+const TEMPLATE_LOAD_FAILED_MESSAGE = '読み込めませんでした。開き直してください。'
+
+const TEMPLATE_LOADING_MESSAGE =
+  'テンプレートを読み込んでいます。読み終わるまで保存できません。'
+
+/**
+ * 差し込み候補を読むアカウント。**既存テンプレートは所属へ固定する。**
+ *
+ * 上のバーで A から B へ替えても、A のテンプレートを開いている限り
+ * 候補は A のまま。替えた先の候補を出すと、A のテンプレートへ B の
+ * 項目キーを書き込める。書き込めても A の友だちにその項目は無いので、
+ * 配信時に `{{field.…}}` が置き換わらないまま相手へ届く。
+ *
+ * 取得が終わるまでは `null`。終わる前に選択中アカウントで読むと、
+ * 一瞬だけ別アカウントの候補が並び、その隙に選べてしまう。
+ */
+function resolveEditorAccountId(binding: TemplateAccountBinding): string | null {
+  if (!binding.templateId) return binding.selectedAccountId
+  if (binding.templateStatus !== 'ready') return null
+  // 所属を持たない旧データだけ、選択中アカウントの候補で編集する。
+  return binding.templateAccountId ?? binding.selectedAccountId
+}
+
+/** 開いているテンプレートの所属と、上のバーの選択が食い違っているか。 */
+function templateAccountMismatch(binding: TemplateAccountBinding): boolean {
+  if (!binding.templateId || binding.templateStatus !== 'ready') return false
+  if (!binding.templateAccountId || !binding.selectedAccountId) return false
+  return binding.templateAccountId !== binding.selectedAccountId
+}
+
+/**
+ * 保存を閉じる理由。**`null` のときだけ保存の口を開ける。**
+ *
+ * 中身の入力（名前・本文）とは分けている。こちらは「その中身を、その
+ * 送り先へ送ってよいか」の話で、押す前から決まる。押してから知らせる
+ * のでは、押せてしまう瞬間があるのと同じ。
+ */
+function templateSaveGuard(binding: TemplateAccountBinding): string | null {
+  if (binding.templateId) {
+    if (binding.templateStatus === 'failed') return TEMPLATE_LOAD_FAILED_MESSAGE
+    /*
+     * 取得が終わるまで閉じる。**ここが開いていると、A を読んだあと URL を
+     * B へ替えた直後に、A の本文を `PUT /api/templates/B` へ送れる。**
+     * 送り先だけ先に切り替わり、中身が追いつくまでの間があるため。
+     */
+    if (binding.templateStatus !== 'ready') return TEMPLATE_LOADING_MESSAGE
+  }
+  if (templateAccountMismatch(binding)) return ACCOUNT_MISMATCH_MESSAGE
+  return null
+}
+
+/**
+ * 差し込み候補の取り込み。**遅れて届いた古い応答は捨てる。**
+ *
+ * A から B へ替えると、A への問い合わせのほうが後に返ることがある。
+ * 届いた順に入れると、B を編集しているのに A の候補が並ぶ。
+ * 出した順番を持ち、いちばん新しい要求以外は結果を返さない。
+ *
+ * 捨てたときは `null`、読めなかったときは `'failed'`。
+ */
+async function requestTemplateReferences(request: {
+  load: (accountId: string) => Promise<TemplateReferences>
+  accountId: string
+  generation: number
+  currentGeneration: () => number
+}): Promise<TemplateReferences | 'failed' | null> {
+  try {
+    const references = await request.load(request.accountId)
+    return request.generation === request.currentGeneration() ? references : null
+  } catch {
+    return request.generation === request.currentGeneration() ? 'failed' : null
+  }
+}
+
+interface TemplateSaveInput extends TemplateAccountBinding {
+  name: string
+  category: string
+  messageType: string
+  messageContent: string
+  folderId: string | null
+}
+
+/**
+ * 保存してよいか。**駄目な理由を返す。`null` なら保存してよい。**
+ *
+ * 所属と選択の食い違いをここで止める。止めないと、B の候補を挿した本文が
+ * A のテンプレートとして保存される。保存する口 (`PUT /api/templates/:id`)
+ * は所属アカウントを受け取らないので、サーバー側では気づけない。
+ */
+function validateTemplateSave(input: TemplateSaveInput): string | null {
+  const guard = templateSaveGuard(input)
+  if (guard) return guard
+  if (!input.templateId && !input.selectedAccountId) return '上のバーでLINE公式アカウントを選んでください'
+  if (!input.name.trim()) return '名前を入力してください'
+  if (!input.messageContent.trim()) return '本文を入力してください'
+  /*
+   * R249: カード型はバブルかカルーセルのJSONでないと保存しない。
+   * 通常文のまま保存できると「作れた」と誤認する。保存口も
+   * 同じ判定で断るが、ここで先に止めると往復しない。
+   */
+  const flexError = validateFlexContent(input.messageType, input.messageContent)
+  if (flexError) return flexError
+  return null
+}
+
+interface TemplateSaveOps {
+  create: typeof api.templates.create
+  update: typeof api.templates.update
+}
+
+/**
+ * 保存する。**断る条件に当たったら、APIを一度も呼ばない。**
+ *
+ * 画面側でボタンを塞ぐだけだと、状態が入れ替わる途中の押下を拾えない。
+ * 送る直前に、送り先と中身が同じテンプレートのものか確かめ直す。
+ */
+async function saveTemplateEdit(
+  input: TemplateSaveInput,
+  ops: TemplateSaveOps = { create: api.templates.create, update: api.templates.update },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const blocked = validateTemplateSave(input)
+  if (blocked) return { ok: false, error: blocked }
+
+  const payload = {
+    name: input.name.trim(),
+    category: input.category,
+    messageType: input.messageType,
+    messageContent: input.messageContent,
+    folderId: input.folderId,
+  }
+  try {
+    const res = input.templateId
+      ? await ops.update(input.templateId, payload)
+      : await ops.create({ accountId: input.selectedAccountId as string, ...payload })
+    return res.success ? { ok: true } : { ok: false, error: res.error }
+  } catch (e) {
+    // WRITE-01: 権限不足・所属違い・機能オフの理由が見えるようにする。
+    // 内部文（API error: 5xx 等）は画面へ出さない。
+    return { ok: false, error: describeSaveFailure(e) }
+  }
+}
+
+/**
+ * 所属アカウントと選択中アカウントが食い違っているときの知らせ。
+ *
+ * 「保存できません」だけでは戻し方が分からない。どのアカウントのものか、
+ * 候補は何のままかを一緒に出す。
+ */
+function TemplateAccountNotice({
+  binding,
+  templateAccountLabel,
+  selectedAccountLabel,
+}: {
+  binding: TemplateAccountBinding
+  templateAccountLabel: string | null
+  selectedAccountLabel: string | null
+}) {
+  if (!templateAccountMismatch(binding)) return null
+  return (
+    <div role="alert" className="border-hairline rounded-control border bg-canvas-sunken px-3 py-2 text-xs">
+      <p className="text-danger font-semibold">{ACCOUNT_MISMATCH_MESSAGE}</p>
+      <p className="text-ink-secondary mt-1">
+        このテンプレートは「{templateAccountLabel ?? binding.templateAccountId}」のものです。
+        いま選んでいるのは「{selectedAccountLabel ?? binding.selectedAccountId}」です。
+      </p>
+      <p className="text-ink-secondary mt-1">
+        差し込み候補は「{templateAccountLabel ?? binding.templateAccountId}」のまま出しています。
+      </p>
+    </div>
+  )
+}
+
+/** 詳細口（GET /api/templates/:id）が返す利用先の形。 */
+type TemplateDetailData = Extract<
+  Awaited<ReturnType<typeof api.templates.get>>,
+  { success: true }
+>['data']
+type TemplateUsedBy = TemplateDetailData['usedBy']
+
+/**
+ * 利用先の1行分（IDEA-11）。
+ *
+ * 一覧のドロワーと同じ行き先へ揃える。旧形式オートメーションは
+ * 開ける画面が無いので、リンクにせずその旨を添える。
+ */
+function templateUsageEntries(usedBy: TemplateUsedBy): Array<{
+  key: string
+  href: string | null
+  label: string
+}> {
+  return [
+    ...usedBy.scenarioSteps.map((usage) => ({
+      key: `scenario-${usage.stepId}`,
+      href: `/scenarios/detail?id=${usage.scenarioId}`,
+      label: `シナリオ「${usage.scenarioName}」${usage.stepOrder}通目`,
+    })),
+    ...usedBy.autoReplies.map((usage) => ({
+      key: `auto-reply-${usage.id}`,
+      href: `/auto-replies/edit?id=${usage.id}`,
+      label: `自動応答「${usage.keyword}」の返信`,
+    })),
+    ...usedBy.automations.map((usage) => ({
+      key: `automation-${usage.id}`,
+      href: null,
+      label: usage.eventType === 'inbox_favorite'
+        ? '受信箱の「よく使う」'
+        : `オートメーション「${usage.name}」（旧形式・画面からは開けません）`,
+    })),
+    ...usedBy.reminderSteps.map((usage) => ({
+      key: `reminder-${usage.stepId}`,
+      href: `/reminders/edit?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」`,
+    })),
+    // R347: 旧公開版に固定された登録も本文は今のテンプレートを読むため、
+    // 変更の影響先に出す。消すのではなく版と状態を添える。
+    ...(usedBy.reminderEnrollments ?? []).map((usage) => ({
+      key: `reminder-enrollment-${usage.enrollmentId}`,
+      href: `/reminders/detail?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」第${usage.versionNumber}版（${usage.enrollmentStatus === 'cancelled' ? '取消ずみ' : '送信待ち'}）`,
+    })),
+    ...usedBy.richMenuAreas.map((usage) => ({
+      key: `rich-menu-${usage.areaId}`,
+      href: `/rich-menus/edit?id=${usage.groupId}`,
+      label: `リッチメニュー「${usage.groupName}」${usage.pageName}`,
+    })),
+    ...usedBy.trackedLinks.map((usage) => ({
+      key: `tracked-link-${usage.id}`,
+      href: `/inflow-links/detail?id=${usage.id}`,
+      label: `流入リンク「${usage.name}」`,
+    })),
+  ]
+}
+
+/**
+ * 「変更の利用先を表示する」（IDEA-11）。
+ *
+ * 使われているテンプレートを直すとき、保存した内容がどこへ届くかを
+ * 保存の手前に出す。出さないと、自動応答やシナリオで使われている
+ * 本文が予告なしに差し替わる。
+ */
+function TemplateUsageNotice({ usedBy, published }: { usedBy: TemplateUsedBy; published: boolean }) {
+  const entries = templateUsageEntries(usedBy)
+  return (
+    <section
+      aria-label="このテンプレートの利用先"
+      className="border-hairline rounded-control border bg-canvas-sunken p-4"
+    >
+      <p className="text-sm font-semibold text-ink">
+        この変更が使われる場所（{entries.length}か所）
+      </p>
+      {entries.length === 0 ? (
+        <p className="text-ink-secondary mt-1 text-xs">
+          このテンプレートはまだどこからも呼ばれていません。
+        </p>
+      ) : (
+        <>
+          {/*
+            R237: 保存は下書きの保存で、利用先へは公開した内容だけが届く。
+            「保存するとそのまま使われる」と書くと、未公開のまま利用先が
+            変わると誤解する。公開の場所（一覧の詳細パネル）も名指しする。
+          */}
+          <p className="text-ink-secondary mt-1 text-xs">
+            {published
+              ? '保存は下書きの保存です。利用先へ反映するには、一覧の詳細パネルから公開してください。内容を確認してから保存してください。'
+              : 'このテンプレートはまだ公開していません。保存しただけでは利用先へ反映されません。一覧の詳細パネルから公開すると、利用先へ新しい内容が使われます。'}
+          </p>
+          <ul className="mt-2 space-y-1 text-xs">
+            {entries.map((entry) => (
+              <li key={entry.key}>
+                {entry.href ? (
+                  <Link href={entry.href} className="text-action underline">
+                    {entry.label}
+                  </Link>
+                ) : (
+                  <span className="text-ink-secondary">{entry.label}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  )
+}
+
+/** 編集中の中身。テンプレート1件分の下書き。 */
+interface TemplateDraft {
+  name: string
+  category: string
+  folderId: string | null
+  messageType: string
+  messageContent: string
+}
+
+/**
+ * 画面が持つ「テンプレート1件分」の状態。
+ *
+ * **`requestedId` と中身を必ず一緒に動かす。** 別々の `useState` に置くと、
+ * URL の id だけ先に変わり、中身が前のテンプレートのまま残る瞬間ができる。
+ * その瞬間に保存すると、前のテンプレートの本文が新しい id へ入る。
+ */
+interface TemplateEditorState {
+  requestedId: string | null
+  status: TemplateLoadStatus
+  templateAccountId: string | null
+  /** R237: 公開版の版番号。未公開は0。保存と公開の説明を分けるために持つ。 */
+  publishedVersion: number | null
+  draft: TemplateDraft
+  /**
+   * 詳細口が返した利用先（IDEA-11）。未取得は null。
+   * 0件（どこからも呼ばれていない）と区別するため、配列と null を分ける。
+   */
+  usedBy: TemplateUsedBy | null
+}
+
+function newTemplateEditorState(templateId: string | null, visual: boolean): TemplateEditorState {
+  return {
+    requestedId: templateId,
+    status: templateId ? 'loading' : 'idle',
+    templateAccountId: null,
+    publishedVersion: null,
+    usedBy: null,
+    draft: {
+      name: visual ? '定期便 初回のご案内' : '',
+      // category は旧一覧との互換用に保存だけ続ける。分け方は folderId に一本化する。
+      category: 'general',
+      folderId: null,
+      messageType: 'text',
+      messageContent: visual
+        ? '{{name}}さん、いつもありがとうございます。\n初回のお届け予定はこちらです。\nhttps://example.co.jp/first-delivery'
+        : '',
+    },
+  }
+}
 
 function TemplateEditInner() {
   const router = useRouter()
-  const { selectedAccountId } = useAccount()
+  const { accounts, selectedAccountId } = useAccount()
+  /*
+   * N-144: 作成・編集APIは requireRole('owner','admin') で閉じている。
+   * staff が URL 直打ちで来てもフォームを出さず、保存まで辿り着けない
+   * ようにする。一覧の閲覧は /templates に残る。
+   */
+  const [canMutateTemplates] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const params = useSearchParams()
   const id = params.get('id')
+  const assetKind = params.get('kind')
+  const visual = params.get('visual') === '1'
+  usePageTitle(id ? 'メッセージを編集' : 'メッセージを作る')
 
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
-  const [messageType, setMessageType] = useState('text')
-  const [messageContent, setMessageContent] = useState('')
-  const [loading, setLoading] = useState(Boolean(id))
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [references, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)
+  const [referenceState, setReferenceState] = useState<TemplateReferenceState>('idle')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [targetDate, setTargetDate] = useState('')
+  const [editorState, setEditor] = useState<TemplateEditorState>(() => newTemplateEditorState(id, visual))
+
+  /*
+   * URL の id が変わった瞬間に、前のテンプレートの中身を捨てる。
+   *
+   * **`useEffect` で捨てるのでは遅い。** 効果が動くまでの1回の描画で
+   * 「本文は A・所属は A・送り先は B」という組み合わせが画面に出てしまい、
+   * そこで保存すると A の本文が `PUT /api/templates/B` へ流れる。
+   * 描画の途中で捨てれば、その組み合わせは一度も現れない。
+   * （描画中の `setState` は React が認めている「props に合わせて状態を
+   *  直す」書き方。この描画は捨てられ、すぐ新しい状態で描き直される。）
+   */
+  let editor = editorState
+  if (editor.requestedId !== id) {
+    editor = newTemplateEditorState(id, visual)
+    setEditor(editor)
+  }
+
+  const { name, category, folderId, messageType, messageContent } = editor.draft
+  const updateDraft = (patch: Partial<TemplateDraft>) =>
+    setEditor((prev) => ({ ...prev, draft: { ...prev.draft, ...patch } }))
+
+  const binding: TemplateAccountBinding = {
+    templateId: id,
+    templateStatus: editor.status,
+    templateAccountId: editor.templateAccountId,
+    selectedAccountId,
+  }
+  const editorAccountId = resolveEditorAccountId(binding)
+  const accountMismatch = templateAccountMismatch(binding)
+  const saveGuard = templateSaveGuard(binding)
+  // 読み込めていない本文のまま保存すると、空で上書きする危険がある。
+  const loadFailed = editor.status === 'failed'
+  const loading = Boolean(id) && (editor.status === 'idle' || editor.status === 'loading')
+  const accountName = (accountId: string | null) =>
+    accounts.find((account) => account.id === accountId)?.name ?? null
+
+  // 置き場の選択肢。category 文字列とは別に folderId で保存する。
+  // フォルダはアカウント単位（N-147）。テンプレートの所属アカウントで絞る。
+  useEffect(() => {
+    // 読み替えるまで前のアカウントの帯を残さない（他の編集画面と同じ）。
+    setFolders([])
+    if (!editorAccountId) {
+      return
+    }
+    let cancelled = false
+    void api.folders.list('template', editorAccountId)
+      .then((res) => {
+        if (!cancelled && res.success) setFolders(res.data)
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [editorAccountId])
+
+  /*
+   * 出した順番。片付けのたびに1つ進めるので、画面から離れたあとの応答も、
+   * アカウントを替える前に出した応答も、いちばん新しい要求と一致しない。
+   */
+  const referenceGeneration = useRef(0)
+
+  useEffect(() => {
+    setReferences(EMPTY_REFERENCES)
+    const generation = ++referenceGeneration.current
+    if (!editorAccountId) {
+      setReferenceState('idle')
+      return
+    }
+
+    setReferenceState('loading')
+    void requestTemplateReferences({
+      load: loadTemplateReferences,
+      accountId: editorAccountId,
+      generation,
+      currentGeneration: () => referenceGeneration.current,
+    }).then((result) => {
+      if (result === null) return
+      if (result === 'failed') {
+        setReferences(EMPTY_REFERENCES)
+        setReferenceState('failed')
+        return
+      }
+      setReferences(result)
+      setReferenceState('ready')
+    })
+    return () => { referenceGeneration.current += 1 }
+  }, [editorAccountId])
+
+  /*
+   * 取得の世代。id を替えるたびに1つ進める。片付けでも進めるので、
+   * 前の id への応答も、画面を離れたあとの応答も、現世代と一致しない。
+   */
+  const templateGeneration = useRef(0)
 
   useEffect(() => {
     if (!id) return
+    const generation = ++templateGeneration.current
+    /** 現世代で、いまも同じ id を開いているときだけ書き込む。 */
+    const accept = (next: (prev: TemplateEditorState) => TemplateEditorState) => {
+      if (generation !== templateGeneration.current) return
+      setEditor((prev) => (prev.requestedId === id ? next(prev) : prev))
+    }
     void api.templates
       .get(id)
       .then((res) => {
-        if (res.success) {
-          setName(res.data.name)
-          setCategory(res.data.category ?? '')
-          setMessageType(res.data.messageType)
-          setMessageContent(res.data.messageContent)
+        if (!res.success) {
+          accept((prev) => ({ ...prev, status: 'failed' }))
+          return
         }
+        // 所属アカウントと本文は、同じ応答から一度に入れる。片方だけ先に
+        // 入れると、その間だけ食い違いの判定が別の答えを出す。
+        accept(() => ({
+          requestedId: id,
+          status: 'ready',
+          templateAccountId: res.data.accountId ?? null,
+          // 利用先も同じ応答に入っている。保存の手前に出す分も一緒に持つ。
+          usedBy: res.data.usedBy ?? null,
+          // R237: 公開・未公開で利用先への反映説明を分ける。
+          publishedVersion: res.data.publishedVersion ?? null,
+          draft: {
+            name: res.data.name,
+            category: res.data.category ?? '',
+            folderId: res.data.folderId ?? null,
+            messageType: res.data.messageType,
+            messageContent: res.data.messageContent,
+          },
+        }))
       })
-      .finally(() => setLoading(false))
+      .catch(() => accept((prev) => ({ ...prev, status: 'failed' })))
+    return () => { templateGeneration.current += 1 }
   }, [id])
 
-  const contentRef = useRef<HTMLTextAreaElement | null>(null)
-
-  /**
-   * 差し込みをカーソル位置に入れる。
-   *
-   * 末尾に足すだけだと、書いている途中の文の真ん中に入れられない。
-   * 差し込みは文中に置くことがほとんどなので、位置を見て入れる。
-   */
-  const insert = (token: string) => {
-    const el = contentRef.current
-    if (!el) {
-      setMessageContent((v) => v + token)
-      return
-    }
-    const start = el.selectionStart ?? messageContent.length
-    const end = el.selectionEnd ?? start
-    const next = messageContent.slice(0, start) + token + messageContent.slice(end)
-    setMessageContent(next)
-    // 入れた直後にカーソルを token の後ろへ。続けて書けるようにする。
-    requestAnimationFrame(() => {
-      el.focus()
-      el.setSelectionRange(start + token.length, start + token.length)
-    })
-  }
-
-  // LINE は約4,500文字で分割される。上限そのものではないので、超えても
-  // 保存はできる。何通に分かれるかだけ伝える。
-  const SPLIT_AT = 4500
-  const willSplit = messageContent.length > SPLIT_AT
-
   const save = async () => {
-    if (!id && !selectedAccountId) {
-      setError('上のバーでLINE公式アカウントを選んでください')
-      return
+    const input: TemplateSaveInput = {
+      ...binding,
+      name,
+      category,
+      messageType,
+      messageContent,
+      folderId,
     }
-    if (!name.trim()) {
-      setError('名前を入力してください')
-      return
-    }
-    if (!messageContent.trim()) {
-      setError('中身を入力してください')
+    const blocked = validateTemplateSave(input)
+    if (blocked) {
+      setError(blocked)
       return
     }
     setSaving(true)
     setError('')
     try {
-      const res = id
-        ? await api.templates.update(id, { name: name.trim(), category, messageType, messageContent })
-        : await api.templates.create({
-            accountId: selectedAccountId!,
-            name: name.trim(),
-            category,
-            messageType,
-            messageContent,
-          })
-      if (!res.success) {
+      const res = await saveTemplateEdit(input)
+      if (!res.ok) {
         setError(res.error)
         return
       }
       router.push('/templates')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
     } finally {
       setSaving(false)
     }
   }
 
+  if (!canMutateTemplates) {
+    return (
+      <div aria-label="テンプレート編集">
+        <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+          <Link href="/templates" className="underline">
+            テンプレート
+          </Link>
+        </nav>
+        <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
+          <p className="font-bold text-ink">テンプレートの作成・変更はオーナーと管理者だけができます</p>
+          <p className="text-ink-secondary mt-1">中身の確認は一覧の行を開くと読めます。</p>
+          <Link href="/templates" className="text-action underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (assetKind === 'rich_message' || assetKind === 'coupon' || assetKind === 'research') {
+    return <TemplateAssetEditor kind={assetKind} visual={visual} />
+  }
+
   return (
-    <div>
+    <div aria-label="テンプレート編集">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/templates" className="hover:underline">
+        <Link href="/templates" className="underline">
           テンプレート
         </Link>
         <span className="mx-1.5">/</span>
         <span>{name || (id ? '編集' : '作成')}</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title={id ? 'テンプレート編集' : 'テンプレートを作る'}
-          description="配信で使うメッセージを作ります。友だち情報欄や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
-          action={
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-          }
-        />
-      </div>
-
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
       ) : (
-        <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-        <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
-          <Field label="テンプレート名" htmlFor="tp-name" required>
-            <input
-              id="tp-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field label="フォルダ" htmlFor="tp-category" note="一覧での並びに使います。">
-            <input
-              id="tp-category"
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field
-            label="種類"
-            htmlFor="tp-type"
-            note={
-              id ? '作ったあとに種類を変えると、中身の書き方も変える必要があります。' : undefined
-            }
-          >
-            <select
-              id="tp-type"
-              value={messageType}
-              onChange={(e) => setMessageType(e.target.value)}
-              className={inputClass}
-            >
-              {TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <div>
-            <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { label: '名前', token: '{{name}}' },
-                { label: '友だち情報', token: '{{field.項目名}}' },
-                { label: '共通情報', token: '{{var.差し込み名}}' },
-              ].map((t) => (
-                <button
-                  key={t.label}
-                  type="button"
-                  onClick={() => insert(t.token)}
-                  className="border-hairline text-ink-secondary rounded-pill hover:bg-canvas-sunken border px-3 py-1 text-xs"
-                >
-                  {t.label}
-                </button>
-              ))}
-              {/* フォーム回答・配信日を本文に差し込む仕組みが無い。 */}
-              {['フォーム回答', '配信日', 'その他'].map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  disabled
-                  title="この差し込みは準備中です"
-                  className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <Field
-            label="中身"
-            htmlFor="tp-content"
-            required
-            note={
-              <>
-                差し込みが使えます。{'{{name}}'} は友だちの表示名、
-                {'{{field.差し込み名}}'} は友だち情報欄、{'{{var.差し込み名}}'} は共通情報です。
-                <br />
-                カルーセルを作るときは{' '}
-                <Link href="/templates/carousel" className="text-accent hover:underline">
-                  カルーセルの編集
-                </Link>{' '}
-                を使ってください。
-              </>
-            }
-          >
-            <textarea
-              id="tp-content"
-              ref={contentRef}
-              rows={messageType === 'flex' ? 14 : 6}
-              value={messageContent}
-              onChange={(e) => setMessageContent(e.target.value)}
-              className={`${inputClass} resize-y ${messageType === 'flex' ? 'font-mono text-xs' : ''}`}
-            />
-            <p className="text-ink-faint mt-1 text-xs tabular-nums">
-              {messageContent.length} 文字
-              {willSplit
-                ? ` ・ 約${SPLIT_AT}文字を超えると複数のメッセージに分割されます`
-                : ' ・ 分割なし'}
-            </p>
-          </Field>
-
-          <section className="border-hairline rounded-card border p-4">
-            <p className="text-ink text-sm font-semibold">本文内のURL</p>
-            {/* テンプレートの本文と短縮URLを結ぶ記録が無い。配信時に短縮
-                されるが、テンプレート単位のクリック数は追えない。 */}
-            <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-              配信するときにURLは自動で短縮され、クリックが記録されます。テンプレートごとのクリック数はまだ出せません。
-            </p>
-          </section>
-
-          <section className="border-hairline rounded-card border p-4">
-            <p className="text-ink text-sm font-semibold">送信時のアイコン・表示名</p>
-            {/* 担当者名義で送る仕組みが無い。送信元は常に公式アカウント。 */}
-            <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-              いまは公式アイコンでの送信だけです。担当者名義での送信は準備中です。
-            </p>
-          </section>
-
-          {error && <p className="text-danger text-sm">{error}</p>}
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
-            <button
-              disabled
-              title="テスト送信は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-            >
-              テスト送信
-            </button>
-            <Link
-              href="/templates"
-              className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control px-4 py-2 text-sm font-medium"
-            >
-              キャンセル
-            </Link>
-          </div>
-        </div>
-
-        <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-80">
-          <section className="bg-canvas rounded-card border-hairline border p-4">
-            <p className="text-ink text-sm font-semibold">プレビュー</p>
-            <p className="text-ink-faint mt-0.5 mb-2 text-xs">差し込み後の見え方</p>
-            <div className="bg-canvas-sunken rounded-card p-3">
-              <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-              <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-                {messageContent || '（本文がまだありません）'}
-              </p>
-            </div>
-            {/* 差し込みは送るときに実際の値へ置き換わる。ここでは記法のまま
-                出す。適当な人の値を当てはめると、その人に送るように見える。 */}
-            <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-              差し込みは送るときに実際の値に置き換わります。ここでは記法のまま出しています。
-            </p>
-            <p className="text-ink-faint mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
-          </section>
-        </div>
-        </div>
+        <>
+        <MessageTemplateEditor
+          value={{ messageType, messageContent }}
+          onChange={(next) => updateDraft(next)}
+          targetDate={targetDate}
+          onTargetDateChange={setTargetDate}
+          references={references}
+          referenceState={referenceState}
+          referenceAccountId={editorAccountId}
+          referenceAccountLabel={accountMismatch ? accountName(editorAccountId) : null}
+          typeNote={id ? '作ったあとに種類を変えると、中身の書き方も変える必要があります。' : undefined}
+          carouselHref="/templates/carousel"
+          beforeType={(
+            <>
+              <Field label="テンプレート名" htmlFor="tp-name" required>
+                <input id="tp-name" type="text" value={name} onChange={(event) => updateDraft({ name: event.target.value })} className={inputClass} />
+              </Field>
+              <Field label="置き場" htmlFor="tp-folder" note="一覧のフォルダ分けと絞り込みに使います。">
+                <Select aria-label="置き場" id="tp-folder" value={folderId ?? ''} onChange={(value) => updateDraft({ folderId: value || null })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              </Field>
+            </>
+          )}
+          afterType={(
+            <TemplateAccountNotice binding={binding} templateAccountLabel={accountName(editor.templateAccountId)} selectedAccountLabel={accountName(selectedAccountId)} />
+          )}
+          footer={(
+            <>
+              {/*
+                IDEA-11: 変更の利用先を保存の手前に出す。
+                新規作成（id なし）や未取得では出さない。
+              */}
+              {id && editor.status === 'ready' && editor.usedBy ? (
+                <TemplateUsageNotice
+                  usedBy={editor.usedBy}
+                  published={(editor.publishedVersion ?? 0) >= 1}
+                />
+              ) : null}
+              {(loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error) && <p className="text-danger text-sm">{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p>}
+              {saveGuard && !loadFailed && !accountMismatch && <p role="status" className="text-ink-secondary text-sm">{saveGuard}</p>}
+              {/*
+                ★V7: 保存・実行は下の固定バーにしか置かない。本文の最後に置くと、
+                長い画面で「どこで保存されるのか」が分からなくなる。
+                理由の文（利用先・保存できない理由）は手前に残す。
+              */}
+            </>
+          )}
+        />
+        <StickyBar
+          actions={(
+            <>
+              <Button href="/templates">キャンセル</Button>
+              <Button type="button" variant="primary" onClick={save} disabled={saving || loadFailed || saveGuard !== null} title={saveGuard ?? undefined}>
+                {saving ? '保存中...' : '保存'}
+              </Button>
+            </>
+          )}
+        />
+        </>
       )}
     </div>
   )
 }
 
-export default function TemplateEditPage() {
+function TemplateEditPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
@@ -324,3 +708,31 @@ export default function TemplateEditPage() {
     </Suspense>
   )
 }
+
+/*
+ * 試験から触れる口。**画面を組み立て直さずに、実際に動く部品を呼ぶ。**
+ * ここに出すのは、画面本体がそのまま使っている関数と部品だけ。
+ */
+const TemplateEditPageWithTestSupport = Object.assign(TemplateEditPage, {
+  __testing: {
+    ACCOUNT_MISMATCH_MESSAGE,
+    TEMPLATE_LOADING_MESSAGE,
+    TEMPLATE_LOAD_FAILED_MESSAGE,
+    TemplateAccountNotice,
+    TemplateEditInner,
+    TemplateInsertControls,
+    TemplateUsageNotice,
+    templateUsageEntries,
+    buildTemplatePreview,
+    loadTemplateReferences,
+    previewDateValue,
+    requestTemplateReferences,
+    resolveEditorAccountId,
+    saveTemplateEdit,
+    templateAccountMismatch,
+    templateSaveGuard,
+    validateTemplateSave,
+  },
+})
+
+export default TemplateEditPageWithTestSupport

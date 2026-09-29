@@ -1,0 +1,1215 @@
+{
+  "version": 1,
+  "rev": 3,
+  "savedAt": "2026-09-03T10:27:27.956Z",
+  "id": "project-g431t5",
+  "name": "LINE Harness V6",
+  "color": "#1f8a4c",
+  "viewport": {
+    "x": 80,
+    "y": 80,
+    "zoom": 1
+  },
+  "nodes": [
+    {
+      "id": "grp-hq",
+      "kind": "group",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "司令塔 Fable 5.1",
+      "titleAuto": true,
+      "color": "#5319e7",
+      "group": null,
+      "collapsed": false,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-hq",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-hq",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "grp-s0",
+      "kind": "group",
+      "position": {
+        "x": 0,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "S0 共通部品 (Opus 5)",
+      "titleAuto": true,
+      "color": "#1f8a4c",
+      "group": null,
+      "collapsed": false,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-s0",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-s0",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "grp-s1",
+      "kind": "group",
+      "position": {
+        "x": 840,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "S1 機能1〜5 (Opus 5)",
+      "titleAuto": true,
+      "color": "#1f8a4c",
+      "group": null,
+      "collapsed": false,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-s1",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-s1",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "grp-s2",
+      "kind": "group",
+      "position": {
+        "x": 1680,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "S2 機能6〜13 (Opus 5)",
+      "titleAuto": true,
+      "color": "#1f8a4c",
+      "group": null,
+      "collapsed": false,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-s2",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-s2",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "grp-s3",
+      "kind": "group",
+      "position": {
+        "x": 2520,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "S3 機能14〜32 (Opus 5)",
+      "titleAuto": true,
+      "color": "#1f8a4c",
+      "group": null,
+      "collapsed": false,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-s3",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-s3",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "grp-codex",
+      "kind": "group",
+      "position": {
+        "x": 3360,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "実装 Codex",
+      "titleAuto": true,
+      "color": "#0052cc",
+      "group": null,
+      "collapsed": false,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-codex",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-codex",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-hq",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "司令塔 Fable 5.1",
+      "titleAuto": false,
+      "color": "#5319e7",
+      "group": null,
+      "tags": [
+        "lane:hq"
+      ],
+      "collapsed": false,
+      "parentId": "grp-hq",
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-hq"
+    },
+    {
+      "id": "note-hq",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "titleAuto": true,
+      "color": "#f6ecd3",
+      "group": null,
+      "collapsed": false,
+      "parentId": "grp-hq",
+      "text": "あなたは司令塔(Fable 5.1)。まず docs/brain/Home.md を読み、docs/v6-orchestration-nodeterm.md §4 の流れで台帳(GitHub Issues)を回す。"
+    },
+    {
+      "id": "agent-s0",
+      "kind": "terminal",
+      "position": {
+        "x": 20.880349112579907,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "S0 共通部品 (Opus 5)",
+      "titleAuto": false,
+      "color": "#1f8a4c",
+      "group": null,
+      "tags": [
+        "lane:s0"
+      ],
+      "collapsed": false,
+      "parentId": "grp-s0",
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-s0"
+    },
+    {
+      "id": "note-s0",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "titleAuto": true,
+      "color": "#f6ecd3",
+      "group": null,
+      "collapsed": false,
+      "parentId": "grp-s0",
+      "text": "あなたは S0(共通部品)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S0 共通部品」の指示で動く。lane:s0 の todo を 1 件取って始める。"
+    },
+    {
+      "id": "agent-s1",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "S1 機能1〜5 (Opus 5)",
+      "titleAuto": false,
+      "color": "#1f8a4c",
+      "group": null,
+      "tags": [
+        "lane:s1"
+      ],
+      "collapsed": false,
+      "parentId": "grp-s1",
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-s1"
+    },
+    {
+      "id": "note-s1",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "titleAuto": true,
+      "color": "#f6ecd3",
+      "group": null,
+      "collapsed": false,
+      "parentId": "grp-s1",
+      "text": "あなたは S1(機能 1〜5)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s1 の todo を 1 件取って始める。"
+    },
+    {
+      "id": "agent-s2",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "S2 機能6〜13 (Opus 5)",
+      "titleAuto": false,
+      "color": "#1f8a4c",
+      "group": null,
+      "tags": [
+        "lane:s2"
+      ],
+      "collapsed": false,
+      "parentId": "grp-s2",
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-s2"
+    },
+    {
+      "id": "note-s2",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "titleAuto": true,
+      "color": "#f6ecd3",
+      "group": null,
+      "collapsed": false,
+      "parentId": "grp-s2",
+      "text": "あなたは S2(機能 6〜13)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s2 の todo を 1 件取って始める。"
+    },
+    {
+      "id": "agent-s3",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "S3 機能14〜32 (Opus 5)",
+      "titleAuto": false,
+      "color": "#1f8a4c",
+      "group": null,
+      "tags": [
+        "lane:s3"
+      ],
+      "collapsed": false,
+      "parentId": "grp-s3",
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-s3"
+    },
+    {
+      "id": "note-s3",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "titleAuto": true,
+      "color": "#f6ecd3",
+      "group": null,
+      "collapsed": false,
+      "parentId": "grp-s3",
+      "text": "あなたは S3(機能 14〜32)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s3 の todo を 1 件取って始める。"
+    },
+    {
+      "id": "agent-codex",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "実装 Codex",
+      "titleAuto": false,
+      "color": "#0052cc",
+      "group": null,
+      "tags": [
+        "lane:codex"
+      ],
+      "collapsed": false,
+      "parentId": "grp-codex",
+      "agentId": "codex",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-codex"
+    },
+    {
+      "id": "note-codex",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "titleAuto": true,
+      "color": "#f6ecd3",
+      "group": null,
+      "collapsed": false,
+      "parentId": "grp-codex",
+      "text": "あなたは実装(Codex)。まず docs/brain/Home.md を読み、docs/v6-directives.md §3 の指示で動く。lane:codex の todo を 1 件取って始める。"
+    },
+    {
+      "id": "trigger-morning",
+      "kind": "trigger",
+      "position": {
+        "x": 840,
+        "y": 0
+      },
+      "size": {
+        "width": 300,
+        "height": 180
+      },
+      "title": "朝の割り当て 09:00",
+      "titleAuto": true,
+      "color": "#b07a1c",
+      "group": null,
+      "collapsed": false,
+      "trigger": {
+        "schedule": {
+          "kind": "cron",
+          "expr": "0 9 * * 1-5"
+        },
+        "payload": "朝の割り当てをする。gh で lane ラベル別に open Issue を読み、各担当の今日の分(1〜2 件)を todo → doing の順に並べ、依存が未完のものは blocked にする。オープン PR 数と、昨日マージした数を Slack の指令塔チャンネルに 1 行で書く。相手の領域への依頼が Slack に来ていたら Issue にする。",
+        "target": "agent-hq",
+        "note": "平日 9:00 に司令塔へ"
+      }
+    },
+    {
+      "id": "trigger-evening",
+      "kind": "trigger",
+      "position": {
+        "x": 1180,
+        "y": 0
+      },
+      "size": {
+        "width": 300,
+        "height": 180
+      },
+      "title": "夕方のまとめ 18:00",
+      "titleAuto": true,
+      "color": "#b07a1c",
+      "group": null,
+      "collapsed": false,
+      "trigger": {
+        "schedule": {
+          "kind": "cron",
+          "expr": "0 18 * * 1-5"
+        },
+        "payload": "review 列の PR を順に確認する: base が最新か、必須ゲート成功か、変更パスが lane の範囲内か。満たすものをマージして Issue を閉じる。満たさないものは理由を Issue にコメントして doing に戻す。オープン PR 数、一致画面数(docs/design-qa/v6-progress-ledger.md)、blocked の件数を Slack に 1 行で書く。docs/brain/Memory.md の「進行中」を更新する。",
+        "target": "agent-hq",
+        "note": "平日 18:00 に司令塔へ"
+      }
+    },
+    {
+      "id": "trigger-pull-s0",
+      "kind": "trigger",
+      "position": {
+        "x": 840,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "s0 の次を取る(30分ごと)",
+      "titleAuto": true,
+      "color": "#8a938d",
+      "group": null,
+      "collapsed": false,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-s0",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-s1",
+      "kind": "trigger",
+      "position": {
+        "x": 1160,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "s1 の次を取る(30分ごと)",
+      "titleAuto": true,
+      "color": "#8a938d",
+      "group": null,
+      "collapsed": false,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-s1",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-s2",
+      "kind": "trigger",
+      "position": {
+        "x": 1480,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "s2 の次を取る(30分ごと)",
+      "titleAuto": true,
+      "color": "#8a938d",
+      "group": null,
+      "collapsed": false,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-s2",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-s3",
+      "kind": "trigger",
+      "position": {
+        "x": 1800,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "s3 の次を取る(30分ごと)",
+      "titleAuto": true,
+      "color": "#8a938d",
+      "group": null,
+      "collapsed": false,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-s3",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-codex",
+      "kind": "trigger",
+      "position": {
+        "x": 2120,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "codex の次を取る(30分ごと)",
+      "titleAuto": true,
+      "color": "#8a938d",
+      "group": null,
+      "collapsed": false,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-codex",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "grp-pen",
+      "kind": "group",
+      "position": {
+        "x": 0,
+        "y": 1040
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "Pencil デザイン修正 (Opus 5)",
+      "color": "#a15c00",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-pen",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-pen",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-pen",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "Pencil デザイン修正 (Opus 5)",
+      "titleAuto": false,
+      "color": "#a15c00",
+      "group": null,
+      "parentId": "grp-pen",
+      "agentId": "claude",
+      "tags": [
+        "lane:pen"
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-pen"
+    },
+    {
+      "id": "note-pen",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-pen",
+      "text": "あなたは Pencil デザイン修正(lane:pen)。まず docs/brain/Home.md を読む。Pencil MCP で ★V6 を直し(docs/v6-pencil-fix-prompt.md の 50 件、優先度順)、直した画面を html-css で書き出して docs/design-reference/<機能>-v6 を更新する。lane:pen の todo を 1 件取って始める。"
+    },
+    {
+      "id": "grp-fix",
+      "kind": "group",
+      "position": {
+        "x": 840,
+        "y": 1040
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "Codex エラー修正",
+      "color": "#0052cc",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-fix",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-fix",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-fix",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "Codex エラー修正",
+      "titleAuto": false,
+      "color": "#0052cc",
+      "group": null,
+      "parentId": "grp-fix",
+      "agentId": "codex",
+      "tags": [
+        "lane:fix"
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-fix"
+    },
+    {
+      "id": "note-fix",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-fix",
+      "text": "あなたは Codex エラー修正(lane:fix)。まず docs/brain/Home.md を読む。品質チェック(lane:qa)が起票した不具合と、ステージングで見つかったエラーを 1 件 1 PR で直す。lane:fix の todo を 1 件取って始める。"
+    },
+    {
+      "id": "grp-qa",
+      "kind": "group",
+      "position": {
+        "x": 1680,
+        "y": 1040
+      },
+      "size": {
+        "width": 1620,
+        "height": 380
+      },
+      "title": "品質チェック (Codex・読み取り専用)",
+      "color": "#6f42c1",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-qa",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-qa",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-qa-error",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 370,
+        "height": 180
+      },
+      "title": "エラーチェック (Codex)",
+      "titleAuto": false,
+      "color": "#6f42c1",
+      "group": null,
+      "parentId": "grp-qa",
+      "agentId": "codex",
+      "tags": [
+        "lane:qa",
+        "qa:error"
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-qa"
+    },
+    {
+      "id": "note-qa-error",
+      "kind": "sticky",
+      "position": {
+        "x": 20,
+        "y": 250
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-qa",
+      "text": "あなたは品質チェック「エラーチェック」(lane:qa)。まず docs/brain/Home.md を読む。typecheck・test・ビルド・ステージングのログを毎朝確認し、失敗と未処理エラーを lane:fix のチケットにする。 コードは直さない(直すのは lane:fix)。結果は line-harness-board に 1 件 1 Issue で起票し、重複は既存 Issue にコメントする。"
+    },
+    {
+      "id": "trigger-qa-error",
+      "kind": "trigger",
+      "position": {
+        "x": 840,
+        "y": 1480
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "エラーチェック 毎朝 07:00",
+      "color": "#6f42c1",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "cron",
+          "expr": "0 7 * * 1-5"
+        },
+        "payload": "エラーチェックを実行する。最新の codex/development を取り込み、付箋の手順で検査し、結果を line-harness-board に起票する。前回起票分の重複は避ける。",
+        "target": "agent-qa-error",
+        "note": "平日朝の定時検査"
+      }
+    },
+    {
+      "id": "agent-qa-code",
+      "kind": "terminal",
+      "position": {
+        "x": 410,
+        "y": 60
+      },
+      "size": {
+        "width": 370,
+        "height": 180
+      },
+      "title": "コードチェック (Codex)",
+      "titleAuto": false,
+      "color": "#6f42c1",
+      "group": null,
+      "parentId": "grp-qa",
+      "agentId": "codex",
+      "tags": [
+        "lane:qa",
+        "qa:code"
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-qa"
+    },
+    {
+      "id": "note-qa-code",
+      "kind": "sticky",
+      "position": {
+        "x": 410,
+        "y": 250
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-qa",
+      "text": "あなたは品質チェック「コードチェック」(lane:qa)。まず docs/brain/Home.md を読む。直近 24 時間にマージされた PR を読み、所有パス違反・重複実装・準備中の増加・契約テストの抜けを指摘し、lane:fix か担当 lane のチケットにする。 コードは直さない(直すのは lane:fix)。結果は line-harness-board に 1 件 1 Issue で起票し、重複は既存 Issue にコメントする。"
+    },
+    {
+      "id": "trigger-qa-code",
+      "kind": "trigger",
+      "position": {
+        "x": 1160,
+        "y": 1480
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "コードチェック 毎朝 07:05",
+      "color": "#6f42c1",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "cron",
+          "expr": "5 7 * * 1-5"
+        },
+        "payload": "コードチェックを実行する。最新の codex/development を取り込み、付箋の手順で検査し、結果を line-harness-board に起票する。前回起票分の重複は避ける。",
+        "target": "agent-qa-code",
+        "note": "平日朝の定時検査"
+      }
+    },
+    {
+      "id": "agent-qa-perf",
+      "kind": "terminal",
+      "position": {
+        "x": 800,
+        "y": 60
+      },
+      "size": {
+        "width": 370,
+        "height": 180
+      },
+      "title": "速度チェック (Codex)",
+      "titleAuto": false,
+      "color": "#6f42c1",
+      "group": null,
+      "parentId": "grp-qa",
+      "agentId": "codex",
+      "tags": [
+        "lane:qa",
+        "qa:perf"
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-qa"
+    },
+    {
+      "id": "note-qa-perf",
+      "kind": "sticky",
+      "position": {
+        "x": 800,
+        "y": 250
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-qa",
+      "text": "あなたは品質チェック「速度チェック」(lane:qa)。まず docs/brain/Home.md を読む。D1 の全件読み込み・LIMIT 無しの一覧・N+1・cron の集中を検査し、閾値超過を lane:codex のチケットにする。 コードは直さない(直すのは lane:fix)。結果は line-harness-board に 1 件 1 Issue で起票し、重複は既存 Issue にコメントする。"
+    },
+    {
+      "id": "trigger-qa-perf",
+      "kind": "trigger",
+      "position": {
+        "x": 1480,
+        "y": 1480
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "速度チェック 毎朝 07:10",
+      "color": "#6f42c1",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "cron",
+          "expr": "10 7 * * 1-5"
+        },
+        "payload": "速度チェックを実行する。最新の codex/development を取り込み、付箋の手順で検査し、結果を line-harness-board に起票する。前回起票分の重複は避ける。",
+        "target": "agent-qa-perf",
+        "note": "平日朝の定時検査"
+      }
+    },
+    {
+      "id": "agent-qa-sec",
+      "kind": "terminal",
+      "position": {
+        "x": 1190,
+        "y": 60
+      },
+      "size": {
+        "width": 370,
+        "height": 180
+      },
+      "title": "セキュリティチェック (Codex)",
+      "titleAuto": false,
+      "color": "#6f42c1",
+      "group": null,
+      "parentId": "grp-qa",
+      "agentId": "codex",
+      "tags": [
+        "lane:qa",
+        "qa:sec"
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-qa"
+    },
+    {
+      "id": "note-qa-sec",
+      "kind": "sticky",
+      "position": {
+        "x": 1190,
+        "y": 250
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-qa",
+      "text": "あなたは品質チェック「セキュリティチェック」(lane:qa)。まず docs/brain/Home.md を読む。認可漏れ(:id ルートの境界)、秘密値の露出、署名検証の抜け、依存の脆弱性(pnpm audit)を検査し、lane:fix のチケットにする(重大なら blocked にして人へ)。 コードは直さない(直すのは lane:fix)。結果は line-harness-board に 1 件 1 Issue で起票し、重複は既存 Issue にコメントする。"
+    },
+    {
+      "id": "trigger-qa-sec",
+      "kind": "trigger",
+      "position": {
+        "x": 1800,
+        "y": 1480
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "セキュリティチェック 毎朝 07:15",
+      "color": "#6f42c1",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "cron",
+          "expr": "15 7 * * 1-5"
+        },
+        "payload": "セキュリティチェックを実行する。最新の codex/development を取り込み、付箋の手順で検査し、結果を line-harness-board に起票する。前回起票分の重複は避ける。",
+        "target": "agent-qa-sec",
+        "note": "平日朝の定時検査"
+      }
+    },
+    {
+      "id": "trigger-pull-pen",
+      "kind": "trigger",
+      "position": {
+        "x": 0,
+        "y": 1480
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "pen の次を取る(30分ごと)",
+      "color": "#8a938d",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-pen",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-fix",
+      "kind": "trigger",
+      "position": {
+        "x": 320,
+        "y": 1480
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "fix の次を取る(30分ごと)",
+      "color": "#8a938d",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-fix",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    }
+  ],
+  "bridges": [
+    {
+      "id": "link-note-hq-agent-hq",
+      "source": "note-hq",
+      "target": "agent-hq"
+    },
+    {
+      "id": "link-note-s0-agent-s0",
+      "source": "note-s0",
+      "target": "agent-s0"
+    },
+    {
+      "id": "link-agent-hq-agent-s0",
+      "source": "agent-hq",
+      "target": "agent-s0"
+    },
+    {
+      "id": "link-note-s1-agent-s1",
+      "source": "note-s1",
+      "target": "agent-s1"
+    },
+    {
+      "id": "link-agent-hq-agent-s1",
+      "source": "agent-hq",
+      "target": "agent-s1"
+    },
+    {
+      "id": "link-note-s2-agent-s2",
+      "source": "note-s2",
+      "target": "agent-s2"
+    },
+    {
+      "id": "link-agent-hq-agent-s2",
+      "source": "agent-hq",
+      "target": "agent-s2"
+    },
+    {
+      "id": "link-note-s3-agent-s3",
+      "source": "note-s3",
+      "target": "agent-s3"
+    },
+    {
+      "id": "link-agent-hq-agent-s3",
+      "source": "agent-hq",
+      "target": "agent-s3"
+    },
+    {
+      "id": "link-note-codex-agent-codex",
+      "source": "note-codex",
+      "target": "agent-codex"
+    },
+    {
+      "id": "link-agent-hq-agent-codex",
+      "source": "agent-hq",
+      "target": "agent-codex"
+    },
+    {
+      "id": "link-note-pen-agent-pen",
+      "source": "note-pen",
+      "target": "agent-pen"
+    },
+    {
+      "id": "link-agent-hq-agent-pen",
+      "source": "agent-hq",
+      "target": "agent-pen"
+    },
+    {
+      "id": "link-note-fix-agent-fix",
+      "source": "note-fix",
+      "target": "agent-fix"
+    },
+    {
+      "id": "link-agent-hq-agent-fix",
+      "source": "agent-hq",
+      "target": "agent-fix"
+    },
+    {
+      "id": "link-note-qa-error-agent-qa-error",
+      "source": "note-qa-error",
+      "target": "agent-qa-error"
+    },
+    {
+      "id": "link-agent-hq-agent-qa-error",
+      "source": "agent-hq",
+      "target": "agent-qa-error"
+    },
+    {
+      "id": "link-note-qa-code-agent-qa-code",
+      "source": "note-qa-code",
+      "target": "agent-qa-code"
+    },
+    {
+      "id": "link-agent-hq-agent-qa-code",
+      "source": "agent-hq",
+      "target": "agent-qa-code"
+    },
+    {
+      "id": "link-note-qa-perf-agent-qa-perf",
+      "source": "note-qa-perf",
+      "target": "agent-qa-perf"
+    },
+    {
+      "id": "link-agent-hq-agent-qa-perf",
+      "source": "agent-hq",
+      "target": "agent-qa-perf"
+    },
+    {
+      "id": "link-note-qa-sec-agent-qa-sec",
+      "source": "note-qa-sec",
+      "target": "agent-qa-sec"
+    },
+    {
+      "id": "link-agent-hq-agent-qa-sec",
+      "source": "agent-hq",
+      "target": "agent-qa-sec"
+    }
+  ],
+  "ropes": [],
+  "kanban": {
+    "columns": [
+      {
+        "id": "todo",
+        "title": "未着手",
+        "color": "#8a938d"
+      },
+      {
+        "id": "doing",
+        "title": "作業中",
+        "color": "#b07a1c"
+      },
+      {
+        "id": "review",
+        "title": "マージ待ち",
+        "color": "#1d76db"
+      },
+      {
+        "id": "blocked",
+        "title": "停止",
+        "color": "#b23a3a"
+      },
+      {
+        "id": "done",
+        "title": "完了",
+        "color": "#1f8a4c"
+      }
+    ],
+    "assignments": [],
+    "github": {
+      "repository": "kentavndng/line-harness-board",
+      "columnMappings": [
+        {
+          "columnId": "todo",
+          "label": "todo"
+        },
+        {
+          "columnId": "doing",
+          "label": "doing"
+        },
+        {
+          "columnId": "review",
+          "label": "review"
+        },
+        {
+          "columnId": "blocked",
+          "label": "blocked"
+        },
+        {
+          "columnId": "done",
+          "label": "done"
+        }
+      ],
+      "completionColumnId": "done"
+    }
+  }
+}

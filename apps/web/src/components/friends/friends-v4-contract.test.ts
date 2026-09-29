@@ -8,10 +8,15 @@ const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'page.tsx'), 
 const TABLE = readFileSync(join(HERE, 'friend-list-table.tsx'), 'utf8')
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
 const KPIS = readFileSync(join(HERE, 'friend-kpis.tsx'), 'utf8')
-const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'summary-card.module.css'), 'utf8')
+const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'kpi-card.module.css'), 'utf8')
 const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
+/* N-039: 保存検索・通知の窓は overlay 規約へ乗せるため部品へ切り出した。 */
+const SAVED_DIALOG = readFileSync(join(HERE, 'saved-search-dialog.tsx'), 'utf8')
+const NOTICE_DIALOG = readFileSync(join(HERE, 'notice-dialog.tsx'), 'utf8')
 const TIMELINE = readFileSync(join(HERE, 'friend-timeline.tsx'), 'utf8')
+/* #984 LAY-14: 友だち配下の主タブの正本は friends-tabs.ts。 */
+const FRIENDS_TABS = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'friends-tabs.ts'), 'utf8')
 const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'detail', 'page.tsx'), 'utf8')
 const DUPLICATES = readFileSync(join(HERE, '..', '..', 'app', 'duplicates', 'page.tsx'), 'utf8')
 const USERS_TABLE = readFileSync(join(HERE, '..', 'users', 'users-table.tsx'), 'utf8')
@@ -43,8 +48,10 @@ describe('友だちV6の画面契約', () => {
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).toContain('data-design="V6Tabs"')
     expect(PAGE).toContain('data-design-node="JB0Ki"')
-    expect(PAGE).toContain("{ key: 'duplicates', label: '重複検出' }")
-    expect(PAGE).toContain("{ key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' }")
+    // 主タブの項目は friends-tabs.ts が正本（#984 LAY-14。UID移行側も同じ一覧を使う）。
+    expect(PAGE).toContain('FRIENDS_MERGED_TABS')
+    expect(FRIENDS_TABS).toContain("{ key: 'duplicates', label: '重複検出'")
+    expect(FRIENDS_TABS).toContain("{ key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' }")
     expect(PAGE).toContain('actions={')
     expect(PAGE).toContain('CSVで書き出す')
     expect(PAGE).not.toContain('友だち管理のマニュアルは準備中です')
@@ -67,12 +74,12 @@ describe('友だちV6の画面契約', () => {
 
   it('V6のカード影と操作色を守る', () => {
     for (const source of [PAGE, TABLE]) {
-      expect(source).toContain('shadow-v6-card')
+      expect(source).toContain('shadow-card')
     }
-    expect(KPIS).toContain("import SummaryCard from '@/components/shared/summary-card'")
+    expect(KPIS).toContain("import KpiCard from '@/components/shared/kpi-card'")
     expect(SUMMARY_CARD_CSS).toContain('box-shadow: var(--shadow-card)')
-    expect(PAGE).toContain('text-v6-action')
-    expect(PAGE).toContain('bg-v6-accent')
+    expect(PAGE).toContain('text-action')
+    expect(PAGE).toContain('bg-accent')
   })
 
   it('一覧の不要な開く列を除き、件数・表示項目・表示件数を見出し右へ置く', () => {
@@ -80,7 +87,8 @@ describe('友だちV6の画面契約', () => {
     expect(TABLE).not.toContain('>操作<')
     expect(ROW).not.toContain('>開く<')
     expect(TABLE).toContain('表示項目を編集')
-    expect(TABLE).toContain('件表示')
+    // #668: 件数の選び口は共通部品 PageSizeSelect（「表示件数 N件」）。
+    expect(TABLE).toContain('PageSizeSelect')
     expect(TABLE).toContain('truncate text-center')
     expect(ROW).toContain('items-center')
     expect(ROW).toContain('text-center')
@@ -91,7 +99,7 @@ describe('友だちV6の画面契約', () => {
     expect(PAGE).toContain('名前・LINE名・タグ・メモで検索')
     expect(PAGE).toContain('詳細条件')
     expect(PAGE).toContain('SavedSearchDialog')
-    expect(PAGE).toContain('api.savedSearches.list')
+    expect(SAVED_DIALOG).toContain('api.friendSavedViews.list')
     expect(PAGE).toContain('savedSearchId')
     expect(ADVANCED).toContain('この条件で表示')
     expect(PAGE).toContain('友だち追加の新しい順')
@@ -114,8 +122,9 @@ describe('友だちV6の画面契約', () => {
   })
 
   it('未対応・注目・表示列の選択状態を目と再読み込み後の両方で確認できる', () => {
-    expect(PAGE).toContain("responseFilter === 'unhandled' ? 'bg-v6-danger-selected ring-2")
-    expect(PAGE).toContain('aria-pressed={attentionOnly}')
+    // m13i: 札の形は共通 FilterChip 1つにそろえた。目の選択表示は部品が持つ。
+    expect(PAGE).toContain("selected={responseFilter === 'unhandled'}")
+    expect(PAGE).toContain('selected={attentionOnly}')
     expect(TABLE).toContain("localStorage.getItem('friends.visibleColumns')")
     expect(TABLE).toContain("localStorage.setItem('friends.visibleColumns'")
     expect(API).toContain('JSON.stringify(metadata)')
@@ -140,8 +149,8 @@ describe('友だちV6の画面契約', () => {
     expect(DUPLICATES).toContain('rounded-[14px]')
     expect(DUPLICATES).toContain('#DADDE2')
     expect(USERS_PAGE).toContain('data-design-node="r7eSi"')
-    expect(USERS_TABLE).toContain('rounded-v6-card')
-    expect(USER_ROW).toContain('border-v6-divider')
+    expect(USERS_TABLE).toContain('rounded-card')
+    expect(USER_ROW).toContain('border-divider-soft')
     expect(USER_ROW).toContain('登録アカウント詳細')
   })
 
@@ -152,8 +161,12 @@ describe('友だちV6の画面契約', () => {
   it('ブラウザ標準アラートを使わず独自ダイアログを出す', () => {
     expect(PAGE).not.toContain('window.alert')
     expect(PAGE).not.toContain('window.confirm')
-    expect(PAGE).toContain('role="dialog"')
-    expect(PAGE).toContain('aria-modal="true"')
+    /* N-039: 通知・保存検索の窓は部品側へ。共通overlay規約（Esc・復元）に乗せる。 */
+    for (const source of [NOTICE_DIALOG, SAVED_DIALOG]) {
+      expect(source).toContain('role="dialog"')
+      expect(source).toContain('aria-modal="true"')
+      expect(source).toContain('useOverlayFocus')
+    }
   })
 
   it('既存の検索・タグ・対応・詳細・受信箱への経路を残す', () => {

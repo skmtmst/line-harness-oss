@@ -25,11 +25,16 @@ describe('予約メール原文の環境分離', () => {
     expect(staging).toMatch(/^RESTAURANT_INTAKE_DOMAIN = "rs\.musubo\.jp"$/m);
   });
 
-  it('飲食店テストは検証だけを明示的に有効にする', () => {
+  // 飲食店向け機能そのものは本番でも使う（Googleビジネスを本番へ出したため）。
+  // 分離したままにするのは予約メールの取り込み一式（RESTAURANT_INTAKE_DOMAIN と
+  // RAW_MAIL）だけで、そこは上の2つの試験が見張っている。
+  // RAW_MAIL は参照箇所すべてが未設定を見て止まるので、本番で機能を有効にしても
+  // 取り込み経路が動き出すことはない。
+  it('飲食店向け機能は本番・検証の両方で明示的に有効にする', () => {
     const production = readFileSync(join(workerRoot, 'wrangler.toml'), 'utf8');
     const staging = readFileSync(join(workerRoot, 'wrangler.staging.toml'), 'utf8');
 
-    expect(production).toMatch(/^RESTAURANT_TEST_ENABLED = "false"$/m);
+    expect(production).toMatch(/^RESTAURANT_TEST_ENABLED = "true"$/m);
     expect(staging).toMatch(/^RESTAURANT_TEST_ENABLED = "true"$/m);
   });
 

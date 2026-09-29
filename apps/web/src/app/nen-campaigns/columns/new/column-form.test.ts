@@ -1,12 +1,15 @@
+import type { Tag } from '@line-crm/shared'
 import { describe, expect, it } from 'vitest'
 import {
   canSubmit,
   EMPTY_DRAFT,
   failureOf,
+  isPastScheduledAt,
   publishedAtIso,
   titleNotice,
   toCreateInput,
   validateDraft,
+  visibleAccountTags,
 } from './column-form'
 
 const draft = (over: Partial<typeof EMPTY_DRAFT> = {}) => ({
@@ -55,7 +58,8 @@ describe('送る形', () => {
     // body / slug / externalId / lineAccountId を含めると400になる。
     const sent = toCreateInput(draft({ category: '食事', excerpt: 'ご紹介します。' }))
     expect(Object.keys(sent).sort()).toEqual(
-      ['articleUrl', 'category', 'excerpt', 'imageUrl', 'publishedAt', 'title'],
+      ['articleUrl', 'category', 'completionEventName', 'completionTagId', 'excerpt', 'imageUrl',
+        'publishedAt', 'scheduledAt', 'targetMode', 'targetTagId', 'title'],
     )
   })
 
@@ -136,5 +140,56 @@ describe('公開日時', () => {
   it('日付だけ・時刻だけでは送らない', () => {
     expect(publishedAtIso('2026-08-31')).toBeNull()
     expect(validateDraft(draft({ publishedAt: '2026-08-31' })).map((e) => e.field)).toContain('publishedAt')
+  })
+})
+
+describe('配信日時（#935 N-304）', () => {
+  it('過去の配信日時を止める', () => {
+    /*
+      過去を通すとWorkerの次のtickで即送され、「予約した」のに「今届いた」になる。
+      Workerも断るが、入力中に先に気づけるようにする。
+    */
+    const errors = validateDraft(draft({ scheduledAt: '2000-01-01T00:00' }))
+    const hit = errors.find((e) => e.field === 'scheduledAt')
+    expect(hit?.message).toContain('いまより先')
+  })
+
+  it('未来の配信日時は通す', () => {
+    expect(validateDraft(draft({ scheduledAt: '2099-05-01T10:30' })).length).toBe(0)
+    expect(toCreateInput(draft({ scheduledAt: '2099-05-01T10:30' })).scheduledAt)
+      .toBe('2099-05-01T10:30:00+09:00')
+  })
+
+  it('空や形の足りない入力を「過去」と間違えない', () => {
+    expect(isPastScheduledAt('')).toBe(false)
+    expect(isPastScheduledAt('2000-01-01')).toBe(false)
+    // 「いま」より1分前だけ過去扱いにする（基準時刻を渡せる）。
+    expect(isPastScheduledAt('2000-01-01T00:00', Date.parse('2000-01-01T00:01:00+09:00'))).toBe(true)
+    expect(isPastScheduledAt('2099-01-01T00:00')).toBe(false)
+  })
+
+  it('Workerの past_datetime を画面の言葉にする', () => {
+    expect(failureOf({ status: 400, code: 'past_datetime' }).message).toContain('いまより先')
+  })
+})
+
+describe('タグの候補(点検 #512 の中4)', () => {
+  const tag = (over: Partial<Tag>): Tag => ({
+    id: 'tag-1', name: 'NEN会員', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z',
+    ...over,
+  })
+
+  it('このアカウントのタグだけを残す', () => {
+    const tags = [
+      tag({ id: 'mine', lineAccountId: 'account-a' }),
+      tag({ id: 'other', name: '別アカ', lineAccountId: 'account-b' }),
+      tag({ id: 'unassigned', name: '所属なし', lineAccountId: null }),
+    ]
+    // 他アカウントは選べると保存で400、所属なしも保存口が断る。
+    expect(visibleAccountTags(tags, 'account-a').map((row) => row.id)).toEqual(['mine'])
+  })
+
+  it('他アカウントしかなければ空にする', () => {
+    expect(visibleAccountTags([tag({ lineAccountId: 'account-b' })], 'account-a')).toEqual([])
   })
 })

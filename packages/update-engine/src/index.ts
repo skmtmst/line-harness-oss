@@ -20,6 +20,7 @@ import { runApply } from './phases/apply.js';
 import { runVerify } from './phases/verify.js';
 import { runRollback } from './phases/rollback.js';
 
+export * from './compat-flags.js';
 export * from './types.js';
 export * from './manifest.js';
 export * from './fork-detect.js';

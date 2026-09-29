@@ -4,10 +4,14 @@ import type { Env } from '../index.js';
 
 const mocks = vi.hoisted(() => ({
   getTemplatesWithUsageCount: vi.fn(),
+  getTemplateSendCounts: vi.fn(),
   getTemplateById: vi.fn(),
   getTemplateUsage: vi.fn(),
   createTemplate: vi.fn(),
   updateTemplate: vi.fn(),
+  saveTemplateDraft: vi.fn(),
+  publishTemplate: vi.fn(),
+  hasTemplateDraft: vi.fn().mockReturnValue(false),
   deleteTemplate: vi.fn(),
   getCarouselTapTotals: vi.fn(),
 }));
@@ -56,6 +60,7 @@ function storedTemplate(messageContent: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCarouselTapTotals.mockResolvedValue(new Map());
+  mocks.getTemplateSendCounts.mockResolvedValue(new Map());
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'],

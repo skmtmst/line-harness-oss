@@ -3,12 +3,30 @@ import {
   getGoogleServiceAccountToken,
   type GoogleServiceAccountCredentials,
 } from './google-service-account.js';
+import {
+  findBookingOperation,
+  finishBookingOperation,
+  queueBookingOperation,
+} from './booking-operation-runs.js';
+import { accountFeatureOffExclusionSql } from '@line-crm/db';
+import { createFeatureJobGate } from './feature-enforcement.js';
 
 export interface StaffCalendarConnection {
   id: string;
   calendar_id: string;
   auth_type: string;
   access_token: string | null;
+}
+
+/**
+ * 消す対象の予定があるのに、削除できる接続が無い (解除ずみ・無効化)。
+ * 「消す物が無い」とは別物として扱い、台帳を成功にせず回復待ちに残す。
+ */
+export class CalendarConnectionMissingError extends Error {
+  constructor() {
+    super('calendar_connection_missing');
+    this.name = 'calendar_connection_missing';
+  }
 }
 
 export async function getStaffCalendarConnection(
@@ -67,11 +85,12 @@ export async function syncConfirmedBookingToGoogle(
   const row = await db
     .prepare(
       `SELECT b.id, b.starts_at, b.ends_at, b.customer_note, b.external_event_id,
-              f.display_name AS friend_name, m.name AS menu_name,
+              COALESCE(f.display_name, bc.display_name) AS customer_name, m.name AS menu_name,
               s.display_name AS staff_name,
               gc.id AS connection_id, gc.calendar_id, gc.auth_type, gc.access_token
          FROM bookings b
-         INNER JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          LEFT JOIN google_calendar_connections gc
@@ -87,7 +106,7 @@ export async function syncConfirmedBookingToGoogle(
       ends_at: string;
       customer_note: string | null;
       external_event_id: string | null;
-      friend_name: string | null;
+      customer_name: string | null;
       menu_name: string;
       staff_name: string;
       connection_id: string | null;
@@ -99,6 +118,48 @@ export async function syncConfirmedBookingToGoogle(
     return { synced: false };
   }
 
+  /*
+   * 予定 ID の置き場を、作る前に原子的に確保する (R327)。
+   *
+   * 読み取り→作成→保存の並びだと、作成応答の待ち時間にもう1本の再試行が
+   * 同じ "external_event_id IS NULL" を通り、外部に予定が2本できる。
+   * ID をこちらで先に採番し、条件付き UPDATE で changes=1 を取れた
+   * 処理だけが作成へ進む。負けた処理は確保ずみの ID を読み直して返し、
+   * 予約・台帳・外部予定の ID が常に一致する。
+   * 作成に失敗したら置き場を空けて、次の再試行が作れる状態に戻す。
+   * ID は Google 側の文字種 (a〜v と数字) に収まる形で採番する。
+   */
+  const reservedEventId = `lh${crypto.randomUUID().replaceAll('-', '')}`;
+  const claim = await db
+    .prepare(
+      `UPDATE bookings
+          SET external_event_id = ?, external_calendar_id = ?,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND external_event_id IS NULL AND status = 'confirmed'`,
+    )
+    .bind(reservedEventId, row.calendar_id, bookingId)
+    .run();
+  if ((claim.meta?.changes ?? 0) === 0) {
+    const current = await db
+      .prepare(`SELECT status, external_event_id, external_calendar_id FROM bookings WHERE id = ?`)
+      .bind(bookingId)
+      .first<{
+        status: string;
+        external_event_id: string | null;
+        external_calendar_id: string | null;
+      }>();
+    // 先に確保した処理がいるならその ID を返す。取消などで確定外に
+    // 変わった場合は作成対象ではないので未同期として返す。
+    if (current?.status !== 'confirmed' || !current.external_event_id) {
+      return { synced: false };
+    }
+    return {
+      synced: true,
+      eventId: current.external_event_id,
+      calendarId: current.external_calendar_id ?? row.calendar_id,
+    };
+  }
+
   const connection: StaffCalendarConnection = {
     id: row.connection_id,
     calendar_id: row.calendar_id,
@@ -106,28 +167,428 @@ export async function syncConfirmedBookingToGoogle(
     access_token: row.access_token,
   };
   const client = await clientForConnection(connection, credentials);
-  const created = await client.createEvent({
-    summary: `${row.friend_name ?? 'お客様'}｜${row.menu_name}`,
-    start: row.starts_at,
-    end: row.ends_at,
-    description: [
-      `LINE Harness予約（担当: ${row.staff_name}）`,
-      `予約ID: ${row.id}`,
-      row.customer_note ? `メモ: ${row.customer_note}` : '',
-    ].filter(Boolean).join('\n'),
-  });
-  await db
-    .prepare(
-      `UPDATE bookings
-          SET external_event_id = ?, external_calendar_id = ?,
-              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND external_event_id IS NULL`,
-    )
-    .bind(created.eventId, row.calendar_id, bookingId)
-    .run();
-  return { synced: true, eventId: created.eventId, calendarId: row.calendar_id };
+  try {
+    const created = await client.createEvent({
+      id: reservedEventId,
+      summary: `${row.customer_name ?? 'お客様'}｜${row.menu_name}`,
+      start: row.starts_at,
+      end: row.ends_at,
+      description: [
+        `LINE Harness予約（担当: ${row.staff_name}）`,
+        `予約ID: ${row.id}`,
+        row.customer_note ? `メモ: ${row.customer_note}` : '',
+      ].filter(Boolean).join('\n'),
+    });
+    if (created.eventId !== reservedEventId) {
+      // Google がこちらの ID を使わなかった場合だけ置き場を付け替える。
+      await db
+        .prepare(`UPDATE bookings SET external_event_id = ? WHERE id = ? AND external_event_id = ?`)
+        .bind(created.eventId, bookingId, reservedEventId)
+        .run();
+    }
+    return { synced: true, eventId: created.eventId, calendarId: row.calendar_id };
+  } catch (error) {
+    // 作成失敗は置き場を空けて投げ直す。置き場が残ると再試行が永久に
+    // 「もうある」と判断して作れなくなる。
+    await db
+      .prepare(
+        `UPDATE bookings
+            SET external_event_id = NULL, external_calendar_id = NULL
+          WHERE id = ? AND external_event_id = ?`,
+      )
+      .bind(bookingId, reservedEventId)
+      .run()
+      .catch(() => undefined);
+    throw error;
+  }
 }
 
+/**
+ * 取消時の Calendar 削除を台帳駆動で1回だけ確実に行う。
+ *
+ * 安定キー (`<bookingId>:google-calendar:delete`) で台帳行を1行に保つ。
+ * - ずみ (succeeded/skipped) なら外部へ触らず返す (二重削除なし)。
+ * - 消す物が無ければ skipped で閉じる (外部へ出ない)。
+ * - 一時失敗は retry_wait で残し、次の取消再試行で同じ鍵で再実行する。
+ * - 外部成功→台帳失敗の間は queued のまま残るため、再実行は相手先の
+ *   410 (削除ずみ) を成功として回収する (deleteEvent が吸収する)。
+ * 投げない (取消処理を壊さない)。DB自体が使えないときだけ投げる。
+ */
+/**
+ * Calendar 削除の台帳の安定キー。取消の再送・cron が同じ1行に集まる。
+ * キーの作り方はここだけに置く (route 側の先行登録と実行側でずらさない)。
+ */
+export function calendarDeleteIdempotencyKey(bookingId: string): string {
+  return `${bookingId}:google-calendar:delete`;
+}
+
+/**
+ * V6 の fence 成功後に台帳行を残す。
+ *
+ * 実行側 (runCalendarDeleteOperation) の作成・検索が初期 DB 失敗すると
+ * retry_wait を返すだけで行が残らず、cron が回収できない。行さえあれば
+ * 再送・cron のどちらでも拾えるため、取消フローはここで失敗を落とさず
+ * 投げる (呼び出し側の取消再試行で回復できる)。INSERT OR IGNORE のため
+ * 二重登録にならない。schema 変更は要らない。
+ * 状態更新の直後ではなく fence 成功後に置く: 巻き戻した 409 の後に
+ * queued 行が残ると cron が確定ずみの予定を消してしまう。
+ */
+export async function enqueueCalendarDeleteOperation(
+  db: D1Database,
+  input: { bookingId: string; lineAccountId: string },
+): Promise<string> {
+  return queueBookingOperation(db, {
+    bookingId: input.bookingId,
+    lineAccountId: input.lineAccountId,
+    kind: 'google_calendar',
+    idempotencyKey: calendarDeleteIdempotencyKey(input.bookingId),
+    result: { direction: 'delete' },
+  });
+}
+
+export async function runCalendarDeleteOperation(
+  db: D1Database,
+  input: {
+    bookingId: string;
+    lineAccountId: string;
+    now?: Date;
+    remove: () => Promise<void>;
+  },
+): Promise<'succeeded' | 'skipped' | 'retry_wait'> {
+  const now = (input.now ?? new Date()).toISOString();
+  const idempotencyKey = calendarDeleteIdempotencyKey(input.bookingId);
+  try {
+    const existing = await findBookingOperation(db, {
+      lineAccountId: input.lineAccountId,
+      idempotencyKey,
+    });
+    if (existing && (existing.status === 'succeeded' || existing.status === 'skipped')) {
+      return existing.status;
+    }
+    const operationId = existing?.id ?? await queueBookingOperation(db, {
+      bookingId: input.bookingId,
+      lineAccountId: input.lineAccountId,
+      kind: 'google_calendar',
+      idempotencyKey,
+      result: { direction: 'delete' },
+    });
+    const booking = await db.prepare(
+      `SELECT external_event_id, status FROM bookings WHERE id = ?`,
+    ).bind(input.bookingId).first<{ external_event_id: string | null; status: string | null }>();
+    if (!booking?.external_event_id) {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'skipped',
+        completedAt: now,
+        result: { direction: 'delete', reason: 'no_external_event' },
+      });
+      return 'skipped';
+    }
+    // 実行の直前に予約の状態を再確認する。409 で巻き戻した確定ずみの予約や、
+    // 残留した古い queued 行の予定を消さない (原子的無効化の受け皿)。
+    if (booking.status !== 'cancelled' && booking.status !== 'expired') {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'skipped',
+        completedAt: now,
+        result: { direction: 'delete', reason: 'booking_not_cancelled' },
+      });
+      return 'skipped';
+    }
+    try {
+      await input.remove();
+    } catch (error) {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'retry_wait',
+        completedAt: now,
+        errorCode: error instanceof Error ? error.name : 'calendar_delete_failed',
+        result: { direction: 'delete' },
+      });
+      console.error('Google Calendar delete (cancel) failed:', error);
+      return 'retry_wait';
+    }
+    await finishBookingOperation(db, {
+      id: operationId,
+      status: 'succeeded',
+      completedAt: now,
+      result: { direction: 'delete' },
+    });
+    return 'succeeded';
+  } catch (error) {
+    console.error('Google Calendar delete operation failed:', error);
+    return 'retry_wait';
+  }
+}
+
+/**
+ * 初回 200 の後に残った Calendar 削除を cron で自動回収する。
+ *
+ * 安定キーで1行のため二重実行にならず、相手先の 410 を成功として回収する。
+ * 取得は opened_at の原子的な更新で行う (lease)。処理中に止まった worker
+ * の行は opened_at が古くなれば再取得する。status は queued/retry_wait の
+ * ままのため、スキーマ変更は要らない。
+ */
+export async function processPendingCalendarDeleteOperations(
+  db: D1Database,
+  input: {
+    now?: Date;
+    limit?: number;
+    /** lease切れとみなす分数。未指定なら 10。 */
+    staleAfterMinutes?: number;
+    remove: (bookingId: string, lineAccountId: string) => Promise<void>;
+  },
+): Promise<{ processed: number; succeeded: number; retrying: number; skipped: number }> {
+  const now = input.now ?? new Date();
+  const nowIso = now.toISOString();
+  const staleCutoff = new Date(
+    now.getTime() - (input.staleAfterMinutes ?? 10) * 60_000,
+  ).toISOString();
+  const limit = input.limit ?? 20;
+  /*
+   * 予約機能がオフのアカウントは claim もしない (#643)。
+   *
+   * claim してから判定すると opened_at を書き換えてしまい、オフ中でも
+   * 状態が動く。候補を読むだけの SELECT を先に置き、機能が動いている
+   * アカウントの行だけを claim する。オフの行は opened_at も status も
+   * 変えず、Google Calendar も呼ばない。skipped 監査だけ残し、
+   * 再オン後の tick でそのまま拾い直す。
+   *
+   * オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、
+   * オフの古い行が上限ぶん先頭を占めたままになり、後ろに並ぶ
+   * 動作中アカウントの行が永久に処理されない。
+   */
+  const dueWhere = `kind = 'google_calendar'
+        AND json_extract(result_json, '$.direction') = 'delete'
+        AND status IN ('queued', 'retry_wait')
+        AND (opened_at IS NULL OR opened_at < ?)`;
+  const bookingOff = accountFeatureOffExclusionSql('booking_operation_runs.line_account_id', 'booking');
+  const candidates = await db.prepare(
+    `SELECT id, booking_id, line_account_id FROM booking_operation_runs
+      WHERE ${dueWhere}
+        AND NOT ${bookingOff}
+      ORDER BY updated_at ASC LIMIT ?`,
+  ).bind(staleCutoff, limit).all<{ id: string; booking_id: string; line_account_id: string }>();
+  const result = { processed: 0, succeeded: 0, retrying: 0, skipped: 0 };
+  const gate = createFeatureJobGate();
+  /*
+   * 止めた事実は監査に残す。行は読むだけで、状態は一切変えない。
+   * 監査は日・アカウント・機能・job で1件にまとまるため、
+   * アカウントごとに1行だけ読めば足りる。
+   */
+  const offOwners = await db.prepare(
+    `SELECT DISTINCT line_account_id FROM booking_operation_runs
+      WHERE ${dueWhere}
+        AND ${bookingOff}
+      ORDER BY line_account_id LIMIT ?`,
+  ).bind(staleCutoff, limit).all<{ line_account_id: string }>();
+  for (const owner of offOwners.results ?? []) {
+    await gate.canRun(db, owner.line_account_id, 'booking', 'booking calendar delete retry');
+  }
+  const runnableIds: string[] = [];
+  for (const candidate of candidates.results ?? []) {
+    // カタログ既定や設定の壊れ方に備え、claim 前にもう一度だけ確かめる。
+    if (await gate.canRun(db, candidate.line_account_id, 'booking', 'booking calendar delete retry')) {
+      runnableIds.push(candidate.id);
+    }
+  }
+  if (runnableIds.length === 0) return result;
+  // claim 条件は候補と同じ述語を残す。別 worker が先に取った行は
+  // ここで 0 行になり、二重に外部を呼ばない。
+  const claimed = await db.prepare(
+    `UPDATE booking_operation_runs SET opened_at = ?, updated_at = ?
+      WHERE id IN (${runnableIds.map(() => '?').join(', ')})
+        AND ${dueWhere}
+        AND NOT ${bookingOff}
+      RETURNING id, booking_id, line_account_id`,
+  ).bind(nowIso, nowIso, ...runnableIds, staleCutoff)
+    .all<{ id: string; booking_id: string; line_account_id: string }>();
+  for (const op of claimed.results ?? []) {
+    result.processed++;
+    const outcome = await runCalendarDeleteOperation(db, {
+      bookingId: op.booking_id,
+      lineAccountId: op.line_account_id,
+      now,
+      remove: () => input.remove(op.booking_id, op.line_account_id),
+    });
+    if (outcome === 'succeeded') result.succeeded++;
+    else if (outcome === 'skipped') result.skipped++;
+    else result.retrying++;
+  }
+  return result;
+}
+
+/**
+ * 予約内容変更・手動再試行の Google 同期キー。
+ * 予約の版（lock_version）ごとに1行。同じ版への再送は同じ行に集まり、
+ * 実行は「現在の予約状態をカレンダーへ反映する」だけなので冪等。
+ */
+export function calendarSyncIdempotencyKey(bookingId: string, lockVersion: number): string {
+  return `${bookingId}:google-calendar:sync:v${lockVersion}`;
+}
+
+/**
+ * 外部カレンダー上の既存イベントを消す。
+ * 接続の探索は「イベントを作ったカレンダー」基準にする。担当変更後は
+ * bookings.staff_id が新しい担当を指すため、staff 基準の JOIN では
+ * 旧カレンダーの接続を見つけられず、旧担当の予定が消せない。
+ */
+async function deleteExternalCalendarEvent(
+  db: D1Database,
+  credentials: GoogleServiceAccountCredentials,
+  input: { lineAccountId: string; externalCalendarId: string; externalEventId: string },
+): Promise<'deleted' | 'connection_missing'> {
+  const connection = await db.prepare(
+    `SELECT id, calendar_id, auth_type, access_token
+       FROM google_calendar_connections
+      WHERE line_account_id = ? AND calendar_id = ? AND is_active = 1
+      LIMIT 1`,
+  ).bind(input.lineAccountId, input.externalCalendarId)
+    .first<{ id: string; calendar_id: string; auth_type: string; access_token: string | null }>();
+  if (!connection) return 'connection_missing';
+  const client = await clientForConnection(connection, credentials);
+  await client.deleteEvent(input.externalEventId);
+  return 'deleted';
+}
+
+/**
+ * 「現在の予約状態」を Google カレンダーへ反映する台帳駆動の同期。
+ *
+ * - confirmed: 既存イベントがあれば消してから、今の担当のカレンダーへ作り直す
+ *   （delete+create。担当変更のカレンダー移動と日時・メニュー変更を同じ形で処理）。
+ * - cancelled/expired: 外部イベントを消す。
+ * - それ以外の状態（requested 等）は触らず skipped。
+ *
+ * 台帳キーは lock_version ごと。外部反映の失敗で予約本体は巻き戻さず、
+ * retry_wait を残して手動再試行・次回実行で回復する。
+ */
+export async function runBookingGoogleSync(
+  db: D1Database,
+  input: {
+    bookingId: string;
+    lineAccountId: string;
+    credentials: GoogleServiceAccountCredentials;
+    now?: Date;
+    /** 既存の台帳行を再利用するときの行ID（手動再試行で失敗行を仕上げる）。 */
+    operationId?: string;
+  },
+): Promise<'succeeded' | 'skipped' | 'retry_wait' | 'not_applicable'> {
+  const now = (input.now ?? new Date()).toISOString();
+  const booking = await db.prepare(
+    `SELECT id, status, staff_id, external_event_id, external_calendar_id, lock_version
+       FROM bookings WHERE id = ? AND line_account_id = ?`,
+  ).bind(input.bookingId, input.lineAccountId)
+    .first<{
+      id: string;
+      status: string;
+      staff_id: string;
+      external_event_id: string | null;
+      external_calendar_id: string | null;
+      lock_version: number;
+    }>();
+  if (!booking) return 'not_applicable';
+  const idempotencyKey = calendarSyncIdempotencyKey(booking.id, Number(booking.lock_version ?? 0));
+  const operationId = input.operationId ?? await queueBookingOperation(db, {
+    bookingId: booking.id,
+    lineAccountId: input.lineAccountId,
+    kind: 'google_calendar',
+    idempotencyKey,
+    result: { direction: 'sync' },
+  });
+  try {
+    if (booking.status === 'cancelled' || booking.status === 'expired') {
+      if (booking.external_event_id && booking.external_calendar_id) {
+        const deleted = await deleteExternalCalendarEvent(db, input.credentials, {
+          lineAccountId: input.lineAccountId,
+          externalCalendarId: booking.external_calendar_id,
+          externalEventId: booking.external_event_id,
+        });
+        if (deleted === 'connection_missing') {
+          // 実際には消せていない。成功にせず予定IDを保持したまま回復待ちに
+          // 残し、再接続後の再試行・cron で消せる状態にする (R328)。
+          await finishBookingOperation(db, {
+            id: operationId, status: 'retry_wait', completedAt: now,
+            errorCode: 'calendar_connection_missing',
+            result: { direction: 'delete', reason: 'connection_missing' },
+          });
+          return 'retry_wait';
+        }
+      }
+      await db.prepare(
+        `UPDATE bookings SET external_event_id = NULL, external_calendar_id = NULL,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+          WHERE id = ?`,
+      ).bind(booking.id).run();
+      await finishBookingOperation(db, {
+        id: operationId, status: 'succeeded', completedAt: now,
+        result: { direction: 'delete' },
+      });
+      return 'succeeded';
+    }
+    if (booking.status !== 'confirmed') {
+      await finishBookingOperation(db, {
+        id: operationId, status: 'skipped', completedAt: now,
+        result: { direction: 'sync', reason: 'booking_not_confirmed' },
+      });
+      return 'skipped';
+    }
+    // confirmed: 旧イベントを消してから作り直す。
+    if (booking.external_event_id && booking.external_calendar_id) {
+      const deleted = await deleteExternalCalendarEvent(db, input.credentials, {
+        lineAccountId: input.lineAccountId,
+        externalCalendarId: booking.external_calendar_id,
+        externalEventId: booking.external_event_id,
+      });
+      if (deleted === 'connection_missing') {
+        // 旧予定を消せる接続が無いまま作り直すと、旧予定を追う術を失ったまま
+        // 新しい予定が増える。旧IDを保持して回復待ちに残す (R328)。
+        await finishBookingOperation(db, {
+          id: operationId, status: 'retry_wait', completedAt: now,
+          errorCode: 'calendar_connection_missing',
+          result: { direction: 'sync', reason: 'connection_missing' },
+        });
+        return 'retry_wait';
+      }
+      await db.prepare(
+        `UPDATE bookings SET external_event_id = NULL, external_calendar_id = NULL,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+          WHERE id = ?`,
+      ).bind(booking.id).run();
+    }
+    const synced = await syncConfirmedBookingToGoogle(db, input.credentials, booking.id);
+    await finishBookingOperation(db, {
+      id: operationId,
+      status: synced.synced ? 'succeeded' : 'skipped',
+      completedAt: now,
+      result: {
+        direction: 'sync',
+        calendarSync: synced.synced ? 'synced' : 'not_configured',
+        eventId: synced.eventId ?? null,
+      },
+    });
+    return synced.synced ? 'succeeded' : 'skipped';
+  } catch (error) {
+    await finishBookingOperation(db, {
+      id: operationId,
+      status: 'retry_wait',
+      completedAt: now,
+      errorCode: error instanceof Error ? error.name : 'calendar_sync_failed',
+      result: { direction: 'sync' },
+    }).catch(() => undefined);
+    console.error('Google Calendar sync failed:', error);
+    return 'retry_wait';
+  }
+}
+
+/**
+ * 台帳駆動の Calendar 削除で呼ぶ「外部予定を消す」処理 (R328)。
+ *
+ * 接続の探索は「イベントを作ったカレンダー」基準にする (担当変更で
+ * bookings.staff_id が変わっても旧カレンダーの接続を見つけられる)。
+ * 消す対象があるのに接続が無い・無効なときは静かに返さず
+ * CalendarConnectionMissingError を投げる。呼び出し側の台帳が
+ * retry_wait に残り、再接続後の取消再送・cron で削除を再試行できる。
+ */
 export async function removeBookingFromGoogle(
   db: D1Database,
   credentials: GoogleServiceAccountCredentials,
@@ -140,7 +601,7 @@ export async function removeBookingFromGoogle(
          FROM bookings b
          LEFT JOIN google_calendar_connections gc
            ON gc.calendar_id = b.external_calendar_id
-          AND gc.staff_id = b.staff_id
+          AND gc.line_account_id = b.line_account_id
           AND gc.is_active = 1
         WHERE b.id = ?`,
     )
@@ -152,7 +613,8 @@ export async function removeBookingFromGoogle(
       auth_type: string | null;
       access_token: string | null;
     }>();
-  if (!row?.external_event_id || !row.external_calendar_id || !row.id || !row.auth_type) return;
+  if (!row?.external_event_id || !row.external_calendar_id) return;
+  if (!row.id || !row.auth_type) throw new CalendarConnectionMissingError();
   const client = await clientForConnection({
     id: row.id,
     calendar_id: row.external_calendar_id,

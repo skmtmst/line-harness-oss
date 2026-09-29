@@ -1,4 +1,6 @@
 import { jstNow } from './utils.js';
+import { removeConsumerReferences, syncTemplateReferences } from './template-versions.js';
+import { saveAutoReplyInternalMemo } from './auto-reply-runs.js';
 // =============================================================================
 // Auto-Replies — Keyword-triggered automatic responses (L社 自動応答 equivalent)
 // =============================================================================
@@ -44,6 +46,20 @@ export interface AutoReply {
   name: string | null;
   /** 158: キーワードが複数あるとき 'any'（どれか1つ）か 'all'（すべて）か。 */
   keyword_match_mode: string;
+  /** 273: 'draft'（未公開）| 'published' | 'stopped' */
+  lifecycle_status: string;
+  /** 機能08 点検: 最後に停止した日時。止めたことが無ければ NULL。 */
+  stopped_at: string | null;
+  /** 機能08 点検: 最後に停止した担当者。 */
+  stopped_by_staff_id: string | null;
+  /** 機能08 点検: 停止の理由。任意なので NULL があり得る。 */
+  stop_reason: string | null;
+  /** 機能08 点検: 停止操作の冪等キー。同じキーの再送は新しい停止として残さない。 */
+  stop_idempotency_key: string | null;
+  /** 機能08 点検: 削除は履歴を残す方式。NULL なら有効な定義。 */
+  deleted_at: string | null;
+  /** 機能08 点検: 削除した担当者。 */
+  deleted_by_staff_id: string | null;
   created_at: string;
 }
 
@@ -58,7 +74,9 @@ export async function getAutoReplies(
       .prepare(
         // 上から順に評価して最初に当てはまった1件だけが動く。画面の並び順と
         // 評価順を一致させるため、一覧もこの順で返す。
-        `SELECT * FROM auto_replies WHERE (line_account_id IS NULL OR line_account_id = ?)
+        // 削除済み（deleted_at あり）は履歴として残すだけで、一覧には出さない。
+        `SELECT * FROM auto_replies WHERE deleted_at IS NULL
+          AND (line_account_id IS NULL OR line_account_id = ?)
           ORDER BY priority ASC, created_at ASC`,
       )
       .bind(lineAccountId)
@@ -66,7 +84,10 @@ export async function getAutoReplies(
     return result.results;
   }
   const result = await db
-    .prepare(`SELECT * FROM auto_replies ORDER BY priority ASC, created_at ASC`)
+    .prepare(
+      `SELECT * FROM auto_replies WHERE deleted_at IS NULL
+        ORDER BY priority ASC, created_at ASC`,
+    )
     .all<AutoReply>();
   return result.results;
 }
@@ -76,7 +97,7 @@ export async function getAutoReplyById(
   id: string,
 ): Promise<AutoReply | null> {
   return db
-    .prepare(`SELECT * FROM auto_replies WHERE id = ?`)
+    .prepare(`SELECT * FROM auto_replies WHERE id = ? AND deleted_at IS NULL`)
     .bind(id)
     .first<AutoReply>();
 }
@@ -120,6 +141,17 @@ export interface CreateAutoReplyInput {
   keywordMatchMode?: 'any' | 'all';
   /** フォルダ。分けていなければ null。 */
   folderId?: string | null;
+  /**
+   * 運用者だけが読むメモ。auto_replies には列が無く、版スナップショットへ
+   * 保存する。友だちへ送る本文には使わない（AUTOREPLY-09）。
+   */
+  internalMemo?: string | null;
+  /**
+   * 新規作成時の有効/停止。**省略や false は止まったまま作る。**
+   * 「オフで作ったのに動いていた」は送り事故なので、有効化は
+   * 明示的な true（または公開・再開の操作）だけに限る。
+   */
+  isActive?: boolean;
 }
 
 export async function createAutoReply(
@@ -128,6 +160,7 @@ export async function createAutoReply(
 ): Promise<AutoReply> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  const isActive = input.isActive === true;
 
   await db
     .prepare(
@@ -138,8 +171,9 @@ export async function createAutoReply(
           priority, message_kinds_json,
           actions_json, response_weekdays_json, response_holiday_rule,
           once_per_friend, keywords_json, friend_conditions_json, respond_to_all, name, keyword_match_mode, folder_id,
+          lifecycle_status,
           created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -149,6 +183,7 @@ export async function createAutoReply(
       input.responseContent,
       input.templateId ?? null,
       input.lineAccountId ?? null,
+      isActive ? 1 : 0,
       input.activeFrom ?? null,
       input.activeUntil ?? null,
       input.cooldownMinutes ?? null,
@@ -167,11 +202,25 @@ export async function createAutoReply(
       input.name ?? null,
       input.keywordMatchMode ?? 'any',
       input.folderId ?? null,
+      // 止まって作った行は stopped、明示的に有効化した行は published。
+      // draft は createAutoReplyWithDraftVersion 専用。
+      isActive ? 'published' : 'stopped',
       now,
     )
     .run();
 
-  return (await getAutoReplyById(db, id))!;
+  const created = (await getAutoReplyById(db, id))!;
+  /*
+   * 社内メモと編集画面が読む版を先に確保する。停止したまま作ったルールは
+   * 実行されず ensureAutoReplyPublishedVersion が走らないので、ここで
+   * 公開版を作っておかないとメモの置き場も編集画面の読み込み先も無い。
+   * 版の状態は実行中の定義を表すので 'published'。ルール本体の
+   * lifecycle_status（stopped）は変えない。
+   */
+  await saveAutoReplyInternalMemo(db, created, input.internalMemo ?? null);
+  // 467: 保存で参照表を書き換える。どの版を使っているかの正本。
+  await syncTemplateReferences(db, 'auto_reply', created.id, created.template_id ? [created.template_id] : []);
+  return created;
 }
 
 export interface UpdateAutoReplyInput {
@@ -208,6 +257,11 @@ export interface UpdateAutoReplyInput {
   keywordMatchMode?: 'any' | 'all';
   /** フォルダ。分けていなければ null。 */
   folderId?: string | null;
+  /**
+   * 運用者だけが読むメモ。送られたときだけ更新する。省略は「触らない」で、
+   * メモを持たない呼び出しが既存のメモを消すことはない（AUTOREPLY-09）。
+   */
+  internalMemo?: string | null;
 }
 
 export async function updateAutoReply(
@@ -218,7 +272,19 @@ export async function updateAutoReply(
   const existing = await getAutoReplyById(db, id);
   if (!existing) return null;
 
-  const now = jstNow();
+  /*
+   * isActive の切替は lifecycle_status と揃える。専用の停止口（stopAutoReply）が
+   * 理由・担当者・日時を残すが、素のトグル経由でも 'published'/'stopped' が
+   * 矛盾した組合せにならないようにする。'draft' は公開の前段なので触らない。
+   */
+  let lifecycleStatus = existing.lifecycle_status;
+  if ('isActive' in input) {
+    if (input.isActive && existing.lifecycle_status === 'stopped') {
+      lifecycleStatus = 'published';
+    } else if (!input.isActive && existing.lifecycle_status === 'published') {
+      lifecycleStatus = 'stopped';
+    }
+  }
 
   await db
     .prepare(
@@ -230,6 +296,7 @@ export async function updateAutoReply(
            template_id = ?,
            line_account_id = ?,
            is_active = ?,
+           lifecycle_status = ?,
            active_from = ?,
            active_until = ?,
            cooldown_minutes = ?,
@@ -257,6 +324,7 @@ export async function updateAutoReply(
       'templateId' in input ? (input.templateId ?? null) : existing.template_id,
       'lineAccountId' in input ? (input.lineAccountId ?? null) : existing.line_account_id,
       'isActive' in input ? (input.isActive ? 1 : 0) : existing.is_active,
+      lifecycleStatus,
       'activeFrom' in input ? (input.activeFrom ?? null) : existing.active_from,
       'activeUntil' in input ? (input.activeUntil ?? null) : existing.active_until,
       'cooldownMinutes' in input ? (input.cooldownMinutes ?? null) : existing.cooldown_minutes,
@@ -296,11 +364,87 @@ export async function updateAutoReply(
     )
     .run();
 
-  return getAutoReplyById(db, id);
+  const updated = await getAutoReplyById(db, id);
+  if (updated && 'internalMemo' in input) {
+    await saveAutoReplyInternalMemo(db, updated, input.internalMemo ?? null);
+  }
+  // 467: 保存で参照表を書き換える。外した参照はここで消える。
+  if (updated) {
+    await syncTemplateReferences(db, 'auto_reply', updated.id, updated.template_id ? [updated.template_id] : []);
+  }
+  return updated;
 }
 
-export async function deleteAutoReply(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM auto_replies WHERE id = ?`).bind(id).run();
+/**
+ * 専用の停止口（機能08 点検 E-01）。
+ *
+ * isActive の素のトグルと違い、いつ・誰が・なぜ止めたかを残す。
+ * stopped_* は「最後に停止した記録」なので、再び動かしても消さない。
+ * 同じ冪等キーの再送は新しい停止として上書きしない。
+ */
+export async function stopAutoReply(
+  db: D1Database,
+  input: {
+    id: string;
+    staffId: string | null;
+    reason: string | null;
+    idempotencyKey: string;
+  },
+): Promise<AutoReply | null> {
+  const replay = await db
+    .prepare(
+      `SELECT * FROM auto_replies
+        WHERE id = ? AND stop_idempotency_key = ? AND deleted_at IS NULL`,
+    )
+    .bind(input.id, input.idempotencyKey)
+    .first<AutoReply>();
+  if (replay) return replay;
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE auto_replies
+          SET is_active = 0,
+              lifecycle_status = CASE
+                WHEN lifecycle_status = 'published' THEN 'stopped'
+                ELSE lifecycle_status
+              END,
+              stopped_at = ?,
+              stopped_by_staff_id = ?,
+              stop_reason = ?,
+              stop_idempotency_key = ?
+        WHERE id = ? AND deleted_at IS NULL`,
+    )
+    .bind(now, input.staffId, input.reason, input.idempotencyKey, input.id)
+    .run();
+  return getAutoReplyById(db, input.id);
+}
+
+/**
+ * 削除は履歴を残す方式（機能08 点検 N-085）。
+ *
+ * 物理削除すると、設定と「誰が消したか」が跡形もなく消える。行を残して
+ * deleted_at で隠し、一覧・評価・集計は deleted_at IS NULL の行だけを見る。
+ * 過去の一致記録（auto_reply_hits）や実行台帳はそのまま残る。
+ */
+export async function deleteAutoReply(
+  db: D1Database,
+  id: string,
+  staffId: string | null = null,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE auto_replies
+          SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0,
+              lifecycle_status = CASE
+                WHEN lifecycle_status = 'published' THEN 'stopped'
+                ELSE lifecycle_status
+              END
+        WHERE id = ? AND deleted_at IS NULL`,
+    )
+    .bind(jstNow(), staffId, id)
+    .run();
+  // 467: 消えた（論理削除の）自動応答の参照を消す。
+  await removeConsumerReferences(db, 'auto_reply', id);
 }
 
 // =============================================================================
@@ -380,7 +524,8 @@ export async function getAutoReplyHitCounts(
               COUNT(*) AS total
          FROM auto_reply_hits h
          JOIN auto_replies r ON r.id = h.auto_reply_id
-        WHERE r.line_account_id IS NULL OR r.line_account_id = ?
+        WHERE r.deleted_at IS NULL
+          AND (r.line_account_id IS NULL OR r.line_account_id = ?)
         GROUP BY h.auto_reply_id`,
     )
     .bind(from, to, lineAccountId)
@@ -390,4 +535,27 @@ export async function getAutoReplyHitCounts(
     period: r.period,
     total: r.total,
   }));
+}
+
+/**
+ * 公開前確認に出す、1ルールの期間内一致数。
+ *
+ * 0件と集計失敗を混ぜないため、この関数は取得できた数だけを返し、
+ * 呼び出し側が失敗を null として扱う。
+ */
+export async function getAutoReplyHitCountSince(
+  db: D1Database,
+  autoReplyId: string,
+  since: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+         FROM auto_reply_hits
+        WHERE auto_reply_id = ?
+          AND datetime(hit_at) >= datetime(?)`,
+    )
+    .bind(autoReplyId, since)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
 }

@@ -42,7 +42,6 @@ const NOT_YET_MIGRATED = [
   'booking/bookings/page.tsx',
   'booking/menus/staff/page.tsx',
   'booking/staff/page.tsx',
-  'booking/staff/shifts/page.tsx',
   'broadcasts/detail/page.tsx',
   'broadcasts/new/page.tsx',
   'broadcasts/page.tsx',
@@ -108,6 +107,7 @@ describe('画面名は上部バーだけが持つ', () => {
       'rich-menus/new/page.tsx',
       'search-console/page.tsx',
       'restaurant-test/stores/new/page.tsx',
+      'booking/staff/shifts/page.tsx',
     ]
     for (const rel of moved) {
       const src = fs.readFileSync(path.join(APP, rel), 'utf8')

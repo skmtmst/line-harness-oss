@@ -1,0 +1,7 @@
+[data-issue481-identity] [data-identity-part='assurance'] {
+  padding-block: 12px;
+}
+
+[data-issue481-identity] [data-identity-part='assurance'] > p:last-child {
+  display: none;
+}

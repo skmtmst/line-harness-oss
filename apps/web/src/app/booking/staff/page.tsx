@@ -1,13 +1,24 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { MoreHorizontal, X } from 'lucide-react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
+import { useRouter } from 'next/navigation'
+import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import ImageUploader from '@/components/shared/image-uploader'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
-import { bookingApi, type BookingStaff } from '@/lib/api'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { api, bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { canEditFeature } from '@/lib/staff-capability'
 
 const EMPTY: Partial<BookingStaff> = {
   name: '',
@@ -23,10 +34,19 @@ const EMPTY: Partial<BookingStaff> = {
 type LoadStatus = 'loading' | 'ready' | 'error'
 
 export default function BookingStaffPage() {
+  usePageTitle('予約設定')
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const [removeTarget, setRemoveTarget] = useState<BookingStaff | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [removeError, setRemoveError] = useState('')
+  // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
+  const [canManageStaff, setCanManageStaff] = useState(false)
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const router = useRouter()
   const loadRequestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -52,6 +72,10 @@ export default function BookingStaffPage() {
   }, [selectedAccountId])
 
   useEffect(() => {
+    setCanManageStaff(canEditFeature('booking.settings'))
+  }, [])
+
+  useEffect(() => {
     void load()
     return () => {
       loadRequestRef.current += 1
@@ -69,31 +93,56 @@ export default function BookingStaffPage() {
     await load()
   }
 
+  /**
+   * 消す前に、**何が消えて何が残るかを本文で読ませる。**
+   * ブラウザの `confirm()` は見た目がブラウザ任せで、設計の確認窓と違ううえ、
+   * 画像比較にも写らない（確認の絵をそもそも撮れない）。
+   */
   async function remove(id: string) {
     if (!selectedAccountId) return
-    if (!confirm('このスタッフを削除しますか？（既存予約は維持されます）')) return
-    await bookingApi.deleteStaff(selectedAccountId, id)
-    await load()
+    setDeleting(true)
+    setRemoveError('')
+    try {
+      await bookingApi.deleteStaff(selectedAccountId, id)
+      setRemoveTarget(null)
+      await load()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setRemoveError('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
-    <div>
-      <Header
-        title="予約スタッフ"
-        description="予約担当スタッフの管理（指名なし枠も含む）"
-        action={
-          <button
-            onClick={() => setEditing(EMPTY)}
-            disabled={!selectedAccountId || loadStatus !== 'ready'}
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-50"
-          >
-            + 新規スタッフ
-          </button>
-        }
-      />
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav data-design="Crumb" className="text-ink-faint text-xs" aria-label="パンくず">
+          <Link href="/booking/menus" className="hover:underline">予約設定</Link>
+          <span className="mx-1.5">/</span>
+          <span>担当スタッフ</span>
+        </nav>
+      </div>
+      {/*
+        作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
+        押せない理由はボタンの説明に出す。押せないボタンを黙って置かない。
+      */}
+      <div data-design="Actions" className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="primary"
+          onClick={() => setEditing(EMPTY)}
+          disabled={!canManageStaff || !selectedAccountId || loadStatus !== 'ready'}
+          title={canManageStaff ? undefined : '予約設定の変更権限がありません'}
+        >
+          ＋ スタッフを作る
+        </Button>
+      </div>
 
       {!selectedAccountId ? (
-        <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約スタッフを管理するLINEアカウントを選んでください。" />
+        <div className="bg-canvas rounded-card border border-hairline">
+          <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約スタッフを管理するLINEアカウントを選んでください。" />
+        </div>
       ) : loadStatus === 'loading' ? (
         <ListState kind="loading" title="予約スタッフを読み込んでいます" />
       ) : loadStatus === 'error' ? (
@@ -104,25 +153,30 @@ export default function BookingStaffPage() {
           action={<Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
         />
       ) : items.length === 0 ? (
-        <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ 新規スタッフ」から最初のスタッフを追加してください。" />
+        <div className="bg-canvas rounded-card border border-hairline">
+          <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ スタッフを作る」から最初のスタッフを追加してください。" />
+        </div>
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+        <DataTable data-design="Table">
               <thead>
-                <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">スタッフ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">役職</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">指名なし枠</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">並び順</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">有効</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">操作</th>
-                </tr>
+                <TableHeadRow>
+                  {/* 名前は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
+                  <Th>スタッフ</Th>
+                  <Th style={{ width: '16%' }}>役職</Th>
+                  <Th style={{ width: '14%' }} align="center">指名なし枠</Th>
+                  <Th style={{ width: '10%' }} align="right">並び順</Th>
+                  <Th style={{ width: '10%' }} align="center">有効</Th>
+                  {/*
+                    操作列は固定幅（128px）。割合（24%）では右に大きく空く。
+                    中身（編集＋…約118px）に合わせる。残りは割合と自動の列で吸う。
+                  */}
+                  <Th align="right" className="w-32">操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {items.map((s) => (
-                  <tr key={s.id} className="hover:bg-canvas-sunken">
-                    <td className="px-4 py-3 text-sm">
+                  <Tr key={s.id} interactive>
+                    <Td>
                       <div className="flex items-center gap-3">
                         {s.profile_image_url ? (
                           <img
@@ -142,41 +196,83 @@ export default function BookingStaffPage() {
                           )}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary">{s.role ?? '-'}</td>
-                    <td className="px-4 py-3 text-center">
+                    </Td>
+                    <Td className="text-ink-secondary">{s.role ?? '-'}</Td>
+                    <Td align="center">
                       {s.is_designation_optional ? (
                         <span className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs">指名なし</span>
                       ) : (
                         <span className="text-xs text-gray-300">-</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right tabular-nums text-ink-faint">{s.sort_order}</td>
-                    <td className="px-4 py-3 text-center">
+                    </Td>
+                    <Td align="right" className="tabular-nums text-ink-faint">{s.sort_order}</Td>
+                    <Td align="center">
                       {s.is_active ? (
                         <span className="inline-block px-2 py-0.5 rounded bg-success-bg text-success text-xs">ON</span>
                       ) : (
                         <span className="inline-block px-2 py-0.5 rounded bg-canvas-sunken text-ink-faint text-xs">OFF</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex gap-2 text-xs">
-                        <button onClick={() => setEditing(s)} className="text-blue-600 hover:underline">編集</button>
-                        <Link href={`/booking/staff/shifts?staff_id=${s.id}`} className="text-blue-600 hover:underline">
-                          シフト
-                        </Link>
-                        <button onClick={() => remove(s.id)} className="text-red-600 hover:underline">削除</button>
+                    </Td>
+                    <ActionCell>
+                      {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、メニューの中の危ない操作へ。 */}
+                      <div className="relative inline-flex items-center justify-end gap-1.5">
+                        {canManageStaff ? (
+                          <>
+                            <Button variant="secondary" size="compact" onClick={() => setEditing(s)}>編集</Button>
+                            <IconButton
+                              aria-label={`${s.display_name}のその他操作`}
+                              aria-expanded={openMenuId === s.id}
+                              onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
+                            >
+                              <MoreHorizontal aria-hidden />
+                            </IconButton>
+                            <ActionMenu
+                              open={openMenuId === s.id}
+                              ariaLabel={`${s.display_name}の操作`}
+                              onClose={() => setOpenMenuId(null)}
+                              items={[{
+                                id: 'shift',
+                                label: 'シフト',
+                                onSelect: () => router.push(`/booking/staff/shifts?staff_id=${s.id}`),
+                              }, {
+                                id: 'delete',
+                                label: '削除する',
+                                tone: 'danger',
+                                dividerBefore: true,
+                                onSelect: () => { setRemoveError(''); setRemoveTarget(s) },
+                              }]}
+                            />
+                          </>
+                        ) : (
+                          <Button href={`/booking/staff/shifts?staff_id=${s.id}`} variant="secondary" size="compact">
+                            シフト
+                          </Button>
+                        )}
                       </div>
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </div>
+        </DataTable>
       )}
 
       {editing && <Modal staff={editing} onSave={save} onClose={() => setEditing(null)} />}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={`「${removeTarget?.name ?? ''}」を削除しますか？`}
+        description="このスタッフを一覧から削除します。すでに入っている予約はそのまま残ります。この操作は取り消せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={removeError}
+        onCancel={() => {
+          if (deleting) return
+          setRemoveTarget(null)
+          setRemoveError('')
+        }}
+        onConfirm={() => { if (removeTarget) void remove(removeTarget.id) }}
+      />
     </div>
   )
 }
@@ -193,16 +289,35 @@ function Modal({
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
+  const panelRef = useOverlayFocus(true, onClose, saving)
+  // N-411 本人勤務: 予約スタッフをログインユーザーへ紐づけるための一覧。
+  const [members, setMembers] = useState<StaffMember[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    api.staff.list()
+      .then((res) => {
+        if (!cancelled && res.success) setMembers(res.data.filter((m) => m.isActive))
+      })
+      .catch(() => { /* 一覧が取れなくても紐づけ以外の編集は続けられる */ })
+    return () => { cancelled = true }
+  }, [])
 
   function set<K extends keyof BookingStaff>(k: K, v: BookingStaff[K]) {
     setForm((prev) => ({ ...prev, [k]: v }))
   }
 
   async function submit() {
-    setSaving(true)
     setErr(null)
+    const parsed = parseBookingStaffInput(form, form.id ? 'update' : 'create')
+    if (!parsed.ok) {
+      setErr(parsed.error)
+      return
+    }
+    setSaving(true)
     try {
-      await onSave(form)
+      await onSave(form.id ? { id: form.id, ...parsed.value } : parsed.value)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -212,9 +327,12 @@ function Modal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-hairline">
-          <h2 className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
+          <h2 id="booking-staff-modal-title" className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
         </div>
         <div className="px-6 py-4 space-y-4">
           <Field label="内部名（管理用）" required>
@@ -222,6 +340,7 @@ function Modal({
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.name}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="例: yamada-taro"
             />
@@ -231,6 +350,7 @@ function Modal({
               type="text"
               value={form.display_name ?? ''}
               onChange={(e) => set('display_name', e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.displayName}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="顧客に表示される名前"
             />
@@ -240,6 +360,7 @@ function Modal({
               type="text"
               value={form.role ?? ''}
               onChange={(e) => set('role', e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.role}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="例: トップスタイリスト"
             />
@@ -250,10 +371,14 @@ function Modal({
             onChange={(v) => set('profile_image_url', v?.mode === 'url' ? v.url : '')}
             label="プロフィール画像"
           />
+          <p className="text-ink-faint -mt-3 text-xs">
+            http:// または https:// で始まるURLを入力してください。
+          </p>
           <Field label="紹介文">
             <textarea
               value={form.bio ?? ''}
               onChange={(e) => set('bio', e.target.value)}
+              maxLength={BOOKING_STAFF_LIMITS.bio}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
               rows={2}
             />
@@ -263,27 +388,35 @@ function Modal({
               type="number"
               value={form.sort_order ?? 0}
               onChange={(e) => set('sort_order', Number(e.target.value))}
+              min={BOOKING_STAFF_LIMITS.sortOrderMin}
+              max={BOOKING_STAFF_LIMITS.sortOrderMax}
+              step={1}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(form.is_designation_optional)}
-              onChange={(e) => set('is_designation_optional', e.target.checked ? 1 : 0)}
-              className="rounded"
+          <Checkbox
+            checked={Boolean(form.is_designation_optional)}
+            onCheckedChange={(checked) => set('is_designation_optional', checked ? 1 : 0)}
+          >「指名なし」枠（仮想スタッフ）</Checkbox>
+          <Checkbox
+            checked={Boolean(form.is_active)}
+            onCheckedChange={(checked) => set('is_active', checked ? 1 : 0)}
+          >有効（顧客に表示する）</Checkbox>
+          <Field label="ログインユーザー（本人の勤務）">
+            <Select
+              aria-label="ログインユーザーとの紐づけ"
+              size="full"
+              value={form.staff_member_id ?? ''}
+              onChange={(v) => set('staff_member_id', v || null)}
+              options={[
+                { value: '', label: '紐づけない' },
+                ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
+              ]}
             />
-            <span>「指名なし」枠（仮想スタッフ）</span>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(form.is_active)}
-              onChange={(e) => set('is_active', e.target.checked ? 1 : 0)}
-              className="rounded"
-            />
-            <span>有効（顧客に表示する）</span>
-          </label>
+            <span className="text-ink-faint mt-1 block text-xs">
+              紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。
+            </span>
+          </Field>
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
         <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
@@ -296,7 +429,7 @@ function Modal({
           <button
             onClick={submit}
             disabled={saving}
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
           >
             {saving ? '保存中…' : '保存'}
           </button>

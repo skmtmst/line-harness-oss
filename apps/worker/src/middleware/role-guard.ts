@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../index.js';
 import type { StaffRole } from './auth.js';
 
@@ -18,6 +18,36 @@ export function requireRole(...allowed: StaffRole[]): MiddlewareHandler<Env> {
     if (!staff || !allowed.includes(staff.role)) {
       return c.json(
         { success: false, error: `この操作には${roleLabel(allowed[0])}権限が必要です` },
+        403,
+      );
+    }
+    return next();
+  };
+}
+
+/**
+ * 項目別permissionによる門番（N-411）。
+ *
+ * owner/admin は常に通す。staff は保存済みの権限キーで判定する:
+ *   - permissionKeys … すべてのメソッドで有効（edit）
+ *   - viewPermissionKeys … GET/HEAD/OPTIONS のみ有効（view）
+ * middleware の permissionForApiPath が経路ごとの第一関門、ここは
+ * 「同じ経路でも操作単位で別キー」を要求するときに使う。
+ */
+export function hasStaffPermission(c: Context<Env>, permission: string): boolean {
+  const staff = c.get('staff');
+  if (!staff) return false;
+  if (staff.role === 'owner' || staff.role === 'admin') return true;
+  const safeRead = c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS';
+  return staff.permissionKeys?.includes(permission) === true
+    || (safeRead && staff.viewPermissionKeys?.includes(permission) === true);
+}
+
+export function requirePermission(permission: string): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    if (!hasStaffPermission(c, permission)) {
+      return c.json(
+        { success: false, error: 'この操作を実行する権限がありません' },
         403,
       );
     }

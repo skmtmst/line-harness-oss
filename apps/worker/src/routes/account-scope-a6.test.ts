@@ -116,13 +116,22 @@ describe('A-6 account tenant scope', () => {
 
   test.each([
     ['chat', chats, '/api/chats', { friendId: 'friend', lineAccountId: 'other' }, mocks.createChat],
-    ['automation', automations, '/api/automations', { name: 'test', eventType: 'message', actions: [], lineAccountId: 'other' }, mocks.createAutomation],
     ['auto-reply', autoReplies, '/api/auto-replies', { keyword: 'test', responseContent: 'reply', lineAccountId: 'other' }, mocks.createAutoReply],
     ['affiliate offer', affiliateOffers, '/api/affiliate-offers', { name: 'test', lineAccountId: 'other' }, mocks.createAffiliateOffer],
   ] as const)('%s body rejects another tenant account', async (_name, route, path, body, create) => {
     mocks.canAccess.mockResolvedValue(false);
     expect((await app(route).request(path, request('POST', body))).status).toBe(403);
     expect(create).not.toHaveBeenCalled();
+  });
+
+  test('automation POST /api/automations は削除済みで何も作らない（#554 点検#519中6）', async () => {
+    mocks.canAccess.mockResolvedValue(false);
+    const response = await app(automations).request(
+      '/api/automations',
+      request('POST', { name: 'test', eventType: 'message', actions: [], lineAccountId: 'other' }),
+    );
+    expect(response.status).toBe(404);
+    expect(mocks.createAutomation).not.toHaveBeenCalled();
   });
 
   test.each([

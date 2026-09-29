@@ -31,7 +31,7 @@
 3. `★ V5 `で始まるtop-level 260画面を削除
 4. `S6umap`を`V6 デザイン基盤｜トークン正本`へ改名し、画面数の集計対象外にする
 5. 残存数を確認: V6画面260＋デザイン基盤1＋資料1
-6. `docs/v5-common-rules.md`をV6表記へ更新し、Node ID参照を検査
+6. `docs/v6-common-rules.md`をV6表記へ更新し、Node ID参照を検査
 7. 要件定義32本と次工程5本をrepositoryへ格納
 
 ## 現在の実施状況

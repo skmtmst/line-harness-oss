@@ -12,7 +12,7 @@ import type { ReactNode } from 'react'
  * 「タグを作る」「1通目を設定」のようにその画面固有の名前だった。
  * メニュー名で足りるのは約120枚しかない。
  *
- * 詳しくは `docs/v6-shell-contract.md` §3。
+ * 詳しくは `docs/v6-common-rules.md` §1。
  */
 export interface PageChrome {
   /** トップバーに出す画面名。null なら既定（menu.ts のラベル）を出す。 */
@@ -64,6 +64,14 @@ export function usePageTitle(title: string | null | undefined) {
   useEffect(() => {
     if (!setTitle) return
     setTitle(next)
+    /*
+     * ブラウザのタブ題が空のままにならないようにする。/hq/support で
+     * <title> が無いと監査で落ちた。既にある題は変えない（BrandTitle の
+     * 公式アカウント名を上書きしない）。空のときだけ画面名を入れる。
+     */
+    if (next && typeof document !== 'undefined' && document.title.trim() === '') {
+      document.title = next
+    }
     // 画面を離れたら既定へ戻す。戻さないと、次の画面に前の名前が残る。
     return () => setTitle(null)
   }, [next, setTitle])

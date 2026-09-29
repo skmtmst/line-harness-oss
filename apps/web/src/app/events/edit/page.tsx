@@ -1,17 +1,20 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import Header from '@/components/layout/header'
 import EventForm from '@/components/events/event-form'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import {
   eventsApi,
-  type EventBookingItem,
+  type EventBookingSummary,
   type EventDetail,
+  type EventLifecycleStatus,
   type EventSlot,
-  type EventWaitlistItem,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -28,65 +31,109 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 
 function BookingStatus({ accountId, eventId }: { accountId: string; eventId: string }) {
   const [event, setEvent] = useState<EventDetail | null>(null)
-  const [slots, setSlots] = useState<EventSlot[]>([])
-  const [bookings, setBookings] = useState<EventBookingItem[]>([])
-  const [waitlist, setWaitlist] = useState<EventWaitlistItem[]>([])
+  const [summary, setSummary] = useState<EventBookingSummary | null>(null)
+  // R81: 公開済みでも今後の枠が無ければ「終了」と出すための枠一覧。
+  const [slots, setSlots] = useState<EventSlot[] | null>(null)
   const [loading, setLoading] = useState(true)
+  // どれか落ちても残りは出すが、黙って0件表示にしない。全部落ちたら
+  // 枠が0件に見え、申込なしと読み違えて定員判断を誤る(点検#520の中10)。
+  const [loadError, setLoadError] = useState(false)
+  const [reloadSeq, setReloadSeq] = useState(0)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setLoadError(false)
+    setEvent(null)
+    setSummary(null)
+    setSlots(null)
     void (async () => {
       // どれか落ちても残りは出す。数えられなかったものは「—」になる。
-      const [e, s, b, w] = await Promise.allSettled([
+      const [e, s, sl] = await Promise.allSettled([
         eventsApi.getEvent(accountId, eventId),
+        eventsApi.getBookingSummary(accountId, eventId),
         eventsApi.listSlots(accountId, eventId),
-        eventsApi.listBookings(accountId, eventId),
-        eventsApi.listWaitlist(accountId, eventId),
       ])
       if (cancelled) return
       if (e.status === 'fulfilled') setEvent(e.value)
-      if (s.status === 'fulfilled') setSlots(s.value.items)
-      if (b.status === 'fulfilled') setBookings(b.value.items)
-      if (w.status === 'fulfilled') setWaitlist(w.value.waitlist)
+      if (s.status === 'fulfilled') setSummary(s.value)
+      if (sl.status === 'fulfilled') setSlots(sl.value.items)
+      if ([e, s, sl].some((r) => r.status === 'rejected')) setLoadError(true)
       setLoading(false)
     })()
     return () => {
       cancelled = true
     }
-  }, [accountId, eventId])
-
-  const count = (status: string) => bookings.filter((x) => x.status === status).length
-  /** 枠の定員の合計。定員なしの枠が混ざっていたら合計は出さない。 */
-  const capacity = slots.some((s) => s.capacity == null)
-    ? null
-    : slots.reduce((sum, s) => sum + (s.capacity ?? 0), 0)
+  }, [accountId, eventId, reloadSeq])
 
   const cells: Array<[string, string]> = [
-    ['予約 / 定員', `${count('confirmed')} / ${capacity ?? '—'}`],
-    // 承認待ちは requested。confirmed になるまで枠は確保されない。
-    ['承認待ち', `${count('requested')} 件`],
-    ['キャンセル待ち', `${waitlist.length} 件`],
-    ['キャンセル', `${count('cancelled')} 件`],
+    ['予約 / 定員', `${summary?.confirmed ?? '—'} / ${summary?.totalCapacity ?? '—'}`],
+    // 承認待ちは requested。未確定だが席は申請時点から消費している
+    // （EVENT-06。残席計算は requested+confirmed を数える）。
+    ['承認待ち', `${summary?.requested ?? '—'} 件`],
+    ['キャンセル待ち', `${summary?.waitlist ?? '—'} 件`],
+    ['キャンセル', `${summary?.cancelled ?? '—'} 件`],
   ]
 
   return (
     <div data-design="Status" className="mb-5">
+      {loadError && (
+        <Notice
+          tone="warn"
+          message="一部を取得できませんでした。取得できなかった数は「—」で表示しています。"
+          action={<button className="font-semibold underline" onClick={() => { setLoading(true); setReloadSeq((n) => n + 1) }}>読み直す</button>}
+          className="mb-3"
+        />
+      )}
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-ink text-sm font-bold">申込の状況</h2>
-        {event && (
-          <span
-            className={`rounded-pill px-2 py-0.5 text-[10px] font-medium ${
-              event.is_published
-                ? 'bg-success-bg text-success'
-                : 'bg-canvas-sunken text-ink-faint'
-            }`}
-          >
-            {event.is_published ? '受付中' : '下書き'}
-          </span>
-        )}
+        {event && (() => {
+          /*
+           * U: 保存する状態を出す。R81: 公開中でも今後の枠が無ければ
+           * 「終了」。枠が読めていないときは断定せず、公開中と出す。
+           */
+          const nowMs = Date.now()
+          const hasFuture = slots === null
+            ? null
+            : slots.some((s) => s.is_active === 1 && Date.parse(s.starts_at) >= nowMs)
+          const lifecycle = event.lifecycle_status ?? (event.is_published === 1 ? 'published' : 'draft')
+          if (lifecycle === 'draft') {
+            return (
+              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-nano font-medium">
+                下書き
+              </span>
+            )
+          }
+          if (lifecycle === 'paused') {
+            return (
+              <span className="rounded-pill bg-warning-bg text-warning px-2 py-0.5 text-nano font-medium">
+                一時停止
+              </span>
+            )
+          }
+          if (lifecycle === 'cancelled') {
+            return (
+              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-nano font-medium">
+                中止
+              </span>
+            )
+          }
+          if (lifecycle === 'ended' || hasFuture === false) {
+            return (
+              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-nano font-medium">
+                終了
+              </span>
+            )
+          }
+          return (
+            <span className="rounded-pill bg-success-bg text-success px-2 py-0.5 text-nano font-medium">
+              公開中
+            </span>
+          )
+        })()}
         <Link
-          href={`/events/bookings?eventId=${eventId}`}
-          className="text-accent ml-auto text-xs hover:underline"
+          href={`/events/bookings?id=${eventId}`}
+          className="text-action ml-auto text-xs hover:underline"
         >
           予約者を見る
         </Link>
@@ -105,6 +152,142 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
   )
 }
 
+/**
+ * U: 状態の切替（下書き・公開中・一時停止・終了・中止）。
+ * 今の状態から進める先だけを出し、一時停止と中止は理由を聞く。
+ * 理由は変更の記録に残る。
+ */
+const NEXT_LIFECYCLE: Record<EventLifecycleStatus, Array<{ to: EventLifecycleStatus; label: string; needsReason: boolean }>> = {
+  draft: [{ to: 'published', label: '公開する', needsReason: false }],
+  published: [
+    { to: 'paused', label: '一時停止する', needsReason: true },
+    { to: 'ended', label: '終了する', needsReason: false },
+    { to: 'cancelled', label: '中止する', needsReason: true },
+  ],
+  paused: [
+    { to: 'published', label: '再開する', needsReason: false },
+    { to: 'ended', label: '終了する', needsReason: false },
+    { to: 'cancelled', label: '中止する', needsReason: true },
+  ],
+  ended: [],
+  cancelled: [],
+}
+
+function LifecycleSection({ accountId, eventId }: { accountId: string; eventId: string }) {
+  const [lifecycle, setLifecycle] = useState<EventLifecycleStatus | null>(null)
+  const [pending, setPending] = useState<{ to: EventLifecycleStatus; label: string; needsReason: boolean } | null>(null)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const idempotencyKeyRef = useRef(crypto.randomUUID())
+
+  useEffect(() => {
+    let cancelled = false
+    void eventsApi.getEvent(accountId, eventId).then(
+      (detail) => {
+        if (cancelled) return
+        setLifecycle(detail.lifecycle_status ?? (detail.is_published === 1 ? 'published' : 'draft'))
+      },
+      () => {
+        if (!cancelled) setLifecycle(null)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [accountId, eventId])
+
+  const runSwitch = async () => {
+    if (!pending || busy) return
+    const trimmed = reason.trim()
+    if (pending.needsReason && trimmed === '') return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await eventsApi.setEventLifecycle(accountId, eventId, {
+        to: pending.to,
+        reason: trimmed === '' ? undefined : trimmed,
+        idempotency_key: idempotencyKeyRef.current,
+      })
+      idempotencyKeyRef.current = crypto.randomUUID()
+      setLifecycle(result.lifecycle_status)
+      setPending(null)
+      setReason('')
+    } catch (err) {
+      const code = (err as { body?: { error?: string } }).body?.error
+      setError(
+        code === 'lifecycle_transition_invalid'
+          ? 'いまの状態からは変えられません。開き直して最新の状態で、もう一度お試しください。'
+          : '変えられませんでした。時間をおいて、もう一度お試しください。',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const options = lifecycle ? NEXT_LIFECYCLE[lifecycle] : []
+  return (
+    <section className="bg-canvas rounded-card border-hairline border p-4" aria-label="公開の状態">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-ink text-sm font-bold">公開の状態</h2>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {options.map((option) => (
+            <Button
+              key={option.to}
+              variant="secondary"
+              onClick={() => {
+                setReason('')
+                setError('')
+                setPending(option)
+              }}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+      {lifecycle === null && (
+        <p className="text-ink-faint mt-2 text-xs">状態を読み込んでいます…</p>
+      )}
+      <ConfirmDialog
+        open={pending !== null}
+        title={`このイベントを${pending?.label ?? '変える'}？`}
+        description={
+          pending?.to === 'cancelled'
+            ? '中止にすると申込の受付は止まり、申込の履歴は残ります。元に戻すことはできません。'
+            : pending?.to === 'paused'
+              ? '一時停止中はお客様の画面から申込ができなくなります。申込の履歴は残ります。'
+              : '状態を変えます。'
+        }
+        confirmLabel={pending?.label ?? '変える'}
+        cancelLabel="やめる"
+        busy={busy}
+        error={error}
+        onConfirm={() => void runSwitch()}
+        onCancel={() => {
+          if (busy) return
+          setPending(null)
+          setReason('')
+          setError('')
+        }}
+      >
+        {pending?.needsReason && (
+          <label className="block">
+            <span className="text-ink-faint text-xs">理由（必須・変更の記録に残ります）</span>
+            <textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={2}
+              placeholder="例：台風のため今週の受付を止めます"
+              className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+            />
+          </label>
+        )}
+      </ConfirmDialog>
+    </section>
+  )
+}
+
 function EditEventInner() {
   const params = useSearchParams()
   const id = params.get('id')
@@ -112,41 +295,38 @@ function EditEventInner() {
 
   if (!id) {
     return (
-      <div>
-
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          イベントが指定されていません。
-          <Link href="/events" className="text-accent ml-1 hover:underline">
-            イベント予約へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="編集するイベントが指定されていません"
+        description="一覧から、編集するイベントを選び直してください。"
+        backHref="/events"
+        backLabel="イベント一覧へ戻る"
+      />
     )
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
-        <Link href="/events" className="hover:underline">
-          イベント予約
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>編集</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title="イベントの編集"
-          description="開催内容と申込のルールを決めます。承認制にすると、申込のたびに確認できます。"
-          action={
-            <Link
-              href={`/events/bookings?eventId=${id}`}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              申込の一覧を見る
-            </Link>
-          }
-        />
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="text-ink-faint text-xs" data-design="Crumb" aria-label="パンくず">
+          <Link href="/events" className="hover:underline">
+            イベント予約
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>編集</span>
+        </nav>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button href={`/events/change-review?id=${id}`} variant="secondary">
+            変更の影響を確認
+          </Button>
+          <Button href={`/events/preview?id=${id}`} variant="secondary">
+            お客様表示を確認
+          </Button>
+          <Button href={`/events/bookings?id=${id}`} variant="secondary">
+            申込の一覧を見る
+          </Button>
+        </div>
       </div>
 
       {!selectedAccountId ? (
@@ -156,14 +336,17 @@ function EditEventInner() {
       ) : (
         <>
           <BookingStatus accountId={selectedAccountId} eventId={id} />
+          <LifecycleSection accountId={selectedAccountId} eventId={id} />
           <div data-design="Body">
             <EventForm accountId={selectedAccountId} eventId={id} />
           </div>
 
-          <section className="bg-canvas-sunken rounded-card border-hairline mt-5 border p-4">
+          <section className="bg-canvas-sunken rounded-card border-hairline border p-4">
             <h2 className="text-ink text-sm font-bold">気をつけること</h2>
             <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
-              <li>・承認制にすると、承認するまで枠は確保されません</li>
+              <li>
+                ・承認制の申込は、承認前（承認待ち）の時点から残席を使います。承認・拒否・期限切れで確定または解放されます
+              </li>
               <li>・定員に達するとキャンセル待ちに切り替わります</li>
               <li>
                 ・公開後に定員を減らすことはできますが、すでに確定した申込は取り消されません

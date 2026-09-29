@@ -82,6 +82,7 @@ published → withdrawn → archived
 - originalはprivate object key。通常APIから公開URLを返さない
 - thumbnail、review、publicの派生画像をversion付きで生成
 - hashで完全重複候補を出す。似た画像判定は注意候補だけ
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #817。
 - 画像処理jobの成功・retry・永久失敗を台帳化
 
 現行はJPEG data URLと拡張子中心で受け、originalの`image_url`を保存・公開している。画像の実体検査、寸法、EXIF除去、private originalへの移行が必要である。
@@ -105,6 +106,9 @@ AI補助で許可するもの:
 `photo_risk_assessment`にはmodel/provider/version、検査日時、flag、confidence、根拠領域、失敗を保存する。再評価で旧結果を上書きしない。
 
 ## 6. 審査操作
+
+> **V7 の追加（2026-09-23）:** キー操作と「判定したら次の未審査へ進む」連続審査は [V7 追加要件 §3](./v7-additions-requirements.md) が正本。V6 の画面は変えず、Pencil ★V7 に新しく描く。
+
 
 - 一覧は未審査、採用、差戻し、公開中を分け、account scopeの件数を表示
 - 一枚表示はoriginal相当のreview derivative、投稿者、pet、投稿日時、過去採否、同意、risk flagを表示
@@ -131,10 +135,13 @@ AI補助で許可するもの:
 
 ## 8. ポイント付与
 
+ここでのポイントは外部EC（23）のポイントであり、17マイレージのマイルとは別である（17 §13参照）。マイル台帳へ合算せず、用語も「ポイント」と「マイル」を分ける。
+
 V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再計算しない。
 
 - `photo_reward_policy`をversion化し、適用開始日時とpoint数を持つ
 - 投稿受付時または採用時に適用policy versionをsnapshot。推奨は採用時
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #817。
 - 同一submission×reward typeで一回だけ
 - 採用decisionはDBへ確定し、point付与はoutboxから外部ECへ送る
 - 外部成功/DB失敗をprovider award keyで照合し、reconciliationする
@@ -156,10 +163,11 @@ V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再�
 
 権限:
 
-- photo.view、photo.review、photo.bulk_review
-- photo.download_original（再認証・監査）
-- photo.publish、photo.withdraw
-- photo.reward、photo.export
+- `photo.submission.view`、`photo.submission.review`、`photo.submission.bulk_review`
+- `photo.original.download`（再認証・監査）
+- `photo.publication.publish`、`photo.publication.withdraw`
+- `photo.reward.grant`、`photo.submission.export`
+- 命名は共通基盤（`v6-shared-platform-requirements.md` §3）の`domain.resource.action`に従う。
 - PII/同意は項目マスク。公開・一括・original downloadは監査必須
 
 ## 10. API
@@ -188,7 +196,7 @@ V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再�
 - bulk一部対象外
 - public asset cache invalidation中/完了/失敗
 
-V6の「出しているもの」の表示回数は、placementごとの実測eventまたは配信logから算出する。取得できない利用先は`未取得`とし、0にしない。
+V6の「出しているもの」の表示回数は、placementごとの実測eventまたは配信logから算出する。取得できない利用先は値を`—`、ラベルを「未取得」とし（共通基盤 §9）、0にしない。
 
 ## 12. 既存移行
 
@@ -201,6 +209,7 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 7. EC point ledgerとsubmissionをaward keyで照合し、不一致を要対応へ
 8. 明示的公開同意のないadopted写真は`approved_private`に置き、公開停止
 9. dual-readと件数・画像hash・point総数を照合後に切替
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #817。
 
 ## 13. 除外
 
@@ -216,7 +225,9 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 
 ## 14. 完了条件
 
-- V6 4画面の主操作・状態・遷移が動く
+- V6 4画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 管理・LIFF・公開APIのaccount/friend境界testが通る
 - original非公開、EXIF除去、形式・寸法・decode検査が通る
 - AIだけで採否・公開されない
@@ -224,9 +235,10 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 - 採用と公開同意が分離され、撤回が全利用先へ反映
 - point二重付与がなく、EC/DB不一致をreconcileできる
 - legacy 5ptと新版policyが再現可能
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #817。
 - crop/rotateでoriginalが変わらない
 - 1440/1920で横スクロールなし
-- V6実Nodeと同幅画像比較を添付
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
 ## 15. 実装順
 
@@ -235,6 +247,7 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 3. 状態機械と追記decision
 4. 同意・publication・撤回
 5. reward policy、outbox、reconciliation
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #817。
 6. AI補助と人のreview UI
 7. 既存移行、E2E、security、画像比較
 

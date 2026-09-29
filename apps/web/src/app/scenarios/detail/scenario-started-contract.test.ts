@@ -13,11 +13,23 @@ describe('V6 シナリオ開始完了', () => {
     expect(DETAIL).toContain('data-design-node="NrBkW"')
   })
 
-  it('完了画面は作り物の対象人数を出さず、開始後の結果へ進める', () => {
-    expect(DETAIL).toContain('配信を開始しました。条件を満たした友だちから順に配信します。')
-    expect(DETAIL).toContain('開始後の結果を見る')
+  it('完了画面は試算と開始記録の実値を使い、開始後の結果へ進める', () => {
+    expect(DETAIL).toContain('api.scenarios.simulate(id, lineAccountId)')
+    expect(DETAIL).toContain('api.scenarios.runs(id, lineAccountId, { limit: 50 })')
+    expect(DETAIL).toContain('simulation.audience.newStartPlanned.toLocaleString')
+    expect(DETAIL).toContain('開始履歴を確認')
+    // 設計 B：状態の札は共通の StatusChip（旧「配信中」「配信可」「一時停止中」の直書き）。
+    expect(DETAIL).toContain('<StatusChip')
+    expect(DETAIL).not.toContain("? '配信中'")
+    expect(DETAIL).toContain('runs?.subscriptions[0]?.startedAt')
+    expect(DETAIL).toContain('開始日時を取得できませんでした')
     expect(DETAIL).toContain('/scenarios/results?id=')
     expect(DETAIL).not.toContain('開始予定116人')
+  })
+
+  it('開始条件の撮影は同じ文言の別ボタンに依存しない', () => {
+    expect(DETAIL).toContain('qaOpen="EvVO5"')
+    expect(DETAIL).toContain('data-qa-open={qaOpen}')
   })
 
   it('停止時は完了画面へ移動せず一覧を読み直す', () => {

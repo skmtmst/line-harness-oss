@@ -1,17 +1,28 @@
 'use client'
 
-import { Suspense, useState, useEffect, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import DateField from '@/components/shared/date-field'
+import FilterChip from '@/components/shared/filter-chip'
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Trash2 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
-import { api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
-import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
-import FolderPanel from '@/components/shared/folder-panel'
-import { audienceSummary, contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import ListState from '@/components/shared/list-state'
+import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ListToolbar from '@/components/shared/list-toolbar'
+import ListRange from '@/components/ui/list-range'
+import { RowActions } from '@/components/shared/row-actions'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Select from '@/components/shared/select'
+import Button from '@/components/shared/button'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -20,50 +31,108 @@ const statusConfig: Record<
   draft: { label: '下書き', className: 'bg-canvas-sunken text-ink-secondary' },
   scheduled: { label: '予約済み', className: 'bg-info-bg text-info' },
   sending: { label: '送信中', className: 'bg-warning-bg text-warning' },
-  sent: { label: '送信完了', className: 'bg-success-bg text-success' },
+  sent: { label: '送信済み', className: 'bg-success-bg text-success' },
 }
 
+/**
+ * 一覧の状態の札（#816・10の状態）。displayStatus があればこちらを出し、
+ * 無ければ statusConfig（上の4つ）へ戻す。
+ */
+const displayStatusConfig: Record<string, { label: string; className: string }> = {
+  draft: { label: '下書き', className: 'bg-canvas-sunken text-ink-secondary' },
+  pending_approval: { label: '承認待ち', className: 'bg-info-bg text-info' },
+  scheduled: { label: '予約済み', className: 'bg-info-bg text-info' },
+  preparing: { label: '送信準備', className: 'bg-info-bg text-info' },
+  sending: { label: '送信中', className: 'bg-warning-bg text-warning' },
+  sent: { label: '送信済み', className: 'bg-success-bg text-success' },
+  partial_failed: { label: '一部失敗', className: 'bg-warning-bg text-warning' },
+  failed: { label: '失敗', className: 'bg-danger-bg text-danger' },
+  stopped: { label: '停止', className: 'bg-canvas-sunken text-ink-secondary' },
+  expired: { label: '期限切れ', className: 'bg-canvas-sunken text-ink-secondary' },
+}
+
+/**
+ * 配信日時。**JSTで書く。**
+ *
+ * `timeZone` を渡さないと、動かしている端末の時計で書き出す。開発機が
+ * UTC+7 だと 9時予約が 7時と出るし、日をまたぐと日付そのものがずれる。
+ * 予約の時刻は入力も保存も JST を前提にしているので、読む側もそろえる。
+ */
 function formatDatetime(iso: string | null): string {
-  if (!iso) return '-'
+  if (!iso) return '未設定'
   return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })
 }
 
+/*
+ * JST の日付（yyyy-mm-dd）。`+9h` して切り出す流儀と `Intl` の流儀が
+ * 混ざっていたので、こっちに寄せる（#490 軽7）。UTC のまま切ると、
+ * 夜の配信が前日に入る。
+ */
+function formatYmdJst(iso: string): string {
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(iso))
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
 function BroadcastsPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const detailId = searchParams.get('id')
 
-  // If ?id=xxx is present, show detail view
+  /*
+   * 旧詳細（`/broadcasts?id=`）は新しい詳細へ置き換え遷移する。
+   * 旧デザインを残さない。履歴に戻るを残さないので `replace`。
+   */
+  useEffect(() => {
+    if (detailId) router.replace(`/broadcasts/detail?id=${encodeURIComponent(detailId)}`)
+  }, [detailId, router])
+
   if (detailId) {
-    return <BroadcastDetail broadcastId={detailId} />
+    return <div className="text-ink-faint p-6 text-sm">配信の詳細へ移動しています...</div>
   }
 
   return <BroadcastList />
 }
 
-type BroadcastTab = 'single' | 'dedup' | 'all'
-
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
 
 function BroadcastList() {
+  usePageTitle('一斉配信')
+  const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
+  const [listKpis, setListKpis] = useState<BroadcastListKpis | null | undefined>(undefined)
   const [tags, setTags] = useState<Tag[]>([])
+  // BROADCAST-15: シナリオ指定の宛先要約に名前を出すため、名前だけ持つ。
+  const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  /** よく使う絞り込み。いま数えられるのは「予約中のみ」だけ。 */
-  const [scheduledOnly, setScheduledOnly] = useState(false)
+  /*
+   * **権限不足を「読み込み失敗」に混ぜない。** 直し方がまったく違う——
+   * 失敗は読み直せば直るが、権限不足は誰かに権限を足してもらうしかない。
+   * 同じ枠で「もう一度試す」を出すと、何度押しても直らない道へ誘う。
+   */
+  const [forbidden, setForbidden] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'draft'>('all')
   const [showCreate, setShowCreate] = useState(false)
   const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
   // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
   // 一覧が増えると、配信名を覚えていても探すのに時間がかかる。
   const [titleQuery, setTitleQuery] = useState('')
+  /* 保存した検索の選び欄の表示値。選ぶと絞りへ反映する（素の select の defaultValue 相当）。 */
+  const [savedViewId, setSavedViewId] = useState('')
   /*
    * 配信日で絞る。
    *
@@ -73,21 +142,87 @@ function BroadcastList() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
+  /** 「未分類」の件数。`null` は数えていない（#631、#730）。 */
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
+  /*
+   * 一覧のページ送り・件数・並び順。APIの limit/cursor/status/folderId/sort と
+   * 連動する。全件取得→手元絞り込みだったのを、口側のページ送りで読む。
+   * タイトル・日付の絞り込みだけは手元に残す(打つたびに取り直すと重い)。
+   */
+  const [pageSize, setPageSize] = useState(20)
+  const [sortKey, setSortKey] = useState<'newest' | 'oldest'>('newest')
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMoreBroadcasts, setLoadingMoreBroadcasts] = useState(false)
+  const [listTotal, setListTotal] = useState<number | null>(null)
+  /**
+   * 削除の確認。ブラウザの `confirm()` は「この配信を削除してもよいですか？」
+   * としか言えず、予約が取り消されることも、送った記録が残ることも読めない。
+   * 画像比較にも写らないので、共通の `ConfirmDialog` へ移した（設計 `H2S1T4`）。
+   */
+  const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [savedViews, setSavedViews] = useState<BroadcastSavedView[]>([])
+  /** 保存した検索の取り直し用。条件は変えず、同じ読み込みをもう一度だけ行う。 */
+  const [savedViewsSeq, setSavedViewsSeq] = useState(0)
+  const [savedViewName, setSavedViewName] = useState('')
+  const [savedViewOpen, setSavedViewOpen] = useState(false)
+  const [savedViewBusy, setSavedViewBusy] = useState(false)
+  const [savedViewError, setSavedViewError] = useState('')
 
-  const loadInsight = async (id: string) => {
-    try {
-      const res = await api.broadcasts.getInsight(id)
-      if (res.success && res.data) {
-        setInsights(prev => ({ ...prev, [id]: res.data! }))
-      }
-    } catch { /* ignore */ }
+  /*
+   * 一覧に同梱の集計(insightSummary)を、行の表示形に直す。
+   * 値が1つも無い(未送信・未取得)ときは undefined で、手動の取得ボタンを出す。
+   * 以前は送信済みごとに getInsight を自動発行(N+1)していたが、一覧1回で
+   * 足りるようになった。LINEへの再取得は下の手動ボタンに寄せる。
+   */
+  const summaryInsight = (summary: ApiBroadcast['insightSummary']): BroadcastInsight | undefined => {
+    if (!summary) return undefined
+    if (summary.delivered == null && summary.uniqueImpression == null
+      && summary.uniqueClick == null && summary.openRate == null && summary.clickRate == null) {
+      return undefined
+    }
+    return {
+      delivered: summary.delivered,
+      uniqueImpression: summary.uniqueImpression,
+      uniqueClick: summary.uniqueClick,
+      uniqueMediaPlayed: null,
+      openRate: summary.openRate,
+      clickRate: summary.clickRate,
+    }
   }
+
+  /*
+   * 一覧同梱の集計が無い送信済みだけ1回ずつ取る。新しい口では summary で
+   * 足りるが、旧い口・目視確認用の mock には同梱が無いため、数が空欄に
+   * ならないよう不足分だけ補う(二重取り防止の済み印付き)。
+   */
+  const fetchedInsightIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const missing = broadcasts.filter((b) =>
+      b.status === 'sent'
+      && !insights[b.id]
+      && !summaryInsight(b.insightSummary)
+      && !fetchedInsightIdsRef.current.has(b.id))
+    if (missing.length === 0) return
+    missing.forEach((b) => {
+      fetchedInsightIdsRef.current.add(b.id)
+      api.broadcasts.getInsight(b.id).then((res) => {
+        if (res.success && res.data) {
+          setInsights((prev) => ({ ...prev, [b.id]: res.data as BroadcastInsight }))
+        }
+      }).catch(() => undefined)
+    })
+  }, [broadcasts, insights])
 
   const handleFetchInsight = async (id: string) => {
     setFetchingInsight(id)
@@ -97,51 +232,204 @@ function BroadcastList() {
         setInsights(prev => ({ ...prev, [id]: res.data }))
       }
     } catch {
-      setError('インサイトの取得に失敗しました')
+      setError('インサイトの取得に失敗しました。もう一度読み込んでください。')
     } finally {
       setFetchingInsight(null)
     }
   }
 
   const loadFolders = useCallback(async () => {
-    const res = await api.folders.list('broadcast')
-    if (res.success) setFolders(res.data)
+    setFolderError('')
+    try {
+      const res = await api.folders.list('broadcast')
+      if (res.success) {
+        setFolders(res.data)
+        setUnfiledCount(res.unfiledCount ?? null)
+      } else {
+        setFolderError('フォルダを読み込めませんでした。')
+      }
+    } catch {
+      setFolderError('フォルダを読み込めませんでした。')
+    }
   }, [])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  const moveFolder = async (index: number, direction: -1 | 1) => {
+    const target = folders[index]
+    const neighbor = folders[index + direction]
+    if (!target || !neighbor || folderBusy) return
+    setFolderBusy(true)
+    setFolderError('')
     try {
-      const [broadcastsRes, tagsRes] = await Promise.all([
-        api.broadcasts.list({ accountId: selectedAccountId || undefined }),
-        api.tags.list(),
-      ])
-      if (broadcastsRes.success) setBroadcasts(broadcastsRes.data)
-      else setError(broadcastsRes.error)
-      if (tagsRes.success) setTags(tagsRes.data)
+      // 2つの更新はサーバが1回で行う（V6R-S2-c）。途中で片方だけ変わらない。
+      const result = await api.folders.swapOrder(target.id, neighbor.id)
+      if (!result.success) throw new Error(result.error)
+      await loadFolders()
     } catch {
-      setError('データの読み込みに失敗しました。もう一度お試しください。')
+      setFolderError('並び順を変えられませんでした。')
     } finally {
-      setLoading(false)
+      setFolderBusy(false)
     }
-  }, [selectedAccountId])
+  }
 
-  useEffect(() => { load() }, [load])
-
-  // 送信済みbroadcastのinsightを読み込み
-  useEffect(() => {
-    broadcasts.filter(b => b.status === 'sent').forEach(b => loadInsight(b.id))
-  }, [broadcasts])
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('この配信を削除してもよいですか？')) return
+  const removeFolder = async () => {
+    if (!deletingFolder || folderBusy) return
+    const targetId = deletingFolder.id
+    setFolderBusy(true)
+    setFolderError('')
     try {
-      await api.broadcasts.delete(id)
-      load()
+      const res = await api.folders.delete(targetId)
+      if (!res.success) throw new Error(res.error)
+      setDeletingFolder(null)
+      if (folderFilter === targetId) setFolderFilter('')
+      await loadFolders()
     } catch {
-      setError('削除に失敗しました')
+      setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const load = useCallback(async (cursor?: string | null, append = false) => {
+    if (append) {
+      if (loadingMoreBroadcasts) return
+      setLoadingMoreBroadcasts(true)
+    } else {
+      setLoading(true)
+    }
+    setError('')
+    setForbidden(false)
+    try {
+      const [broadcastsRes, tagsRes, scenariosRes] = await Promise.all([
+        api.broadcasts.list({
+          accountId: selectedAccountId || undefined,
+          limit: pageSize,
+          cursor: cursor ?? undefined,
+          // 状態・フォルダは口側で絞る。タイトル・日付は手元で絞る。
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
+          sort: sortKey,
+        }),
+        // R23横展開: 宛先要約の名前解決も今のアカウントだけ（別アカウント混入防止）。
+        append ? null : api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
+        // 宛先要約のシナリオ名。取れなくても一覧は出す（名前は「指定のシナリオ」のまま）。
+        append ? null : api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).catch(() => null),
+      ])
+      if (broadcastsRes.success) {
+        if (append) {
+          const rows = broadcastsRes.data
+          setBroadcasts((prev) => {
+            const seen = new Set(prev.map((b) => b.id))
+            return [...prev, ...rows.filter((r) => !seen.has(r.id))]
+          })
+        } else {
+          setBroadcasts(broadcastsRes.data)
+        }
+        setListKpis(broadcastsRes.kpis)
+        setNextCursor(broadcastsRes.pagination?.nextCursor ?? null)
+        setListTotal(broadcastsRes.pagination?.total ?? null)
+      }
+      else setError(broadcastsRes.error)
+      if (tagsRes && tagsRes.success) setTags(tagsRes.data)
+      if (scenariosRes && scenariosRes.success) {
+        setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
+      }
+    } catch (err) {
+      /* 403 は読み直しても直らない。失敗と別の1枚にする。 */
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+      else setError('データの読み込みに失敗しました。もう一度お試しください。')
+    } finally {
+      if (append) setLoadingMoreBroadcasts(false)
+      else setLoading(false)
+    }
+  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, loadingMoreBroadcasts])
+
+  useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setSavedViews([])
+      return
+    }
+    let cancelled = false
+    setSavedViewError('')
+    api.broadcasts.savedViews.list(selectedAccountId).then((res) => {
+      if (cancelled) return
+      if (res.success) setSavedViews(res.data)
+      else setSavedViewError('保存した検索を読み込めませんでした。')
+    }).catch(() => {
+      if (!cancelled) setSavedViewError('保存した検索を読み込めませんでした。')
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId, savedViewsSeq])
+
+  const applySavedView = (id: string) => {
+    const view = savedViews.find((item) => item.id === id)
+    if (!view) return
+    const filters = view.filters
+    /*
+     * 旧形式（`statuses: ['scheduled']` など）で保存された行は、新形式に
+     * 読み替える。読み替えないと、選んでも何も変わらず復元不良になる
+     * （点検 #490 中5）。`openRateMax` は口も画面も未接続のため、
+     * ここでは絞りに使わず無視する。
+     */
+    const legacyStatuses = Array.isArray(filters.statuses) ? filters.statuses : []
+    const legacyStatus = legacyStatuses.includes('scheduled')
+      ? 'scheduled'
+      : legacyStatuses.includes('draft')
+        ? 'draft'
+        : null
+    setTitleQuery(typeof filters.titleQuery === 'string' ? filters.titleQuery : '')
+    setStatusFilter(
+      filters.statusFilter === 'scheduled' || filters.statusFilter === 'draft'
+        ? filters.statusFilter
+        : legacyStatus ?? 'all',
+    )
+    setDateFrom(typeof filters.dateFrom === 'string' ? filters.dateFrom : '')
+    setDateTo(typeof filters.dateTo === 'string' ? filters.dateTo : '')
+    setFolderFilter(typeof filters.folderFilter === 'string' ? filters.folderFilter : '')
+  }
+
+  const saveCurrentView = async () => {
+    if (!selectedAccountId || !savedViewName.trim() || savedViewBusy) return
+    setSavedViewBusy(true)
+    setSavedViewError('')
+    try {
+      const res = await api.broadcasts.savedViews.create(selectedAccountId, {
+        name: savedViewName.trim(),
+        filters: { titleQuery, statusFilter, dateFrom, dateTo, folderFilter },
+        sortKey: 'scheduled',
+        pageSize: 20,
+      })
+      if (!res.success) throw new Error(res.error)
+      setSavedViews((current) => [...current, res.data])
+      setSavedViewName('')
+      setSavedViewOpen(false)
+    } catch {
+      setSavedViewError('この検索条件を保存できませんでした。')
+    } finally {
+      setSavedViewBusy(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    // 押している間は受け付けない。二度押しの2回目は404になり、
+    // 消えているのに「削除できませんでした」と出る。
+    if (!deleteTarget || deleting) return
+    const targetId = deleteTarget.id
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const res = await api.broadcasts.delete(targetId)
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      await load()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -150,20 +438,16 @@ function BroadcastList() {
     return tags.find((t) => t.id === tagId)?.name ?? null
   }
 
-  // タブで分類: 単アカ配信 (multi-account-dedup 以外) と 複アカ重複除外配信 を分ける。
+  const getScenarioName = (scenarioId: string) =>
+    scenarios.find((s) => s.id === scenarioId)?.name ?? null
+
+  // タブで分類: 1アカウントへの配信 (multi-account-dedup 以外) と 複数アカウントの重複除外配信 を分ける。
   // 全件タブは未フィルタ。サイドバー account context のフィルタは API 側で済んでる。
-  const dedupCount = broadcasts.filter((b) => b.targetType === 'multi-account-dedup').length
-  const singleCount = broadcasts.length - dedupCount
+  // 状態・フォルダは口側で絞り済み。タイトル・日付だけ手元で絞る。
   const visibleBroadcasts = broadcasts.filter((b) => {
     // タイトルは手元で絞る。打つたびに取り直すと重い。
-    if (titleQuery.trim() && !b.title.toLowerCase().includes(titleQuery.trim().toLowerCase())) {
-      return false
-    }
-    // まだ送っていない予約だけを見る。送る前に中身を直せるのはこれだけ。
-    if (scheduledOnly && b.status !== 'scheduled') return false
-    if (folderFilter === UNFILED) {
-      if (b.folderId) return false
-    } else if (folderFilter && b.folderId !== folderFilter) {
+    const query = titleQuery.trim().toLowerCase()
+    if (query && !`${b.title} ${b.messageContent}`.toLowerCase().includes(query)) {
       return false
     }
     if (dateFrom || dateTo) {
@@ -171,57 +455,35 @@ function BroadcastList() {
       const iso = b.status === 'sent' ? b.sentAt : b.scheduledAt
       if (!iso) return false
       // JST の日付で比べる。UTC のまま切ると、夜の配信が前日に入る。
-      const ymd = new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+      const ymd = formatYmdJst(iso)
       if (dateFrom && ymd < dateFrom) return false
       if (dateTo && ymd > dateTo) return false
     }
-    if (activeTab === 'all') return true
-    if (activeTab === 'dedup') return b.targetType === 'multi-account-dedup'
-    return b.targetType !== 'multi-account-dedup'
+    return true
   })
 
-  return (
-    <div>
-      {/* 設計 `V2 4-2 一斉配信` */}
-      <div data-design="Head">
-      <Header
-        title="一斉配信"
-        description="条件を指定した友だちにメッセージをまとめて送ります。予約配信と開封の計測ができます。"
-        action={(
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-            <button
-              type="button"
-              onClick={() => setFolderDialogOpen(true)}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              フォルダを追加
-            </button>
-            <button
-              type="button"
-              onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              テンプレートから配信
-            </button>
-            <button
-              onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
-              className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-            >
-              + 新規配信
-            </button>
-          </div>
-        )}
-      />
-      </div>
+  /**
+   * R173: 状態・フォルダ・検索・日付・保存した検索のいずれかが効いているか。
+   * 効いているときの0件は「まだありません」と言わず、条件を外す口を出す。
+   */
+  const broadcastFilterActive = statusFilter !== 'all'
+    || folderFilter !== ''
+    || titleQuery.trim() !== ''
+    || dateFrom !== ''
+    || dateTo !== ''
+    || savedViewId !== ''
+  const clearBroadcastFilters = () => {
+    setStatusFilter('all')
+    setFolderFilter('')
+    setTitleQuery('')
+    setDateFrom('')
+    setDateTo('')
+    setSavedViewId('')
+  }
 
+  return (
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -232,318 +494,466 @@ function BroadcastList() {
         />
       )}
 
+      {editingFolder && (
+        <FolderAddDialog
+          kind="broadcast"
+          folder={editingFolder}
+          note="配信を分けてしまう箱です。削除しても、中の配信は未分類に残ります。"
+          placeholder="例: 01_キャンペーン"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void loadFolders() }}
+        />
+      )}
+
       <div data-design="KPIs">
-      <BroadcastKpis />
+      <BroadcastKpis
+        loading={loading}
+        failed={Boolean(error) || forbidden}
+        listKpis={loading ? undefined : listKpis}
+      />
+      </div>
+
+      <div data-design="Head" className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="primary"
+          aria-label="＋ 配信を作る"
+          onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
+        >
+          ＋ 配信を作る
+        </Button>
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-          {/* 設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。 */}
-          <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+          {/*
+            設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。
+            狭い幅で1列になるときも `minmax(0,1fr)` で列を画面内に収める
+            （U014）。`grid-cols-1` を付けないと暗黙の auto 列が中身の
+            最大幅（一覧表の最小幅 640px）まで広がり、検索行ごと横に
+            はみ出して390pxで入力の右端が見えなくなる。
+          */}
+          <div style={FOLDER_RAIL_STYLE} className="grid grid-cols-1 gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+            {/*
+              件数は読み込んだ範囲での数。まだ奥があるときだけ口の total を
+              総数に出す(読み込んだ分だけを総数に見せない)。全部読めていれば
+              従来どおりの数え方で、見た目は変わらない。
+            */}
             <FolderPanel
-              total={`${broadcasts.length} 件`}
+              /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧の側に出す。 */
               activeId={folderFilter}
               onSelect={setFolderFilter}
+              onAddFolder={() => setFolderDialogOpen(true)}
               rows={[
-                { id: '', label: 'すべて', count: broadcasts.length },
-                ...folders.map((f) => ({
+                { id: '', label: 'すべて', count: listTotal ?? broadcasts.length },
+                ...folders.map((f, index) => ({
                   id: f.id,
                   label: f.name,
-                  count: broadcasts.filter((b) => b.folderId === f.id).length,
+                  // #631: フォルダ件数はAPI(itemCount)をそのまま出す。読み込み
+                  // 済み範囲だけを数えるフォールバックは、cursorページングで
+                  // まだ全部読めていないと実数と食い違うため廃止。
+                  count: f.itemCount ?? null,
                   color: f.color,
+                  // 中央の行なら、上へ／下へを含む設計の5操作を全部撮れる。
+                  qaOpen: index === 1 ? 'xkRDb' : undefined,
+                  onEdit: () => setEditingFolder(f),
+                  onMoveUp: index > 0 ? () => void moveFolder(index, -1) : undefined,
+                  onMoveDown: index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+                  onDelete: () => setDeletingFolder(f),
+                  deleteNote: '削除しても、中の配信は未分類に残ります。',
                 })),
                 {
                   id: UNFILED,
                   label: '未分類',
-                  count: broadcasts.filter((b) => !b.folderId).length,
+                  count: unfiledCount,
                 },
               ]}
             >
               <p className="text-ink-faint text-xs leading-relaxed">
                 フォルダを消しても、入っていた配信は未分類として残ります。
               </p>
+              {/*
+                ★V7 `x63W5x`：補助のデータ（フォルダ）だけ取れないときは、
+                その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+                一覧本体も失敗しているとき（一覧の失敗・権限不足の1枚が
+                出ているとき）はそちらへまとめ、ここは出さない。一覧が
+                戻れば、まだ取れていなければ再び出る。
+              */}
+              {folderError && !forbidden && (broadcasts.length > 0 || showCreate || !error) ? (
+                <p role="alert" className="text-ink-secondary text-xs">
+                  {folderError}
+                  <button type="button" onClick={() => void loadFolders()} className="text-action ml-2 font-semibold hover:underline">
+                    もう一度
+                  </button>
+                </p>
+              ) : null}
             </FolderPanel>
 
-            <div>
-
-          {/* 検索と並び順（設計 `Body` の上）。 */}
-          <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-            <input
-              type="search"
-              placeholder="タイトルで検索"
-              aria-label="タイトルで検索"
-              value={titleQuery}
-              onChange={(e) => setTitleQuery(e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-            />
-            <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-            <select
-              disabled
-              title="並び替えは準備中です"
-              className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-            >
-              <option>配信日が新しい順</option>
-            </select>
-            <span className="text-ink-faint text-xs whitespace-nowrap">配信日</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              aria-label="配信日（開始）"
-              className="border-hairline rounded-control border px-2 py-2 text-sm"
-            />
-            <span className="text-ink-faint text-xs">〜</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              aria-label="配信日（終了）"
-              className="border-hairline rounded-control border px-2 py-2 text-sm"
-            />
-            {(dateFrom || dateTo) && (
-              <button
-                type="button"
-                onClick={() => { setDateFrom(''); setDateTo('') }}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm"
-              >
-                日付を外す
-              </button>
-            )}
-            <button
-              disabled
-              title="保存した条件は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-            >
-              保存した条件
-            </button>
-          </div>
+            <div className="flex flex-col gap-4">
+              {/* 一覧列の縦の間隔も gap-4（16px）にそろえる。行ごとの mb-3 は付けない。 */}
 
           {/*
-            よく使う絞り込み。数え方が決まっているのは「予約中のみ」だけ。
-            開封率の低さと今月分は、比べる相手や区切りを決める前に押せる
-            ようにすると、押した人ごとに違うものを想像する。
+            ★V7 `Xn1Mz`：検索は幅320で「保存した検索・この条件を保存」と
+            同じ行に置く。横いっぱいに伸ばさない。狭い幅では検索が240まで
+            縮み、入りきらない分は折り返す（潰して読めなくしない）。
           */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs">よく使う</span>
-            <button
-              onClick={() => setScheduledOnly((v) => !v)}
-              className={`rounded-pill px-3 py-1 text-xs transition-colors ${
-                scheduledOnly
-                  ? 'bg-accent-soft text-accent'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-              }`}
-            >
-              予約中のみ
-            </button>
-            {['開封率が低い', '今月分'].map((label) => (
-              <button
-                key={label}
-                disabled
-                title="この絞り込みはまだ数えられません"
-                className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-              >
-                {label}
+          <ListToolbar
+            search={{ placeholder: 'タイトル・内容で検索', value: titleQuery, onChange: setTitleQuery }}
+            actions={
+              <>
+                <Select
+                  aria-label="保存した検索"
+                  value={savedViewId}
+                  onChange={(value) => { setSavedViewId(value); applySavedView(value) }}
+                  options={[
+                    { value: '', label: '保存した検索' },
+                    ...savedViews.map((view) => ({ value: view.id, label: view.name })),
+                  ]}
+                />
+                <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
+              </>
+            }
+            filters={
+              <>
+                <FilterChip selected={statusFilter === 'scheduled'} onChange={(on) => setStatusFilter(on ? 'scheduled' : 'all')}>予約中のみ</FilterChip>
+                <FilterChip selected={statusFilter === 'draft'} onChange={(on) => setStatusFilter(on ? 'draft' : 'all')}>下書き</FilterChip>
+                {/* ★V7：押せない「非表示」「開封率が低い」の札は外した（機能が無い・未接続のまま置かれていた）。 */}
+                <span className="text-ink-faint ml-1 text-xs whitespace-nowrap">配信日</span>
+                <div data-date-input><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" /></div>
+                <span className="text-ink-faint text-xs">〜</span>
+                <div data-date-input><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" /></div>
+                {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
+              </>
+            }
+            trailing={
+              <>
+                {/*
+                  ★V7 `Xn1Mz`：2行目を1440px（中身の幅 ≈835px）で1行に収める。
+                  選ぶ欄は共通 ListToolbar の印（data-sort-select・
+                  data-per-page-select）で幅をそろえる（並び順150・表示件数96）。
+                  「〜が」を省いた短い文字にし、何の順かは aria-label、
+                  件数は左の見出しで分かるようにする。
+                */}
+                <div data-sort-select>
+                  <Select
+                    aria-label="並び順"
+                    className="w-full"
+                    value={sortKey}
+                    onChange={(value) => setSortKey(value === 'oldest' ? 'oldest' : 'newest')}
+                    options={[
+                      { value: 'newest', label: '新しい順' },
+                      { value: 'oldest', label: '古い順' },
+                    ]}
+                  />
+                </div>
+                <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
+                <div data-per-page-select>
+                  <Select
+                    aria-label="表示件数"
+                    className="w-full"
+                    value={String(pageSize)}
+                    size="page-size"
+                    onChange={(value) => setPageSize(Number(value) || 20)}
+                    options={[
+                      { value: '20', label: '20件' },
+                      { value: '50', label: '50件' },
+                      { value: '100', label: '100件' },
+                    ]}
+                  />
+                </div>
+              </>
+            }
+          />
+          {savedViewOpen && (
+            <div className="border-hairline bg-canvas flex flex-wrap items-center gap-2 rounded-control border p-3">
+              <input
+                aria-label="保存する検索の名前"
+                placeholder="検索条件の名前"
+                value={savedViewName}
+                onChange={(event) => setSavedViewName(event.target.value)}
+                className="border-hairline rounded-control min-w-64 border px-3 py-2 text-sm"
+              />
+              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()}>{savedViewBusy ? '保存中…' : '保存'}</Button>
+              <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
+            </div>
+          )}
+          {/*
+            ★V7 `x63W5x`：補助のデータ（保存した検索）だけ取れないときは、
+            その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+          */}
+          {savedViewError && (
+            <p role="alert" className="text-ink-secondary text-xs">
+              {savedViewError}
+              <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className="text-action ml-2 font-semibold hover:underline">
+                もう一度
               </button>
-            ))}
-          </div>
+            </p>
+          )}
 
-      {/* Error */}
-      {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
-      )}
+      {/*
+        ★V7 `x63W5x`：読み込み失敗の帯は出さない。一覧の場所の ListState error
+        だけにまとめる（同じ失敗を2回出さない。帯は生の口の文言をそのまま
+        出していたため、英語が出ることもあった）。
+      */}
 
       {/* Create form */}
       {showCreate && (
         <BroadcastForm
           tags={tags}
-          onSuccess={() => { setShowCreate(false); load() }}
+          onSuccess={() => { setShowCreate(false); void load(); void loadFolders() }}
+          /*
+           * BROADCAST-16: 「下書き保存」はフォームが閉じないので、保存のたびに
+           * 一覧とフォルダ件数を読み直す。読み直さないと、保存した下書きが
+           * 未分類へ増えても件数が古いままになる。
+           */
+          onDraftSaved={() => { void load(); void loadFolders() }}
           onCancel={() => setShowCreate(false)}
           openTemplatePickerInitially={openTemplatePicker}
         />
       )}
 
-      {/* Tabs */}
-      {!loading && broadcasts.length > 0 && (
-        <div className="mb-4 flex gap-1 border-b border-hairline">
-          {([
-            { id: 'all', label: '全部', count: broadcasts.length },
-            { id: 'single', label: '単アカ配信', count: singleCount },
-            { id: 'dedup', label: '複アカ重複除外', count: dedupCount },
-          ] as const).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-accent text-ink'
-                  : 'border-transparent text-ink-faint hover:text-ink-secondary'
-              }`}
-              style={activeTab === tab.id ? { borderColor: 'var(--color-accent)' } : undefined}
-            >
-              {tab.label}
-              <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0 rounded-full bg-canvas-sunken text-xs text-ink-secondary min-w-[20px]">
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Loading */}
+      {/*
+        Loading。**読み込み中であることを言葉で出す。** 骨だけのスケルトン
+        では「読み込んでいます」の文言が無く、ほかの一覧と同じ
+        読込表示（共通 ListState）にそろえる（#634）。
+      */}
       {loading ? (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-hairline rounded w-48" />
-                <div className="h-2 bg-canvas-sunken rounded w-32" />
-              </div>
-              <div className="h-5 bg-canvas-sunken rounded-full w-16" />
-              <div className="h-3 bg-canvas-sunken rounded w-24" />
-            </div>
-          ))}
-        </div>
+        <ListState kind="loading" />
+      ) : forbidden ? (
+        /*
+          権限不足。**「ありません」とも「失敗しました」とも別の1枚**にする。
+          読み直しても直らないので、誰に頼めばよいかを言う。
+        */
+        <ListState kind="forbidden" title="配信を見る権限がありません" />
       ) : broadcasts.length === 0 && !showCreate ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          {/* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */}
-          <p className="text-ink-faint">
-            {error
-              ? 'いまは読み込めていません。上の案内をご覧ください。'
-              : '配信がありません。「新規配信」から作成してください。'}
-          </p>
-        </div>
+        /* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */
+        error ? (
+          <ListState
+            kind="error"
+            title="表示できませんでした"
+            description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+            onRetry={() => void load()}
+          />
+        ) : broadcastFilterActive ? (
+          /* R173: 状態・フォルダ・検索・日付で絞った結果0件。元データ0件と分け、条件を外す口を出す。 */
+          <div className="bg-canvas rounded-card border border-hairline">
+            <ListState
+              kind="empty"
+              emptyPreset="filtered"
+              action={<Button variant="secondary" onClick={clearBroadcastFilters}>条件をクリア</Button>}
+            />
+          </div>
+        ) : (
+          /* 文言は設計 `TmHjF`（6-1-N）どおり。 */
+          <div className="bg-canvas rounded-card border border-hairline">
+            <ListState kind="empty" title="まだ配信がありません" description="最初の1つを作ると、ここに並びます。" />
+          </div>
+        )
       ) : visibleBroadcasts.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">
-            {activeTab === 'dedup' ? '複数アカ重複除外配信はまだありません。' : 'このタブに該当する配信はありません。'}
-          </p>
+        /* R173: タイトル・日付の絞り込みで0件。作る口ではなく条件を外す口を出す。 */
+        <div className="bg-canvas rounded-card border border-hairline">
+          <ListState
+            kind="empty"
+            emptyPreset="filtered"
+            action={<Button variant="secondary" onClick={clearBroadcastFilters}>条件をクリア</Button>}
+          />
         </div>
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+        <>
+        {/* m18s: タイトル・日付の絞り込み後の件数は一覧の側に出す。見出しには出さない。 */}
+        <div className="mb-2">
+          <ListRange
+            total={visibleBroadcasts.length}
+            first={visibleBroadcasts.length === 0 ? 0 : 1}
+            last={visibleBroadcasts.length}
+          />
+        </div>
+        <DataTable>
+            {/*
+              列は設計 `q76C35`（V6 6-1 一斉配信）の6列。
+              タイトル・内容／状態／配信条件／配信日時／結果／操作。
+
+              前は見出しが8つ、中身が7つで**1列ずれていた**。「開封（率）」の
+              下に状態バッジ、「状態」の下に削除ボタンが並んでいて、表として
+              読めていなかった。設計どおり6列にそろえ、見出しと中身の数を
+              合わせる。「配信数」と「開封（率）」は設計では1つの列
+              （配信・開封・クリック）にまとまっている。
+            */}
+            {/*
+              列幅は % と操作列の固定幅の組み合わせ（m20i）。
+              操作は中身（詳細＋…約90＋共通の余白24）だけの120pxに固定する
+              （★V7：操作列は固定幅・右端の余白は共通の12px）。
+              % の合計は82に抑え、120pxを足しても
+              いちばん狭い帯（1280px時の表≈700px）に収まる。タイトルも
+              16%に詰めて、空いたぶんを結果18%へ回す。結果の各行は
+              1440pxで1行に収まる。狭い帯ではラベルと数字の間で折れて
+              よい（数字と率は離さない）。横には送らない。
+            */}
             <thead>
-              <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  タイトル
-                </th>
-                {/*
-                  列は設計 `V2 4-2 一斉配信` の並び。
-                  「予約日時」と「送信完了日時」を「配信日時」の1列にまとめている。
-                  予約中なら予約の時刻、送信済みなら送った時刻。どちらか一方しか
-                  意味を持たないので、2列に分けると常に片方が空になる。
-                */}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信日時
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信条件
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  内容
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信数
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  開封（率）
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
+              <TableHeadRow>
+                <Th style={{ width: '16%' }}>
+                  タイトル・内容
+                </Th>
+                <Th style={{ width: '14%' }}>
                   状態
-                </th>
-                <th className="px-4 py-3" />
-              </tr>
+                </Th>
+                <Th style={{ width: '20%' }}>
+                  配信条件
+                </Th>
+                {/*
+                  予約中なら予約の時刻、送信済みなら送った時刻。
+                  2列に分けると、どちらか一方が常に空になる。
+                */}
+                <Th style={{ width: '14%' }}>
+                  配信日時
+                </Th>
+                <Th style={{ width: '18%' }}>
+                  結果
+                </Th>
+                {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                <Th style={{ width: 120 }} align="right" className="sticky right-0 bg-canvas-sunken">
+                  操作
+                </Th>
+              </TableHeadRow>
             </thead>
-            <tbody className="divide-y divide-hairline">
+            <tbody>
               {visibleBroadcasts.map((broadcast) => {
-                const statusInfo = statusConfig[broadcast.status]
-                const tagName = getTagName(broadcast.targetTagId)
+                const statusInfo = (broadcast.displayStatus && displayStatusConfig[broadcast.displayStatus])
+                  ?? statusConfig[broadcast.status]
+                /*
+                 * m20i: 状態の札と承認の札が同じ言葉になる組み合わせ。
+                 * このときだけ承認の札1つにまとめる（下の状態セル）。
+                 */
+                const approvalDuplicatesStatus = (broadcast.displayStatus === 'pending_approval' && broadcast.approvalStatus === 'pending')
+                  || (broadcast.displayStatus === 'expired' && broadcast.approvalStatus === 'expired')
                 const isDedup = broadcast.targetType === 'multi-account-dedup'
+                // 手動で取り直した値があればそれを、一覧同梱の集計があればそれを使う。
+                const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
+                // 配信条件の1行表示と title 用。関数を2回呼ばない。
+                const audience = audienceSummary(broadcast, getTagName, getScenarioName)
 
                 return (
-                  <tr key={broadcast.id} className="hover:bg-canvas-sunken transition-colors">
-                    {/* Title */}
-                    <td className="px-4 py-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-action hover:text-action-hover hover:underline">
-                            {broadcast.title}
-                          </a>
-                          {isDedup && (
-                            <span className="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
-                              複アカ
-                            </span>
-                          )}
-                        </div>
-                        {/*
-                          前は text / image 以外をすべて「Flex」と出していた。
-                          スタンプもカルーセルも位置情報も「Flex」に見えるので、
-                          一覧で中身を確かめられなかった。
-                        */}
-                        <p className="text-xs text-ink-faint mt-0.5">
-                          {messageTypeLabel(broadcast.messageType)}
-                        </p>
+                  <Tr
+                    key={broadcast.id}
+                    interactive
+                    className="group cursor-pointer"
+                    tabIndex={0}
+                    onClick={() => router.push(`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        router.push(`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`)
+                      }
+                    }}
+                  >
+                    {/*
+                      行を押したら詳細へ（一覧の決まり）。名前は黒文字の太字。
+                      行の中の操作（インサイト取得・削除）は行の移動を起こさない。
+                    */}
+                    {/*
+                      タイトル・内容。設計は「8月キャンペーンのお知らせ」の下に
+                      「キャンペーン告知／画像＋テキスト 2通」と出す。一覧から
+                      中身を思い出せないと、開いて確かめることになる。
+                    */}
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <a href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="text-sm font-bold text-ink hover:text-action hover:underline">
+                          {broadcast.title}
+                        </a>
+                        {isDedup && (
+                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded text-[10px] font-medium bg-info-bg text-info">
+                            複数アカウント
+                          </span>
+                        )}
                       </div>
-                    </td>
+                      {/*
+                        前は text / image 以外をすべて「Flex」と出していた。
+                        スタンプもカルーセルも位置情報も「Flex」に見えるので、
+                        一覧で中身を確かめられなかった。
+                      */}
+                      <p className="text-xs text-ink-faint mt-0.5 line-clamp-2 break-all">
+                        {rowExcerpt(broadcast.messageType, broadcast.messageContent)}
+                      </p>
+                    </Td>
 
                     {/*
-                      配信日時。予約中なら予約の時刻、送信済みなら送った時刻。
-                      2列に分けると、どちらかが常に空になって読みにくい。
+                      状態。設計では2列目。承認待ちの札もここに出す（A-2）。
+                      m20i: 承認の札と状態の札が同じ言葉になる組み合わせ
+                      （承認待ち・期限切れ）は2つ出さず、承認の札（札＋?）
+                      1つにする。2つ出すと狭い列に収まらず「?」が下へ
+                      はみ出す。言葉が違う組み合わせは両方残す。
                     */}
-                    <td className="px-4 py-3 text-sm text-ink-faint">
-                      {broadcast.status === 'sent'
-                        ? formatDatetime(broadcast.sentAt)
-                        : formatDatetime(broadcast.scheduledAt)}
-                    </td>
+                    <Td>
+                      {approvalDuplicatesStatus ? (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <ApprovalBadge status={broadcast.approvalStatus} />
+                        </span>
+                      ) : (
+                        <span className="inline-flex flex-wrap items-center gap-1">
+                          <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                            {statusInfo.label}
+                          </span>
+                          <ApprovalBadge status={broadcast.approvalStatus} />
+                        </span>
+                      )}
+                    </Td>
 
                     {/*
                       配信条件。前は「全員」か「タグ指定」の2つしか見ていなかったので、
                       詳細条件で絞った配信も「タグ指定」と出ていた。送った相手を
                       後から確かめられないので、監査にならなかった。
+                      m20i: 「タグ：NEN会員（定期）」が3行に折れて行が高く
+                      なるので、1行で省略し全文は title で見せる。
                     */}
-                    <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {audienceSummary(broadcast, getTagName)}
-                    </td>
-
-                    {/* 内容。一覧から中身を思い出せるように、本文の頭を出す。 */}
-                    <td className="px-4 py-3 text-sm text-ink-secondary">
-                      <span className="line-clamp-2 break-all">
-                        {contentExcerpt(broadcast.messageType, broadcast.messageContent) || '—'}
+                    <Td className="text-ink-secondary">
+                      <span className="block truncate" title={audience}>
+                        {audience}
                       </span>
-                    </td>
+                    </Td>
 
-                    {/* Stats & Insight */}
-                    <td className="px-4 py-3 text-sm text-ink-faint">
-                      {broadcast.status === 'sent' ? (
+                    <Td className="text-ink-faint tabular-nums whitespace-nowrap">
+                      {broadcast.status === 'sent'
+                        ? formatDatetime(broadcast.sentAt)
+                        : formatDatetime(broadcast.scheduledAt)}
+                    </Td>
+
+                    {/*
+                      配信・開封・クリック。送信済みの配信だけ数がある。
+                      **まだ送っていない配信に 0件 とは書かない。** 0通届いた
+                      のではなく、届く前だから数が無い。
+                    */}
+                    <Td className="text-ink-faint">
+                      {broadcast.status !== 'sent' ? (
+                        <span className="text-ink-faint">—</span>
+                      ) : (
                         <div>
                           {broadcast.totalCount > 0 && (
-                            <p>{broadcast.successCount.toLocaleString('ja-JP')} / {broadcast.totalCount.toLocaleString('ja-JP')} 件</p>
+                            <p className="whitespace-nowrap">{broadcast.successCount.toLocaleString('ja-JP')} / {broadcast.totalCount.toLocaleString('ja-JP')} 件</p>
                           )}
-                          {insights[broadcast.id] ? (
+                          {insight ? (
                             <div className="mt-1 space-y-0.5">
-                              {insights[broadcast.id].delivered != null && (
-                                <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insights[broadcast.id].delivered!.toLocaleString('ja-JP')}</span></p>
+                              {insight.delivered != null && (
+                                <p className="whitespace-nowrap text-xs">配信: <span className="font-medium text-ink-secondary">{insight.delivered.toLocaleString('ja-JP')}</span></p>
                               )}
-                              {insights[broadcast.id].uniqueImpression != null && (
-                                <p className="text-xs">開封: <span className="font-medium text-info">{insights[broadcast.id].uniqueImpression!.toLocaleString('ja-JP')}</span>
-                                  {insights[broadcast.id].openRate != null && (
-                                    <span className="text-ink-faint"> ({(insights[broadcast.id].openRate! * 100).toFixed(1)}%)</span>
+                              {insight.uniqueImpression != null && (
+                                <p className="text-xs">開封: <span className="whitespace-nowrap"><span className="font-medium text-info">{insight.uniqueImpression.toLocaleString('ja-JP')}</span>
+                                  {insight.openRate != null && (
+                                    <span className="text-ink-faint"> ({(insight.openRate * 100).toFixed(1)}%)</span>
                                   )}
-                                </p>
+                                </span></p>
                               )}
-                              {insights[broadcast.id].uniqueClick != null && (
-                                <p className="text-xs">クリック: <span className="font-medium text-success">{insights[broadcast.id].uniqueClick!.toLocaleString('ja-JP')}</span>
-                                  {insights[broadcast.id].clickRate != null && (
-                                    <span className="text-ink-faint"> ({(insights[broadcast.id].clickRate! * 100).toFixed(1)}%)</span>
+                              {insight.uniqueClick != null && (
+                                <p className="text-xs">クリック: <span className="whitespace-nowrap"><span className="font-medium text-success">{insight.uniqueClick.toLocaleString('ja-JP')}</span>
+                                  {insight.clickRate != null && (
+                                    <span className="text-ink-faint"> ({(insight.clickRate * 100).toFixed(1)}%)</span>
                                   )}
-                                </p>
+                                </span></p>
                               )}
                             </div>
                           ) : (
                             <button
-                              onClick={() => handleFetchInsight(broadcast.id)}
+                              onClick={(event) => { event.stopPropagation(); handleFetchInsight(broadcast.id) }}
                               disabled={fetchingInsight === broadcast.id}
                               className="mt-1 text-xs text-action hover:text-action-hover disabled:opacity-50"
                             >
@@ -551,42 +961,131 @@ function BroadcastList() {
                             </button>
                           )}
                         </div>
-                      ) : (
-                        '-'
                       )}
-                    </td>
+                    </Td>
 
-                    {/* Status */}
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
-                        {statusInfo.label}
+                    {/*
+                      操作は共通 RowActions：主な1つ（詳細）＋「…」。
+                      削除はメニューの中の危ない操作へ。行にゴミ箱の
+                      アイコンだけのボタンは置かない（★V7 Xn1Mz）。
+                    */}
+                    <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
+                      {/* 行を押すと詳細へ行くので、行の中の操作は行へ伝えない。 */}
+                      {/* m20i: 操作列が固定幅で余るぶんは右へ寄せ、「…」を枠の端に置く。 */}
+                      <span className="inline-flex w-full justify-end" onClick={(event) => event.stopPropagation()}>
+                        {/*
+                          監査 R207: 下書き・予約は同じIDで編集を続けられる。
+                          操作列は固定幅（詳細＋…）なので、枠ボタンは増やさず
+                          「…」の中へ入れる。幅契約は変えない。
+                        */}
+                        <RowActions
+                          subjectName={broadcast.title}
+                          detail={{ href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}` }}
+                          menuItems={(broadcast.status === 'draft' || broadcast.status === 'scheduled') ? [
+                            {
+                              id: 'resume',
+                              label: '編集を続ける',
+                              external: true,
+                              onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
+                            },
+                          ] : []}
+                          destructiveItem={(broadcast.status === 'draft' || broadcast.status === 'scheduled') ? {
+                            id: 'delete',
+                            label: '削除する',
+                            onSelect: () => { setDeleteError(''); setDeleteTarget(broadcast) },
+                          } : undefined}
+                        />
                       </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
-                          <button
-                            onClick={() => handleDelete(broadcast.id)}
-                            className="px-3 py-1 min-h-[44px] text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
-                          >
-                            削除
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                 )
               })}
             </tbody>
-          </table>
-          </div>
-        </div>
+        </DataTable>
+          {/*
+            口側ページ送りの続き。押すと次のカーソルから足す。
+            件数・タブを変えると先頭から取り直す(load の依存で自動)。
+          */}
+          {nextCursor && (
+            <button
+              type="button"
+              onClick={() => { void load(nextCursor, true) }}
+              disabled={loadingMoreBroadcasts}
+              className="text-success hover:bg-accent-soft w-full border-t border-hairline px-4 py-3 text-sm disabled:opacity-50"
+            >
+              {loadingMoreBroadcasts ? '読み込み中...' : 'さらに読み込む'}
+            </button>
+          )}
+        </>
       )}
             </div>
           </div>
       </div>
+
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={`削除しても、中の配信は未分類に残ります。いまこのフォルダに入っているのは${
+          deletingFolder ? broadcasts.filter((b) => b.folderId === deletingFolder.id).length : 0
+        }件です。`}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onConfirm={() => void removeFolder()}
+        onCancel={() => {
+          if (folderBusy) return
+          setDeletingFolder(null)
+          setFolderError('')
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        /*
+          **題は設計 `EGMb1` どおり、配信名だけ。**
+          「配信「…」を削除しますか？」と接頭辞を付けていたが、設計は
+          「「8月キャンペーンのお知らせ」を削除しますか？」。何を消すのかは
+          名前で分かるので、種類を足すと読む語が増えるだけになる。
+        */
+        title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}
+        titleIcon={<Trash2 size={18} aria-hidden="true"></Trash2>}
+        description="削除すると配信設定と確認画面から消えます。予約中の配信は中止され、この操作は取り消せません。"
+        confirmLabel="削除する"
+        designNode="EGMb1"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteTarget(null)
+          setDeleteError('')
+        }}
+      />
+      <style jsx global>{`
+        /* m13i: 絞り込み札は共通 FilterChip 1つにそろえた（形・色は部品が持つ）。 */
+        [data-design-node='EGMb1'][role='presentation'] {
+          align-items: flex-start;
+          padding-top: 280px;
+        }
+        [data-design-node='EGMb1'] [data-design-part='dialog'] {
+          width: min(720px, calc(100vw - 32px));
+          max-width: 720px;
+        }
+        [data-design-node='EGMb1'] [data-qa-dialog-callout] {
+          gap: 4px;
+          border: 0;
+          background: transparent;
+          padding: 0;
+        }
+        [data-design-node='EGMb1'] [data-qa-dialog-callout] h2 {
+          color: var(--color-ink);
+        }
+        [data-design-node='EGMb1'] [data-qa-dialog-callout] p {
+          color: var(--color-ink-faint);
+        }
+      `}</style>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import {
   getRichMenuTargetingCandidates,
+  recordRichMenuAssignment,
   type RichMenuTargetingCandidate,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -74,6 +75,12 @@ export async function applyRichMenuTargeting(
 
   if (picked?.lineRichMenuId) {
     await line.linkRichMenuToUser(friend.line_user_id, picked.lineRichMenuId);
+    await recordRichMenuAssignment(db, {
+      friendId,
+      lineAccountId: accountId,
+      lineRichMenuId: picked.lineRichMenuId,
+      reasonKind: 'targeting_rule',
+    });
     return { kind: 'linked', groupId: picked.groupId, richMenuId: picked.lineRichMenuId };
   }
 
@@ -85,5 +92,11 @@ export async function applyRichMenuTargeting(
     const message = err instanceof Error ? err.message : String(err);
     if (!message.includes('404')) throw err;
   }
+  await recordRichMenuAssignment(db, {
+    friendId,
+    lineAccountId: accountId,
+    lineRichMenuId: null,
+    reasonKind: 'targeting_rule_fallback',
+  });
   return { kind: 'unlinked' };
 }
