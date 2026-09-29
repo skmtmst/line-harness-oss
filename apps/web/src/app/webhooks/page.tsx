@@ -1000,6 +1000,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           lineAccountId={selectedAccountId}
           endpointUrl={endpointUrl}
           canManage={canCreate}
+          canResolveUnmatched={staffRole === null || staffRole === 'owner' || staffRole === 'admin'}
           onReload={() => void load()}
           onToggle={handleToggleIncoming}
           togglingIds={togglingIdsOf('incoming')}

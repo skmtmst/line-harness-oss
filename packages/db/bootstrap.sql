@@ -3454,7 +3454,7 @@ CREATE TABLE incoming_webhook_receipts (
   attempt_count INTEGER NOT NULL DEFAULT 0,
   completed_at TEXT,
   last_error_code TEXT,
-  received_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  received_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), config_version INTEGER, identity_match_json TEXT, action_refs_json TEXT, body_hash TEXT,
   PRIMARY KEY (webhook_id, signature_hash)
 );
 
@@ -8195,6 +8195,9 @@ CREATE INDEX idx_inbox_reply_leases_expiry ON inbox_reply_leases (expires_at);
 
 CREATE INDEX idx_inbox_staff_reads_conversation
   ON inbox_staff_reads (channel, conversation_id, staff_id);
+
+CREATE UNIQUE INDEX idx_incoming_webhook_receipts_body
+  ON incoming_webhook_receipts (webhook_id, body_hash);
 
 CREATE INDEX idx_incoming_webhook_receipts_received
   ON incoming_webhook_receipts (received_at);

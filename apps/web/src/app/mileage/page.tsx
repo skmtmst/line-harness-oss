@@ -29,6 +29,7 @@ import {
   type MileageEarningRuleTestResult,
   type MileageEarningRuleV6,
   type MileageEarningRulesV6Overview,
+  type MileageFriendV6,
   type MileageFriendsV6Overview,
 } from '@/lib/api'
 import { adminSessionHeaders } from '@/lib/admin-session'
@@ -106,6 +107,19 @@ type EarningRuleSummary = {
    * （MILEAGE-05）。残高0の人は分母に入れない。
    */
   averageDenominator: number | null
+}
+
+/*
+ * R383: 「期限つきマイルがない（null）」と「期限つきはあるが30日以内は
+ * 0（次の失効はもっと先）」を区別する一覧表示。
+ */
+function expiringLabel(member: MileageFriendV6): string {
+  if (member.expiringMiles30d == null) return 'なし'
+  if (member.expiringMiles30d === 0 && member.nextExpiringAt) {
+    const date = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(new Date(member.nextExpiringAt))
+    return `30日以内はなし（次は ${date}）`
+  }
+  return `${formatMileageNumber(member.expiringMiles30d)} マイル`
 }
 
 function rankLabel(rank: string | null) {
@@ -558,6 +572,10 @@ function MileagePageInner() {
   }
 
   const summary = overview?.summary
+  /* R383: 期限つきマイルが30日より先だけにあるときに添える次の失効日。 */
+  const nextExpiringLabel = summary?.nextExpiringAt
+    ? new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(new Date(summary.nextExpiringAt))
+    : null
   const members = overview?.items ?? []
   const activeRules = rules.filter((rule) => rule.published.status === 'published')
   const topRule = [...rules].sort((a, b) => grantedMiles30d(b) - grantedMiles30d(a))[0] ?? null
@@ -704,7 +722,13 @@ function MileagePageInner() {
           title="もうすぐ消えるマイル"
           value={summary?.expiringMiles30d ?? null}
           unit=" マイル"
-          detail={summary?.expiringMiles30d == null ? '期限付きの付与記録はありません' : '30日以内に期限を迎える分'}
+          detail={summary?.expiringMiles30d == null
+            ? '期限付きの付与記録はありません'
+            // R383: 期限つきが30日より先だけにあるときは 0 と次の失効日を出し、
+            // 「期限付きなし（null）」と区別する。
+            : summary.expiringMiles30d === 0 && summary.nextExpiringAt
+              ? `30日以内の失効はありません（次は ${nextExpiringLabel}）`
+              : '30日以内に期限を迎える分'}
         />
       </div>
       <NoteBar>
@@ -1134,7 +1158,7 @@ function MileagePageInner() {
                     <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-secondary">
                       <div><dt className="inline text-ink-faint">ランク：</dt><dd className="inline" title={member.rankReason}>{displayRank ?? '未設定'}</dd></div>
                       <div><dt className="inline text-ink-faint">今月の増減：</dt><dd className={`inline font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-ink'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</dd></div>
-                      <div><dt className="inline text-ink-faint">消える予定：</dt><dd className="inline">{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</dd></div>
+                      <div><dt className="inline text-ink-faint">消える予定：</dt><dd className="inline">{expiringLabel(member)}</dd></div>
                       <div><dt className="inline text-ink-faint">最終変動：</dt><dd className="inline">{formatMileageDate(member.lastChangedAt)}</dd></div>
                     </dl>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -1173,7 +1197,7 @@ function MileagePageInner() {
                         {member.pending > 0 && <p className="text-micro text-status-warn-deep">保留 {formatMileageNumber(member.pending)}</p>}
                       </td>
                       <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-ink'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
-                      <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}>{member.expiringMiles30d == null ? 'なし' : formatMileageNumber(member.expiringMiles30d)}</p></td>
+                      <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={expiringLabel(member)}>{expiringLabel(member)}</p></td>
                       <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastChangedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">

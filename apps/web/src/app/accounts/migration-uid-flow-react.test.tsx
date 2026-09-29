@@ -491,3 +491,41 @@ describe('UID移行の空と履歴のカード表示', () => {
     expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
   })
 })
+
+describe('R398 一部反映の500で「未変更」と残さない', () => {
+  it('本移行の500後は履歴を読み直し、反映済みと残作業を示す', async () => {
+    net.failExecute = { status: 500, error: '本移行を実行できませんでした' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    const getsBefore = net.detailGets
+    // 確定後の読み直しでは、1件反映済みの失敗が返る。
+    net.detailResponders.set('run-1', async () => json(detailFixture(runFixture({
+      status: 'failed',
+      counts: { total: 2, auto: 0, review: 2, unmatched: 0, conflict: 0, applied: 1, failed: 1 },
+    }))))
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    // POSTの再送はしないが、詳細GETは読み直す。
+    expect(net.calls.filter((call) => call.path.endsWith('/execute') && call.method === 'POST')).toHaveLength(1)
+    expect(net.detailGets).toBeGreaterThan(getsBefore)
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('1 件が反映されています')
+    expect(document.body.textContent).toContain('一部だけ反映されました')
+    expect(document.body.textContent).not.toContain('実データはまだ変更していません')
+  })
+
+  it('500後に詳細の再取得も失敗したら結果未確認になる', async () => {
+    net.failExecute = { status: 500, error: '本移行を実行できませんでした' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    // 確定後の読み直しも失敗する。
+    net.detailResponders.set('run-1', async () => json(null, 500))
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    expect(openDialog().textContent).toContain('実行結果を確認できませんでした')
+  })
+})

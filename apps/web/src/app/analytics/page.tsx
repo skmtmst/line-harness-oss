@@ -18,9 +18,17 @@ import {
   type AnalyticsRoutesOverview,
   type AnalyticsUsageOverview,
   type AnalyticsUrlClicksOverview,
+  type RecentOneTimeReport,
   type SavedAnalyticsSnapshot,
   type SavedAnalyticsSummary,
 } from '@/lib/api'
+import Disclosure from '@/components/shared/disclosure'
+import {
+  deliveryChannelLabel,
+  deliveryStatusLabel,
+  runErrorLabel,
+  runStateLabel,
+} from './report-run-state'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import MetricValue from '@/components/ui/metric-value'
@@ -109,10 +117,10 @@ function AnalyticsNotice({ children }: { children: ReactNode }) {
   return <Notice tone="info">{children}</Notice>
 }
 
-function AnalyticsExportButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+function AnalyticsExportButton({ onClick, disabled, label }: { onClick: () => void; disabled: boolean; label?: string }) {
   return (
     <Button onClick={onClick} disabled={disabled} variant="secondary">
-      CSVで書き出す
+      {label ?? 'CSVで書き出す'}
     </Button>
   )
 }
@@ -2726,6 +2734,73 @@ function reportScheduleCadenceLabel(schedule: AnalyticsReportSchedule): string {
     : `毎月${schedule.monthDay}日 ${schedule.sendTime}`
 }
 
+/*
+ * R463: 保存した時点の結果を読む部品。履歴から数値・条件へ到達させる。
+ *
+ * 結果の形は分析の種類で違う（クロス・ファネル）ので、葉の値を
+ * そのまま並べる。0は「0件」と出し、null・欠けは「未取得」と
+ * 分ける。現在の再集計で過去結果を置き換えることはしない。
+ */
+function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: string; text: string }> {
+  const rows: Array<{ path: string; text: string }> = []
+  const visit = (node: unknown, path: string, depth: number) => {
+    if (rows.length >= limit || depth > 3) return
+    if (node === null || node === undefined) {
+      rows.push({ path, text: '未取得' })
+      return
+    }
+    if (typeof node === 'number' || typeof node === 'string' || typeof node === 'boolean') {
+      rows.push({ path, text: typeof node === 'number' ? node.toLocaleString('ja-JP') : String(node) })
+      return
+    }
+    if (Array.isArray(node)) {
+      if (node.length === 0) rows.push({ path, text: '0件' })
+      node.slice(0, 4).forEach((item, index) => visit(item, `${path}[${index + 1}]`, depth + 1))
+      if (node.length > 4) rows.push({ path, text: `ほか${node.length - 4}件` })
+      return
+    }
+    if (typeof node === 'object') {
+      const entries = Object.entries(node)
+      if (entries.length === 0) rows.push({ path, text: '—' })
+      entries.slice(0, 8).forEach(([key, child]) => visit(child, path ? `${path}・${key}` : key, depth + 1))
+    }
+  }
+  visit(result, '', 0)
+  return rows.filter((row) => row.path !== '' || row.text !== '—')
+}
+
+function SnapshotResultDetail({ snapshot }: { snapshot: SavedAnalyticsSnapshot }) {
+  const rows = summarizeSnapshotResult(snapshot.result)
+  return (
+    <Disclosure size="compact" title="この時点の結果を見る" hint={`${SAVED_STATE_LABELS[snapshot.state]}`}>
+      <dl className="grid gap-1 text-xs">
+        <div className="flex justify-between gap-3">
+          <dt className="text-ink-faint">対象期間</dt>
+          <dd className="text-ink tabular-nums">{formatAnalyticsDate(snapshot.periodFrom)}〜{formatAnalyticsDate(snapshot.periodTo)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-ink-faint">データ締切</dt>
+          <dd className="text-ink tabular-nums">{formatAnalyticsDateTime(snapshot.dataCutoffAt)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-ink-faint">集計状態</dt>
+          <dd className="text-ink">{SAVED_STATE_LABELS[snapshot.state]}</dd>
+        </div>
+        {rows.length === 0 && (
+          <div className="text-ink-faint">保存された数値はありません。</div>
+        )}
+        {rows.map((row, index) => (
+          <div key={index} className="flex justify-between gap-3">
+            <dt className="text-ink-faint truncate" title={row.path}>{row.path || '結果'}</dt>
+            <dd className="text-ink tabular-nums">{row.text}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-ink-faint mt-2 text-xs">保存時点の固定結果です。いま集計し直しても変わりません。</p>
+    </Disclosure>
+  )
+}
+
 function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   accountId: string
   onCountChange?: (count: number | null) => void
@@ -2739,9 +2814,14 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [error, setError] = useState('')
   const [schedules, setSchedules] = useState<AnalyticsReportSchedule[]>([])
+  // R454: しまった1回送信の直近分（一覧から消えても失敗に気づけるように）。
+  const [recentOneTime, setRecentOneTime] = useState<RecentOneTimeReport[]>([])
   const [schedulesLoading, setSchedulesLoading] = useState(true)
   const [schedulesError, setSchedulesError] = useState('')
   const [scheduleBusyId, setScheduleBusyId] = useState('')
+  // R462: 履歴の失敗は一覧の失敗と分ける。一覧の取得済み件数を
+  // 履歴の失敗で隠さないし、回復したら古い案内を消す。
+  const [snapshotError, setSnapshotError] = useState('')
   // 一覧・履歴の取り直し用。選んだ分析や検索語はそのままに、同じ取得だけをやり直す。
   const [savedReload, setSavedReload] = useState(0)
   const [snapshotReload, setSnapshotReload] = useState(0)
@@ -2781,37 +2861,50 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   useEffect(() => () => {
     schedulesAlive.current = false
   }, [])
+  // R456: 再読込の応答も「どのアカウントへ向けた取得か」で比べる。
+  // マウントの有無だけでは、アカウント切替後に遅い旧応答が
+  // 新しい一覧へ上書きする。世代が変わっていたら捨てる。
+  const schedulesGen = useRef(0)
 
   const reloadSchedules = useCallback(() => {
+    const gen = (schedulesGen.current += 1)
     setSchedulesLoading(true)
     void api.analytics.reportSchedules
       .list(accountId)
       .then((response) => {
-        if (!schedulesAlive.current) return
+        if (!schedulesAlive.current || gen !== schedulesGen.current) return
         if (!response.success) throw new Error(response.error)
         setSchedules(response.data.items)
+        setRecentOneTime(response.data.recentOneTime ?? [])
       })
       .catch((caught: unknown) => {
-        if (!schedulesAlive.current) return
+        if (!schedulesAlive.current || gen !== schedulesGen.current) return
         // ★V7 `x63W5x`：接続切れの英語（`Failed to fetch`）をそのまま出さない。
         setSchedulesError(caught instanceof TypeError ? '定期レポートを確認できませんでした' : caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
       })
       .finally(() => {
-        if (schedulesAlive.current) setSchedulesLoading(false)
+        if (schedulesAlive.current && gen === schedulesGen.current) setSchedulesLoading(false)
       })
   }, [accountId])
 
   useEffect(() => {
     let active = true
+    // 切替で旧アカウント向けの再読込応答を無効にする（R456）。
+    schedulesGen.current += 1
     setSchedulesLoading(true)
     setSchedules([])
+    setRecentOneTime([])
     setSchedulesError('')
+    // R456: アカウントが変わったら前の確認窓は閉じる。対象だけ残すと
+    // 別アカウントへ操作要求を送る原因になる。
+    setArchiveTarget(null)
     void api.analytics.reportSchedules
       .list(accountId)
       .then((response) => {
         if (!active) return
         if (!response.success) throw new Error(response.error)
         setSchedules(response.data.items)
+        setRecentOneTime(response.data.recentOneTime ?? [])
       })
       .catch((caught: unknown) => {
         if (!active) return
@@ -2854,20 +2947,25 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   useEffect(() => {
     if (!selectedId) {
       setSnapshots([])
+      setSnapshotError('')
       return
     }
     let active = true
     setSnapshotLoading(true)
     setSnapshots([])
+    // R462: 取り直しを始めたら古い失敗案内は消す。成功時も消す。
+    // 一覧の error とは別の棚に置き、一覧KPIを隠さない。
+    setSnapshotError('')
     void api.analytics.saved
       .snapshots(accountId, selectedId)
       .then((response) => {
         if (!active) return
         if (!response.success) throw new Error(response.error)
         setSnapshots(response.data)
+        setSnapshotError('')
       })
       .catch((caught: unknown) => {
-        if (active) setError(caught instanceof Error ? caught.message : '結果の履歴を確認できませんでした')
+        if (active) setSnapshotError(caught instanceof Error ? caught.message : '結果の履歴を確認できませんでした')
       })
       .finally(() => {
         if (active) setSnapshotLoading(false)
@@ -3022,6 +3120,39 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
         )}
       </section>
 
+      {/*
+        R454: 1回だけ送った直近の結果。一覧からは消えるため、
+        ここから失敗理由・宛先別結果（依頼IDの画面）へ進める。
+      */}
+      {recentOneTime.length > 0 && (
+        <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
+            <h2 className="text-sm font-semibold">1回だけ送った結果</h2>
+            <span className="text-ink-faint text-xs">{recentOneTime.length}件</span>
+          </div>
+          <ul className="divide-hairline divide-y">
+            {recentOneTime.map((item) => (
+              <li key={item.schedule.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-ink truncate text-sm font-medium" title={item.schedule.name}>
+                    {item.schedule.name}
+                  </p>
+                  <p className="text-ink-secondary mt-1 text-xs">
+                    {item.lastRun ? runStateLabel(item.lastRun.state) : 'まだ送信されていません'}
+                    {item.lastRun && runErrorLabel(item.lastRun.errorCode, item.lastRun.state)
+                      ? `：${runErrorLabel(item.lastRun.errorCode, item.lastRun.state)}`
+                      : ''}
+                  </p>
+                </div>
+                <Button href={`/analytics/reports/new?id=${item.schedule.id}`} variant="secondary">
+                  結果を見る
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="saved-analysis-search" className="sr-only">分析名・作った人で探す</label>
         <input id="saved-analysis-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="分析名・作った人で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
@@ -3129,8 +3260,10 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
             {/*
               ★V7 `x63W5x`：補助のデータ（結果の履歴）だけ取れないときは、
               その場所に小さく1行だけ。赤字・口の生文言にしない。
+              R462: 一覧の error ではなく履歴専用の error を見る。
+              取り直しの成功・別の分析の取得成功で消える。
             */}
-            {error && items.length > 0 && (
+            {snapshotError && (
               <p className="text-ink-secondary mt-3 text-xs" role="alert">
                 結果の履歴を読み込めませんでした。
                 <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button>
@@ -3158,9 +3291,31 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                     <p className="text-ink-faint mt-1 text-xs tabular-nums">
                       データ締切 {formatAnalyticsDateTime(snapshot.dataCutoffAt)}
                     </p>
+                    {/* R463: 履歴1件ごとに固定結果を開ける。 */}
+                    <div className="mt-2">
+                      <SnapshotResultDetail snapshot={snapshot} />
+                    </div>
                   </li>
                 ))}
               </ol>
+            )}
+            {/* R463: 保存結果のCSVは一覧のCSVと分ける。 */}
+            {selected && snapshots.length > 0 && (
+              <div className="mt-3">
+                <AnalyticsExportButton
+                  label="この分析の結果をCSVで書き出す"
+                  onClick={() => downloadCsv(`analytics-saved-${selected.id}.csv`, [
+                    ['対象期間', 'データ締切', '集計状態', '結果の要約'],
+                    ...snapshots.map((snapshot) => [
+                      `${snapshot.periodFrom}〜${snapshot.periodTo}`,
+                      snapshot.dataCutoffAt,
+                      SAVED_STATE_LABELS[snapshot.state],
+                      summarizeSnapshotResult(snapshot.result, 6).map((row) => `${row.path || '結果'}: ${row.text}`).join(' / ').slice(0, 200),
+                    ]),
+                  ])}
+                  disabled={false}
+                />
+              </div>
             )}
           </aside>
         </div>

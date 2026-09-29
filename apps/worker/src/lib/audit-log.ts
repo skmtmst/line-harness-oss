@@ -27,6 +27,7 @@ export type AuditAction =
   | 'mileage.rule.publish'
   | 'mileage.event.create'
   | 'mileage.adjustment.create'
+  | 'mileage.adjustment.notification.retry'
   | 'mileage.adjustment.policy.update'
   | 'mileage.adjustment.approval.request'
   | 'mileage.adjustment.approval.approve'

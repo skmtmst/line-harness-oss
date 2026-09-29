@@ -2364,6 +2364,25 @@ const spec = {
         responses: { '200': { description: 'Mileage redemptions with failure reason, attempts, and timestamps' }, '400': { description: 'Status is invalid' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
       },
     },
+    '/api/mileage/entries/{id}/notification-retry': {
+      post: {
+        tags: ['Mileage'],
+        summary: 'マイル手動調整の友だち通知だけをあとから再送する（残高は動かさない）',
+        description: '保存済みの通知記録があればその本文と送信キーで、記録の作成自体が失敗した調整では台帳の依頼印から本文を組み直して送る。送信済みの通知は再送しない。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId'],
+          properties: { accountId: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: '通知の再送結果（sent/failed/delivery_unknown など）' },
+          '400': { description: 'LINEアカウントが未指定' },
+          '403': { description: 'owner/adminではない、またはアカウント範囲外' },
+          '404': { description: '調整・通知対象が見つからない、または通知を依頼していない調整' },
+        },
+      },
+    },
     // ── Action Scores ────────────────────────────────────────────────────────
     '/api/action-scores/adjustments': {
       post: {
@@ -3788,8 +3807,10 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['pending', 'resolved', 'dismissed'] } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0 } },
         ],
-        responses: { '200': { description: '一覧' }, '404': { description: 'Not found' } },
+        responses: { '200': { description: '一覧（total に同条件の総数を返す）' }, '404': { description: 'Not found' } },
       },
     },
     '/api/webhooks/unmatched/{id}/resolve': {

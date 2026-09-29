@@ -17,6 +17,7 @@ import {
 } from '../services/friend-profile-candidates.js';
 import {
   getMergedPerson,
+  hasMergedPersonHistory,
   listMergedPeople,
   mergedPersonAccountIds,
   MergedPersonError,
@@ -157,8 +158,17 @@ function errorResponse(c: Context<Env>, error: unknown): Response {
 
 async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
   const accountIds = await mergedPersonAccountIds(c.env.DB, tenantId(c), id);
-  return accountIds.length > 0
-    && canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds);
+  if (accountIds.length > 0) {
+    return canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds);
+  }
+  /*
+   * R391: 結び付き0件の保管状態は、アカウントの壁では測れない。統括全体を
+   * 見られる担当だけに開き、履歴の残っている本人に限る。担当店だけの
+   * スタッフには開示しない。
+   */
+  const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
+  return !scope.isAccountScoped
+    && hasMergedPersonHistory(c.env.DB, tenantId(c), id);
 }
 
 function positiveInt(value: string | undefined, fallback: number, max: number): number | null {

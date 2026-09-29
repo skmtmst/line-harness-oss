@@ -333,10 +333,30 @@ export async function createMileageAdjustmentApprovalRequest(
   if (!request) {
     throw new MileageV6Error('approval_request_failed', '承認の依頼に失敗しました', 500);
   }
-  if (write.meta.changes > 0) {
-    await appendApprovalEvent(db, request.id, input.staffId, 'requested', input.reason);
+  /*
+   * R378: 同じ Idempotency-Key で別の内容が来た場合は、古い依頼をそのまま
+   * 返さず 409 にする。再送は内容が一致したときだけ同じ依頼を返す。
+   */
+  if (write.meta.changes === 0) {
+    const sameRequest = request.friend_id === input.friendId
+      && request.direction === input.direction
+      && Number(request.amount) === input.amount
+      && request.reason_category === input.reasonCategory
+      && request.reason === input.reason
+      && (request.source_reference_id ?? null) === (input.sourceReferenceId ?? null)
+      && (request.expires_at ?? null) === (input.expiresAt ?? null)
+      && (request.notify_friend === 1) === (input.notifyFriend === true);
+    if (!sameRequest) {
+      throw new MileageV6Error(
+        'idempotency_conflict',
+        '同じIdempotency-Keyが別の内容で使われています',
+        409,
+      );
+    }
+    return { request, replayed: true };
   }
-  return { request, replayed: write.meta.changes === 0 };
+  await appendApprovalEvent(db, request.id, input.staffId, 'requested', input.reason);
+  return { request, replayed: false };
 }
 
 async function appendApprovalEvent(

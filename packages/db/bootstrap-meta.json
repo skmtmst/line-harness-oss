@@ -471,7 +471,9 @@
     "511_restaurant_google_posts.sql",
     "512_restaurant_google_metrics.sql",
     "513_conversion_approval_freeze.sql",
-    "514_tiktok_pnl.sql"
+    "514_tiktok_pnl.sql",
+    "520_incoming_webhook_receipt_plan.sql",
+    "521_incoming_webhook_receipt_body_hash.sql"
   ],
-  "migrationCount": 472
+  "migrationCount": 474
 }
