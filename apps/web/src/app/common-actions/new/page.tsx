@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
-  ApiError,
+  describeSaveFailure,
   type CommonActionResources,
   type CommonActionStep,
 } from '@/lib/api'
 import CommonActionEditor, { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
@@ -55,7 +56,15 @@ export default function NewCommonActionPage() {
         if (!cancelled && response.success) setResources(response.data)
       })
       .catch((caught) => {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : '選択肢を読み込めませんでした')
+        if (cancelled) return
+        // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+        // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+        if (isForbiddenOrRateLimited(caught)) {
+          setError(loadFailureNotice(caught, '選択肢'))
+          return
+        }
+        const message = caught instanceof Error ? caught.message : ''
+        setError(message && !/^API error: /.test(message) ? message : '選択肢を読み込めませんでした')
       })
       .finally(() => {
         if (!cancelled) setResourcesLoading(false)
@@ -88,7 +97,8 @@ export default function NewCommonActionPage() {
       if (!response.success) throw new Error(response.error)
       router.push(`/common-actions/versions?id=${encodeURIComponent(response.data.id)}`)
     } catch (caught) {
-      setError(caught instanceof ApiError || caught instanceof Error ? caught.message : '下書きを保存できませんでした')
+      // m23m: 生の内部文は出さず、共通の保存失敗文にする。
+      setError(describeSaveFailure(caught))
     } finally {
       setSaving(false)
     }

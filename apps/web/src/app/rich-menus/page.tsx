@@ -17,6 +17,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { RowActions } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -199,6 +200,8 @@ export default function RichMenusListPage() {
     lineMenus: LineMenu[]
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  /** m23m: 捕まえた一覧の読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [externalError, setExternalError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [applyTo, setApplyTo] = useState<RichMenuGroupListItem | null>(null)
@@ -292,6 +295,7 @@ export default function RichMenusListPage() {
     const accountId = selectedAccount.id
     setLoading(true)
     setError(null)
+    setLoadError(null)
     try {
       const groupsRes = await api.richMenuGroups.listPage(accountId, {
         page: reordering ? 1 : page,
@@ -309,6 +313,7 @@ export default function RichMenusListPage() {
     } catch (e) {
       if (activeAccountRef.current === accountId) {
         setError(richMenuError(e, 'load'))
+        setLoadError(e)
       }
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
@@ -378,10 +383,14 @@ export default function RichMenusListPage() {
   }, [loadList, loadTapStats, loadExternal])
 
   const loadFolders = useCallback(async () => {
-    // #730: 選択中の1件に閉じた母集団で数える。未選択時は付けず、件数は不明（—）のまま。
-    const accountId = selectedAccount?.id ?? undefined
-    const res = await api.folders.list('rich_menu', accountId)
-    if (res.success) setFolders(res.data)
+    try {
+      // #730: 選択中の1件に閉じた母集団で数える。未選択時は付けず、件数は不明（—）のまま。
+      const accountId = selectedAccount?.id ?? undefined
+      const res = await api.folders.list('rich_menu', accountId)
+      if (res.success) setFolders(res.data)
+    } catch {
+      // m23m: 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
+    }
   }, [selectedAccount?.id])
 
   useEffect(() => {
@@ -867,7 +876,10 @@ export default function RichMenusListPage() {
               <ListState
                 kind="error"
                 title="表示できませんでした"
-                description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+                // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+                // それ以外は画面の文のまま。
+                description={isForbiddenOrRateLimited(loadError) ? undefined : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
+                error={loadError ?? undefined}
                 onRetry={() => void reload()}
               />
             ) : shownGroups.length === 0 ? (
