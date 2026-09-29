@@ -36,6 +36,7 @@ import {
   createAnalyticsReportSchedule,
   getAnalyticsReportRuns,
   getAnalyticsReportSchedule,
+  getRecentOneTimeAnalyticsReportRuns,
   getAnalyticsReportScheduleIncludingArchived,
   getAnalyticsReportSchedules,
   requeueOneTimeAnalyticsReportSchedule,
@@ -636,15 +637,19 @@ analytics.get('/api/analytics/report-schedules', async (c) => {
     if (!account.ok) return account.response;
     const selected = await getLineAccountById(c.env.DB, account.accountId);
     if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
-    const [items, savedAnalyses, recipients] = await Promise.all([
+    const [items, savedAnalyses, recipients, recentOneTime] = await Promise.all([
       getAnalyticsReportSchedules(c.env.DB, account.accountId),
       getSavedAnalytics(c.env.DB, account.accountId),
       reportRecipientOptions(c, account.accountId),
+      // R454: しまった1回送信の直近分も返す。一覧から消えても
+      // 失敗に気づき、依頼IDの結果へ進めるようにする。
+      getRecentOneTimeAnalyticsReportRuns(c.env.DB, account.accountId),
     ]);
     return c.json({
       success: true,
       data: {
         items,
+        recentOneTime,
         options: {
           timeZone: selected.timezone || 'Asia/Tokyo',
           savedAnalyses: savedAnalyses.map((item) => ({ id: item.id, name: item.name, kind: item.kind })),

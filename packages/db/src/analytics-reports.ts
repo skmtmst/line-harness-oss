@@ -72,6 +72,31 @@ export async function getAnalyticsReportSchedules(db: D1Database, lineAccountId:
   return result.results.map(serialize);
 }
 
+/**
+ * 直近にしまった1回送信の一覧（R454）。
+ *
+ * 1回送信は送信後に archived になるため通常の一覧に出ない。
+ * 失敗に気づけるよう、直近分だけ依頼と最新履歴を返す。
+ */
+export async function getRecentOneTimeAnalyticsReportRuns(
+  db: D1Database, lineAccountId: string, limit = 5,
+): Promise<Array<{ schedule: AnalyticsReportSchedule; lastRun: AnalyticsReportRun | null }>> {
+  const rows = await db.prepare(
+    `SELECT * FROM analytics_report_schedules
+      WHERE line_account_id = ? AND status = 'archived' AND is_one_time = 1
+      ORDER BY updated_at DESC, id DESC LIMIT ?`,
+  ).bind(lineAccountId, limit).all<ScheduleRow>();
+  const items: Array<{ schedule: AnalyticsReportSchedule; lastRun: AnalyticsReportRun | null }> = [];
+  for (const row of rows.results) {
+    const schedule = serialize(row);
+    const runs = await getAnalyticsReportRuns(db, {
+      scheduleId: schedule.id, lineAccountId, limit: 1,
+    });
+    items.push({ schedule, lastRun: runs[0] ?? null });
+  }
+  return items;
+}
+
 export async function getAnalyticsReportSchedule(db: D1Database, id: string, lineAccountId: string) {
   const row = await db.prepare(
     `SELECT * FROM analytics_report_schedules

@@ -13,6 +13,7 @@ import {
   getAnalyticsReportSchedule,
   getAnalyticsReportScheduleIncludingArchived,
   getAnalyticsReportSchedules,
+  getRecentOneTimeAnalyticsReportRuns,
   reclaimStaleAnalyticsReportRuns,
   requeueOneTimeAnalyticsReportSchedule,
   setAnalyticsReportScheduleStatus,
@@ -302,5 +303,26 @@ describe('V6 定期レポート', () => {
     expect(await requeueOneTimeAnalyticsReportSchedule(db, {
       id: schedule.id, lineAccountId: 'account-b', now: '2026-09-08T00:00:00.000Z',
     })).toBe('missing');
+  });
+
+  it('R454: しまった1回送信の直近分を一覧とは別に返す', async () => {
+    expect(await getRecentOneTimeAnalyticsReportRuns(db, 'account-a')).toEqual([]);
+    const schedule = await createAnalyticsReportSchedule(db, {
+      lineAccountId: 'account-a', name: '1回送信', sections: ['friends'],
+      savedAnalysisIds: [], cadence: 'weekly', weekday: 1, monthDay: null,
+      sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+      recipients: [{ kind: 'email', email: 'a@example.com', label: 'a@example.com' }],
+      channels: ['email'], alertRules: [], nextRunAt: '2026-09-07T00:00:00.000Z',
+      createdBy: 'staff-a', now: '2026-09-06T00:00:00.000Z', isOneTime: true,
+    });
+    await setAnalyticsReportScheduleStatus(db, {
+      id: schedule.id, lineAccountId: 'account-a', status: 'archived',
+      expectedUpdatedAt: schedule.updatedAt, now: '2026-09-07T01:00:00.000Z',
+    });
+    const recent = await getRecentOneTimeAnalyticsReportRuns(db, 'account-a');
+    expect(recent).toHaveLength(1);
+    expect(recent[0].schedule.id).toBe(schedule.id);
+    expect(recent[0].lastRun).toBeNull();
+    expect(await getRecentOneTimeAnalyticsReportRuns(db, 'account-b')).toEqual([]);
   });
 });

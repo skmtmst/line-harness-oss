@@ -34,6 +34,7 @@ const mocks = {
   getSavedAnalytics: vi.fn(),
   getSavedAnalyticsSnapshots: vi.fn(),
   getAnalyticsReportSchedules: vi.fn(),
+  getRecentOneTimeAnalyticsReportRuns: vi.fn(async () => []),
   getAnalyticsReportSchedule: vi.fn(),
   getAnalyticsReportScheduleIncludingArchived: vi.fn(),
   getAnalyticsReportRuns: vi.fn(),
