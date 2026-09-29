@@ -388,14 +388,14 @@ describe('N-342 (#943): 正本名 /api/line-notifications 配下の運用者通�
     // 下書きは正本名の draft 口。公開・停止はここでは受け付けない。
     const drafted = await instance.request(
       `/api/line-notifications/operator-rules/${ruleId}/draft`,
-      patch({ lineAccountId: 'account-1', name: '新しい予約(正本・改)' }),
+      patch({ lineAccountId: 'account-1', expectedVersion: 1, name: '新しい予約(正本・改)' }),
     );
     expect(drafted.status).toBe(200);
     await expect(drafted.json()).resolves.toMatchObject({ data: { name: '新しい予約(正本・改)' } });
 
     const rejected = await instance.request(
       `/api/line-notifications/operator-rules/${ruleId}/draft`,
-      patch({ lineAccountId: 'account-1', isActive: true }),
+      patch({ lineAccountId: 'account-1', expectedVersion: 2, isActive: true }),
     );
     expect(rejected.status).toBe(409);
     await expect(rejected.json()).resolves.toMatchObject({ code: 'use_publish_or_stop' });
@@ -411,9 +411,57 @@ describe('N-342 (#943): 正本名 /api/line-notifications 配下の運用者通�
       json({ lineAccountId: 'account-1' }),
     );
     expect(rulePreview.status).toBe(200);
+    // m26e R565: 版なしの下書き保存は受け付けない（顧客通知の下書きとそろえる）。
+    const noVersion = await instance.request(
+      `/api/line-notifications/operator-rules/${ruleId}/draft`,
+      patch({ lineAccountId: 'account-1', name: '版なし保存' }),
+    );
+    expect(noVersion.status).toBe(400);
     // ルールの受け取る人(owner-1)だけを見る。全スタッフではない。
     await expect(rulePreview.json()).resolves.toMatchObject({
       data: { summary: { staff: 1, canReceive: 1 } },
+    });
+  });
+
+  it('m26e R565: 古い版の下書き保存は409で止め、先行内容を保って現在値を返す', async () => {
+    const instance = app(testDb.db);
+    // AとBが同じ版1を読む。
+    const read = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1?lineAccountId=account-1',
+    );
+    await expect(read.json()).resolves.toMatchObject({ data: { version: 1 } });
+    // Aが先に保存する。
+    const savedA = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/draft',
+      patch({ lineAccountId: 'account-1', expectedVersion: 1, name: '新しい予約(A)' }),
+    );
+    expect(savedA.status).toBe(200);
+    await expect(savedA.json()).resolves.toMatchObject({ data: { name: '新しい予約(A)', version: 2 } });
+    // Bが古い版1で保存すると409。先行内容は保ち、比較用に現在値を返す。
+    const savedB = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/draft',
+      patch({ lineAccountId: 'account-1', expectedVersion: 1, name: '新しい予約(B)' }),
+    );
+    expect(savedB.status).toBe(409);
+    await expect(savedB.json()).resolves.toMatchObject({
+      success: false,
+      code: 'version_conflict',
+      data: { current: { name: '新しい予約(A)', version: 2 } },
+    });
+    const reread = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1?lineAccountId=account-1',
+    );
+    await expect(reread.json()).resolves.toMatchObject({
+      data: { name: '新しい予約(A)', version: 2 },
+    });
+    // 開き直した版2では保存できる。
+    const retried = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/draft',
+      patch({ lineAccountId: 'account-1', expectedVersion: 2, name: '新しい予約(B・再)' }),
+    );
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toMatchObject({
+      data: { name: '新しい予約(B・再)', version: 3 },
     });
   });
 

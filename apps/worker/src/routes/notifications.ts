@@ -604,6 +604,7 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     const id = c.req.param('id') ?? '';
     const body = await c.req.json<{
       lineAccountId: string;
+      expectedVersion?: unknown;
       name?: string;
       eventType?: string;
       conditions?: Record<string, unknown>;
@@ -612,6 +613,15 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     }>();
     const lineAccountId = body.lineAccountId?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    // 顧客通知の下書きとそろえ、読んだ版を必須にする。版なしの保存は
+    // 古い画面からの上書きを許すので受け付けない(m26e R565)。
+    const expectedVersion = typeof body.expectedVersion === 'number'
+      && Number.isInteger(body.expectedVersion) && body.expectedVersion > 0
+      ? body.expectedVersion
+      : null;
+    if (!expectedVersion) {
+      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+    }
     if (body.isActive !== undefined) {
       return c.json({
         success: false,
@@ -626,12 +636,24 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     }
     const current = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!current) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
-    await updateNotificationRule(c.env.DB, id, lineAccountId, {
+    const saved = await updateNotificationRule(c.env.DB, id, lineAccountId, {
       name: body.name,
       eventType: body.eventType,
       conditions: body.conditions,
       channels,
-    });
+    }, { expectedVersion });
+    if (!saved) {
+      // 読んだ後にほかの担当者が保存した。先行内容は保たれたまま、
+      // 比較と開き直しのために現在値を返す(m26e R565)。
+      const latest = await getNotificationRuleById(c.env.DB, id, lineAccountId);
+      if (!latest) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: 'ほかの担当者が先に保存しました。開き直して内容を確認してください',
+        data: { current: serializeRule(latest) },
+      }, 409);
+    }
     const updated = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
     return c.json({ success: true, data: serializeRule(updated) });
