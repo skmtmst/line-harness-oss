@@ -518,7 +518,7 @@ export function OutgoingOverview({
                             role="menu"
                             aria-label={`「${item.name}」の設定`}
                             onKeyDown={onSettingsMenuKeyDown}
-                            className="bg-canvas border-hairline rounded-card absolute top-1/2 right-full z-10 mr-2 flex min-w-max -translate-y-1/2 gap-2 border p-2 shadow-lg"
+                            className="bg-canvas border-hairline rounded-card absolute top-1/2 right-full z-10 mr-2 flex min-w-max -translate-y-1/2 gap-2 border p-2 shadow-float"
                           >
                           {/*
                             送信中でも**押せる状態のまま**にする(#707)。
@@ -1244,7 +1244,7 @@ export function IncomingOverview({
         </label>
         <textarea
           id="incoming-test-json"
-          className="border-hairline text-ink mt-1 h-36 w-full rounded-lg border p-3 font-mono text-sm"
+          className="border-hairline text-ink mt-1 h-36 w-full rounded-control border p-3 font-mono text-sm"
           value={testJson}
           onChange={(event) => setTestJson(event.target.value)}
           placeholder='{"friendId": "…"}'

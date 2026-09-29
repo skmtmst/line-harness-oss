@@ -50,7 +50,7 @@ export default function SessionLostNotice() {
       aria-modal="true"
       aria-labelledby="session-lost-title"
     >
-      <div ref={panelRef} className="rounded-card mt-12 w-full max-w-xl bg-canvas p-6 shadow-lg">
+      <div ref={panelRef} className="rounded-card mt-12 w-full max-w-xl bg-canvas p-6 shadow-float">
         <h2 id="session-lost-title" className="text-ink text-lg font-bold">
           ログイン情報がサーバーに届いていません
         </h2>

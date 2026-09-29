@@ -268,7 +268,7 @@ function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimel
       <span>{timelineTypeLabel(item.type)}</span>
       <span className="min-w-0 flex-1 basis-full @lg:basis-auto">
         {statusLabel ? (
-          <span className="border-hairline bg-canvas-sunken text-ink-faint mr-1.5 inline-block rounded-full border px-1.5 py-px font-semibold leading-4">
+          <span className="border-hairline bg-canvas-sunken text-ink-faint mr-1.5 inline-block rounded-pill border px-1.5 py-px font-semibold leading-4">
             {statusLabel}
           </span>
         ) : null}
@@ -2135,7 +2135,7 @@ function FriendDetailInner() {
                     )}
 
                     {warnings.length > 0 && (
-                      <ul className="bg-warning-bg text-warning mb-3 space-y-1 rounded-lg p-3 text-xs">
+                      <ul className="bg-warning-bg text-warning mb-3 space-y-1 rounded-control p-3 text-xs">
                         {warnings.map((w) => (
                           <li key={w}>{w}</li>
                         ))}

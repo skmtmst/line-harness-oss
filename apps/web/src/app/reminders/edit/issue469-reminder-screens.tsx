@@ -233,7 +233,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       <LinePreview caption={selectedStep ? `表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます` : '通知はまだありません'} empty={!selectedStep}>{selectedStep ? selectedStep.messageContent ? renderReminderBodySample(selectedStep.messageContent) : '本文を入力すると、ここに表示例が出ます。' : '「通知を追加」で1通目を作成してください。'}</LinePreview>
     </div>}>
       <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。">
-        {settings.steps.length === 0 ? <p className="text-ink-faint rounded-lg border border-hairline p-3 text-xs">通知はまだありません。「通知を追加」で1通目を作成してください。本文が入るまで次へは進めません。</p> : null}
+        {settings.steps.length === 0 ? <p className="text-ink-faint rounded-control border border-hairline p-3 text-xs">通知はまだありません。「通知を追加」で1通目を作成してください。本文が入るまで次へは進めません。</p> : null}
         <div className="grid min-h-28 gap-2 md:grid-cols-3">{settings.steps.map((step, index) => <ReminderStepCard key={step.stableStepId} selected={step.stableStepId === selectedStep?.stableStepId} number={index + 1} timing={stepTimingLabel(step, settings.deliveryMode)} title={`${index + 1}通目のお知らせ`} note={step.messageContent} onClick={() => setSelectedStepId(step.stableStepId)} />)}</div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Button onClick={addStep} disabled={settings.steps.length >= 50}>通知を追加</Button>
@@ -270,7 +270,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
             : null}
         </div>
       </ReminderPanel> : null}
-      <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-lg border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
+      <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-control border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
       {error ? <p className="text-danger text-xs">{error}{conflict ? <button type="button" className="ml-2 underline" onClick={() => void loadDraft()}>最新を読み込み直す</button> : null}</p> : null}
     </ReminderWorkspace>
     <div className="mt-16"><ReminderFooter primary={saving ? '保存中…' : '送信設定へ'} primaryDisabled={saving || !allStepsHaveContent} onPrimary={() => void save()} /></div>

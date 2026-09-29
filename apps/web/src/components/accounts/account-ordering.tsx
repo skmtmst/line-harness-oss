@@ -240,7 +240,7 @@ export default function AccountOrdering() {
         <span className="text-ink-faint">⠇</span><span className={`flex h-7 w-7 items-center justify-center rounded-control text-sm ${depth === 0 ? 'bg-canvas text-success' : depth === 1 ? 'bg-canvas text-accent-deep' : 'bg-accent-soft text-success'}`}>▧</span>
         <div className="min-w-0 flex-1"><p className="truncate whitespace-nowrap text-sm font-semibold text-ink" title={account.displayName || account.name}>{account.displayName || account.name}</p><p className="truncate whitespace-nowrap text-[11px] text-ink-faint">{account.basicId || (depth === 0 ? '親・LINE公式アカウント' : `上位LINEの${depthLabel}`)}</p></div>
         {depth === 0 && <span className="text-[10px] text-ink-faint">ログイン時の表示<br/><b className="text-success">権限ON：子・孫のLINEを表示</b></span>}
-        {depth > 0 && <><span className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] ${depth === 1 ? 'bg-canvas text-accent-deep' : 'bg-accent-soft text-success'}`}>{depthLabel}</span><span className={`whitespace-nowrap text-[10px] font-medium ${depth === 1 ? 'text-accent-deep' : 'text-ink-faint'}`}>{depth === 1 ? '権限ON：孫を管理' : '自分のみ'}</span></>}
+        {depth > 0 && <><span className={`flex h-6 w-6 items-center justify-center rounded-pill text-[10px] ${depth === 1 ? 'bg-canvas text-accent-deep' : 'bg-accent-soft text-success'}`}>{depthLabel}</span><span className={`whitespace-nowrap text-[10px] font-medium ${depth === 1 ? 'text-accent-deep' : 'text-ink-faint'}`}>{depth === 1 ? '権限ON：孫を管理' : '自分のみ'}</span></>}
         {moveMenu(account)}
       </div>
       {children.map((child) => node(child, depth + 1))}

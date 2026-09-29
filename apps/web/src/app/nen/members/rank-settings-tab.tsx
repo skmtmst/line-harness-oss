@@ -265,7 +265,7 @@ export default function RankSettingsTab({
         </section>
 
         <div data-design="Side" data-design-node="RgQEL" className="flex flex-col gap-4">
-          <section data-design-node="luziY" className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
+          <section data-design-node="luziY" className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-body font-bold text-ink">ランクの決まり方</h2>
             <dl className="mt-3 flex flex-col gap-3">
               <RuleRow label="通年の区切り" value={RULE_LABELS.yearStartMonth(rules?.yearStartMonth ?? 1)} />
@@ -274,7 +274,7 @@ export default function RankSettingsTab({
               <RuleRow label="集計に含める注文" value={RULE_LABELS.countOrders} />
             </dl>
           </section>
-          <section data-design-node="vMRJs" className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
+          <section data-design-node="vMRJs" className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-body font-bold text-ink">ECとの同期</h2>
             <div className="mt-2 flex items-center gap-2">
               {rules?.syncStatus === 'synced' ? <Chip tone="ok">同期済み</Chip> : rules?.syncStatus === 'failed' ? <Chip tone="danger">失敗</Chip> : <Chip tone="warn">未同期</Chip>}

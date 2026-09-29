@@ -14,7 +14,7 @@ import {
 export function FeatureDisabledScreen({ featureId }: { featureId?: string }) {
   return (
     <section
-      className="rounded-card border border-hairline bg-canvas p-6 shadow-sm"
+      className="rounded-card border border-hairline bg-canvas p-6 shadow-card"
       data-feature-disabled={featureId ?? 'unknown'}
     >
       <ListState

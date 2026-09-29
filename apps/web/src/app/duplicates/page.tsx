@@ -293,7 +293,7 @@ export default function DuplicatesPage() {
                 type="button"
                 onClick={() => void detect()}
                 disabled={refreshing}
-                className="h-9 rounded-[9px] border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
+                className="h-9 rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
               >
                 {refreshing ? '再検出中…' : '重複を再検出'}
               </button>
@@ -382,7 +382,7 @@ export default function DuplicatesPage() {
             {data.perAccount.length === 0 ? (
               <p className="mt-3 text-sm text-ink-faint">アカウントが登録されていません。</p>
             ) : (
-              <div className="mt-3 overflow-hidden rounded-[14px] border border-hairline bg-canvas shadow-card">
+              <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
@@ -425,7 +425,7 @@ export default function DuplicatesPage() {
                 （16px。先頭列の pl-4 とそろえる）。
               */}
               <style>{`[data-duplicates-matrix] tr > :last-child { padding-right: 16px; }`}</style>
-              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-[14px] border border-hairline bg-canvas shadow-card">
+              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>

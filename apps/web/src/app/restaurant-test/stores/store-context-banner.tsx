@@ -39,7 +39,7 @@ export default function StoreContextBanner() {
   }
 
   if (!store) return null
-  return <div className="sticky top-0 z-20 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-card border border-accent bg-accent-soft px-4 py-3 shadow-sm">
+  return <div className="sticky top-0 z-20 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-card border border-accent bg-accent-soft px-4 py-3 shadow-card">
     <p className="text-sm text-ink"><strong>{store.name}</strong> を表示しています</p>
     <button type="button" disabled={busy} onClick={() => void returnToHeadquarters()} className="rounded-control border border-accent bg-canvas px-4 py-2 text-xs font-semibold text-success disabled:opacity-50">{busy ? '戻っています…' : '統括に戻る'}</button>
   </div>

@@ -58,7 +58,7 @@ export default function HqOpenPage() {
   if (!target) {
     return (
       <div className="flex min-h-64 items-center justify-center" role="status" aria-label="移動先を確認中">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
+        <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
       </div>
     )
   }
@@ -92,7 +92,7 @@ export default function HqOpenPage() {
       ) : null}
       {!error && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
+          <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
       {!error && !loading && accounts.length === 0 ? (

@@ -308,7 +308,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
         </Notice>
       ) : null}
 
-      <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+      <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
         {/* 960px以上は表。それ未満は縦に重ねたカード（#1014 ATTR-14）。 */}
         <table className="hidden w-full table-fixed text-sm md:table">
           <thead className="border-b border-hairline bg-canvas-sunken text-caption text-ink-faint"><tr>
@@ -382,7 +382,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
         ) : null}
       </div>
 
-      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"><h2 className="text-sm font-bold text-ink">既定値・種類・削除の安全確認</h2><p className="mt-1 text-xs leading-relaxed text-ink-faint">既定値は空欄送信事故を防ぎます。種類は新規登録後に変更不可とし、値が入っている項目は削除せず新しい項目へ移行します。</p></section>
+      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card"><h2 className="text-sm font-bold text-ink">既定値・種類・削除の安全確認</h2><p className="mt-1 text-xs leading-relaxed text-ink-faint">既定値は空欄送信事故を防ぎます。種類は新規登録後に変更不可とし、値が入っている項目は削除せず新しい項目へ移行します。</p></section>
       <ConfirmDialog open={pendingDelete !== null} title={`項目「${pendingDelete?.name ?? ''}」を削除しますか？`} description="値が入っていない項目だけ削除できます。この操作は元に戻せません。" confirmLabel="削除する" destructive onCancel={() => setPendingDelete(null)} onConfirm={() => { const target = pendingDelete; setPendingDelete(null); if (target) void remove(target) }} />
     </div>
   )
