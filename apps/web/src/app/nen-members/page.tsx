@@ -514,6 +514,12 @@ export default function PhotoReviewsPage() {
     } catch (error) {
       if (generation === accountGeneration.current) {
         setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
+        // M508: ほかの人が先に決めていたときは一覧を読み直し、最新の状態を
+        // 見せる。保存の失敗（500）は読み直さず、同じ内容で再試行できる。
+        if (error instanceof ApiError && error.status === 409) {
+          reviewKeys.current.delete(id)
+          await load()
+        }
       }
     }
     finally { setReviewing(null) }

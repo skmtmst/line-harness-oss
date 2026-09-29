@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { api, type NenColumn } from '@/lib/api'
+import { ApiError, api, type NenColumn } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -16,7 +16,7 @@ import { useAccount } from '@/contexts/account-context'
  * 以前はここだけヘビ語の別型で読んでいたため、下書きが常に空になり
  * 保存ボタンがずっと押せないままだった（#512 重大1）。
  */
-type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'publishedAt'>
+type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'publishedAt' | 'updatedAt'>
 
 /**
  * NENコラムに添える紹介文の編集。
@@ -87,14 +87,32 @@ function NenColumnEditInner() {
     setSaveError(null)
     setSavedId(null)
     try {
-      const res = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, drafts[column.id] ?? '')
+      // M507: 開いたときの版を添える。ほかの人が先に保存していたら409で止まる。
+      const res = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, drafts[column.id] ?? '', column.updatedAt)
       if (!res.success) {
         setSaveError({ id: column.id, message: '保存に失敗しました。時間をおいてもう一度お試しください。' })
         return
       }
+      // 版を成功応答の新しい版へ進める。他のカードの入力は残したままにする。
+      setColumns((current) => current.map((item) => item.id === column.id
+        ? { ...item, introText: drafts[column.id] ?? item.introText, updatedAt: res.data?.updatedAt ?? item.updatedAt }
+        : item))
       setSavedId(column.id)
-      void load()
     } catch (e) {
+      // M507: 競合時は最新の紹介文を読み直し、入力は残したまま比べながら
+      // 保存し直せるようにする。
+      if (e instanceof ApiError && e.status === 409 && e.code === 'VERSION_CONFLICT') {
+        const latest = (e.data as { latest?: { introText?: string; updatedAt?: string } } | null)?.latest
+        if (latest) {
+          setColumns((current) => current.map((item) => item.id === column.id
+            ? { ...item, introText: latest.introText ?? item.introText, updatedAt: latest.updatedAt ?? item.updatedAt }
+            : item))
+        } else {
+          void load()
+        }
+        setSaveError({ id: column.id, message: 'ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。' })
+        return
+      }
       setSaveError({ id: column.id, message: e instanceof Error ? e.message : '保存に失敗しました。時間をおいてもう一度お試しください。' })
     } finally {
       setSavingId(null)

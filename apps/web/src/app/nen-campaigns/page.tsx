@@ -257,10 +257,30 @@ export default function NenCampaignsPage() {
     if (!selectedAccountId || !introDraft.trim()) { setNotice({ tone: 'error', text: '紹介文を入力してください。' }); return }
     setSavingColumnId(column.id)
     try {
-      await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, introDraft)
-      setColumns((current) => current.map((item) => item.id === column.id ? { ...item, introText: introDraft } : item))
+      // M507: 開いたときの版を添える。ほかの人が先に保存していたら409で止まる。
+      const saved = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, introDraft, column.updatedAt)
+      // 版を成功応答の新しい版へ進める。入力は残したままにする。
+      setColumns((current) => current.map((item) => item.id === column.id
+        ? { ...item, introText: introDraft, updatedAt: saved.data?.updatedAt ?? item.updatedAt }
+        : item))
       setNotice({ tone: 'success', text: `「${column.title}」の紹介文を保存しました。` })
-    } catch { setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' }) } finally { setSavingColumnId(null) }
+    } catch (caught) {
+      // M507: 競合時は最新の紹介文を読み直し、入力は残したまま比べながら
+      // 保存し直せるようにする。
+      if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
+        const latest = (caught.data as { latest?: { introText?: string; updatedAt?: string } } | null)?.latest
+        if (latest) {
+          setColumns((current) => current.map((item) => item.id === column.id
+            ? { ...item, introText: latest.introText ?? item.introText, updatedAt: latest.updatedAt ?? item.updatedAt }
+            : item))
+        } else {
+          await loadTab('columns')
+        }
+        setNotice({ tone: 'error', text: 'ほかの人が先に紹介文を保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。' })
+        return
+      }
+      setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' })
+    } finally { setSavingColumnId(null) }
   }
   /*
     ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。

@@ -46,6 +46,9 @@ export default function PetEditor({ accountId, pet, onClose, onSaved }: {
   const [weight, setWeight] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // M511: 開いたときの版。競合で最新の版を受け取ったらここを進め、
+  // 入力は残したまま保存し直せるようにする。
+  const [version, setVersion] = useState<string | null>(null)
 
   useEffect(() => {
     if (!pet) return
@@ -56,6 +59,7 @@ export default function PetEditor({ accountId, pet, onClose, onSaved }: {
     setBreed(pet.breed)
     setWeight(pet.weightKg == null ? '' : String(pet.weightKg))
     setError('')
+    setVersion(pet.updatedAt)
   }, [pet])
 
   const save = async () => {
@@ -80,11 +84,22 @@ export default function PetEditor({ accountId, pet, onClose, onSaved }: {
         birthday: normalized ?? '',
         breed: breed.trim(),
         weightKg,
+        // M511: 開いたときの版を添える。ほかの人が先に直していたら409で止まる。
+        expectedUpdatedAt: version ?? pet.updatedAt,
       })
       if (!result.success) throw new Error('ペットを保存できませんでした。')
       onSaved()
       onClose()
     } catch (caught) {
+      // M511: 競合時は最新の版だけ受け取って進め、入力は残したまま
+      // 保存し直せるようにする。一覧の表示は onSaved で読み直す。
+      if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
+        const latest = (caught.data as { latest?: { updatedAt?: string } } | null)?.latest
+        if (latest?.updatedAt) setVersion(latest.updatedAt)
+        setError('ほかの人が先にペットの情報を変えました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。')
+        onSaved()
+        return
+      }
       setError(caught instanceof ApiError ? caught.message : 'ペットを保存できませんでした。通信の状態を確認して、もう一度お試しください。')
     } finally {
       setSaving(false)

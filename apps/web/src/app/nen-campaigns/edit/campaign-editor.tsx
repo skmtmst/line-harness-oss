@@ -256,14 +256,34 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         // 阻む保存拒否(除外にはフォーム必須)に当たってしまう。
         excludeFormRespondents: Boolean(formAction) && merged.excludeFormRespondents,
         afterActions: actions,
+        // M507: 開いたときの版を添える。ほかの人が先に保存していたら409で
+        // 止まり、最新の内容を見てから保存し直せる。
+        expectedUpdatedAt: setting.updatedAt,
       })
       if (!response.success) {
         setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
         return
       }
-      setSetting(merged)
       setNotice('配信内容を保存しました')
+      // 版を成功応答の新しい版へ進める。進めないと次の保存が古い版のまま
+      // 409になる。入力（draft）は残すので、保存した内容の追記は続けられる。
+      setSetting({ ...merged, updatedAt: response.data?.updatedAt ?? merged.updatedAt })
     } catch (error) {
+      // M507: ほかの人が先に保存したときは入力を残したまま最新の内容を
+      // 読み直し、比べながら保存し直せるようにする。
+      if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
+        try {
+          const reloaded = await api.nenCampaigns.settings(selectedAccountId)
+          if (reloaded.success) {
+            const found = reloaded.data.find((item) => item.campaignKey === campaignKey) ?? null
+            if (found) setSetting(found)
+          }
+        } catch {
+          // 読み直しに失敗しても入力は残す。文面だけで理由を伝える。
+        }
+        setError('ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。')
+        return
+      }
       const reason = error instanceof ApiError && error.message ? error.message : ''
       setError(reason || '保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
