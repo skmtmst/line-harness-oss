@@ -10,6 +10,8 @@ import { TextInput } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CONVERSION_APPROVAL_EDIT_KEY, normalizeStaffPermissionKeys, toggleStaffPermissionKey } from '../permission-labels'
 
 type Role = 'admin' | 'staff' | 'viewer'
@@ -37,6 +39,11 @@ const NOTIFICATIONS = [
   ['updates', 'システム更新', '更新が完了したとき'],
 ] as const
 
+const INITIAL_NOTIFICATIONS: Record<string, Channel> = {
+  operations: { email: true, line: true }, emergency: { email: true, line: true },
+  security: { email: true, line: false }, updates: { email: false, line: true },
+}
+
 export default function NewStaffPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
@@ -46,10 +53,7 @@ export default function NewStaffPage() {
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [assignedLineAccountId, setAssignedLineAccountId] = useState('')
   const [inheritAccounts, setInheritAccounts] = useState(false)
-  const [notifications, setNotifications] = useState<Record<string, Channel>>({
-    operations: { email: true, line: true }, emergency: { email: true, line: true },
-    security: { email: true, line: false }, updates: { email: false, line: true },
-  })
+  const [notifications, setNotifications] = useState<Record<string, Channel>>({ ...INITIAL_NOTIFICATIONS })
   const togglePermission = (key: string) => setPermissionKeys((current) => toggleStaffPermissionKey(current, key))
   const toggleChannel = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
   useEffect(() => {
@@ -58,6 +62,18 @@ export default function NewStaffPage() {
     })
   }, [])
 
+  /*
+   * 追加途中の離脱確認。名前・アドレス・役割・権限・通知先のどれかに
+   * 手を付けていたら、キャンセルや左メニューで確認窓を出す。
+   * 招待メールを送ると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || email || assignedLineAccountId || permissionKeys.length > 0 ||
+    inheritAccounts || role !== 'admin' ||
+    JSON.stringify(notifications) !== JSON.stringify(INITIAL_NOTIFICATIONS)
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
+
   return <div data-design-node="I3ZSrU"><CreatePage
     title="ユーザーを追加する"
     description="管理画面にログインできる人を追加し、できることの範囲を決めます。"
@@ -65,7 +81,7 @@ export default function NewStaffPage() {
     saveLabel="招待メールを送る"
     showHeader={false}
     variant="v6"
-    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? '正しいメールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
+    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? '正しいメールアドレスを入力してください' : email.trim().length > 254 ? 'メールアドレスは254文字以内で入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
     onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: inheritAccounts, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
       <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-ink">1.</b> 招待メールでアドレスを確認</li><li><b className="text-ink">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-ink">3.</b> 連携完了後はLINE認証でログイン</li></ol></AsideCard>
@@ -76,7 +92,7 @@ export default function NewStaffPage() {
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="名前" htmlFor="staff-name" required><TextInput id="staff-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><TextInput id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><TextInput id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} /></Field>
       </div>
     </FormSection>
 
@@ -111,5 +127,7 @@ export default function NewStaffPage() {
     <FormSection step={role === 'staff' ? 5 : 4} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
       <div className="divide-hairline overflow-hidden rounded-card border border-hairline divide-y">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 px-4 py-3"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>メール</span><NotificationSwitch checked={notifications[key].email} onChange={() => toggleChannel(key, 'email')} label={`${label}をメールで通知`} /></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>LINE</span><NotificationSwitch checked={notifications[key].line} onChange={() => toggleChannel(key, 'line')} label={`${label}をLINEで通知`} /></div></div>)}</div>
     </FormSection>
-  </CreatePage></div>
+  </CreatePage>
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したユーザー" onConfirm={confirmLeave} onCancel={cancelLeave} />
+  </div>
 }

@@ -259,7 +259,7 @@ describe('文言と実態の一致・書きかけの保護（実mount・#935）'
     await click(link!)
 
     // 確認対話は document.body へ portal される。
-    expect(document.body.textContent).toContain('入力中の内容があります')
+    expect(document.body.textContent).toContain('保存していない変更があります')
     expect(navigation.push).not.toHaveBeenCalled()
 
     const leave = Array.from(document.body.querySelectorAll('button'))

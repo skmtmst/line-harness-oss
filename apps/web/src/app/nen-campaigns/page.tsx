@@ -17,6 +17,7 @@ import {
   type NenDeliveryList,
   type NenFlowMetrics,
 } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
 import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
@@ -228,7 +229,19 @@ export default function NenCampaignsPage() {
       await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
       updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
       setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '動かしました' : '止めました'}。` })
-    } catch { setNotice({ tone: 'error', text: `${setting.label}を切り替えられませんでした。` }) }
+    } catch (caught) {
+      /*
+       * M501: 混雑（429）の案内は共通部品に任せる。画面で状態を見分けて
+       * 文言を書き分けず、失敗そのままを渡す（Retry-After は口が返さない
+       * ため、共通部品の「少し待ってから」の案内を使う）。
+       */
+      setNotice({
+        tone: 'error',
+        text: describeApiFailure(caught, `${setting.label}の切り替え`, {
+          forbidden: `${setting.label}を切り替える権限がありません。権限を確認してください。`,
+        }),
+      })
+    }
     finally { setSaving(null) }
   }
   const testSend = async (setting: NenCampaignSetting) => {

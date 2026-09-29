@@ -8,6 +8,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -44,8 +45,12 @@ export default function FileScanSettingsPage() {
   const [releaseTarget, setReleaseTarget] = useState<FileScanItem | null>(null)
   const [releaseReason, setReleaseReason] = useState('')
   const [releaseBusy, setReleaseBusy] = useState(false)
+  /* 監査 D017: 確認窓の中で起きた失敗は窓の中に出す。ページ最上部の帯は
+   * 暗転の後ろに隠れて読めないため、ConfirmDialog の error へ渡す。 */
+  const [releaseError, setReleaseError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<FileScanItem | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [config, setConfig] = useState<FileScanConfig | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
   const [provider, setProvider] = useState('')
@@ -53,6 +58,7 @@ export default function FileScanSettingsPage() {
   const [secretRef, setSecretRef] = useState('')
   const [configBusy, setConfigBusy] = useState(false)
   const [stopExternal, setStopExternal] = useState(false)
+  const [stopError, setStopError] = useState('')
 
   // 外の検査の設定が保存前なら離脱の番兵を出す。
   const configDirty = configOpen && (
@@ -109,21 +115,27 @@ export default function FileScanSettingsPage() {
   }, [load])
 
   async function release() {
-    if (!selectedAccountId || !releaseTarget || !releaseReason.trim()) return
+    if (!selectedAccountId || !releaseTarget) return
+    /* 監査 D018: 必須の理由が空なら送らず、窓の中で理由を促す。 */
+    if (!releaseReason.trim()) {
+      setReleaseError('理由を入力してください')
+      return
+    }
     setReleaseBusy(true)
-    setActionError('')
+    setReleaseError('')
     try {
       const res = await api.fileScan.release(releaseTarget.id, selectedAccountId, releaseReason.trim())
       if (!res.success) {
-        setActionError('戻せませんでした。通信状態を確認して、もう一度お試しください。')
+        setReleaseError('戻せませんでした。通信状態を確認して、もう一度お試しください。')
         return
       }
       setReleaseTarget(null)
       setReleaseReason('')
+      setReleaseError('')
       setActionDone(`${releaseTarget.filename} を使えるように戻しました。`)
       await load()
     } catch (caught) {
-      setActionError(caught instanceof ApiError && caught.status === 409
+      setReleaseError(caught instanceof ApiError && caught.status === 409
         ? 'しまったファイルだけ戻せます。一覧を読み直してください。'
         : '戻せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
@@ -134,18 +146,19 @@ export default function FileScanSettingsPage() {
   async function remove() {
     if (!selectedAccountId || !deleteTarget) return
     setDeleteBusy(true)
-    setActionError('')
+    setDeleteError('')
     try {
       const res = await api.fileScan.remove(deleteTarget.id, selectedAccountId)
       if (!res.success) {
-        setActionError('消せませんでした。通信状態を確認して、もう一度お試しください。')
+        setDeleteError('消せませんでした。通信状態を確認して、もう一度お試しください。')
         return
       }
       setDeleteTarget(null)
+      setDeleteError('')
       setActionDone(`${deleteTarget.filename} を消しました。`)
       await load()
     } catch (caught) {
-      setActionError(caught instanceof ApiError && caught.status === 409
+      setDeleteError(caught instanceof ApiError && caught.status === 409
         ? 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
         : '消せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
@@ -186,7 +199,7 @@ export default function FileScanSettingsPage() {
   async function stopExternalConfig() {
     if (!selectedAccountId) return
     setConfigBusy(true)
-    setActionError('')
+    setStopError('')
     try {
       const res = await api.fileScan.saveConfig(selectedAccountId, {
         externalProvider: null,
@@ -194,15 +207,16 @@ export default function FileScanSettingsPage() {
         externalSecretRef: null,
       })
       if (!res.success) {
-        setActionError('設定を消せませんでした。')
+        setStopError('設定を消せませんでした。')
         return
       }
       setStopExternal(false)
+      setStopError('')
       setConfigOpen(false)
       setActionDone('外の検査サービスへの送信を止めました。内蔵の簡易検査は続きます。')
       await load()
     } catch {
-      setActionError('設定を消せませんでした。通信状態を確認して、もう一度お試しください。')
+      setStopError('設定を消せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setConfigBusy(false)
     }
@@ -324,13 +338,13 @@ export default function FileScanSettingsPage() {
                     {item.status === 'quarantined' ? (
                       <RowActions
                         subjectName={item.filename}
-                        edit={{ label: '使えるように戻す', onClick: () => { setReleaseTarget(item); setReleaseReason('') } }}
-                        destructiveItem={{ id: 'delete', label: '消す', onSelect: () => setDeleteTarget(item) }}
+                        edit={{ label: '使えるように戻す', onClick: () => { setReleaseTarget(item); setReleaseReason(''); setReleaseError('') } }}
+                        destructiveItem={{ id: 'delete', label: '消す', onSelect: () => { setDeleteTarget(item); setDeleteError('') } }}
                       />
                     ) : item.status === 'rejected' ? (
                       <RowActions
                         subjectName={item.filename}
-                        destructiveItem={{ id: 'delete', label: '消す', onSelect: () => setDeleteTarget(item) }}
+                        destructiveItem={{ id: 'delete', label: '消す', onSelect: () => { setDeleteTarget(item); setDeleteError('') } }}
                       />
                     ) : (
                       <span className="text-ink-faint">—</span>
@@ -387,7 +401,7 @@ export default function FileScanSettingsPage() {
           {configOpen ? '設定を閉じる' : '設定を編集'}
         </Button>
         {config?.externalProvider && config?.externalEndpointUrl ? (
-          <Button type="button" disabled={configBusy} onClick={() => setStopExternal(true)}>
+          <Button type="button" disabled={configBusy} onClick={() => { setStopExternal(true); setStopError('') }}>
             外の検査を止める
           </Button>
         ) : null}
@@ -437,7 +451,8 @@ export default function FileScanSettingsPage() {
           confirmLabel="使えるように戻す"
           cancelLabel="やめる"
           busy={releaseBusy}
-          onCancel={() => { setReleaseTarget(null); setReleaseReason('') }}
+          error={releaseError || undefined}
+          onCancel={() => { setReleaseTarget(null); setReleaseReason(''); setReleaseError('') }}
           onConfirm={() => void release()}
         >
           <div>
@@ -445,20 +460,16 @@ export default function FileScanSettingsPage() {
             <TextArea
               id="file-scan-release-reason"
               value={releaseReason}
-              onChange={(event) => setReleaseReason(event.target.value)}
+              onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
               placeholder="例：社内の画像と確認できたため"
             />
           </div>
         </ConfirmDialog>
       ) : null}
 
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="保存せずに移動すると、外の検査の設定の変更は失われます。"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        destructive
+        subject="外の検査の設定の変更"
         busy={configBusy}
         onCancel={() => {
           if (!configBusy) cancelLeave()
@@ -476,7 +487,8 @@ export default function FileScanSettingsPage() {
           confirmLabel="外の検査を止める"
           cancelLabel="やめる"
           busy={configBusy}
-          onCancel={() => setStopExternal(false)}
+          error={stopError || undefined}
+          onCancel={() => { setStopExternal(false); setStopError('') }}
           onConfirm={() => void stopExternalConfig()}
         />
       ) : null}
@@ -489,7 +501,8 @@ export default function FileScanSettingsPage() {
           confirmLabel="消す"
           cancelLabel="やめる"
           busy={deleteBusy}
-          onCancel={() => setDeleteTarget(null)}
+          error={deleteError || undefined}
+          onCancel={() => { setDeleteTarget(null); setDeleteError('') }}
           onConfirm={() => void remove()}
         />
       ) : null}

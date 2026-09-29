@@ -9,6 +9,7 @@ import {
   applyItemOrder,
   featureSettingsAreDirty,
   featureSettingsErrorMessage,
+  featureSettingsSaveConflictMessage,
   normalizeFeatureSettings,
   splitFeatureGroups,
 } from './feature-settings-view'
@@ -60,6 +61,22 @@ describe('機能設定の画面契約', () => {
     expect(FEATURE_SETTINGS_CONFLICT_MESSAGE).toContain('最新の状態を読み直した')
     expect(featureSettingsErrorMessage(403, 'load')).toContain('見る権限')
     expect(featureSettingsErrorMessage(403, 'save')).toContain('変更する権限')
+  })
+
+  it('読み込めていないのに保存で弾かれたら競合ではなく本当の理由を出す (D019)', () => {
+    // 読み込めているときの競合は従来どおり。
+    expect(featureSettingsSaveConflictMessage({ loadFailed: false, loadForbidden: false }))
+      .toBe(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+    // 読み込みが権限で失敗していたら、保存の失敗も権限の理由にする。
+    expect(featureSettingsSaveConflictMessage({ loadFailed: true, loadForbidden: true }))
+      .toContain('変更する権限')
+    expect(featureSettingsSaveConflictMessage({ loadFailed: true, loadForbidden: true }))
+      .not.toContain('ほかの管理者')
+    // 読み込みが通信・サーバーで失敗していたら、汎用の保存失敗にする。
+    expect(featureSettingsSaveConflictMessage({ loadFailed: true, loadForbidden: false }))
+      .toContain('保存できませんでした')
+    expect(featureSettingsSaveConflictMessage({ loadFailed: true, loadForbidden: false }))
+      .not.toContain('ほかの管理者')
   })
 
   it('撮影用の機能設定も本物と同じ版・全キー・既定オフを返す', () => {

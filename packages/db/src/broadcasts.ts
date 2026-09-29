@@ -404,10 +404,20 @@ export async function updateBroadcast(
   return saved;
 }
 
-export async function deleteBroadcast(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM broadcasts WHERE id = ?`).bind(id).run();
+export async function deleteBroadcast(db: D1Database, id: string): Promise<boolean> {
+  // D026: 下書き・予約だけ消す。送信中・送信済みは消さない。
+  // 状態の確認と削除を1文にまとめる。確認のあとで送信が始まる窓を
+  // 作らないため（cancel の UPDATE 側再確認と同じ考え方）。
+  // 送信中の行を消すと broadcast_send_claims の請求行まで
+  // ON DELETE CASCADE で一緒に消え、届き続けるのに記録だけ失う。
+  const result = await db
+    .prepare(`DELETE FROM broadcasts WHERE id = ? AND status IN ('draft', 'scheduled')`)
+    .bind(id)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) return false;
   // 467: 消えた配信の参照を消す。
   await removeConsumerReferences(db, 'broadcast', id);
+  return true;
 }
 
 export async function createBroadcastInsight(
