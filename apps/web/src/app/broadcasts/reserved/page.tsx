@@ -10,10 +10,11 @@ import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
 import { notifyToast } from '@/components/shared/toast'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { useAccount } from '@/contexts/account-context'
-import { api, type ApiBroadcast } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { audienceSummary } from '@/lib/broadcast-summary'
 
@@ -83,7 +84,12 @@ function ReservedBroadcastContent() {
   } | null>(null)
   const [notificationText, setNotificationText] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  /*
+   * 存在しない予約（404）と通信の失敗（503など）は別の案内にする（R582）。
+   * 存在しないものに「もう一度読み込む」だけ出しても直らないし、
+   * 通信の失敗に一覧へ戻る口だけ出しても続けられない。
+   */
+  const [notFound, setNotFound] = useState(false)
   /*
     予約の取消。**送信が始まったあとは戻せない**ので、押す前に何が起きるかを
     読ませ、押している間は受け付けない。取り消しても中身は消えず、下書きに
@@ -111,14 +117,14 @@ function ReservedBroadcastContent() {
     }
 
     setLoading(true)
-    setError('')
+    setNotFound(false)
     setEstimate(null)
     try {
       const result = await api.broadcasts.get(id)
       if (!isCurrent()) return
       if (!result.success) {
         setBroadcast(null)
-        setError('予約した配信を表示できませんでした。')
+        setNotFound(true)
         return
       }
 
@@ -170,10 +176,15 @@ function ReservedBroadcastContent() {
           if (isCurrent()) setEstimate(null)
         })
       await Promise.all([notifyTask, estimateTask])
-    } catch {
+    } catch (err) {
       if (!isCurrent()) return
       setBroadcast(null)
-      setError('予約した配信を表示できませんでした。通信を確認して、もう一度お試しください。')
+      // 実Workerは存在しない予約を404で返す。汎用の通信失敗と混ぜない。
+      if (err instanceof ApiError && err.status === 404) {
+        setNotFound(true)
+      } else {
+        setNotFound(false)
+      }
     } finally {
       if (isCurrent()) setLoading(false)
     }
@@ -204,13 +215,29 @@ function ReservedBroadcastContent() {
     return <ListState kind="loading" title="予約結果を確認しています" />
   }
 
-  if (error || !broadcast) {
+  /*
+   * R582: 対象なしは存在しない旨と配信予定への戻り口だけ。
+   * 通信の失敗（503など）は同画面での再試行だけ。混ぜない。
+   */
+  if (notFound) {
     return (
-      <ListState
+      <TargetMissing
+        kind="not-found"
+        title="予約した配信が見つかりません"
+        description="削除されたか、配信予定から選び直してください。"
+        backHref="/broadcasts"
+        backLabel="配信予定へ戻る"
+      />
+    )
+  }
+
+  if (!broadcast) {
+    return (
+      <TargetMissing
         kind="error"
         title="予約結果を表示できませんでした"
-        description={error || '予約した配信が見つかりませんでした。'}
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        description="通信が切れたか、サーバーが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }
