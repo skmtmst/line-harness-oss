@@ -22,6 +22,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatNumber } from '@/lib/format'
 
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -482,7 +483,7 @@ export default function AdvancedSearchDialog({
               <div>
                 <p className="text-micro font-medium text-ink-faint">現在の条件に一致</p>
                 <p className="mt-0.5 text-xl font-bold tabular-nums text-ink">
-                  {counting ? '…' : count === null ? '—' : `${count.toLocaleString('ja-JP')}人`}
+                  {counting ? '…' : count === null ? '—' : `${formatNumber(count)}人`}
                 </p>
               </div>
               {countFailed ? (
@@ -813,7 +814,7 @@ export default function AdvancedSearchDialog({
               className="px-5"
               onClick={() => onApply({ params, summary, editorState })}
             >
-              {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
+              {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${formatNumber(count)}人を表示`}
             </Button>
           </div>
         </div>

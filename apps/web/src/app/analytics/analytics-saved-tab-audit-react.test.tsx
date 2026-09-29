@@ -194,7 +194,7 @@ describe('R463 履歴から固定結果を開ける', () => {
     await act(async () => { summary.click() })
     expect(details.open).toBe(true)
     expect(host.textContent).toContain('129,001')
-    expect(host.textContent).toContain('2026/9/21〜2026/9/27')
+    expect(host.textContent).toContain('9月21日（月）〜9月27日（日）')
     // 未取得の区別も出る
     expect(host.textContent).toContain('未取得')
     // 保存結果のCSVは一覧のCSVと別の入口

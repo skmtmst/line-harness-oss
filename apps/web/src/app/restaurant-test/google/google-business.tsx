@@ -37,6 +37,7 @@ import {
   type GoogleReviewListData,
   type GoogleReviewOrder,
 } from '@/lib/restaurant-google-api'
+import { formatNumber } from '@/lib/format'
 
 /**
  * ★V6 Googleビジネス（飲食店向け）第1段：設定タブ＋口コミタブ。
@@ -765,7 +766,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {data.aiAvailable ? <><Button size="field" onClick={() => void generate('shorter')} disabled={busy !== null || !text} data-gb3-action="shorten-draft">短くする</Button><Button size="field" onClick={() => void generate('polite')} disabled={busy !== null || !text} data-gb3-action="polish-draft">丁寧にする</Button></> : <span className="text-ink-faint text-xs">この環境ではAI下書きは使えません。</span>}
                 <span className="grow" />
-                <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{textLength.toLocaleString()} / 4,096</span>
+                <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{formatNumber(textLength)} / 4,096</span>
               </div>
               {saved ? <p className="text-success mt-3 text-xs">{saved}</p> : null}
               {actionError ? <NoteBar tone="danger" className="mt-3">{actionError}</NoteBar> : null}

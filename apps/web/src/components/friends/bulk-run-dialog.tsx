@@ -20,6 +20,7 @@ import {
   failureOf, isRunComplete, itemStatusLabel, operationLabel, type Failure,
 } from './bulk-run-view'
 import styles from './bulk-run-dialog.module.css'
+import { formatNumber } from '@/lib/format'
 
 type Phase = 'operation' | 'confirm' | 'result'
 type ResultState = 'idle' | 'loading' | 'ready' | 'error'
@@ -336,7 +337,7 @@ export default function BulkRunDialog({
             </button>
           </div>
           <div className={styles.selectionBanner}>
-            <strong>✓　{friendIds.length.toLocaleString('ja-JP')}人を選択中</strong>
+            <strong>✓　{formatNumber(friendIds.length)}人を選択中</strong>
             <span>対象を確認してから操作を選んでください</span>
             <button type="button" onClick={close}>選択を解除</button>
           </div>

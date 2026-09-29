@@ -16,8 +16,9 @@ import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { mileStatusLabel, text } from './photo-text'
+import { formatNumber } from '@/lib/format'
 
-const views = (value: unknown) => value == null ? '—（未取得）' : `${Number(value).toLocaleString('ja-JP')}回`
+const views = (value: unknown) => value == null ? '—（未取得）' : `${formatNumber(Number(value))}回`
 const PLACEMENT_CHOICES = [
   { type: 'rich_menu', label: 'リッチメニュー' },
   { type: 'column', label: 'NENコラム' },

@@ -15,6 +15,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import { formatNumber } from '@/lib/format'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -200,10 +201,10 @@ export default function NewAffiliateOfferPage() {
                 <p className="text-ink-faint mt-1 text-xs leading-relaxed">{description}</p>
               )}
               <p className="text-ink mt-2 text-sm font-semibold tabular-nums">
-                ¥{yen.toLocaleString()}
+                ¥{formatNumber(yen)}
                 {miles > 0 && (
                   <span className="text-ink-secondary ml-1 text-xs">
-                    ＋ {miles.toLocaleString()}マイル
+                    ＋ {formatNumber(miles)}マイル
                   </span>
                 )}
               </p>
@@ -212,7 +213,7 @@ export default function NewAffiliateOfferPage() {
               </p>
               {miles > 0 && (
                 <p className="text-ink-faint mt-1 text-xs">
-                  成果が認められると {miles.toLocaleString()} マイルも付与します
+                  成果が認められると {formatNumber(miles)} マイルも付与します
                 </p>
               )}
               <p className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">

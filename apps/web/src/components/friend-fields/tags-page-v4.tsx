@@ -32,6 +32,7 @@ import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import type { FeatureKey } from '@/lib/feature-settings'
 import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
+import { formatDay, formatNumber } from '@/lib/format'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -214,7 +215,7 @@ function hasLinkedActions(tag: Tag): boolean {
  */
 function isThisMonth(value: string): boolean {
   const month = (d: Date) =>
-    new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit' }).format(d)
+    formatDay(d)
   return month(new Date(value)) === month(new Date())
 }
 
@@ -226,12 +227,7 @@ function isThisMonth(value: string): boolean {
 function formatDate(value: string): string {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return value
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(d)
+  return formatDay(d)
 }
 
 /**
@@ -434,7 +430,7 @@ function deleteImpactRows(
     {
       name: '付与人数',
       // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
-      value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
+      value: `${formatNumber((impact?.friendCount ?? tag.friendCount ?? 0))}人`,
       result: 'タグが外れます',
     },
     { name: '参照先', value: refs ? manualRefSummary(refs) : '—', result: '絞り込み条件から外れます' },

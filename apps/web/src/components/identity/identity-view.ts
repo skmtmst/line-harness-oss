@@ -6,6 +6,7 @@ import type {
   IdentityEvidenceStrength,
   IdentityReprocessMode,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 本人照合の候補（設計 `InCDe` 3-2-A ／ `ELayY` 23-1-A）が読む言い換え。
@@ -27,7 +28,7 @@ export const NOT_AVAILABLE = '—（未取得）'
  */
 export function impactText(metric: IdentityCandidateImpactMetric): string {
   if (metric.value === null) return NOT_AVAILABLE
-  return `${metric.value.toLocaleString('ja-JP')}${metric.unit}`
+  return `${formatNumber(metric.value)}${metric.unit}`
 }
 
 /** マスク済みの補足。無ければ「—（未取得）」。平文の値はここへ来ない。 */

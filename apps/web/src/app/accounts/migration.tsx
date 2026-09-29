@@ -22,6 +22,7 @@ import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { FRIENDS_MERGED_TABS } from '@/app/friends/friends-tabs'
 import { splitCsvRecords } from '@/app/friends/migrations/friend-csv'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const STEPS: readonly string[] = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合']
 
@@ -139,7 +140,7 @@ function runStatusView(run: UidMigrationDetail, unresolved: number | null): RunS
       return run.counts.applied > 0
         ? {
             heading: '移行の状態',
-            description: `一部だけ反映されました（反映 ${run.counts.applied.toLocaleString()} 件・失敗 ${run.counts.failed.toLocaleString()} 件）。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`,
+            description: `一部だけ反映されました（反映 ${formatNumber(run.counts.applied)} 件・失敗 ${formatNumber(run.counts.failed)} 件）。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`,
             badgeTone: 'danger',
             badgeLabel: '一部失敗',
           }
@@ -365,7 +366,7 @@ export default function AccountMigration() {
       const applied = response.data.counts.applied
       setMessage(
         failed > 0
-          ? `本移行で ${applied.toLocaleString()} 件を反映しましたが、${failed.toLocaleString()} 件が失敗しました。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`
+          ? `本移行で ${formatNumber(applied)} 件を反映しましたが、${formatNumber(failed)} 件が失敗しました。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`
           : '本移行と照合が完了しました。必要な場合はこの履歴から切り戻せます。',
       )
       if (detail) setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
@@ -390,7 +391,7 @@ export default function AccountMigration() {
           setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
           const applied = detail.counts.applied
           setExecuteError(applied > 0 || detail.status === 'failed' || detail.status === 'completed'
-            ? `本移行で ${applied.toLocaleString()} 件が反映されています。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`
+            ? `本移行で ${formatNumber(applied)} 件が反映されています。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`
             : apiErrorMessage(error, '本移行を実行できませんでした。'))
         } else {
           setExecuteError('実行結果を確認できませんでした。履歴を読み直して状態を確認してください。')
@@ -422,7 +423,7 @@ export default function AccountMigration() {
       const detail = await loadDetail(active.id, 0, '', false)
       const rolledBack = (response.data as UidMigrationRun & { rolledBack?: number }).rolledBack
       setMessage(typeof rolledBack === 'number'
-        ? `切り戻しが完了しました（${rolledBack.toLocaleString()} 件を移行前の状態に戻しました）。`
+        ? `切り戻しが完了しました（${formatNumber(rolledBack)} 件を移行前の状態に戻しました）。`
         : '切り戻しが完了しました。')
       if (detail) setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
       setConfirmRollback(false)
@@ -566,7 +567,7 @@ export default function AccountMigration() {
           {file ? (
             <AttachmentRow
               name={file.name}
-              meta={`${mappings.length.toLocaleString()}行・${formatMappingBytes(file.size)}`}
+              meta={`${formatNumber(mappings.length)}行・${formatMappingBytes(file.size)}`}
               onRemove={() => { setFile(null); setMappings([]); setMessage(null) }}
             />
           ) : (
@@ -701,7 +702,7 @@ export default function AccountMigration() {
         <ConfirmDialog
           open={confirmRollback}
           title="この移行を切り戻します"
-          description={`反映した ${active.counts.applied.toLocaleString()} 件を移行前の紐付けに戻します。移行後に別の変更があった行は切り戻さず、競合として表示します。`}
+          description={`反映した ${formatNumber(active.counts.applied)} 件を移行前の紐付けに戻します。移行後に別の変更があった行は切り戻さず、競合として表示します。`}
           confirmLabel="切り戻す"
           destructive
           busy={busy}
@@ -710,7 +711,7 @@ export default function AccountMigration() {
           onCancel={() => { if (!busy) { setConfirmRollback(false); setRollbackConflicts([]) } }}
         >
           <ul className="text-ink list-disc space-y-1 pl-5 text-sm">
-            <li>対象：この履歴で反映済みの {active.counts.applied.toLocaleString()} 行だけです。失敗・除外の行は変更しません。</li>
+            <li>対象：この履歴で反映済みの {formatNumber(active.counts.applied)} 行だけです。失敗・除外の行は変更しません。</li>
             <li>制約：移行後に統合ユーザーへ別の変更があった行は切り戻せません。</li>
             <li>実行権限：ownerのみ。</li>
           </ul>
@@ -735,7 +736,7 @@ export default function AccountMigration() {
                 : run.status === 'executing' ? { tone: 'info', label: '実行中' }
                   : run.status === 'ready' ? { tone: 'success', label: '確認完了' }
                     : { tone: 'neutral', label: '確認中' }
-        return <button key={run.id} className="hover:bg-canvas-sunken flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => { setPage(0); setClassification(''); setPendingOnly(false); void loadDetail(run.id, 0, '', false) }}><span><span className="text-ink block text-sm font-semibold">{run.purpose}</span><span className="text-ink-faint text-xs">{new Date(run.createdAt).toLocaleString('ja-JP')} ・ {run.counts.total.toLocaleString()}件</span></span><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></button>
+        return <button key={run.id} className="hover:bg-canvas-sunken flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => { setPage(0); setClassification(''); setPendingOnly(false); void loadDetail(run.id, 0, '', false) }}><span><span className="text-ink block text-sm font-semibold">{run.purpose}</span><span className="text-ink-faint text-xs">{formatDateTime(run.createdAt)} ・ {formatNumber(run.counts.total)}件</span></span><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></button>
       })}</div>}</section>
       {/* #984 LAY-13: 移行元・移行先の選び欄は欄いっぱいに広げる（部品の size="full" を使う）。 */}
     </div>
@@ -797,7 +798,7 @@ function ActiveMigration({
       <div className="border-hairline flex flex-wrap items-center gap-3 border-b px-4 py-3">
         <Select aria-label="分類で絞り込む" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" />
         <Checkbox checked={pendingOnly} onCheckedChange={(checked) => onFilterChange(classification, checked)}>未判断のみ</Checkbox>
-        <span className="text-ink-faint ml-auto text-xs">全 {total.toLocaleString()} 件</span>
+        <span className="text-ink-faint ml-auto text-xs">全 {formatNumber(total)} 件</span>
       </div>
       {(active.items?.length ?? 0) === 0 ? <ListState kind="empty" title="対応表に結果がありません" description="絞り込みを変えるか、別のCSVを選んでテスト移行してください。" /> : <DataTable className="rounded-none border-0">
         <thead><TableHeadRow><Th className="w-1/6">旧UID</Th><Th className="w-1/6">候補ユーザー</Th><Th className="w-1/6">一致根拠</Th><Th>競合内容</Th><Th className="w-1/12">判断</Th><Th className="w-1/6">操作</Th></TableHeadRow></thead>

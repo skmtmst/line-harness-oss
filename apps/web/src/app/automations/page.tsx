@@ -31,6 +31,7 @@ import {
   type Automation as SharedAutomation,
   type AutomationEventType,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -742,7 +743,7 @@ export default function AutomationsPage() {
               <p className="truncate text-ink-secondary" title={conditionLabel(automation.conditions)}>{conditionLabel(automation.conditions)}</p>
               <p className="truncate text-ink-secondary" title={automation.actions.map((action) => automationActionLabel(action.type)).join('、')}>{automation.actions.map((action) => automationActionLabel(action.type)).join('、') || '処理なし'}</p>
               <div>
-                <span className="text-ink tabular-nums">{automation.executionCount30d.toLocaleString('ja-JP')}回</span>
+                <span className="text-ink tabular-nums">{formatNumber(automation.executionCount30d)}回</span>
                 {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
               </div>
               {/* #670 25: 状態は他画面と同じ札(Chip)で出す。素テキストだと列の中で浮く。 */}

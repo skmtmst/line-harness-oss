@@ -39,6 +39,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
 import OtpInput from '@/components/shared/otp-input'
+import { formatDateTime } from '@/lib/format'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -100,14 +101,14 @@ function auditActionLabel(action: string): string {
   if (normalized.includes('update') || normalized.includes('change')) return '設定変更'
   return '操作記録'
 }
-function formatStaffDate(value: string | undefined): string { if (!value) return 'まだ入っていません'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '日時を取得できませんでした' : date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+function formatStaffDate(value: string | undefined): string { if (!value) return 'まだ入っていません'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '日時を取得できませんでした' : formatDateTime(date) }
 /* 一覧の StaffMember には招待期限が載っていない。再送口の返事を読むための形。 */
 type StaffMemberWithInvite = StaffMember & { inviteExpiresAt?: string | null }
 function formatInviteExpiry(value: string | null | undefined): string {
   if (!value) return '期限を取得できませんでした'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '期限を取得できませんでした'
-  const text = date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const text = formatDateTime(date)
   return date.getTime() < Date.now() ? `期限切れ（${text}まででした）` : `${text}まで`
 }
 function permissionSummary(member: StaffMember): string { if (member.role === 'owner' || member.role === 'admin') return 'すべての画面'; if (member.permissionKeys.length === 0) return member.role === 'viewer' ? '閲覧できる画面は未設定' : '表示する機能は未設定'; const labels = member.permissionKeys.map((key) => permissionLabel(key)).filter(Boolean); return labels.length > 0 ? labels.join('・') : `${member.permissionKeys.length}機能` }

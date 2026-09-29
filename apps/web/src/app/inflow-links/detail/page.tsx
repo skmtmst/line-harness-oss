@@ -22,6 +22,7 @@ import type {
   Tag,
   TrafficPool,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /** 選んだ流入元の人数、成果、友だち、追加時の動きをまとめて表示する。 */
 
@@ -350,7 +351,7 @@ function InflowLinkDetailPageContent() {
           最初に来た友だち）の注文だけを数える。友だちに結びついていない注文や
           経路の分からない注文は未計測としてここには出ない。
         */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /><MetricCard label="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? 'この経路から来た人の注文（累計）' : '注文の集計を取得できていません'} /><MetricCard label="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? `返金 ${ordersSummary.refunded.toLocaleString('ja-JP')}・取消 ${ordersSummary.cancelled.toLocaleString('ja-JP')}` : '注文の集計を取得できていません'} /></div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /><MetricCard label="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? 'この経路から来た人の注文（累計）' : '注文の集計を取得できていません'} /><MetricCard label="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? `返金 ${formatNumber(ordersSummary.refunded)}・取消 ${formatNumber(ordersSummary.cancelled)}` : '注文の集計を取得できていません'} /></div>
         {/*
           IDEA-18: 集計の期間・帰属ルール・計測できる範囲の断り書き。
           未計測を0と読ませないため、数えられないものを明記する。
@@ -421,7 +422,7 @@ function MetricCard({ label, value, unit, detail }: { label: string; value: numb
     <div className="rounded-card border border-hairline bg-canvas p-4">
       <dt className="text-ink-faint text-xs">{label}</dt>
       <dd className="text-ink text-xl font-bold tabular-nums">
-        {value == null ? '—' : value.toLocaleString()}
+        {value == null ? '—' : formatNumber(value)}
         <span className="text-ink-faint ml-0.5 text-xs font-normal">{unit}</span>
       </dd>
       <p className="mt-1 text-xs text-ink-faint">{detail}</p>
@@ -457,7 +458,7 @@ function FunnelView({ funnel }: { funnel: EntryRouteFunnel }) {
                   進まなかった」に読める。取れていないだけなら、
                   施策を止める判断を誤る。
                 */}
-                {typeof s.value === 'number' ? s.value.toLocaleString() : '—'}
+                {typeof s.value === 'number' ? formatNumber(s.value) : '—'}
                 {typeof s.value === 'number' && pct !== null && (
                   <span className="ml-1.5 text-xs font-normal text-ink-faint">{pct}%</span>
                 )}

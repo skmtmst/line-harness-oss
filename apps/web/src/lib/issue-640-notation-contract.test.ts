@@ -94,18 +94,18 @@ describe('#640 日時表記の統一（JST・フォーマット）', () => {
   })
 
   it('/tags: 登録日は端末の地域ではなく JST 固定で出す', () => {
-    expect(TAGS).toMatch(/function formatDate[\s\S]{0,400}?timeZone: 'Asia\/Tokyo'/)
+    expect(TAGS).toMatch(/function formatDate[\s\S]{0,400}?formatDay\(d\)/)
     expect(TAGS).not.toContain('d.getFullYear()')
   })
 
   it('/contents/vars: 更新日は JST、日付型の値は formatStamp の「/」区切り', () => {
-    expect(VARS).toMatch(/function formatListDate[\s\S]{0,400}?timeZone: 'Asia\/Tokyo'/)
+    expect(VARS).toMatch(/function formatListDate[\s\S]{0,400}?formatDay\(date\)/)
     expect(VARS).toMatch(/formatVarValue\(item\.type, item\.value\)/)
     expect(VARS).toMatch(/formatVarValue\(item\.type, pending\.value\)/)
   })
 
   it('日時の整形は画面の既存ユーティリティを使う（場当たりの文字列処理を増やさない）', () => {
-    expect(ANALYTICS_TIME).toContain("timeZone: 'Asia/Tokyo'")
+    expect(ANALYTICS_TIME).toMatch(/import \{ formatDateTime, formatDay \} from '@\/lib\/format'/)
     expect(VARS).toMatch(/import \{[^}]*formatStamp[^}]*\} from '@\/lib\/common-vars'/)
   })
 })

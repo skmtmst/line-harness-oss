@@ -1,4 +1,5 @@
 import type { BroadcastListKpis, BroadcastStats } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 一斉配信の一覧に出す帯の 4 枚（設計 `q76C35` ★V6 6-1）。
@@ -14,7 +15,7 @@ import type { BroadcastListKpis, BroadcastStats } from '@/lib/api'
 /** 帯の副題に出す数。数が無いなら `—` にして、単位も付けない。 */
 export function countText(value: unknown, unit: string): string {
   return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')}${unit}`
+    ? `${formatNumber(value)}${unit}`
     : '—'
 }
 

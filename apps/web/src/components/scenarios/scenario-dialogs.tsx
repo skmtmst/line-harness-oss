@@ -26,6 +26,7 @@ import ConditionBuilder, {
   type SegmentRule,
 } from '@/components/shared/condition-builder'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatDateTime } from '@/lib/format'
 
 function Shell({
   title,
@@ -1023,7 +1024,7 @@ export function TestSendDialog({
 
       {lastTest ? (
         <Notice tone="info" className="mb-4">
-          前回のテスト送信：{new Date(lastTest.sentAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{lastTest.messageCount}通
+          前回のテスト送信：{formatDateTime(lastTest.sentAt)}・{lastTest.messageCount}通
         </Notice>
       ) : null}
 
@@ -1345,7 +1346,7 @@ export function FriendPlanDialog({
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-ink-faint">試算した時刻</dt>
               <dd className="text-ink tabular-nums">
-                {new Date(plan.computedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                {formatDateTime(plan.computedAt)}
               </dd>
             </div>
           </dl>

@@ -13,6 +13,7 @@ import { TextField } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
 import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen-ranks-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { formatNumber } from '@/lib/format'
 
 type Draft = { id: string | null; name: string; kcal: string; isDefault: boolean; kind: NenFeedingKind }
 type Status = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -158,7 +159,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
       setTreatLimit(String(res.data.treatLimitPercent ?? 10))
       setDirty(false)
       setNotice(res.data.refreshedPets
-        ? `主食を保存し、登録済みのペット ${res.data.refreshedPets.toLocaleString('ja-JP')}頭の目安を計算し直しました。`
+        ? `主食を保存し、登録済みのペット ${formatNumber(res.data.refreshedPets)}頭の目安を計算し直しました。`
         : '主食を保存しました。')
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
@@ -243,7 +244,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-body font-bold text-ink">登録済みのペット</h2>
-            <p className="mt-2 text-heading font-semibold tabular-nums text-ink">{data.petCount.toLocaleString('ja-JP')}<span className="ml-1 text-caption font-semibold text-ink-faint">頭</span></p>
+            <p className="mt-2 text-heading font-semibold tabular-nums text-ink">{formatNumber(data.petCount)}<span className="ml-1 text-caption font-semibold text-ink-faint">頭</span></p>
             <p className="mt-1 text-micro text-ink-faint">保存すると、この全員の目安（主食・然の鹿肉）が計算し直されます。</p>
           </section>
         </div>

@@ -61,7 +61,7 @@ describe('未取得と取得できた値を分ける', () => {
     expect(dateText(null)).toBe(NOT_AVAILABLE)
     expect(dateText('こわれた日付')).toBe(NOT_AVAILABLE)
     // JSTで読む。UTCのままだと日付が1日ずれる。
-    expect(dateText('2026-08-28T15:30:00.000Z')).toContain('2026/08/29')
+    expect(dateText('2026-08-28T15:30:00.000Z')).toContain('8月29日（土）')
   })
 })
 

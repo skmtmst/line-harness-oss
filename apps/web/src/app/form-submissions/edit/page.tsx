@@ -59,6 +59,7 @@ import {
   takenFormAnswerNames as takenAnswerNames,
   uniqueFormCopyName as uniqueCopyName,
 } from '@/components/forms/form-definition-operations'
+import { formatDateTime } from '@/lib/format'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
@@ -978,7 +979,7 @@ function FormEditInner() {
                   </Button>
                 </div>
                 <p className="text-ink-faint mt-1 text-xs">
-                  {testExpiresAt ? `このURLは${new Date(testExpiresAt).toLocaleString('ja-JP', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで使えます。` : ''}
+                  {testExpiresAt ? `このURLは${formatDateTime(testExpiresAt)}まで使えます。` : ''}
                   試しは友だち登録済みのLINEで開いてください。
                 </p>
               </div>
