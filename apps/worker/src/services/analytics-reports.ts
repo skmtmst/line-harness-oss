@@ -8,12 +8,17 @@ import {
   finishAnalyticsReportRun,
   getAnalyticsFriendsOverview,
   getAnalyticsReactionsOverview,
+  getAnalyticsReportRun,
+  getAnalyticsReportSchedule,
   getAnalyticsRoutesOverview,
   getAnalyticsUsageOverview,
   getLineAccountById,
+  getSavedAnalytics,
   getSavedAnalyticsSnapshots,
+  getStaffAccountScopeIds,
   getStaffById,
   purgeExpiredAnalyticsReportRuns,
+  reclaimStaleAnalyticsReportRuns,
   resolveLineCredential,
   type AnalyticsOverviewContext,
   type AnalyticsReportAlertRule,
@@ -21,6 +26,7 @@ import {
 } from '@line-crm/db';
 import { sendXServerMail } from './xserver-mail.js';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { zonedWallTime } from './zoned-time.js';
 
 type AnalyticsReportEnv = {
   DB: D1Database;
@@ -32,8 +38,6 @@ type AnalyticsReportEnv = {
   LINE_CHANNEL_ACCESS_TOKEN: string;
   LINE_CREDENTIAL_ENCRYPTION_KEY?: string;
 };
-
-const DAY_MS = 86_400_000;
 
 function dateInZone(value: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -80,13 +84,32 @@ function contextFor(schedule: AnalyticsReportSchedule, now: Date, offsetPeriods 
 
 function nextRun(schedule: AnalyticsReportSchedule): string {
   const current = new Date(schedule.nextRunAt);
-  if (schedule.cadence === 'weekly') return new Date(current.getTime() + 7 * DAY_MS).toISOString();
+  if (schedule.cadence === 'weekly') {
+    return zonedWallTime(addDays(dateInZone(current, schedule.timeZone), 7), schedule.sendTime, schedule.timeZone);
+  }
   const localDate = new Date(`${dateInZone(current, schedule.timeZone)}T00:00:00.000Z`);
   localDate.setUTCMonth(localDate.getUTCMonth() + 1);
   localDate.setUTCDate(schedule.monthDay ?? 1);
-  const [hour, minute] = schedule.sendTime.split(':').map(Number);
-  return new Date(Date.parse(zonedStart(localDate.toISOString().slice(0, 10), schedule.timeZone))
-    + hour * 3_600_000 + minute * 60_000).toISOString();
+  return zonedWallTime(localDate.toISOString().slice(0, 10), schedule.sendTime, schedule.timeZone);
+}
+
+/**
+ * 滞留した予定を未来へ進める（R457）。
+ *
+ * 止まっていた間に何回分も過ぎていたら、古い予定から1周期ずつ
+ * 送り直さない。最新の期間を1回だけ送り、飛ばした回数を数えて
+ * 履歴に残す。各回の期間が同じ最新期間になる重複通知を防ぐ。
+ */
+function futureRunAt(schedule: AnalyticsReportSchedule, nowISO: string): { nextRunAt: string; skipped: number } {
+  let nextRunAt = nextRun(schedule);
+  let skipped = 0;
+  let cursor = { ...schedule, nextRunAt: schedule.nextRunAt };
+  while (nextRunAt <= nowISO && skipped < 1000) {
+    skipped += 1;
+    cursor = { ...schedule, nextRunAt };
+    nextRunAt = nextRun(cursor);
+  }
+  return { nextRunAt, skipped };
 }
 
 function reportState(value: unknown): 'available' | 'partial' | 'unavailable' {
@@ -331,22 +354,34 @@ async function buildReport(db: D1Database, schedule: AnalyticsReportSchedule, no
     current[section] = await load(db, currentContext);
     previous[section] = await load(db, previousContext);
   }
+  // R459: 全体の状態は通常の節だけでなく、添えた保存済み分析の
+  // 状態も見る。保存済みだけ選んだ場合、current={} は「集計済み」に
+  // 見えてしまう。無い写し（消された分析）は未取得として扱う。
   const savedAnalyses = [];
+  const savedStates: Array<{ state: string }> = [];
+  const savedNames = new Map(
+    (schedule.savedAnalysisIds.length
+      ? await getSavedAnalytics(db, schedule.lineAccountId)
+      : []).map((item) => [item.id, item.name]),
+  );
   for (const id of schedule.savedAnalysisIds) {
     const snapshots = await getSavedAnalyticsSnapshots(db, schedule.lineAccountId, id);
-    savedAnalyses.push({ savedAnalysisId: id, snapshot: snapshots?.[0] ?? null });
+    const snapshot = snapshots?.[0] ?? null;
+    savedAnalyses.push({ savedAnalysisId: id, name: savedNames.get(id) ?? null, snapshot });
+    savedStates.push({ state: snapshot?.state ?? 'unavailable' });
   }
+  const state = reportState({ current, saved: savedStates });
   const result = {
     period: { from: currentContext.fromDate, to: currentContext.toDate },
     previousPeriod: { from: previousContext.fromDate, to: previousContext.toDate },
     timeZone: schedule.timeZone,
     dataCutoffAt: currentContext.dataCutoffAt,
     current, previous, savedAnalyses,
-    alertEvaluation: reportState(current) === 'available'
+    alertEvaluation: state === 'available'
       ? { state: 'evaluated', results: await evaluateAlertRules(db, schedule, current, previous, currentContext, previousContext) }
       : { state: 'skipped', reason: '未取得または一部集計中の数字があるため変化通知を行いません' },
   };
-  return { context: currentContext, result, state: reportState(current) };
+  return { context: currentContext, result, state };
 }
 
 const jaNumber = new Intl.NumberFormat('ja-JP');
@@ -442,6 +477,32 @@ function alertLines(evaluation: { state: string; results?: AlertRuleEvaluation[]
   return lines;
 }
 
+/**
+ * 添えた保存済み分析は、その結果が「いつのものか」を添える（R460）。
+ *
+ * 保存結果は不変（1月のまま）が正しい。問題は通知だけが今回の
+ * 期間・締切を名乗り、受け手が9月の集計と受け取る点。分析ごとに
+ * 元の対象期間・締切と「保存した時点の結果」であることを示す。
+ */
+function savedAnalysisLines(report: Awaited<ReturnType<typeof buildReport>>): string[] {
+  const items = (report.result.savedAnalyses ?? []) as Array<{
+    savedAnalysisId: string; name: string | null;
+    snapshot: {
+      periodFrom: string; periodTo: string; dataCutoffAt: string; state: string;
+    } | null;
+  }>;
+  return items.map((item) => {
+    const name = item.name ?? '保存した分析';
+    if (!item.snapshot) return `・添付した分析「${name}」: 結果が見つかりません`;
+    const from = String(item.snapshot.periodFrom).slice(0, 10);
+    const to = String(item.snapshot.periodTo).slice(0, 10);
+    const stateLabel = item.snapshot.state === 'available' ? '確定結果'
+      : item.snapshot.state === 'partial' ? '一部集計中の結果'
+      : item.snapshot.state === 'failed' ? '失敗したときの結果' : '未取得の結果';
+    return `・添付した分析「${name}」: ${from}〜${to} の${stateLabel}（保存した時点のもので、今回の集計ではありません。データ締切 ${item.snapshot.dataCutoffAt}）`;
+  });
+}
+
 export function reportText(
   schedule: AnalyticsReportSchedule, report: Awaited<ReturnType<typeof buildReport>>,
   adminOrigin: string | null = null,
@@ -452,6 +513,7 @@ export function reportText(
     `状態: ${report.state === 'available' ? '集計済み' : report.state === 'partial' ? '一部集計中' : '未取得'}`,
     `データ締切: ${report.context.dataCutoffAt}`,
     ...headlineLines(schedule, report),
+    ...savedAnalysisLines(report),
   ];
   const alerts = alertLines(report.result.alertEvaluation as { state: string; results?: AlertRuleEvaluation[] });
   if (alerts.length > 0) lines.push('▼すぐの知らせ', ...alerts);
@@ -463,11 +525,51 @@ export function reportText(
   return lines.join('\n');
 }
 
+export type DeliveryOutcome = {
+  channel: string; recipient: string; status: 'sent' | 'failed' | 'skipped'; reason?: string;
+};
+
+/**
+ * 送信直前の宛先の再検査（R449）。
+ *
+ * 作成時は宛先の権限を検査するが、保存後に担当者が停止されたり
+ * 閲覧範囲から外れたりしても、送信時は getStaffById で引けるだけで
+ * 送っていた。ここでは有効状態・所属・対象アカウントの閲覧権限を
+ * 送る直前に確かめ直す。外れた宛先には送らず、理由を宛先別に残す。
+ * 直接のメール指定（kind=email）は担当者の状態と区別し、そのまま送る。
+ */
+async function validStaffFor(
+  db: D1Database, staffId: string, lineAccountId: string,
+): Promise<{ ok: true; member: NonNullable<Awaited<ReturnType<typeof getStaffById>>> } | { ok: false; reason: string }> {
+  const member = await getStaffById(db, staffId);
+  if (!member) return { ok: false, reason: '担当者の登録が無いため送りませんでした（退職・削除の可能性があります）' };
+  if (!member.is_active || member.invite_status !== 'active') {
+    return { ok: false, reason: '担当者が利用停止中のため送りませんでした' };
+  }
+  if (member.account_scope === 'accounts') {
+    const scope = await getStaffAccountScopeIds(db, staffId);
+    if (!scope.includes(lineAccountId)) {
+      return { ok: false, reason: 'このLINEアカウントの閲覧範囲から外れたため送りませんでした' };
+    }
+  }
+  return { ok: true, member };
+}
+
 async function deliver(env: AnalyticsReportEnv, schedule: AnalyticsReportSchedule, text: string) {
-  const results: Array<{ channel: string; recipient: string; status: 'sent' | 'failed'; reason?: string }> = [];
-  const staff = new Map<string, Awaited<ReturnType<typeof getStaffById>>>();
+  const results: DeliveryOutcome[] = [];
+  const staff = new Map<string, NonNullable<Awaited<ReturnType<typeof getStaffById>>>>();
   for (const recipient of schedule.recipients) {
-    if (recipient.kind === 'staff' && recipient.staffId) staff.set(recipient.staffId, await getStaffById(env.DB, recipient.staffId));
+    if (recipient.kind !== 'staff' || !recipient.staffId) continue;
+    const checked = await validStaffFor(env.DB, recipient.staffId, schedule.lineAccountId);
+    if (!checked.ok) {
+      // R449: 除外した理由を履歴に残す。有効な宛先への送信は続ける。
+      for (const channel of schedule.channels) {
+        if (channel === 'dashboard') continue;
+        results.push({ channel, recipient: recipient.staffId, status: 'skipped', reason: checked.reason });
+      }
+      continue;
+    }
+    staff.set(recipient.staffId, checked.member);
   }
   if (schedule.channels.includes('dashboard')) {
     try {
@@ -513,46 +615,114 @@ async function deliver(env: AnalyticsReportEnv, schedule: AnalyticsReportSchedul
   return results;
 }
 
+/**
+ * 取り残された実行中を「中断」とみなすまでの時間（R450）。
+ *
+ * 正常な同時実行（開始直後の running 行）を回収しないよう、
+ * この時間より古いものだけを対象にする。
+ */
+const STALE_RUN_MS = 2 * 3_600_000;
+
+/**
+ * 読み取り後に変わった設定を見分ける（R451）。
+ *
+ * 止める・しまう・内容変更のいずれも、版（updatedAt）か次回予定か
+ * 状態が変わる。読み取ったまま送ると旧宛先へ送るので、変わって
+ * いたら送らずに止める。変更後の予定は編集側が未来へ置き直す。
+ */
+export function isClaimStale(
+  claimed: AnalyticsReportSchedule, fresh: AnalyticsReportSchedule | null,
+): boolean {
+  return !fresh || fresh.status !== 'active'
+    || fresh.updatedAt !== claimed.updatedAt || fresh.nextRunAt !== claimed.nextRunAt;
+}
+
 export async function processDueAnalyticsReports(env: AnalyticsReportEnv, now = new Date()) {
-  const due = await claimDueAnalyticsReportSchedules(env.DB, now.toISOString());
+  const nowISO = now.toISOString();
+  // R450: 前回取り残された running 行を先に回収する。回収しないと
+  // 同じ予定時刻の begin がずっと null になり、次回以降も止まる。
+  const staleCutoff = new Date(now.getTime() - STALE_RUN_MS).toISOString();
+  const reclaimed = await reclaimStaleAnalyticsReportRuns(env.DB, staleCutoff);
+  const due = await claimDueAnalyticsReportSchedules(env.DB, nowISO);
   let processed = 0;
   let failed = 0;
+  let repaired = 0;
   for (const schedule of due) {
     // 機能オフ中は作らず予約のまま残す。再オンで再開する。
     if (!await featureJobCanRun(env.DB, { accountId: schedule.lineAccountId, featureId: 'analytics', job: 'analytics scheduled reports' })) {
       continue;
     }
+    // R451: 読み取った設定でそのまま送らない。実行開始の直前に
+    // 最新を読み直し、止める・しまう・内容変更の後なら送らない。
+    // 変更後の予定は編集側が未来へ置き直すので、ここでは進めない。
+    const fresh = await getAnalyticsReportSchedule(env.DB, schedule.id, schedule.lineAccountId);
+    if (isClaimStale(schedule, fresh)) continue;
     const context = contextFor(schedule, now);
     const runId = await beginAnalyticsReportRun(env.DB, {
       scheduleId: schedule.id, lineAccountId: schedule.lineAccountId,
       scheduledFor: schedule.nextRunAt, periodFrom: context.fromDate, periodTo: context.toDate,
       timeZone: schedule.timeZone, dataCutoffAt: context.dataCutoffAt,
     });
-    if (!runId) continue;
+    if (!runId) {
+      // R450: 送信済みの記録があるのに予定だけ古いままなら、送り直さず
+      // 予定だけ未来へ補修する。running 行は上の回収で既に処理済み。
+      const existing = await getAnalyticsReportRun(env.DB, {
+        scheduleId: schedule.id, scheduledFor: schedule.nextRunAt,
+      });
+      if (existing && existing.state !== 'running') {
+        await advanceAnalyticsReportSchedule(env.DB, schedule.id, schedule.nextRunAt,
+          futureRunAt(schedule, nowISO).nextRunAt, nowISO);
+        repaired += 1;
+      }
+      continue;
+    }
+    // R452: 履歴保存が失敗しても、確認済みの送信結果を空にしない。
+    // catch 側でもここまでの deliveryResults を引き継ぐ。
+    let deliveryResults: DeliveryOutcome[] = [];
     try {
       const report = await buildReport(env.DB, schedule, now);
-      const deliveryResults = await deliver(
+      // R451: 集計中に止める・しまう・内容変更があれば、旧設定で送らない。
+      const latest = await getAnalyticsReportSchedule(env.DB, schedule.id, schedule.lineAccountId);
+      if (!latest || latest.status !== 'active' || latest.updatedAt !== schedule.updatedAt) {
+        await finishAnalyticsReportRun(env.DB, {
+          id: runId, state: 'failed', result: {}, deliveryResults: [],
+          errorCode: 'schedule_changed_before_send', completedAt: new Date().toISOString(),
+        });
+        failed += 1;
+        // 変更後の予定は編集側が管理するので、ここでは進めない。
+        continue;
+      }
+      deliveryResults = await deliver(
         env, schedule, reportText(schedule, report, env.ADMIN_ORIGIN ?? null));
       const deliveryFailed = deliveryResults.some((item) => item.status === 'failed');
+      const backlog = futureRunAt(schedule, nowISO);
       await finishAnalyticsReportRun(env.DB, {
         id: runId, state: deliveryFailed && report.state === 'available' ? 'partial' : report.state,
-        result: report.result, deliveryResults, completedAt: new Date().toISOString(),
+        // R457: 滞留分をまとめて1回送ったときは、省略した回数を履歴に残す。
+        result: backlog.skipped > 0
+          ? { ...report.result, backlog: { scheduledFor: schedule.nextRunAt, sentPeriods: 1, skippedPeriods: backlog.skipped } }
+          : report.result,
+        deliveryResults, completedAt: new Date().toISOString(),
       });
+      if (schedule.isOneTime) await archiveAnalyticsReportSchedule(env.DB, schedule.id, nowISO);
+      else await advanceAnalyticsReportSchedule(env.DB, schedule.id, schedule.nextRunAt, backlog.nextRunAt, nowISO);
       processed += 1;
     } catch (error) {
       await finishAnalyticsReportRun(env.DB, {
-        id: runId, state: 'failed', result: {}, deliveryResults: [],
+        id: runId, state: 'failed', result: {}, deliveryResults,
         errorCode: error instanceof Error ? error.message.slice(0, 120) : 'analytics_report_failed',
         completedAt: new Date().toISOString(),
       });
       failed += 1;
-    } finally {
-      if (schedule.isOneTime) await archiveAnalyticsReportSchedule(env.DB, schedule.id, now.toISOString());
-      else await advanceAnalyticsReportSchedule(env.DB, schedule.id, schedule.nextRunAt, nextRun(schedule), now.toISOString());
+      if (schedule.isOneTime) await archiveAnalyticsReportSchedule(env.DB, schedule.id, nowISO);
+      else {
+        await advanceAnalyticsReportSchedule(env.DB, schedule.id, schedule.nextRunAt,
+          futureRunAt(schedule, nowISO).nextRunAt, nowISO);
+      }
     }
   }
   const retention = new Date(now);
   retention.setUTCMonth(retention.getUTCMonth() - 13);
   const purged = await purgeExpiredAnalyticsReportRuns(env.DB, retention.toISOString());
-  return { processed, failed, purged };
+  return { processed, failed, purged, reclaimed, repaired };
 }

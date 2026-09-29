@@ -199,7 +199,8 @@ export type IncomingWebhookDetail = IncomingWebhook & {
     displayName: string
   }>
   actionExecution: {
-    state: 'connected' | 'not_configured'
+    // R404: 保存済みの未対応種類があるときは needs_attention と理由が返る。
+    state: 'connected' | 'not_configured' | 'needs_attention'
     reason: string | null
   }
   latestSample: {
@@ -2321,6 +2322,33 @@ export type AnalyticsReportSchedule = {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+}
+// R454: 定期レポートの実行履歴（失敗理由・宛先別結果）。
+export type AnalyticsReportDelivery = {
+  channel: string
+  recipient: string
+  status: 'sent' | 'failed' | 'skipped'
+  reason?: string
+}
+export type AnalyticsReportRun = {
+  id: string
+  scheduleId: string
+  lineAccountId: string
+  scheduledFor: string
+  periodFrom: string
+  periodTo: string
+  timeZone: string
+  dataCutoffAt: string
+  state: 'running' | 'available' | 'partial' | 'unavailable' | 'failed'
+  result: unknown
+  deliveryResults: AnalyticsReportDelivery[]
+  errorCode: string | null
+  startedAt: string
+  completedAt: string | null
+}
+export type RecentOneTimeReport = {
+  schedule: AnalyticsReportSchedule
+  lastRun: AnalyticsReportRun | null
 }
 export type AnalyticsReportScheduleOptions = {
   timeZone: string
@@ -6769,7 +6797,7 @@ export const api = {
   analytics: {
     reportSchedules: {
       list: (accountId: string) =>
-        fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; options: AnalyticsReportScheduleOptions }>>(
+        fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; recentOneTime?: RecentOneTimeReport[]; options: AnalyticsReportScheduleOptions }>>(
           `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         ),
       create: (accountId: string, data: Omit<
@@ -6792,6 +6820,15 @@ export const api = {
       }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
         `/api/analytics/report-schedules/${encodeURIComponent(id)}/status?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
+      ),
+      // R454: しまった1回送信も依頼IDで履歴を引く・送り直す。
+      runs: (accountId: string, id: string) =>
+        fetchApi<ApiResponse<{ schedule: AnalyticsReportSchedule; runs: AnalyticsReportRun[] }>>(
+          `/api/analytics/report-schedules/${encodeURIComponent(id)}/runs?account_id=${encodeURIComponent(accountId)}`,
+        ),
+      retry: (accountId: string, id: string) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}/retry?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({}) },
       ),
     },
     friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
@@ -11857,10 +11894,15 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
-      /* 人が見つからなかった届物の箱(#939 N-367)。 */
-      unmatched: (id: string, lineAccountId: string, status?: 'pending' | 'resolved' | 'dismissed') =>
-        fetchApi<ApiResponse<IncomingWebhookUnmatchedItem[]>>(
-          `/api/webhooks/incoming/${encodeURIComponent(id)}/unmatched?lineAccountId=${encodeURIComponent(lineAccountId)}${status ? `&status=${status}` : ''}`,
+      /* 人が見つからなかった届物の箱(#939 N-367)。R401: 50件超えは limit/offset で辿る。 */
+      unmatched: (
+        id: string,
+        lineAccountId: string,
+        status?: 'pending' | 'resolved' | 'dismissed',
+        paging?: { limit?: number; offset?: number },
+      ) =>
+        fetchApi<ApiResponse<IncomingWebhookUnmatchedItem[]> & { total?: number }>(
+          `/api/webhooks/incoming/${encodeURIComponent(id)}/unmatched?lineAccountId=${encodeURIComponent(lineAccountId)}${status ? `&status=${status}` : ''}${paging?.limit ? `&limit=${paging.limit}` : ''}${paging?.offset ? `&offset=${paging.offset}` : ''}`,
         ),
       resolveUnmatched: (id: string, lineAccountId: string, data: { action: 'dismiss' } | { action: 'link'; friendId: string }) =>
         fetchApi<ApiResponse<{ id: string; status: string }>>(

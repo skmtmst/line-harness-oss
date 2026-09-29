@@ -327,14 +327,16 @@ describe('定期レポートの作成後(R76)', () => {
     expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])
   })
 
-  it('1回だけ送る成功後は一覧へ移す（同じ依頼を二重に押せない）', async () => {
+  it('1回だけ送る成功後はその依頼の結果へ移す（同じ依頼を二重に押せない）', async () => {
+    // R454: 一覧からは消えるため、結果の行き先（依頼IDの画面）へ移す。
+    // 作成フォームが残らないので二重押しもできない（R76の意図は維持）。
     await render()
     await selectRecipient()
     await act(async () => { button('今すぐ1回だけ送る').click(); await Promise.resolve(); await Promise.resolve() })
 
     expect(writeCalls('POST')).toHaveLength(1)
     expect((writeCalls('POST').at(-1)?.body as { sendOnce: boolean }).sendOnce).toBe(true)
-    expect(fixture.pushes).toEqual(['/analytics?tab=saved'])
+    expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])
   })
 })
 

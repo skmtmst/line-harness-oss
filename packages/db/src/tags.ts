@@ -1099,6 +1099,20 @@ export async function addTagToFriend(
   db: D1Database,
   friendId: string,
   tagId: string,
+  options?: {
+    /**
+     * R403: 連動処理の冪等キー。受信Webhookの再試行など、同じ出来事を
+     * 繰り返す呼び出し元が安定した値を渡す。同じ値の再実行は二重計上しない。
+     * 省略時は従来どおり付与時刻入りの値を使う（単発の手動付与用）。
+     */
+    sourceEventId?: string;
+    /**
+     * R403: true のとき連動処理の失敗を握りつぶさず投げる。
+     * 受信Webhookの受領は失敗状態で残り、同じ受信の再送で欠けた記録だけを
+     * 復旧できる。手動付与など単発の呼び出しは従来どおり false。
+     */
+    strictSideEffects?: boolean;
+  },
 ): Promise<boolean> {
   const now = jstNow();
   const result = await db
@@ -1109,12 +1123,15 @@ export async function addTagToFriend(
     .bind(friendId, tagId, now)
     .run();
   const added = (result.meta?.changes ?? 0) > 0;
-  if (added) {
+  const sideEffectKey = options?.sourceEventId ?? `${friendId}:${tagId}:${now}`;
+  // 安定キーがある再実行は、タグ行が既にあっても連動処理を試す
+  // （冪等キーで二重計上しない）。単発の付け直しは従来どおり何もしない。
+  if (added || options?.sourceEventId !== undefined) {
     try {
       await enqueueMileageEvent(db, {
         eventType: 'tag_added',
         source: 'tag',
-        sourceEventId: `${friendId}:${tagId}:${now}`,
+        sourceEventId: sideEffectKey,
         friendId,
         subjectKey: tagId,
         metadata: { tagId },
@@ -1122,6 +1139,7 @@ export async function addTagToFriend(
       });
     } catch (error) {
       console.error('tag mileage enqueue failed:', error);
+      if (options?.strictSideEffects) throw error;
     }
     // 「タグが付いた」を成果として数える(#648)。
     //
@@ -1132,18 +1150,23 @@ export async function addTagToFriend(
     // 画面の起点一覧は「タグが付いた」としか書いておらず、誰が付けたかで
     // 数えたり数えなかったりする境界は運用者に説明できない。
     //
-    // 冪等キーは付与時刻を含む。同じ(友だち,タグ)の2回目は上の
+    // 冪等キーは安定キー（受領起点）か付与時刻。単発の付け直しは上の
     // INSERT OR IGNORE が 0 行になり added=false なので、ここへ来ない。
-    // 失敗しても握って進む。タグ付与そのものを巻き添えにしない。
+    // 単発では失敗しても握って進む。タグ付与そのものを巻き添えにしない。
+    // R403: strict のときは失敗を残す。欠けた記録は同じ安定キーの再送で復旧する。
     try {
-      await recordConversionSourceEvent(db, {
+      const conversion = await recordConversionSourceEvent(db, {
         sourceType: 'tag_added',
         friendId,
-        sourceEventId: `${friendId}:${tagId}:${now}`,
+        sourceEventId: sideEffectKey,
         metadata: { tagId },
       });
+      if (options?.strictSideEffects && conversion.failed > 0) {
+        throw new Error(`tag conversion record failed: ${conversion.failed}`);
+      }
     } catch (error) {
       console.error('tag conversion record failed:', error);
+      if (options?.strictSideEffects) throw error;
     }
   }
   return added;

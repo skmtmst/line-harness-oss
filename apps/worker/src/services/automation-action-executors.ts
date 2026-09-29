@@ -273,7 +273,16 @@ async function tagExecutor(context: AutomationActionContext, operation: 'add' | 
   const tagId = requiredString(context.action.params.tagId, 'tag_id_missing', 'タグ');
   await requireScopedResource(context, { table: 'tags', id: tagId, code: 'tag_not_found', label: 'タグ' });
   if (operation === 'add') {
-    await addTagToFriend(context.db, friend.id, tagId);
+    /*
+     * R403: 受信Webhookの起点では連動処理（マイル・成果）の失敗を握りつぶさない。
+     * 受領は失敗状態で残り、同じ受信の再送で欠けた記録だけを復旧する
+     * （安定キーで二重計上しない）。自動化など他の起点は従来どおり。
+     */
+    const fromIncomingWebhook = context.automationId.startsWith('incoming-webhook:');
+    await addTagToFriend(context.db, friend.id, tagId, {
+      sourceEventId: context.sourceEventId,
+      strictSideEffects: fromIncomingWebhook,
+    });
   } else {
     await removeTagFromFriend(context.db, friend.id, tagId);
   }

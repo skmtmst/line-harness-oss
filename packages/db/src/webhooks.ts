@@ -1203,6 +1203,19 @@ export async function createIncomingWebhook(
   return (await getIncomingWebhookById(db, id, input.lineAccountId))!;
 }
 
+/**
+ * R424: 秘密値の等価判定（定数時間）。同じ値の再保存を重複操作として扱い、
+ * 旧合言葉の猶予を保つために使う。判定自体に秘密値は出さない。
+ */
+function sameSecretValue(current: string, next: string): boolean {
+  if (current.length !== next.length) return false;
+  let diff = 0;
+  for (let index = 0; index < current.length; index += 1) {
+    diff |= current.charCodeAt(index) ^ next.charCodeAt(index);
+  }
+  return diff === 0;
+}
+
 export async function updateIncomingWebhook(
   db: D1Database,
   id: string,
@@ -1221,20 +1234,35 @@ export async function updateIncomingWebhook(
      * 入れ替え時刻と一緒に残す。受信側は入れ替えから24時間だけ前の
      * 合言葉の署名も受け付ける(相手側の切り替えに猶予を持たせる)。
      * 前の値が暗号文ならそのまま移す。旧平文だけ残る行は暗号化して移す。
+     *
+     * R424: 同じ新値の再保存（応答消失の再試行）は重複操作として扱い、
+     * 既存 previous と失効時刻を保つ。別値への変更だけが猶予を作り直す。
      */
     const before = await db
       .prepare(`SELECT secret, secret_encrypted FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
       .bind(id, lineAccountId)
       .first<{ secret: string | null; secret_encrypted: string | null }>();
-    const previous = before?.secret_encrypted
-      ?? (before?.secret ? await encryptWebhookSecret(before.secret, keys) : null);
-    sets.push('secret_previous_encrypted = ?');
-    values.push(previous);
-    sets.push('secret_rotated_at = ?');
-    values.push(jstNow());
-    sets.push('secret_encrypted = ?');
-    values.push(await encryptWebhookSecret(updates.secret, keys));
-    sets.push('secret = NULL');
+    let resave = false;
+    try {
+      const current = await resolveWebhookSecret(
+        { secret: before?.secret ?? null, secret_encrypted: before?.secret_encrypted ?? null },
+        keys,
+      );
+      resave = current !== null && sameSecretValue(current, updates.secret);
+    } catch {
+      resave = false;
+    }
+    if (!resave) {
+      const previous = before?.secret_encrypted
+        ?? (before?.secret ? await encryptWebhookSecret(before.secret, keys) : null);
+      sets.push('secret_previous_encrypted = ?');
+      values.push(previous);
+      sets.push('secret_rotated_at = ?');
+      values.push(jstNow());
+      sets.push('secret_encrypted = ?');
+      values.push(await encryptWebhookSecret(updates.secret, keys));
+      sets.push('secret = NULL');
+    }
   }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
   if (sets.length === 0) return;
@@ -1490,11 +1518,12 @@ export async function listIncomingWebhookUnmatched(
   lineAccountId: string,
   status: IncomingWebhookUnmatchedStatus = 'pending',
   limit = 50,
+  offset = 0,
 ): Promise<IncomingWebhookUnmatchedEventRow[]> {
   const result = await db.prepare(`SELECT * FROM incoming_webhook_unmatched_events
       WHERE webhook_id = ? AND line_account_id = ? AND status = ?
-      ORDER BY received_at DESC LIMIT ?`)
-    .bind(webhookId, lineAccountId, status, Math.min(100, Math.max(1, limit)))
+      ORDER BY received_at DESC LIMIT ? OFFSET ?`)
+    .bind(webhookId, lineAccountId, status, Math.min(100, Math.max(1, limit)), Math.max(0, offset))
     .all<IncomingWebhookUnmatchedEventRow>();
   return result.results ?? [];
 }
@@ -1503,10 +1532,11 @@ export async function countIncomingWebhookUnmatched(
   db: D1Database,
   webhookId: string,
   lineAccountId: string,
+  status: IncomingWebhookUnmatchedStatus = 'pending',
 ): Promise<number> {
   const row = await db.prepare(`SELECT COUNT(*) AS count FROM incoming_webhook_unmatched_events
-      WHERE webhook_id = ? AND line_account_id = ? AND status = 'pending'`)
-    .bind(webhookId, lineAccountId)
+      WHERE webhook_id = ? AND line_account_id = ? AND status = ?`)
+    .bind(webhookId, lineAccountId, status)
     .first<{ count: number }>();
   return row?.count ?? 0;
 }

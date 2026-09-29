@@ -193,7 +193,19 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
-    await linkFriendToUser(c.env.DB, body.friendId, userId);
+    /*
+     * R394: 同時に別の人が動かしたときは上書きせず409にする（変更0）。
+     * 最新の結び付きを読み直してからやり直す。
+     */
+    const linked = await linkFriendToUser(
+      c.env.DB, body.friendId, userId, { id: c.get('staff')?.id ?? null },
+    );
+    if (!linked) {
+      return c.json({
+        success: false,
+        error: '別の担当が先に結び付きを変更しました。最新の状態を読み直してください',
+      }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('POST /api/users/:id/link error:', err);

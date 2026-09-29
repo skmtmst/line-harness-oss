@@ -49,7 +49,14 @@ import {
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
-import { reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
+import { stoppedTenantLineAccountSql } from '../services/tenant-runtime-status.js';
+import {
+  reserveIncomingWebhook,
+  readIncomingWebhookReceiptPlan,
+  saveIncomingWebhookReceiptPlan,
+  type IncomingWebhookExecution,
+  type IncomingWebhookReceiptPlan,
+} from '../services/incoming-webhook-receipts.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
@@ -81,6 +88,40 @@ const INCOMING_ACTION_KINDS = new Set([
   'reminder', 'conversion', 'mileage_rule', 'score_rule', 'outgoing_webhook',
   'operator_notification',
 ]);
+
+/*
+ * R404: 受信直後に直接動かせる種類。directAction（incoming-webhook-actions.ts）
+ * が組み立てられる5種類と、公開済み版を展開する共通アクションだけ。
+ * friend_field・reminder・conversion・mileage_rule・score_rule・
+ * operator_notification の直接指定は、保存できても試しも実実行も必ず失敗する
+ * ため、保存時点で理由つきで止める（接続済み表示もしない）。
+ */
+const INCOMING_DIRECTLY_EXECUTABLE_KINDS = new Set([
+  'common_action', 'tag', 'support_mark', 'template', 'scenario', 'outgoing_webhook',
+]);
+
+const INCOMING_ACTION_KIND_LABELS: Record<string, string> = {
+  common_action: '共通アクションを動かす',
+  tag: 'タグを付ける',
+  friend_field: '友だち情報を更新する',
+  support_mark: '対応マークを付ける',
+  template: 'テンプレートを送る',
+  scenario: 'シナリオを開始する',
+  reminder: 'リマインダを開始する',
+  conversion: '成果を記録する',
+  mileage_rule: 'マイルを付ける',
+  score_rule: 'スコアを更新する',
+  outgoing_webhook: '別のサービスへ知らせる',
+  operator_notification: '担当者へ知らせる',
+};
+
+function incomingUnexecutableReason(refKind: string): string | null {
+  if (INCOMING_DIRECTLY_EXECUTABLE_KINDS.has(refKind)) return null;
+  const label = INCOMING_ACTION_KIND_LABELS[refKind] ?? '保存済みの処理を動かす';
+  return `「${label}」は受信直後の処理として直接実行できないため、保存できません。`
+    + 'タグを付ける・対応マークを付ける・テンプレートを送る・シナリオを開始する・'
+    + '別のサービスへ知らせる・共通アクションを動かす、から選び直してください。';
+}
 
 function safeJson<T>(raw: string | null | undefined, fallback: T): T {
   try {
@@ -172,6 +213,9 @@ function readIncomingConfig(body: unknown):
       || (refVersionId !== null && (!refVersionId || refVersionId.length > 200))) {
       return { ok: false, error: '実行処理は許可された種類と構造化IDで指定してください' };
     }
+    // R404: 直接実行できない種類は保存200にしない。試しも実実行も必ず失敗するため。
+    const unexecutable = incomingUnexecutableReason(refKind);
+    if (unexecutable) return { ok: false, error: unexecutable };
     actions.push({ refKind, refId, refVersionId });
   }
   return {
@@ -207,6 +251,58 @@ const MAX_EVENT_TYPE_LENGTH = 100;
 const MAX_INCOMING_BODY_BYTES = 256 * 1024;
 const RECEIVE_RATE_LIMIT = 60;
 const RECEIVE_RATE_WINDOW_MS = 60_000;
+/*
+ * R430 (v6-26 §7-1): 署名時刻の受付窓。過去15分・未来5分（時計ずれ分）。
+ * 時刻を送ってきた受信だけを検査し、送らない古い送信元は壊さない。
+ */
+const RECEIVE_TIMESTAMP_PAST_MS = 15 * 60_000;
+const RECEIVE_TIMESTAMP_FUTURE_MS = 5 * 60_000;
+
+/*
+ * R428: 申告なし・申告不足の本文も上限を超えて読み続けない。
+ * 上限を超えたら null を返し、呼び出し側は413にする。
+ */
+async function readCappedBodyText(raw: Request, maxBytes: number): Promise<string | null> {
+  const reader = raw.body?.getReader();
+  if (!reader) return '';
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      try {
+        await reader.cancel();
+      } catch {
+        // 読み捨ての中断に失敗しても、413 にはできる。
+      }
+      return null;
+    }
+    chunks.push(value);
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(merged);
+}
+
+/** R430: X-Webhook-Timestamp の検査状態。送らない受信は checked:false。 */
+function receiveTimestampState(raw: string | null | undefined):
+  | { checked: false }
+  | { checked: true; timeMs: number | null } {
+  if (raw === null || raw === undefined || raw.trim() === '') return { checked: false };
+  const text = raw.trim();
+  const numeric = Number(text);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return { checked: true, timeMs: numeric >= 1e11 ? numeric : numeric * 1000 };
+  }
+  const parsed = Date.parse(text);
+  return { checked: true, timeMs: Number.isFinite(parsed) ? parsed : null };
+}
 
 /**
  * 名前と種別の上限。極端な値で一覧表示が崩れる・DBが膨らむのを防ぐ(#506 軽)。
@@ -361,6 +457,10 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
     // N-367 (#939): 「未照合として確認する」「友だち候補を作る」を選んだ口が
     // 溜めている未確認の件数。箱の中身は /unmatched で見せる。
     const pendingUnmatched = await countIncomingWebhookUnmatched(c.env.DB, item.id, lineAccountId);
+    // R404: 既に保存済みの未対応種類は「接続済み」にしない。理由も添える。
+    const unexecutableReason = actions
+      .map((action) => incomingUnexecutableReason(action.refKind))
+      .find((reason): reason is string => reason !== null) ?? null;
     return c.json({
       success: true,
       data: {
@@ -375,10 +475,11 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
         identityMatching,
         actions: namedActions,
         pendingUnmatched,
-        actionExecution: {
-          state: actions.length > 0 ? 'connected' : 'not_configured',
-          reason: null,
-        },
+        actionExecution: actions.length === 0
+          ? { state: 'not_configured' as const, reason: null }
+          : unexecutableReason
+            ? { state: 'needs_attention' as const, reason: unexecutableReason }
+            : { state: 'connected' as const, reason: null },
         latestSample: sample && item.latest_received_at
           ? { receivedAt: item.latest_received_at, ...sample }
           : null,
@@ -615,10 +716,14 @@ webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin
     const webhook = await getIncomingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
     const status = c.req.query('status');
-    const items = await listIncomingWebhookUnmatched(
-      c.env.DB, webhook.id, lineAccountId,
-      status === 'resolved' || status === 'dismissed' ? status : 'pending',
-    );
+    const listStatus = status === 'resolved' || status === 'dismissed' ? status : 'pending';
+    // R401: 50件超えは limit/offset で辿る。空表示の判定に使う総数も返す。
+    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') ?? '') || 50));
+    const offset = Math.max(0, Number(c.req.query('offset') ?? '') || 0);
+    const [items, total] = await Promise.all([
+      listIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus, limit, offset),
+      countIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus),
+    ]);
     /*
      * S: 複数一致で保留した届物は、人が選べるよう候補の友だちを
      * 名前つきで返す。候補に載っていない友だちが選ばれても構わない
@@ -636,6 +741,7 @@ webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin
     }
     return c.json({
       success: true,
+      total,
       data: items.map((item) => {
         const friendIds = item.kind === 'ambiguous'
           ? safeJson<string[]>(item.candidate_friend_ids_json, [])
@@ -1474,8 +1580,9 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       return c.json({ success: false, error: 'X-Webhook-Signature header is required' }, 401);
     }
 
-    const rawBody = await c.req.text();
-    if (new TextEncoder().encode(rawBody).byteLength > MAX_INCOMING_BODY_BYTES) {
+    // R428: 申告が無くても実バイト数で止める。上限超えは読まずに413。
+    const rawBody = await readCappedBodyText(c.req.raw, MAX_INCOMING_BODY_BYTES);
+    if (rawBody === null) {
       return c.json({ success: false, error: 'Payload too large' }, 413);
     }
     /*
@@ -1500,6 +1607,43 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       }));
     }
 
+    /*
+     * R427: 署名が通った後、受領の前に契約先の状態を見る。停止・保管が
+     * 完了した契約先への新規受信からは外部POSTを1件も起こさない
+     * （即時送信と定期再送で同じ停止方針）。署名の前に弾くと停止の有無が
+     * 外部へ漏れるため、この順序にする。
+     */
+    if (wh.line_account_id) {
+      const stopped = await c.env.DB.prepare(
+        `SELECT 1 AS stopped FROM line_accounts
+          WHERE line_accounts.id = ? AND ${stoppedTenantLineAccountSql('line_accounts.id')}`,
+      ).bind(wh.line_account_id).first<{ stopped: number }>();
+      if (stopped) {
+        return c.json({
+          success: false,
+          error: '契約先が停止中のため受信できません',
+          code: 'TENANT_SUSPENDED',
+        }, 403);
+      }
+    }
+
+    /*
+     * R430 (v6-26 §7-1): 署名時刻の窓検査。受付期間外の初回受信と
+     * 許容幅を超える未来時刻は受領・後続処理なしで拒否する。
+     * 時刻を送らない古い送信元は受理する（署名対象への時刻組込みは
+     * 将来の送信側契約更新で行う）。
+     */
+    const timestampState = receiveTimestampState(c.req.header('X-Webhook-Timestamp'));
+    if (timestampState.checked) {
+      if (timestampState.timeMs === null) {
+        return c.json({ success: false, error: 'X-Webhook-Timestamp の形式が正しくありません' }, 400);
+      }
+      const skew = Date.now() - timestampState.timeMs;
+      if (skew > RECEIVE_TIMESTAMP_PAST_MS || skew < -RECEIVE_TIMESTAMP_FUTURE_MS) {
+        return c.json({ success: false, error: 'X-Webhook-Timestamp が受付期間外です' }, 401);
+      }
+    }
+
     let payload: unknown;
     try {
       payload = JSON.parse(rawBody);
@@ -1521,13 +1665,16 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
      * 入れるのは署名そのものではなく SHA-256(台帳に使い回せる値を残さない)。
      */
     const signatureHash = await sha256Hex(expected);
+    // R425: 本文のハッシュも残す。合言葉の入れ替え後に同じ通知を再署名しても
+    // 同じ受領へ結び付け、受領・未照合・後続通知を重ねない。
+    const bodyHash = await sha256Hex(rawBody);
     // N-384: 受領の予約に窓内件数の上限を載せて1文で判定する。
     // 上限超えの新規受信は受領記録を消費せず 429 で返し、
     // 窓が明けたあとの正規再送を残す。
     const reserved = await reserveIncomingWebhook(c.env.DB, wh.id, signatureHash, {
       limit: RECEIVE_RATE_LIMIT,
       windowMs: RECEIVE_RATE_WINDOW_MS,
-    });
+    }, bodyHash);
     if (reserved.kind === 'rate_limited') {
       c.header('Retry-After', String(Math.ceil(RECEIVE_RATE_WINDOW_MS / 1000)));
       return c.json({ success: false, error: 'Too many requests' }, 429);
@@ -1589,10 +1736,28 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       matchStatus: 'matched' | 'not_found' | 'ambiguous' | 'skipped' } =
       { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'skipped' };
     try {
-      const identityMatching = safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
-        methods: [], onNotFound: 'do_nothing',
-      });
-      const configuredActions = safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []);
+      /*
+       * R402: 受領時に照合方法・未一致時の扱い・処理配列全体・参照版を
+       * 一つの実行計画として保存する。再試行はその計画を最後まで使い、
+       * 後日の設定変更は新規受信へだけ適用する。既存受信を別計画へ変える
+       * 場合は差分と未処理分を明示する（現状は計画の固定のみ行う）。
+       */
+      let receiptPlan = await readIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId);
+      if (!receiptPlan) {
+        const fresh: IncomingWebhookReceiptPlan = {
+          configVersion: typeof wh.version === 'number' ? wh.version : null,
+          identityMatching: safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
+            methods: [], onNotFound: 'do_nothing',
+          }),
+          actions: safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []),
+        };
+        /*
+         * 計画の確定は賃借柵の外で行う。内容は受領行の1行に先勝ちで書き、
+         * 同じ受領の並行・再試行が上書きしない。柵内の行動実行はこの後。
+         */
+        await saveIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId, fresh);
+        receiptPlan = await readIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId) ?? fresh;
+      }
       if (wh.line_account_id) {
         actionResult = await execution.step('actions', async () => {
           const result = await executeIncomingWebhookActions(execution!.db, {
@@ -1600,8 +1765,8 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
           webhookId: wh.id,
           sourceEventId: execution!.sourceEventId,
           payload,
-          identityMatching,
-          actions: configuredActions,
+          identityMatching: receiptPlan!.identityMatching,
+          actions: receiptPlan!.actions,
           dependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
           execution,
           });
