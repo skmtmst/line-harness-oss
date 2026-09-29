@@ -282,7 +282,7 @@ describe('mileage admin API', () => {
     expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
   });
 
-  it('lists failed redemptions inside the account boundary without secrets', async () => {
+  it('lists redemptions needing attention by default without secrets', async () => {
     dbMocks.listMileageRedemptions.mockResolvedValueOnce({
       items: [{
         id: 'redemption-9', lineAccountId: 'account-1', rewardId: 'reward-1',
@@ -293,10 +293,11 @@ describe('mileage admin API', () => {
       }],
       pagination: { total: 1, limit: 100, offset: 0 },
     });
+    // R364: 既定は要対応（失敗中＋配送中）。照合待ちを一覧から消さない。
     const response = await call('/api/mileage/redemptions?accountId=account-1&limit=999');
     expect(response.status).toBe(200);
     expect(dbMocks.listMileageRedemptions).toHaveBeenCalledWith(env.DB, {
-      lineAccountId: 'account-1', status: 'delivery_failed', limit: 100, offset: 0,
+      lineAccountId: 'account-1', status: 'needs_attention', limit: 100, offset: 0,
     });
     const body = await response.json() as {
       data: { items: Array<Record<string, unknown>>; pagination: Record<string, unknown> };
@@ -321,6 +322,7 @@ describe('mileage admin API', () => {
   it('retries only a failed fulfillment and keeps the same redemption', async () => {
     dbMocks.getMileageRedemption.mockResolvedValue({
       id: 'redemption-9', lineAccountId: 'account-1', status: 'delivery_failed',
+      idempotencyKey: 'secret-key-9', requestFingerprint: 'secret-fp-9',
     });
     deliveryMocks.deliverMileageReward.mockResolvedValueOnce({
       status: 'succeeded', rewardName: '500円引き', customerMessage: '',
@@ -334,10 +336,40 @@ describe('mileage admin API', () => {
     expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledWith(
       env.DB, 'redemption-9', expect.objectContaining({}),
     );
+    // R367: 交換の今の状態も返す。画面は返却完了などを区別できる。
+    const body = await response.json() as { data: { redemption: Record<string, unknown> } };
+    expect(body.data.redemption).toMatchObject({ id: 'redemption-9', lineAccountId: 'account-1' });
+    expect(JSON.stringify(body)).not.toContain('secret');
+  });
+
+  /*
+   * R364: 配送中（照合待ち）のやり直しも受け付ける。
+   * 送ったか確かめられない手順は送り直さない（配送側の責務）。
+   * （直す前は delivering が409＝赤）
+   */
+  it('retries a delivering redemption left unconfirmed without resending', async () => {
+    dbMocks.getMileageRedemption.mockResolvedValue({
+      id: 'redemption-hold', lineAccountId: 'account-1', status: 'delivering',
+      idempotencyKey: 'key-hold', requestFingerprint: 'fp-hold',
+    });
+    deliveryMocks.deliverMileageReward.mockResolvedValueOnce({
+      status: 'delivery_failed', rewardName: '500円引き', customerMessage: '',
+      rewardCode: null, retryAt: null, failurePolicy: 'retry',
+      message: '特典の送信は終わっています。確定を確認しています。',
+    });
+    const response = await call('/api/mileage/redemptions/redemption-hold/retry-fulfillment', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(response.status).toBe(202);
+    expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledWith(
+      env.DB, 'redemption-hold', expect.objectContaining({}),
+    );
+    const body = await response.json() as { data: { redemption: Record<string, unknown> } };
+    expect(body.data.redemption).toMatchObject({ id: 'redemption-hold' });
   });
 
   it('refuses to retry a redemption that is not failing', async () => {
-    for (const status of ['reserved', 'delivering', 'succeeded', 'refunded']) {
+    for (const status of ['reserved', 'succeeded', 'refunded']) {
       dbMocks.getMileageRedemption.mockResolvedValueOnce({
         id: `redemption-${status}`, lineAccountId: 'account-1', status,
       });

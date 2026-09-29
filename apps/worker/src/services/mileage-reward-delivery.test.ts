@@ -5,17 +5,28 @@ const dbMocks = {
   getMileageRewardDeliveryPlan: vi.fn(),
   getReservedMileageRewardCode: vi.fn(),
   claimRedemptionStep: vi.fn().mockResolvedValue('send'),
+  claimRedemptionStepForRecovery: vi.fn().mockResolvedValue('send'),
   markRedemptionStepSent: vi.fn().mockResolvedValue(undefined),
   clearRedemptionStepIntent: vi.fn().mockResolvedValue(undefined),
+  hasSentRedemptionSteps: vi.fn().mockResolvedValue(false),
+  MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS: 24 * 60 * 60 * 1000,
   MileageRedemptionConfirmError: class MileageRedemptionConfirmError extends Error {},
+  MileageRewardError: class MileageRewardError extends Error {
+    code: string;
+    constructor(code: string, message: string, status?: number) {
+      super(message);
+      this.code = code;
+    }
+  },
   recordMileageRedemptionAttempt: vi.fn(),
   refundMileageRewardRedemption: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
 const execute = vi.fn();
+const executeWebhook = vi.fn();
 vi.mock('./automation-action-executors.js', () => ({
-  createAutomationActionExecutors: () => ({ add_tag: execute }),
+  createAutomationActionExecutors: () => ({ add_tag: execute, send_webhook: executeWebhook }),
 }));
 vi.mock('./automation-engine.js', () => ({
   AutomationActionError: class AutomationActionError extends Error {
@@ -190,6 +201,8 @@ describe('mileage reward delivery', () => {
       }]),
     }));
     dbMocks.claimRedemptionStep.mockResolvedValueOnce('reconcile');
+    // 回復も引き継げない行は、送らず勝手に確定もせず待つ。
+    dbMocks.claimRedemptionStepForRecovery.mockResolvedValueOnce('reconcile');
     const result = await deliverMileageReward(db, 'redemption-1', {
       now: () => '2026-08-29T00:00:00.000Z',
     });
@@ -282,6 +295,124 @@ describe('mileage reward delivery', () => {
       redemptionId: 'redemption-1', status: 'failed',
     }));
     expect(result).toMatchObject({ status: 'delivery_failed', retryAt: '2026-08-29T00:01:00.000Z' });
+  });
+
+  /*
+   * R361: 2手順目で失敗しても、渡し終えた1手順目がある交換は
+   * 全額返却しない。成功済み手順を繰り返さず、未完了だけやり直せる。
+   * （直す前は refund が呼ばれ全額戻っていた＝赤）
+   */
+  it('does not refund the full cost when an earlier step already succeeded', async () => {
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
+      rewardKind: 'tag',
+      failurePolicy: 'refund',
+      actionConfig: JSON.stringify([
+        { id: 'step-1', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' },
+        { id: 'step-2', type: 'add_tag', params: { tagId: 'tag-2' }, onFailure: 'stop' },
+      ]),
+    }));
+    // 1手順目は渡し済みで飛ばし、2手順目だけ実行して失敗する。
+    dbMocks.claimRedemptionStep
+      .mockResolvedValueOnce('sent')
+      .mockResolvedValueOnce('send');
+    execute.mockRejectedValueOnce(new Error('tag-2 is gone'));
+    dbMocks.hasSentRedemptionSteps.mockResolvedValueOnce(true);
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(dbMocks.refundMileageRewardRedemption).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ status: 'delivery_failed' });
+    expect(result.message ?? '').toContain('渡し済み');
+    // 未完了の手順だけやり直せるよう、再試行の目安を残す。
+    expect(result.retryAt).toBe('2026-08-29T00:01:00.000Z');
+  });
+
+  /*
+   * R362: 返却より先に再試行が成功していたら、遅い返却で
+   * 成功済みの交換を書き換えない。成功として返す。
+   * （直す前は already_delivered が投げっぱなし＝赤）
+   */
+  it('returns success when a late refund finds the redemption already delivered', async () => {
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({ failurePolicy: 'refund' }));
+    dbMocks.decryptCredential.mockRejectedValueOnce(new Error('delivery failed'));
+    dbMocks.refundMileageRewardRedemption.mockRejectedValueOnce(
+      new dbMocks.MileageRewardError('already_delivered', 'すでに特典を渡した交換は返金できません', 409),
+    );
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+    expect(result).toMatchObject({ status: 'succeeded' });
+  });
+
+  /*
+   * R344: 最初の送信から24時間を過ぎた手順は、同じキーで送り直さない。
+   * 自動返却もしない。人が確かめる照合待ちに残す。
+   * （直す前は claim に期限がなく送り直していた＝赤）
+   */
+  it('holds without resending or refunding when the retry key is expired', async () => {
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
+      rewardKind: 'tag',
+      failurePolicy: 'refund',
+      actionConfig: JSON.stringify([{
+        id: 'step-1', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop',
+      }]),
+    }));
+    dbMocks.claimRedemptionStep.mockResolvedValueOnce('expired');
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(dbMocks.refundMileageRewardRedemption).not.toHaveBeenCalled();
+    expect(dbMocks.recordMileageRedemptionAttempt).not.toHaveBeenCalledWith(db, expect.objectContaining({
+      status: 'failed',
+    }));
+    expect(result).toMatchObject({ status: 'delivery_failed', retryAt: null });
+    expect(result.message ?? '').toContain('24時間');
+  });
+
+  /*
+   * R364: 照合待ちの手順は、送り直しても安全な種類だけ期限内に
+   * 回復を試みる。回復できれば二重に送らず成功へ進む。
+   * （直す前は回復を試みず確認中のまま＝赤）
+   */
+  it('recovers a reconcilable step without resending the benefit twice', async () => {
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
+      rewardKind: 'tag',
+      actionConfig: JSON.stringify([{
+        id: 'step-1', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop',
+      }]),
+    }));
+    dbMocks.claimRedemptionStep.mockResolvedValueOnce('reconcile');
+    dbMocks.claimRedemptionStepForRecovery.mockResolvedValueOnce('send');
+    // 前の試験で確定を失敗させ続けているので、既定に戻す。
+    dbMocks.markRedemptionStepSent.mockResolvedValue(undefined);
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ status: 'succeeded' });
+  });
+
+  /*
+   * R364: Webhookの照合待ちは、受け先で二重に処理されるため
+   * 自動では回復しない。送らず照合待ちのまま残す。
+   */
+  it('does not auto-recover a webhook step left unconfirmed', async () => {
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
+      rewardKind: 'tag',
+      actionConfig: JSON.stringify([{
+        id: 'w1', type: 'send_webhook', params: { webhookId: 'webhook-1' }, onFailure: 'stop',
+      }]),
+    }));
+    dbMocks.claimRedemptionStep.mockResolvedValueOnce('reconcile');
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+    expect(executeWebhook).not.toHaveBeenCalled();
+    expect(dbMocks.claimRedemptionStepForRecovery).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ status: 'delivery_failed' });
+    expect(result.message ?? '').toContain('確認しています');
   });
 
   it('executes a pinned common-action version instead of the mutable owner', async () => {

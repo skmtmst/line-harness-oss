@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
@@ -14,6 +16,7 @@ import {
   createSingleFlightLock,
 } from './redemption-request-guard'
 import {
+  ApiError,
   api,
   fetchApi,
   type MileageRewardAdminOverview,
@@ -58,9 +61,10 @@ function miles(value: number | null | undefined): string {
 }
 
 /**
- * 届かなかった交換（`GET /api/mileage/redemptions` の行）。
- * **残高の再減算はしない**ことが口の約束なので、画面は理由・回数・最終日時と
- * やり直しだけ出す。金額は出さない（減っていないものを減ったように見せる）。
+ * 要対応の交換（`GET /api/mileage/redemptions` の行）。
+ * **残高の再減算はしない**ことが口の約束なので、画面は状態・理由・回数・
+ * 最終日時とやり直しだけ出す。金額は出さない（減っていないものを
+ * 減ったように見せる）。`delivering` は送ったか分からない照合待ち。
  */
 interface FailedRedemption {
   id: string
@@ -76,6 +80,21 @@ interface RedemptionHistory {
   items: FailedRedemption[]
   pagination: { total: number; limit: number; offset: number }
 }
+
+/** やり直しの口の返事。返却完了でも HTTP 202＋success:false で返る。 */
+interface RetryFulfillmentResponse {
+  success: boolean
+  data?: {
+    message?: string | null
+    redemption?: { status?: string }
+  }
+  error?: string
+}
+
+type RedemptionsLoad = 'loading' | 'ready' | 'error' | 'forbidden'
+
+/** 1回に読む件数。口の既定（20）と同じにする。 */
+const REDEMPTIONS_PAGE_SIZE = 20
 
 /**
  * 数に限りがあるかどうかの一行。
@@ -95,6 +114,31 @@ function stockText(reward: MileageRewardSummary): string | null {
   return `数量に限りがあります（残り ${reward.availableCodeCount.toLocaleString('ja-JP')}個）`
 }
 
+/**
+ * R365: 総件数と表示範囲を示す。最後まで読んでいないのに
+ * 「すべて」と言わない。1ページに収まるときだけすべて表示と書く。
+ */
+function RedemptionsCount({ total, page, shown }: { total: number; page: number; shown: number }) {
+  if (total <= 0 || shown <= 0) return null
+  const toJa = (value: number): string => value.toLocaleString('ja-JP')
+  const pageCount = Math.max(1, Math.ceil(total / REDEMPTIONS_PAGE_SIZE))
+  if (pageCount === 1) {
+    return (
+      <p className="text-ink-faint mt-3 text-xs">
+        要対応の交換 {toJa(total)}つをすべて表示
+      </p>
+    )
+  }
+  const current = Math.min(Math.max(1, page), pageCount)
+  const from = (current - 1) * REDEMPTIONS_PAGE_SIZE + 1
+  const to = Math.min(total, (current - 1) * REDEMPTIONS_PAGE_SIZE + shown)
+  return (
+    <p className="text-ink-faint mt-3 text-xs">
+      要対応の交換 {toJa(total)}つ中 {toJa(from)}〜{toJa(to)}を表示
+    </p>
+  )
+}
+
 export default function MileageRewardsTab({ accountId }: { accountId: string | null }) {
   const [overview, setOverview] = useState<MileageRewardAdminOverview | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -102,8 +146,18 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
   const [actionError, setActionError] = useState('')
   const [failedRedemptions, setFailedRedemptions] = useState<FailedRedemption[]>([])
   const [redemptionsVisible, setRedemptionsVisible] = useState(false)
+  const [redemptionsLoad, setRedemptionsLoad] = useState<RedemptionsLoad>('loading')
+  const [redemptionsPage, setRedemptionsPage] = useState(1)
+  const [redemptionsTotal, setRedemptionsTotal] = useState(0)
+  const [redemptionsNotice, setRedemptionsNotice] = useState<{ tone: 'success' | 'info'; message: string } | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')
+  /*
+   * やり直しの閉じ込めが読む今のページ。stateのままだと押したときの
+   * 古いページで読み直し、返却で行が消えたあとも古い offset に残る。
+   */
+  const redemptionsPageRef = useRef(1)
+  useEffect(() => { redemptionsPageRef.current = redemptionsPage }, [redemptionsPage])
   /*
    * 店を A→B と切り替えたとき、遅れて届いた A の応答で B を上書きしない。
    * 世代札を取って、入れる直前に今の世代か確かめる。
@@ -133,6 +187,8 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
     retryLock.reset()
     setRetryingId(null)
     setRetryError('')
+    setRedemptionsPage(1)
+    setRedemptionsNotice(null)
   }, [accountId, accountTracker, retryLock])
 
   const load = useCallback(async () => {
@@ -165,37 +221,63 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
   useEffect(() => { void load() }, [load])
 
   /*
-   * 届かなかった交換の一覧。**使い道の一覧とは別に読む。**
-   * こちらが取れなくても使い道は出す。取れないときに「0件」と書くと、
-   * 届いていない交換が無いことになってしまうので、欄ごと出さない。
+   * 要対応の交換の一覧。**使い道の一覧とは別に読む。**
+   * こちらが取れなくても使い道は出す。取れないときに欄ごと消すと、
+   * 見えていない失敗を「対応不要」と誤認する（R366）。0件のときだけ
+   * 欄を出さず、失敗・権限不足は理由と再読み込みを出す。
+   * 21件以上あっても残りを出せるよう、ページ送りで読む（R365）。
    */
-  const loadFailedRedemptions = useCallback(async () => {
+  const loadFailedRedemptions = useCallback(async (page: number) => {
     const requestId = redemptionsGuard.issue()
     if (!accountId) {
       if (!redemptionsGuard.isCurrent(requestId)) return
       setFailedRedemptions([])
       setRedemptionsVisible(false)
+      setRedemptionsLoad('loading')
+      setRedemptionsTotal(0)
       return
     }
+    setRedemptionsLoad('loading')
     try {
+      const offset = (Math.max(1, page) - 1) * REDEMPTIONS_PAGE_SIZE
       const response = await fetchApi<ApiResponse<RedemptionHistory>>(
-        `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`,
+        `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`
+        + `&limit=${REDEMPTIONS_PAGE_SIZE}&offset=${offset}`,
       )
       if (!redemptionsGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.items)) throw new Error('malformed')
+      // 成功済み・返金済みを並べると、やり直しの押し間違いの素になる。
+      // 失敗中と送ったか分からない配送中（照合待ち）だけ並べる。
       setFailedRedemptions(
-        response.data.items.filter((item) => item.status === 'delivery_failed'),
+        response.data.items.filter(
+          (item) => item.status === 'delivery_failed' || item.status === 'delivering',
+        ),
       )
+      const total = response.data.pagination?.total ?? 0
+      const limit = response.data.pagination?.limit || REDEMPTIONS_PAGE_SIZE
+      const serverOffset = response.data.pagination?.offset ?? offset
+      setRedemptionsTotal(total)
+      // 返却で行が消え、今のページが空になったら1ページ目へ戻す。
+      if (response.data.items.length === 0 && total > 0 && Math.max(1, page) > 1) {
+        setRedemptionsPage(1)
+      } else {
+        setRedemptionsPage(Math.floor(serverOffset / limit) + 1)
+      }
       setRedemptionsVisible(true)
-    } catch {
+      setRedemptionsLoad('ready')
+    } catch (reason) {
       if (!redemptionsGuard.isCurrent(requestId)) return
       setFailedRedemptions([])
-      setRedemptionsVisible(false)
+      setRedemptionsVisible(true)
+      setRedemptionsTotal(0)
+      const forbidden = reason instanceof ApiError
+        && (reason.status === 403 || reason.code === 'forbidden')
+      setRedemptionsLoad(forbidden ? 'forbidden' : 'error')
     }
   }, [accountId, redemptionsGuard])
 
-  useEffect(() => { void loadFailedRedemptions() }, [loadFailedRedemptions])
+  useEffect(() => { void loadFailedRedemptions(redemptionsPage) }, [loadFailedRedemptions, redemptionsPage])
 
   /*
    * 届かなかった交換のやり直し。**押した指が離れる前に止める。**
@@ -217,14 +299,9 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
     const operation = accountTracker.track(startedAccountId)
     setRetryingId(redemption.id)
     setRetryError('')
-    try {
-      const response = await fetchApi<ApiResponse<unknown>>(
-        `/api/mileage/redemptions/${encodeURIComponent(redemption.id)}/retry-fulfillment`,
-        { method: 'POST', body: JSON.stringify({ accountId: startedAccountId }) },
-      )
-      if (!response.success) throw new Error(response.error)
-      if (!accountTracker.isCurrent(operation)) return
-      await loadFailedRedemptions()
+    setRedemptionsNotice(null)
+    const reloadLists = async () => {
+      await loadFailedRedemptions(redemptionsPageRef.current)
       /*
        * 1つ目の再取得を待っている間に B へ切り替わることがある。
        * ここで確かめず 2つ目を読むと、古い閉じ込めが新しい世代として
@@ -232,9 +309,42 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
        */
       if (!accountTracker.isCurrent(operation)) return
       await load()
+    }
+    try {
+      const response = await fetchApi<RetryFulfillmentResponse>(
+        `/api/mileage/redemptions/${encodeURIComponent(redemption.id)}/retry-fulfillment`,
+        { method: 'POST', body: JSON.stringify({ accountId: startedAccountId }) },
+      )
+      if (!accountTracker.isCurrent(operation)) return
+      /*
+       * R367: やり直しの返事が success:false でも、交換の状態が変わって
+       * いればそのとおりに案内する。返却完了を「やり直せませんでした」
+       * と出さず、古い行は一覧の読み直しで外す。
+       */
+      const redemptionStatus = response.data?.redemption?.status
+      const serverMessage = typeof response.data?.message === 'string'
+        && response.data.message.trim()
+        ? response.data.message
+        : null
+      if (!response.success && redemptionStatus === 'refunded') {
+        setRedemptionsNotice({
+          tone: 'success',
+          message: serverMessage ?? '交換したマイルを戻しました。',
+        })
+      } else if (!response.success && redemptionStatus === 'delivering') {
+        setRedemptionsNotice({
+          tone: 'info',
+          message: serverMessage ?? '特典の送信結果を確認しています。確定するまでお待ちください。',
+        })
+      } else if (!response.success) {
+        throw new Error(response.error)
+      }
+      await reloadLists()
     } catch {
       if (!accountTracker.isCurrent(operation)) return
       setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。')
+      // 押した間に状態が変わっていることがあるので、一覧は読み直す。
+      await loadFailedRedemptions(redemptionsPageRef.current)
     } finally {
       retryLock.release(redemption.id)
       if (accountTracker.isCurrent(operation)) setRetryingId(null)
@@ -436,53 +546,98 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       )}
 
       {/*
-        届かなかった交換。**マイルは減ったまま、特典だけ届いていないもの。**
-        やり直してもマイルはもう減らない（口が同じ交換IDを続ける）。
-        取れなかったときは欄ごと出さない。「0件」と書くと見落とす。
+        要対応の交換。**マイルは減ったまま、特典が届いていないか、
+        届いたか分からないもの。** やり直してもマイルはもう減らない
+        （口が同じ交換IDを続ける）。0件のときだけ欄を出さない。
+        取れないときは理由と再読み込みを出す（R366）。
       */}
-      {redemptionsVisible && failedRedemptions.length > 0 && (
-        <section aria-label="届かなかった交換">
-          <h2 className="text-ink text-sm font-bold">届かなかった交換</h2>
+      {redemptionsNotice ? (
+        <Notice tone={redemptionsNotice.tone} message={redemptionsNotice.message} />
+      ) : null}
+      {redemptionsVisible && (failedRedemptions.length > 0 || redemptionsLoad === 'error' || redemptionsLoad === 'forbidden') && (
+        <section aria-label="要対応の交換">
+          <h2 className="text-ink text-sm font-bold">要対応の交換</h2>
           <p className="text-ink-faint mt-1 text-xs leading-5">
-            マイルは減ったまま、特典だけ届いていない交換です。やり直してもマイルはもう減りません。
+            マイルは減ったまま、特典が届いていないか、届いたか分からない交換です。やり直してもマイルはもう減りません。
           </p>
           {retryError ? <Notice tone="danger" message={retryError} className="mt-3" /> : null}
-          <div className="mt-3">
-            <DataTable>
-              <thead>
-                <TableHeadRow>
-                  <Th>使い道</Th>
-                  <Th>届かなかった理由</Th>
-                  <Th align="right">試した回数</Th>
-                  <Th>最後の更新</Th>
-                  <Th align="right">操作</Th>
-                </TableHeadRow>
-              </thead>
-              <tbody className="divide-hairline divide-y">
-                {failedRedemptions.map((item) => (
-                  <Tr key={item.id}>
-                    <Td>
-                      <p className="text-ink font-semibold">{item.rewardName}</p>
-                    </Td>
-                    <Td>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</Td>
-                    <Td align="right" className="tabular-nums">{item.attemptCount.toLocaleString('ja-JP')}回</Td>
-                    <Td>{formatMileageDate(item.updatedAt)}</Td>
-                    <Td align="right">
-                      <Button
-                        disabled={retryingId !== null}
-                        onClick={() => void retryRedemption(item)}
-                      >
-                        {retryingId === item.id ? 'やり直しています' : 'もう一度届ける'}
-                      </Button>
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </DataTable>
-            <p className="text-ink-faint mt-3 text-xs">
-              届かなかった交換 {failedRedemptions.length}つをすべて表示
-            </p>
-          </div>
+          {redemptionsLoad === 'error' || redemptionsLoad === 'forbidden' ? (
+            <div className="mt-3">
+              <ListState
+                kind={redemptionsLoad}
+                description={redemptionsLoad === 'forbidden'
+                  ? '要対応の交換を見る権限がありません。オーナーか管理者に確認してください。'
+                  : '要対応の交換を読み込めませんでした。'}
+                onRetry={redemptionsLoad === 'error'
+                  ? () => void loadFailedRedemptions(redemptionsPageRef.current)
+                  : undefined}
+              />
+            </div>
+          ) : (
+            <div className="mt-3">
+              <DataTable>
+                <thead>
+                  <TableHeadRow>
+                    <Th>使い道</Th>
+                    <Th className="w-24">状態</Th>
+                    <Th>届かなかった理由</Th>
+                    <Th align="right">試した回数</Th>
+                    <Th>最後の更新</Th>
+                    <Th align="right">操作</Th>
+                  </TableHeadRow>
+                </thead>
+                <tbody className="divide-hairline divide-y">
+                  {redemptionsLoad === 'loading' && failedRedemptions.length === 0
+                    ? <TableStateRow colSpan={6} kind="loading" />
+                    : failedRedemptions.map((item) => (
+                      <Tr key={item.id}>
+                        <Td>
+                          <p className="text-ink truncate font-semibold" title={item.rewardName}>{item.rewardName}</p>
+                        </Td>
+                        <Td>
+                          {item.status === 'delivering' ? (
+                            <span className="text-ink-secondary inline-flex items-center gap-1 whitespace-nowrap">
+                              確認中
+                              <HelpTip label="確認中の説明">
+                                送った結果が分からず、確定を確認しています。二重に送らないよう自動では動かしていません。
+                              </HelpTip>
+                            </span>
+                          ) : (
+                            <span className="text-ink-secondary whitespace-nowrap">届いていない</span>
+                          )}
+                        </Td>
+                        <Td>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</Td>
+                        <Td align="right" className="tabular-nums">{item.attemptCount.toLocaleString('ja-JP')}回</Td>
+                        <Td>{formatMileageDate(item.updatedAt)}</Td>
+                        <Td align="right">
+                          <Button
+                            disabled={retryingId !== null}
+                            onClick={() => void retryRedemption(item)}
+                          >
+                            {retryingId === item.id ? 'やり直しています' : 'もう一度届ける'}
+                          </Button>
+                        </Td>
+                      </Tr>
+                    ))}
+                </tbody>
+              </DataTable>
+              <RedemptionsCount
+                total={redemptionsTotal}
+                page={redemptionsPage}
+                shown={failedRedemptions.length}
+              />
+              {Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE) > 1 ? (
+                <div className="mt-3 flex justify-center">
+                  <Pagination
+                    page={redemptionsPage}
+                    pageCount={Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE)}
+                    onPageChange={(next) => setRedemptionsPage(next)}
+                    ariaLabel="要対応の交換のページ送り"
+                  />
+                </div>
+              ) : null}
+            </div>
+          )}
         </section>
       )}
     </div>
