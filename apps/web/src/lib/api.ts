@@ -2322,6 +2322,33 @@ export type AnalyticsReportSchedule = {
   createdAt: string
   updatedAt: string
 }
+// R454: 定期レポートの実行履歴（失敗理由・宛先別結果）。
+export type AnalyticsReportDelivery = {
+  channel: string
+  recipient: string
+  status: 'sent' | 'failed' | 'skipped'
+  reason?: string
+}
+export type AnalyticsReportRun = {
+  id: string
+  scheduleId: string
+  lineAccountId: string
+  scheduledFor: string
+  periodFrom: string
+  periodTo: string
+  timeZone: string
+  dataCutoffAt: string
+  state: 'running' | 'available' | 'partial' | 'unavailable' | 'failed'
+  result: unknown
+  deliveryResults: AnalyticsReportDelivery[]
+  errorCode: string | null
+  startedAt: string
+  completedAt: string | null
+}
+export type RecentOneTimeReport = {
+  schedule: AnalyticsReportSchedule
+  lastRun: AnalyticsReportRun | null
+}
 export type AnalyticsReportScheduleOptions = {
   timeZone: string
   savedAnalyses: Array<{ id: string; name: string; kind: 'cross' | 'funnel' }>
@@ -6753,7 +6780,7 @@ export const api = {
   analytics: {
     reportSchedules: {
       list: (accountId: string) =>
-        fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; options: AnalyticsReportScheduleOptions }>>(
+        fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; recentOneTime?: RecentOneTimeReport[]; options: AnalyticsReportScheduleOptions }>>(
           `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         ),
       create: (accountId: string, data: Omit<
@@ -6776,6 +6803,15 @@ export const api = {
       }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
         `/api/analytics/report-schedules/${encodeURIComponent(id)}/status?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
+      ),
+      // R454: しまった1回送信も依頼IDで履歴を引く・送り直す。
+      runs: (accountId: string, id: string) =>
+        fetchApi<ApiResponse<{ schedule: AnalyticsReportSchedule; runs: AnalyticsReportRun[] }>>(
+          `/api/analytics/report-schedules/${encodeURIComponent(id)}/runs?account_id=${encodeURIComponent(accountId)}`,
+        ),
+      retry: (accountId: string, id: string) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}/retry?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({}) },
       ),
     },
     friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
