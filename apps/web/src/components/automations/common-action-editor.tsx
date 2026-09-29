@@ -56,11 +56,18 @@ export default function CommonActionEditor({
   value,
   resources,
   onChange,
+  stepNumbers,
 }: {
   value: CommonActionStep[]
   resources: CommonActionResources
   onChange: (next: CommonActionStep[]) => void
+  /*
+   * 監査 R474: 分岐を挟むときの実行順の番号表（処理ID→全体の番号）。
+   * 無ければ従来どおりこの欄だけの連番。見た目と動きは変えない。
+   */
+  stepNumbers?: Record<string, number>
 }) {
+  const numberOf = (index: number, step: CommonActionStep) => stepNumbers?.[step.id] ?? index + 1
   const update = (index: number, patch: Partial<CommonActionStep>) => {
     onChange(value.map((step, stepIndex) => stepIndex === index ? { ...step, ...patch } : step))
   }
@@ -77,15 +84,15 @@ export default function CommonActionEditor({
       {value.map((step, index) => (
         <section key={step.id} className="border-hairline rounded-card border bg-canvas p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className="text-ink font-semibold">{index + 1}. {ACTION_OPTIONS.find((item) => item.value === step.type)?.label}</h3>
+            <h3 className="text-ink font-semibold">{numberOf(index, step)}. {ACTION_OPTIONS.find((item) => item.value === step.type)?.label}</h3>
             <div className="flex items-center gap-1">
-              <IconButton onClick={() => move(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目の処理を上へ`}>
+              <IconButton onClick={() => move(index, -1)} disabled={index === 0} aria-label={`${numberOf(index, step)}番目の処理を上へ`}>
                 <ArrowUp size={16} aria-hidden />
               </IconButton>
-              <IconButton onClick={() => move(index, 1)} disabled={index === value.length - 1} aria-label={`${index + 1}番目の処理を下へ`}>
+              <IconButton onClick={() => move(index, 1)} disabled={index === value.length - 1} aria-label={`${numberOf(index, step)}番目の処理を下へ`}>
                 <ArrowDown size={16} aria-hidden />
               </IconButton>
-              <IconButton onClick={() => onChange(value.filter((_, stepIndex) => stepIndex !== index))} aria-label={`${index + 1}番目の処理を削除`}>
+              <IconButton onClick={() => onChange(value.filter((_, stepIndex) => stepIndex !== index))} aria-label={`${numberOf(index, step)}番目の処理を削除`}>
                 <Trash2 size={16} aria-hidden />
               </IconButton>
             </div>

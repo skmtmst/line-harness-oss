@@ -2367,6 +2367,8 @@ export type CommonActionVersion = {
   versionNumber: number;
   status: 'draft' | 'published';
   actions: CommonActionStep[];
+  /* 監査 R473・R477: 保存ごとに進む改訂番号。 */
+  draftRevision: number;
   createdBy: string | null;
   createdAt: string;
   publishedAt: string | null;
@@ -2383,6 +2385,9 @@ export type CommonActionBinding = {
   hasNewerVersion: boolean;
   runningCount: number | null;
   waitingCount: number | null;
+  /* 監査 R471: 切替後に旧版のまま進んでいる実行。現在版の件数とは分ける。 */
+  olderRunningCount: number | null;
+  olderWaitingCount: number | null;
   updatedAt: string;
 };
 
@@ -10367,14 +10372,21 @@ export const api = {
         pagination?: { total: number; limit: number | null; offset: number }
         summary?: {
           total: number; published: number; draft: number; oldVersion: number; unused: number;
+          archived: number;
           actions: number; bindings: number; outdated: number; outdatedItems: number;
           executions: number; failures: number;
         }
         freshness?: 'available'
       }>(`/api/common-actions?${query}`);
     },
-    csvUrl: (accountId: string) =>
-      `${API_URL}/api/common-actions?account_id=${encodeURIComponent(accountId)}&format=csv`,
+    // 監査 R464: 一覧の検索・絞り込みをそのまま渡す。付けないと
+    // 「絞り込んだつもりが全件」になる。status=all・空queryは付けない。
+    csvUrl: (params: { accountId: string; status?: string; query?: string }) => {
+      const query = new URLSearchParams({ account_id: params.accountId, format: 'csv' });
+      if (params.status && params.status !== 'all') query.set('status', params.status);
+      if (params.query?.trim()) query.set('query', params.query.trim());
+      return `${API_URL}/api/common-actions?${query}`;
+    },
     get: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonActionDetail>>(
         `/api/common-actions/${id}?account_id=${encodeURIComponent(accountId)}`,
@@ -10384,16 +10396,31 @@ export const api = {
         `/api/common-actions/${id}/duplicate?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: '{}' },
       ),
+    // 監査 R480: 未使用の共通アクションを保管する。利用中はサーバが拒否する。
+    archive: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ archived: true }>>(
+        `/api/common-actions/${id}/archive?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    unarchive: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ unarchived: true }>>(
+        `/api/common-actions/${id}/unarchive?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    // 監査 R475: 初回保存から再試行まで同じ鍵を送り、二重作成にしない。
     create: (accountId: string, data: {
       name: string;
       description?: string | null;
       actions: CommonActionStep[];
+      clientRequestKey: string;
     }) => fetchApi<ApiResponse<{ id: string; draftVersionId: string; versionNumber: number }>>(
       `/api/common-actions?account_id=${encodeURIComponent(accountId)}`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
+    // 監査 R473: 保存ごとに進む改訂番号を照合する。古い画面の保存は409で止まる。
     updateDraft: (id: string, accountId: string, data: {
       expectedDraftVersionId: string;
+      expectedDraftRevision: number;
       name: string;
       description?: string | null;
       actions: CommonActionStep[];
@@ -10406,16 +10433,22 @@ export const api = {
         `/api/common-actions/${id}/versions?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify({ fromVersionId }) },
       ),
-    publish: (id: string, accountId: string, versionId: string) =>
+    // 監査 R477: 公開確認に使った改訂番号を照合する。読取後の保存があれば409で止まる。
+    publish: (id: string, accountId: string, versionId: string, expectedDraftRevision: number) =>
       fetchApi<ApiResponse<{ versionId: string; versionNumber: number }>>(
         `/api/common-actions/${id}/versions/${versionId}/publish?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: '{}' },
+        { method: 'POST', body: JSON.stringify({ expectedDraftRevision }) },
       ),
-    updateBinding: (id: string, accountId: string, bindingId: string, versionId: string) =>
-      fetchApi<ApiResponse<{ updated: true }>>(
-        `/api/common-actions/${id}/bindings/${bindingId}/version?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ versionId }) },
-      ),
+    // 監査 R467: 比較に使った現在版IDを更新要求にも渡す。無いと422で
+    // 利用者が解消できない。先に別担当が切り替えたら409で再確認へ導く。
+    updateBinding: (
+      id: string,
+      accountId: string,
+      data: { bindingId: string; versionId: string; expectedVersionId: string },
+    ) => fetchApi<ApiResponse<{ updated: true }>>(
+      `/api/common-actions/${id}/bindings/${data.bindingId}/version?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify({ versionId: data.versionId, expectedVersionId: data.expectedVersionId }) },
+    ),
   },
   chatStats: {
     get: () => fetchApi<ApiResponse<InboxStats>>('/api/chats/stats'),

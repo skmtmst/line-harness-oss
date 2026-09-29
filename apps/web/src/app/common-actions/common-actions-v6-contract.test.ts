@@ -50,13 +50,24 @@ describe('V6共通アクションの画面契約', () => {
 
   it('条件分岐はタグ条件と両方の公開版を保存・実行契約へ接続する', () => {
     expect(CREATE + EDIT).toContain('<BranchEditors')
-    expect(BRANCH_EDITOR).toContain('条件のタグ')
+    expect(BRANCH_EDITOR).toContain('条件の組み合わせ')
     expect(BRANCH_EDITOR).toContain('当てはまるとき')
     expect(BRANCH_EDITOR).toContain('当てはまらないとき')
     expect(WORKER).toContain("'branch'")
     expect(WORKER).toContain('branch_too_deep')
     expect(ENGINE).toContain("type: 'branch_marker'")
     expect(ENGINE).toContain('branch_not_selected')
+  })
+
+  it('分岐の編集で非表示の条件・子処理を消さない（監査 R474・R476）', () => {
+    // R474: 通常処理の編集で分岐の位置を保ち、番号は実行順で一致させる。
+    expect(CREATE + EDIT).toContain('mergeOrderedActions')
+    expect(CREATE + EDIT).toContain('stepNumbers')
+    expect(EDITOR).toContain('stepNumbers')
+    // R476: 全条件・両側の全処理を出し、対象だけ更新する。読めない構造は残す。
+    expect(BRANCH_EDITOR).toContain('updateBranchStep')
+    expect(BRANCH_EDITOR).toContain('ここでは変えられません')
+    expect(BRANCH_EDITOR).toContain('すべてに当てはまる')
   })
 
   it('利用版の変更前に差分と進行中への影響を確認する', () => {
@@ -77,7 +88,15 @@ describe('V6共通アクションの画面契約', () => {
   it('一覧の集計・絞り込み・CSVを新しい契約へ接続する', () => {
     expect(LIST).toContain('summary?.executions')
     expect(LIST).toContain('summary?.failures')
-    expect(LIST).toContain('api.commonActions.csvUrl(selectedAccountId)')
+    // 監査 R464: CSVは一覧の検索・絞り込みを引き継ぎ、範囲と件数を事前に出す。
+    expect(LIST).toContain('api.commonActions.csvUrl({')
+    expect(LIST).toContain('status: filter')
+    expect(LIST).toContain('query: deferredQuery')
+    expect(LIST).toContain('この条件の')
+    expect(LIST).toContain('条件に合う共通アクションがないため書き出せません')
+    // 監査 R466: 書き出し権限のない担当者にリンク自体を出さない。
+    expect(LIST).toContain('canExportCsv')
+    expect(LIST).toContain('useAutomationRunPermissions')
     expect(LIST).toContain('古い版あり')
     expect(LIST).toContain('limit: PAGE_SIZE')
     expect(LIST).toContain('offset: (page - 1) * PAGE_SIZE')
@@ -89,6 +108,50 @@ describe('V6共通アクションの画面契約', () => {
     expect(PERMISSION).toContain("role === 'owner' || role === 'admin'")
     expect(CREATE + EDIT).toContain('共通アクションは閲覧のみです')
     expect(LIST + VERSIONS).toContain('canManage')
+  })
+
+  it('利用先の更新は現在版IDを渡し失敗は確認窓内に出す（監査 R467）', () => {
+    // 通常UIから expectedVersionId なしでは422で詰む。比較に使った現在版を渡す。
+    expect(API).toContain('expectedVersionId')
+    expect(VERSIONS).toContain('expectedVersionId: pendingBinding.versionId')
+    // 失敗理由は操作中の確認窓内に表示する（ページ本文だけにしない）。
+    expect(VERSIONS).toContain('dialogError')
+  })
+
+  it('利用先ごとの件数と旧版の残りを分けて出す（監査 R471・R472）', () => {
+    expect(WORKER).toContain('older_running_count')
+    expect(WORKER).toContain('consumer_path')
+    expect(API).toContain('olderRunningCount')
+    expect(VERSIONS).toContain('olderRunningCount')
+    expect(VERSIONS).toContain('旧版のまま進行中')
+  })
+
+  it('下書き保存・公開は改訂番号を照合する（監査 R473・R477）', () => {
+    expect(API).toContain('expectedDraftRevision')
+    expect(EDIT).toContain('expectedDraftRevision: draftRevision')
+    expect(EDIT).toContain('最新の内容を読み込み直す')
+    expect(VERSIONS).toContain('version.draftRevision')
+  })
+
+  it('新規作成は再試行鍵を持ち二重作成にしない（監査 R475）', () => {
+    expect(API).toContain('clientRequestKey')
+    expect(CREATE).toContain('clientRequestKey: requestKey')
+  })
+
+  it('確認後の参照先更新は再確認なしで公開しない（監査 R479）', () => {
+    expect(WORKER).toContain('reference_updated')
+    expect(WORKER).toContain('新しい版があります')
+    expect(WORKER).toContain('keepPins')
+  })
+
+  it('未使用は保管でき利用中は理由を示して止まる（監査 R480）', () => {
+    expect(LIST).toContain('保管する')
+    expect(LIST).toContain('保管を戻す')
+    expect(LIST).toContain('api.commonActions.archive')
+    expect(LIST).toContain('api.commonActions.unarchive')
+    expect(LIST).toContain("value: 'archived'")
+    expect(WORKER).toContain('binding_exists')
+    expect(API).toContain('archive:')
   })
 
   it('版操作は店が外れていたら実行しない (#580)', () => {

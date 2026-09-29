@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
@@ -18,12 +18,14 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import { useAutomationRunPermissions } from '@/components/automations/use-can-manage'
 import { useManualHref } from '@/lib/use-manual-href'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
+import Dialog from '@/components/shared/dialog'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
-type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused'
+type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 const PAGE_SIZE = 6
 
 const FILTERS: Array<{ value: Filter; label: string }> = [
@@ -32,6 +34,8 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'draft', label: '下書き' },
   { value: 'old_version', label: '古い版あり' },
   { value: 'unused', label: '呼ばれていない' },
+  // 監査 R480: 保管済みは通常一覧に出さない。この札で見る・戻す。
+  { value: 'archived', label: '保管' },
 ]
 
 const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
@@ -42,6 +46,13 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
 
 export default function CommonActionsPage() {
   const canManage = useCanManageCommonActions()
+  /*
+   * 監査 R466: 書き出しの権限（automation.run.export）がない担当者には
+   * 出力リンク自体を出さない。押してから403になる誘導をやめる。
+   * 本当の可否はサーバが決める（routeは403を維持）。
+   */
+  const runPermissions = useAutomationRunPermissions()
+  const canExportCsv = runPermissions?.canExport ?? false
   /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
   const manualHref = useManualHref('/common-actions')
   // /common-actions はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
@@ -50,6 +61,7 @@ export default function CommonActionsPage() {
   const [items, setItems] = useState<CommonActionSummary[]>([])
   const [summary, setSummary] = useState<{
     total: number; published: number; draft: number; oldVersion: number; unused: number;
+    archived: number;
     actions: number; bindings: number; outdated: number; outdatedItems: number;
     executions: number; failures: number;
   } | null>(null)
@@ -66,8 +78,14 @@ export default function CommonActionsPage() {
   // 行の「その他」メニューの開き先（#641）
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const router = useRouter()
+  /*
+   * 監査 R465: アカウント・検索・絞り込みを含む取得の世代。取得中に条件が
+   * 変わったら、遅れて届いた古い応答は捨てて現在の一覧を上書きしない。
+   */
+  const requestSeq = useRef(0)
 
   const load = useCallback(async () => {
+    const my = ++requestSeq.current
     if (!selectedAccountId) {
       setItems([])
       setSummary(null)
@@ -90,6 +108,7 @@ export default function CommonActionsPage() {
         api.automations.list({ accountId: selectedAccountId }).catch(() => null),
         api.automations.templates(selectedAccountId).catch(() => null),
       ])
+      if (requestSeq.current !== my) return
       if (response.success) {
         setItems(response.data)
         setTotal(response.pagination?.total ?? response.data.length)
@@ -102,9 +121,10 @@ export default function CommonActionsPage() {
       } : null)
       setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
     } catch (caught) {
+      if (requestSeq.current !== my) return
       setError(caught instanceof Error ? caught.message : '共通アクションを読み込めませんでした')
     } finally {
-      setLoading(false)
+      if (requestSeq.current === my) setLoading(false)
     }
   }, [deferredQuery, filter, page, selectedAccountId])
 
@@ -122,6 +142,10 @@ export default function CommonActionsPage() {
     failures: summary?.failures ?? 0,
   }), [summary])
 
+  /* 監査 R464: 0件の条件では書き出せない。押せる理由がない操作は置かない。 */
+  const csvEmpty = !loading && !error && total === 0
+  const csvScoped = filter !== 'all' || deferredQuery.trim() !== ''
+
   // ★V7 `x63W5x`：集計が取れていない間、絞り込みの件数に 0 を出さない。
   const filterCount = (value: Filter): number | undefined => {
     if (!summary || error) return undefined
@@ -130,6 +154,7 @@ export default function CommonActionsPage() {
     if (value === 'unused') return summary.unused
     if (value === 'published') return summary.published
     if (value === 'draft') return summary.draft
+    if (value === 'archived') return summary.archived
     return undefined
   }
 
@@ -144,6 +169,42 @@ export default function CommonActionsPage() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '共通アクションを複製できませんでした')
       setDuplicatingId(null)
+    }
+  }
+
+  /*
+   * 監査 R480: 未使用なら確認後に保管、利用中は窓内で件数と理由を示して止める。
+   * 保管済みは同じ窓で戻せる。権限なしの操作はサーバでも拒否する。
+   */
+  const [archiving, setArchiving] = useState<{ item: CommonActionSummary; mode: 'archive' | 'unarchive' } | null>(null)
+  const [archivingBusy, setArchivingBusy] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
+
+  const openArchiveDialog = (item: CommonActionSummary, mode: 'archive' | 'unarchive') => {
+    setArchiveError('')
+    setArchiving({ item, mode })
+  }
+
+  const confirmArchive = async () => {
+    if (!archiving || !selectedAccountId || archivingBusy) return
+    // 利用中は理由を示すだけで実行しない（押せない操作に見せかけない）。
+    if (archiving.mode === 'archive' && archiving.item.bindingCount > 0) {
+      setArchiving(null)
+      return
+    }
+    setArchivingBusy(true)
+    setArchiveError('')
+    try {
+      const response = archiving.mode === 'archive'
+        ? await api.commonActions.archive(archiving.item.id, selectedAccountId)
+        : await api.commonActions.unarchive(archiving.item.id, selectedAccountId)
+      if (!response.success) throw new Error(response.error)
+      setArchiving(null)
+      await load()
+    } catch (caught) {
+      setArchiveError(caught instanceof Error ? caught.message : '操作を完了できませんでした')
+    } finally {
+      setArchivingBusy(false)
     }
   }
 
@@ -216,7 +277,26 @@ export default function CommonActionsPage() {
       */}
       <div className="my-3 flex flex-wrap items-center gap-2">
         {canManage ? <Button href="/common-actions/new" variant="primary">＋ 共通アクションを作る</Button> : null}
-        {selectedAccountId ? <Button href={api.commonActions.csvUrl(selectedAccountId)}>CSVで書き出す</Button> : null}
+        {/*
+          監査 R464: 「この条件の結果を書き出す」が既定。検索・絞り込みを
+          そのまま渡し、実行前に範囲と件数が分かる文を添える。
+        */}
+        {canExportCsv && selectedAccountId ? (
+          csvEmpty ? (
+            <Button disabled title="条件に合う共通アクションがないため書き出せません">CSVで書き出す</Button>
+          ) : (
+            <Button href={api.commonActions.csvUrl({
+              accountId: selectedAccountId,
+              status: filter === 'all' ? undefined : filter,
+              query: deferredQuery.trim() || undefined,
+            })}>CSVで書き出す</Button>
+          )
+        ) : null}
+        {canExportCsv && selectedAccountId && !loading && !error ? (
+          <span className="text-xs text-ink-faint">
+            {csvScoped ? `この条件の${total}件を書き出します` : `全${total}件を書き出します`}
+          </span>
+        ) : null}
       </div>
 
       {/*
@@ -304,7 +384,14 @@ export default function CommonActionsPage() {
                     ) : null}
                   </Td>
                   <Td>
-                    {item.publishedVersion ? `v${item.publishedVersion}` : '—'}
+                    {/* 短い文字列は途中で折らない。版と札は1行ずつ出す。 */}
+                    <span className="block truncate" title={item.publishedVersion ? `v${item.publishedVersion}` : undefined}>
+                      {item.publishedVersion ? `v${item.publishedVersion}` : '—'}
+                    </span>
+                    {/* 監査 R470: 公開版と下書きが両方あるとき、下書きの存在も識別できるようにする。 */}
+                    {item.status === 'published' && item.draftVersion != null ? (
+                      <span className="text-ink-faint block truncate text-xs" title={`下書きv${item.draftVersion}を編集中`}>下書きあり</span>
+                    ) : null}
                   </Td>
                   <ActionCell>
                     {/* #641: 「中身を見る」＋「その他（…）」の形にそろえる。残りはメニューへ集約。 */}
@@ -331,6 +418,17 @@ export default function CommonActionsPage() {
                           ariaLabel={`${item.name}の操作`}
                           onClose={() => setOpenMenuId(null)}
                           items={[
+                            item.status === 'archived'
+                              ? {
+                                  id: 'unarchive',
+                                  label: '保管を戻す',
+                                  onSelect: () => openArchiveDialog(item, 'unarchive'),
+                                }
+                              : {
+                                  id: 'archive',
+                                  label: '保管する',
+                                  onSelect: () => openArchiveDialog(item, 'archive'),
+                                },
                             item.status === 'draft'
                               ? {
                                   id: 'publish',
@@ -368,6 +466,29 @@ export default function CommonActionsPage() {
           <Pagination page={page} pageCount={Math.ceil(total / PAGE_SIZE)} onPageChange={setPage} />
         </div>
       ) : null}
+      {/* 監査 R480: 利用中は件数と理由を示して止める。保管済みの閲覧・復元もここ。 */}
+      <Dialog
+        open={Boolean(archiving)}
+        title={archiving?.mode === 'unarchive'
+          ? `「${archiving?.item.name}」の保管を戻しますか`
+          : `「${archiving?.item.name}」を保管しますか`}
+        description={archiving?.mode === 'unarchive'
+          ? '通常一覧に戻ります。実行記録はそのまま残ります。'
+          : '通常一覧から外れます。実行記録は残ります。'}
+        confirmLabel={archiving?.mode === 'unarchive'
+          ? '保管を戻す'
+          : archiving && archiving.item.bindingCount > 0 ? '閉じる' : '保管する'}
+        busy={archivingBusy}
+        onCancel={() => setArchiving(null)}
+        onConfirm={() => void confirmArchive()}
+      >
+        {archiving?.mode === 'archive' && archiving.item.bindingCount > 0 ? (
+          <p className="text-ink-secondary mt-3 text-sm" role="alert">
+            利用中のため保管できません（{archiving.item.bindingCount}か所）。先に利用先を外してください。
+          </p>
+        ) : null}
+        {archiveError ? <p className="text-danger mt-3 text-sm" role="alert">{archiveError}</p> : null}
+      </Dialog>
     </div>
   )
 }

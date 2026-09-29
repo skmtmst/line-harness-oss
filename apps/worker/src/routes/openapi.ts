@@ -2047,6 +2047,32 @@ const spec = {
         },
       },
     },
+    '/api/common-actions/{id}/archive': {
+      post: {
+        tags: ['Common actions'],
+        summary: '未使用の共通アクションを保管する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Archived' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Common action not found in account scope' },
+          '422': { description: 'In use by consumers (binding_exists)' },
+        },
+      },
+    },
+    '/api/common-actions/{id}/unarchive': {
+      post: {
+        tags: ['Common actions'],
+        summary: '保管した共通アクションを戻す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Unarchived' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Common action not found in account scope' },
+          '409': { description: 'Not archived' },
+        },
+      },
+    },
     '/api/common-actions/resources': {
       get: {
         tags: ['Common actions'],
