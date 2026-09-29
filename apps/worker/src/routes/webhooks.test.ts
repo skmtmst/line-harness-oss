@@ -69,6 +69,8 @@ vi.mock('../services/webhook-interactions.js', () => ({
   retryWebhookInteraction: vi.fn(),
   webhookFailureLabel: vi.fn((reason: string | null) => reason ? '安全な失敗理由' : null),
   webhookResponseLabel: vi.fn((row: { status: string }) => row.status === 'failed' ? '処理できませんでした' : '届きました'),
+  // d23d R407: 試しの結果印。実物と同じ形で返す（ラベル化はサービス側の試験で見る）。
+  incomingTestIdempotencyKey: vi.fn((outcome: string) => `incoming-test:${outcome}:uuid-1`),
 }));
 
 // Stub fireEvent to keep receive-endpoint tests focused on signature
@@ -1251,9 +1253,71 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
     // 試しは実行しない。行動の実行と受領の予約は呼ばれない。
     expect(executeIncomingWebhookActions).not.toHaveBeenCalled();
     // 結果はやり取り台帳へ test 種別で分けて残る(v6-26 §9)。
+    // d23d R407: 試算の結果（照合できた）を記録へ残す。試しなので
+    // 相手への応答番号は残さない（実際の受信とは分ける）。
     expect(createWebhookInteraction).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ eventType: 'incoming_webhook.test', direction: 'incoming' }),
+      expect.objectContaining({
+        eventType: 'incoming_webhook.test',
+        direction: 'incoming',
+        triggerSummary: expect.stringContaining('友だちと照合できた'),
+        idempotencyKey: expect.stringMatching(/^incoming-test:matched:/),
+      }),
+    );
+    expect(finishWebhookInteraction).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), ACCOUNT_ID,
+      expect.objectContaining({ status: 'succeeded', responseStatus: null }),
+    );
+  });
+
+  // d23d R407: 照合相手がいない試しを「結びつきました」と記録しない。
+  test.each([
+    [
+      'not_found（照合相手なし）',
+      { match: { status: 'not_found' }, identityAttempts: [], actions: [] },
+      '照合相手がいなかった',
+      'incoming-test:not_found:',
+    ],
+    [
+      'ambiguous（候複数）',
+      { match: { status: 'ambiguous', friendIds: ['f-1', 'f-2'] }, identityAttempts: [], actions: [] },
+      '照合候補が複数あった',
+      'incoming-test:ambiguous:',
+    ],
+    [
+      '行動の確認に失敗',
+      {
+        match: { status: 'matched', friendId: 'friend-a' },
+        identityAttempts: [],
+        actions: [{
+          refIndex: 0,
+          ref: { refKind: 'tag', refId: 'tag-x', refVersionId: null },
+          ok: false,
+          error: '対応していない処理です',
+        }],
+      },
+      '行動の確認で不備があった',
+      'incoming-test:invalid:',
+    ],
+  ])('受け取りの試しの記録は試算の結果を残す: %s', async (_name, preview, summaryPart, keyPrefix) => {
+    vi.mocked(previewIncomingWebhook).mockResolvedValue(preview as never);
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload: { friendId: 'missing' } }),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(createWebhookInteraction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'incoming_webhook.test',
+        triggerSummary: expect.stringContaining(summaryPart as string),
+        idempotencyKey: expect.stringMatching(new RegExp(`^${keyPrefix}`)),
+      }),
     );
   });
 
