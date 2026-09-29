@@ -18,6 +18,7 @@ import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { canEditFeature } from '@/lib/staff-capability'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { bookingMenuError } from '../menu-validation'
@@ -55,6 +56,14 @@ export default function NewBookingMenuPage() {
    * 取得が終わるまで作成できない（DEEP-17: 候補の無いIDを送らないため）。
    */
   const [staffLoadState, setStaffLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** R536: 担当候補の取得失敗。そのまま捨てず、再試行と権限案内に使う。 */
+  const [staffError, setStaffError] = useState<unknown>(null)
+  /**
+   * R535: この作成試行の一意キー。サーバーで保存された直後に応答だけを
+   * 失っても、同じキーでの再送は作り直さず作成済みIDを返す。アカウント
+   * 切替・入力の破棄では新しい試行になるので新しいキーに替える。
+   */
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
   const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
   const [bookingMileage, setBookingMileage] = useState<number | null>(null)
   /**
@@ -82,10 +91,28 @@ export default function NewBookingMenuPage() {
 
   // 担当一覧と店舗設定は別々に取る。片方の失敗・遅延でもう片方を巻き込まない
   // （担当が読めているのに設定待ちで作れない、という止まり方をしない）。
+  // R536: 担当候補だけを取り直す再試行。入力は state に残るので、
+  // 通信復旧後に同じ画面から続けられる。初回取得は下の効果のまま。
+  async function reloadStaff(accountId: string) {
+    setStaffLoadState('loading')
+    setStaffError(null)
+    try {
+      const staffResult = await bookingApi.listStaff(accountId)
+      setStaff(staffResult.staff)
+      setStaffLoadState('ready')
+    } catch (e) {
+      // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
+      setStaff([])
+      setStaffError(e)
+      setStaffLoadState('error')
+    }
+  }
+
   useEffect(() => {
     setStaff([])
     setStoreSettings(null)
     setStaffLoadState('loading')
+    setStaffError(null)
     if (!selectedAccountId) return
     let alive = true
     bookingApi.listStaff(selectedAccountId)
@@ -94,10 +121,11 @@ export default function NewBookingMenuPage() {
         setStaff(staffResult.staff)
         setStaffLoadState('ready')
       })
-      .catch(() => {
+      .catch((e) => {
         // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
         if (alive) {
           setStaff([])
+          setStaffError(e)
           setStaffLoadState('error')
         }
       })
@@ -150,6 +178,9 @@ export default function NewBookingMenuPage() {
     // ものではなくなるので一緒に閉じる。
     setAssigned(new Set())
     setCreatedMenuNeedingStaff(null)
+    // R535: アカウントが変わったら別の作成試行。古いキーを使い回すと、
+    // 別アカウントの再送が前の応答に結び付くので新しいキーに替える。
+    setIdempotencyKey(crypto.randomUUID())
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -272,7 +303,7 @@ export default function NewBookingMenuPage() {
           return '担当スタッフを読み込んでいます。読み込みが終わってから作成してください'
         }
         if (staffLoadState === 'error') {
-          return '担当スタッフを読み込めませんでした。開き直してから作成してください'
+          return '担当スタッフを読み込めませんでした。下の「担当をもう一度読み込む」で読み込んでから作成してください'
         }
         const validationError = bookingMenuError({
           name,
@@ -302,6 +333,9 @@ export default function NewBookingMenuPage() {
         setAutoTagId(null)
         setTagQuery('')
         setCreatedMenuNeedingStaff(null)
+        // R535: 入力を捨てて作り直すときは別の作成試行。古いキーを使い回すと、
+        // 前に作ったメニューの応答が返って新しいメニューが作られない。
+        setIdempotencyKey(crypto.randomUUID())
       }}
       onSave={async () => {
         // DEEP-16: メニューが作成済みなら createMenu は二度と呼ばない。
@@ -327,7 +361,8 @@ export default function NewBookingMenuPage() {
             intake_question: intakeQuestion.trim() || null,
             is_active: isActive ? 1 : 0,
             auto_tag_id: autoTagId,
-            })
+            // R535: 同じ試行の再送は同じキー。応答消失後の再操作で作り直さない。
+            }, idempotencyKey)
           } catch (e) {
             // 選んだ後にタグが消えた場合は Worker が tag_not_found で落とす。
             // 入力は残る(CreatePage が失敗時に初期化しない)ので選び直せる。
@@ -615,9 +650,26 @@ export default function NewBookingMenuPage() {
             担当を読み込んでいます…
           </p>
         ) : staffLoadState === 'error' ? (
-          <p className="text-ink-faint text-sm">
-            担当を読み込めませんでした。開き直してください。
-          </p>
+          <div className="space-y-2">
+            {/*
+             * R536: 403は権限不足で、押しても直らない再試行は出さない。
+             * それ以外は入力を保ったまま同じ画面から取り直せる。
+             */}
+            <p className="text-ink-faint text-sm">
+              {classifyApiFailure(staffError) === 'forbidden'
+                ? '担当スタッフを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                : '担当を読み込めませんでした。入力はそのまま残っています。'}
+            </p>
+            {classifyApiFailure(staffError) !== 'forbidden' && selectedAccountId && (
+              <Button
+                variant="secondary"
+                size="compact"
+                onClick={() => void reloadStaff(selectedAccountId)}
+              >
+                担当をもう一度読み込む
+              </Button>
+            )}
+          </div>
         ) : staff.length === 0 ? (
           <p className="text-ink-faint text-sm">
             まだスタッフが登録されていません。先に予約設定の「担当スタッフ」から登録してください。
