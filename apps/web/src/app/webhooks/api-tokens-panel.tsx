@@ -5,6 +5,7 @@ import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
@@ -332,14 +333,14 @@ export default function ApiTokensPanel() {
                   </HelpTip>
                 </legend>
                 {['tags:read', 'tags:write'].map((scope) => (
-                  <label key={scope} className="text-ink mb-1 flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
+                  <div key={scope} className="mb-1">
+                    <Checkbox
                       checked={scopes.includes(scope)}
-                      onChange={() => toggleScope(scope)}
-                    />
-                    {scopeLabel(scope)}
-                  </label>
+                      onCheckedChange={() => toggleScope(scope)}
+                    >
+                      {scopeLabel(scope)}
+                    </Checkbox>
+                  </div>
                 ))}
               </fieldset>
               <div className="flex flex-wrap gap-2">
