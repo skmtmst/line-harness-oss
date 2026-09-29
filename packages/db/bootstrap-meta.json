@@ -470,7 +470,8 @@
     "510_rich_menu_publish_run_pages.sql",
     "511_restaurant_google_posts.sql",
     "512_restaurant_google_metrics.sql",
-    "513_conversion_approval_freeze.sql"
+    "513_conversion_approval_freeze.sql",
+    "532_webhook_interaction_secret_unavailable.sql"
   ],
-  "migrationCount": 471
+  "migrationCount": 472
 }
