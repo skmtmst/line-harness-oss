@@ -10358,11 +10358,16 @@ export const api = {
         `/api/common-actions/${id}/versions/${versionId}/publish?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: '{}' },
       ),
-    updateBinding: (id: string, accountId: string, bindingId: string, versionId: string) =>
-      fetchApi<ApiResponse<{ updated: true }>>(
-        `/api/common-actions/${id}/bindings/${bindingId}/version?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ versionId }) },
-      ),
+    // 監査 R467: 比較に使った現在版IDを更新要求にも渡す。無いと422で
+    // 利用者が解消できない。先に別担当が切り替えたら409で再確認へ導く。
+    updateBinding: (
+      id: string,
+      accountId: string,
+      data: { bindingId: string; versionId: string; expectedVersionId: string },
+    ) => fetchApi<ApiResponse<{ updated: true }>>(
+      `/api/common-actions/${id}/bindings/${data.bindingId}/version?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify({ versionId: data.versionId, expectedVersionId: data.expectedVersionId }) },
+    ),
   },
   chatStats: {
     get: () => fetchApi<ApiResponse<InboxStats>>('/api/chats/stats'),

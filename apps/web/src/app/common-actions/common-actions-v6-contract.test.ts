@@ -99,6 +99,14 @@ describe('V6共通アクションの画面契約', () => {
     expect(LIST + VERSIONS).toContain('canManage')
   })
 
+  it('利用先の更新は現在版IDを渡し失敗は確認窓内に出す（監査 R467）', () => {
+    // 通常UIから expectedVersionId なしでは422で詰む。比較に使った現在版を渡す。
+    expect(API).toContain('expectedVersionId')
+    expect(VERSIONS).toContain('expectedVersionId: pendingBinding.versionId')
+    // 失敗理由は操作中の確認窓内に表示する（ページ本文だけにしない）。
+    expect(VERSIONS).toContain('dialogError')
+  })
+
   it('版操作は店が外れていたら実行しない (#580)', () => {
     expect(VERSIONS).toContain('if (!selectedAccountId) {')
     expect(VERSIONS).toContain('LINEアカウントを選び直してください')
