@@ -16,6 +16,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { TextField } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
 import {
   ROLE_LABELS,
@@ -130,7 +131,10 @@ function MembersInner() {
         setStepUp({ retry: (token) => submitDialog(value, token) })
         return
       }
-      setDialogError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
+      // M026：原文のまま出さず、共通の状態別案内へ渡す（本人確認の分岐は先に残す）。
+      setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
+        forbidden: '権限者の招待・変更はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+      }))
     } finally {
       setDialogBusy(false)
     }
@@ -145,7 +149,10 @@ function MembersInner() {
       if (!res.success) throw new Error(res.error)
       setNotice(`${member.email} へ招待メールを送り直しました。`)
     } catch (caught) {
-      setActionError(caught instanceof Error && caught.message ? caught.message : '招待メールを送り直せませんでした。')
+      // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
+      setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
+        forbidden: '招待メールの再送はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+      }))
     } finally {
       setResendingId(null)
     }
@@ -454,7 +461,10 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
       setName(response.data.name ?? trimmed)
       setSaved(true)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '統括名を保存できませんでした。')
+      // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
+        forbidden: '統括名の変更は管理者だけができます。必要なときは管理者の方に操作してもらってください。',
+      }))
     } finally {
       setSaving(false)
     }

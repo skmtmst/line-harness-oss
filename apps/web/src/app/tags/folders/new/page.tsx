@@ -12,6 +12,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
 import { useAccount } from '@/contexts/account-context'
 import {
+  folderDeleteErrorMessage,
   folderSaveErrorMessage,
   isCurrentFolderRequest,
   type FolderRequestKey,
@@ -152,7 +153,7 @@ function FolderEditor() {
     } catch (reason) {
       if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
       setDeleteOpen(false)
-      setError(folderSaveErrorMessage(reason instanceof ApiError ? reason.status : undefined))
+      setError(folderDeleteErrorMessage(reason instanceof ApiError ? reason.status : undefined))
     } finally {
       if (isCurrentFolderRequest(activeRequestRef.current, request)) setSaving(false)
     }

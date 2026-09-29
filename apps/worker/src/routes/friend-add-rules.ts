@@ -1296,6 +1296,21 @@ friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'a
     if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_DRAFT_NOT_TESTED') {
       return c.json({ success: false, error: '公開前にテストを成功させてください' }, 409);
     }
+    /*
+     * M008: 存在しない設定の公開は 500 にしない。消した直後などの競合では
+     * 対象の有無を見直し、無いときは 404、あるとき（下書きが無い）は 409。
+     */
+    if (error instanceof Error && (
+      error.message === 'FRIEND_ADD_RULE_NOT_FOUND'
+      || error.message === 'FRIEND_ADD_RULE_DRAFT_NOT_FOUND'
+      || error.message === 'FRIEND_ADD_RULE_NOT_PUBLISHED'
+    )) {
+      const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+      if (!current) {
+        return c.json({ success: false, error: '見つかりません（一覧を読み直してください）' }, 404);
+      }
+      return c.json({ success: false, error: '公開できる下書きがありません。最新の状態を読み直してください' }, 409);
+    }
     throw error;
   }
 });
@@ -1342,10 +1357,25 @@ friendAddRules.delete('/api/friend-add-rules/:id', requireRole('owner', 'admin')
   const accountId = accountIdFrom(c);
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+  /*
+   * M007: 存在しない設定と共通あいさつ（受け皿）を分ける。無いときは 404。
+   */
+  const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+  if (!current) {
+    return c.json({ success: false, error: '見つかりません（一覧を読み直してください）' }, 404);
+  }
+  if (current.is_unknown_route_fallback === 1) {
+    return c.json({ success: false, error: '経路が分からなかった人の設定は削除できません' }, 409);
+  }
   try {
     await archiveFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
     return c.json({ success: true });
   } catch {
+    // 先の確認と更新の間に消えたときは 404。残っているときは受け皿相当の 409。
+    const gone = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+    if (!gone) {
+      return c.json({ success: false, error: '見つかりません（一覧を読み直してください）' }, 404);
+    }
     return c.json({ success: false, error: '経路が分からなかった人の設定は削除できません' }, 409);
   }
 });

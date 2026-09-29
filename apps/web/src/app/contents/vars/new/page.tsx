@@ -14,7 +14,7 @@ import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import RadioCard from '@/components/shared/radio-card'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 
@@ -663,15 +663,7 @@ function NewCommonVarInner() {
         )}
       />
 
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、入力した共通情報は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した共通情報" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

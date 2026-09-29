@@ -21,7 +21,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { TEMPLATES } from '@/lib/rich-menu-templates'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { pruneCondition } from '@/lib/segment-condition'
 
 /**
@@ -263,15 +263,7 @@ export default function NewRichMenuPage() {
           setMediaPickerOpen(false)
         }}
       />
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="入力中の内容があります"
-        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="入力を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

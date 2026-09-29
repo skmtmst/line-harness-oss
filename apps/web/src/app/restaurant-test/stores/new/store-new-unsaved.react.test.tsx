@@ -54,7 +54,7 @@ describe('R161: 店舗追加の書きかけがある間の離脱確認', () => {
     await screen.findByText('保存していない変更があります')
     expect(fixture.routerPush).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: '入力を続ける' }))
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
     await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
     expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('渋谷店')
   })

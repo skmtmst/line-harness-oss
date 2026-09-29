@@ -36,6 +36,8 @@ const mocks = {
   getFriendById: vi.fn(),
   setFriendFieldValue: vi.fn(),
   setFriendFieldValuesBulk: vi.fn(),
+  // M046: 単票 PUT は1件ずつ書かず、1人の複数項目を1回の batch で書く。
+  setFriendFieldValuesForFriend: vi.fn(),
   jstNow: () => '2026-09-14T00:00:00.000+09:00',
   recordLoginAudit: vi.fn(),
   validateFriendFieldValue: vi.fn(),
@@ -657,6 +659,7 @@ describe('友だちのLINEアカウント境界', () => {
     expect(res.status).toBe(404);
     expect(mocks.getFriendFieldsWithValues).not.toHaveBeenCalled();
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).not.toHaveBeenCalled();
   });
 });
 
@@ -954,20 +957,17 @@ describe('値の型検証（N-042 単票）', () => {
       values: { 'ff-num': '1,000', 'ff-sel': '柴犬' },
     });
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+    // M046: 1件ずつ書かず、正規化ずみを1回の batch にまとめる。
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(1);
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), {
       friendId: 'f-1',
-      fieldId: 'ff-num',
-      value: '1000',
+      entries: [
+        { fieldId: 'ff-num', value: '1000' },
+        { fieldId: 'ff-sel', value: 'opt-1' },
+      ],
       updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'number' }),
-    });
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
-      friendId: 'f-1',
-      fieldId: 'ff-sel',
-      value: 'opt-1',
-      updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'select' }),
+      now: '2026-09-14T00:00:00.000+09:00',
     });
   });
 
@@ -1009,13 +1009,13 @@ describe('値の型検証（N-042 単票）', () => {
     const second = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', body);
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
-    expect(mocks.setFriendFieldValue).toHaveBeenLastCalledWith(expect.anything(), {
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(2);
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenLastCalledWith(expect.anything(), {
       friendId: 'f-1',
-      fieldId: 'ff-num',
-      value: '1000',
+      entries: [{ fieldId: 'ff-num', value: '1000' }],
       updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'number' }),
+      now: '2026-09-14T00:00:00.000+09:00',
     });
   });
 
@@ -1025,12 +1025,12 @@ describe('値の型検証（N-042 単票）', () => {
       values: { 'ff-1': '' },
     });
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), {
       friendId: 'f-1',
-      fieldId: 'ff-1',
-      value: null,
+      entries: [{ fieldId: 'ff-1', value: null }],
       updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'text' }),
+      now: '2026-09-14T00:00:00.000+09:00',
     });
   });
 });
@@ -1145,6 +1145,7 @@ describe('個人情報の個別権限（N-045）', () => {
     });
     expect(res.status).toBe(403);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).not.toHaveBeenCalled();
   });
 
   it('view キーだけでは保存できない', async () => {
@@ -1155,6 +1156,7 @@ describe('個人情報の個別権限（N-045）', () => {
     );
     expect(res.status).toBe(403);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).not.toHaveBeenCalled();
   });
 
   it('edit キーを持つ staff は個人情報の項目を保存できる', async () => {
@@ -1165,10 +1167,10 @@ describe('個人情報の個別権限（N-045）', () => {
       { values: { 'ff-2': '080-0000-0000' } },
     );
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       friendId: 'f-1',
-      fieldId: 'ff-2',
-      value: '080-0000-0000',
+      entries: [{ fieldId: 'ff-2', value: '080-0000-0000' }],
     }));
   });
 
@@ -1183,8 +1185,12 @@ describe('個人情報の個別権限（N-045）', () => {
     const body = (await res.json()) as { data: { updated: number }; warnings: string[] };
     expect(body.data.updated).toBe(1);
     expect(body.warnings[0]).toContain('ペットの名前');
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(1);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fieldId: 'ff-2' }));
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(1);
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      friendId: 'f-1',
+      entries: [{ fieldId: 'ff-2', value: '080-0000-0000' }],
+    }));
   });
 
   it('一括変更: edit キーを持つ staff は個人情報の項目だけ実行できる', async () => {
