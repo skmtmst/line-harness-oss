@@ -160,12 +160,24 @@ describe('/api/users authorization boundaries', () => {
       createdBy: 'staff-own',
     }));
     expect((await instance.request('/api/users/user-own', request('PUT', { displayName: 'Changed' }))).status).toBe(200);
+    // R394: 結び直しは担当者を添えて呼び、成功すれば200。
+    db.linkFriendToUser.mockResolvedValue(true);
     expect((await instance.request('/api/users/user-own/link', request('POST', { friendId: 'friend-own' }))).status).toBe(200);
     expect((await instance.request('/api/users/user-own/accounts')).status).toBe(200);
     expect((await instance.request('/api/users/match', request('POST', { email: 'own@example.com' }))).status).toBe(200);
     expect(db.updateUser).toHaveBeenCalled();
-    expect(db.linkFriendToUser).toHaveBeenCalledWith({}, 'friend-own', 'user-own');
+    expect(db.linkFriendToUser).toHaveBeenCalledWith({}, 'friend-own', 'user-own', { id: 'staff-own' });
     expect(db.getUserFriends).toHaveBeenCalledWith({}, 'user-own');
+  });
+
+  test('R394 linkで競合（false）が返ったら409で止める', async () => {
+    db.linkFriendToUser.mockResolvedValue(false);
+    const response = await app().request(
+      '/api/users/user-own/link',
+      request('POST', { friendId: 'friend-own' }),
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('最新の状態を読み直してください') });
   });
 
   test('role gate rejects staff mutations', async () => {

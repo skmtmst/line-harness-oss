@@ -12,6 +12,8 @@ import {
   createNotification,
   createWebhookInteraction,
   finishWebhookInteraction,
+  hasSucceededInteractionForKey,
+  markFailedInteractionsRetried,
   activeTenantLineAccountSql,
   isOperationCapabilityStopped,
   resolveWebhookSecret,
@@ -651,6 +653,12 @@ export interface DeliveryResult {
   blockReason?: WebhookBlockReason | null;
   /** secret を復号できず、署名を付けられないので送らなかった(#650)。 */
   secretUnavailable?: boolean;
+  /**
+   * 最後の試行が応答を受け取る前に切れた（接続失敗・タイムアウト）印。
+   * 届いたかどうか分からないため、履歴の理由は「結果不明」にする
+   * (d23b R410)。response_xxx・connection_failed に分類しない。
+   */
+  outcomeUnknown?: boolean;
 }
 
 /**
@@ -762,6 +770,7 @@ export async function deliverWebhook(
   return {
     ok: false, attempts: maxRetries + 1, lastStatus,
     retryAfterMs: lastRetryAfterMs ?? undefined,
+    outcomeUnknown: lastStatus === null,
   };
 }
 
@@ -802,10 +811,28 @@ export async function recordDeliveryOutcome(
       .run();
     return;
   }
+  // d23b R411: 成功で0に戻ったあと、過去の失敗が遅れて確定した場合でも
+  // 数を信じられるよう、履歴の実数（最後の成功以降の失敗件数）から
+  // 数え直す。履歴が1件も無い送り先だけは従来どおり +1 で進める。
   await db
     .prepare(
       `UPDATE outgoing_webhooks
-          SET consecutive_failures = consecutive_failures + 1,
+          SET consecutive_failures = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM webhook_interaction_logs l
+               WHERE l.webhook_id = outgoing_webhooks.id AND l.direction = 'outgoing'
+            ) THEN (
+              SELECT COUNT(*) FROM webhook_interaction_logs l
+               WHERE l.webhook_id = outgoing_webhooks.id
+                 AND l.direction = 'outgoing' AND l.status = 'failed'
+                 AND l.created_at > COALESCE((
+                   SELECT MAX(s.created_at) FROM webhook_interaction_logs s
+                    WHERE s.webhook_id = outgoing_webhooks.id
+                      AND s.direction = 'outgoing' AND s.status = 'succeeded'
+                 ), '')
+            )
+            ELSE consecutive_failures + 1
+          END,
               last_failed_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND deleted_at IS NULL`,
     )
@@ -1199,12 +1226,39 @@ export function deliverOnce(
   return deliverWebhook({ ...webhook, max_retries: 0 }, body, opts);
 }
 
-function sweepFailureReason(status: number | null): WebhookInteractionFailureReason {
+/**
+ * 配送結果を履歴の失敗理由へ写す共通の対応表（d23b R410/R415）。
+ * 全経路（イベント発火・自動回収・手動のやり直し・試し送信）で同じ
+ * 言葉を履歴に残すため、ここに集める。
+ *
+ *   secretUnavailable → 'secret_unavailable'  送る前にこちらで止めた
+ *   outcomeUnknown    → 'unknown'             届いたか分からない
+ *   blocked           → 'processing_failed'   送り先のURLが危ない
+ *   429/425           → 'response_429'        混み合っている
+ *   5xx               → 'response_5xx'        相手先で処理できない
+ *   その他の4xx       → 'response_4xx'        内容を受け取れない
+ */
+export function failureReasonForDelivery(result: DeliveryResult): WebhookInteractionFailureReason {
+  if (result.secretUnavailable) return 'secret_unavailable';
+  if (result.blocked) return 'processing_failed';
+  if (result.outcomeUnknown) return 'unknown';
+  const status = result.lastStatus;
   if (status === null) return 'connection_failed';
   if (status === 429) return 'response_429';
   if (status >= 500) return 'response_5xx';
   if (status >= 400) return 'response_4xx';
   return 'unknown';
+}
+
+/** 同じ通知の自動配送台帳の行を引く（d23b R412 の手動↔自動の照合に使う）。 */
+export async function findOutgoingDeliveryByKey(
+  db: D1Database,
+  webhookId: string,
+  idempotencyKey: string,
+): Promise<OutgoingDeliveryRow | null> {
+  return db.prepare(
+    `SELECT * FROM outgoing_webhook_deliveries WHERE webhook_id = ? AND idempotency_key = ?`,
+  ).bind(webhookId, idempotencyKey).first<OutgoingDeliveryRow>();
 }
 
 /**
@@ -1235,7 +1289,7 @@ async function logSweptDeliveryAttempt(
       responseStatus: sendResult.lastStatus,
       attemptCount: sendResult.attempts,
       durationMs,
-      failureReason: sendResult.ok ? null : sweepFailureReason(sendResult.lastStatus),
+      failureReason: sendResult.ok ? null : failureReasonForDelivery(sendResult),
     });
   } catch (error) {
     console.error(`送信Webhook配送 ${row.id} の結果記録に失敗:`, error);
@@ -1340,6 +1394,12 @@ export async function sweepOutgoingWebhookDeliveries(
         kind: 'failed', responseStatus: null,
         errorCode: 'webhook_inactive', errorMessage: outgoingDeliverySafeMessage('webhook_inactive'),
       };
+    } else if (await hasSucceededInteractionForKey(db, row.line_account_id, row.webhook_id, row.idempotency_key)) {
+      // d23b R412: 手動のやり直し（または別経路）で同じ通知がすでに届いて
+      // いる。自動配送は新たに送らず、台帳を「届いた」で閉じる。
+      attempt = {
+        kind: 'delivered', responseStatus: row.last_response_status ?? 200,
+      };
     } else {
       sendResult = await deliverOnce(webhook, row.body_json, {
         idempotencyKey: row.idempotency_key,
@@ -1357,6 +1417,15 @@ export async function sweepOutgoingWebhookDeliveries(
         await recordDeliveryOutcome(db, row.webhook_id, true);
       } catch (error) {
         console.error(`送信Webhook ${row.webhook_id} の連続失敗数を戻せませんでした:`, error);
+      }
+      // d23b R412: 届いた通知と同じ失敗記録が残っていれば畳む。
+      // 「やり直せる」のまま残すと届いた分をもう一度送らせてしまう。
+      try {
+        await markFailedInteractionsRetried(
+          db, row.line_account_id, row.webhook_id, row.idempotency_key,
+        );
+      } catch (error) {
+        console.error(`送信Webhook ${row.webhook_id} の失敗記録の整理に失敗:`, error);
       }
     } else if (outcome === 'failed') {
       result.failed += 1;

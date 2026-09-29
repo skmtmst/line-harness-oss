@@ -77,7 +77,7 @@ jobs:
       PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
       D1_STAGING_DATABASE_NAME: ${{ secrets.D1_STAGING_DATABASE_NAME }}
-      STAGING_API_URL: https://nen-line-stg.skmtmst.workers.dev
+      STAGING_API_URL: https://stg-api.musubo.jp
       STAGING_PAGES_PROJECT: nen-line-stg-admin
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

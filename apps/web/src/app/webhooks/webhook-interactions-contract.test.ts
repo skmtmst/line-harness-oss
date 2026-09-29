@@ -65,7 +65,11 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     expect(PAGE).toContain('前の失敗をやり直した記録')
     expect(PAGE).toContain('送り直せるのは管理者です')
     expect(PAGE).toContain('相手側でもう一度送ってもらってください')
-    expect(PAGE).toContain('data.summary.resultUnknown')
+    // d23b R408: 件数は「送り直せる数」と「対象外の数」に分けて出す。
+    // 結果不明の件数も引き続き案内へ出す。
+    expect(PAGE).toContain('summary.resultUnknown')
+    expect(PAGE).toContain('summary.retryable')
+    expect(PAGE).toContain('summary.outgoingFailed')
   })
 
   it('技術的な記録は必要なときだけ開き、秘密情報はそこにも出さない(IDEA-26)', () => {

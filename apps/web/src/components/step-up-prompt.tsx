@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { api, ApiError, type StepUpPurpose } from '@/lib/api'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import StepUpDialog from '@/components/shared/step-up-dialog'
@@ -30,10 +30,22 @@ type PendingStepUp = { purpose: StepUpPurpose; action: string; resolve: (token: 
 export function useStepUpGate(): {
   gate: (purpose: StepUpPurpose, action: string) => Promise<string | null>
   prompt: React.ReactNode
+  /**
+   * 開いている本人確認の窓を外から閉じる(d23b R420)。待っている gate は
+   * null で返り、待っていた保存処理は「確認されなかった」として進む。
+   * アカウント切り替えのように、開いた時点の前提が崩れたときに使う。
+   */
+  cancel: () => void
 } {
   const [pending, setPending] = useState<PendingStepUp | null>(null)
   const gate = (purpose: StepUpPurpose, action: string) =>
     new Promise<string | null>((resolve) => setPending({ purpose, action, resolve }))
+  const cancel = useCallback(() => {
+    setPending((current) => {
+      current?.resolve(null)
+      return null
+    })
+  }, [])
   const prompt = pending ? (
     <StepUpPrompt
       request={{
@@ -45,7 +57,7 @@ export function useStepUpGate(): {
       onClose={() => { pending.resolve(null); setPending(null) }}
     />
   ) : null
-  return { gate, prompt }
+  return { gate, prompt, cancel }
 }
 
 /**

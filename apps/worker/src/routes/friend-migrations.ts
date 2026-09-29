@@ -334,6 +334,15 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
     if ((claim.meta?.changes ?? 0) === 0) {
       return c.json({ success: false, error: 'この移行はすでに実行中か、実行できる状態ではありません' }, 409);
     }
+    /*
+     * R395: 競合した行の失敗記録。before/after は書かない（何も変えていない
+     * ため）。成功時の before_json は確認時＝書込時の現在値になる。
+     */
+    const failItem = async (itemId: string, message: string) => {
+      await c.env.DB.prepare(`UPDATE uid_migration_items
+        SET result = 'failed', error_message = ?, updated_at = ? WHERE id = ?`)
+        .bind(message, now, itemId).run();
+    };
     try {
       for (const item of items) {
         /*
@@ -350,9 +359,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           continue;
         }
         if (item.decision !== 'link' || !item.old_friend_id || !item.new_friend_id) {
-          await c.env.DB.prepare(`UPDATE uid_migration_items
-            SET result = 'failed', error_message = ?, updated_at = ? WHERE id = ?`)
-            .bind('この判断は自動反映できません。新しい友だちを確認してください', now, item.id).run();
+          await failItem(item.id, 'この判断は自動反映できません。新しい友だちを確認してください');
           continue;
         }
         const pair = await c.env.DB.prepare(`SELECT id, user_id, display_name FROM friends
@@ -361,33 +368,73 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         const oldFriend = pair.results.find((friend) => friend.id === item.old_friend_id);
         const newFriend = pair.results.find((friend) => friend.id === item.new_friend_id);
         if (!oldFriend || !newFriend || (oldFriend.user_id && newFriend.user_id && oldFriend.user_id !== newFriend.user_id)) {
-          await c.env.DB.prepare(`UPDATE uid_migration_items
-            SET result = 'failed', error_message = ?, updated_at = ? WHERE id = ?`)
-            .bind('本移行前に結び付きが変わりました。確認してからもう一度実行してください', now, item.id).run();
+          await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
           continue;
         }
         const userId = oldFriend.user_id ?? newFriend.user_id ?? crypto.randomUUID();
-        const statements: D1PreparedStatement[] = [];
+        /*
+         * R395: 2件の付け替えは1文で同時に行う。確認時と現在値が両方一致
+         * したときだけ2件更新になり、確認後の再連携は上書きしない。
+         * 片方でも違うと0〜1件で止まり、この行は競合として残す（変更0）。
+         * `IS` 比較なので未連携（NULL）の一致も見られる。
+         */
+        /*
+         * 条件付きの付け替えだけを先に行い、2件とも一致したときだけ次へ進む。
+         * 新規作成の本人行は付け替えの後に足す（競合時はゴミ行を作らない）。
+         */
+        const pairResult = await c.env.DB.prepare(
+          `UPDATE friends
+              SET user_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END, updated_at = ?
+            WHERE id IN (?, ?)
+              AND ((id = ? AND user_id IS ?) OR (id = ? AND user_id IS ?))`,
+        ).bind(
+          oldFriend.id, userId, newFriend.id, userId, now,
+          oldFriend.id, newFriend.id,
+          oldFriend.id, oldFriend.user_id, newFriend.id, newFriend.user_id,
+        ).run();
+        if ((pairResult.meta?.changes ?? 0) !== 2) {
+          /*
+           * R395/R396: 片方だけ動いた場合は、今書いた値のままの行だけを
+           * 確認時の値へ戻す（ペア全体で変更0へ寄せる）。競合側の行は
+           * 今書いた値を持たないので触らない。
+           */
+          await c.env.DB.batch([
+            c.env.DB.prepare(
+              `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
+            ).bind(oldFriend.user_id, now, oldFriend.id, userId),
+            c.env.DB.prepare(
+              `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
+            ).bind(newFriend.user_id, now, newFriend.id, userId),
+          ]);
+          await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
+          continue;
+        }
+        const recordWrites: D1PreparedStatement[] = [];
         if (!oldFriend.user_id && !newFriend.user_id) {
-          statements.push(c.env.DB.prepare(`INSERT INTO users
+          recordWrites.push(c.env.DB.prepare(`INSERT INTO users
             (id, display_name, primary_display_name, created_by, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)`).bind(
             userId, newFriend.display_name ?? oldFriend.display_name, newFriend.display_name ?? oldFriend.display_name,
             staff.id, now, now,
           ));
         }
-        statements.push(
-          c.env.DB.prepare('UPDATE friends SET user_id = ?, updated_at = ? WHERE id IN (?, ?)')
-            .bind(userId, now, oldFriend.id, newFriend.id),
+        recordWrites.push(
           /*
             再実行で前の before_json を消さないよう、未反映の行だけ
             result='applied' へ進める（WHERE result <> 'applied'）。
+            条件付き書込みが通ったので、確認時の値は書込時と同じ。
           */
           c.env.DB.prepare(`UPDATE uid_migration_items
             SET result = 'applied', before_json = ?, after_json = ?, updated_at = ? WHERE id = ? AND result <> 'applied'`)
             .bind(JSON.stringify({ oldUserId: oldFriend.user_id, newUserId: newFriend.user_id }), JSON.stringify({ userId }), now, item.id),
+          /*
+           * R392: 結び付きが変わるので本人の版を進める。後に開いた保存は
+           * 409になり、移行前の中身が再保存されない。
+           */
+          c.env.DB.prepare(`UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ?`)
+            .bind(now, userId),
         );
-        await c.env.DB.batch(statements);
+        await c.env.DB.batch(recordWrites);
       }
     } catch (error) {
       /*
@@ -503,18 +550,52 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
     const lateConflicts: typeof conflicts = [];
     let rolledBack = 0;
     for (const { item, before, afterUserId } of prepared) {
-      const writes = await c.env.DB.batch([
-        c.env.DB.prepare('UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id = ?')
-          .bind(before.oldUserId, now, item.old_friend_id, afterUserId),
-        c.env.DB.prepare('UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id = ?')
-          .bind(before.newUserId, now, item.new_friend_id, afterUserId),
-      ]);
-      if ((writes[0]?.meta?.changes ?? 0) === 0 || (writes[1]?.meta?.changes ?? 0) === 0) {
+      /*
+       * R396: ペア2件の書き戻しは1文で行う。両方一致のときだけ2件更新に
+       * なり、遅い競合では1件も変わらない（部分復旧を出さない）。
+       * 変わらなかった行は applied のまま残り、移行後の状態も保たれるので
+       * 再試行できる。`IS` 比較で未連携（NULL）の一致も見られる。
+       */
+      const restored = await c.env.DB.prepare(
+        `UPDATE friends
+            SET user_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END, updated_at = ?
+          WHERE id IN (?, ?)
+            AND ((id = ? AND user_id IS ?) OR (id = ? AND user_id IS ?))`,
+      ).bind(
+        item.old_friend_id, before.oldUserId, item.new_friend_id, before.newUserId, now,
+        item.old_friend_id, item.new_friend_id,
+        item.old_friend_id, afterUserId, item.new_friend_id, afterUserId,
+      ).run();
+      if ((restored.meta?.changes ?? 0) !== 2) {
+        /*
+         * R396: 片方だけ戻った場合は、今書いた値のままの行だけを移行後の
+         * 値へ戻す（ペア全体で変更0へ寄せ、再試行できる状態に保つ）。
+         */
+        await c.env.DB.batch([
+          c.env.DB.prepare(
+            `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
+          ).bind(afterUserId, now, item.old_friend_id, before.oldUserId),
+          c.env.DB.prepare(
+            `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
+          ).bind(afterUserId, now, item.new_friend_id, before.newUserId),
+        ]);
         lateConflicts.push({ itemId: item.id, oldUid: item.old_uid, reason: '切り戻しの直前に統合ユーザーが変更されました' });
         continue;
       }
-      await c.env.DB.prepare(`UPDATE uid_migration_items SET result = 'rolled_back', updated_at = ?
-        WHERE id = ? AND result = 'applied'`).bind(now, item.id).run();
+      /*
+       * R392: 結び付きが変わるので関係する本人の版を進める。後に開いた
+       * 保存は409になり、切り戻し前の中身が再保存されない。
+       */
+      const bumped = [...new Set(
+        [before.oldUserId, before.newUserId, afterUserId].filter((id) => id !== null),
+      )];
+      await c.env.DB.batch([
+        c.env.DB.prepare(`UPDATE uid_migration_items SET result = 'rolled_back', updated_at = ?
+          WHERE id = ? AND result = 'applied'`).bind(now, item.id),
+        ...bumped.map((userId) => c.env.DB.prepare(
+          `UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ?`,
+        ).bind(now, userId)),
+      ]);
       rolledBack += 1;
     }
     if (lateConflicts.length > 0) {

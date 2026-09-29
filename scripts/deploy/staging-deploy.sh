@@ -34,7 +34,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 STAGING_CONFIG="apps/worker/wrangler.staging.toml"
-STAGING_API_URL="https://nen-line-stg.skmtmst.workers.dev"
+STAGING_API_URL="https://stg-api.musubo.jp"
 STAGING_PAGES_PROJECT="nen-line-stg-admin"
 # wrangler.staging.toml の account_id を唯一の出どころにする。ここに同じ値を
 # 書き写すと、片方だけ直したときに黙って別アカウントへ配りかねない。

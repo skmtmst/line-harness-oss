@@ -8,6 +8,11 @@ compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 account_id = "55f40f5577bd68828d67716f8d900642"
 
+# 他社向けサービス用の本番APIドメイン。既存の workers.dev URL も併存して使える。
+routes = [
+  { pattern = "api.musubo.jp", custom_domain = true }
+]
+
 # Worker runs before static assets so bot UAs get OGP HTML injection;
 # normal UAs fall through to the SPA via env.ASSETS.fetch().
 [assets]
@@ -46,9 +51,9 @@ ADMIN_PAGES_PROJECT = "nen-line-admin-98712679"
 LIFF_PAGES_PROJECT = ""
 D1_DATABASE_ID = "5b0fcea8-e05e-42bf-9efa-f2bc4c459552"
 MANIFEST_URL = "https://github.com/Shudesu/line-harness-oss/releases/latest/download/release-manifest.json"
-WORKER_PUBLIC_URL = "https://nen-line.skmtmst.workers.dev"
-ADMIN_PUBLIC_URL = "https://nen-line-admin-98712679.pages.dev"
-LIFF_PUBLIC_URL = "https://nen-line.skmtmst.workers.dev"
+WORKER_PUBLIC_URL = "https://api.musubo.jp"
+ADMIN_PUBLIC_URL = "https://admin.musubo.jp"
+LIFF_PUBLIC_URL = "https://api.musubo.jp"
 CF_ACCOUNT_ID = "55f40f5577bd68828d67716f8d900642"
 MEDIA_R2_BUCKET_NAME = "nen-line-images"
 NEN_EC_BASE_URL = "https://nen-petfood.com"
