@@ -30,6 +30,7 @@ import type {
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { pruneCondition } from '@/lib/segment-condition'
 import { api, describeSaveFailure } from '@/lib/api'
+import { describeFriendAddFailure } from './friend-add-failure'
 import {
   addTimeWindow,
   friendAddFlowSteps,
@@ -206,8 +207,9 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         })
         setLoadedAccountId(request.accountId)
       }
-    } catch {
-      if (isCurrentRequest()) setError('設定を読み込めませんでした。')
+    } catch (caught) {
+      // M006: 権限・対象なしを汎用文にまとめない。
+      if (isCurrentRequest()) setError(describeFriendAddFailure(caught, '設定', 'load').message)
     } finally {
       if (isCurrentRequest()) setLoading(false)
     }
