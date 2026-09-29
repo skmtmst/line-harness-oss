@@ -1954,7 +1954,20 @@ webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), async
       return stepUpRequiredResponse(c, 'APIトークンの再発行には本人確認が必要です');
     }
     const rotated = await rotateIntegrationApiToken(c.env.DB, id, lineAccountId, c.get('staff')?.id);
-    if (!rotated) return c.json({ success: false, error: 'Not found' }, 404);
+    if (rotated.status === 'not_found') {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (rotated.status === 'conflict') {
+      // 同時再発行に負けた・古い読み取りのまま来た側（R431）。
+      // 新トークンは作っていない。一覧を読み直して今の状態から進める。
+      const current = await listIntegrationApiTokens(c.env.DB, lineAccountId);
+      return c.json({
+        success: false,
+        code: 'TOKEN_ROTATE_CONFLICT',
+        error: 'ほかの操作が先にこのトークンを更新しました。一覧を読み直して、最新の状態からもう一度お試しください',
+        tokens: current.map(serializeApiToken),
+      }, 409);
+    }
     auditLog(c, 'webhook.api_token.rotate', { kind: 'integration_api_token', id: rotated.row.id }, { lineAccountId });
     return c.json({
       success: true,
