@@ -682,19 +682,56 @@ export async function acknowledgeOperationAlert(
   return { status: 'changed', alert: await getOperationAlert(db, row.id) };
 }
 
+/**
+ * 未enqueueのeventだけに、同一tenant・対象accountを見られるowner/adminの通知行を積む。
+ * 同じalertの同じactionを同じ担当者・同じ経路へ一定時間内に重ねて送らない。
+ * 解消の直後の再発（ばたつき）もまとめて1通にする。表の追加は要らない。
+ */
+export const OPERATION_ALERT_NOTIFICATION_DEDUP_MS = 30 * 60_000;
+
+async function operationAlertNotifiedRecently(
+  db: D1Database,
+  input: { alertId: string; action: string; staffId: string; channel: 'line' | 'email'; since: string },
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_alert_notification_outbox o
+       JOIN operation_alert_events e ON e.id = o.event_id
+      WHERE e.alert_id = ? AND e.action = ? AND o.staff_id = ? AND o.channel = ?
+        AND o.created_at >= ? AND o.status IN ('queued', 'sending', 'sent')
+      LIMIT 1`,
+  ).bind(input.alertId, input.action, input.staffId, input.channel, input.since).first();
+  return hit !== null;
+}
+
+async function operationAlertResolvedRecently(
+  db: D1Database,
+  input: { alertId: string; eventId: string; createdAt: string; since: string },
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_alert_events
+      WHERE alert_id = ? AND action = 'resolved' AND id != ?
+        AND created_at >= ? AND created_at <= ?
+      LIMIT 1`,
+  ).bind(input.alertId, input.eventId, input.since, input.createdAt).first();
+  return hit !== null;
+}
+
 /** 未enqueueのeventだけに、同一tenant・対象accountを見られるowner/adminの通知行を積む。 */
 export async function enqueuePendingOperationAlertNotifications(
   db: D1Database,
   input: { lineAccountId?: string; now?: string },
 ): Promise<void> {
   const now = input.now ?? new Date().toISOString();
+  const since = new Date(Date.parse(now) - OPERATION_ALERT_NOTIFICATION_DEDUP_MS).toISOString();
   const events = await db.prepare(
-    `SELECT e.id, e.line_account_id
+    `SELECT e.id, e.line_account_id, e.alert_id, e.action, e.created_at
        FROM operation_alert_events e
       WHERE e.notification_enqueued_at IS NULL
         AND (? IS NULL OR e.line_account_id = ?)
       ORDER BY e.created_at, e.id LIMIT 100`,
-  ).bind(input.lineAccountId ?? null, input.lineAccountId ?? null).all<{ id: string; line_account_id: string }>();
+  ).bind(input.lineAccountId ?? null, input.lineAccountId ?? null).all<{
+    id: string; line_account_id: string; alert_id: string; action: string; created_at: string;
+  }>();
   for (const event of events.results ?? []) {
     const recipients = await db.prepare(
       `SELECT sm.id, sm.email, sm.line_user_id
@@ -713,17 +750,28 @@ export async function enqueuePendingOperationAlertNotifications(
     ).bind(
       event.line_account_id, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, event.line_account_id,
     ).all<{ id: string; email: string | null; line_user_id: string | null }>();
+    // 解消の直後の再発は、解消の知らせとまとめて1通にする。
+    const flapSuppressed = event.action === 'reopened'
+      && await operationAlertResolvedRecently(db, {
+        alertId: event.alert_id, eventId: event.id, createdAt: event.created_at, since,
+      });
     const statements: D1PreparedStatement[] = [];
     let missingContactCount = 0;
     for (const recipient of recipients.results ?? []) {
       if (!recipient.line_user_id && !recipient.email) missingContactCount += 1;
-      if (recipient.line_user_id) statements.push(db.prepare(
+      if (recipient.line_user_id && !flapSuppressed
+        && !(await operationAlertNotifiedRecently(db, {
+          alertId: event.alert_id, action: event.action, staffId: recipient.id, channel: 'line', since,
+        }))) statements.push(db.prepare(
         `INSERT OR IGNORE INTO operation_alert_notification_outbox
            (id, event_id, line_account_id, staff_id, channel, status, attempt_count,
             next_attempt_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, 'line', 'queued', 0, ?, ?, ?)`,
       ).bind(crypto.randomUUID(), event.id, event.line_account_id, recipient.id, now, now, now));
-      if (recipient.email) statements.push(db.prepare(
+      if (recipient.email && !flapSuppressed
+        && !(await operationAlertNotifiedRecently(db, {
+          alertId: event.alert_id, action: event.action, staffId: recipient.id, channel: 'email', since,
+        }))) statements.push(db.prepare(
         `INSERT OR IGNORE INTO operation_alert_notification_outbox
            (id, event_id, line_account_id, staff_id, channel, status, attempt_count,
             next_attempt_at, created_at, updated_at)

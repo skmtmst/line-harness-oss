@@ -17,6 +17,7 @@ import { AreaProperties, intentOf } from '@/components/rich-menus/area-propertie
 import type { RichMenuAreaTapCount, RichMenuTargetPreview, RichMenuScheduleInput } from '@/lib/api'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -488,15 +489,7 @@ function Editor({
    * 「保存せずに移動」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
-    <ConfirmDialog primaryAction="cancel"
-      open={leaveTarget !== null}
-      title="保存していない変更があります"
-      description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
-      confirmLabel="保存せずに移動"
-      cancelLabel="編集を続ける"
-      onConfirm={confirmLeaveAndDiscard}
-      onCancel={cancelLeave}
-    ></ConfirmDialog>
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューへの変更" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
   )
 
   const closeConfirm = () => {

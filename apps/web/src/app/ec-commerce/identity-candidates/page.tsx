@@ -137,6 +137,7 @@ export default function EcIdentityCandidatesPage() {
         failure={review.failure}
         emptyTitle="つき合わせる会員はありません"
         emptyDescription="メールアドレスか電話番号が同じなら自動で結び付きます。どちらも違うときだけ、ここへ並びます。"
+        onRetry={() => { void loadOperations(); review.reload() }}
       />
 
       {pageState === 'ready' ? (

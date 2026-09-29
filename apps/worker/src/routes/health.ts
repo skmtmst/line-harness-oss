@@ -121,6 +121,16 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), async (c) => {
 
     const db = c.env.DB;
 
+    /*
+     * M020：存在しない移行元で 201 の幽霊行を作っていた。
+     * 移行前に可視範囲で有無を見て、無いときは 404 にして作らない。
+     * 範囲外も 404 に倒す（詳細口と同じ fail-closed）。
+     */
+    const scope = await getVisibleLineAccountScope(db, c.get('staff'));
+    if (!scope.ids.includes(fromAccountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+
     // 移行対象: このアカウントに紐づく友だち数をカウント（line_accountsとの関連はuser_id経由）
     // 簡易版: is_following=1 の全友だちを移行対象とする
     const countResult = await db

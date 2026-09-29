@@ -72,7 +72,7 @@ describe('文言と実態の一致・書きかけの保護（#935）', () => {
 
   it('N-301: 書きかけのまま離れるとき共通の未保存ガードで止める', () => {
     expect(EDITOR).toContain('useUnsavedGuard')
-    expect(EDITOR).toContain('ConfirmDialog')
-    expect(EDITOR).toContain('入力中の内容があります')
+    expect(EDITOR).toContain('UnsavedLeaveDialog')
+    expect(EDITOR).toContain('leaveTarget !== null')
   })
 })

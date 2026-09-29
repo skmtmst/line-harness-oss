@@ -10,6 +10,7 @@ import type { ApiResponse, Chat, Folder, FriendField, Scenario } from '@line-crm
 import {
   api,
   ApiError,
+  describeSaveFailure,
   fetchApi,
   type FriendDetail,
   type FriendFormSubmission,
@@ -31,6 +32,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { loadFailureKind } from './load-failure-kind'
 
 /**
  * 友だち詳細。
@@ -448,6 +450,8 @@ function FriendDetailInner() {
   const [error, setError] = useState('')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [friendMissing, setFriendMissing] = useState(false)
+  /** M012：読み込み 403（権限不足）。汎用の失敗面とは分け、再試行口は出さない。 */
+  const [loadForbidden, setLoadForbidden] = useState(false)
   const [notice, setNotice] = useState('')
   const [warnings, setWarnings] = useState<string[]>([])
   /*
@@ -589,6 +593,7 @@ function FriendDetailInner() {
     setLoading(true)
     setError('')
     setFriendMissing(false)
+    setLoadForbidden(false)
     try {
       // PERF-13: 回答本文は初期応答に載せない。総数だけ返るので
       // サイドの「フォーム回答 N件」とタブの案内は変わらない。
@@ -601,6 +606,10 @@ function FriendDetailInner() {
       setFriend(null)
       if (err instanceof ApiError && err.status === 404) {
         setFriendMissing(true)
+        setError('')
+      } else if (loadFailureKind(err) === 'forbidden') {
+        // M012：403 は権限不足。汎用の失敗文ではなく権限の面へ分ける。
+        setLoadForbidden(true)
         setError('')
       } else {
         setError('読み込みに失敗しました。もう一度読み込んでください。')
@@ -978,7 +987,8 @@ function FriendDetailInner() {
         setSupportEditing(false)
         void loadFriend()
       } else {
-        setSupportError(err instanceof ApiError ? err.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+        // M012：原文のまま出さず、共通の状態別案内（403は権限・500は読み直し）へ渡す。
+        setSupportError(describeSaveFailure(err))
       }
     } finally {
       setSupportBusy(false)
@@ -1075,7 +1085,8 @@ function FriendDetailInner() {
         setScenarioError(res.error)
       }
     } catch (err) {
-      setScenarioError(err instanceof ApiError ? err.message : '登録に失敗しました。通信を確かめて、もう一度お試しください。')
+      // M012：原文のまま出さず、共通の状態別案内へ渡す。
+      setScenarioError(describeSaveFailure(err))
     } finally {
       setScenarioBusy(false)
     }
@@ -1247,6 +1258,20 @@ function FriendDetailInner() {
         accountName={selectedAccount?.name}
         backHref="/friends"
         backLabel="友だち一覧へ戻る"
+      />
+    )
+  }
+
+  /*
+   * M012：読み込み 403（権限不足）。汎用の失敗面とは分け、再試行口は
+   * 出さない（押し直しても直らないため）。誰に確認するかを添える。
+   */
+  if (!loading && loadForbidden) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="この友だちを見る権限がありません"
+        description="見るには権限が要ります。オーナーか管理者の方に確認してください。"
       />
     )
   }

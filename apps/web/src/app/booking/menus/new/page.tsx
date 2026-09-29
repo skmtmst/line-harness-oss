@@ -18,6 +18,8 @@ import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { canEditFeature } from '@/lib/staff-capability'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { bookingMenuError } from '../menu-validation'
 
 /**
@@ -213,6 +215,20 @@ export default function NewBookingMenuPage() {
       ? '無料'
       : `¥${Number(basePrice).toLocaleString()}`
 
+  /*
+   * 作成途中の離脱確認。名前・時間・料金・担当・タグのどれかに手を付けて
+   * いたら、キャンセルや左メニューで確認窓を出す。タグの検索欄は絞り込み
+   * のため数えない。作成が終わると一覧へ router.push するので、成功後に
+   * 警告は出ない。
+   */
+  const dirty = Boolean(
+    name || categoryLabel || description || durationMinutes !== '60' ||
+    bufferAfterMinutes !== '0' || basePrice || concurrentCapacity !== '1' ||
+    windowDays || cutoffHours || cancelDeadlineHours || intakeQuestion ||
+    !isActive || assigned.size > 0 || autoTagId
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
+
   if (!canEditMenus) {
     return (
       <div data-design-node="GhOb3" className="mx-auto max-w-2xl p-6">
@@ -226,6 +242,7 @@ export default function NewBookingMenuPage() {
   }
 
   return (
+    <>
     <CreatePage
       designNode="GhOb3"
       title="予約メニューをつくる"
@@ -733,6 +750,8 @@ export default function NewBookingMenuPage() {
         </Checkbox>
       </FormSection>
     </CreatePage>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したメニュー" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </>
   )
 }
 

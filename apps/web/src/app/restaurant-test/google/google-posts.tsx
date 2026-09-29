@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
@@ -558,7 +559,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
       {editable ? (
         <StickyBar actions={<><Button onClick={() => void saveDraft()} disabled={busy !== null}>{busy === 'save' ? '保存中…' : '下書き保存'}</Button><Button variant="primary" onClick={() => void openConfirm()} disabled={busy !== null}>{busy === 'confirm' ? '確認中…' : '公開内容を確認'}</Button></>} />
       ) : null}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない内容があります" description="このまま移動すると、入力した内容は失われます。" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

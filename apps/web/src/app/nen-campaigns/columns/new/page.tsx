@@ -7,7 +7,7 @@ import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
 import Card, { CardHeader } from '@/components/shared/card'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { Field as FormField, RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -387,15 +387,7 @@ function NewNenColumnInner() {
         )}
       />
       {/* #935 N-301: 入力途中で離れるときの確認。 */}
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="入力中の内容があります"
-        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="入力を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

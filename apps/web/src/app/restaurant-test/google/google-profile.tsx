@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Clock3, Download, History, Info, Mic, Pencil, Plus, Sparkles, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
@@ -726,7 +726,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
         </div>
       ) : main}
       <StickyBar actions={<><Button onClick={clear} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={!canSubmit}>{busy ? '確認中…' : '変更案を確認'}</Button></>} />
-      <ConfirmDialog open={leaveTarget !== null} title="入力した内容があります" description="このまま移動すると、入力した営業時間の変更は失われます。Googleにはまだ何も送っていません。" confirmLabel="入力を捨てて移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した営業時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -1230,7 +1230,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Pr
       </div>
 
       <StickyBar actions={<><Button onClick={() => { setForm(formFrom(data)); setAdds([]); setDeletes([]); setActionError('') }} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={busy || !dirty || data.closed || form.description.length > 750}>{busy ? '確認中…' : '変更内容を確認'}</Button></>} />
-      <ConfirmDialog open={leaveTarget !== null} title="入力した内容があります" description="このまま移動すると、プロフィールの変更は失われます。Googleにはまだ何も送っていません。" confirmLabel="入力を捨てて移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="プロフィールの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

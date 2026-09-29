@@ -14,6 +14,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { fetchApi, ApiError } from '@/lib/api'
+import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { csvCell } from '@/lib/presentation'
 import ListRange from '@/components/ui/list-range'
 import {
@@ -91,6 +92,24 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
   URL.revokeObjectURL(url)
 }
 
+/*
+ * M004：後処理の再実行の失敗理由。状態の言い分けは共通部品に任せ、
+ * 画面で状態を見分けて文言を書き分けない。ただし口が返した日本語の
+ * 理由（記録なし等）はそのまま出す。内部文・英語文は出さない。
+ */
+function retryEffectsFailureText(error: unknown): string {
+  if (error instanceof ApiError) {
+    return describeApiFailure(error, '後処理の再実行', {
+      forbidden: '後処理を再実行する権限がありません。選んでいるアカウントと権限を確認してください。',
+    })
+  }
+  if (error instanceof Error && error.message && error.message !== 'retry_failed'
+    && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) {
+    return error.message
+  }
+  return describeApiFailure(error, '後処理の再実行')
+}
+
 function FormResponsesInner() {
   const searchParams = useSearchParams()
   const formId = searchParams.get('id') ?? ''
@@ -105,6 +124,8 @@ function FormResponsesInner() {
   const [error, setError] = useState('')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [formMissing, setFormMissing] = useState(false)
+  /** 403で権限不足のとき。再試行は出さない（M005）。 */
+  const [formForbidden, setFormForbidden] = useState(false)
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'rows' | 'summary'>('rows')
   const [selected, setSelected] = useState<Submission | null>(null)
@@ -130,6 +151,7 @@ function FormResponsesInner() {
     setLoading(true)
     setError('')
     setFormMissing(false)
+    setFormForbidden(false)
     try {
       const account = `account_id=${encodeURIComponent(selectedAccountId)}`
       const needle = (searchText ?? queryRef.current).trim()
@@ -153,6 +175,9 @@ function FormResponsesInner() {
       if (request !== loadRequest.current) return
       if (caught instanceof ApiError && caught.status === 404) {
         setFormMissing(true)
+      } else if (classifyApiFailure(caught) === 'forbidden') {
+        // M005：権限不足は通信障害ではない。再試行を出さず理由を示す。
+        setFormForbidden(true)
       } else {
         setError('集まった回答を読み込めませんでした。')
       }
@@ -280,11 +305,7 @@ function FormResponsesInner() {
       setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)))
       setSelected(updated)
     } catch (error) {
-      setRetryError(
-        error instanceof Error && error.message && error.message !== 'retry_failed'
-          ? error.message
-          : '後処理の再実行に失敗しました。もう一度お試しください。',
-      )
+      setRetryError(retryEffectsFailureText(error))
     } finally {
       setRetrying(false)
     }
@@ -307,6 +328,21 @@ function FormResponsesInner() {
     )
   }
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" />
+  /*
+   * M005：権限不足は通信障害ではない。再試行ボタンは出さず、
+   * アカウントの選び直しと管理者への確認を案内する。
+   */
+  if (formForbidden) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="集まった回答を見る権限がありません"
+        description="選んでいるアカウントでは見られません。アカウントを選び直すか、管理者に権限を確認してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
   if (formMissing || (!error && !form)) {
     return (
       <TargetMissing
