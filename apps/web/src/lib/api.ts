@@ -2537,15 +2537,43 @@ export class ApiError extends Error {
    * 画面は「（追跡番号 …）」として添える（要件 v6-34 §9-1）。
    */
   readonly trackingId: string | undefined
+  /**
+   * 429などでサーバーが返す待ち秒数（`Retry-After` 応答ヘッダ由来）。
+   * 無い応答では `undefined`——画面は秒数なしの待ち案内にするだけ。
+   */
+  readonly retryAfterSeconds: number | undefined
 
-  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string) {
+  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string, retryAfterSeconds?: number) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.data = data
     this.trackingId = trackingId
+    this.retryAfterSeconds = retryAfterSeconds
   }
+}
+
+/**
+ * `Retry-After` 応答ヘッダを待ち秒数にする（m23m）。
+ *
+ * 秒数と日時の両方を受け、1〜3600秒に丸める。0以下・読めない値・
+ * 過ぎた日時は `undefined`（画面は秒数なしの待ち案内にする）。
+ */
+export function parseRetryAfterSeconds(value: string | null): number | undefined {
+  if (value === null) return undefined
+  const text = value.trim()
+  if (!text) return undefined
+  if (/^\d+$/.test(text)) {
+    const seconds = Number(text)
+    if (!Number.isSafeInteger(seconds) || seconds <= 0) return undefined
+    return Math.min(seconds, 3600)
+  }
+  const at = Date.parse(text)
+  if (Number.isNaN(at)) return undefined
+  const seconds = Math.ceil((at - Date.now()) / 1000)
+  if (seconds <= 0) return undefined
+  return Math.min(seconds, 3600)
 }
 
 /**
@@ -2824,6 +2852,8 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
         ? extractApiErrorData(raw)
         : undefined,
       extractApiErrorTrackingId(raw),
+      // m23m: 429の待ち秒数（Retry-After）。画面は待つ案内に使う。
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
     )
   }
   if (res.status === 204) return undefined as T
@@ -2851,6 +2881,7 @@ async function fetchApiBlob(path: string, init?: { method?: string }): Promise<B
       code,
       undefined,
       extractApiErrorTrackingId(raw),
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
     )
   }
   return res.blob()
@@ -2894,6 +2925,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
       code,
       undefined,
       extractApiErrorTrackingId(raw),
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
     )
   }
   const disposition = res.headers.get('Content-Disposition') ?? ''

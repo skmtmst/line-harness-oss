@@ -1727,3 +1727,44 @@ describe('describeSaveFailure（WRITE-01: 保存失敗の安全な理由表示�
       .toBe('対象が見つかりません')
   })
 })
+
+describe('fetchApi の Retry-After 受け渡し（m23m）', () => {
+  async function failWith(status: number, headers?: Record<string, string>): Promise<InstanceType<typeof ApiError>> {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: false, error: 'rate_limited' }),
+      { status, headers: { 'content-type': 'application/json', ...(headers ?? {}) } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      await fetchApi('/api/folders?kind=template')
+      throw new Error('投げなかった')
+    } catch (error) {
+      if (error instanceof ApiError) return error
+      throw error
+    }
+  }
+
+  it('429のRetry-After（秒）を失敗に載せる', async () => {
+    const err = await failWith(429, { 'Retry-After': '30' })
+    expect(err.status).toBe(429)
+    expect(err.retryAfterSeconds).toBe(30)
+  })
+
+  it('Retry-After（日時）は今との差を秒にする', async () => {
+    const future = new Date(Date.now() + 65 * 1000).toUTCString()
+    const err = await failWith(429, { 'Retry-After': future })
+    expect(err.retryAfterSeconds).toBeGreaterThan(0)
+    expect(err.retryAfterSeconds).toBeLessThanOrEqual(65)
+  })
+
+  it('読めないRetry-Afterは載せない', async () => {
+    const err = await failWith(429, { 'Retry-After': 'soon' })
+    expect(err.retryAfterSeconds).toBeUndefined()
+  })
+
+  it('Retry-Afterが無ければ載せない', async () => {
+    const err = await failWith(403)
+    expect(err.status).toBe(403)
+    expect(err.retryAfterSeconds).toBeUndefined()
+  })
+})
