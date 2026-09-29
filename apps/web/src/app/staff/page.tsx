@@ -37,7 +37,7 @@ import { SCOPE_ITEMS, BUNDLE_PRESETS, BROADCAST_EDIT_OPERATION_KEYS, type Featur
 import { csvCell } from '@/lib/presentation'
 import { qrToDataURL } from '@/lib/qr-image'
 import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
-import { applyScopeRowChange, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
+import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
 import OtpInput from '@/components/shared/otp-input'
 
@@ -295,6 +295,13 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
   // 開いたときの保存済みが土台。11行の写しなので描画ごとに作り直す。
   const savedBase: ScopeLevels | null =
     isCustom && hasSaved ? restoreSavedLevels(savedEditKeys, savedViewKeys, savedEmailMask) : null
+  /*
+   * R497b: 3択では表せない「一部だけ許可」の行（例：分析の1キーのみ）。
+   * keysToScopeLevels は none（出さない）と写すが、実際には許可中のキーが
+   * あるので、そのまま「出さない」と押した表示にしない。内訳を別に示す。
+   */
+  const partialRows = isCustom && hasSaved ? findPartialScopeRows(savedEditKeys, savedViewKeys) : []
+  const partialRowIds = new Set(partialRows.map((row) => row.itemId))
   const [bundle, setBundle] = useState<Exclude<AccessRoleBundle, 'custom'>>(
     user.roleBundle === 'custom' ? 'reception' : user.roleBundle,
   )
@@ -310,6 +317,20 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
    */
   const [touchedRowIds, setTouchedRowIds] = useState<string[]>([])
   const [wholesale, setWholesale] = useState(false)
+  /*
+   * R497b: 行を触る前の部分行だけが「一部」のまま。行を選び直したら
+   * その行は選んだ内容に置き換わるので、一部の表示は消す。
+   * かたまり・コピーは全体の置き換えなので、選んだら一部表示は消す。
+   */
+  const isPartialUntouched = (itemId: string): boolean =>
+    partialRowIds.has(itemId) && !touchedRowIds.includes(itemId) && !wholesale
+  const partialUntouchedRows = wholesale ? [] : partialRows.filter((row) => !touchedRowIds.includes(row.itemId))
+  const partialLabelOf = (itemId: string): string => {
+    const row = partialRows.find((candidate) => candidate.itemId === itemId)
+    if (!row) return ''
+    const labels = row.allowedKeys.map((key) => permissionLabel(key) || key)
+    return labels.join('・')
+  }
   const levels: ScopeLevels = customLevels ?? savedBase ?? BUNDLE_PRESETS[bundle].levels
   const dirty = wholesale || touchedRowIds.length > 0
   /*
@@ -464,8 +485,13 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
    * 個別設定の人の保存済み内訳はAPIが返さないため、差分は「未確認」と出す。
    */
   const featureItems = SCOPE_ITEMS.filter((item) => item.kind === 'feature')
-  const visibleItems = featureItems.filter((item) => (levels[item.id] ?? 'none') !== 'none')
-  const hiddenItems = featureItems.filter((item) => (levels[item.id] ?? 'none') === 'none')
+  /*
+   * R497b: 一部だけ許可の行は「出る・出さない」のどちらにも数えない。
+   * そのまま数えると、出さない側に寄って保存内容と違う見え方になる。
+   * 内訳は下の「一部だけ許可」の行で別に示す。
+   */
+  const visibleItems = featureItems.filter((item) => (levels[item.id] ?? 'none') !== 'none' && !isPartialUntouched(item.id))
+  const hiddenItems = featureItems.filter((item) => (levels[item.id] ?? 'none') === 'none' && !isPartialUntouched(item.id))
   const piiLevel = levels.pii ?? 'none'
   const piiNote = piiLevel === 'edit'
     ? '個人情報（電話番号・住所・メール）もそのまま見えます'
@@ -491,7 +517,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
   return <div data-design-node="EOTS4" className="flex flex-col gap-4 pb-28">
     {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
     <div className="flex items-center justify-between"><nav className="text-xs text-ink-faint"><span className="font-bold text-action">ログインユーザー</span>　›　<span className="font-bold text-action">{user.name}</span>　›　見せる範囲</nav><Button variant="secondary" disabled={!writable || copyCandidates.length === 0} onClick={() => setCopyOpen((current) => !current)}>ほかの人と同じにする</Button></div>
-    {copyOpen && <section className="rounded-card border border-hairline bg-canvas p-4" aria-label="ほかの人の権限をコピー"><p className="mb-2 text-xs text-ink-secondary">同じ組織の人を選ぶと、その人の権限のかたまりを下書きへ反映します。</p><Select aria-label="コピー元のログインユーザー" value={copySourceId} onChange={copyBundle} size="full" options={[{ value: '', label: 'コピー元を選ぶ', disabled: true }, ...copyCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.name}（${ACCESS_ROLE_LABEL[candidate.roleBundle]}）` }))]} />{copyNotice && <p className="mt-2 text-xs font-medium text-success" role="status">{copyNotice}</p>}</section>}
+    {copyOpen && <section className="rounded-card border border-hairline bg-canvas p-4" aria-label="ほかの人の権限をコピー"><p className="mb-2 text-xs text-ink-secondary">同じ組織の人を選ぶと、その人の権限のかたまりを下書きへ反映します。コピーするとすべての行がコピー元の内容に置き換わり、一部だけ許可の細かい設定は残りません。</p><Select aria-label="コピー元のログインユーザー" value={copySourceId} onChange={copyBundle} size="full" options={[{ value: '', label: 'コピー元を選ぶ', disabled: true }, ...copyCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.name}（${ACCESS_ROLE_LABEL[candidate.roleBundle]}）` }))]} />{copyNotice && <p className="mt-2 text-xs font-medium text-success" role="status">{copyNotice}</p>}</section>}
     {/*
       LAY-07: 狭い幅は1列で「いまの権限→変更項目→影響の確認」の順にする。
       説明欄（390px）と横に並べるのは、設定欄に十分な幅が残る1024px以上だけ。
@@ -499,8 +525,8 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
     */}
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
       <div className="flex flex-col gap-4">
-        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">いまの権限</h2><p className="mt-1 text-xs text-ink-secondary">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。{isCustom ? (savedBase ? '下の表には保存されている内容をそのまま出しています。' : '項目ごとの内訳は取得できていません（未確認）。') : ''}{targetIsAdministrator ? '' : '保存すると、対象者はもう一度ログインが必要です。'}</p>{/* IDEA-30: 閲覧・編集・実行とあわせて対象アカウントの権限もこの画面で確認できるようにする。 */}<p className="mt-2 text-xs text-ink-secondary">対象のLINEアカウント：{accessScopeLabel(user, accountNames)}{user.accountScope.type === 'accounts' && user.accountScope.includesDescendants ? '（配下のアカウントも含みます）' : ''}</p>{targetIsAdministrator ? <p className="mt-2 text-xs font-medium text-ink-secondary">管理者はすべての機能を使えます。この画面では権限の確認だけでき、ここからは変更できません。役割を変えるときは一覧の「変更する」から行います。</p> : null}</section>
-        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">{bundles.map(([value, label, note]) => <button key={value} type="button" disabled={!writable} onClick={() => {
+        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">いまの権限</h2><p className="mt-1 text-xs text-ink-secondary">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。{isCustom ? (savedBase ? (partialUntouchedRows.length > 0 ? '下の表には保存されている内容を出しています。一部だけ許可の行は3つの選択肢に当てはまらないため、行の下に内訳を出しています。' : '下の表には保存されている内容をそのまま出しています。') : '項目ごとの内訳は取得できていません（未確認）。') : ''}{targetIsAdministrator ? '' : '保存すると、対象者はもう一度ログインが必要です。'}</p>{/* IDEA-30: 閲覧・編集・実行とあわせて対象アカウントの権限もこの画面で確認できるようにする。 */}<p className="mt-2 text-xs text-ink-secondary">対象のLINEアカウント：{accessScopeLabel(user, accountNames)}{user.accountScope.type === 'accounts' && user.accountScope.includesDescendants ? '（配下のアカウントも含みます）' : ''}</p>{targetIsAdministrator ? <p className="mt-2 text-xs font-medium text-ink-secondary">管理者はすべての機能を使えます。この画面では権限の確認だけでき、ここからは変更できません。役割を変えるときは一覧の「変更する」から行います。</p> : null}</section>
+        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。かたまりを選ぶとすべての行がその内容に置き換わり、一部だけ許可の細かい設定は残りません。</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">{bundles.map(([value, label, note]) => <button key={value} type="button" disabled={!writable} onClick={() => {
             // R67: かたまりを選んだら個別の上書きは捨てる。残したままにすると
             // 表示は新しいかたまりなのに保存は古い個別設定になる。
             // R497: 選んでいる かたまりの選び直しは何も変えない。
@@ -516,9 +542,9 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
           以前の3列140px固定の表形式は狭い幅で潰れていた。
           各選択肢は触れる高さ（min-h-11）を確保する。
         */}
-        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。「変えられる」は閲覧・編集に加えて配信や返信などの実行も許し、「見えるだけ」は読み取り専用、「出さない」はメニューにも出しません。ただし「個人情報」は機能ではなくメールなどの見せ方を選ぶので、「そのまま見せる」「伏せて見せる」「見せない」の3つになります。</p></div><div className="divide-y divide-hairline border-t border-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const level = levels[item.id] ?? 'none'; const optionLabels = item.kind === 'email_mask' ? SCOPE_MASK_LEVEL_LABELS : SCOPE_LEVEL_LABELS; return <div key={label} className="px-4 py-3"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><div className="min-w-0"><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{item.hint ? <p className="text-xs font-semibold text-warning">{item.hint}</p> : null}</div><div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label={`${label}の見せ方`}>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = level === optionLevel; const optionLabel = optionLabels[option]; return <button key={`${option}:${text}`} type="button" aria-label={`${label}：${optionLabel}（${text}）`} aria-pressed={selected} disabled={!writable} onClick={() => setLevel(item.id, optionLevel)} className={`min-h-11 rounded-control border px-2 py-2 text-center text-xs leading-tight ${selected ? 'border-accent bg-accent-soft font-semibold text-accent-deep' : 'border-divider-soft bg-canvas text-ink-secondary'} ${writable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}><span className="block font-bold">{optionLabel}</span><span className="mt-0.5 block">{text}</span></button> })}</div></div> })}</div></section>
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。「変えられる」は閲覧・編集に加えて配信や返信などの実行も許し、「見えるだけ」は読み取り専用、「出さない」はメニューにも出しません。ただし「個人情報」は機能ではなくメールなどの見せ方を選ぶので、「そのまま見せる」「伏せて見せる」「見せない」の3つになります。行を選び直すとその行だけ置き換わり、触っていない行の一部だけ許可はそのまま残ります。</p></div><div className="divide-y divide-hairline border-t border-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const partialHere = isPartialUntouched(item.id); const level = partialHere ? undefined : (levels[item.id] ?? 'none'); const optionLabels = item.kind === 'email_mask' ? SCOPE_MASK_LEVEL_LABELS : SCOPE_LEVEL_LABELS; return <div key={label} className="px-4 py-3"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><div className="min-w-0"><p className="text-xs font-bold text-ink">{label}{partialHere ? '（一部だけ許可）' : ''}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{item.hint ? <p className="text-xs font-semibold text-warning">{item.hint}</p> : null}</div><div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label={`${label}の見せ方`}>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = !partialHere && level === optionLevel; const optionLabel = optionLabels[option]; return <button key={`${option}:${text}`} type="button" aria-label={`${label}：${optionLabel}（${text}）`} aria-pressed={selected} disabled={!writable} onClick={() => setLevel(item.id, optionLevel)} className={`min-h-11 rounded-control border px-2 py-2 text-center text-xs leading-tight ${selected ? 'border-accent bg-accent-soft font-semibold text-accent-deep' : 'border-divider-soft bg-canvas text-ink-secondary'} ${writable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}><span className="block font-bold">{optionLabel}</span><span className="mt-0.5 block">{text}</span></button> })}</div>{partialHere ? <p className="mt-2 text-xs font-medium text-ink-secondary">一部だけ許可されています（3つの選択肢では表せません）。許可中のもの：{partialLabelOf(item.id)}。このまま保存すれば残ります。この行を選び直すと、その行は選んだ内容に置き換わります。</p> : null}</div> })}</div></section>
       </div>
-      <aside className="flex flex-col gap-4"><section className="rounded-card border border-hairline bg-canvas p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2>{dirty ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-deep">変更後の予定</span> : null}</div><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　メニューに出るのは{visibleItems.length}項目</b><br />　　{visibleItems.length > 0 ? visibleItems.map((item) => item.label).join('・') : '出る項目はありません'}</p><p><b className="text-ink">◉　出さないのは{hiddenItems.length}項目</b><br />　　{hiddenItems.length > 0 ? `${hiddenItems.map((item) => item.label).join('・')}。URLを直に打っても「見る権限がありません」と出ます` : '出さない項目はありません'}</p><p><b className="text-ink">◉　{piiNote}</b></p>{changedItems === null ? <p><b className="text-ink">◉　いまの設定は個別に決められているため、ここから変わる項目の内訳は未確認です</b></p> : changedItems.length > 0 ? <p><b className="text-ink">◉　いまの設定から変わるのは{changedItems.length}項目</b><br />　　{changedItems.map((item) => item.label).join('・')}</p> : <p><b className="text-ink">◉　いまの設定と同じ内容です</b></p>}{extraLabels.length > 0 ? <p><b className="text-ink">◉　この表にない権限{extraLabels.length}件（{extraLabels.join('・')}）は保存してもそのまま残します</b></p> : null}</div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2>{/* LAY-10: 見た目だけの矢印をやめ、本物のリンクにする。開くと未保存の下書きは捨ててその画面へ移る（キャンセルと同じ扱い）。 */}<div className="mt-3 space-y-3 text-xs"><Link href="/settings" onClick={onClose} className="block font-bold text-action hover:underline">→ 機能設定</Link><Link href="/staff?tab=audit" onClick={onClose} className="block font-bold text-action hover:underline">→ 入った記録</Link><Link href="/emergency" onClick={onClose} className="block font-bold text-action hover:underline">→ 運用状態</Link><Link href="/booking/menus" onClick={onClose} className="block font-bold text-action hover:underline">→ 予約設定</Link></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
+      <aside className="flex flex-col gap-4"><section className="rounded-card border border-hairline bg-canvas p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2>{dirty ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-deep">変更後の予定</span> : null}</div><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　メニューに出るのは{visibleItems.length}項目</b><br />　　{visibleItems.length > 0 ? visibleItems.map((item) => item.label).join('・') : '出る項目はありません'}</p><p><b className="text-ink">◉　出さないのは{hiddenItems.length}項目</b><br />　　{hiddenItems.length > 0 ? `${hiddenItems.map((item) => item.label).join('・')}。URLを直に打っても「見る権限がありません」と出ます` : '出さない項目はありません'}</p><p><b className="text-ink">◉　{piiNote}</b></p>{changedItems === null ? <p><b className="text-ink">◉　いまの設定は個別に決められているため、ここから変わる項目の内訳は未確認です</b></p> : changedItems.length > 0 ? <p><b className="text-ink">◉　いまの設定から変わるのは{changedItems.length}項目</b><br />　　{changedItems.map((item) => item.label).join('・')}</p> : <p><b className="text-ink">◉　いまの設定と同じ内容です</b></p>}{partialUntouchedRows.length > 0 ? <p><b className="text-ink">◉　一部だけ許可が{partialUntouchedRows.length}行あります</b><br />　　{partialUntouchedRows.map((row) => `${SCOPE_ITEMS.find((item) => item.id === row.itemId)?.label ?? row.itemId}（許可中のもの：${row.allowedKeys.map((key) => permissionLabel(key) || key).join('・')}）`).join('、')}。行を触らず保存すれば残ります。かたまり・コピーを選ぶと置き換わります</p> : null}{extraLabels.length > 0 ? <p><b className="text-ink">◉　この表にない権限{extraLabels.length}件（{extraLabels.join('・')}）は保存してもそのまま残します</b></p> : null}</div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2>{/* LAY-10: 見た目だけの矢印をやめ、本物のリンクにする。開くと未保存の下書きは捨ててその画面へ移る（キャンセルと同じ扱い）。 */}<div className="mt-3 space-y-3 text-xs"><Link href="/settings" onClick={onClose} className="block font-bold text-action hover:underline">→ 機能設定</Link><Link href="/staff?tab=audit" onClick={onClose} className="block font-bold text-action hover:underline">→ 入った記録</Link><Link href="/emergency" onClick={onClose} className="block font-bold text-action hover:underline">→ 運用状態</Link><Link href="/booking/menus" onClick={onClose} className="block font-bold text-action hover:underline">→ 予約設定</Link></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
     </div>
     {/*
       LAY-08: バーはビュー幅に追従する。メニューが無い幅では全幅、

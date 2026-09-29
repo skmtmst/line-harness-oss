@@ -58,3 +58,47 @@ export function applyScopeRowChange(
 export function scopePiiToEmailMask(pii: FeatureAccessLevel | undefined): EmailMaskLevel {
   return pii === 'edit' ? 'full' : pii === 'none' ? 'none' : 'masked'
 }
+
+/*
+ * 3択では表せない「一部だけ許可」の行を見つける（R497b）。
+ *
+ * 例：分析の7キーのうち `/analytics` だけ許可されていると、
+ * keysToScopeLevels はその行を `none`（出さない）と写す。
+ * 実際には `/analytics` が使えるので、そのまま「出さない」と出すのは
+ * 保存内容と違う。該当行は3択のどれも押さず、内訳を別に示す。
+ *
+ * 判定は表のキー（SCOPE_ITEMS の keys）だけを見る。
+ * 配信の操作キー（下書き・テスト・送信・CSV）は有無を問わない
+ * （古い保存行は操作キーなしでも配信editとして読む既存の約束どおり）。
+ * 混ざり（edit と view に分かれて全部ある）も一部扱いにする。
+ * 全部が view にあるときだけ view、全部が edit にあるときだけ edit。
+ */
+export interface PartialScopeRow {
+  itemId: string
+  allowedEditKeys: string[]
+  allowedViewKeys: string[]
+  allowedKeys: string[]
+}
+
+export function findPartialScopeRows(
+  editKeys: string[],
+  viewKeys: string[],
+): PartialScopeRow[] {
+  const rows: PartialScopeRow[] = []
+  for (const item of SCOPE_ITEMS) {
+    if (item.kind !== 'feature') continue
+    const editInRow = item.keys.filter((key) => editKeys.includes(key))
+    const viewInRow = item.keys.filter((key) => !editKeys.includes(key) && viewKeys.includes(key))
+    const allowed = [...editInRow, ...viewInRow]
+    if (allowed.length === 0) continue
+    if (editInRow.length === item.keys.length) continue
+    if (viewInRow.length === item.keys.length) continue
+    rows.push({
+      itemId: item.id,
+      allowedEditKeys: editInRow,
+      allowedViewKeys: viewInRow,
+      allowedKeys: allowed,
+    })
+  }
+  return rows
+}
