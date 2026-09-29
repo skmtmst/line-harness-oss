@@ -84,6 +84,7 @@ const GROUP = {
   status: 'draft' as const, publishingAt: null,
   targetingCondition: null, targetingPriority: 0, targetingEnabled: false,
   folderId: null,
+  version: 1,
   pages: [{
     id: 'pg-1', orderIndex: 0, name: 'トップ', aliasId: '',
     lineRichmenuId: null, imageR2Key: null, imageContentType: null, areas: [],

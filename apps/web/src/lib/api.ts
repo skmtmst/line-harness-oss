@@ -12549,6 +12549,8 @@ export const api = {
         targetingPriority: number;
         targetingEnabled: boolean;
         folderId: string | null;
+        /** M951: 保存時に送り返す版。古い版での保存は 409 で止まる。 */
+        version: number;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -12640,6 +12642,8 @@ export const api = {
       }),
 
     update: (groupId: string, input: {
+      /** M951: 読んだときの版。必須。古ければ 409。 */
+      expectedVersion: number;
       name?: string;
       chatBarText?: string;
       isDefaultForAll?: boolean;

@@ -131,6 +131,8 @@ type Group = {
   targetingEnabled: boolean
   /** 159: フォルダ。分けていなければ null。 */
   folderId: string | null
+  /** M951: 読んだときの版。保存時に送り返し、古ければ 409 で止まる。 */
+  version: number
   pages: Page[]
 }
 
@@ -740,7 +742,14 @@ function Editor({
   }
 
   async function persistDraft(): Promise<void> {
+    // M951: 読んだときの版を付けて保存する。別画面・別タブで先に保存
+    // されていたら 409 になり、上書きせず読み直しを促す。
+    const version = group?.version
+    if (version === undefined) {
+      throw new Error('メニューを読み込めていません。一覧から開き直してください。')
+    }
     const res = await api.richMenuGroups.update(groupId, {
+      expectedVersion: version,
       name,
       chatBarText,
       isDefaultForAll,
@@ -859,7 +868,10 @@ function Editor({
       )
       await reload()
     } catch {
-      setConfirmError('取り下げできませんでした。しばらくおいてから、もう一度お試しください。')
+      // M953: LINE 側の削除に失敗したときは draft 確定にならず published の
+      // まま残る。メニューが LINE 上に残っていることを明示し、この窓のまま
+      // もう一度取り下げられるようにする（窓は閉じない）。
+      setConfirmError('LINE上のメニューを取り下げできませんでした。メニューはLINE上に残っています。最新の状態を確認して、もう一度お試しください。')
     } finally {
       setUnpublishing(false)
     }
