@@ -379,6 +379,34 @@ describe('#838 Google Sheets 連携パネル', () => {
     expect(text()).not.toContain('出力先を保存できませんでした')
   })
 
+  it('接続開始の応答が返る前に別アカウントへ切り替えたら、前のアカウントの認証へ進まない（R446）', async () => {
+    let resolveStart: ((v: unknown) => void) | null = null
+    handler = async (path, method) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) return connectionBody('disconnected')
+      if (path.startsWith('/api/integrations/google-sheets/runs')) return { success: true, data: { runs: [] } }
+      if (path === '/api/integrations/google-sheets/connect/start' && method === 'POST') {
+        return new Promise((resolve) => { resolveStart = resolve })
+      }
+      return { success: false, error: 'unhandled' }
+    }
+    await render()
+
+    await act(async () => { button('Googleアカウントを接続する')!.click() })
+    // 応答を待つ間に別アカウントへ切り替える
+    accountState.selectedAccountId = 'acc-2'
+    await act(async () => { root.render(<GoogleSheetsPanel />) })
+    await act(async () => {
+      resolveStart!({ success: true, data: { authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth?x=1', mode: 'connect' } })
+    })
+    await settle()
+
+    const assignMock = (globalThis as unknown as { location: { assign: unknown } }).location.assign as ReturnType<typeof vi.fn>
+    expect(assignMock.mock.calls.length).toBe(0)
+    // B側にAの失敗・busyも残らない
+    expect(text()).not.toContain('接続を始められませんでした')
+    expect(button('Googleアカウントを接続する')?.disabled).toBe(false)
+  })
+
   it('解除の確認窓は対象アカウント名を見せ、アカウント切替で閉じる（R446/R447）', async () => {
     accountState.selectedAccount = { name: '一号店' }
     handler = async (path) => {

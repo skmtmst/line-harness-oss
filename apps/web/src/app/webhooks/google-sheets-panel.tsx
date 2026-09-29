@@ -210,8 +210,13 @@ export default function GoogleSheetsPanel() {
     setActionError('')
     try {
       const res = await api.webhooks.googleSheets.connectStart(requestAccountId)
+      /*
+       * 応答が返る前に別アカウントへ切り替わっていたら何もしない。
+       * ここで止めないと、いま見ているアカウントの画面から
+       * 前のアカウント向けの認証へ勝手に連れて行かれる。
+       */
+      if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
-        if (selectedAccountIdRef.current !== requestAccountId) return
         setActionError(res.error)
         return
       }
