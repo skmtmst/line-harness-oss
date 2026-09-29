@@ -773,14 +773,21 @@ export async function createStepUpGrant(
     expiresAt: string;
     now?: string;
     totpStep?: number;
+    /** 発行したセッションの指紋。無いとき（APIキー経路）は結び付けない。 */
+    sessionTokenHash?: string | null;
+    /** 発行時の権限の版。権限の更新で進むと確認票は使えない。 */
+    issuedPolicyVersion?: number | null;
   },
 ): Promise<boolean> {
   const now = input.now ?? new Date().toISOString();
+  const sessionTokenHash = input.sessionTokenHash ?? null;
+  const issuedPolicyVersion = input.issuedPolicyVersion ?? null;
   if (input.totpStep === undefined) {
     await db.prepare(
       `INSERT INTO auth_step_up_grants
-         (token_hash, staff_id, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`,
-    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now).run();
+         (token_hash, staff_id, purpose, expires_at, created_at, session_token_hash, issued_policy_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now, sessionTokenHash, issuedPolicyVersion).run();
     return true;
   }
 
@@ -794,9 +801,9 @@ export async function createStepUpGrant(
     // claim成功を示すときだけgrantを保存し、並列の同一コードを増殖させない。
     db.prepare(
       `INSERT INTO auth_step_up_grants
-         (token_hash, staff_id, purpose, expires_at, created_at)
-       SELECT ?, ?, ?, ?, ? WHERE changes() = 1`,
-    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now),
+         (token_hash, staff_id, purpose, expires_at, created_at, session_token_hash, issued_policy_version)
+       SELECT ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`,
+    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now, sessionTokenHash, issuedPolicyVersion),
     db.prepare(
       `DELETE FROM auth_step_up_attempts
         WHERE staff_id = ?
@@ -855,6 +862,30 @@ export async function reserveStepUpAttempt(
   } : null;
 }
 
+/**
+ * R503: 入力上限で止めたとき、次に試せるまでの秒数。
+ *
+ * 10分窓の開始から数える。行が無い・読めないときは窓全体（10分）を返す。
+ * 画面は「約N分待ってからやり直してください」と出す。
+ */
+export async function stepUpAttemptRetryAfterSeconds(
+  db: D1Database,
+  staffId: string,
+  now = new Date().toISOString(),
+): Promise<number> {
+  const windowSeconds = Math.round(STEP_UP_ATTEMPT_WINDOW_MS / 1000);
+  try {
+    const row = await db.prepare(
+      'SELECT window_started_at FROM auth_step_up_attempts WHERE staff_id = ?',
+    ).bind(staffId).first<{ window_started_at: string }>();
+    if (!row) return windowSeconds;
+    const resetAt = Date.parse(row.window_started_at) + STEP_UP_ATTEMPT_WINDOW_MS;
+    return Math.max(1, Math.ceil((resetAt - Date.parse(now)) / 1000));
+  } catch {
+    return windowSeconds;
+  }
+}
+
 /** 二段階認証の初回設定確認について、10分間に5回までの試行枠を確保する。 */
 export async function reserveTwoFactorSetupAttempt(
   db: D1Database,
@@ -909,14 +940,29 @@ export async function clearStepUpAttempts(db: D1Database, staffId: string): Prom
 
 export async function consumeStepUpGrant(
   db: D1Database,
-  input: { tokenHash: string; staffId: string; purpose: string; now?: string },
+  input: {
+    tokenHash: string; staffId: string; purpose: string; now?: string;
+    /**
+     * 使おうとしている要求のセッション指紋（無いときは null）。
+     * 確認票の発行セッションと違う・発行セッションが消えていたら使えない。
+     * 確認票側の結び付けが無い（移行前）は従来どおり通す。
+     */
+    sessionTokenHash?: string | null;
+  },
 ): Promise<boolean> {
   const now = input.now ?? new Date().toISOString();
   const result = await db.prepare(
     `UPDATE auth_step_up_grants SET consumed_at = ?
       WHERE token_hash = ? AND staff_id = ? AND purpose = ?
-        AND consumed_at IS NULL AND expires_at > ?`,
-  ).bind(now, input.tokenHash, input.staffId, input.purpose, now).run();
+        AND consumed_at IS NULL AND expires_at > ?
+        AND (session_token_hash IS NULL OR session_token_hash = ?)
+        AND (session_token_hash IS NULL OR EXISTS (
+          SELECT 1 FROM admin_sessions
+          WHERE token_hash = auth_step_up_grants.session_token_hash
+            AND staff_id = auth_step_up_grants.staff_id))
+        AND (issued_policy_version IS NULL OR issued_policy_version = (
+          SELECT policy_version FROM staff_members WHERE id = auth_step_up_grants.staff_id))`,
+  ).bind(now, input.tokenHash, input.staffId, input.purpose, now, input.sessionTokenHash ?? null).run();
   return Number(result.meta?.changes ?? 0) === 1;
 }
 

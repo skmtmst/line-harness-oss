@@ -22,8 +22,12 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import {
   ACCESS_ROLE_BUNDLE_IDS, SCOPE_ITEMS, BUNDLE_PRESETS, scopeLevelsToKeys, keysToScopeLevels,
+  BROADCAST_EDIT_OPERATION_KEYS,
   type AccessRoleBundleId, type FeatureAccessLevel, type EmailMaskLevel, type ScopeLevels,
 } from '@line-crm/shared';
+import {
+  getStaffPermissionReceipt, saveStaffPermissionReceipt,
+} from '@line-crm/db';
 
 const staff = new Hono<Env>();
 // 招待の有効期限は7日。要件 v6-30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
@@ -93,6 +97,43 @@ function parseScope(value: unknown): ScopeLevels | null | undefined {
     if (level !== 'none' && level !== 'view' && level !== 'edit') return null;
   }
   return value as ScopeLevels;
+}
+
+/*
+ * R497: 見せる範囲の表・かたまりが管理するキーの集合。
+ * `/automations` のように表にも全プリセットにも載っていない既存キーは、
+ * この外側として保存で落とさない（温存する）。
+ */
+const SCOPE_COVERED_KEYS: ReadonlySet<string> = new Set([
+  ...SCOPE_ITEMS.flatMap((item) => item.keys),
+  ...BROADCAST_EDIT_OPERATION_KEYS,
+]);
+
+/*
+ * R497: 個別編集の窓で付け外しできる顔ぶれ。
+ * web の `staff/page.tsx` の EDIT_PERMISSION_PATHS（21件）と
+ * `permission-labels.ts` の成果承認の組（操作＋表示）に対応する。
+ * この外側のキーはその窓から消せないので、保存で落とさない。
+ * 顔ぶれを変えたらこちらも合わせる。
+ */
+const INDIVIDUAL_EDIT_UI_KEYS: ReadonlySet<string> = new Set([
+  '/', '/chats', '/friends', '/tags', '/scenarios', '/broadcasts', '/reminders',
+  '/auto-replies', '/templates', '/rich-menus', '/form-submissions', '/contents/vars',
+  '/contents', '/analytics', '/automations', '/webhooks', '/booking/bookings',
+  '/ec-commerce', '/line-notifications', '/nen-campaigns', '/nen-members',
+  '/conversions', 'conversion.approval.edit',
+]);
+
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+function parseIdempotencyKey(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === 'string' && IDEMPOTENCY_KEY_PATTERN.test(value) ? value : null;
+}
+
+function parseExpectedPolicyVersion(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : null;
 }
 
 function displayRole(row: StaffMember): 'admin' | 'staff' | 'viewer' {
@@ -586,7 +627,16 @@ staff.patch('/api/staff/:id', async (c) => {
     accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq';
     roleBundle?: string; permissionScope?: Record<string, string>;
     permissionViewKeys?: string[]; emailMask?: string;
+    idempotencyKey?: string; expectedPolicyVersion?: number;
   }>();
+  const idempotencyKey = parseIdempotencyKey(body.idempotencyKey);
+  if (idempotencyKey === null) {
+    return c.json({ success: false, error: '要求キーの形式が正しくありません' }, 400);
+  }
+  const expectedPolicyVersion = parseExpectedPolicyVersion(body.expectedPolicyVersion);
+  if (expectedPolicyVersion === null) {
+    return c.json({ success: false, error: '保存の版の形式が正しくありません' }, 400);
+  }
   const keyError = invalidPermissionKeys(body.permissionKeys)
     ?? invalidPermissionKeys(body.permissionViewKeys)
     ?? invalidNotificationPreferences(body.notificationPreferences);
@@ -683,6 +733,37 @@ staff.patch('/api/staff/:id', async (c) => {
     return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
   }
 
+  /*
+   * R498: 同じ要求キーの送り直しは、受け付けた結果をそのまま返す。
+   * 応答を見失った画面の再試行が、版を重ねたり保存後の新しいセッションを
+   * 切ったりしないようにする。対象の権限確認（上）は済ませているが、
+   * 新しい副作用は起こさないので直前再認証は求めない（初回で済ませている）。
+   * 内容が違う送り直しは受け付けない。
+   */
+  const requestHashSource = JSON.stringify({
+    name: body.name ?? null, email: body.email ?? null, role: body.role ?? null,
+    isActive: body.isActive ?? null, lineLinked: body.lineLinked ?? null,
+    permissionKeys: body.permissionKeys ?? null,
+    notificationPreferences: body.notificationPreferences ?? null,
+    assignedLineAccountId: body.assignedLineAccountId ?? null,
+    canAccessDescendantAccounts: body.canAccessDescendantAccounts ?? null,
+    accountScope: accountScope.accountScope ?? null,
+    scopedLineAccountIds: accountScope.scopedLineAccountIds ?? null,
+    roleBundle: body.roleBundle ?? null, permissionScope: body.permissionScope ?? null,
+    permissionViewKeys: body.permissionViewKeys ?? null, emailMask: body.emailMask ?? null,
+    expectedPolicyVersion: expectedPolicyVersion ?? null,
+  });
+  const requestHash = await sha256Hex(requestHashSource);
+  if (idempotencyKey !== undefined) {
+    const receipt = await getStaffPermissionReceipt(c.env.DB, id, idempotencyKey);
+    if (receipt) {
+      if (receipt.request_hash !== requestHash) {
+        return c.json({ success: false, error: '同じ要求キーで内容が異なる保存は受け付けません' }, 422);
+      }
+      return c.json(JSON.parse(receipt.result) as { success: boolean; data: unknown });
+    }
+  }
+
   // 権限・利用状態・連携・見せる範囲の変更は乗っ取り悪用されやすい高危険操作。
   // 判定は書き込みより前に行い、step-up無しならDBへ何も書かない（N-427）。
   const authenticationPolicyChanged =
@@ -702,12 +783,23 @@ staff.patch('/api/staff/:id', async (c) => {
   // N-424: 役割bundleは「初期値のプリセット」。保存されるのは role_bundle と
   // 展開済みの edit/view キーで、実際の認可は保存済みキーが決める。
   // bundle と項目・メールを同時に指定したときはプリセットから外れた=カスタムとして保存する。
+  //
+  // R497: 表・窓に載っていない既存キー（`/automations` など）はどの入口からも
+  // 落とさない。置き換えるのは各入口が管理する集合だけにし、外側は温存する。
+  const previousEditKeys = safeJson<string[]>(target.permission_keys, []);
+  const previousViewKeys = safeJson<string[]>(target.view_permission_keys, []);
+  const keepOutside = (previous: string[], shown: ReadonlySet<string>): string[] =>
+    previous.filter((key) => !shown.has(key));
+  const mergeKeys = (computed: string[], kept: string[]): string[] =>
+    [...new Set([...computed, ...kept])];
   let roleWrite: 'admin' | 'staff' | undefined =
     body.role === 'admin' ? 'admin' : body.role ? 'staff' : undefined;
   let levelWrite: 'read_only' | 'full' | undefined =
     body.role === undefined ? undefined : body.role === 'viewer' ? 'read_only' : 'full';
   let bundleWrite: string | null | undefined;
-  let editKeysWrite: string[] | undefined = body.permissionKeys;
+  let editKeysWrite: string[] | undefined = body.permissionKeys !== undefined
+    ? mergeKeys(body.permissionKeys, keepOutside(previousEditKeys, INDIVIDUAL_EDIT_UI_KEYS))
+    : undefined;
   let viewKeysWrite: string[] | undefined = body.permissionViewKeys;
   let maskWrite: EmailMaskLevel | null | undefined = emailMask;
 
@@ -719,8 +811,14 @@ staff.patch('/api/staff/:id', async (c) => {
     roleWrite = bundle === 'administrator' ? 'admin' : 'staff';
     levelWrite = bundle === 'view_only' ? 'read_only' : 'full';
     bundleWrite = customized ? 'custom' : bundle;
-    editKeysWrite = scope !== undefined ? scopeLevelsToKeys(scope).edit : body.permissionKeys ?? presetKeys.edit;
-    viewKeysWrite = scope !== undefined ? scopeLevelsToKeys(scope).view : body.permissionViewKeys ?? presetKeys.view;
+    editKeysWrite = mergeKeys(
+      scope !== undefined ? scopeLevelsToKeys(scope).edit : body.permissionKeys ?? presetKeys.edit,
+      keepOutside(previousEditKeys, SCOPE_COVERED_KEYS),
+    );
+    viewKeysWrite = mergeKeys(
+      scope !== undefined ? scopeLevelsToKeys(scope).view : body.permissionViewKeys ?? presetKeys.view,
+      keepOutside(previousViewKeys, SCOPE_COVERED_KEYS),
+    );
     maskWrite = emailMask ?? preset.emailMask;
   } else if (bundle === 'custom' || scope !== undefined
     || body.permissionViewKeys !== undefined || emailMask !== undefined) {
@@ -728,16 +826,31 @@ staff.patch('/api/staff/:id', async (c) => {
     if (bundle === 'custom') { roleWrite = 'staff'; levelWrite = 'full'; }
     if (scope !== undefined) {
       const keys = scopeLevelsToKeys(scope);
-      editKeysWrite = keys.edit;
-      viewKeysWrite = keys.view;
+      editKeysWrite = mergeKeys(keys.edit, keepOutside(previousEditKeys, SCOPE_COVERED_KEYS));
+      viewKeysWrite = mergeKeys(keys.view, keepOutside(previousViewKeys, SCOPE_COVERED_KEYS));
     }
   } else if (body.role !== undefined) {
     // 旧来の role 指定も bundle へ写す（画面・監査で同じ言葉を使うため）。
     bundleWrite = body.role === 'admin' ? 'administrator' : body.role === 'viewer' ? 'view_only' : 'custom';
     if (body.role === 'viewer' && viewKeysWrite === undefined) {
-      viewKeysWrite = scopeLevelsToKeys(BUNDLE_PRESETS.view_only.levels).view;
+      viewKeysWrite = mergeKeys(
+        scopeLevelsToKeys(BUNDLE_PRESETS.view_only.levels).view,
+        keepOutside(previousViewKeys, SCOPE_COVERED_KEYS),
+      );
     }
   }
+
+  /*
+   * R501: この保存で対象が「操作できる管理者」から外れるか。外れるときは
+   * 書き込みと同じ条件で「ほかに有効な管理者が残る」ことを求める。
+   * 直前の guardLastAdmin は単独の最終管理者を止めるが、同時の互いの停止は
+   * 両方が通過してしまうため、書き込み時の条件で0人を防ぐ。
+   */
+  const postIsActive = body.isActive ?? Boolean(target.is_active);
+  const postRole = roleWrite ?? target.role;
+  const postLevel = levelWrite ?? target.access_level;
+  const removesAdminFromTarget = canAdminister(target)
+    && !(postIsActive && postRole !== 'staff' && postLevel !== 'read_only');
 
   const updated = await updateStaffMember(c.env.DB, id, {
     name: body.name, email: body.email,
@@ -759,13 +872,48 @@ staff.patch('/api/staff/:id', async (c) => {
         ? body.canAccessDescendantAccounts
         : false,
     account_scope: accountScope.accountScope,
-  });
+  }, ...((expectedPolicyVersion !== undefined || removesAdminFromTarget)
+    ? [{
+      ...(expectedPolicyVersion !== undefined ? { expectedPolicyVersion } : {}),
+      ...(removesAdminFromTarget ? { requireRemainingAdmin: { tenantId: currentTenantId(c) } } : {}),
+    }]
+    : []));
+  /*
+   * R499: 読んだ版と違うまま保存しようとしたら競合で止める。
+   * 最新の制限を古い画面が上書きしない。行自体が無いときは404のまま。
+   * R501: 同時に互いを止めた2つ目は、ほかに管理者が残らないので競合で止める。
+   */
+  if (!updated && (expectedPolicyVersion !== undefined || removesAdminFromTarget)) {
+    const latest = await getStaffById(c.env.DB, id);
+    if (latest && isInCurrentTenant(c, latest)) {
+      const versionChanged = expectedPolicyVersion !== undefined
+        && Number(latest.policy_version ?? 1) !== expectedPolicyVersion;
+      return c.json({
+        success: false,
+        error: versionChanged
+          ? 'ほかの管理者が先に権限を変更しました。最新の内容を確認してから、もう一度保存してください。'
+          : 'ほかの管理者の変更と重なり、管理者が一人もいなくなります。最新の内容を確認してから、もう一度保存してください。',
+        code: 'STAFF_POLICY_CONFLICT',
+        data: await serializeStaff(c.env.DB, latest, staffEmailVisibility(c, latest.id)),
+      }, 409);
+    }
+    return c.json({ success: false, error: 'Staff member not found' }, 404);
+  }
   if (updated && accountScope.accountScope !== undefined) {
     await replaceStaffAccountScopes(c.env.DB, id, accountScope.scopedLineAccountIds);
   }
   if (updated && authenticationPolicyChanged) {
     await revokeStaffAuthentication(c.env.DB, id);
   }
+  // R498: 受け付けた結果を要求キーに残す。送り直しはここへ来ず台帳から返す。
+  const storeReceipt = async (payload: { success: boolean; data: unknown }) => {
+    if (idempotencyKey === undefined || !updated) return;
+    await saveStaffPermissionReceipt(c.env.DB, {
+      idempotencyKey, staffId: id,
+      requestHash, policyVersion: Number(updated.policy_version ?? 1),
+      result: JSON.stringify(payload),
+    });
+  };
   if (updated && selfEmailChange) {
     await updateStaffMember(c.env.DB, id, {
       email_change_new: selfEmailChange.next,
@@ -788,9 +936,14 @@ staff.patch('/api/staff/:id', async (c) => {
       return c.json({ success: false, error: '確認メールを送信できませんでした。時間をおいて、もう一度変更してください。' }, 500);
     }
     const data = await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id));
-    return c.json({ success: true, data: { ...data, emailChangePending: true, pendingEmail: selfEmailChange.next } });
+    const payload = { success: true as const, data: { ...data, emailChangePending: true, pendingEmail: selfEmailChange.next } };
+    await storeReceipt(payload);
+    return c.json(payload);
   }
-  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!updated) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  const payload = { success: true as const, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) };
+  await storeReceipt(payload);
+  return c.json(payload);
 });
 
 /*
@@ -938,8 +1091,22 @@ staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   if (!await consumeStaffStepUp(c, 'staff.permissions.change')) {
     return c.json({ success: false, error: 'スタッフの利用停止には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
   }
-  const updated = await updateStaffMember(c.env.DB, id, { is_active: 0 });
-  await revokeStaffAuthentication(c.env.DB, id);
+  // R501: 削除も「ほかに有効な管理者が残る」を同じ書き込みの条件にする。
+  const removesAdmin = canAdminister(target);
+  const updated = await updateStaffMember(c.env.DB, id, { is_active: 0 },
+    ...(removesAdmin ? [{ requireRemainingAdmin: { tenantId: currentTenantId(c) } }] : []));
+  if (!updated && removesAdmin) {
+    const latest = await getStaffById(c.env.DB, id);
+    if (latest && isInCurrentTenant(c, latest)) {
+      return c.json({
+        success: false,
+        error: 'ほかの管理者の変更と重なり、管理者が一人もいなくなります。最新の内容を確認してから、もう一度保存してください。',
+        code: 'STAFF_POLICY_CONFLICT',
+      }, 409);
+    }
+    return c.json({ success: false, error: 'Staff member not found' }, 404);
+  }
+  if (updated) await revokeStaffAuthentication(c.env.DB, id);
   return updated
     ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) })
     : c.json({ success: false, error: 'Staff member not found' }, 404);
