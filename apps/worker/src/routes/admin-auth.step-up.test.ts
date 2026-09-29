@@ -78,7 +78,12 @@ describe('POST /api/auth/step-up の試行回数制限', () => {
 
     const fifth = await requestStepUp(invalid, 'affiliate.payout.export');
     expect(fifth.status).toBe(429);
-    await expect(fifth.json()).resolves.toEqual({ success: false, error: LIMIT_ERROR });
+    // R503: 上限時は待ち秒数を本文と Retry-After の両方で返す。
+    await expect(fifth.json()).resolves.toEqual({
+      success: false, error: LIMIT_ERROR, data: { retryAfterSeconds: expect.any(Number) },
+    });
+    const retryAfter = Number(fifth.headers.get('Retry-After'));
+    expect(Number.isInteger(retryAfter) && retryAfter > 0).toBe(true);
 
     const blocked = await requestStepUp(await currentCode(), 'photo.original.download');
     expect(blocked.status).toBe(429);
@@ -102,6 +107,10 @@ describe('POST /api/auth/step-up の試行回数制限', () => {
     expect(testDb.raw.prepare(
       'SELECT * FROM auth_step_up_attempts WHERE staff_id = ?',
     ).get('staff-1')).toBeUndefined();
+    // 発行した確認票には発行時の権限の版が残る（試験台にセッション行は無い）。
+    expect(testDb.raw.prepare(
+      'SELECT session_token_hash, issued_policy_version FROM auth_step_up_grants WHERE staff_id = ?',
+    ).get('staff-1')).toEqual({ session_token_hash: null, issued_policy_version: 1 });
   });
 
   it('10分の窓が過ぎたら再び認証を試せる', async () => {

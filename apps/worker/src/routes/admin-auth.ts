@@ -41,6 +41,7 @@ import {
   incrementTwoFactorChallengeAttempts,
   reserveStepUpAttempt,
   staffRequiresMfa,
+  stepUpAttemptRetryAfterSeconds,
   updateStaffMember,
 } from '@line-crm/db';
 import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
@@ -62,6 +63,20 @@ const OAUTH_REMEMBER_COOKIE = 'lh_line_remember';
 const OAUTH_MAX_AGE = 600;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
 const STEP_UP_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
+
+/*
+ * R503: 入力上限の429には待ち秒数を付ける。画面は「約N分待ってから」と出す。
+ * Retry-After（秒）も付け、機械的な再試行の目安にする。本文は利用者向けの
+ * 回復案内だけ（内部情報は入れない）。
+ */
+async function stepUpRateLimitResponse(c: Context<Env>, staffId: string) {
+  const retryAfterSeconds = await stepUpAttemptRetryAfterSeconds(c.env.DB, staffId);
+  return c.json(
+    { success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR, data: { retryAfterSeconds } },
+    429,
+    { 'Retry-After': String(retryAfterSeconds) },
+  );
+}
 
 function oauthCookie(name: string, value: string, maxAge = OAUTH_MAX_AGE): string {
   return `${name}=${encodeURIComponent(value)}; Path=/api/auth/line; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
@@ -506,7 +521,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   }
   const attempt = await reserveStepUpAttempt(c.env.DB, staff.id);
   if (!attempt) {
-    return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
+    return stepUpRateLimitResponse(c, staff.id);
   }
   let totpStep: number | undefined;
   if (useTotp) {
@@ -518,7 +533,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
     );
     if (!verified.valid || verified.step === null) {
       if (attempt.attempts >= attempt.maxAttempts) {
-        return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
+        return stepUpRateLimitResponse(c, staff.id);
       }
       return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
     }
@@ -526,7 +541,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   } else {
     if (!await verifyPassword(password, staff.password_hash!)) {
       if (attempt.attempts >= attempt.maxAttempts) {
-        return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
+        return stepUpRateLimitResponse(c, staff.id);
       }
       return c.json({ success: false, error: 'パスワードが正しくありません' }, 400);
     }
@@ -542,12 +557,16 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   if (totpStep === undefined) await clearStepUpAttempts(c.env.DB, staff.id);
   const token = randomToken();
   const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+  // 確認票は発行したセッションと発行時の権限の版に結び付ける。
+  // ログアウト・権限の更新の後は使えない（使う側で再認証を案内する）。
   if (!await createStepUpGrant(c.env.DB, {
     tokenHash: await sha256Hex(token),
     staffId: staff.id,
     purpose,
     expiresAt,
     totpStep,
+    sessionTokenHash,
+    issuedPolicyVersion: Number(staff.policy_version ?? 1),
   })) {
     return c.json({ success: false, error: 'この認証コードは使用済みです' }, 409);
   }
