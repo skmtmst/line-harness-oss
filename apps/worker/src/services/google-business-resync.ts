@@ -33,6 +33,10 @@ interface ResyncInput {
   now: string;
   fetch?: FetchLike;
   sleep?: (ms: number) => Promise<void>;
+  /** 指定時はこの店舗だけを対象にする（検証環境の手動同期など）。省略時は全店舗（cronの通常挙動）。 */
+  storeId?: string;
+  /** trueならJST当日ゲートを無視して取り直す（手動同期用。cronからは渡さない）。 */
+  force?: boolean;
 }
 
 type ResyncConnectionRow = ConnectionRow & {
@@ -56,14 +60,14 @@ function isStale(lastSyncedAt: string | null, nowIso: string, staleMs: number): 
   return Date.parse(nowIso) - last >= staleMs;
 }
 
-async function listActiveConnections(env: Env['Bindings']): Promise<ResyncConnectionRow[]> {
-  const rows = await env.DB.prepare(
-    `SELECT c.*, s.line_account_id AS store_line_account_id
+async function listActiveConnections(env: Env['Bindings'], storeId?: string): Promise<ResyncConnectionRow[]> {
+  const base = `SELECT c.*, s.line_account_id AS store_line_account_id
        FROM rt_google_connections c
        JOIN rt_stores s ON s.id = c.store_id
-      WHERE c.status = 'connected' AND c.location_name IS NOT NULL AND s.status = 'active'
-      ORDER BY s.line_account_id`,
-  ).all<ResyncConnectionRow>();
+      WHERE c.status = 'connected' AND c.location_name IS NOT NULL AND s.status = 'active'`;
+  const rows = storeId
+    ? await env.DB.prepare(`${base} AND c.store_id = ? ORDER BY s.line_account_id`).bind(storeId).all<ResyncConnectionRow>()
+    : await env.DB.prepare(`${base} ORDER BY s.line_account_id`).all<ResyncConnectionRow>();
   return rows.results;
 }
 
@@ -150,14 +154,14 @@ export async function processGoogleBusinessDailyMetrics(
   const fetchFn = input.fetch ?? fetch;
   const gate = createFeatureJobGate();
   const today = jstDate(input.now);
-  const connections = await listActiveConnections(env);
+  const connections = await listActiveConnections(env, input.storeId);
 
   let synced = 0;
   let skipped = 0;
   let failed = 0;
 
   for (const connection of connections) {
-    if (connection.last_metrics_synced_at && jstDate(connection.last_metrics_synced_at) === today) {
+    if (!input.force && connection.last_metrics_synced_at && jstDate(connection.last_metrics_synced_at) === today) {
       skipped += 1;
       continue;
     }

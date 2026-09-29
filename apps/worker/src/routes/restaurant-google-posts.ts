@@ -111,6 +111,11 @@ function parseMedia(json: string): MediaRef[] {
   }
 }
 
+/** Google側から届いた画像URL（sourceUrl）を media_json 用に変換する。Google発の画像には社内の登録メディアIDが無い。 */
+function mediaRefsFromUrls(urls: string[]): MediaRef[] {
+  return urls.map((url) => ({ mediaId: '', filename: '', sourceUrl: url }));
+}
+
 /** DB行 → 投稿案（Googleへ送る形）。 */
 function draftFromRow(row: PostRow): PostDraft {
   const schedule: PostSchedule | null =
@@ -278,7 +283,7 @@ async function updateDraft(c: Context<Env>, store: StoreContext, id: string, inp
     .run();
 }
 
-type PostStatusPatch = Partial<{ status: PostStatus; error: string | null; requestId: string | null; sentAt: string | null; publishedAt: string | null; checkedAt: string | null; deletedAt: string | null; contentFingerprint: string | null; googlePostName: string | null; googleState: string | null; searchUrl: string | null; googleCreateTime: string | null; googleUpdateTime: string | null; origin: 'admin' | 'google' }>;
+type PostStatusPatch = Partial<{ status: PostStatus; error: string | null; requestId: string | null; sentAt: string | null; publishedAt: string | null; checkedAt: string | null; deletedAt: string | null; contentFingerprint: string | null; googlePostName: string | null; googleState: string | null; searchUrl: string | null; googleCreateTime: string | null; googleUpdateTime: string | null; origin: 'admin' | 'google'; mediaJson: string }>;
 
 async function setStatusForEnv(env: Env['Bindings'], storeId: string, id: string, patch: PostStatusPatch): Promise<void> {
   const sets: string[] = ['updated_at = ?'];
@@ -298,6 +303,7 @@ async function setStatusForEnv(env: Env['Bindings'], storeId: string, id: string
     google_create_time: patch.googleCreateTime,
     google_update_time: patch.googleUpdateTime,
     origin: patch.origin,
+    media_json: patch.mediaJson,
   };
   for (const [column, value] of Object.entries(columns)) {
     if (value === undefined) continue;
@@ -378,6 +384,9 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
         googleUpdateTime: post.updateTime,
         checkedAt: now,
         publishedAt: stateStatus === 'published' && !existing.published_at ? now : undefined,
+        // Google発の投稿（origin='google'）はGoogle側が正なので、画像も毎回最新化する（過去の取りこぼし分もここで自己修復する）。
+        // アプリ発（origin='admin'）は社内の登録メディア参照を保持するため触らない。
+        mediaJson: existing.origin === 'google' ? JSON.stringify(mediaRefsFromUrls(post.mediaUrls)) : undefined,
       });
       continue;
     }
@@ -412,7 +421,7 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
         `INSERT INTO rt_google_posts
            (id, store_id, kind, origin, summary, title, media_json, status, google_post_name, google_state, search_url,
             google_create_time, google_update_time, checked_at, published_at)
-         VALUES (?, ?, ?, 'google', ?, ?, '[]', ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, 'google', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -420,6 +429,7 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
         post.kind === 'unknown' || post.kind === 'alert' ? 'standard' : post.kind,
         post.summary,
         post.title,
+        JSON.stringify(mediaRefsFromUrls(post.mediaUrls)),
         stateStatus,
         post.name,
         post.state,

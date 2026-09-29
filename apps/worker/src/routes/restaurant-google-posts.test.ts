@@ -350,6 +350,49 @@ describe('取り込み（sync）', () => {
     expect(fromGoogle).toMatchObject({ status: 'published', origin: 'google' });
     expect(body.counts.attention).toBe(1);
   });
+
+  it('Google側で作られた投稿の画像を取り込み、「画像なし」にしない', async () => {
+    googlePostsOnGoogle.push({
+      name: `${LOCATION}/localPosts/fromgoogle-img`,
+      topicType: 'STANDARD',
+      summary: '画像つきの投稿',
+      state: 'LIVE',
+      createTime: NOW.toISOString(),
+      media: [{ googleUrl: 'https://lh3.googleusercontent.com/photo1' }],
+    });
+    const s = await call('/api/restaurant-test/google/posts/sync', { method: 'POST' });
+    expect(s.status).toBe(200);
+
+    const list = await call('/api/restaurant-test/google/posts');
+    const body = (await list.json()) as { posts: Array<{ summary: string; id: string }> };
+    const created = body.posts.find((p) => p.summary === '画像つきの投稿');
+    expect(created).toBeTruthy();
+    const get = await call(`/api/restaurant-test/google/posts/${created!.id}`);
+    const detail = (await get.json()) as { post: { media: Array<{ sourceUrl: string }> } };
+    expect(detail.post.media).toEqual([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo1' }]);
+
+    // 2回目の同期でGoogle側の画像が変わっても最新化される（自己修復）。
+    googlePostsOnGoogle = googlePostsOnGoogle.map((p) =>
+      p.name === `${LOCATION}/localPosts/fromgoogle-img` ? { ...p, media: [{ googleUrl: 'https://lh3.googleusercontent.com/photo2' }] } : p,
+    );
+    const s2 = await call('/api/restaurant-test/google/posts/sync', { method: 'POST' });
+    expect(s2.status).toBe(200);
+    const get2 = await call(`/api/restaurant-test/google/posts/${created!.id}`);
+    const detail2 = (await get2.json()) as { post: { media: Array<{ sourceUrl: string }> } };
+    expect(detail2.post.media).toEqual([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo2' }]);
+  });
+
+  it('アプリ発の投稿がGoogleに反映された後も、登録メディアの参照を保持する（Google側のmedia_jsonで上書きしない）', async () => {
+    seedMedia('media-own', 'mise.jpg', 'account-2');
+    const draft = await createDraft({ ...standardBody, mediaId: 'media-own' });
+    await publish(draft.json.post!.id);
+    // 送信直後のGoogle側の応答に画像情報が含まれない（あるいは異なる）ケースでも、上書きしない。
+    const s = await call('/api/restaurant-test/google/posts/sync', { method: 'POST' });
+    expect(s.status).toBe(200);
+    const get = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    const detail = (await get.json()) as { post: { media: Array<{ mediaId: string; sourceUrl: string }> } };
+    expect(detail.post.media).toEqual([{ mediaId: 'media-own', filename: 'mise.jpg', sourceUrl: 'https://worker.example.test/images/images/mise.jpg' }]);
+  });
 });
 
 describe('削除', () => {

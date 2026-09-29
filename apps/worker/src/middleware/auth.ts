@@ -414,7 +414,9 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['POST', '/api/restaurant-test/google/posts'],
   ['POST', '/api/restaurant-test/google/posts/sync'],
   // Googleビジネス第4段（GB-9）：パフォーマンスは読み取りのみ。担当者も見られる。
+  // performance/sync は口コミ・投稿・プロフィールのsyncと同じくGoogleから読んで自DBに書くだけ（Googleへの書き込みは無い）ため、担当者にも許可する。
   ['GET', '/api/restaurant-test/google/performance'],
+  ['POST', '/api/restaurant-test/google/performance/sync'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],

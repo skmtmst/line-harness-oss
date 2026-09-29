@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -16,6 +16,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { api, ApiError } from '@/lib/api'
 import type { MediaItem } from '@line-crm/shared'
+import { extractMediaMetadata, mediaAcceptForKind, putMediaFile, validateMediaFile } from '@/app/contents/media-direct-upload'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import {
   restaurantGoogleApi,
@@ -295,6 +296,8 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
   const [picker, setPicker] = useState<{ open: boolean; items: MediaItem[]; loading: boolean; error: string }>({ open: false, items: [], loading: false, error: '' })
   const [busy, setBusy] = useState<'save' | 'confirm' | null>(null)
   const [actionError, setActionError] = useState('')
+  const [upload, setUpload] = useState<{ busy: boolean; progress: number; error: string }>({ busy: false, progress: 0, error: '' })
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!postId) { setForm(emptyForm(kindFromUrl)); setInitial(emptyForm(kindFromUrl)); setLoading(false); return }
@@ -324,6 +327,32 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
       setPicker({ open: true, items: response.data.items, loading: false, error: '' })
     } catch (err) {
       setPicker({ open: true, items: [], loading: false, error: errorMessage(err, '登録メディアを読み込めませんでした。') })
+    }
+  }
+
+  /** 端末（PC/スマホ）内のファイルをそのまま登録メディアへ登録し、投稿画像として選ぶ。 */
+  const uploadFromDevice = async (file: File) => {
+    const problem = validateMediaFile(file)
+    if (problem) { setUpload({ busy: false, progress: 0, error: problem }); return }
+    setUpload({ busy: true, progress: 0, error: '' })
+    try {
+      const metadata = await extractMediaMetadata(file)
+      const prepared = await api.media.prepareUploads({ accountId, files: [{ filename: file.name, mimeType: file.type, sizeBytes: file.size, metadata }] })
+      if (!prepared.success) throw new ApiError(500, prepared.error)
+      const session = prepared.data.sessions[0]
+      if (!session) throw new Error('送信の準備結果を確認できませんでした')
+      const etag = await putMediaFile(session, file, (progress) => setUpload((current) => ({ ...current, progress })))
+      const completion = await api.media.completeUpload(session.id, { accountId, etag })
+      if (!completion.success) throw new ApiError(500, completion.error)
+      const mediaId = completion.data.mediaId
+      if (!mediaId) throw new Error('登録を完了できませんでした')
+      const detail = await api.media.detail(mediaId, accountId)
+      if (!detail.success) throw new ApiError(500, detail.error)
+      setForm({ ...form, mediaId: detail.data.item.id, mediaFilename: detail.data.item.filename, mediaSourceUrl: detail.data.item.url })
+      setPicker({ open: false, items: [], loading: false, error: '' })
+      setUpload({ busy: false, progress: 100, error: '' })
+    } catch (err) {
+      setUpload({ busy: false, progress: 0, error: errorMessage(err, 'アップロードできませんでした。') })
     }
   }
 
@@ -431,8 +460,21 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-label font-semibold">画像</span>
               <span className="grow" />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={mediaAcceptForKind('image')}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) void uploadFromDevice(file)
+                }}
+              />
+              <Button size="field" onClick={() => fileInputRef.current?.click()} disabled={!editable || upload.busy}>{upload.busy ? `アップロード中… ${upload.progress}%` : '端末からアップロード'}</Button>
               <Button size="field" onClick={() => void openPicker()} disabled={!editable || picker.loading}>登録メディアから選ぶ</Button>
             </div>
+            {upload.error ? <NoteBar tone="danger">{upload.error}</NoteBar> : null}
             {form.mediaSourceUrl ? (
               <figure className="border-hairline relative overflow-hidden rounded-control border" style={{ width: 120, height: 120 }}>
                 <img src={form.mediaSourceUrl} alt={form.mediaFilename ?? ''} className="h-full w-full object-cover" />
