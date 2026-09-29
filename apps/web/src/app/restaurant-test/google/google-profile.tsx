@@ -1195,13 +1195,13 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Pr
             {photosError ? <p className="text-ink-faint text-caption">{photosError}</p> : null}
             <div className="flex flex-wrap gap-2">
               {visiblePhotos.map((p) => (
-                <figure key={p.name} className="border-hairline bg-surface-chrome relative overflow-hidden rounded-control border" style={{ width: 100, height: 100 }}>
+                <figure key={p.name} className="border-hairline bg-shell-gray relative overflow-hidden rounded-control border" style={{ width: 100, height: 100 }}>
                   {p.thumbnailUrl || p.googleUrl ? <img src={p.thumbnailUrl ?? p.googleUrl ?? ''} alt="" className="h-full w-full object-cover" /> : null}
                   <button type="button" onClick={() => setDeletes([...deletes, p.name])} className="bg-canvas text-danger absolute right-1.5 bottom-1.5 rounded-mini px-1.5 text-micro font-semibold" aria-label="この写真を削除">削除</button>
                 </figure>
               ))}
               {adds.map((m) => (
-                <figure key={m.id} className="border-accent bg-surface-chrome relative overflow-hidden rounded-control border" style={{ width: 100, height: 100 }} title={m.filename}>
+                <figure key={m.id} className="border-accent bg-shell-gray relative overflow-hidden rounded-control border" style={{ width: 100, height: 100 }} title={m.filename}>
                   <img src={m.url} alt={m.filename} className="h-full w-full object-cover" />
                   <span className="bg-accent-deep text-on-accent absolute top-1.5 left-1.5 rounded-mini px-1.5 text-micro font-semibold">追加</span>
                   <button type="button" onClick={() => setAdds(adds.filter((x) => x.id !== m.id))} className="bg-canvas text-ink absolute right-1.5 bottom-1.5 rounded-mini px-1.5 text-micro font-semibold" aria-label="追加をやめる">やめる</button>

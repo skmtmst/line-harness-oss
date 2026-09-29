@@ -1221,7 +1221,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
                       disabled={mutationLocked}
                       autoFocus
                       autoComplete="current-password"
-                      className="mt-2 w-full rounded-control border border-surface-chrome bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-action"
+                      className="mt-2 w-full rounded-control border border-shell-gray bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-action"
                     />
                   </>
                 ) : (

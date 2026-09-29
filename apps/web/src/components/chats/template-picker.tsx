@@ -419,7 +419,7 @@ export default function TemplatePicker({
                     setPackItems([])
                   }}
                   aria-pressed={packMode}
-                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${packMode ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-surface-chrome bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
+                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${packMode ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-shell-gray bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
                 >
                   まとめて選ぶ
                 </button>
@@ -470,7 +470,7 @@ export default function TemplatePicker({
                         )
                       }}
                       aria-pressed={packMode ? inPack : selected?.id === template.id}
-                      className={`w-full rounded-lg border px-3 py-3 text-left ${inPack || (!packMode && selected?.id === template.id) ? 'border-accent-border bg-accent-soft' : 'border-surface-chrome bg-canvas hover:bg-canvas-sunken'}`}
+                      className={`w-full rounded-lg border px-3 py-3 text-left ${inPack || (!packMode && selected?.id === template.id) ? 'border-accent-border bg-accent-soft' : 'border-shell-gray bg-canvas hover:bg-canvas-sunken'}`}
                     >
                       <p className="truncate text-sm font-semibold text-[#1F2937]" title={template.name}>
                         {inPack ? `${packIndex + 1}. ` : ''}{template.name}
@@ -513,7 +513,7 @@ export default function TemplatePicker({
                         type="button"
                         onClick={() => setPackItems((prev) => prev.filter((p) => p.id !== item.id))}
                         aria-label={`${item.name}をまとめ送りから外す`}
-                        className="shrink-0 rounded px-1.5 py-0.5 text-ink-faint hover:bg-surface-chrome hover:text-ink-secondary"
+                        className="shrink-0 rounded px-1.5 py-0.5 text-ink-faint hover:bg-shell-gray hover:text-ink-secondary"
                       >
                         外す
                       </button>

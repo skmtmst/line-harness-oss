@@ -212,6 +212,9 @@
     "direct-secondary-button": 2,
     "direct-primary-button": 1
   },
+  "app/layout.tsx": {
+    "unresolved-classname": 1
+  },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 1,
     "arbitrary-value": 8,
