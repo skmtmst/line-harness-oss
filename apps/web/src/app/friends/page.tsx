@@ -697,7 +697,7 @@ function FriendsPageInner({
       {advancedOpen ? (
         <style>{`
           [data-friends-advanced-search] > div {
-            background-color: rgb(16 24 40 / 33%) !important;
+            background-color: var(--color-scrim) !important;
           }
           [data-friends-advanced-search] > div > div {
             max-height: min(944px, calc(100vh - 32px)) !important;

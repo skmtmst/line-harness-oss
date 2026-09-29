@@ -111,9 +111,9 @@ type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'unused'
 
 const typeBadgeColor: Record<string, string> = {
   text: 'bg-canvas-sunken text-ink-secondary',
-  flex: 'bg-purple-100 text-purple-700',
+  flex: 'bg-chip-alt-soft text-chip-alt',
   image: 'bg-info-bg text-info',
-  carousel: 'bg-amber-100 text-amber-700',
+  carousel: 'bg-warning-bg text-warning',
   question: 'bg-accent-soft text-accent-deep',
 }
 
@@ -884,10 +884,10 @@ export default function TemplatesPage() {
           <h2 className="text-sm font-semibold text-ink mb-4">新規テンプレートを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-status-danger">*</span></label>
               <input
                 type="text"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="例: コスト比較 flex"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -897,7 +897,7 @@ export default function TemplatesPage() {
               <label className="block text-xs font-medium text-ink-secondary mb-1">カテゴリ</label>
               <input
                 type="text"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="例: general, 挨拶, 返信"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -908,7 +908,7 @@ export default function TemplatesPage() {
               <Select aria-label="タイプ" value={form.messageType} onChange={(value) => setForm({ ...form, messageType: value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} size="full" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-status-danger">*</span></label>
               {form.messageType === 'image' ? (
                 <ImageUploader
                   mode="line-image"
@@ -939,7 +939,7 @@ export default function TemplatesPage() {
                 />
               ) : (
                 <textarea
-                  className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                  className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                   rows={form.messageType === 'flex' ? 10 : 4}
                   placeholder={form.messageType === 'flex' ? '{"type":"bubble","body":...}' : 'メッセージ内容'}
                   value={form.messageContent}
@@ -948,7 +948,7 @@ export default function TemplatesPage() {
               )}
             </div>
 
-            {formError && <p className="text-xs text-red-600">{formError}</p>}
+            {formError && <p className="text-xs text-danger">{formError}</p>}
 
             <div className="flex gap-2">
               <Button
@@ -1191,7 +1191,7 @@ export default function TemplatesPage() {
             `.overlay`）と同じ 80 に上げ、閉じる操作をいつも見える所に残す。
           */}
           <div
-            className="fixed inset-0 bg-black/30 lg:hidden"
+            className="fixed inset-0 bg-scrim lg:hidden"
             style={{ zIndex: 80 }}
             onClick={() => setDrawerId(null)}
           />
@@ -1207,7 +1207,7 @@ export default function TemplatesPage() {
                     autoFocus
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 border border-hairline rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="flex-1 border border-hairline rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 ) : (
                   <h3
@@ -1232,7 +1232,7 @@ export default function TemplatesPage() {
               <div className="p-6 text-sm text-ink-faint">読み込み中...</div>
             ) : drawerError ? (
               <div className="p-6">
-                <p className="text-sm text-red-600 mb-2">読み込みに失敗しました</p>
+                <p className="text-sm text-danger mb-2">読み込みに失敗しました</p>
                 <p className="text-xs text-ink-faint">{drawerError}</p>
               </div>
             ) : !drawerData ? null : (
@@ -1265,7 +1265,7 @@ export default function TemplatesPage() {
                   )}
                 </div>
                 {publishError && (
-                  <p role="alert" className="text-xs text-red-600">{publishError}</p>
+                  <p role="alert" className="text-xs text-danger">{publishError}</p>
                 )}
 
                 <div>
@@ -1366,7 +1366,7 @@ export default function TemplatesPage() {
                   <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
-                    className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                    className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     readOnly={!canMutateTemplates}
@@ -1448,7 +1448,7 @@ export default function TemplatesPage() {
                         ))}
                       </ul>
                       {drawerUsageCount > 0 && (
-                        <p className="mt-2 text-[10px] text-amber-700">
+                        <p className="mt-2 text-[10px] text-warning">
                           このテンプレートは使用中です。削除する前に使用先を差し替えてください。
                         </p>
                       )}

@@ -238,7 +238,7 @@ export default function RichMenuEditPage() {
     <Suspense
       fallback={
         <div>
-          <p className="text-sm text-gray-500">読み込み中...</p>
+          <p className="text-sm text-ink-faint">読み込み中...</p>
         </div>
       }
     >
@@ -983,7 +983,7 @@ function Editor({
   if (loading) {
     return (
       <div>
-        <p className="text-sm text-gray-500">読み込み中...</p>
+        <p className="text-sm text-ink-faint">読み込み中...</p>
       </div>
     )
   }
@@ -1159,8 +1159,8 @@ function Editor({
               }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 active
-                  ? 'bg-accent-deep text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-accent-deep text-on-accent'
+                  : 'bg-shell text-ink-secondary hover:bg-shell-gray'
               }`}
             >
               {p.name}
@@ -1173,7 +1173,7 @@ function Editor({
         })}
         <button
           onClick={addPage}
-          className="px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="px-3 py-1.5 text-sm font-medium border border-hairline rounded-lg hover:bg-surface-pearl transition-colors"
         >
           + ページ追加
         </button>
@@ -1251,7 +1251,7 @@ function Editor({
               }}
             />
           ) : (
-            <p className="text-sm text-gray-500">ページがありません</p>
+            <p className="text-sm text-ink-faint">ページがありません</p>
           )}
 
           {/*
@@ -1271,7 +1271,7 @@ function Editor({
               </p>
             )}
           {/* メニュー設定 */}
-          <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
+          <section className="bg-canvas border border-hairline rounded-lg shadow-sm p-5 space-y-4">
             <h2 className="text-ink text-sm font-semibold">基本設定</h2>
             <p className="text-ink-faint text-xs">
               サイズ {SIZE_LABEL[group.size]} ・{' '}
@@ -1282,9 +1282,9 @@ function Editor({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="mt-1 block w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="mt-1 text-[11px] text-gray-500">管理画面でだけ使う名前 (友だちには見えない)</p>
+              <p className="mt-1 text-[11px] text-ink-faint">管理画面でだけ使う名前 (友だちには見えない)</p>
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
@@ -1301,35 +1301,35 @@ function Editor({
                 value={chatBarText}
                 onChange={(e) => setChatBarText(e.target.value)}
                 maxLength={14}
-                className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="mt-1 block w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="mt-1 text-[11px] text-gray-500">14 文字以内 (友だちのトーク画面でメニューを開く前に表示)</p>
+              <p className="mt-1 text-[11px] text-ink-faint">14 文字以内 (友だちのトーク画面でメニューを開く前に表示)</p>
             </label>
           </section>
 
           {/* ページ設定 (画像 upload 含む、常時表示) */}
           {activePage && (
-            <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
+            <section className="bg-canvas border border-hairline rounded-lg shadow-sm p-5 space-y-4">
               <h2 className="text-ink text-sm font-semibold">タブ（メニューの切り替え）</h2>
               <p className="text-ink-faint text-xs leading-relaxed">
                 1つのメニューの中でタブを分けられます。タブのボタンを押すと別の面に切り替わります。タブは2〜3つまでを推奨します。多いと押されなくなります。
               </p>
               <label className="block">
-                <span className="text-xs font-medium text-gray-600">ページ名</span>
+                <span className="text-xs font-medium text-ink-secondary">ページ名</span>
                 <input
                   value={activePage.name}
                   onChange={(e) =>
                     updatePage(activePage.id, { name: e.target.value })
                   }
-                  className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="mt-1 block w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </label>
               <div>
-                <span className="text-xs font-medium text-gray-600">画像</span>
+                <span className="text-xs font-medium text-ink-secondary">画像</span>
                 {activePage.imageR2Key ? (
-                  <p className="mt-1 text-xs text-gray-700">✓ アップロード済み</p>
+                  <p className="mt-1 text-xs text-ink-secondary">✓ アップロード済み</p>
                 ) : (
-                  <p className="mt-1 text-xs text-gray-400">未設定</p>
+                  <p className="mt-1 text-xs text-ink-faint">未設定</p>
                 )}
                 <input
                   ref={fileInput}
@@ -1346,7 +1346,7 @@ function Editor({
                   <button
                     onClick={() => fileInput.current?.click()}
                     disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium border border-hairline rounded-lg hover:bg-surface-pearl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {activePage.imageR2Key ? '画像を差し替え' : '画像を選択'}
                   </button>
@@ -1361,28 +1361,28 @@ function Editor({
                   <button
                     onClick={() => setMediaPickerOpen(true)}
                     disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-canvas-sunken disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium border border-hairline rounded-lg hover:bg-canvas-sunken disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     登録メディアから選ぶ
                   </button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-gray-500">
+                <p className="mt-1.5 text-[11px] text-ink-faint">
                   PNG / JPEG, {SIZE_LABEL[group.size]}, 1MB 以下
                 </p>
                 {activePage.id.startsWith('tmp-') && (
-                  <p className="mt-1 text-[11px] text-amber-600">
+                  <p className="mt-1 text-[11px] text-status-warn-deep">
                     新規ページは「下書き保存」してから画像をアップロードしてください
                   </p>
                 )}
               </div>
-              <p className="text-[11px] text-gray-400 pt-3 border-t border-gray-100">
+              <p className="text-[11px] text-ink-faint pt-3 border-t border-divider-soft">
                 中央のキャンバスでドラッグして tap 領域 (areas) を追加・編集できます。
               </p>
             </section>
           )}
 
           {/* 誰に出すか（149） */}
-          <section className="bg-white border border-hairline rounded-lg shadow-sm p-5 space-y-4">
+          <section className="bg-canvas border border-hairline rounded-lg shadow-sm p-5 space-y-4">
             <div>
               <h2 className="text-ink text-sm font-semibold">誰に出すか</h2>
               <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
@@ -1432,7 +1432,7 @@ function Editor({
                 />
 
                 {!targetingCondition && (
-                  <p className="text-[11px] text-amber-600">
+                  <p className="text-[11px] text-status-warn-deep">
                     条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。
                   </p>
                 )}
@@ -1442,7 +1442,7 @@ function Editor({
 
           {/* 選択中エリア (area が選択されている時のみ追加表示) */}
           {selectedArea && activePage && (
-            <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
+            <section className="bg-canvas border border-hairline rounded-lg shadow-sm p-5">
               <AreaProperties
                 area={selectedArea}
                 pages={pagesForSelect}
@@ -1494,17 +1494,17 @@ function Editor({
       ) : null}
 
       {/* ─────────── 危険な操作 (画面最下部に分離) ─────────── */}
-      <section className="mt-10 bg-red-50 border border-red-200 rounded-lg shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-red-700 mb-1">危険な操作</h2>
-        <p className="text-xs text-red-600 mb-4">
+      <section className="mt-10 bg-danger-bg border border-status-danger-border rounded-lg shadow-sm p-5">
+        <h2 className="text-sm font-semibold text-danger mb-1">危険な操作</h2>
+        <p className="text-xs text-danger mb-4">
           以下の操作は元に戻せません。誤操作を避けるため、別セクションにまとめています。
         </p>
         <div className="space-y-3">
           {group.status === 'published' && (
-            <div className="flex items-start justify-between gap-4 bg-white border border-red-200 rounded-lg p-4">
+            <div className="flex items-start justify-between gap-4 bg-canvas border border-status-danger-border rounded-lg p-4">
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">LINE から取り下げ</div>
-                <div className="text-xs text-gray-600 mt-0.5">
+                <div className="text-sm font-medium text-ink">LINE から取り下げ</div>
+                <div className="text-xs text-ink-secondary mt-0.5">
                   LINE 公式アカウント上のメニュー登録 (alias / richmenu / 全員のデフォルト設定) を解除します。
                   友だちのトーク画面からメニューが消えます。下書きに戻すので、再登録すれば復旧できます。
                 </div>
@@ -1515,36 +1515,36 @@ function Editor({
                   setConfirmKind('unpublish')
                 }}
                 disabled={saving || publishing || unpublishing || busy}
-                className="shrink-0 px-3 py-2 text-sm font-medium border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+                className="shrink-0 px-3 py-2 text-sm font-medium border border-status-danger-border text-danger bg-canvas rounded-lg hover:bg-danger-bg disabled:opacity-50 transition-colors"
               >
                 {unpublishing ? '取り下げ中...' : 'LINE から取り下げ'}
               </button>
             </div>
           )}
           {activePage && pages.length > 1 && (
-            <div className="flex items-start justify-between gap-4 bg-white border border-red-200 rounded-lg p-4">
+            <div className="flex items-start justify-between gap-4 bg-canvas border border-status-danger-border rounded-lg p-4">
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">
+                <div className="text-sm font-medium text-ink">
                   ページ「{activePage.name}」を削除
                 </div>
-                <div className="text-xs text-gray-600 mt-0.5">
+                <div className="text-xs text-ink-secondary mt-0.5">
                   現在表示中のページを削除します。他のページから「タブ切替」でこのページを参照している場合は事前に解除が必要です。
                 </div>
               </div>
               <button
                 onClick={() => askRemovePage(activePage)}
-                className="shrink-0 px-3 py-2 text-sm font-medium border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-50 transition-colors"
+                className="shrink-0 px-3 py-2 text-sm font-medium border border-status-danger-border text-danger bg-canvas rounded-lg hover:bg-danger-bg transition-colors"
               >
                 ページ削除
               </button>
             </div>
           )}
-          <div className="flex items-start justify-between gap-4 bg-white border border-red-300 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-4 bg-canvas border border-status-danger-border rounded-lg p-4">
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900">
+              <div className="text-sm font-medium text-ink">
                 このリッチメニュー全体を削除
               </div>
-              <div className="text-xs text-gray-600 mt-0.5">
+              <div className="text-xs text-ink-secondary mt-0.5">
                 {group.status === 'published'
                   ? '⚠ 先に「LINE から取り下げ」を実行してください。LINE 上のメニューが残ったままだと友だちに表示され続けます。'
                   : '管理画面と DB から完全に削除します。元には戻せません。'}
@@ -1552,8 +1552,8 @@ function Editor({
             </div>
             <button
               onClick={handleDelete}
-              className="shrink-0 px-3 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#dc2626' }}
+              className="shrink-0 px-3 py-2 text-sm font-medium text-on-accent rounded-lg transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'var(--color-danger)' }}
             >
               削除
             </button>
@@ -1723,7 +1723,7 @@ function Editor({
           <button
             onClick={handleSave}
             disabled={saving || publishing || unpublishing || busy}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-lg border border-hairline px-4 py-2 text-sm font-medium transition-colors hover:bg-surface-pearl disabled:opacity-50"
           >
             {saving ? '保存中...' : '下書きに保存'}
           </button>

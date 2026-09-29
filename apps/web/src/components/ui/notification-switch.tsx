@@ -20,7 +20,7 @@ export default function NotificationSwitch({ checked, label, onChange }: Notific
     >
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+        className={`pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-canvas transition-transform ${
           checked ? 'translate-x-[14px]' : 'translate-x-0'
         }`}
       />

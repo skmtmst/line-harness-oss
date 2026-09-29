@@ -307,7 +307,7 @@ export default function DuplicatesPage() {
             <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(lowConfidenceCount)}組`} detail="" help="名前・画像だけの候補です" />
           </section>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#565F59]">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-ink-secondary">
             <div className="flex flex-1 flex-wrap items-center gap-2">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・電話で検索" aria-label="名前・メール・電話で検索" className="h-10 min-w-60 rounded-control border border-hairline bg-canvas px-3 text-sm" />
               <Select
@@ -334,7 +334,7 @@ export default function DuplicatesPage() {
                 type="button"
                 onClick={() => void detect()}
                 disabled={refreshing}
-                className="h-9 rounded-[9px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#565F59] hover:bg-[#F6F6F8] disabled:opacity-50"
+                className="h-9 rounded-[9px] border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
               >
                 {refreshing ? '再検出中…' : '重複を再検出'}
               </button>
@@ -425,12 +425,12 @@ export default function DuplicatesPage() {
           {data ? (
           <>
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-            <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント別ブレイクダウン</h2>
+            <h2 className="text-sm font-bold text-ink">アカウント別ブレイクダウン</h2>
             <p className="mt-1 text-xs text-ink-faint">どのアカウントに重複が偏っているかを見ます。</p>
             {data.perAccount.length === 0 ? (
               <p className="mt-3 text-sm text-ink-faint">アカウントが登録されていません。</p>
             ) : (
-              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
+              <div className="mt-3 overflow-hidden rounded-[14px] border border-hairline bg-canvas shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
@@ -441,10 +441,10 @@ export default function DuplicatesPage() {
                       <Th align="right" className="pr-5">重複率</Th>
                     </TableHeadRow>
                   </thead>
-                  <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
+                  <tbody className="divide-y divide-divider-soft bg-canvas text-ink-secondary">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td className="py-4 pr-4 pl-5 font-semibold text-[#1D1D1F]" title={row.accountName}><span className="block truncate">{row.accountName}</span></td>
+                        <td className="py-4 pr-4 pl-5 font-semibold text-ink" title={row.accountName}><span className="block truncate">{row.accountName}</span></td>
                         <td className="px-4 py-4 text-right tabular-nums"><span>{fmt.format(row.friends)}</span></td>
                         <td className="px-4 py-4 text-right tabular-nums"><span>{fmt.format(row.dups)}</span></td>
                         <td className="py-4 pr-5 pl-4 text-right tabular-nums">
@@ -464,7 +464,7 @@ export default function DuplicatesPage() {
             const pairwise = data.pairwiseOverlap
             return (
             <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-              <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント間 重複マトリックス</h2>
+              <h2 className="text-sm font-bold text-ink">アカウント間 重複マトリックス</h2>
               <p className="mt-1 text-xs text-ink-faint">
                 行アカウントの友だちのうち、列アカウントにも居る人数 （行のアカウントに対する割合）。
               </p>
@@ -473,7 +473,7 @@ export default function DuplicatesPage() {
                 （16px。先頭列の pl-4 とそろえる）。
               */}
               <style>{`[data-duplicates-matrix] tr > :last-child { padding-right: 16px; }`}</style>
-              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
+              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-[14px] border border-hairline bg-canvas shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
@@ -491,10 +491,10 @@ export default function DuplicatesPage() {
                       ))}
                     </TableHeadRow>
                   </thead>
-                  <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
+                  <tbody className="divide-y divide-divider-soft bg-canvas text-ink-secondary">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td title={row.accountName} className="py-4 pr-2 pl-4 font-semibold text-[#1D1D1F]">
+                        <td title={row.accountName} className="py-4 pr-2 pl-4 font-semibold text-ink">
                           <span className="block truncate">{row.accountName}</span>
                         </td>
                         {data.perAccount.map((col) => {
@@ -502,7 +502,7 @@ export default function DuplicatesPage() {
                             return (
                               <td
                                 key={col.accountId}
-                                className="px-2 py-4 text-right text-[#B8BCC2]"
+                                className="px-2 py-4 text-right text-ink-disabled"
                               >
                                 <span>—</span>
                               </td>

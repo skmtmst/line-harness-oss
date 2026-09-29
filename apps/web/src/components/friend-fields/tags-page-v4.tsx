@@ -251,10 +251,10 @@ const QUICK_FILTERS: Array<[string, string]> = [
 const cardShadow = '[box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
 
 export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
-  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
-  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
-  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
-  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
+  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: 'var(--color-status-warn-deep)', createdAt: '', updatedAt: '' },
+  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: 'var(--color-status-danger)', createdAt: '', updatedAt: '' },
+  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: 'var(--color-accent)', createdAt: '', updatedAt: '' },
+  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: 'var(--color-status-info)', createdAt: '', updatedAt: '' },
 ]
 
 export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
@@ -267,7 +267,7 @@ export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
 ].map(([name, groupId, friendCount, mileageReward, referralMileageReward, mileageMultiplierBps], index) => ({
   id: `qa-${index}`,
   name: String(name),
-  color: '#8b938d',
+  color: 'var(--color-ink-faint)',
   groupId: String(groupId),
   friendCount: Number(friendCount),
   mileageReward: Number(mileageReward),
@@ -290,9 +290,9 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
      * 未分類の数）だけを出し、総数は一覧の上の「1–20 / N件」だけにする
      * （同じ数を重ねて出さない。#946 の「絞り込み後の件数は一覧の側」）。
      */
-    { id: '', name: 'すべて', count: null, color: '#06c755' },
+    { id: '', name: 'すべて', count: null, color: 'var(--color-accent)' },
     ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length as number | null, color: group.color ?? '#8b938d' })),
-    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length as number | null, color: '#c3c8c4' },
+    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length as number | null, color: 'var(--color-ink-disabled)' },
   ]
   const move = async (group: TagGroup, direction: -1 | 1) => {
     const index = groups.findIndex((item) => item.id === group.id)

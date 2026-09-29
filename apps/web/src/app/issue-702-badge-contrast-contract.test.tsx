@@ -108,7 +108,7 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
 
   it('リッチメニュー編集のページ札も同じ規則（明るい緑の上書き・生の黄は使わない）', () => {
     const page = read('rich-menus/edit/page.tsx')
-    expect(page).toContain('bg-accent-deep text-white')
+    expect(page).toContain('bg-accent-deep text-on-accent')
     expect(page).toContain('bg-warning-bg p-2 text-[11px] text-warning')
     expect(page).not.toContain("backgroundColor: 'var(--color-accent)'")
     expect(page).not.toContain('bg-amber-50 p-2 text-[11px] text-amber-700')

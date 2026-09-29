@@ -1072,14 +1072,14 @@ export function AffiliatorsTab({
                               {/* Duplicate flags */}
                               {report && report.duplicateFlags.length > 0 && (
                                 <div>
-                                  <p className="text-xs font-semibold text-amber-700 uppercase mb-2">
+                                  <p className="text-xs font-semibold text-warning uppercase mb-2">
                                     {duplicateFlagHeading(report.duplicateFlags.length)}
                                   </p>
                                   <div className="flex flex-wrap gap-2">
                                     {report.duplicateFlags.map((f) => (
                                       <span
                                         key={f.friendId}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800"
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-status-warn-soft border border-status-warn rounded text-xs text-status-warn-deep"
                                       >
                                         ⚠ {duplicateFriendNameText(f.friendId, journeys)}
                                       </span>
@@ -1219,7 +1219,7 @@ export function AffiliatorsTab({
                                           {journeys.map((j) => {
                                             const isDup = report?.duplicateFlags.some((f) => f.friendId === j.friendId)
                                             return (
-                                              <tr key={j.friendId} className={isDup ? 'bg-amber-50' : ''}>
+                                              <tr key={j.friendId} className={isDup ? 'bg-status-warn-soft' : ''}>
                                                 <td className={`py-1 pr-4 ${j.displayName ? 'text-ink' : 'text-ink-faint italic'}`}>
                                                   {isDup && <span className="mr-1">⚠</span>}
                                                   {personNameText(j.displayName)}
@@ -1243,7 +1243,7 @@ export function AffiliatorsTab({
                                       <button
                                         onClick={() => { void loadMoreJourneys(row.id, detailGenRef.current) }}
                                         disabled={journeyLoadingMore}
-                                        className="mt-3 px-4 py-2 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50 rounded-md border border-blue-200"
+                                        className="mt-3 px-4 py-2 text-sm text-action hover:bg-status-info-soft disabled:opacity-50 rounded-md border border-status-info-soft"
                                       >
                                         {journeyLoadingMore ? '読み込み中...' : 'さらに読み込む'}
                                       </button>
@@ -3154,13 +3154,13 @@ function SettlementEditor({
   }
 
   return (
-    <div className="rounded-lg border border-gray-100 bg-white p-4">
-      <p className="mb-3 text-xs font-semibold uppercase text-gray-500">支払いの取り決め</p>
+    <div className="rounded-lg border border-divider-soft bg-canvas p-4">
+      <p className="mb-3 text-xs font-semibold uppercase text-ink-faint">支払いの取り決め</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
           <label
             htmlFor={`aff-email-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             連絡先
           </label>
@@ -3173,13 +3173,13 @@ function SettlementEditor({
               setSaved(false)
             }}
             placeholder="partner@example.com"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
           />
         </div>
         <div>
           <label
             htmlFor={`aff-hold-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             確定までの保留
           </label>
@@ -3195,15 +3195,15 @@ function SettlementEditor({
                 setSaved(false)
               }}
               placeholder="なし"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-action"
             />
-            <span className="whitespace-nowrap text-xs text-gray-400">日</span>
+            <span className="whitespace-nowrap text-xs text-ink-faint">日</span>
           </div>
         </div>
         <div>
           <label
             htmlFor={`aff-cycle-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             支払いサイクル
           </label>
@@ -3217,7 +3217,7 @@ function SettlementEditor({
             }}
             placeholder="例: 月末締め翌月末払い"
             maxLength={100}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
           />
         </div>
       </div>
@@ -3229,15 +3229,15 @@ function SettlementEditor({
         }}
         className="mt-3"
       >成果が出たときに本人へ知らせる</Checkbox>
-      <p className="mt-2 text-[11px] text-gray-400">
+      <p className="mt-2 text-[11px] text-ink-faint">
         保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。
       </p>
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex items-center gap-2">
         <button
           onClick={save}
           disabled={saving}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          className="rounded-md border border-hairline px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-surface-pearl disabled:opacity-40"
         >
           {saving ? '保存中...' : '取り決めを保存'}
         </button>
