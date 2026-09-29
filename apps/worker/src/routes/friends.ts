@@ -931,7 +931,12 @@ friends.get('/api/friends/:id/mileage', requireVisibleFriend, async (c) => {
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const [summary, history, insights, connections] = await Promise.all([
       getMileageSummaryForFriend(c.env.DB, friendId),
-      getMileageHistoryForFriend(c.env.DB, friendId, { limit }),
+      // R387: 残高は名寄せした本人で共通だが、理由・実行者・元イベントは
+      // 担当者が見られるアカウントの分だけ返す。
+      getMileageHistoryForFriend(c.env.DB, friendId, {
+        limit,
+        visibleAccountIds: accountScope.allowedAccountIds,
+      }),
       getMileageSelfInsights(c.env.DB, friendId),
       getMileageConnectedAccountsForFriend(c.env.DB, friendId, accountScope.allowedAccountIds),
     ]);

@@ -31,6 +31,8 @@ const dbMocks = {
   applyMileageRulesForEvent: vi.fn(),
   getMileageManualAdjustmentPolicy: vi.fn(),
   setMileageManualAdjustmentPolicy: vi.fn(),
+  findCommittedMileageAdjustment: vi.fn(async () => null),
+  getMileageAdjustmentNotificationRecord: vi.fn(async () => null),
   postMileageAdjustment: vi.fn(),
   confirmPendingMileageEntry: vi.fn(),
   voidMileageLedgerEntry: vi.fn(),
@@ -854,6 +856,61 @@ describe('mileage admin API', () => {
       }),
     });
     expect(hidden.status).toBe(404);
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  /*
+   * R378: 確定済みの調整を同じ内容で再送したときは、あとから変わった
+   * 承認境界や経過した元の期限で拒否せず、当時の結果をそのまま返す。
+   */
+  it('replays a committed adjustment even after the approval threshold was lowered', async () => {
+    dbMocks.findCommittedMileageAdjustment.mockResolvedValueOnce({
+      entry: { id: 'entry-9', amount: 500 },
+      balanceBefore: 100,
+      balanceAfter: 600,
+      replayed: true,
+    });
+    // 境界を 100 へ下げたあとの再送。新規判定なら承認依頼になる額。
+    dbMocks.getMileageManualAdjustmentPolicy.mockResolvedValueOnce({ approvalThreshold: 100 });
+    const response = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 500,
+        reasonCategory: 'campaign', reason: 'キャンペーン調整',
+        expiresAt: '2020-01-01T00:00:00.000Z',
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { entryId: 'entry-9', balanceBefore: 100, balanceAfter: 600, replayed: true },
+    });
+    expect(dbMocks.createMileageAdjustmentApprovalRequest).not.toHaveBeenCalled();
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('rejects a same-key retry whose content differs from the committed adjustment', async () => {
+    dbMocks.findCommittedMileageAdjustment.mockRejectedValueOnce(
+      new dbMocks.MileageAdjustmentError('idempotency_conflict'),
+    );
+    const response = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 999,
+        reasonCategory: 'campaign', reason: '別の内容',
+      }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      success: false, code: 'idempotency_conflict',
+    });
     expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
   });
 

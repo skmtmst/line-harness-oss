@@ -113,9 +113,17 @@ export async function sendMileageNotification(
     return markMileageAdjustmentNotification(ports.db, {
       id: reserved.id, status: 'sent', lineRequestId: sent.requestId,
     });
-  } catch {
+  } catch (error) {
+    /*
+     * R379: 相手が明示的に拒否した失敗（HTTP応答あり）と、応答が届かず
+     * 送れたか分からない失敗（タイムアウト・接続断）は区別する。
+     * 後者は同じキーで再送しても LINE 側が一度だけ受理にまとめる。
+     */
+    const explicit = typeof (error as { status?: unknown } | null)?.status === 'number';
     return markMileageAdjustmentNotification(ports.db, {
-      id: reserved.id, status: 'failed', errorCode: 'delivery_failed',
+      id: reserved.id,
+      status: 'failed',
+      errorCode: explicit ? 'delivery_failed' : 'delivery_unknown',
     });
   }
 }
