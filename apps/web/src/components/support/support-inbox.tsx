@@ -351,7 +351,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-bold text-ink">{item.customerName}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-micro font-bold ${item.channel === 'line' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-secondary'}`}>{item.channel === 'line' ? 'LINE' : 'メール'}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-micro font-medium ${item.channel === 'line' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-secondary'}`}>{item.channel === 'line' ? 'LINE' : 'メール'}</span>
                     </div>
                     <p className="mt-1 truncate text-xs font-medium text-ink-secondary">{item.subject}</p>
                     <p className="mt-1 truncate text-xs text-ink-faint">{item.preview}</p>
@@ -403,10 +403,10 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   <p className="mt-1 truncate text-xs text-ink-faint">{detail.thread.customer_name || selected.customerName} · {detail.thread.customer_email}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => void updateStatus('in_progress')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
-                  <button onClick={() => void updateStatus('on_hold')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
-                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
-                  {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-lg bg-canvas-sunken px-3 py-2 text-xs font-bold text-ink-secondary">再オープン</button>}
+                  <button onClick={() => void updateStatus('in_progress')} className={`rounded-lg px-3 py-2 text-xs font-semibold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
+                  <button onClick={() => void updateStatus('on_hold')} className={`rounded-lg px-3 py-2 text-xs font-semibold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
+                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-semibold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
+                  {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-lg bg-canvas-sunken px-3 py-2 text-xs font-semibold text-ink-secondary">再オープン</button>}
                 </div>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">

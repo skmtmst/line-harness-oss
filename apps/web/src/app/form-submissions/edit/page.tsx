@@ -988,7 +988,7 @@ function FormEditInner() {
           <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">
             {/* ---- 出来上がり ---- */}
             <section data-design="Preview" className="min-w-0 xl:sticky xl:top-4 xl:self-start">
-              <h2 className="text-ink-secondary mb-1 text-xs font-medium">お客さまに見える形</h2>
+              <h2 className="text-ink-secondary mb-1 text-xs font-semibold">お客さまに見える形</h2>
               <p className="mb-2 text-xs text-ink-faint">実際にお客さまが見る画面です</p>
               <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
               <p className="mt-2 text-center text-xs text-ink-faint">

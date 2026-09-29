@@ -63,7 +63,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
             <img src={qr} alt={`${info.accountName} の友だち追加 QR コード`} className="h-44 w-44 rounded-control border border-hairline" />
           ) : null}
           <div className="grid min-w-0 flex-1 gap-2 text-caption text-ink">
-            <p className="text-label font-bold">{info.accountName}{info.basicId ? `（${info.basicId}）` : ''}</p>
+            <p className="text-label font-medium">{info.accountName}{info.basicId ? `（${info.basicId}）` : ''}</p>
             <ol className="grid list-decimal gap-1 pl-5">
               <li>スマートフォンの LINE でこの QR を読み取るか、下のボタンから友だち追加します。</li>
               <li>追加できたら、LINE のトーク画面で次の 6 桁を送ってください（あなたの管理画面と紐づきます）。</li>

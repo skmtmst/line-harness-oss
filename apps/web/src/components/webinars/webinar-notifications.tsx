@@ -341,7 +341,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       */}
       {available && (overview?.skippedReasons?.length ?? 0) > 0 && (
         <div className="border-hairline rounded-xl border p-4" data-testid="webinar-skip-reasons">
-          <p className="text-ink text-xs font-bold">見送りの内訳</p>
+          <p className="text-ink text-xs font-medium">見送りの内訳</p>
           <ul className="mt-2 space-y-1">
             {overview!.skippedReasons.map((reason) => (
               <li key={reason.code ?? 'unknown'} className="text-ink-secondary flex justify-between gap-4 text-xs">

@@ -228,8 +228,8 @@ function MembersInner() {
                           aria-hidden="true"
                           className={
                             isSelf
-                              ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-bold text-on-accent'
-                              : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep'
+                              ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-medium text-on-accent'
+                              : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep'
                           }
                         >
                           {(member.name || '?').slice(0, 1).toUpperCase()}
@@ -243,8 +243,8 @@ function MembersInner() {
                         <span
                           className={
                             member.role === 'owner' || member.role === 'admin'
-                              ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                              : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-secondary'
+                              ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                              : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-medium text-ink-secondary'
                           }
                         >
                           {ROLE_LABELS[member.role]}
@@ -252,12 +252,12 @@ function MembersInner() {
                         <span
                           className={
                             state === 'active'
-                              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                               : state === 'invited'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
                                 : state === 'expired'
-                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger'
-                                  : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger'
+                                  : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-medium text-ink-secondary'
                           }
                         >
                           {STATUS_LABELS[state]}
@@ -323,8 +323,8 @@ function MembersInner() {
                               aria-hidden="true"
                               className={
                                 isSelf
-                                  ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-bold text-on-accent'
-                                  : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep'
+                                  ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-medium text-on-accent'
+                                  : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep'
                               }
                             >
                               {(member.name || '?').slice(0, 1).toUpperCase()}
@@ -340,8 +340,8 @@ function MembersInner() {
                           <span
                             className={
                               member.role === 'owner' || member.role === 'admin'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                                : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-secondary'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                                : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-medium text-ink-secondary'
                             }
                           >
                             {ROLE_LABELS[member.role]}
@@ -352,12 +352,12 @@ function MembersInner() {
                           <span
                             className={
                               state === 'active'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                                 : state === 'invited'
-                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
                                   : state === 'expired'
-                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger'
-                                    : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger'
+                                    : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-medium text-ink-secondary'
                             }
                           >
                             {STATUS_LABELS[state]}
@@ -475,7 +475,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
       <NoteBar tone="info" help="統括名は統括コンソールとメールの差出人に使われます" helpLabel="統括名の意味">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
       <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="tenant-name" className="text-label font-bold text-ink">統括名</label>
+          <label htmlFor="tenant-name" className="text-label font-medium text-ink">統括名</label>
           <p className="text-micro text-ink-faint">100文字以内で入力してください。</p>
           <TextField
             id="tenant-name"

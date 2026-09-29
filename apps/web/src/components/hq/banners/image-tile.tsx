@@ -41,7 +41,7 @@ export default function ImageTile({
           <img src={image.media.url} alt="" className="h-full w-full object-cover" loading="lazy" />
         </button>
         <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center gap-1.5">
-          <span className="inline-flex h-5 items-center rounded-mini bg-canvas/80 px-1.5 text-nano font-bold text-ink-secondary">
+          <span className="inline-flex h-5 items-center rounded-mini bg-canvas/80 px-1.5 text-nano font-medium text-ink-secondary">
             {aspectBadge(image)}
           </span>
           {onToggleFavorite ? (
@@ -60,7 +60,7 @@ export default function ImageTile({
           ) : null}
           <span className="flex-1" />
           {delivered ? (
-            <span className="inline-flex h-5 items-center gap-1 rounded-mini bg-canvas/80 px-1.5 text-nano font-bold text-accent-deep">
+            <span className="inline-flex h-5 items-center gap-1 rounded-mini bg-canvas/80 px-1.5 text-nano font-medium text-accent-deep">
               <Store aria-hidden="true" className="h-3 w-3" />
               渡し済み
             </span>

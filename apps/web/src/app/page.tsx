@@ -294,7 +294,7 @@ function FriendAddLinkCard({
               ]}
             />
           </label>
-          <Link href="/inflow-links" className="border-hairline text-action hover:bg-action-soft rounded-control border px-3 py-2 text-xs font-medium">経路を分けて発行</Link>
+          <Link href="/inflow-links" className="border-hairline text-action hover:bg-action-soft rounded-control border px-3 py-2 text-xs font-semibold">経路を分けて発行</Link>
         </div>
       </div>
 
@@ -306,10 +306,10 @@ function FriendAddLinkCard({
           aria-label="友だち追加リンク"
           className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2.5 font-mono text-xs"
         />
-        <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-medium">
+        <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-semibold">
           {copyState === 'copied' ? 'コピーしました ✓' : 'コピー'}
         </button>
-        <button type="button" onClick={() => writeQr(routeId || 'base')} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-medium">QRを表示</button>
+        <button type="button" onClick={() => writeQr(routeId || 'base')} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-semibold">QRを表示</button>
       </div>
       {copyState === 'failed' ? (
         <p role="alert" className="text-danger mt-2 text-xs">
@@ -1470,7 +1470,7 @@ function DashboardPageInner() {
             {unreadNotificationCount > 0 ? (
               <span
                 aria-hidden="true"
-                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-full px-1 text-center text-xs leading-5 font-bold tabular-nums"
+                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-full px-1 text-center text-xs leading-5 font-medium tabular-nums"
               >{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
             ) : null}
             <NotificationPanel

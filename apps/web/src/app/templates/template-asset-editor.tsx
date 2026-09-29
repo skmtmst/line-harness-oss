@@ -581,7 +581,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               </section>
               <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
                 <div className="flex items-center justify-between">
-                  <div><h2 className="font-bold">質問（上から順に出ます）</h2><p className="text-caption mt-1 text-ink-faint">{questions.length} / {MAX_QUESTIONS} 問</p></div>
+                  <div><h2 className="font-semibold">質問（上から順に出ます）</h2><p className="text-caption mt-1 text-ink-faint">{questions.length} / {MAX_QUESTIONS} 問</p></div>
                   <Button type="button" disabled={questions.length >= MAX_QUESTIONS} title={questions.length >= MAX_QUESTIONS ? `質問は${MAX_QUESTIONS}問までです` : undefined} onClick={addQuestion}>
                     質問を追加（あと{MAX_QUESTIONS - questions.length}問）
                   </Button>

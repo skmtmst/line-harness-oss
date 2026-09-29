@@ -94,9 +94,9 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('flex h-full w-11 items-center justify-center')
     // カード: サムネイル112、ファイル名12/700、形式・容量10/600、使用状況10/700。
     expect(PAGE).toContain("view === 'grid' ? 'h-28' : 'h-14 w-20 shrink-0'")
-    expect(PAGE).toContain('truncate text-caption font-bold')
+    expect(PAGE).toContain('truncate text-caption font-medium')
     expect(PAGE).toContain('text-ink-faint text-nano font-semibold tabular-nums')
-    expect(PAGE).toContain('text-nano font-bold tabular-nums')
+    expect(PAGE).toContain('text-nano font-medium tabular-nums')
   })
 
   it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {

@@ -188,7 +188,7 @@ function MemberRow({ member, rankOrder }: { member: NenMemberRow; rankOrder: str
             // eslint-disable-next-line @next/next/no-img-element -- LINEのCDN画像
             <img src={member.pictureUrl} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
           ) : (
-            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
+            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep">{initial}</span>
           )}
           <span className="min-w-0">
             <span className="block truncate text-label font-semibold text-ink" title={member.name}>{member.name || '（名前なし）'}</span>

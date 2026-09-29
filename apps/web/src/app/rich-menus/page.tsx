@@ -1280,9 +1280,9 @@ function ExternalImportWorkspace({
                     >
                       <span className="bg-canvas-sunken text-ink-faint flex h-10 items-center justify-center rounded-control">▧</span>
                       <span className="min-w-0"><strong className="text-ink block truncate text-sm">{menu.name || '名前なし'}</strong><span className="text-ink-faint block truncate text-xs">{menu.areasCount}面・切替なし・画像あり</span></span>
-                      <span className="text-ink hidden text-sm font-bold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
+                      <span className="text-ink hidden text-sm font-semibold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
                       <span className="text-ink-secondary hidden text-xs sm:block">作成日不明</span>
-                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-bold whitespace-nowrap">取り込む</span>
+                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-medium whitespace-nowrap">取り込む</span>
                     </button>
                   )
                 })}
@@ -1306,7 +1306,7 @@ function ExternalImportWorkspace({
                 <h2 className="text-ink text-sm font-bold">選んだメニューの中身</h2>
                 <p className="text-ink mt-3 text-sm font-semibold">{selected.name || '名前なし'}</p>
                 <div className="border-hairline bg-canvas-sunken mt-3 grid grid-cols-3 overflow-hidden rounded-control border" style={{ aspectRatio: `${selected.size.width} / ${selected.size.height}` }}>
-                  {areas.map((area) => <span key={area} className="border-hairline text-ink-faint flex items-center justify-center border text-xs font-bold">{area}</span>)}
+                  {areas.map((area) => <span key={area} className="border-hairline text-ink-faint flex items-center justify-center border text-xs font-medium">{area}</span>)}
                 </div>
                 <h3 className="text-ink-secondary mt-3 text-xs font-bold">面ごとの動き（LINEから読んだもの）</h3>
                 {selected.areas?.length ? (

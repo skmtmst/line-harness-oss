@@ -214,7 +214,7 @@ function OpsTenantDetailContent() {
             <tbody>
               {accounts.map((a) => (
                 <Tr key={a.id}>
-                  <Td><span className="block truncate text-label font-bold text-ink" title={a.name}>{a.name}</span></Td>
+                  <Td><span className="block truncate text-label font-medium text-ink" title={a.name}>{a.name}</span></Td>
                   <Td align="right"><span className="text-label text-ink">{a.friend_count.toLocaleString()}</span></Td>
                   <Td>{a.archived_at ? <Chip tone="neutral">アーカイブ</Chip> : a.is_active ? <Chip tone="ok">接続中</Chip> : <Chip tone="danger">停止</Chip>}</Td>
                   <Td><span className="text-caption text-ink-secondary">{formatDateTime(a.updated_at)}</span></Td>
@@ -240,7 +240,7 @@ function OpsTenantDetailContent() {
             <tbody>
               {members.map((m) => (
                 <Tr key={m.id}>
-                  <Td><span className="block truncate text-label font-bold text-ink" title={m.name}>{m.name}</span></Td>
+                  <Td><span className="block truncate text-label font-medium text-ink" title={m.name}>{m.name}</span></Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={m.email ?? ''}>{m.email ?? '—'}</span></Td>
                   <Td><span className="text-caption text-ink-secondary">{ROLE_LABEL[m.role] ?? m.role}{m.access_level === 'read_only' ? '（閲覧）' : ''}</span></Td>
                   <Td>{m.is_active ? <Chip tone="ok">有効</Chip> : <Chip tone="neutral">停止</Chip>}</Td>
@@ -268,7 +268,7 @@ function OpsTenantDetailContent() {
               {audit.map((row) => (
                 <Tr key={row.id}>
                   <Td><span className="text-caption text-ink-secondary">{formatDateTime(row.created_at)}</span></Td>
-                  <Td><span className="block truncate text-caption font-bold text-ink">{row.staff_name}</span></Td>
+                  <Td><span className="block truncate text-caption font-medium text-ink">{row.staff_name}</span></Td>
                   <Td>{auditActionChip(row.action)}</Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={row.reason ?? ''}>{row.reason ?? '—'}</span></Td>
                   <Td><span className="text-caption text-ink-faint">{row.visible_to_tenant ? '表示する' : '運営のみ'}</span></Td>
@@ -351,12 +351,12 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       <div className="flex flex-col gap-4">
         {needsName ? (
           <label className="block">
-            <span className="mb-1.5 block text-caption font-bold text-ink">確認のため、契約先の名前をそのまま入力</span>
+            <span className="mb-1.5 block text-caption font-medium text-ink">確認のため、契約先の名前をそのまま入力</span>
             <TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} />
           </label>
         ) : null}
         <label className="block">
-          <span className="mb-1.5 block text-caption font-bold text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
+          <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
           <TextArea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} />
         </label>
       </div>

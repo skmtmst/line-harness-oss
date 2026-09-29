@@ -85,7 +85,7 @@ export default function OpsInvitePage() {
       title="運営メンバーの招待"
       description={
         <>
-          <span className="mb-1 block text-caption font-bold text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
           {check?.needsPassword
             ? 'musubo 運営コンソールに招待されています。名前とパスワードを設定してください。設定のあと、2要素認証の登録に進みます。'
             : 'musubo 運営コンソールに招待されています。続けると 2要素認証の登録に進みます。'}

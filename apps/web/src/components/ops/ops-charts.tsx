@@ -63,7 +63,7 @@ export function RevenueBars({ rows, width = 920, height = 220 }: { rows: Array<{
             {r.current && current ? (
               <g>
                 <rect x={x + barW / 2 - 44} y={Math.max(y - 30, 2)} width={88} height={24} rx={6} fill="var(--color-ink)" />
-                <text x={x + barW / 2} y={Math.max(y - 30, 2) + 16} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--color-on-accent)">{formatYen(current.yen)}</text>
+                <text x={x + barW / 2} y={Math.max(y - 30, 2) + 16} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--color-on-accent)">{formatYen(current.yen)}</text>
               </g>
             ) : null}
           </g>
@@ -114,7 +114,7 @@ export function PlanDonut({ rows, total, size = 190 }: { rows: Array<{ key: stri
           return el
         })
         : null}
-      <text x={c} y={c - 2} textAnchor="middle" fontSize={26} fontWeight={700} fill="var(--color-ink)">{total}</text>
+      <text x={c} y={c - 2} textAnchor="middle" fontSize={26} fontWeight={600} fill="var(--color-ink)">{total}</text>
       <text x={c} y={c + 20} textAnchor="middle" fontSize={12} fill="var(--color-ink-secondary)">契約先</text>
     </svg>
   )

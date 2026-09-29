@@ -291,7 +291,7 @@ function OccurrenceApplicantsPanel({
         人は下の行で追う。記録の操作自体は下の予約一覧の既存ボタンで行う。
       */}
       <div className="border-hairline mt-4 border-t pt-3" data-idea29="attendance">
-        <h4 className="text-ink text-sm font-medium">当日の受付</h4>
+        <h4 className="text-ink text-sm font-semibold">当日の受付</h4>
         {attendance === null ? (
           <p className="text-ink-faint mt-1 text-xs">受付の記録はまだ取得できていません。</p>
         ) : (
@@ -328,7 +328,7 @@ function OccurrenceApplicantsPanel({
         案内中・待機中は上の一覧にいるので、ここでは結果が出た分を追う。
       */}
       <div className="border-hairline mt-4 border-t pt-3" data-idea29="waitlist-history">
-        <h4 className="text-ink text-sm font-medium">繰上げ・案内の履歴</h4>
+        <h4 className="text-ink text-sm font-semibold">繰上げ・案内の履歴</h4>
         {data.waitlistHistory === undefined ? (
           <p className="text-ink-faint mt-1 text-xs">履歴はまだ取得できていません。</p>
         ) : waitlistHistory.length === 0 ? (
@@ -1143,7 +1143,7 @@ function BookingsInner() {
             {canManageApplicantBroadcast && (
               <>
                 <div className="border-hairline mt-4 border-t pt-4">
-                  <h4 className="text-ink font-medium">この開催回の申込者へ一斉送信</h4>
+                  <h4 className="text-ink font-semibold">この開催回の申込者へ一斉送信</h4>
                   <p className="text-ink-faint mt-1 text-xs">対象はこの確認時点の申込者で固定します。確認後の申込・取消・タグ変更では宛先を入れ替えません。</p>
                   <textarea
                     value={broadcastMessage}

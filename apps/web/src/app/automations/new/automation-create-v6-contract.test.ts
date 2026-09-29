@@ -101,14 +101,14 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*height: 26px;/)
     expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*border-radius: var\(--radius-pill\);/)
     expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*font-size: var\(--text-caption\);/)
-    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*font-weight: 700;/)
+    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*font-weight: 500;/)
 
     // 主要ボタン 高さ40 / 角丸8 / 余白[0,14] / 13px / 700
     expect(CSS).toMatch(/\.action\s*\{[^}]*height: 40px;/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*border-radius: var\(--radius-control\);/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*padding: 0 14px;/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 700;/)
+    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 600;/)
 
     // 「動きを追加」だけ高さ44、行の中の小さな操作は 32 / r6
     expect(CSS).toMatch(/\.addAction\s*\{[^}]*height: 44px;/)

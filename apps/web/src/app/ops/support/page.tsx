@@ -389,7 +389,7 @@ export default function OpsSupportPage() {
         {/* 左：チケット一覧 */}
         <section aria-label={listTitle} className={knowledgeStyles.supportList}>
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
-            <h2 className="text-label font-bold text-ink">{listTitle}</h2>
+            <h2 className="text-label font-semibold text-ink">{listTitle}</h2>
             <ListRange total={total} first={tickets.length === 0 ? 0 : 1} last={tickets.length} />
           </header>
           {loading && tickets.length === 0 ? (
@@ -422,7 +422,7 @@ export default function OpsSupportPage() {
                         <span className="truncate">{t.staffName || '—'}</span>
                         <span className="ml-auto shrink-0 text-ink-faint">{elapsedLabel(t.lastMessageAt)}</span>
                       </span>
-                      <span className="mt-1 block truncate text-label font-bold text-ink">{t.subject}</span>
+                      <span className="mt-1 block truncate text-label font-medium text-ink">{t.subject}</span>
                       <span className="mt-1.5 flex items-center gap-1.5">
                         {stageChip(t.stage, t.stageLabel)}
                         {priorityChip(t.priority, t.priorityLabel)}
@@ -452,7 +452,7 @@ export default function OpsSupportPage() {
             <div className="grid gap-3">
               {/* 見出し行 */}
               <div className={knowledgeStyles.supportSubject}>
-                <span className="text-label font-bold text-ink-secondary">{ticket.ticketLabel}</span>
+                <span className="text-label font-medium text-ink-secondary">{ticket.ticketLabel}</span>
                 <h2 className="text-body font-bold text-ink">{ticket.subject}</h2>
                 {ticket.subjectAuto ? <Chip tone="neutral">自動で付けた件名</Chip> : null}
                 {priorityChip(ticket.priority, ticket.priorityLabel)}
@@ -503,7 +503,7 @@ export default function OpsSupportPage() {
               {/* 返信 */}
               <div className={knowledgeStyles.supportReply} data-design-node={aiBusy ? 'XlTAd' : replyFromAi ? references.length > 0 ? 'RPjQ6' : 'b2uv3' : undefined}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-label font-bold text-ink">返信</h3>
+                  <h3 className="text-label font-semibold text-ink">返信</h3>
                   {aiBusy ? (
                     <Chip tone="info">作成中…</Chip>
                   ) : replyFromAi ? (

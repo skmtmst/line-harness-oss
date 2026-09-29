@@ -845,7 +845,7 @@ function SentResult({
               <div className="mt-3 space-y-2">
                 {insight.links.map((link) => (
                   <div key={link.id} className="bg-canvas-sunken rounded-control flex items-center justify-between gap-4 p-3">
-                    <div className="min-w-0"><p className="text-ink truncate text-sm font-bold" title={link.label}>{link.label}</p><p className="text-ink-faint truncate text-xs" title={link.url}>{link.url}</p></div>
+                    <div className="min-w-0"><p className="text-ink truncate text-sm font-semibold" title={link.label}>{link.label}</p><p className="text-ink-faint truncate text-xs" title={link.url}>{link.url}</p></div>
                     <p className="text-ink-secondary shrink-0 text-xs">クリック {link.uniqueClickCount.toLocaleString('ja-JP')}人（{rateText(link.clickRate)}）</p>
                   </div>
                 ))}

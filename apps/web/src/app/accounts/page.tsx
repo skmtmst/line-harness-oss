@@ -250,7 +250,7 @@ export default function AccountsPage() {
                 return (
                   <tr key={account.id} className="border-hairline hover:bg-canvas-sunken border-t align-middle">
                     <td className="py-3 pr-4 pl-5">
-                      <p className="text-ink text-sm font-medium">{account.name}</p>
+                      <p className="text-ink text-sm font-semibold">{account.name}</p>
                       <p className="text-ink-faint mt-0.5 text-xs">
                         チャネル {account.channelId}
                         {` ・ ${account.timezone ?? 'Asia/Tokyo'}`}

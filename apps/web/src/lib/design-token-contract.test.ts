@@ -34,6 +34,10 @@ const ALLOWED_SAME_VALUE = [
   // ★V7「見た目の物差し」§1: 題（カードの題16・見出し18・画面名20）の
   // 行の高さは全部 1.4。大きさが違うので名前は別のままにする。
   '--text-lead--line-height / --text-heading--line-height / --text-title--line-height',
+  // ★V7「見た目の物差し」§2: font-bold / font-extrabold は意図的に
+  // 600 へ畳む別名。700 が効くのは text-hero（28px の大きな数）だけで、
+  // 既存の font-bold 書き込みを全部書き換えずに済ませるための名残。
+  '--font-weight-bold / --font-weight-extrabold',
 ]
 
 /**

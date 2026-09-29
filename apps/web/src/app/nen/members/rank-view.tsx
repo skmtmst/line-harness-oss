@@ -23,14 +23,14 @@ export function RankChip({ rankKey, name, rankOrder = ['regular', 'silver', 'gol
     <span
       className={
         tone === 'top'
-          ? 'inline-flex h-5.5 items-center rounded-pill bg-ink px-2 text-nano font-bold text-on-accent'
+          ? 'inline-flex h-5.5 items-center rounded-pill bg-ink px-2 text-nano font-medium text-on-accent'
           : tone === 'second'
-            ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+            ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
             : tone === 'base'
-              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
               : tone === 'middle'
-                ? 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-secondary'
-                : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-faint'
+                ? 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-medium text-ink-secondary'
+                : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-medium text-ink-faint'
       }
     >
       {name}

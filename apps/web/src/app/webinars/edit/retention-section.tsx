@@ -137,7 +137,7 @@ export default function RetentionSection({
                     y={padTop + 2}
                     className="fill-info"
                     fontSize={12}
-                    fontWeight={700}
+                    fontWeight={500}
                   >
                     申し込みボタン（{fmtMin(ctaAtSeconds ?? 0)}）
                   </text>

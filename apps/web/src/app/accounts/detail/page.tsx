@@ -312,7 +312,7 @@ function AccountDetail() {
                       <button
                         type="button"
                         onClick={() => void loadAll()}
-                        className="text-action ml-2 text-xs font-bold underline"
+                        className="text-action ml-2 text-xs font-medium underline"
                       >
                         もう一度読み込む
                       </button>
@@ -367,7 +367,7 @@ function AccountDetail() {
                 />
               </dl>
               <div className="bg-canvas-sunken rounded-control mt-3 px-3 py-2">
-                <p className="text-ink text-xs font-bold">値そのものは、ここにも出しません</p>
+                <p className="text-ink text-xs font-medium">値そのものは、ここにも出しません</p>
                 <p className="text-ink-secondary mt-1 text-xs">差し替えるときは、新しい値を入れて保存し直します。今の値を見たり直したりはできません。</p>
               </div>
             </Card>

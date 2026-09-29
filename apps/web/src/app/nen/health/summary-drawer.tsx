@@ -82,7 +82,7 @@ export default function SummaryDrawer({
             <div className="flex flex-col gap-1 border-t border-hairline pt-2"><dt className="text-micro text-ink-faint">涙やけ</dt><dd className="text-caption text-ink">{countText(s.tearStain, TEAR_LABELS)}</dd></div>
           </dl>
           <section>
-            <h3 className="text-label font-bold text-ink">メモ</h3>
+            <h3 className="text-label font-semibold text-ink">メモ</h3>
             {s.notes.length === 0 ? (
               <p className="mt-1 text-caption text-ink-faint">メモはありません</p>
             ) : (

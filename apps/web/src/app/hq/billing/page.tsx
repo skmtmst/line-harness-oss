@@ -172,9 +172,9 @@ function BillingInner() {
       </div>
 
       <div data-design="Interval" data-design-node={interval === 'year' ? 'k8DFrR' : 'T4S2Qb'} className="flex flex-wrap items-center justify-end gap-3">
-        <span className={interval === 'month' ? 'text-label font-bold text-ink' : 'text-label font-semibold text-ink-faint'}>月払い</span>
+        <span className={interval === 'month' ? 'text-label font-medium text-ink' : 'text-label font-semibold text-ink-faint'}>月払い</span>
         <Toggle label="年払い" checked={interval === 'year'} onChange={(yearly) => setInterval(yearly ? 'year' : 'month')} className={styles.intervalToggle} />
-        <span className={interval === 'year' ? 'text-label font-bold text-ink' : 'text-label font-semibold text-ink-faint'}>年払い</span>
+        <span className={interval === 'year' ? 'text-label font-medium text-ink' : 'text-label font-semibold text-ink-faint'}>年払い</span>
         <span className="text-nano text-ink-faint">年払いは約15% OFF</span>
       </div>
 
@@ -196,20 +196,20 @@ function BillingInner() {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-heading font-bold text-ink">{plan.name}</h2>
                 {plan.recommended ? (
-                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">おすすめ</span>
+                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">おすすめ</span>
                 ) : null}
                 {interval === 'year' ? (
-                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">約15% OFF</span>
+                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">約15% OFF</span>
                 ) : null}
                 {plan.current ? (
-                  <span className="inline-flex h-5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info">利用中</span>
+                  <span className="inline-flex h-5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info">利用中</span>
                 ) : null}
               </div>
               <p className="text-caption text-ink-faint">{plan.description}</p>
             </div>
             <div className="flex flex-col gap-2" data-price-source={price.fromStripe ? 'stripe' : 'fallback'}>
               <div className="flex items-baseline gap-2">
-                <span className="text-display font-bold text-ink">{yen(price.monthlyYen)}</span>
+                <span className="text-hero text-ink">{yen(price.monthlyYen)}</span>
                 <span className="text-caption text-ink-faint">/月（税込）</span>
               </div>
               {price.yearlyYen !== null ? <p className="text-caption text-ink-faint">年額 {yen(price.yearlyYen)}（税込）</p> : null}

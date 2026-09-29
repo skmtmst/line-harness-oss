@@ -118,7 +118,7 @@ export function RichMenuTemplatePreview({ template }: { template: RichMenuTempla
       ) : template.areas.map((area, index) => (
         <g key={index}>
           <rect x={area.x + inset} y={area.y + inset} width={Math.max(0, area.w - inset * 2)} height={Math.max(0, area.h - inset * 2)} rx={dims.width * 0.008} strokeWidth={dims.width * 0.004} style={{ fill: 'var(--color-accent-soft)', stroke: 'var(--color-accent)' }} />
-          <text x={area.x + area.w / 2} y={area.y + area.h / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(9px, 0.75vw, 14px)', fill: 'var(--color-ink-secondary)', fontWeight: 700 }}>{String.fromCharCode(65 + index)}</text>
+          <text x={area.x + area.w / 2} y={area.y + area.h / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(9px, 0.75vw, 14px)', fill: 'var(--color-ink-secondary)', fontWeight: 500 }}>{String.fromCharCode(65 + index)}</text>
         </g>
       ))}
     </svg>
@@ -269,7 +269,7 @@ export default function RichMenuCreateForm({
           <div>
             <span className="text-ink-secondary mb-2 block text-sm font-medium">画像の大きさ</span>
             <div className="flex flex-wrap gap-2">
-              {SIZE_TABS.map((item) => <button key={item.value} type="button" disabled={locked} onClick={() => changeSize(item.value)} aria-pressed={value.size === item.value} className={`rounded-control border px-4 py-2 text-left text-sm transition-colors ${value.size === item.value ? 'border-accent bg-accent-soft text-ink' : 'border-transparent text-ink-secondary hover:bg-canvas-sunken'}`}><span className="font-medium whitespace-nowrap">{item.label}</span><span className="text-ink-faint ml-2 text-xs whitespace-nowrap">{item.dims}</span><span className="text-ink-faint text-micro mt-0.5 block">{item.hint}</span></button>)}
+              {SIZE_TABS.map((item) => <button key={item.value} type="button" disabled={locked} onClick={() => changeSize(item.value)} aria-pressed={value.size === item.value} className={`rounded-control border px-4 py-2 text-left text-sm transition-colors ${value.size === item.value ? 'border-accent bg-accent-soft text-ink' : 'border-transparent text-ink-secondary hover:bg-canvas-sunken'}`}><span className="font-semibold whitespace-nowrap">{item.label}</span><span className="text-ink-faint ml-2 text-xs whitespace-nowrap">{item.dims}</span><span className="text-ink-faint text-micro mt-0.5 block">{item.hint}</span></button>)}
             </div>
           </div>
 
@@ -379,8 +379,8 @@ export default function RichMenuCreateForm({
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <section><h2 className="text-ink-secondary text-sm font-medium">トークを開いたとき</h2><p className="text-ink-faint mt-2 text-xs leading-5">メニューを開いた状態・閉じた状態の指定は、下書き保存後の編集画面で設定します。</p></section>
-            <section><h2 className="text-ink-secondary text-sm font-medium">画像</h2>{imageAction ?? <Button href="/contents" className="mt-2">登録メディアから選ぶ</Button>}<p className="text-ink-faint mt-2 text-xs">{SIZE_DIMENSIONS.large.width} × {SIZE_DIMENSIONS.large.height}px ／ 1MBまで・JPG・PNG</p><p className="text-ink-faint mt-1 text-micro">選んだ画像は下書きの最初に見せるページへ登録します。</p></section>
+            <section><h2 className="text-ink-secondary text-sm font-semibold">トークを開いたとき</h2><p className="text-ink-faint mt-2 text-xs leading-5">メニューを開いた状態・閉じた状態の指定は、下書き保存後の編集画面で設定します。</p></section>
+            <section><h2 className="text-ink-secondary text-sm font-semibold">画像</h2>{imageAction ?? <Button href="/contents" className="mt-2">登録メディアから選ぶ</Button>}<p className="text-ink-faint mt-2 text-xs">{SIZE_DIMENSIONS.large.width} × {SIZE_DIMENSIONS.large.height}px ／ 1MBまで・JPG・PNG</p><p className="text-ink-faint mt-1 text-micro">選んだ画像は下書きの最初に見せるページへ登録します。</p></section>
           </div>
 
           <section className="border-hairline bg-canvas-sunken rounded-card border p-4">

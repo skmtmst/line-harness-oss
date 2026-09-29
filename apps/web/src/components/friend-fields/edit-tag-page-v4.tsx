@@ -79,11 +79,11 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
     >
       <div className="overflow-hidden rounded-control border border-hairline">
         <dl className="divide-y divide-hairline text-sm">
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-bold">{(dependencies?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-bold">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-bold">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-bold">停止</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-bold">そのまま残る</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-medium">{(dependencies?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-medium">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-medium">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-medium">停止</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-medium">そのまま残る</dd></div>
         </dl>
       </div>
       <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>

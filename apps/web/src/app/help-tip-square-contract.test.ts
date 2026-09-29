@@ -47,7 +47,7 @@ describe('「？」の正円', () => {
     expect(CSS).toContain('background: var(--color-canvas);')
     expect(CSS).toContain('border-radius: 50%;')
     expect(CSS).toContain('font-size: var(--text-micro);')
-    expect(CSS).toContain('font-weight: 700;')
+    expect(CSS).toContain('font-weight: 500;')
   })
 
   it('lucide の丸いアイコン・枠なし・透明地は使わない', () => {

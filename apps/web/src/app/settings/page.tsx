@@ -276,7 +276,7 @@ function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry,
             {/* 監査 R66: 並び替え中は上下ボタンが増えて行幅が伸びる。狭い幅ではラベルを省略し、操作を下へ回す。 */}
             <p className="truncate text-sm font-bold text-ink" title={item.label}>{item.label}</p>
             {sharedSwitch && (
-              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-micro font-bold text-ink-faint">
+              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-micro font-medium text-ink-faint">
                 同じスイッチ
               </span>
             )}
@@ -413,7 +413,7 @@ function SidebarPreview({ groups, features }: {
         <div className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-6 pb-3 pt-6">
           {groups.map((group) => (
             <div key={group.id}>
-              <p className="mb-2 text-xs font-bold text-ink-faint">{group.label}</p>
+              <p className="mb-2 text-xs font-medium text-ink-faint">{group.label}</p>
               <div className="space-y-0.5 pl-3">
                 {group.items.map((item) => {
                   const enabled = itemIsEnabled(item, features)
@@ -1003,7 +1003,7 @@ export default function SettingsPage() {
 
           {dirty && !loadFailed && (
             <div className="border-hairline bg-canvas rounded-card flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
-              <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-bold">
+              <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-medium">
                 変更理由<RequiredBadge />
               </label>
               <TextField

@@ -89,7 +89,7 @@ describe('V6 1通目設定の契約', () => {
     expect(TABS_CSS).toMatch(/\.rail \{[^}]*min-height: 38px;[^}]*border-radius: 8px;/)
     expect(TABS_CSS).toMatch(/\.tab \{[^}]*height: 30px;[^}]*border-radius: 6px;/)
     expect(TABS).toContain('styles.rail')
-    expect(TABS).toContain('${styles.tab} px-3 text-micro font-bold')
+    expect(TABS).toContain('${styles.tab} px-3 text-micro font-medium')
     expect(TABS).not.toContain('rounded-t-control')
   })
 

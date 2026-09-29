@@ -215,7 +215,7 @@ export default function HqFormDefinitionEditor({
       <Field label="回答用URL"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">配布先で発行</p></Field>
     </div>
     <div className="grid gap-4 xl:grid-cols-3">
-      <section className="xl:sticky xl:top-4 xl:col-span-1 xl:self-start"><h2 className="mb-1 text-xs font-medium text-ink-secondary">お客さまに見える形</h2><FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} /></section>
+      <section className="xl:sticky xl:top-4 xl:col-span-1 xl:self-start"><h2 className="mb-1 text-xs font-semibold text-ink-secondary">お客さまに見える形</h2><FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} /></section>
       <section className="min-w-0 xl:col-span-2">
         <div className="flex flex-wrap items-center gap-1 border-b border-hairline pb-2">
           <button type="button" aria-pressed={tab === HEADER_TAB} onClick={() => setTab(HEADER_TAB)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent-deep">共通ヘッダ</button>

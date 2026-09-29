@@ -503,7 +503,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           >
             <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-4">
               <div className="min-w-0">
-                <p className="text-ink text-xs font-bold">右パネルの表示項目</p>
+                <p className="text-ink text-xs font-medium">右パネルの表示項目</p>
                 <p className="text-ink-faint text-micro mt-0.5">ドラッグで順番変更・スイッチで表示切替</p>
               </div>
               <button
@@ -856,7 +856,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             */}
             <div style={sectionStyle('starred')} className={`${sectionVisibility('starred')} p-4`}>
               <div className="mb-2 flex items-center justify-between">
-                <h4 className="text-[11px] font-medium text-gray-500">★つき友だち情報</h4>
+                <h4 className="text-[11px] font-semibold text-gray-500">★つき友だち情報</h4>
                 <a href={`/friends/detail?id=${friend.id}`} className="text-action text-[11px] hover:underline">
                   すべて見る
                 </a>
@@ -900,7 +900,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
             {/* Rich Menu */}
             <div style={sectionStyle('richMenu')} className={`${sectionVisibility('richMenu')} p-4`}>
-              <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">リッチメニュー</h4>
+              <h4 className="text-[11px] font-semibold text-gray-500 mb-1.5">リッチメニュー</h4>
               <p className="text-[11px] text-gray-500 mb-1">現在の設定</p>
               {richMenu.kind === 'loading' ? (
                 <p className="text-[11px] text-gray-400 italic">読み込み中...</p>
@@ -932,7 +932,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
             {/* Metadata custom fields */}
             <div style={sectionStyle('metadata')} className={`${sectionVisibility('metadata')} p-4`}>
-              <h4 className="text-[11px] font-medium text-gray-500 mb-2">友だち情報</h4>
+              <h4 className="text-[11px] font-semibold text-gray-500 mb-2">友だち情報</h4>
               {/* 設計は追加日と流入元を必ず出す。どちらも既に持っている値。 */}
               <dl className="mb-2 space-y-1 text-xs">
                 <div className="flex justify-between gap-2">
@@ -982,7 +982,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             {/* Form answers — save_to_metadata の設定に関係なく回答履歴を表示 */}
             <div style={sectionStyle('forms')} className={`${sectionVisibility('forms')} p-4`}>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h4 className="text-[11px] font-medium text-gray-500">フォーム回答</h4>
+                <h4 className="text-[11px] font-semibold text-gray-500">フォーム回答</h4>
                 {/*
                   INBOX-17: 取得するのは最新10件まで。続きがあるか、全部で
                   何件あるかを黙らせない。10件を超える分は友だち詳細へ誘導する。

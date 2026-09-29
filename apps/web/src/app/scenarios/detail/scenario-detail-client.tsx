@@ -1365,7 +1365,7 @@ export default function ScenarioDetailClient({
   const renderStepForm = () => (
     <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}>
       {!editingStepId && (
-        <h4 className="text-sm font-medium text-ink-secondary mb-3">新しいステップを追加</h4>
+        <h4 className="text-sm font-semibold text-ink-secondary mb-3">新しいステップを追加</h4>
       )}
       {/* 左が編集、右が「いまどの通を触っているか」。任意値の桁指定ではなく
           3列の標準段で組む（2:1）。直書きの数を増やさない。 */}

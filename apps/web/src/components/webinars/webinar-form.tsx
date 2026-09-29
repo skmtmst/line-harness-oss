@@ -409,7 +409,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
           </summary>
           <div className="space-y-4 border-t border-hairline bg-canvas-sunken/50 p-4 sm:p-6">
             <div className="rounded-xl border border-hairline bg-canvas p-4">
-              <div className="mb-3 text-xs font-bold text-ink-secondary">毎日の枠をまとめて作成</div>
+              <div className="mb-3 text-xs font-medium text-ink-secondary">毎日の枠をまとめて作成</div>
               <div className="flex flex-wrap items-end gap-3">
                 <span className="text-xs text-ink-faint">開始<TimeField value={bulkStart} onChange={setBulkStart} aria-label="まとめて作る枠の開始" className="mt-1" /></span>
                 <span className="text-xs text-ink-faint">終了<TimeField value={bulkEnd} onChange={setBulkEnd} aria-label="まとめて作る枠の終了" className="mt-1" /></span>

@@ -194,7 +194,7 @@ export default function FormDesignSettings({
           CSS編集を実装するときは、そのときタブへ戻す。
         */}
         <div>
-          <h3 className="text-ink text-sm font-medium">
+          <h3 className="text-ink text-sm font-semibold">
             色
             {' '}
             <HelpTip label="文字と背景の色の決まりの説明">
@@ -262,7 +262,7 @@ export default function FormDesignSettings({
         </div>
 
         <div className="border-hairline mt-5 border-t pt-5">
-          <h3 className="text-ink text-sm font-medium">文字と角の丸み</h3>
+          <h3 className="text-ink text-sm font-semibold">文字と角の丸み</h3>
           <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <Field label="文字の書体" htmlFor="form-theme-font">
             <Select
@@ -298,7 +298,7 @@ export default function FormDesignSettings({
           が背景として描き、`normalizeFormTheme` が https のURLだけ通す。
         */}
         <div className="border-hairline mt-5 border-t pt-5">
-          <h3 className="text-ink text-sm font-medium">背景</h3>
+          <h3 className="text-ink text-sm font-semibold">背景</h3>
           <div className="mt-3 flex items-center justify-between gap-3">
             <p className="text-ink text-sm font-semibold">
               {theme.backgroundImageUrl ? '登録メディアの画像を使っています' : '背景画像は使っていません'}
@@ -318,7 +318,7 @@ export default function FormDesignSettings({
         </div>
 
         <div className="border-hairline mt-5 border-t pt-5">
-          <h3 className="text-ink text-sm font-medium">リンクの見え方</h3>
+          <h3 className="text-ink text-sm font-semibold">リンクの見え方</h3>
           <p className="text-ink-faint mt-0.5 text-xs">LINEやSNSにこのフォームのURLを貼ったときに出るカードです。空のままなら自動で作ります。</p>
           <div className="mt-3 space-y-4">
             <Field label="カードの見出し" htmlFor="form-og-title">

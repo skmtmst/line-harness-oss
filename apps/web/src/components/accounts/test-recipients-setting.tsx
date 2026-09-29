@@ -181,7 +181,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
                 {candidate.pictureUrl ? (
                   <img src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-full" />
                 ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-micro font-bold">{candidate.staffName.charAt(0)}</span>
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-micro font-medium">{candidate.staffName.charAt(0)}</span>
                 )}
                 <span>{candidate.staffName}</span>
                 <span aria-hidden="true" className="text-success">＋</span>

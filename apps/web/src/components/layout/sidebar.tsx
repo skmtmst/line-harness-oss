@@ -684,7 +684,7 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-lg object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
         </div>
       </div>

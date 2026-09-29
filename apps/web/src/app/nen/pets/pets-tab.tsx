@@ -208,7 +208,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
             // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
             <img src={pet.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
           ) : (
-            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
+            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep">{initial}</span>
           )}
           <span className="min-w-0">
             <span className="block truncate text-label font-semibold text-ink" title={pet.callName}>{pet.callName || pet.name || '（名前なし）'}</span>
@@ -283,7 +283,7 @@ function PetCard({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; o
           // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
           <img src={pet.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
         ) : (
-          <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
+          <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep">{initial}</span>
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-ink" title={pet.callName}>{pet.callName || pet.name || '（名前なし）'}</p>
