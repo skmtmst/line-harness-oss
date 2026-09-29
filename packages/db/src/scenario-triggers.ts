@@ -55,6 +55,33 @@ export async function getTagAddedScenarioIds(
   return (rows.results ?? []).map((r) => r.scenario_id);
 }
 
+/**
+ * そのタグが付いたときに始まる、指定アカウント向けのシナリオのIDだけを返す（R435）。
+ *
+ * 共通タグ（所属なし）はどのアカウントの友だちにも付けられるが、始めてよいのは
+ * 友だちと同じアカウントのシナリオと、全体共通（所属なし）のシナリオだけ。
+ * 別組織のシナリオが同じ共通タグをきっかけにしていても、ここで混ぜない。
+ * 全体共通は友だち追加のきっかけと同じく「どの組織にも流れる」設計なので保つ。
+ * 停止中は従来どおり外す。
+ */
+export async function getTagAddedScenarioIdsForAccount(
+  db: D1Database,
+  tagId: string,
+  lineAccountId: string | null,
+): Promise<string[]> {
+  const rows = await db
+    .prepare(
+      `SELECT st.scenario_id
+         FROM scenario_triggers st
+         JOIN scenarios s ON s.id = st.scenario_id
+        WHERE st.kind = 'tag_added' AND st.tag_id = ?
+          AND s.is_active = 1 AND (s.line_account_id = ? OR s.line_account_id IS NULL)`,
+    )
+    .bind(tagId, lineAccountId)
+    .all<{ scenario_id: string }>();
+  return (rows.results ?? []).map((r) => r.scenario_id);
+}
+
 /** 1本のシナリオに付いているきっかけを全部返す。画面用。 */
 export async function getScenarioTriggers(
   db: D1Database,

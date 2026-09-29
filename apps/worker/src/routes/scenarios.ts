@@ -2044,16 +2044,24 @@ scenarios.post('/api/scenarios/:id/triggers', requireScenarioEditBoundary, async
       return c.json({ success: false, error: 'きっかけになるタグを選んでください。' }, 400);
     }
 
-    const scenario = await c.env.DB.prepare(`SELECT id FROM scenarios WHERE id = ?`)
+    const scenario = await c.env.DB.prepare(`SELECT id, line_account_id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
-      .first<{ id: string }>();
+      .first<{ id: string; line_account_id: string | null }>();
     if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
 
     if (kind === 'tag_added') {
-      const tag = await c.env.DB.prepare(`SELECT id FROM tags WHERE id = ?`)
+      const tag = await c.env.DB.prepare(`SELECT id, line_account_id FROM tags WHERE id = ?`)
         .bind(body.tagId)
-        .first<{ id: string }>();
+        .first<{ id: string; line_account_id: string | null }>();
       if (!tag) return c.json({ success: false, error: 'タグが見つかりません。' }, 400);
+      // 別組織のタグを開始条件に付けると、そのタグ操作で別組織の購読が
+      // 作られてしまう（R435）。共通タグと自組織のタグだけ受け付ける。
+      // 全体共通のシナリオはどの組織のタグでもよい（どの友だちにも流れる設計）。
+      if (tag.line_account_id !== null
+        && scenario.line_account_id !== null
+        && tag.line_account_id !== scenario.line_account_id) {
+        return c.json({ success: false, error: 'ほかのLINEアカウントのタグは開始条件にできません。' }, 400);
+      }
     }
 
     await addScenarioTrigger(c.env.DB, scenarioId, kind as 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed', body.tagId ?? null);
