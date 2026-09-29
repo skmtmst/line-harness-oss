@@ -41,6 +41,11 @@ function RecipeClone() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
+  /*
+   * M044: 捕まえた取得失敗は共通部品へ渡す。403 は権限の案内になり、
+   * 押しても直らない再試行は出ない。429 は待ち秒数を添えた案内になる。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [prefix, setPrefix] = useState('')
   const [cloneState, setCloneState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   /** 同じ作成意図の再送で使い回すキー（監査 R126）。 */
@@ -51,11 +56,16 @@ function RecipeClone() {
   const reload = useCallback(async (): Promise<'ok' | 'missing' | 'error'> => {
     try {
       const res = await api.recipes.get(id, selectedAccountId ?? undefined)
-      if (!res.success || !res.data) return 'error'
+      if (!res.success || !res.data) {
+        setLoadError(null)
+        return 'error'
+      }
       setRecipe(res.data)
+      setLoadError(null)
       return 'ok'
     } catch (caught: unknown) {
       if (caught instanceof ApiError && caught.status === 404) return 'missing'
+      setLoadError(caught)
       return 'error'
     }
   }, [id, selectedAccountId])
@@ -63,6 +73,7 @@ function RecipeClone() {
   const refresh = useCallback(() => {
     setStatus('loading')
     setMissing(false)
+    setLoadError(null)
     void reload().then((outcome) => {
       if (outcome === 'missing') {
         setMissing(true)
@@ -112,6 +123,7 @@ function RecipeClone() {
         kind="error"
         title="レシピを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        error={loadError ?? undefined}
         onRetry={() => refresh()}
       />
     )

@@ -8,6 +8,7 @@ import StoreContextBanner from './stores/store-context-banner'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
+import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -118,6 +119,11 @@ export default function RestaurantConsole({ view }: { view: string }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  /*
+   * D024: 取得失敗を未登録（EmptySetup）と混ぜない。理由は帯に残し、
+   * ここでは理由と読み直し口だけを出す。機能自体は変えない。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
   // R103: 台帳の絞り込み条件は台帳画面が持ち、ダッシュボードは今後の有効予約だけを読む。
   const [todayStartIso] = useState(() => { const day = new Date(); day.setHours(0, 0, 0, 0); return day.toISOString() })
   const [ledgerQuery, setLedgerQuery] = useState<ReservationQuery | null>(null)
@@ -128,15 +134,16 @@ export default function RestaurantConsole({ view }: { view: string }) {
       : undefined, [activeView, ledgerQuery, todayStartIso])
 
   const load = useCallback(async () => {
-    if (!selectedAccountId) { setSnapshot(null); setLoading(false); return }
+    if (!selectedAccountId) { setSnapshot(null); setLoadError(null); setLoading(false); return }
     setLoading(true)
     try {
       const res = await restaurantTestApi.snapshot(selectedAccountId, effectiveQuery)
       setSnapshot(res.data)
+      setLoadError(null)
       setSelectedStoreId((current) => res.data.stores.some((item) => item.id === current)
         ? current
         : res.data.stores[0]?.id || '')
-    } catch { setNotice({ tone: 'error', text: '飲食店向けテストデータを読み込めませんでした。' }) }
+    } catch (caught) { setLoadError(caught); setNotice({ tone: 'error', text: '飲食店向けテストデータを読み込めませんでした。' }) }
     finally { setLoading(false) }
   }, [selectedAccountId, effectiveQuery])
   useEffect(() => { void load() }, [load])
@@ -155,6 +162,7 @@ export default function RestaurantConsole({ view }: { view: string }) {
     <TestBoundary />
     {notice && <div className={`mb-4 rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
     {loading ? <div className="rounded-card border border-hairline bg-canvas p-16 text-center text-sm text-ink-faint">読み込み中…</div>
+      : loadError !== null && !snapshot?.organization ? <ListState kind="error" error={loadError} onRetry={() => void load()} />
       : !snapshot?.organization ? <EmptySetup />
       : activeView === 'dashboard' ? <Dashboard data={snapshot} />
       : activeView === 'organization' ? <Organization
