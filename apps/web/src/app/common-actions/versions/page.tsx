@@ -74,12 +74,12 @@ function CommonActionVersionsInner() {
         setSummaryError('')
       } else {
         setSummary(null)
-        setSummaryError(listResponse.error || '月次件数を取得できませんでした。通信の状態を確認してください。')
+        setSummaryError(listResponse.error || '月次件数を読み込めませんでした。通信の状態を確認してください。')
       }
     } catch {
       if (requestSeq.current !== my) return
       setSummary(null)
-      setSummaryError('月次件数を取得できませんでした。通信の状態を確認してください。')
+      setSummaryError('月次件数を読み込めませんでした。通信の状態を確認してください。')
     } finally {
       if (requestSeq.current === my) setSummaryRetrying(false)
     }
@@ -142,13 +142,13 @@ function CommonActionVersionsInner() {
         setSummaryError('')
       } else {
         setSummary(null)
-        setSummaryError(listResponse.error || '月次件数を取得できませんでした。通信の状態を確認してください。')
+        setSummaryError(listResponse.error || '月次件数を読み込めませんでした。通信の状態を確認してください。')
       }
     } catch {
       if (requestSeq.current !== my) return
       setSummary(null)
       // 一覧だけの失敗は全体の失敗にしない。詳細の loadFailure は触らない。
-      setSummaryError('月次件数を取得できませんでした。通信の状態を確認してください。')
+      setSummaryError('月次件数を読み込めませんでした。通信の状態を確認してください。')
     } finally {
       if (requestSeq.current === my) setLoading(false)
     }
@@ -300,7 +300,7 @@ function CommonActionVersionsInner() {
       {summaryError ? (
         <Notice
           tone="warn"
-          message="月次件数を取得できませんでした。版と利用先は表示しています。"
+          message="月次件数を読み込めませんでした。版と利用先は表示しています。"
           action={(
             <Button variant="secondary" disabled={summaryRetrying} onClick={() => void reloadSummary()}>
               月次件数をもう一度読み込む
@@ -317,7 +317,7 @@ function CommonActionVersionsInner() {
           title="今月 動いた回数"
           value={summary?.executionCountThisMonth ?? null}
           unit=""
-          detail={summaryError ? '取得できませんでした' : ''}
+          detail={summaryError ? '読み込めませんでした' : ''}
           help="実行記録から集計しています"
           onRetry={summaryError ? () => void reloadSummary() : undefined}
           retryLabel="月次件数をもう一度読み込む"
@@ -327,7 +327,7 @@ function CommonActionVersionsInner() {
           title="失敗"
           value={summary?.failureCountThisMonth ?? null}
           unit=""
-          detail={summaryError ? '取得できませんでした' : ''}
+          detail={summaryError ? '読み込めませんでした' : ''}
           help="部分成功を含みます"
           onRetry={summaryError ? () => void reloadSummary() : undefined}
           retryLabel="月次件数をもう一度読み込む"
@@ -405,7 +405,7 @@ function CommonActionVersionsInner() {
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
             <p className="text-ink-faint mt-1 text-sm">公開した版は書き換えられません。</p>
-            <p className="text-ink-faint mt-1 text-xs">この30日の実行 {formatNumber(summary?.executionCountThisMonth) ?? '—'}回・失敗 {formatNumber(summary?.failureCountThisMonth) ?? '—'}回{summaryError ? '（月次件数を取得できませんでした）' : ''}</p>
+            <p className="text-ink-faint mt-1 text-xs">この30日の実行 {formatNumber(summary?.executionCountThisMonth) ?? '—'}回・失敗 {formatNumber(summary?.failureCountThisMonth) ?? '—'}回{summaryError ? '（月次件数を読み込めませんでした）' : ''}</p>
           </div>
         </div>
         <DataTable>
