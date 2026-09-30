@@ -5,7 +5,7 @@
  */
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import ToastHost, { clearToastsForTest, undoLatestToast } from '@/components/shared/toast'
+import ToastHost, { clearToastsForTest, notifyToast, undoLatestToast } from '@/components/shared/toast'
 import { runOptimistic, runUndoable } from './undoable'
 
 beforeEach(() => {
@@ -101,6 +101,144 @@ describe('R623 通知のhoverと送信期限は一つの期限', () => {
     expect(undoLatestToast()).toBe(false)
     expect(undo).not.toHaveBeenCalled()
     expect(container.querySelector('[role="status"]')).toBeNull()
+  })
+})
+
+describe('R623b 消えた通知の未取消の保存は残り時間で必ず一度だけ送る', () => {
+  it('hover中に×で閉じても残り時間で一度だけcommit', async () => {
+    const commit = vi.fn().mockResolvedValue({ success: true })
+    const undo = vi.fn()
+    const { container } = render(<ToastHost />)
+    act(() => {
+      runUndoable({ message: '外しました', commit, undo })
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    act(() => {
+      fireEvent.pointerEnter(container.querySelector('[role="status"]')!)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    // 止まったまま×で閉じる（残り3秒）。取り消していないので送る。
+    act(() => {
+      ;(container.querySelector('button[aria-label="知らせを閉じる"]') as HTMLButtonElement).click()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2999)
+    })
+    expect(commit).not.toHaveBeenCalled()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(undo).not.toHaveBeenCalled()
+    expect(undoLatestToast()).toBe(false)
+  })
+
+  it('hover中に4件目で押し出されても残り時間で一度だけcommit', async () => {
+    const commit = vi.fn().mockResolvedValue({ success: true })
+    const undo = vi.fn()
+    const { container } = render(<ToastHost />)
+    act(() => {
+      runUndoable({ message: '外しました', commit, undo })
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    act(() => {
+      fireEvent.pointerEnter(container.querySelector('[role="status"]')!)
+    })
+    // 止まったまま4件目が来て押し出される（残り3秒）
+    act(() => {
+      notifyToast('a')
+      notifyToast('b')
+      notifyToast('c')
+    })
+    expect(container.textContent).not.toContain('外しました')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2999)
+    })
+    expect(commit).not.toHaveBeenCalled()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(undo).not.toHaveBeenCalled()
+  })
+
+  it('focus保持のままホストを外しても一度だけcommit', async () => {
+    const commit = vi.fn().mockResolvedValue({ success: true })
+    const undo = vi.fn()
+    const { container, unmount } = render(<ToastHost />)
+    act(() => {
+      runUndoable({ message: '外しました', commit, undo })
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    act(() => {
+      fireEvent.focusIn(container.querySelector('[role="status"]')!)
+    })
+    // 元の期限（5秒）を過ぎても止まったまま
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000)
+    })
+    expect(commit).not.toHaveBeenCalled()
+    // 画面遷移などでホストが外れる。未取消なので残り時間で送る。
+    act(() => {
+      unmount()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2999)
+    })
+    expect(commit).not.toHaveBeenCalled()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(undo).not.toHaveBeenCalled()
+  })
+
+  it('hoverとfocusの重なりは両方離すまで止まる', async () => {
+    const commit = vi.fn().mockResolvedValue({ success: true })
+    const { container } = render(<ToastHost />)
+    act(() => {
+      runUndoable({ message: '外しました', commit, undo: vi.fn() })
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    act(() => {
+      fireEvent.pointerEnter(container.querySelector('[role="status"]')!)
+      fireEvent.focusIn(container.querySelector('[role="status"]')!)
+    })
+    // 元の期限を過ぎても止まったまま
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6000)
+    })
+    expect(commit).not.toHaveBeenCalled()
+    // マウスだけ離してもfocusが残っていれば止まったまま
+    act(() => {
+      fireEvent.pointerLeave(container.querySelector('[role="status"]')!)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6000)
+    })
+    expect(commit).not.toHaveBeenCalled()
+    // 両方離したら残り4秒で送る
+    act(() => {
+      fireEvent.focusOut(container.querySelector('[role="status"]')!)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3999)
+    })
+    expect(commit).not.toHaveBeenCalled()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(commit).toHaveBeenCalledTimes(1)
   })
 })
 
