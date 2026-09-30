@@ -370,11 +370,36 @@ function AnalyticsReportFormPage() {
    * 読み直しは同じ対象の再取得であり、進行中の保存と競わせないため。
    */
   const saveTargetRef = useRef<{ accountId: string | null; editId: string | null } | null>(null)
+  /*
+   * R526・ABA: 保存の試行の世代と、その試行の中身（キー＋内容の署名）。
+   * 新しく押すたびに世代が進む。保存の対象（アカウント・編集ID）が
+   * 切り替わっても世代を進め、切替前の試行の応答を永続無効化する
+   * （読み直し reloadSeq とは別。要求キー自体は残すので、押し直しは
+   * 同じキー・同じ内容なら既にある予約へ戻る＝再送の意味は維持）。
+   * 古い試行の応答は捨てるのが基本だが、同じキー・同じ内容の正当な
+   * 再送の応答だけは受け付ける（同じ行に戻るだけなので害がない）。
+   * 下の submit 内の isFresh が比べる。
+   */
+  const saveSeqRef = useRef(0)
+  const latestAttemptRef = useRef<{ seq: number; key: string; signature: string } | null>(null)
+  /*
+   * R526・ABA: 保存の対象（アカウント・編集ID）の世代。対象が切り替わる
+   * たびに進む。試行は始まったときの対象世代を掴み、切替後に戻った古い
+   * 応答は内容が同じでも受け付けない（下の isFresh）。
+   */
+  const switchSeqRef = useRef(0)
   useEffect(() => {
     const prev = saveTargetRef.current
     saveTargetRef.current = { accountId: selectedAccountId, editId }
     if (prev && (prev.accountId !== selectedAccountId || prev.editId !== editId)) {
       setSaving(false)
+      /*
+       * R526・ABA: 対象を移ったら切替前の保存の応答を永続無効化する。
+       * 戻ってきても古い応答は受け付けない。古い作成が成功して古い予約の
+       * 画面へ飛ぶと、未送信の編集（新しい保存の内容）が消えるため。
+       * 要求キーは残すので、押し直しは再送として効く。
+       */
+      switchSeqRef.current += 1
     }
   }, [selectedAccountId, editId])
   /*
@@ -450,6 +475,29 @@ function AnalyticsReportFormPage() {
     const wantAccount = selectedAccountId
     const wantEditId = editId
     const sameTarget = () => accountRef.current === wantAccount && editIdRef.current === wantEditId
+    /*
+     * R526・ABA: 同じ依頼・同じアカウントへ戻って作り直すと、sameTarget
+     * だけでは切替前の古い応答が通過する。古い作成が成功すると古い予約の
+     * 画面へ飛び、新しい保存の状態と要求キーが消える。失敗でも新しい保存
+     * の文を汚し、保存中の表示を落とす。保存の試行ごとに世代を数え、
+     * 新しい試行が始まったら古い応答（成功・失敗とも）を捨てる。ただし
+     * 同じキー・同じ内容の再送（正当な再送）の応答は受け付ける。
+     */
+    const mySeq = (saveSeqRef.current += 1)
+    // R526・ABA: 試行が始まったときの対象世代。切替後に戻った古い応答は
+    // 内容が同じでも受け付けない（対象切替で永続無効化）。
+    const mySwitchSeq = switchSeqRef.current
+    const myAttempt: { current: { key: string; signature: string } | null } = { current: null }
+    const isFresh = () => {
+      if (!sameTarget() || mySwitchSeq !== switchSeqRef.current) return false
+      const latest = latestAttemptRef.current
+      if (!latest || latest.seq === mySeq) return true
+      // 対象を移らない新しい試行がある。同じキー・同じ内容の再送なら
+      // 同じ行の結果なので受ける。
+      const mine = myAttempt.current
+      if (!mine) return false
+      return latest.key === mine.key && latest.signature === mine.signature
+    }
     const recipients = [
       ...options.recipients.filter((item) => staffIds.includes(item.id)).map((item) => ({
         kind: 'staff' as const, staffId: item.id, label: item.name,
@@ -472,10 +520,12 @@ function AnalyticsReportFormPage() {
     }
     try {
       if (editing) {
+        myAttempt.current = { key: `update:${editing.id}`, signature: JSON.stringify(payload) }
+        latestAttemptRef.current = { seq: mySeq, ...myAttempt.current }
         const response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
           ...payload, expectedUpdatedAt: editing.updatedAt,
         })
-        if (!sameTarget()) return
+        if (!isFresh()) return
         if (!response.success) throw new Error(response.error)
         setEditing(response.data)
         notifyToast(response.data.status === 'paused'
@@ -488,6 +538,8 @@ function AnalyticsReportFormPage() {
         // 衝突して500になる）。Aへ戻ればAのキーが残っているので再送が効く。
         const requestKey = createKeysRef.current[selectedAccountId]
           ?? (createKeysRef.current[selectedAccountId] = crypto.randomUUID())
+        myAttempt.current = { key: `create:${requestKey}`, signature: JSON.stringify(payload) }
+        latestAttemptRef.current = { seq: mySeq, ...myAttempt.current }
         let response
         try {
           response = await api.analytics.reportSchedules.create(selectedAccountId, {
@@ -498,7 +550,7 @@ function AnalyticsReportFormPage() {
           // 既にある。2件目を黙って作らず、既にある予約への案内を出す。
           if (caught instanceof ApiError && caught.status === 409) {
             const existingId = (caught.data as { existingId?: unknown } | undefined)?.existingId
-            if (typeof existingId === 'string' && existingId && sameTarget()) {
+            if (typeof existingId === 'string' && existingId && isFresh()) {
               setConflictId(existingId)
               setError('')
               return
@@ -506,7 +558,7 @@ function AnalyticsReportFormPage() {
           }
           throw caught
         }
-        if (!sameTarget()) return
+        if (!isFresh()) return
         if (!response.success) throw new Error(response.error)
         // R526: 解決したのはこの保存の試行だけ。別アカウントの試行は残す。
         delete createKeysRef.current[wantAccount]
@@ -531,10 +583,10 @@ function AnalyticsReportFormPage() {
         }
       }
     } catch (caught) {
-      if (!sameTarget()) return
+      if (!isFresh()) return
       setError(caught instanceof Error ? caught.message : editing ? '定期レポートを更新できませんでした' : '定期レポートを作れませんでした')
     } finally {
-      if (sameTarget()) setSaving(false)
+      if (isFresh()) setSaving(false)
     }
   }
 

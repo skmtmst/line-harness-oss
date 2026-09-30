@@ -113,6 +113,19 @@ function buttonByText(text: string): HTMLButtonElement {
   return found as HTMLButtonElement
 }
 
+/*
+ * 保存ボタンは保存中に文言が「作っています」へ変わる（busyLabel）。
+ * 保存の前後どちらからも掴めるように、両方の文言で探す。
+ */
+function saveButton(): HTMLButtonElement {
+  const found = [...container.querySelectorAll('button')].find((b) => {
+    const text = (b.textContent ?? '').trim()
+    return text === 'つくって動かす' || text === '作っています'
+  })
+  if (!found) throw new Error('保存ボタンが見つかりません')
+  return found as HTMLButtonElement
+}
+
 /** 宛先の行リストから、名前の行のチェックを付ける。 */
 async function checkRecipient(name: string) {
   const label = [...container.querySelectorAll('li')].find(
@@ -264,5 +277,180 @@ describe('定期レポート作成の要求キー（R526）', () => {
     expect(posted[0].accountId).toBe('account-a')
     expect(posted[1].accountId).toBe('account-a')
     expect(posted[1].key).toBe(posted[0].key)
+  })
+
+  it('Aで作りかけ→B→Aへ戻って作り直し中に、切替前の古いAの成功は新しい保存を消さない（R526・ABA）', async () => {
+    postMode.current = 'manual'
+    await mount()
+    await settle()
+    expect(hasText('山田')).toBe(true)
+
+    await checkRecipient('山田')
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(1)
+
+    // Bへ移ってAへ戻る。同じアカウント文字列だけでは古い応答が通過する。
+    account.id = 'account-b'
+    await rerender()
+    await settle()
+    account.id = 'account-a'
+    await rerender()
+    await settle()
+
+    // 内容を変えてAで作り直す（新しい保存の試行。独立proofと同値）。
+    const nameField = container.querySelector('input[type="text"]')
+    if (!nameField) throw new Error('レポート名の入力が見つかりません')
+    await act(async () => { fireEvent.change(nameField, { target: { value: 'new A content' } }) })
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(2)
+
+    // 切替前の古いAの成功が遅れて戻っても、新しい保存は消えない。
+    // 古い予約の画面へ飛ばないし、保存中の表示も落とさない。
+    await act(async () => {
+      pendingPosts[0].resolve(new Response(
+        JSON.stringify({ success: true, data: { id: 'old-a' } }), { status: 201 },
+      ))
+    })
+    await settle()
+    expect(pushed).toHaveLength(0)
+    expect(saveButton().disabled).toBe(true)
+
+    // 新しい保存の成功は受け付けて、その結果へ進む。
+    await act(async () => {
+      pendingPosts[1].resolve(new Response(
+        JSON.stringify({ success: true, data: { id: 'new-a' } }), { status: 201 },
+      ))
+    })
+    await settle()
+    expect(pushed).toHaveLength(1)
+    expect(pushed[0]).toContain('id=new-a')
+  })
+
+  it('Aで作りかけ→B→Aへ戻って作り直し中に、切替前の古いAの失敗は新しい保存を汚さない（R526・ABA）', async () => {
+    postMode.current = 'manual'
+    await mount()
+    await settle()
+    expect(hasText('山田')).toBe(true)
+
+    await checkRecipient('山田')
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(1)
+
+    account.id = 'account-b'
+    await rerender()
+    await settle()
+    account.id = 'account-a'
+    await rerender()
+    await settle()
+
+    const nameField = container.querySelector('input[type="text"]')
+    if (!nameField) throw new Error('レポート名の入力が見つかりません')
+    await act(async () => { fireEvent.change(nameField, { target: { value: 'new A content' } }) })
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(2)
+
+    // 切替前の古いAの失敗が遅れて戻っても、新しい保存の文を汚さないし、
+    // 保存中の表示も落とさない。
+    await act(async () => { pendingPosts[0].reject(new Error('network down')) })
+    await settle()
+    expect(pushed).toHaveLength(0)
+    expect(hasText('定期レポートを作れませんでした')).toBe(false)
+    expect(saveButton().disabled).toBe(true)
+
+    // 新しい保存の成功は受け付けて、その結果へ進む。
+    await act(async () => {
+      pendingPosts[1].resolve(new Response(
+        JSON.stringify({ success: true, data: { id: 'new-a' } }), { status: 201 },
+      ))
+    })
+    await settle()
+    expect(pushed).toHaveLength(1)
+    expect(pushed[0]).toContain('id=new-a')
+  })
+
+  it('Aで作りかけ→B→Aへ戻って内容を変えず作り直すと、古いAは捨て新しい保存が同じ予約へ戻る（R526・ABA）', async () => {
+    postMode.current = 'manual'
+    await mount()
+    await settle()
+    expect(hasText('山田')).toBe(true)
+
+    await checkRecipient('山田')
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(1)
+
+    account.id = 'account-b'
+    await rerender()
+    await settle()
+    account.id = 'account-a'
+    await rerender()
+    await settle()
+
+    // 内容を変えずに作り直す。正当な再送で、同じキー・同じ内容になる。
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(2)
+    expect(pendingPosts[1].key).toBe(pendingPosts[0].key)
+
+    // 切替前の古いAの成功は捨てる（古い予約の画面へ飛ばない）。
+    await act(async () => {
+      pendingPosts[0].resolve(new Response(
+        JSON.stringify({ success: true, data: { id: 'old-a' } }), { status: 201 },
+      ))
+    })
+    await settle()
+    expect(pushed).toHaveLength(0)
+    expect(saveButton().disabled).toBe(true)
+
+    // 新しい保存は同じキーなので、裏側は既にある予約を返す（再送の意味を維持）。
+    await act(async () => {
+      pendingPosts[1].resolve(new Response(
+        JSON.stringify({ success: true, data: { id: 'old-a' } }), { status: 201 },
+      ))
+    })
+    await settle()
+    expect(pushed).toHaveLength(1)
+    expect(pushed[0]).toContain('id=old-a')
+  })
+
+  it('Aで作りかけ→B→Aへ戻って名前だけ変えた状態では、古いAの成功は未送信の編集を消さない（R526・ABA）', async () => {
+    postMode.current = 'manual'
+    await mount()
+    await settle()
+    expect(hasText('山田')).toBe(true)
+
+    await checkRecipient('山田')
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(1)
+
+    account.id = 'account-b'
+    await rerender()
+    await settle()
+    account.id = 'account-a'
+    await rerender()
+    await settle()
+
+    // 新しい保存はまだ押さない。名前だけ変えた未送信の編集がある。
+    const nameField = container.querySelector('input[type="text"]') as HTMLInputElement | null
+    if (!nameField) throw new Error('レポート名の入力が見つかりません')
+    await act(async () => { fireEvent.change(nameField, { target: { value: 'new A content' } }) })
+
+    // 切替前の古いAの成功が戻っても、未送信の編集は消えない。
+    // 古い予約の画面へ飛ばないし、入力も文もそのまま。
+    await act(async () => {
+      pendingPosts[0].resolve(new Response(
+        JSON.stringify({ success: true, data: { id: 'old-a' } }), { status: 201 },
+      ))
+    })
+    await settle()
+    expect(pushed).toHaveLength(0)
+    expect((container.querySelector('input[type="text"]') as HTMLInputElement).value).toBe('new A content')
+    expect(hasText('定期レポートを作れませんでした')).toBe(false)
+    expect(saveButton().disabled).toBe(false)
   })
 })
