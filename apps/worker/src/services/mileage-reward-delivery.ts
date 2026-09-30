@@ -4,6 +4,7 @@ import {
   claimRedemptionStepForRecovery,
   clearRedemptionStepIntent,
   decryptCredential,
+  findIncompleteMileageRefunds,
   getMileageRewardDeliveryPlan,
   getReservedMileageRewardCode,
   hasSentRedemptionSteps,
@@ -241,6 +242,20 @@ export async function deliverMileageReward(
     };
   }
   if (plan.redemption.status === 'refunded') {
+    /*
+     * R362: 返却確定後に台帳・ロットの書き込みが中断した行は、
+     * ここで欠けた分を足してから案内する。残高・台帳・状態が
+     * 一致するまで復旧する。直せなくても案内は変えない
+     * （cron・再試行の回復に任せる）。
+     */
+    try {
+      await refundMileageRewardRedemption(db, {
+        redemptionId,
+        reason: '中断した返却の再開',
+      });
+    } catch {
+      /* 回復は再試行・cronに任せる */
+    }
     return {
       status: 'delivery_failed', rewardName: plan.rewardName,
       customerMessage: plan.customerMessage, rewardCode: null, retryAt: null,
@@ -515,7 +530,7 @@ export async function deliverMileageReward(
 export async function processDueMileageRewardDeliveries(
   db: D1Database,
   options: Omit<MileageRewardDeliveryOptions, 'now'> & { now: string; limit?: number },
-): Promise<{ processed: number; succeeded: number; failed: number }> {
+): Promise<{ processed: number; succeeded: number; failed: number; recovered: number }> {
   const limit = Math.min(100, Math.max(1, options.limit ?? 50));
   const leaseCutoff = new Date(
     new Date(options.now).getTime() - STALE_DELIVERY_LEASE_MS,
@@ -580,5 +595,39 @@ export async function processDueMileageRewardDeliveries(
     if (result.status === 'succeeded') succeeded += 1;
     else failed += 1;
   }
-  return { processed: due.results.length + stalled.results.length, succeeded, failed };
+  /*
+   * R362: 返却確定後に書き込みが中断した交換（台帳なしの refunded）。
+   * 期限待ちの一覧にも要対応にも出ない取り残しなので、cron が
+   * 見つけて残高・台帳・状態が一致するまで再開する。
+   * 機能オフ中は触らず残す。再オンで再開する。
+   */
+  const recoveryLimit = Math.max(0, limit - due.results.length - stalled.results.length);
+  let recovered = 0;
+  if (recoveryLimit > 0) {
+    const incomplete = await findIncompleteMileageRefunds(db, { limit: recoveryLimit });
+    for (const target of incomplete) {
+      if (target.lineAccountId && !await featureJobCanRun(db, { accountId: target.lineAccountId, featureId: 'mileage', job: 'mileage reward delivery retry' })) {
+        continue;
+      }
+      try {
+        await refundMileageRewardRedemption(db, {
+          redemptionId: target.id,
+          reason: '中断した返却の再開',
+        });
+        recovered += 1;
+      } catch (error) {
+        // 直前に成功へ移っていたら返す必要はない（遅い返却は書かない）。
+        if (error instanceof MileageRewardError && error.code === 'already_delivered') {
+          recovered += 1;
+          continue;
+        }
+        failed += 1;
+      }
+    }
+    return {
+      processed: due.results.length + stalled.results.length + incomplete.length,
+      succeeded, failed, recovered,
+    };
+  }
+  return { processed: due.results.length + stalled.results.length, succeeded, failed, recovered };
 }

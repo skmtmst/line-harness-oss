@@ -252,6 +252,50 @@ describe('失敗した交換の追跡とやり直しの店境界(実D1)', () => 
     expect(redemptionRow(testDb, theirs)).toEqual(before);
   });
 
+  it('R362: 中断した返却のやり直しは202で残高まで戻し、完了済みは409', async () => {
+    const testDb = createTestD1();
+    seedTenants(testDb);
+    const mine = await seedFailedRedemption(testDb, 'account-1', 'r362');
+    const target = app(testDb.db, tenantOwner);
+    const retry = (id: string) => target.request(
+      `/api/mileage/redemptions/${id}/retry-fulfillment`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: 'account-1' }),
+      },
+    );
+
+    // 返却確定だけ済んで書き込みが中断した取り残しにする。
+    const now = new Date().toISOString();
+    testDb.raw.prepare(
+      `UPDATE mileage_redemptions
+          SET status = 'refunded', refunded_at = ?, next_retry_at = NULL, updated_at = ?
+        WHERE id = ?`,
+    ).run(now, now, mine);
+    const wallet = () => (testDb.raw.prepare(
+      `SELECT available FROM mileage_wallets
+        WHERE program_id = 'default' AND beneficiary_key = 'user:user-r362'`,
+    ).get() as { available: number }).available;
+    expect(wallet()).toBe(700);
+
+    // 取り残しは要対応一覧に出る。
+    const listed = await target.request('/api/mileage/redemptions?accountId=account-1');
+    expect(listed.status).toBe(200);
+    expect(((await listed.json()) as ListBody).data?.items.map((item) => item.id)).toContain(mine);
+
+    // やり直しは202で、残高・台帳まで一致する。
+    const resumed = await retry(mine);
+    expect(resumed.status).toBe(202);
+    expect(wallet()).toBe(1000);
+
+    // 書き込み済みの返却のやり直しは従来どおり409（二重返却なし）。
+    const again = await retry(mine);
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as { code?: string }).code).toBe('redemption_not_retryable');
+    expect(wallet()).toBe(1000);
+  });
+
   it('店を渡さない一覧・やり直しは通らない', async () => {
     const testDb = createTestD1();
     seedTenants(testDb);
