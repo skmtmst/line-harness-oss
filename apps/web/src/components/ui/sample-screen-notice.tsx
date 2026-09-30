@@ -34,7 +34,7 @@ export default function SampleScreenNotice({
       </p>
       <Link
         href={backHref}
-        className="border-warning text-status-warn-deep hover:bg-canvas rounded-control shrink-0 border px-3 py-1.5 text-xs font-bold"
+        className="border-warning text-status-warn-deep hover:bg-canvas rounded-control shrink-0 border px-3 py-1.5 text-xs font-medium"
       >
         {backLabel}
       </Link>

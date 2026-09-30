@@ -29,7 +29,7 @@ export default function InboxList({
   const end = Math.min(total, page * pageSize)
 
   return (
-    <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
+    <div className="overflow-hidden rounded-control bg-canvas shadow-card ring-1 ring-hairline">
       {rows.length === 0 && !loading ? (
         <ListState
           kind="empty"
@@ -44,7 +44,7 @@ export default function InboxList({
         </div>
       )}
       {total > 0 && (
-        <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
+        <div className="flex items-center justify-between border-t border-divider-soft px-4 py-3 text-sm text-ink-secondary">
           <ListRange total={total} first={start} last={end} />
           <Pagination page={page} pageCount={totalPages} onPageChange={onPageChange} disabled={loading} />
         </div>

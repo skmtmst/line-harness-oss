@@ -72,7 +72,7 @@ export default function ProjectFormDialog({
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${uid}-name`} className="text-label font-bold text-ink">プロジェクト名</label>
+          <label htmlFor={`${uid}-name`} className="text-label font-medium text-ink">プロジェクト名</label>
           <TextField
             id={`${uid}-name`}
             value={name}
@@ -86,7 +86,7 @@ export default function ProjectFormDialog({
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between">
-            <label htmlFor={`${uid}-description`} className="text-label font-bold text-ink">説明</label>
+            <label htmlFor={`${uid}-description`} className="text-label font-medium text-ink">説明</label>
             <span className="text-micro text-ink-faint">任意</span>
           </div>
           <TextArea

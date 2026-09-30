@@ -31,7 +31,7 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain("usePageTitle('1通目を設定')")
     expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
     expect(PAGE).not.toContain('<Header')
-    expect(PAGE).toContain('✕ キャンセル')
+    expect(PAGE).toContain('キャンセル')
   })
 
   it('設計Node IDを画面に残す', () => {
@@ -67,7 +67,7 @@ describe('V6 1通目設定の契約', () => {
   })
 
   it('下見の外枠は設計の幅500・角丸10', () => {
-    expect(PREVIEW_CSS).toMatch(/\.preview \{[^}]*max-width: 500px;[^}]*border-radius: 10px;/)
+    expect(PREVIEW_CSS).toMatch(/\.preview \{[^}]*max-width: 500px;[^}]*border-radius: var\(--radius-card\);/)
     expect(PREVIEW).toContain('styles.preview')
     expect(PAGE).toContain('xl:grid-cols-[minmax(0,1fr)_500px]')
   })
@@ -80,16 +80,16 @@ describe('V6 1通目設定の契約', () => {
   })
 
   it('吹き出しは左下だけ角を落とし、本文は13px', () => {
-    expect(PREVIEW_CSS).toMatch(/\.bubble \{[^}]*border-radius: 14px 14px 14px 4px;/)
+    expect(PREVIEW_CSS).toMatch(/\.bubble \{[^}]*border-radius: var\(--radius-card\) var\(--radius-card\) var\(--radius-card\) var\(--radius-mini\);/)
     expect(PREVIEW).toContain('styles.bubble')
     expect(PREVIEW).toContain('text-label leading-relaxed font-medium')
   })
 
   it('種別タブは外枠38・タブ30の帯にする', () => {
-    expect(TABS_CSS).toMatch(/\.rail \{[^}]*min-height: 38px;[^}]*border-radius: 8px;/)
-    expect(TABS_CSS).toMatch(/\.tab \{[^}]*height: 30px;[^}]*border-radius: 6px;/)
+    expect(TABS_CSS).toMatch(/\.rail \{[^}]*min-height: 38px;[^}]*border-radius: var\(--radius-control\);/)
+    expect(TABS_CSS).toMatch(/\.tab \{[^}]*height: 30px;[^}]*border-radius: var\(--radius-mini\);/)
     expect(TABS).toContain('styles.rail')
-    expect(TABS).toContain('${styles.tab} px-3 text-micro font-bold')
+    expect(TABS).toContain('${styles.tab} px-3 text-micro font-medium')
     expect(TABS).not.toContain('rounded-t-control')
   })
 

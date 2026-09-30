@@ -75,7 +75,7 @@ describe('お問い合わせの続き', () => {
     await act(async () => { root.render(<HqSupportDetailPage />) })
     await flush()
     const textarea = host.querySelector('textarea') as HTMLTextAreaElement
-    const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('送信する'))!
+    const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('送る'))!
     expect(send.hasAttribute('disabled')).toBe(true)
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!

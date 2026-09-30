@@ -468,7 +468,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       <span>{m.name}{m.is_active ? '' : '（休止中）'}</span>
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
-                        <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
+                        <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded-mini px-2 py-0.5 text-xs">
                           {m.category_label}
                         </span>
                       )}
@@ -872,9 +872,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           <Button
             onClick={() => void submit()}
             disabled={saving}
-            variant="primary"
-          >
-            {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作成' : '変更を保存'}
+            variant="primary" busy={saving}>
+            {initial.version === 0 ? '基本ルールを作る' : '保存する'}
           </Button>
         </div>
       ) : (
@@ -1205,9 +1204,7 @@ function EditMenuModal({
               variant="primary"
               onClick={() => void submit()}
               disabled={saving || !canEdit}
-              title={canEdit ? undefined : '予約メニューの変更権限がありません'}
-            >
-              {saving ? '保存中…' : '保存'}
+              title={canEdit ? undefined : '予約メニューの変更権限がありません'} busy={saving}>保存する
             </Button>
           </div>
         }
@@ -1318,7 +1315,7 @@ function EditMenuModal({
             </p>
           </Field>
 
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <div>
               <p className="text-ink-secondary text-sm font-semibold">このメニューで使う設備</p>
               <p className="text-ink-faint mt-1 text-xs">部屋・席・機材を複数選び、1件の予約に必要な数を指定します。</p>
@@ -1379,7 +1376,7 @@ function EditMenuModal({
                 disabled={resourceSaving || resourceLoadError !== null}
                 className="border-accent text-accent-deep rounded-control border px-3 py-2 text-sm font-semibold disabled:opacity-50"
               >
-                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存'}
+                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存する'}
               </button>
             ) : (
               <p className="text-ink-faint text-xs">設備の割当は閲覧のみです。変更は管理者へ依頼してください。</p>
@@ -1388,7 +1385,7 @@ function EditMenuModal({
           </div>
 
           {/* 受付条件。空欄は「制限しない」で、これまでと同じ動きになる。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink-secondary text-sm font-semibold">受付条件</p>
             <div className="grid grid-cols-2 gap-3">
               <NumField
@@ -1568,7 +1565,7 @@ function MenusPageHost() {
       <div data-design="Tabs" className="border-hairline flex flex-wrap gap-1 border-b">
         <Link
           href="/booking/menus?tab=menus"
-          className={`rounded-t-md px-4 py-2 text-sm ${
+          className={`rounded-t-mini px-4 py-2 text-sm ${
             tab === 'menus'
               ? 'border-accent text-accent-deep border-b-2 font-medium'
               : 'text-ink-faint hover:text-ink-secondary'
@@ -1578,7 +1575,7 @@ function MenusPageHost() {
         </Link>
         <Link
           href="/booking/staff/shifts"
-          className={`rounded-t-md px-4 py-2 text-sm ${
+          className={`rounded-t-mini px-4 py-2 text-sm ${
             'text-ink-faint hover:text-ink-secondary'
           }`}
         >
@@ -1586,13 +1583,13 @@ function MenusPageHost() {
         </Link>
         <Link
           href="/booking/staff/shifts#special"
-          className="text-ink-faint hover:text-ink-secondary rounded-t-md px-4 py-2 text-sm"
+          className="text-ink-faint hover:text-ink-secondary rounded-t-mini px-4 py-2 text-sm"
         >
           休業日
         </Link>
         <Link
           href="/booking/menus?tab=rules"
-          className={`rounded-t-md px-4 py-2 text-sm ${tab === 'rules' ? 'border-accent text-ink border-b-2 font-medium' : 'text-ink-faint hover:text-ink-secondary'}`}
+          className={`rounded-t-mini px-4 py-2 text-sm ${tab === 'rules' ? 'border-accent text-ink border-b-2 font-medium' : 'text-ink-faint hover:text-ink-secondary'}`}
         >
           予約のルール
         </Link>

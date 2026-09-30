@@ -1067,7 +1067,7 @@ function MediaLibraryInner() {
               kind="empty"
               title="まだメディアがありません"
               description="配信で使う画像・動画・音声・ファイルの置き場です。"
-              action={<Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button>}
+              action={<Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録する</Button>}
             />
           ) : (
             <ListState
@@ -1137,16 +1137,16 @@ function MediaLibraryInner() {
                       <button
                         onClick={() => setRenaming(null)}
                         disabled={renamingBusy}
-                        className="border-hairline text-ink-secondary rounded border px-2 py-1 text-[11px]"
+                        className="border-hairline text-ink-secondary rounded-mini border px-2 py-1 text-[11px]"
                       >
                         キャンセル
                       </button>
                       <button
                         onClick={() => void rename()}
                         disabled={renamingBusy}
-                        className="bg-accent-deep text-on-accent rounded px-2 py-1 text-[11px] disabled:opacity-50"
+                        className="bg-accent-deep text-on-accent rounded-mini px-2 py-1 text-[11px] disabled:opacity-50"
                       >
-                        {renamingBusy ? '保存中…' : '保存'}
+                        {renamingBusy ? '保存中…' : '保存する'}
                       </button>
                     </div>
                   </div>
@@ -1177,18 +1177,18 @@ function MediaLibraryInner() {
                           }
                         />
                       ) : null}
-                      <span className="bg-ink-secondary text-on-accent rounded px-1 py-0.5 text-[10px] leading-none">
+                      <span className="bg-ink-secondary text-on-accent rounded-mini px-1 py-0.5 text-[10px] leading-none">
                         {KINDS.find((k) => k.key === item.kind)?.label ?? 'ファイル'}
                       </span>
                       {item.archivedAt ? (
                         <span
-                          className="bg-canvas-sunken text-ink-secondary rounded px-1 py-0.5 text-[10px] leading-none"
+                          className="bg-canvas-sunken text-ink-secondary rounded-mini px-1 py-0.5 text-[10px] leading-none"
                           title={item.archiveReason ? `退避の理由：${item.archiveReason}` : '退避済み'}
                         >
                           退避済み
                         </span>
                       ) : null}
-                      <span className="text-ink min-w-0 flex-1 truncate text-caption font-bold" title={item.filename}>
+                      <span className="text-ink min-w-0 flex-1 truncate text-caption font-medium" title={item.filename}>
                         {item.filename}
                       </span>
                     </span>
@@ -1196,7 +1196,7 @@ function MediaLibraryInner() {
                       {formatMediaDetails(item)}
                     </p>
                     <p
-                      className={`text-nano font-bold tabular-nums ${
+                      className={`text-nano font-medium tabular-nums ${
                         item.usageCount === undefined
                           ? 'text-ink-faint'
                           : item.usageCount === 0
@@ -1314,8 +1314,7 @@ function MediaLibraryInner() {
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteMedia({ impact, busy: deleteBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()}>
-                  {deleteBusy ? '処理中…' : '削除する'}
+                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
                 </Button>
               ) : null}
             </div>
@@ -1347,7 +1346,7 @@ function MediaLibraryInner() {
 
             {impact.references.length > 0 ? (
               <div>
-                <p className="text-ink text-xs font-bold">使われている場所</p>
+                <p className="text-ink text-xs font-medium">使われている場所</p>
                 <ul className="mt-1.5 space-y-1.5">
                   {impact.references.map((ref: MediaDeleteImpactReference, index: number) => (
                     <li
@@ -1393,15 +1392,13 @@ function MediaLibraryInner() {
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button type="button" onClick={() => setBulkConfirm(null)} disabled={bulkBusy}>
-              やめる
+              キャンセル
             </Button>
             <Button
               type="button"
               variant="primary"
               disabled={bulkBusy}
-              onClick={() => void runBulkDelete(bulkConfirm ?? [])}
-            >
-              {bulkBusy ? '処理中…' : '削除する'}
+              onClick={() => void runBulkDelete(bulkConfirm ?? [])} busy={bulkBusy} busyLabel="処理中…">削除する
             </Button>
           </div>
         }
@@ -1437,23 +1434,20 @@ function MediaLibraryInner() {
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button type="button" onClick={() => setArchiveTarget(null)} disabled={archiveBusy}>
-              やめる
+              キャンセル
             </Button>
             <Button
               type="button"
               variant="primary"
               disabled={archiveBusy || !archiveReason.trim()}
-              onClick={() => void confirmArchiveChange()}
-            >
-              {archiveBusy
-                ? '処理中…'
-                : archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
+              onClick={() => void confirmArchiveChange()} busy={archiveBusy} busyLabel="処理中…">
+              {archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
             </Button>
           </div>
         }
       >
         <label className="block space-y-1.5">
-          <span className="text-ink text-xs font-bold">理由<RequiredBadge /><span className="font-normal text-ink-faint">（あとから履歴で確認できます）</span></span>
+          <span className="text-ink text-xs font-medium">理由<RequiredBadge /><span className="font-normal text-ink-faint">（あとから履歴で確認できます）</span></span>
           <input
             type="text"
             autoFocus

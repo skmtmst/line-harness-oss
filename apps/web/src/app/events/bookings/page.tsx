@@ -29,6 +29,7 @@ import {
   type EventSlot,
 } from '@/lib/api'
 import { describeBookingCapacity } from '../event-attention'
+import { formatDateTime } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -101,14 +102,7 @@ function formatJp(iso: string | null | undefined, fallback: string): string {
   if (!iso) return fallback
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return fallback
-  return date.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(date)
 }
 
 /**
@@ -204,9 +198,7 @@ function OccurrenceApplicantsPanel({
           <Button
             onClick={onPromote}
             disabled={promoting || waitingCount === 0}
-            data-occurrence-action="promote-waitlist"
-          >
-            {promoting ? '案内を送信中…' : '次の方へ案内'}
+            data-occurrence-action="promote-waitlist" busy={promoting} busyLabel="案内を送信中…">次の方へ案内
           </Button>
         </div>
       </div>
@@ -291,7 +283,7 @@ function OccurrenceApplicantsPanel({
         人は下の行で追う。記録の操作自体は下の予約一覧の既存ボタンで行う。
       */}
       <div className="border-hairline mt-4 border-t pt-3" data-idea29="attendance">
-        <h4 className="text-ink text-sm font-medium">当日の受付</h4>
+        <h4 className="text-ink text-sm font-semibold">当日の受付</h4>
         {attendance === null ? (
           <p className="text-ink-faint mt-1 text-xs">受付の記録はまだ取得できていません。</p>
         ) : (
@@ -328,7 +320,7 @@ function OccurrenceApplicantsPanel({
         案内中・待機中は上の一覧にいるので、ここでは結果が出た分を追う。
       */}
       <div className="border-hairline mt-4 border-t pt-3" data-idea29="waitlist-history">
-        <h4 className="text-ink text-sm font-medium">繰上げ・案内の履歴</h4>
+        <h4 className="text-ink text-sm font-semibold">繰上げ・案内の履歴</h4>
         {data.waitlistHistory === undefined ? (
           <p className="text-ink-faint mt-1 text-xs">履歴はまだ取得できていません。</p>
         ) : waitlistHistory.length === 0 ? (
@@ -1143,7 +1135,7 @@ function BookingsInner() {
             {canManageApplicantBroadcast && (
               <>
                 <div className="border-hairline mt-4 border-t pt-4">
-                  <h4 className="text-ink font-medium">この開催回の申込者へ一斉送信</h4>
+                  <h4 className="text-ink font-semibold">この開催回の申込者へ一斉送信</h4>
                   <p className="text-ink-faint mt-1 text-xs">対象はこの確認時点の申込者で固定します。確認後の申込・取消・タグ変更では宛先を入れ替えません。</p>
                   <textarea
                     value={broadcastMessage}
@@ -1160,8 +1152,7 @@ function BookingsInner() {
                     className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm"
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''}>
-                      {broadcastBusy ? '対象を確定中…' : '対象と内容を確認'}
+                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="対象を確定中…">対象と内容を確認
                     </Button>
                     {activeBroadcastPreview && <span className="text-ink-secondary text-sm">送信対象 {activeBroadcastPreview.recipientCount}人</span>}
                     {activeBroadcastPreview && <Button onClick={() => setBroadcastConfirmOpen(true)} disabled={broadcastBusy}>送信前の最終確認へ</Button>}
@@ -1172,8 +1163,8 @@ function BookingsInner() {
                   open={broadcastConfirmOpen && activeBroadcastPreview !== null}
                   title="この申込者へ送信を開始しますか？"
                   description={`確認済みの ${activeBroadcastPreview?.recipientCount ?? 0} 人へ送信します。送信開始後は取り消せません。`}
-                  confirmLabel="送信を開始"
-                  cancelLabel="戻る"
+                  confirmLabel="送る"
+                  cancelLabel="キャンセル"
                   busy={broadcastBusy}
                   error={broadcastError}
                   onConfirm={() => void sendOccurrenceBroadcast()}
@@ -1406,7 +1397,7 @@ function BookingsInner() {
         title="この予約を運営側でキャンセルしますか？"
         description="予約は「キャンセル」になり、枠が空きます。友だちにはLINEでキャンセルのお知らせが届きます。送ったお知らせは取り消せません。この画面から元の「確定」に戻すことはできません。"
         confirmLabel="キャンセルにする"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
         destructive
         busy={cancelling}
@@ -1460,7 +1451,7 @@ function BookingsInner() {
               ? '順番を変える'
               : '見送る'
         }
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         busy={promotingWaitlist}
         error={waitlistOpError}
         /* 理由が必須。空のまま送らせない（確認ボタンを出さない）。 */
@@ -1497,7 +1488,7 @@ function BookingsInner() {
         title="この申し込みを断りますか？"
         description="予約は「拒否」になり、枠が空きます。友だちにはLINEで断りのお知らせが届きます。送ったお知らせは取り消せません。"
         confirmLabel="申し込みを断る"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
         destructive
         busy={busy}

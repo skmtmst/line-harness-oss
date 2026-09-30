@@ -9,6 +9,7 @@ import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
+import { formatDay } from '@/lib/format'
 
 /*
  * 一覧は `api.nenCampaigns.columns`（`NenColumn`・ラクダ語）を読む。
@@ -156,7 +157,7 @@ function NenColumnEditInner() {
                 <p className="text-ink text-sm font-medium">{column.title}</p>
                 <p className="text-ink-faint text-xs">
                   {column.publishedAt
-                    ? new Date(column.publishedAt).toLocaleDateString('ja-JP')
+                    ? formatDay(column.publishedAt)
                     : '未公開'}
                 </p>
               </div>
@@ -200,7 +201,7 @@ function NenColumnEditInner() {
                   disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}
                   className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken shrink-0 border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
                 >
-                  {savingId === column.id ? '保存中...' : '保存'}
+                  {savingId === column.id ? '保存中...' : '保存する'}
                 </button>
               </div>
             </div>

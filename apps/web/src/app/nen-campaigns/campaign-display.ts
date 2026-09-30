@@ -1,4 +1,5 @@
 import type { NenCampaignSetting } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
 
 type TimingSetting = Pick<NenCampaignSetting, 'campaignKey' | 'delayDays' | 'deliveryTime'>
 type ContentSetting = Pick<NenCampaignSetting, 'campaignKey' | 'buttonLabel'>
@@ -47,15 +48,7 @@ export function formatCampaignContent(setting: ContentSetting): string {
 export function formatNenJobDateTime(value: string): string {
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) return '日時を確認できません'
-  return date.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(date)
 }
 
 /*

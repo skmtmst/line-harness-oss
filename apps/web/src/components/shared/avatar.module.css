@@ -14,8 +14,8 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 9999px;
-  font-weight: 700;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
   line-height: 1;
   user-select: none;
 }

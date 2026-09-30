@@ -25,14 +25,14 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
         actions={
           <>
             <select aria-label="保存した検索" />
-            <button type="button">この条件を保存</button>
+            <button type="button">この条件を保存する</button>
           </>
         }
       />,
     )
     const searchAt = html.indexOf('タイトル・内容で検索')
     const savedAt = html.indexOf('保存した検索')
-    const saveAt = html.indexOf('この条件を保存')
+    const saveAt = html.indexOf('この条件を保存する')
     expect(searchAt).toBeGreaterThan(-1)
     expect(savedAt).toBeGreaterThan(searchAt)
     expect(saveAt).toBeGreaterThan(savedAt)

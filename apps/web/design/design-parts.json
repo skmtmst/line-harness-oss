@@ -13,7 +13,7 @@
   },
   "$componentInventory": {
     "file": "design/pencil-component-inventory.json",
-    "requiredCount": 86,
+    "requiredCount": 87,
     "requiredClassifications": [
       "global",
       "feature",
@@ -67,7 +67,7 @@
     "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は docs/v6-directives.md §4「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。2026-09-26: 必須節点の ApbSZ・zPRvi・I5rKbM を uR9s8（★V7 共通部品その2 §1・§2）へ置き換え。",
     "tokens": 21,
     "parts": 20,
-    "componentInventory": 86,
+    "componentInventory": 87,
     "v6RepresentativeNodes": 10,
     "v6PartNodes": [
       "nBRKk",
@@ -210,19 +210,19 @@
     },
     "--shadow-card": {
       "pencil": "XywGr effect → #673 Beautiful shadows sm",
-      "source": "0px 2px 3px -1px rgba(0,0,0,0.1), 0px 1px 0px 0px rgba(25,28,33,0.02), 0px 0px 0px 1px rgba(25,28,33,0.08)",
-      "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114",
+      "source": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14",
+      "resolved": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14",
       "status": "active",
-      "note": "#673 で Beautiful shadows の層状影（近距離の薄い影＋下端の光＋輪郭の1pxリング）へ差し替え。1px罫線だけの硬さを残さない。利用者承認済みの視覚改善（監査6・提案1）。",
-      "lastCheckedAt": "2026-09-24"
+      "note": "★V7 の段1。影の色は V6 の黒からインク色（#1d1d1f系）へ変え、ぼやけを抑えた。",
+      "lastCheckedAt": "2026-09-30"
     },
     "--shadow-float": {
       "pencil": "hGpFq/z6TmF effect → #673 Beautiful shadows md",
-      "source": "0px 4px 8px -2px rgba(0,0,0,0.08), 0px 12px 24px -4px rgba(25,28,33,0.14), 0px 0px 0px 1px rgba(25,28,33,0.08)",
-      "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114",
+      "source": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14",
+      "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14",
       "status": "active",
-      "note": "#673 で Beautiful shadows の層状影へ差し替え。メニュー・ドロップダウン・モーダル・引き出しなど、カードより一段強く浮く面で共有する。",
-      "lastCheckedAt": "2026-09-24"
+      "note": "★V7 の段2。浮いて追いつく物にだけ使う。影の色はインク色系へ統一。",
+      "lastCheckedAt": "2026-09-30"
     },
     "--color-status-info": {
       "pencil": "$status-info",
@@ -435,7 +435,7 @@
           "class": "supportMetric",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "10px"
+          "resolved": "12px"
         },
         {
           "pencil": "k9daJ height 100",
@@ -529,7 +529,7 @@
           "class": "card",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "10px"
+          "resolved": "12px"
         },
         {
           "pencil": "XywGr fill: $canvas",
@@ -543,7 +543,7 @@
           "class": "card",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
+          "resolved": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14"
         },
         {
           "pencil": "ラベル fill: $ink-secondary",
@@ -581,11 +581,11 @@
           "resolved": "22px"
         },
         {
-          "pencil": "値 fontWeight: 700",
+          "pencil": "値 fontWeight: 600（★V7 §2 3段化）",
           "class": "value",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "説明 fill: $ink-faint",
@@ -613,7 +613,7 @@
           "class": "badge",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "10px"
+          "resolved": "12px"
         },
         {
           "pencil": "バッジ fill: $accent-soft",
@@ -1051,11 +1051,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "Blot6 current label fontWeight: 700",
+          "pencil": "Blot6 current label fontWeight: 500（★V7 §2 3段化）",
           "class": "current",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         }
       ]
     },
@@ -1292,7 +1292,7 @@
           "class": "item",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "10px"
+          "resolved": "12px"
         },
         {
           "pencil": "J33xq menu label fontSize: $size-body",
@@ -1323,11 +1323,11 @@
           "resolved": "#087a3e"
         },
         {
-          "pencil": "J33xq selected label fontWeight: 700",
+          "pencil": "J33xq selected label fontWeight: 500（★V7 §2 3段化）",
           "class": "active",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "J33xq section height: 34",
@@ -1527,11 +1527,11 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "R098Z current fontWeight: 700",
+          "pencil": "R098Z current fontWeight: 500（★V7 §2 3段化）",
           "class": "current",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "R098Z separator fill: $ink-faint",
@@ -1620,11 +1620,11 @@
           "resolved": "#087a3e"
         },
         {
-          "pencil": "VPn1F fontWeight: 700",
+          "pencil": "VPn1F fontWeight: 500（★V7 §2 3段化）",
           "class": "selected",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "z9TQJ height: 50",
@@ -1659,7 +1659,7 @@
           "class": "segmented",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "10px"
+          "resolved": "12px"
         },
         {
           "pencil": "z9TQJ item height: 42",
@@ -1723,7 +1723,7 @@
           "class": "card",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "10px"
+          "resolved": "12px"
         },
         {
           "pencil": "X34VF fill: $canvas",
@@ -1737,7 +1737,7 @@
           "class": "card",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
+          "resolved": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14"
         },
         {
           "pencil": "dashboard card layout: vertical",
@@ -1886,11 +1886,11 @@
           "resolved": "16px"
         },
         {
-          "pencil": "t0jk8p title fontWeight: 700",
+          "pencil": "t0jk8p title fontWeight: 600（★V7 §2 3段化）",
           "class": "title",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "t0jk8p action fill: $action（#669: 緑は主操作専用。見出しリンクはaction色へ）",
@@ -1990,11 +1990,11 @@
           "resolved": "12px"
         },
         {
-          "pencil": "xRvDB fontWeight: 700",
+          "pencil": "xRvDB fontWeight: 500（★V7 §2 3段化）",
           "class": "badge",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "dashboard compact padding: [4,8]（★V7）",
@@ -2534,11 +2534,11 @@
           "resolved": "#e8f8ee"
         },
         {
-          "pencil": "Gfsb4 selected fontWeight: 700",
+          "pencil": "Gfsb4 selected fontWeight: 500（★V7 §2 3段化）",
           "class": "selected",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "Gfsb4 check width: 18",
@@ -2760,8 +2760,8 @@
           "pencil": "J6x4Q effect: card",
           "class": "panel",
           "prop": "box-shadow",
-          "source": "var(--shadow-card)",
-          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
+          "source": "var(--shadow-overlay)",
+          "resolved": "0px 8px 16px -4px #1d1d1f1a,0px 24px 48px -8px #1d1d1f2e,0px 0px 0px 1px #1d1d1f14"
         },
         {
           "pencil": "J6x4Q gap: 12",
@@ -2792,11 +2792,11 @@
           "resolved": "16px"
         },
         {
-          "pencil": "J6x4Q title fontWeight: 700",
+          "pencil": "J6x4Q title fontWeight: 600（★V7 §2 3段化）",
           "class": "title",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "J6x4Q description fill: $ink-faint",
@@ -2915,7 +2915,7 @@
           "class": "inline",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
+          "resolved": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14"
         },
         {
           "pencil": "VJKAT header padding top/right",
@@ -2932,11 +2932,11 @@
           "resolved": "14px"
         },
         {
-          "pencil": "VJKAT title fontWeight: 700",
+          "pencil": "VJKAT title fontWeight: 600（★V7 §2 3段化）",
           "class": "title",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "VJKAT close width: 18 icon in 32 target",
@@ -3096,8 +3096,8 @@
       ],
       "cssPrefix": "toast",
       "pencilUsage": "★V7 共通部品その2 §2 の知らせへ適用",
-      "lastCheckedAt": "2026-09-26",
-      "note": "4秒で消える。role=status。取り消せる操作は「元に戻す」を1つ付ける。置き場所は外枠に1つ。",
+      "lastCheckedAt": "2026-09-30",
+      "note": "4秒で消える。role=status。取り消せる操作は「元に戻す」を1つ付ける。置き場所は外枠に1つ。「知らせは黒にしない」（2026-09-30 オーナー）— 白地・細い線・段2（浮く）の影で、成功・失敗は印の色（緑/赤）だけで分ける。",
       "routes": {
         "active": [
           "*"
@@ -3113,28 +3113,63 @@
           "resolved": "fixed"
         },
         {
-          "pencil": "toast surface: ink",
+          "pencil": "uR9s8 §2: 知らせは白地（2026-09-30 オーナー「黒にしない」）",
           "class": "toast",
           "prop": "background",
+          "source": "var(--color-canvas)",
+          "resolved": "#ffffff"
+        },
+        {
+          "pencil": "uR9s8 §2: 細い線",
+          "class": "toast",
+          "prop": "border",
+          "source": "1px solid var(--color-hairline)",
+          "resolved": "1px solid #dadde2"
+        },
+        {
+          "pencil": "uR9s8 §2: 段2（浮く）の影",
+          "class": "toast",
+          "prop": "box-shadow",
+          "source": "var(--shadow-float)",
+          "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14"
+        },
+        {
+          "pencil": "uR9s8 §2: 文字は ink / caption semibold",
+          "class": "toast",
+          "prop": "color",
           "source": "var(--color-ink)",
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "toast text: caption semibold",
+          "pencil": "uR9s8 toast text: caption",
           "class": "toast",
           "prop": "font-size",
           "source": "var(--text-caption)",
           "resolved": "12px"
         },
         {
-          "pencil": "toast corner: control",
+          "pencil": "uR9s8 toast corner: control",
           "class": "toast",
           "prop": "border-radius",
           "source": "var(--radius-control)",
           "resolved": "8px"
         },
         {
-          "pencil": "toast auto-dismiss",
+          "pencil": "uR9s8 §2: 成功の印は緑",
+          "class": "iconSuccess",
+          "prop": "color",
+          "source": "var(--color-success)",
+          "resolved": "#047833"
+        },
+        {
+          "pencil": "uR9s8 §2: 失敗の印は赤",
+          "class": "iconError",
+          "prop": "color",
+          "source": "var(--color-danger)",
+          "resolved": "#b3261e"
+        },
+        {
+          "pencil": "uR9s8 toast auto-dismiss",
           "class": "toast",
           "prop": "--toast-duration",
           "source": "4000ms",
@@ -3215,7 +3250,7 @@
           "class": "menu",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114"
+          "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14"
         },
         {
           "pencil": "xifuV gap: 2",
@@ -3406,7 +3441,7 @@
           "class": "panel",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114"
+          "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14"
         },
         {
           "pencil": "z6TmF header padding",
@@ -3423,11 +3458,11 @@
           "resolved": "16px"
         },
         {
-          "pencil": "z6TmF title fontWeight: 700",
+          "pencil": "z6TmF title fontWeight: 600（★V7 §2 3段化）",
           "class": "title",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "z6TmF tabs gap: 6",
@@ -3512,6 +3547,62 @@
           "prop": "background",
           "source": "var(--color-status-danger)",
           "resolved": "#e5484d"
+        }
+      ]
+    },
+    "bulk-bar": {
+      "name": "★V7 一括バー（選択中のまとめ操作）",
+      "pencilNodes": [
+        "z97zZN"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/bulk-bar.tsx",
+      "cssModule": "src/components/shared/bulk-bar.module.css",
+      "components": [
+        "BulkBar"
+      ],
+      "cssPrefix": "bulk-bar",
+      "pencilUsage": "★V7 仕上げ §2「一括バーは黒にしない」へ適用",
+      "lastCheckedAt": "2026-09-30",
+      "note": "表で1件でも選ぶと下端から8px上がって出る、0件で下がって消える。黒地は使わず surface-pearl＋上1pxの線＋段2（浮く）の影。件数は濃い緑の太字、操作は白地ボタン＋残りは「…」。",
+      "routes": {
+        "active": [
+          "/friends",
+          "/scenarios",
+          "/nen-members"
+        ],
+        "impact": "選択式の一覧を持つ画面"
+      },
+      "declarations": [
+        {
+          "pencil": "z97zZN §2: 一括バーの地は surface-pearl（黒にしない）",
+          "class": "bar",
+          "prop": "background",
+          "source": "var(--color-surface-pearl)",
+          "resolved": "#fafafc"
+        },
+        {
+          "pencil": "z97zZN §2: 上に1pxの細い線",
+          "class": "bar",
+          "prop": "border-top",
+          "source": "1px solid var(--color-hairline)",
+          "resolved": "1px solid #dadde2"
+        },
+        {
+          "pencil": "z97zZN §2: 段2（浮く）の影",
+          "class": "bar",
+          "prop": "box-shadow",
+          "source": "var(--shadow-float)",
+          "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14"
+        },
+        {
+          "pencil": "z97zZN §2: 件数は濃い緑の太字",
+          "class": "count",
+          "prop": "color",
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         }
       ]
     }

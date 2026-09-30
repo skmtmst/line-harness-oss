@@ -27,7 +27,7 @@ export default function TagBadge({ tag, onRemove }: TagBadgeProps) {
       // ので、ここだけ style で書く。
       style={{ backgroundColor: `${color}1a`, color: tagTextColor(color) }}
     >
-      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
+      <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: color }} aria-hidden="true" />
       {tag.name}
       {onRemove && (
         <button

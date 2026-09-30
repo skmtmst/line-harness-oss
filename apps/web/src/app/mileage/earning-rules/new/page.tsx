@@ -28,6 +28,7 @@ import {
   EARNING_RULE_NOTIFY_TEMPLATE,
   earningRuleCancellationEvent,
 } from '../rule-fields'
+import { formatNumber } from '@/lib/format'
 
 /**
  * たまる決めごとをつくる（設計 V6 17-1-D / BmoGY）。
@@ -267,7 +268,7 @@ export default function NewMileageRulePage() {
           {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く想定は見える札のまま残す。 */}
           <LinePreview caption={`${selected.label}あと、すぐに届く想定です`}>
             <div className="rounded-card bg-canvas p-3 text-sm leading-6 text-ink">
-              ありがとうございます。{validAmount ? value.toLocaleString('ja-JP') : '—'} マイルが付きました。現在の残高は、配信時に自動で入ります。
+              ありがとうございます。{validAmount ? formatNumber(value) : '—'} マイルが付きました。現在の残高は、配信時に自動で入ります。
             </div>
             <Checkbox
               checked={notifyFriend}

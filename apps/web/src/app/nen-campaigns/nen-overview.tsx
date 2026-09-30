@@ -36,6 +36,7 @@ import { campaignTriggerLabel, formatCampaignAudience, formatCampaignTiming, for
 import { isPastScheduledAt, publishedAtIso } from './columns/new/column-form'
 import { CampaignLinePreview, COLUMN_PET_NAME_FALLBACK, ColumnLinePreview } from './line-preview'
 import { jstLongDateTime, jstShortDate, jstShortDateTime } from './nen-period'
+import { formatNumber } from '@/lib/format'
 
 /*
  * NEN配信の一覧。★V6 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム。
@@ -149,7 +150,7 @@ function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined
 }
 
 function num(value: number | null | undefined): string {
-  return value == null ? '—' : value.toLocaleString('ja-JP')
+  return value == null ? '—' : formatNumber(value)
 }
 
 /** 自動配信の行に付ける印。実キーごと（★V6 37-6 の1列目）。 */
@@ -181,7 +182,7 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: {
     return (
       <span className="flex items-center gap-2 text-caption text-ink-secondary">
         テスト送信先が未登録です
-        {accountId ? <Button href={`/accounts/detail?id=${encodeURIComponent(accountId)}`} size="field">テスト送信先を登録</Button> : null}
+        {accountId ? <Button href={`/accounts/detail?id=${encodeURIComponent(accountId)}`} size="field">テスト送信先を登録する</Button> : null}
       </span>
     )
   }
@@ -403,7 +404,7 @@ export function NenOverview({
         footer={previewSetting ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
-            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)}>{testing === previewSetting.campaignKey ? '送信中…' : '自分にテスト送信'}</Button>
+            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)} busy={testing === previewSetting.campaignKey} busyLabel="送信中…">自分にテストを送る</Button>
           </div>
         ) : undefined}
       >
@@ -483,8 +484,7 @@ function AutoPanel({
           <Disclosure size="compact" title="送られる仕組み">
             <p className="text-caption leading-6 text-ink-secondary">
               文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。注文が取り消し・返金になったあとの案内は自動で止まります。きっかけの記録と定期便の次の発送は{' '}
-              <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link>
-              {' '}で確認できます。
+              <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link> で確認できます。
             </p>
           </Disclosure>
         )}
@@ -643,18 +643,18 @@ function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
       description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
       busy={saving}
       onClose={onClose}
-      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave}>{saving ? '保存中…' : '設定を保存'}</Button>}
+      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave} busy={saving}>設定を保存する</Button>}
     >
       <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+        <label className="flex flex-col gap-1 text-caption font-medium text-ink">
           割引の額（円）
           <TextField type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+        <label className="flex flex-col gap-1 text-caption font-medium text-ink">
           使える日数
           <TextField type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+        <label className="flex flex-col gap-1 text-caption font-medium text-ink">
           クーポンの頭の文字
           <TextField value={coupon.codePrefix} maxLength={10} onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
           <span className="text-micro font-normal text-ink-faint">半角大文字・数字・- で3〜10文字。発行されるクーポンは「{coupon.codePrefix || 'NENBDAY'}-1234」のようになります。</span>
@@ -910,20 +910,20 @@ function ColumnsPanel({
         <aside data-design="Panel" data-design-node="nen-column-panel" className="flex flex-col gap-4">
           <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-label font-bold text-ink">LINEに届くカード</h2>
+              <h2 className="text-label font-semibold text-ink">LINEに届くカード</h2>
               <span className="text-micro text-ink-faint">選んだコラムから自動で作られます</span>
             </div>
             {selected ? (
               <>
                 <ColumnLinePreview column={selected} introText={introDraft} buttonLabel={buttonLabel} />
                 <p className="text-micro text-ink-faint">差し込み：{'{{pet_name}}'} → {COLUMN_PET_NAME_FALLBACK}（コラムは全員に同じ文面で届きます）</p>
-                <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+                <label className="flex flex-col gap-1 text-caption font-medium text-ink">
                   カードの前に送る紹介文
                   <TextArea rows={4} maxLength={1500} value={introDraft} onChange={(event) => onIntroChange(event.target.value)} />
                 </label>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-micro text-ink-faint">{introDraft.length}／1500文字</span>
-                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)}>{savingColumnId === selected.id ? '保存中…' : '紹介文を保存'}</Button>
+                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)} busy={savingColumnId === selected.id}>紹介文を保存する</Button>
                 </div>
               </>
             ) : (
@@ -932,7 +932,7 @@ function ColumnsPanel({
           </section>
 
           <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
-            <h2 className="text-label font-bold text-ink">誰に・いつ送るか</h2>
+            <h2 className="text-label font-semibold text-ink">誰に・いつ送るか</h2>
             {/* #934 N-295: コラム配信の停止・再開は自動配信タブに出ないため、ここに置く。 */}
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2">
@@ -990,7 +990,7 @@ function ColumnsPanel({
         actions={(
           <>
             <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
-            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)}>{selected && testing === selected.id ? '送信中…' : '自分にテスト送信'}</Button>
+            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)} busy={selected && testing === selected.id} busyLabel="送信中…">自分にテストを送る</Button>
             <Button type="button" variant="primary" disabled={!selected || !columnEnabled || scheduleInvalid} onClick={() => selected && setConfirmDeliver({ column: selected, scheduledAt: scheduledIso ?? undefined })}>
               {plan.when === 'now' ? 'この内容で送る' : 'この内容で予約する'}
             </Button>
@@ -1148,10 +1148,10 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                       <td colSpan={6} className="border-t border-hairline bg-canvas-sunken p-4">
                         <div className="grid gap-4 lg:grid-cols-3">
                           <div className="lg:col-span-2">
-                            <p className="text-micro font-bold text-ink-faint">{detail.trigger}</p>
-                            <h3 className="mt-1 text-label font-bold text-ink">{detail.content.title || detail.label}</h3>
+                            <p className="text-micro font-medium text-ink-faint">{detail.trigger}</p>
+                            <h3 className="mt-1 text-label font-semibold text-ink">{detail.content.title || detail.label}</h3>
                             <p className="mt-2 whitespace-pre-wrap text-caption leading-6 text-ink-secondary">{detail.content.bodyText || detail.content.reason}</p>
-                            {detail.content.buttonLabel ? <p className="mt-2 text-caption font-bold text-accent-deep">{detail.content.buttonLabel}</p> : null}
+                            {detail.content.buttonLabel ? <p className="mt-2 text-caption font-medium text-accent-deep">{detail.content.buttonLabel}</p> : null}
                             {/* IDEA-21: 案内の送り先を友だち詳細へつなぐ。注文・定期便の状況はそこで追える。 */}
                             <p className="mt-2">
                               <Link href={`/friends/detail?id=${encodeURIComponent(delivery.friendId)}`} className="text-micro font-semibold text-action hover:underline">
@@ -1161,7 +1161,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                           </div>
                           {canRetryDelivery(delivery) ? (
                             <div className="flex flex-col gap-2">
-                              <label className="flex flex-col gap-1 text-caption font-bold text-ink">
+                              <label className="flex flex-col gap-1 text-caption font-medium text-ink">
                                 再送する理由（500文字まで）
                                 <TextArea value={retryReasons[delivery.id] ?? ''} onChange={(event) => setRetryReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} rows={3} maxLength={500} />
                               </label>

@@ -9,6 +9,7 @@ import type { FriendListItem } from '@/lib/api'
 import type { FriendListColumn } from './friend-list-table'
 import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
+import { formatDay } from '@/lib/format'
 
 interface Props {
   friend: FriendListItem
@@ -97,7 +98,7 @@ export default function FriendListRow({
           event.stopPropagation()
           onToggleAttention?.()
         }}
-        className={`rounded p-1 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
+        className={`rounded-mini p-1 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
       >
         <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
       </button>
@@ -124,7 +125,7 @@ export default function FriendListRow({
             「対応済み」の札と「●対応中」のマークが縦に並んで食い違って見えた。マークが無い時は何も出さない。
           */}
           <p className="flex min-w-0 items-center gap-2">
-            <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-micro font-bold ${status.className}`}>{status.label}</span>
+            <span className={`inline-flex whitespace-nowrap rounded-pill px-2 py-0.5 text-micro font-medium ${status.className}`}>{status.label}</span>
             {friend.supportMark ? (
               <span className="flex min-w-0 items-center gap-1 truncate text-micro font-semibold text-ink-secondary" title={`対応マーク：${friend.supportMark.name}`}>
                 <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark.color ?? 'var(--color-ink-disabled)' }} />
@@ -141,7 +142,7 @@ export default function FriendListRow({
             <span
               aria-hidden="true"
               data-operator-avatar={friend.operator ? 'assigned' : 'unassigned'}
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-nano font-extrabold ${friend.operator ? 'text-on-accent' : 'bg-avatar-bg text-ink-faint'}`}
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-pill text-nano font-medium ${friend.operator ? 'text-on-accent' : 'bg-avatar-bg text-ink-faint'}`}
               style={friend.operator ? { backgroundColor: avatarTone(friend.operator.name) } : undefined}
             >
               {friend.operator ? (friend.operator.name.charAt(0) || '－') : '－'}
@@ -297,7 +298,7 @@ export function FriendListCard({
             event.stopPropagation()
             onToggleAttention?.()
           }}
-          className={`rounded p-1 pt-1.5 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
+          className={`rounded-mini p-1 pt-1.5 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
         >
           <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
         </button>
@@ -317,7 +318,7 @@ export function FriendListCard({
         <div className="flex shrink-0 flex-col items-end gap-1">
           {/* statusView() の戻り値を className へ入れると静的に読めない。判定をここへ展開する。 */}
           <span
-            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-micro font-bold ${
+            className={`inline-flex whitespace-nowrap rounded-pill px-2 py-1 text-micro font-medium ${
               friend.chatStatus === 'unread'
                 ? 'bg-status-danger-soft text-danger'
                 : friend.chatStatus === 'in_progress' || friend.chatStatus === 'on_hold'
@@ -372,12 +373,9 @@ function messageTypeLabel(messageType: string): string {
   } as Record<string, string>)[messageType] ?? 'メッセージ'
 }
 
-/** 今年は「8月14日」、それ以外は「2025年8月14日」（★V7：数字の斜線より読みやすい）。 */
+/** M月D日（曜）。年が違う記録は YYYY年M月D日（★V7：数字の斜線より読みやすい）。 */
 function formatDate(iso: string): string {
-  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
-  if (!year || !month || !day) return iso.slice(0, 10)
-  const thisYear = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(new Date()))
-  return year === thisYear ? `${month}月${day}日` : `${year}年${month}月${day}日`
+  return formatDay(iso)
 }
 
 function avatarTone(name: string): string {

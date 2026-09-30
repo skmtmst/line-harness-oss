@@ -56,6 +56,6 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
     expect(EDITOR).toContain('回答フォーム「{formAction.formName}」を開く')
     expect(EDITOR).toContain("{ kind: 'award_mileage', amount: 200, trigger: 'form_submitted' }")
     expect(EDITOR).toContain('afterActions: actions')
-    expect(EDITOR).toContain('配信内容を保存')
+    expect(EDITOR).toContain('配信内容を保存する')
   })
 })

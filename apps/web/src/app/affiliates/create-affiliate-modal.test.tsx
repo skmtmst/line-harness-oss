@@ -76,7 +76,7 @@ describe('CreateAffiliateModal', () => {
     render(
       <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={() => {}} onCreated={() => {}} />,
     )
-    const submit = screen.getByRole('button', { name: '作成' })
+    const submit = screen.getByRole('button', { name: '作る' })
     expect((submit as HTMLButtonElement).disabled).toBe(true)
     expect(fixture.createCalls).toHaveLength(0)
   })
@@ -87,7 +87,7 @@ describe('CreateAffiliateModal', () => {
       <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={onClose} onCreated={() => {}} />,
     )
     await selectFriend()
-    fireEvent.click(screen.getByRole('button', { name: '作成' }))
+    fireEvent.click(screen.getByRole('button', { name: '作る' }))
     await waitFor(() => expect(fixture.createCalls).toHaveLength(1))
     expect(fixture.createCalls[0]).toMatchObject({
       friendId: 'friend-kenta',
@@ -106,9 +106,9 @@ describe('CreateAffiliateModal', () => {
       <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={() => {}} onCreated={() => {}} />,
     )
     await selectFriend()
-    fireEvent.click(screen.getByRole('button', { name: '作成' }))
+    fireEvent.click(screen.getByRole('button', { name: '作る' }))
     await screen.findByText('LINEアカウントを指定してください')
-    expect((screen.getByRole('button', { name: '作成' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: '作る' }) as HTMLButtonElement).disabled).toBe(false)
   })
 })
 
@@ -134,7 +134,7 @@ describe('閉じる操作（監査7 #809）', () => {
       <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={onClose} onCreated={() => {}} />,
     )
     await selectFriend()
-    fireEvent.click(screen.getByRole('button', { name: '作成' }))
+    fireEvent.click(screen.getByRole('button', { name: '作る' }))
     // 発行済みリンクが見える状態（成功画面）
     await screen.findByDisplayValue('https://lin.ee/issued-1')
     expect(screen.getAllByRole('button', { name: '閉じる' })).toHaveLength(1)

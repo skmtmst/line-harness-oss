@@ -8,6 +8,7 @@ import { useBrand } from '@/lib/use-brand'
 import { qrToDataURL } from '@/lib/qr-image'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '../two-factor-error'
 
 type SetupData = { provisioningUri: string; manualKey: string }
@@ -106,7 +107,7 @@ export default function TwoFactorSetupPage() {
   }
 
   return <main className="flex min-h-[100svh] items-center justify-center bg-canvas-sunken px-4 py-8">
-    <section className="w-full max-w-md rounded-card bg-canvas px-6 py-8 shadow-sm sm:px-10">
+    <section className="w-full max-w-md rounded-card bg-canvas px-6 py-8 shadow-card sm:px-10">
       <div className="flex items-center justify-center gap-3 text-sm font-semibold text-ink">
         <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">然</span>
         {brand.name ?? '然-NEN- 公式'}
@@ -138,7 +139,7 @@ export default function TwoFactorSetupPage() {
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
             <img src={qr} alt="認証アプリ登録用のQRコード" className="h-52 w-52 rounded-control border border-hairline" />
           ) : (
-            <div className="h-52 w-52 animate-pulse rounded-control bg-canvas-sunken" aria-hidden="true" />
+            <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
           )}
           <div className="text-center">
             <p className="text-xs text-ink-faint">読み取れないときは、このキーを手で入力</p>
@@ -151,8 +152,7 @@ export default function TwoFactorSetupPage() {
               <OtpInput id="totp-setup-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
             </div>
           </div>
-          <Button type="submit" variant="primary" disabled={busy} className="w-full">
-            {busy ? '確認しています…' : '確認して登録を完了する'}
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="確認しています…">確認して登録を完了する
           </Button>
         </form>
       ) : null}

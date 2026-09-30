@@ -24,6 +24,7 @@ import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
   EFFECTIVE_LEGEND,
   LOAD_STATE_WORDS,
@@ -169,9 +170,20 @@ function ruleSubtitle(r: AutoReply, templateName: string | null): string {
   return `${trigger} / ${[response, ...actions].join('＋')}`
 }
 
+/**
+ * R527: 見るだけの担当者（staff）には作成・変更・停止・削除の入口を出さない。
+ * 口側は作成・更新・停止・削除を owner/admin だけに絞っている
+ * （`auto-replies.ts` の requireRole）ので、画面も同じ境目
+ * （`canManageRole`）で出し分ける。確認が終わるまで
+ * （staffRole === null）は今までどおり出す。
+ */
+const NO_MANAGE_NOTE = '自動応答の作成・変更・停止・削除はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。'
+
 export default function AutoRepliesPage() {
   usePageTitle('自動応答')
   const { selectedAccountId, accounts } = useAccount()
+  const staffRole = useStaffRole()
+  const canManage = staffRole === null || canManageRole(staffRole)
   const [items, setItems] = useState<AutoReply[]>([])
   const [query, setQuery] = useState('')
   const [templates, setTemplates] = useState<TemplateLite[]>([])
@@ -312,7 +324,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-canvas-sunken text-ink-faint line-through"
                 title={title}
               >
                 {word.mark} {label}
@@ -323,7 +335,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-success font-medium"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-success-bg text-success font-medium"
                 title={title}
               >
                 {word.mark} {label}{ea.via === 'automation' && <span className="text-success">⚙</span>}
@@ -333,7 +345,7 @@ export default function AutoRepliesPage() {
           return (
             <span
               key={ea.accountId}
-              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-warning-bg text-warning"
+              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-warning-bg text-warning"
               title={title}
             >
               {word.mark} {label}
@@ -353,10 +365,10 @@ export default function AutoRepliesPage() {
           r.responseType === 'silent'
             ? 'text-ink-faint text-xs'
             : r.responseType === 'flex'
-              ? 'px-1.5 py-0.5 rounded bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
+              ? 'px-1.5 py-0.5 rounded-mini bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
               : r.responseType === 'image'
-                ? 'px-1.5 py-0.5 rounded bg-info-bg text-info text-[10px] font-medium'
-                : 'px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
+                ? 'px-1.5 py-0.5 rounded-mini bg-info-bg text-info text-[10px] font-medium'
+                : 'px-1.5 py-0.5 rounded-mini bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
         }
         title={word.note}
       >
@@ -681,10 +693,10 @@ export default function AutoRepliesPage() {
               <span
                 className={
                   row.status === 'reply'
-                    ? 'inline-flex items-center gap-0.5 rounded bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
+                    ? 'inline-flex items-center gap-0.5 rounded-mini bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
                     : row.status === 'silent'
-                      ? 'inline-flex items-center gap-0.5 rounded bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
-                      : 'inline-flex items-center gap-0.5 rounded bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
+                      ? 'inline-flex items-center gap-0.5 rounded-mini bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
+                      : 'inline-flex items-center gap-0.5 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
                 }
               >
                 {row.mark ? `${row.mark} ` : ''}アカウント名
@@ -696,24 +708,30 @@ export default function AutoRepliesPage() {
       </Disclosure>
 
       <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
-        <Button
-          variant="primary"
-          onClick={() => setEditing({
-            keyword: '',
-            matchType: 'exact',
-            responseType: 'text',
-            responseContent: '',
-            templateId: null,
-            lineAccountId: selectedAccountId,
-            // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
-            // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
-            isActive: false,
-            // R28: 新しいルールは一覧のいちばん下へ。順番は窓の中では変えない。
-            priority: nextPriority,
-          })}
-        >
-          ＋ ルールを作る
-        </Button>
+        {canManage ? (
+          <Button
+            variant="primary"
+            onClick={() => setEditing({
+              keyword: '',
+              matchType: 'exact',
+              responseType: 'text',
+              responseContent: '',
+              templateId: null,
+              lineAccountId: selectedAccountId,
+              // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
+              // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
+              isActive: false,
+              // R28: 新しいルールは一覧のいちばん下へ。順番は窓の中では変えない。
+              priority: nextPriority,
+            })}
+          >
+            ＋ ルールを作る
+          </Button>
+        ) : (
+          <p className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs leading-relaxed">
+            {NO_MANAGE_NOTE}
+          </p>
+        )}
       </div>
 
       {/*
@@ -758,7 +776,7 @@ export default function AutoRepliesPage() {
       </div>
       </div>
 
-      {folderDialogOpen && (
+      {folderDialogOpen && canManage && (
         <FolderAddDialog
           kind="auto_reply"
           note="自動応答を分けてしまう箱です。消しても、入っていた応答は未分類として残ります。"
@@ -773,7 +791,7 @@ export default function AutoRepliesPage() {
           /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
           activeId={folderFilter}
           onSelect={setFolderFilter}
-          onAddFolder={() => setFolderDialogOpen(true)}
+          onAddFolder={canManage ? () => setFolderDialogOpen(true) : undefined}
           rows={[
             { id: '', label: 'すべて', count: visualTotal },
             ...folders.map((f) => ({
@@ -821,7 +839,7 @@ export default function AutoRepliesPage() {
                 <th className="hidden px-4 py-3">累計</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-divider-soft">
               {/*
                 読めていないときに「ありません」と言わない。消えたように読める。
                 読込中・読めなかった・権限が無い・本当に0件を言い分ける。
@@ -872,7 +890,7 @@ export default function AutoRepliesPage() {
                     <td className="px-3 py-3">
                       {/* E-01: 止めた記録があれば、いつ・誰が・なぜを title で読める */}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-pill text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
                         title={stopNote(r) ?? undefined}
                       >
                         {r.isActive ? '有効' : '停止中'}
@@ -926,12 +944,16 @@ export default function AutoRepliesPage() {
                         読めるように title を付ける（第5パス D-3）。 */}
                     <td
                       className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3 text-right whitespace-nowrap"
-                      title={['編集', r.isActive ? '停止' : r.lifecycleStatus !== 'draft' ? '再開' : null, '削除'].filter(Boolean).join('・')}
+                      title={canManage
+                        ? ['編集', r.isActive ? '停止' : r.lifecycleStatus !== 'draft' ? '再開' : null, '削除'].filter(Boolean).join('・')
+                        : NO_MANAGE_NOTE}
                     >
                       {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、
                           メニューの中の危ない操作へ。
                           N-086: 行から止められる。下書き（未公開）は公開の前段なので、
-                          動かす口は出さず、公開の流れに任せる。 */}
+                          動かす口は出さず、公開の流れに任せる。
+                          R527: 見るだけには行の操作を出さず「—」にする。 */}
+                      {canManage ? (
                       <div className="relative inline-flex items-center justify-end gap-1.5">
                         {/*
                           R28: 順番は「評価順」の並びで上下を入れ替えて決める。
@@ -1009,6 +1031,9 @@ export default function AutoRepliesPage() {
                           ]}
                         />
                       </div>
+                      ) : (
+                        <span className="text-ink-faint text-xs">—</span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -1025,7 +1050,7 @@ export default function AutoRepliesPage() {
         </p>
       )}
 
-      {editing && (
+      {editing && canManage && (
         <EditDialog
           draft={editing}
           templates={templates}
@@ -1099,7 +1124,7 @@ export default function AutoRepliesPage() {
           open={pendingDelete !== null}
           title={`自動応答「${pendingDelete?.item.name || pendingDelete?.item.keyword || 'すべてのメッセージ'}」を削除しますか？`}
           description="新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。"
-          confirmLabel="自動応答を削除"
+          confirmLabel="自動応答を削除する"
           destructive
           busy={deleting}
           error={deleteError}

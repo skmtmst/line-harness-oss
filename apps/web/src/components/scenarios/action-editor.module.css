@@ -16,7 +16,7 @@
 /* 追加する動作の札。設計 h=58・角丸8。 */
 .kindButton {
   height: 58px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 /* 実行する動作の行。中身の高さで伸びるので下限だけ決める。 */

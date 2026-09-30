@@ -39,7 +39,7 @@
   aspect-ratio: 1 / 1; /* 縦横は必ず同じ */
   padding: 0;
   border: 1px solid var(--color-ink-faint); /* border: $ink-faint */
-  border-radius: 50%; /* ★V7 `LYs5d` 18px 正円 */
+  border-radius: var(--radius-pill); /* ★V7 `LYs5d` 18px 正円 */
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-ink-secondary); /* color: $ink-secondary */
   cursor: pointer;
@@ -67,7 +67,7 @@
 /* 箱の中の「?」。★V7 `LYs5d`：11px 太字 `ink-secondary`。 */
 .mark {
   font-size: var(--text-micro); /* fontSize: 11 */
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
 }
 

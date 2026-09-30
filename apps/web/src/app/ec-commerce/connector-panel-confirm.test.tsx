@@ -109,7 +109,7 @@ async function mountReady(): Promise<HTMLDivElement> {
   root = createRoot(container)
   await act(async () => { root!.render(<ConnectorPanel accountId="account-a" />) })
   await act(async () => { await drainMicrotasks() })
-  if (!container.textContent?.includes('設定を保存')) throw new Error('保存画面が出ませんでした')
+  if (!container.textContent?.includes('設定を保存する')) throw new Error('保存画面が出ませんでした')
   return container
 }
 
@@ -118,7 +118,7 @@ function checkboxes(el: HTMLDivElement): HTMLInputElement[] {
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '設定を保存')
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '設定を保存する')
   if (!button) throw new Error('「設定を保存」ボタンが見つかりません')
   return button as HTMLButtonElement
 }

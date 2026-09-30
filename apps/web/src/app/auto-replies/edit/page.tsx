@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
 import Notice from '@/components/shared/notice'
@@ -24,9 +25,17 @@ const STEP_LABELS = ['基本設定', 'どんなときに動くか', '何を返�
  * 中身は一覧で使っているダイアログをそのまま出す。編集の中身を2つ持つと、
  * 片方だけ直したときに食い違う。
  */
+/**
+ * R527: 作成・編集のURLを直接開いた見るだけにも、保存の入口を出さない。
+ * 口側の下書き・検証・公開は owner/admin だけなので、画面も同じ境目で分ける。
+ */
+const NO_MANAGE_NOTE = '自動応答の作成・変更はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。'
+
 function AutoReplyEditInner() {
   const router = useRouter()
   const params = useSearchParams()
+  const staffRole = useStaffRole()
+  const canManage = staffRole === null || canManageRole(staffRole)
   const id = params.get('id')
   const requestedStep = params.get('step')
   const step = requestedStep === 'trigger' || requestedStep === 'response' ? requestedStep : 'basic'
@@ -114,7 +123,13 @@ function AutoReplyEditInner() {
         <span>{id ? '編集' : '作成'}</span>
       </nav>
 
-      {error && (
+      {!loading && !canManage && (
+        <p className="bg-info-bg text-ink-secondary rounded-control mb-4 px-4 py-3 text-xs leading-relaxed">
+          {NO_MANAGE_NOTE}
+        </p>
+      )}
+
+      {error && canManage && (
         <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
@@ -122,7 +137,7 @@ function AutoReplyEditInner() {
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : draft ? (
+      ) : draft && canManage ? (
         <>
         <Stepper
           label="自動応答を作る進み方"

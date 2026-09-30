@@ -38,6 +38,7 @@ import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 interface Template {
   id: string
@@ -111,33 +112,30 @@ type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'unused'
 
 const typeBadgeColor: Record<string, string> = {
   text: 'bg-canvas-sunken text-ink-secondary',
-  flex: 'bg-purple-100 text-purple-700',
+  flex: 'bg-chip-alt-soft text-chip-alt',
   image: 'bg-info-bg text-info',
-  carousel: 'bg-amber-100 text-amber-700',
+  carousel: 'bg-warning-bg text-warning',
   question: 'bg-accent-soft text-accent-deep',
 }
 
 /** 種別の札。一覧の表とスマホのカードで同じ顔にする。 */
 function TemplateKindBadge({ kind }: { kind: string }) {
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+    <span className={`inline-flex items-center rounded-mini px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
       {messageTypeText(kind)}
     </span>
   )
 }
 
-/** 今年は「1月13日」、それ以外は「2025年1月13日」。時刻は title で見せる（★V7：1行に収める）。 */
+/** M月D日（曜）。時刻は title で見せる（★V7：1行に収める）。 */
 function formatDate(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  const thisYear = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric' }).formatToParts(new Date()).find((part) => part.type === 'year')?.value
-  return get('year') === thisYear ? `${get('month')}月${get('day')}日` : `${get('year')}年${get('month')}月${get('day')}日`
+  return formatDay(date)
 }
 
 function formatCount(value: number): string {
-  return new Intl.NumberFormat('ja-JP').format(value)
+  return formatNumber(value)
 }
 
 /** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
@@ -599,7 +597,7 @@ export default function TemplatesPage() {
           ? { id: 'usage', label: '使用先を見る', onSelect: () => handleDelete(template) }
           : {
               id: 'delete',
-              label: 'テンプレートを削除',
+              label: 'テンプレートを削除する',
               tone: 'danger',
               dividerBefore: true,
               onSelect: () => handleDelete(template),
@@ -848,7 +846,7 @@ export default function TemplatesPage() {
                 key={key}
                 onClick={() => setTypeFilter(key)}
                 /* #702: 選んだ札は濃い緑＋白文字(5.44:1)。明るいLINE緑だと白文字で2.26:1しかない。 */
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-pill transition-colors ${
                   typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
                 }`}
               >
@@ -871,7 +869,7 @@ export default function TemplatesPage() {
       */}
       {error && view !== 'error' && (
         <div
-          className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+          className="p-4 bg-danger-bg border border-danger-bg rounded-control text-danger text-sm"
           role="alert"
         >
           {error}
@@ -884,10 +882,10 @@ export default function TemplatesPage() {
           <h2 className="text-sm font-semibold text-ink mb-4">新規テンプレートを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-status-danger">*</span></label>
               <input
                 type="text"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="例: コスト比較 flex"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -897,7 +895,7 @@ export default function TemplatesPage() {
               <label className="block text-xs font-medium text-ink-secondary mb-1">カテゴリ</label>
               <input
                 type="text"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="例: general, 挨拶, 返信"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -908,7 +906,7 @@ export default function TemplatesPage() {
               <Select aria-label="タイプ" value={form.messageType} onChange={(value) => setForm({ ...form, messageType: value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} size="full" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-status-danger">*</span></label>
               {form.messageType === 'image' ? (
                 <ImageUploader
                   mode="line-image"
@@ -939,7 +937,7 @@ export default function TemplatesPage() {
                 />
               ) : (
                 <textarea
-                  className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                  className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                   rows={form.messageType === 'flex' ? 10 : 4}
                   placeholder={form.messageType === 'flex' ? '{"type":"bubble","body":...}' : 'メッセージ内容'}
                   value={form.messageContent}
@@ -948,15 +946,13 @@ export default function TemplatesPage() {
               )}
             </div>
 
-            {formError && <p className="text-xs text-red-600">{formError}</p>}
+            {formError && <p className="text-xs text-danger">{formError}</p>}
 
             <div className="flex gap-2">
               <Button
                 onClick={handleCreate}
                 disabled={saving}
-                variant="primary"
-              >
-                {saving ? '作成中...' : '作成'}
+                variant="primary" busy={saving} busyLabel="作成中...">作る
               </Button>
               <Button
                 onClick={() => { setShowCreate(false); setFormError('') }}
@@ -1138,7 +1134,7 @@ export default function TemplatesPage() {
                         <span className="text-ink-faint text-xs">送信数を確認できません</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs whitespace-nowrap text-ink-faint tabular-nums" title={new Date(t.updatedAt).toLocaleString('ja-JP')}>{formatDate(t.updatedAt)}</td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap text-ink-faint tabular-nums" title={formatDateTime(t.updatedAt)}>{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
                       {/* 行のクリック（詳細を開く）へ伝えない。 */}
                       <div
@@ -1191,12 +1187,12 @@ export default function TemplatesPage() {
             `.overlay`）と同じ 80 に上げ、閉じる操作をいつも見える所に残す。
           */}
           <div
-            className="fixed inset-0 bg-black/30 lg:hidden"
+            className="fixed inset-0 bg-scrim lg:hidden"
             style={{ zIndex: 80 }}
             onClick={() => setDrawerId(null)}
           />
           <div
-            className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline overflow-y-auto"
+            className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-float border-l border-hairline overflow-y-auto"
             style={{ zIndex: 80 }}
           >
             <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-canvas z-10">
@@ -1207,7 +1203,7 @@ export default function TemplatesPage() {
                     autoFocus
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 border border-hairline rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="flex-1 border border-hairline rounded-mini px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 ) : (
                   <h3
@@ -1232,16 +1228,16 @@ export default function TemplatesPage() {
               <div className="p-6 text-sm text-ink-faint">読み込み中...</div>
             ) : drawerError ? (
               <div className="p-6">
-                <p className="text-sm text-red-600 mb-2">読み込みに失敗しました</p>
+                <p className="text-sm text-danger mb-2">読み込みに失敗しました</p>
                 <p className="text-xs text-ink-faint">{drawerError}</p>
               </div>
             ) : !drawerData ? null : (
               <div className="flex flex-col gap-4 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-mini text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                     {messageTypeText(drawerData.question ? 'question' : drawerData.messageType)}
                   </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-pill text-[10px] font-medium bg-info-bg text-info">
                     {drawerData.category}
                   </span>
                   <span className="text-[10px] text-ink-faint">
@@ -1258,14 +1254,12 @@ export default function TemplatesPage() {
                     <Button
                       variant="primary"
                       onClick={() => void handlePublish(drawerData)}
-                      disabled={publishing}
-                    >
-                      {publishing ? '公開中...' : '公開する'}
+                      disabled={publishing} busy={publishing} busyLabel="公開中...">公開する
                     </Button>
                   )}
                 </div>
                 {publishError && (
-                  <p role="alert" className="text-xs text-red-600">{publishError}</p>
+                  <p role="alert" className="text-xs text-danger">{publishError}</p>
                 )}
 
                 <div>
@@ -1298,8 +1292,8 @@ export default function TemplatesPage() {
 
                 {/* Preview */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
-                  <div className="border border-hairline rounded-lg p-3 bg-canvas-sunken overflow-x-auto">
+                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
+                  <div className="border border-hairline rounded-control p-3 bg-canvas-sunken overflow-x-auto">
                     {drawerData.question ? (
                       <div className="space-y-2">
                         {drawerData.question.intro && <p className="text-sm whitespace-pre-wrap">{drawerData.question.intro}</p>}
@@ -1341,7 +1335,7 @@ export default function TemplatesPage() {
                           if (typeof imageUrl !== 'string' || !/^https?:\/\//.test(imageUrl)) {
                             return <p className="text-ink-faint text-xs">画像のURLを開けませんでした。http(s)から始まるURLを入れてください。</p>
                           }
-                          return <img src={imageUrl} alt="" className="max-w-full rounded" />
+                          return <img src={imageUrl} alt="" className="max-w-full rounded-mini" />
                         } catch {
                           return <pre className="text-xs whitespace-pre-wrap">{drawerData.messageContent}</pre>
                         }
@@ -1363,10 +1357,10 @@ export default function TemplatesPage() {
                     </Button>
                   )
                 ) : <div>
-                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
+                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
-                    className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                    className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     readOnly={!canMutateTemplates}
@@ -1381,11 +1375,11 @@ export default function TemplatesPage() {
                       disabled={savingEdit}
                       className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                     >
-                      {savingEdit ? '保存中...' : '保存'}
+                      {savingEdit ? '保存中...' : '保存する'}
                     </button>
                     <button
                       onClick={() => { setEditContent(null); setEditName(null) }}
-                      className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-md"
+                      className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-mini"
                     >
                       キャンセル
                     </button>
@@ -1394,7 +1388,7 @@ export default function TemplatesPage() {
 
                 {/* Used by */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">
+                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">
                     使用箇所 ({drawerUsageCount})
                   </h4>
                   {drawerUsageCount === 0 ? (
@@ -1448,7 +1442,7 @@ export default function TemplatesPage() {
                         ))}
                       </ul>
                       {drawerUsageCount > 0 && (
-                        <p className="mt-2 text-[10px] text-amber-700">
+                        <p className="mt-2 text-[10px] text-warning">
                           このテンプレートは使用中です。削除する前に使用先を差し替えてください。
                         </p>
                       )}
@@ -1462,7 +1456,7 @@ export default function TemplatesPage() {
       )}
       {blockedDelete !== null ? (
         <div className="fixed inset-0 flex items-center justify-center bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="M9cij">
-          <section ref={blockedPanelRef} className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
+          <section ref={blockedPanelRef} className="flex w-full flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
             <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
               <h2 id="blocked-template-title" className="text-lead font-bold text-ink">使用中のテンプレートは削除できません</h2>
               <button
@@ -1478,15 +1472,15 @@ export default function TemplatesPage() {
               </button>
             </header>
             <div className="space-y-4 px-6 py-5">
-              <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
-            <p className="flex items-start gap-2 text-xs font-bold">
+              <div className="rounded-control border border-danger bg-danger-bg px-4 py-3 text-danger">
+            <p className="flex items-start gap-2 text-xs font-medium">
               <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
               このテンプレートは{drawerData ? drawerUsageCount : (blockedDelete?.usageCount ?? 0)}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
             </p>
             {drawerLoading ? (
               <p className="mt-3 text-xs">使用先を読み込んでいます…</p>
             ) : drawerError ? (
-              <p className="mt-3 text-xs font-bold">使用先を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
+              <p className="mt-3 text-xs font-medium">使用先を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
             ) : (
               <ul className="mt-3 space-y-2 text-xs font-semibold">
                 {replacementDestinations.map(({ key, label, href, icon: Icon }) => (
