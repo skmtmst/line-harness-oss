@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import MenuPortal from '@/components/shared/menu-portal'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Button from '@/components/shared/button'
 
 export interface AccountSwitchTarget {
   id: string
@@ -60,8 +61,8 @@ export function AccountSwitchDialog({
       </div>
       <p className="mt-4 text-xs leading-5 text-ink-secondary">移動すると、ダッシュボードや友だち・配信などの表示対象がこのLINE公式アカウントに切り替わります。</p>
       <div className="mt-5 flex justify-end gap-2">
-        <button type="button" onClick={onClose} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink hover:bg-canvas-sunken">キャンセル</button>
-        <button type="button" onClick={onConfirm} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-semibold text-on-accent hover:brightness-92">このアカウントへ移動</button>
+        <Button variant="secondary" className="px-4 py-2.5 font-medium h-auto whitespace-normal" type="button" onClick={onClose}>キャンセル</Button>
+        <Button variant="primary" className="px-4 py-2.5 border-0 h-auto whitespace-normal" type="button" onClick={onConfirm}>このアカウントへ移動</Button>
       </div>
     </div>
   </div>

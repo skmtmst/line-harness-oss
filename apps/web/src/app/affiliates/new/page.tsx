@@ -16,6 +16,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { formatNumber } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /**
  * 入力欄の幅。
@@ -567,18 +568,14 @@ export default function NewAffiliatePage() {
               {previewUrl ?? '—'}
             </code>
             {previewUrl && (
-              <button
-                type="button"
-                onClick={() => {
+              <Button variant="secondary" className="px-2 py-1 text-xs h-auto whitespace-normal" type="button" onClick={() => {
                   void navigator.clipboard?.writeText(previewUrl).then(
                     () => setCopied(true),
                     () => setCopied(false),
                   )
-                }}
-                className="border-hairline text-ink rounded-control hover:bg-canvas-sunken border px-2 py-1 text-xs font-semibold"
-              >
+                }}>
                 コピー
-              </button>
+              </Button>
             )}
           </div>
           <p className="text-ink-faint text-micro mt-1">

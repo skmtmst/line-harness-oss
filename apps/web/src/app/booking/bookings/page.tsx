@@ -997,43 +997,29 @@ export default function BookingsPage() {
               <>
                 <span className="text-ink-faint text-xs">よく使う</span>
                 {STATUS_TABS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setTab(key)}
-                    /* R315: 選んでいる絞り込みを色だけでなく意味でも伝える。 */
-                    aria-pressed={tab === key}
-                    className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
+                  <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
                       tab === key
                         ? 'bg-accent-deep text-on-accent'
                         : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                    }`}
-                  >
+                    }`) + ' border-0 h-auto whitespace-normal'} key={key} onClick={() => setTab(key)} aria-pressed={tab === key}>
                     {label}
-                  </button>
+                  </Button>
                 ))}
                 <span className="border-hairline mx-1 h-4 border-l" />
-                <button
-                  onClick={() => setRange(range === 'today' ? 'all' : 'today')}
-                  aria-pressed={range === 'today'}
-                  className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium ${
                     range === 'today'
                       ? 'bg-accent-deep text-on-accent'
                       : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                  }`}
-                >
+                  }`) + ' border-0 h-auto whitespace-normal'} onClick={() => setRange(range === 'today' ? 'all' : 'today')} aria-pressed={range === 'today'}>
                   今日
-                </button>
-                <button
-                  onClick={() => setRange(range === 'week' ? 'all' : 'week')}
-                  aria-pressed={range === 'week'}
-                  className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                </Button>
+                <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium ${
                     range === 'week'
                       ? 'bg-accent-deep text-on-accent'
                       : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                  }`}
-                >
+                  }`) + ' border-0 h-auto whitespace-normal'} onClick={() => setRange(range === 'week' ? 'all' : 'week')} aria-pressed={range === 'week'}>
                   今週
-                </button>
+                </Button>
                 {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
                 <Select
                   aria-label="担当者で絞り込む"
@@ -1198,13 +1184,9 @@ export default function BookingsPage() {
                     onFocus={(e) => e.currentTarget.select()}
                     className="border-hairline bg-canvas rounded-control min-w-0 flex-1 border px-3 py-2 font-mono text-xs"
                   />
-                  <button
-                    type="button"
-                    onClick={() => copyUrl(shareUrl)}
-                    className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-                  >
+                  <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" type="button" onClick={() => copyUrl(shareUrl)}>
                     {isCopied(shareUrl) ? 'コピー済' : 'コピー'}
-                  </button>
+                  </Button>
                   <span className="text-ink-faint text-xs">お客さまが新しく予約を入れるURL</span>
                 </div>
                 {/* N-396: 履歴URLは別画面を開く。両方発行できることを注記と揃える。 */}
@@ -1217,13 +1199,9 @@ export default function BookingsPage() {
                       onFocus={(e) => e.currentTarget.select()}
                       className="border-hairline bg-canvas rounded-control min-w-0 flex-1 border px-3 py-2 font-mono text-xs"
                     />
-                    <button
-                      type="button"
-                      onClick={() => copyUrl(historyUrl)}
-                      className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-                    >
+                    <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" type="button" onClick={() => copyUrl(historyUrl)}>
                       {isCopied(historyUrl) ? 'コピー済' : 'コピー'}
-                    </button>
+                    </Button>
                     <span className="text-ink-faint text-xs">お客さまが自分の予約履歴を見るURL</span>
                   </div>
                 ) : null}
@@ -1464,12 +1442,9 @@ function ActionButtons({
   if (status === 'requested') {
     return (
       <div className="inline-flex gap-1">
-        <button
-          onClick={() => onAction('approve')}
-          className="rounded-control bg-accent-deep text-on-accent hover:brightness-92 px-3 py-1 text-xs font-medium transition-colors"
-        >
+        <Button variant="primary" className="px-3 py-1 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => onAction('approve')}>
           承認
-        </button>
+        </Button>
         <button
           onClick={() => onAction('reject')}
           className="text-danger bg-danger-bg rounded-mini px-3 py-1 text-xs font-medium hover:bg-status-danger-selected"

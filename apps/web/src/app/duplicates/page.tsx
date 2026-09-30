@@ -289,14 +289,9 @@ export default function DuplicatesPage() {
                   {formatRelative(data.computedAt)}に計算
                 </span>
               )}
-              <button
-                type="button"
-                onClick={() => void detect()}
-                disabled={refreshing}
-                className="h-9 rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
-              >
+              <Button variant="secondary" className="h-9 px-3 text-xs text-ink-secondary hover:bg-surface-pearl disabled:opacity-50 whitespace-normal" type="button" onClick={() => void detect()} disabled={refreshing}>
                 {refreshing ? '再検出中…' : '重複を再検出'}
-              </button>
+              </Button>
             </div>
           </div>
 

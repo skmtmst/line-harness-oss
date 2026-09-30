@@ -64,7 +64,10 @@ describe('#969-U009 送信ボタン: どの幅でもラベルは1行', () => {
   const footer = region(PAGE, '{/* 下段 */}', '<TemplatePicker')
 
   it('送信ボタンは縮まず・折り返さない', () => {
-    const send = region(footer, 'onClick={handleSendMessage}', '{sending ?')
+    // V8 移行 ①: 直書き <button> は共通 Button。クラスは onClick より前に書かれる
+    // ので、送信ボタンの開きタグから区切る（handleSendMessage を持つのは送信だけ）。
+    const send = region(footer, '<Button variant="primary"', '{sending ?')
+    expect(send).toContain('onClick={handleSendMessage}')
     expect(send).toContain('whitespace-nowrap')
     expect(send).toContain('shrink-0')
   })
