@@ -83,6 +83,9 @@ function stripConditionalBlocks(css) {
 /** `.card{...}` の中身を取り出す。クラス名は完全一致。 */
 function ruleBody(css, selector) {
   css = stripConditionalBlocks(css)
+  // `[data-theme="v8"] ...` の規定は別テーマの上書きで、既定（V7）の
+  // 契約値とは別物。照合対象から除く（V8 側は v8-*-contract.test.ts が守る）。
+  css = css.replace(/[^{}]*data-theme[^{}]*\{[^}]*\}/g, '')
   const re = new RegExp(`\\.${selector}\\s*\\{([^}]*)\\}`, 'g')
   const bodies = []
   let m

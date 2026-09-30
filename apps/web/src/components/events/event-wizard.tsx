@@ -301,7 +301,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       if (slotPayload && id) {
         if (firstSlotId && slots.some((s) => s.id === firstSlotId)) {
           // 概要で確定した枠だけを更新する。ほかの枠の日時・定員は触らない。
-          await eventsApi.updateSlot(accountId, id, firstSlotId, slotPayload)
+          // m26g: 期待版つきで送り、古ければ409で止める（上書きしない）。
+          const firstSlot = slots.find((s) => s.id === firstSlotId)
+          await eventsApi.updateSlot(accountId, id, firstSlotId, slotPayload, firstSlot?.version ?? 1)
           /*
             EVENT-01: 保存した枠を一覧へ即時反映する。PUT の戻り値は枠の
             行だけで申込数(active_count)を持たないので、残席表示を狂わせ
