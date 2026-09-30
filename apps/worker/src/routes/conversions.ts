@@ -13,6 +13,7 @@ import {
   decideConversionApproval,
   getApprovalNotificationState,
   markApprovalNotified,
+  releaseApprovalNotification,
   getConversionApprovalNotifyInfo,
   getConversionOfferActionPlan,
   enrollFriendInScenario,
@@ -2100,7 +2101,12 @@ async function bulkItemAccountId(db: D1Database, eventId: string): Promise<strin
  *
  * 承認状態（updated/already_set）と通知の送信状態を分け、同じ承認世代の
  * 通知は1回だけ送る。再試行の修復（already_set で版・マイルを補った場合）
- * でも、未送信ならここで送る。二重送信は送信記録で止める。
+ * でも、未送信ならここで送る。
+ *
+ * 順番は「送信権の確保→送信→失敗時だけ解放」。読み直しの send だけでは
+ * 同じ判断の並行要求を止められない（両方が send=true を見て2件送る）ため、
+ * markApprovalNotified の CAS 結果が送ってよいかの正本。負けた側は送らない。
+ * 送信の途中で落ちたら記録を戻し、再試行で送り直せるようにする（欠落防止）。
  * 通知の失敗は承認を巻き添えにしない（best-effort）。
  */
 async function notifyApprovalOnce(
@@ -2114,8 +2120,16 @@ async function notifyApprovalOnce(
     const info = await getConversionApprovalNotifyInfo(db, eventId);
     // R48: 紹介者が成果の通知を切っているときは送信処理に進まない。
     if (!info || !info.notifyOnConversion) return;
-    await notifyAffiliateApproval(db, env, info.affiliateId, info.offerName, info.rewardAmount);
-    await markApprovalNotified(db, eventId, state.approvedAt);
+    const claimed = await markApprovalNotified(db, eventId, state.approvedAt);
+    if (!claimed) return;
+    try {
+      await notifyAffiliateApproval(db, env, info.affiliateId, info.offerName, info.rewardAmount);
+    } catch (err) {
+      // 送信の途中で落ちたら同じ世代の記録だけ戻す。世代が変わって
+      // いたら戻さない（新しい世代の未送信を消さない）。
+      await releaseApprovalNotification(db, eventId, state.approvedAt);
+      throw err;
+    }
   } catch (err) {
     console.error('Affiliate approval notify failed (non-blocking):', err);
   }

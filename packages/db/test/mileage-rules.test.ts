@@ -80,9 +80,26 @@ function asD1(sqlite: Database.Database): D1Database {
             },
             async first<T>() { return (statement.get(...params) as T) ?? null; },
             async all<T>() { return { success: true, results: statement.all(...params) as T[], meta: {} }; },
+            // 本物の D1 が持つ batch 用の同期実行口。postMileageAdjustment は
+            // 台帳と内訳を同じ batch で書く（m25d R359）ため、ここでも必須。
+            runSyncForBatch<T>() {
+              const result = statement.run(...params);
+              return { success: true, results: [], meta: { changes: result.changes } } as T;
+            },
           };
         },
       };
+    },
+    async batch<T>(statements: D1PreparedStatement[]) {
+      const results: unknown[] = [];
+      sqlite.transaction(() => {
+        for (const statement of statements) {
+          const sync = (statement as unknown as { runSyncForBatch?: <T>() => T }).runSyncForBatch;
+          if (sync) results.push(sync());
+          else results.push(statement.run());
+        }
+      })();
+      return Promise.all(results) as T;
     },
   } as unknown as D1Database;
 }

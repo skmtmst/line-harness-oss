@@ -180,6 +180,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     }))
     await mount()
     fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    // R497: 何も変えない保存は更新要求を送らない。二度押しの検証は変更ありで行う。
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
 
     const save = screen.getByRole('button', { name: /見せる範囲を保存/ })
     await act(async () => {
@@ -263,6 +265,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
   it('見せる範囲の保存は再ログインを確認し、取消・成功・失敗を正しく出す', async () => {
     await mount()
     fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    // R497: 何も変えない保存は確認窓を出さず閉じるだけ。確認の検証は変更ありで行う。
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
 
     expect(screen.getByText('保存すると、対象者のすべてのログインが終了します。新しい権限で使うには、対象者がもう一度ログインする必要があります。')).toBeTruthy()
