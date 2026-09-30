@@ -1,4 +1,4 @@
-import { uploadHqImage } from '../services/hq-templates/authoring-media.js';
+import { deleteHqImage, uploadHqImage } from '../services/hq-templates/authoring-media.js';
 import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
 import { Hono, type Context } from 'hono';
 import { HQ_TEMPLATE_TYPES, getStaffById, type HqTemplateType } from '@line-crm/db';
@@ -27,7 +27,7 @@ const reasons: Record<string, string> = {
   INVALID_REQUEST_ID: '作成依頼の識別情報を確認してください',
   IDEMPOTENCY_CONFLICT: '同じ作成依頼の内容が変わっています。元の内容で再確認してください',
   CREATE_RECEIPT_UNAVAILABLE: '作成済みの記録を確認できません。一覧から状態を確認してください',
-  FORBIDDEN: '統括の編集権限が必要です', NOT_FOUND: '対象が見つかりません',
+  FORBIDDEN: '統括の編集権限が必要です', NOT_FOUND: '対象が見つかりません', INVALID_IMAGE: '画像の指定を確認してください',
   UNSUPPORTED: 'この種類のひな形はまだ利用できません',
   VERSION_CONFLICT: '編集がありました。もう一度確認してください',
   SELECTION_REQUIRED: '重複した項目ごとに上書きか別名を選んでください',
@@ -62,6 +62,18 @@ hqTemplates.post('/api/hq/templates/media', async c => {
     return c.json({ success: true, data }, 201);
   } catch (error) {
     if (error instanceof TemplateHqTemplateError) throw new HqTemplateError(error.code, 422);
+    throw error;
+  }
+});
+// R568: reclaim an upload that was never adopted. Ownership is verified
+// inside deleteHqImage; anything outside the caller tenant is NOT_FOUND.
+hqTemplates.delete('/api/hq/templates/media', async c => {
+  const auth = await authority(c);
+  try {
+    const data = await deleteHqImage(c.env.IMAGES, auth, c.req.query('r2Key'));
+    return c.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof TemplateHqTemplateError) throw new HqTemplateError(error.code, error.code === 'NOT_FOUND' ? 404 : 422);
     throw error;
   }
 });

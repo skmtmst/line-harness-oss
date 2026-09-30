@@ -17,6 +17,7 @@ import {
   INVOICE_STATUS_LABELS,
   billingBanner,
   billingPlanPrice,
+  billingPriceNote,
   yen,
   type BillingInvoice,
   type BillingInterval,
@@ -212,6 +213,7 @@ function BillingInner() {
                 <span className="text-caption text-ink-faint">/月（税込）</span>
               </div>
               {price.yearlyYen !== null ? <p className="text-caption text-ink-faint">年額 {yen(price.yearlyYen)}（税込）</p> : null}
+              {!price.fromStripe ? <p className="text-caption text-ink-faint">仮の料金です</p> : null}
             </div>
             <div className="border-t border-hairline" />
             <ul className="flex flex-1 flex-col gap-2">
@@ -242,11 +244,12 @@ function BillingInner() {
 
       <p data-design="Note" data-design-node={interval === 'year' ? 'CqhfL' : 'MAzqO'} className="flex items-center gap-1.5 text-caption text-ink-faint">
         <Info aria-hidden="true" className="h-3.5 w-3.5" />
+        {/* R607：料金の出所は選んだ周期で変わる。料金とプラン内容の確定度は分けて案内する。 */}
         {!summary.stripeReady
-          ? '決済の接続設定がまだのため、申込ボタンは押せません。料金と内容は仮置きです。'
+          ? `決済の接続設定がまだのため、申込ボタンは押せません。${billingPriceNote(summary.plans, interval)}`
           : !isOwner
-            ? 'プランの申込と変更はオーナーだけができます。料金と内容は仮置きです。'
-            : '料金と内容は仮置きです。決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。'}
+            ? `プランの申込と変更はオーナーだけができます。${billingPriceNote(summary.plans, interval)}`
+            : `${billingPriceNote(summary.plans, interval)}決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。`}
       </p>
 
       <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className="flex flex-col rounded-card border border-hairline bg-canvas">
