@@ -406,6 +406,139 @@ function adjustmentLotSpendOrderSql(): string {
   return `CASE WHEN expires_at IS NULL THEN 1 ELSE 0 END, expires_at, available_at, ledger_entry_id`;
 }
 
+interface AdjustmentLotConsumption {
+  lotId: string;
+  amount: number;
+}
+
+/**
+ * R359: この調整で内訳から消費済みの分を台帳の印から読む。
+ * 取り直しの batch が落ちた後の再送は、この印だけが「残り」の根拠。
+ * 印が無ければ未記録として全額を請求対象にする（上限は残高との照合で守る）。
+ */
+function readLotConsumed(metadata: string | null | undefined): AdjustmentLotConsumption[] {
+  try {
+    const parsed = metadata
+      ? (JSON.parse(metadata) as { lotConsumed?: unknown })
+      : null;
+    if (!parsed || !Array.isArray(parsed.lotConsumed)) return [];
+    return parsed.lotConsumed.filter((item): item is AdjustmentLotConsumption =>
+      !!item &&
+      typeof item === 'object' &&
+      typeof (item as { lotId?: unknown }).lotId === 'string' &&
+      typeof (item as { amount?: unknown }).amount === 'number');
+  } catch {
+    return [];
+  }
+}
+
+async function recordLotConsumed(
+  db: D1Database,
+  ledgerId: string,
+  programId: string,
+  idempotencyKey: string,
+  entries: AdjustmentLotConsumption[],
+): Promise<void> {
+  await db.prepare(
+    `UPDATE mileage_ledger
+        SET metadata = json_set(COALESCE(metadata, '{}'), '$.lotConsumed', json(?))
+      WHERE id = ? AND program_id = ? AND idempotency_key = ?`,
+  ).bind(JSON.stringify(entries), ledgerId, programId, idempotencyKey).run();
+}
+
+/**
+ * R359: 同じ依頼キーの再送で、残っている内訳の不足を取り直す。
+ * 初回の取り直し batch が落ちると台帳はあるのに内訳が残り、
+ * 従来は再送が何もせずずれが固定されていた。請求は印の残りだけに絞り、
+ * さらに「使える内訳が残高を上回る分」を上限にするため、
+ * 印が古くても残高より多くは消費しない（二重消費防止）。
+ * 台帳・残高には触らない（存在する行を返すだけ）。
+ */
+async function repairAdjustmentLotShortfall(
+  db: D1Database,
+  entry: MileageLedgerEntry,
+  owedTotal: number,
+): Promise<void> {
+  const recorded = readLotConsumed(entry.metadata);
+  let claimed = owedTotal - recorded.reduce((sum, item) => sum + item.amount, 0);
+  if (claimed <= 0) return;
+  const key = entry.beneficiary_user_id
+    ? `user:${entry.beneficiary_user_id}`
+    : `friend:${entry.beneficiary_friend_id}`;
+  const balanceRow = await db.prepare(
+    `SELECT COALESCE(SUM(CASE WHEN status = 'available' THEN amount ELSE 0 END), 0) AS available
+       FROM mileage_ledger
+      WHERE program_id = ?
+        AND (beneficiary_user_id = ? OR beneficiary_friend_id = ?)`,
+  ).bind(entry.program_id, entry.beneficiary_user_id, entry.beneficiary_friend_id)
+    .first<{ available: number }>();
+  const now = jstNow();
+  const usableRow = await db.prepare(
+    `SELECT COALESCE(SUM(remaining_amount), 0) AS total FROM mileage_grant_lots
+      WHERE program_id = ? AND beneficiary_key = ? AND status = 'available'
+        AND remaining_amount > 0 AND (expires_at IS NULL OR expires_at > ?)`,
+  ).bind(entry.program_id, key, now).first<{ total: number }>();
+  const excess = Number(usableRow?.total ?? 0) - Number(balanceRow?.available ?? 0);
+  claimed = Math.min(claimed, excess);
+  if (claimed <= 0) return;
+  let guard = 0;
+  while (claimed > 0 && guard < 8) {
+    guard += 1;
+    const fresh = await db.prepare(
+      `SELECT ledger_entry_id, remaining_amount FROM mileage_grant_lots
+        WHERE program_id = ? AND beneficiary_key = ? AND status = 'available'
+          AND remaining_amount > 0 AND (expires_at IS NULL OR expires_at > ?)
+        ORDER BY ${adjustmentLotSpendOrderSql()}`,
+    ).bind(entry.program_id, key, now)
+      .all<{ ledger_entry_id: string; remaining_amount: number }>();
+    const retry: AdjustmentLotConsumption[] = [];
+    let need = claimed;
+    for (const lot of fresh.results) {
+      if (need <= 0) break;
+      const take = Math.min(need, lot.remaining_amount);
+      retry.push({ lotId: lot.ledger_entry_id, amount: take });
+      need -= take;
+    }
+    if (retry.length === 0) break;
+    const retryResults = (await db.batch(
+      retry.map((spend) =>
+        db.prepare(
+          `UPDATE mileage_grant_lots
+              SET remaining_amount = remaining_amount - ?,
+                  status = CASE WHEN remaining_amount - ? = 0 THEN 'exhausted' ELSE status END
+            WHERE ledger_entry_id = ? AND remaining_amount >= ?
+              AND EXISTS (SELECT 1 FROM mileage_ledger WHERE id = ?)`,
+        ).bind(spend.amount, spend.amount, spend.lotId, spend.amount, entry.id),
+      ),
+    )) as Array<{ meta?: { changes?: unknown } }>;
+    const applied: AdjustmentLotConsumption[] = [];
+    for (let index = 0; index < retry.length; index += 1) {
+      if (Number(retryResults[index]?.meta?.changes ?? 0) > 0) {
+        applied.push(retry[index]);
+        claimed -= retry[index].amount;
+      }
+    }
+    if (applied.length === 0) break;
+    recorded.push(...applied);
+    await recordLotConsumed(db, entry.id, entry.program_id, entry.idempotency_key, recorded);
+    entry.metadata = JSON.stringify({
+      ...(tryParseMetadata(entry.metadata)),
+      lotConsumed: recorded,
+    });
+  }
+}
+
+function tryParseMetadata(metadata: string | null | undefined): Record<string, unknown> {
+  try {
+    const parsed = metadata ? (JSON.parse(metadata) as unknown) : null;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function postMileageAdjustment(
   db: D1Database,
   input: PostMileageAdjustmentInput,
@@ -421,7 +554,15 @@ export async function postMileageAdjustment(
     .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
     .bind(programId, input.idempotencyKey)
     .first<MileageLedgerEntry>();
-  if (existing) return adjustmentResult(existing, fingerprint, true);
+  if (existing) {
+    const result = adjustmentResult(existing, fingerprint, true);
+    // R359: 初回の取り直し batch が落ちた再送は、ここで残りを取り直す。
+    // 台帳・残高には触らない。印と残高超過の上限で二重消費しない。
+    if (input.amount < 0) {
+      await repairAdjustmentLotShortfall(db, existing, -input.amount);
+    }
+    return result;
+  }
 
   const friend = await db
     .prepare(`SELECT id, user_id FROM friends WHERE id = ? AND line_account_id = ?`)
@@ -536,10 +677,14 @@ export async function postMileageAdjustment(
   // 台帳を書かなかった再送（ledgerChanges 0）は直した本人が直している
   // ため、ここでは何もしない（二重消費防止）。
   if (input.amount < 0 && ledgerChanges > 0 && lotSpends.length > 0) {
+    // R359: 確定した消費の印。再送の請求はこの印の残りだけにする。
+    const consumed: AdjustmentLotConsumption[] = [];
     let shortfall = 0;
     for (let index = 0; index < lotSpends.length; index += 1) {
       if (Number(batchResults[1 + index]?.meta?.changes ?? 0) === 0) {
         shortfall += lotSpends[index].amount;
+      } else {
+        consumed.push(lotSpends[index]);
       }
     }
     const friendKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
@@ -579,11 +724,15 @@ export async function postMileageAdjustment(
       for (let index = 0; index < retry.length; index += 1) {
         if (Number(retryResults[index]?.meta?.changes ?? 0) > 0) {
           progressed += retry[index].amount;
+          consumed.push(retry[index]);
         }
       }
       if (progressed === 0) break;
       shortfall -= progressed;
     }
+    // R359: 確定分を台帳へ刻む。再送はこの印の残りだけを請求するため、
+    // 印が無くても残高超過の上限で二重消費しない。
+    await recordLotConsumed(db, id, programId, input.idempotencyKey, consumed);
   }
 
   const inserted = await db
