@@ -8285,6 +8285,12 @@ CREATE INDEX idx_line_accounts_archived
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
 
+CREATE UNIQUE INDEX idx_line_accounts_liff_id_unique
+  ON line_accounts(liff_id);
+
+CREATE UNIQUE INDEX idx_line_accounts_login_channel_id_unique
+  ON line_accounts(login_channel_id);
+
 CREATE UNIQUE INDEX idx_line_accounts_one_default_per_tenant
   ON line_accounts (COALESCE(tenant_id, '00000000-0000-4000-8000-000000000001'))
   WHERE is_default = 1;

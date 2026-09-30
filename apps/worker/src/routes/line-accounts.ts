@@ -1090,8 +1090,11 @@ function validateLoginChannelPair(
 // Reject duplicate login_channel_id / liff_id across accounts.
 // /auth/callback and /api/liff/config both resolve the row with `.first()`
 // after a `WHERE col = ?` lookup, so duplicates would silently bind events
-// to whichever row D1 happens to return first. App-level check (no DB UNIQUE
-// constraint) so we can tighten without a migration on a busy production DB.
+// to whichever row D1 happens to return first. Two layers:
+//   1. this app-level pre-check for the sequential path (409 with the value),
+//   2. DB UNIQUE indexes from migration 542 for the concurrent path.
+// A request that passes 1 but loses the INSERT race lands in
+// duplicateAccountError below, with the same wording.
 async function checkUniqueLoginAndLiff(
   db: D1Database,
   values: { loginChannelId?: string | null | undefined; liffId?: string | null | undefined },
@@ -1120,6 +1123,30 @@ async function checkUniqueLoginAndLiff(
     }
   }
   return null;
+}
+
+// Map a D1 UNIQUE-constraint failure to the identifier the caller can act on.
+// The concurrent loser passes checkUniqueLoginAndLiff but hits migration 542
+// on INSERT. Report which identifier is taken so the UI can point at the
+// existing account instead of showing a generic channel error.
+function duplicateAccountError(
+  message: string,
+  values: { loginChannelId?: string | null; liffId?: string | null },
+): { status: 409; error: string } | null {
+  if (!/UNIQUE constraint failed/i.test(message)) return null;
+  if (values.loginChannelId && message.includes('login_channel_id')) {
+    return {
+      status: 409,
+      error: `loginChannelId '${values.loginChannelId}' is already assigned to another account`,
+    };
+  }
+  if (values.liffId && message.includes('liff_id')) {
+    return {
+      status: 409,
+      error: `liffId '${values.liffId}' is already assigned to another account`,
+    };
+  }
+  return { status: 409, error: 'channelId already registered' };
 }
 
 type ConnectBody = {
@@ -1309,16 +1336,19 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
       return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
     }
     const message = error instanceof Error ? error.message : String(error);
-    const duplicateChannel = /UNIQUE constraint failed/i.test(message);
+    const duplicate = duplicateAccountError(message, {
+      loginChannelId: parsed.value.loginChannelId,
+      liffId: prepared.liffId,
+    });
     return c.json({
       success: false,
-      error: duplicateChannel ? 'channelId already registered' : '認証状態を確認できなかったため、アカウントは保存していません',
+      error: duplicate ? duplicate.error : '認証状態を確認できなかったため、アカウントは保存していません',
       data: publicConnectData(
         prepared,
         [...prepared.steps.slice(0, 4), lineConnectStep(5, 'failed', '認証状態を確認できませんでした。時間をおいて、もう一度お試しください。')],
         { capability: 'unknown', phase: 'not_started' },
       ),
-    }, duplicateChannel ? 409 : 502);
+    }, duplicate ? duplicate.status : 502);
   }
 });
 
@@ -1328,6 +1358,9 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
   }
+  // INSERT競争の負け側の409案内に使う。catch からも読めるよう try の外に置く。
+  let attemptedLoginChannelId: string | null = null;
+  let attemptedLiffId: string | null = null;
   try {
     let body: {
       channelId: string;
@@ -1397,6 +1430,8 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
     const loginChannelId = normalizeOptionalString(body.loginChannelId) ?? null;
     const loginChannelSecret = normalizeOptionalString(body.loginChannelSecret) ?? null;
     const liffId = normalizeOptionalString(body.liffId) ?? null;
+    attemptedLoginChannelId = loginChannelId;
+    attemptedLiffId = liffId;
     const officialProfileUrl = readOfficialProfileUrl(body.officialProfileUrl);
     if (!officialProfileUrl.ok) return c.json({ success: false, error: officialProfileUrl.error }, 400);
 
@@ -1510,9 +1545,15 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
     // D1 surfaces UNIQUE-constraint violations as a thrown error. Surface
     // those as 409 so idempotent callers (e.g. create-line-harness retry
     // loop) can treat "already registered" as a non-fatal success.
+    // Migration 542 can also surface login_channel_id / liff_id here when
+    // a concurrent request wins the race after the pre-check passed.
     const message = err instanceof Error ? err.message : String(err);
-    if (/UNIQUE constraint failed/i.test(message)) {
-      return c.json({ success: false, error: 'channelId already registered' }, 409);
+    const duplicate = duplicateAccountError(message, {
+      loginChannelId: attemptedLoginChannelId,
+      liffId: attemptedLiffId,
+    });
+    if (duplicate) {
+      return c.json({ success: false, error: duplicate.error }, duplicate.status);
     }
     console.error('POST /api/line-accounts error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
