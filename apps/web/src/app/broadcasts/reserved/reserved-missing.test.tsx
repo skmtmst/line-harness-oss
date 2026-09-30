@@ -54,7 +54,6 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 import { ApiError } from '@/lib/api'
 import Page from './page'
 
