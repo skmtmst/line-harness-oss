@@ -1088,8 +1088,7 @@ export async function getTemplatesWithUsageCount(
     const scored = ids
       .map((row) => ({
         row,
-        // 月間0件の月は累計へ落とす（?? だと 0 が残り total が死ぬ。10/01月初で発覚）。
-        score: sends.get(row.id)?.thisMonth || sends.get(row.id)?.total || countVisible(row),
+        score: sends.get(row.id)?.thisMonth ?? sends.get(row.id)?.total ?? countVisible(row),
       }))
       .sort((a, b) =>
         b.score - a.score
