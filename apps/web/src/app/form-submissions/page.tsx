@@ -1068,22 +1068,12 @@ export default function FormSubmissionsPage() {
             </label>
             {renameError && <p className="mt-2 text-xs text-status-danger">{renameError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingForm(null)}
-                disabled={savingName}
-                className="rounded-control border border-hairline px-4 py-2 text-sm text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
-              >
+              <Button variant="secondary" className="px-4 py-2 text-ink-secondary hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={() => setEditingForm(null)} disabled={savingName}>
                 キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => void saveName()}
-                disabled={!editingName.trim() || savingName}
-                className="rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent hover:brightness-92 disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void saveName()} disabled={!editingName.trim() || savingName}>
                 {savingName ? '保存中...' : '保存する'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -23,6 +23,7 @@ import {
   toActionPayload,
   type InlineAction,
 } from '@/components/auto-replies/draft-fields'
+import Button from '@/components/shared/button'
 
 /**
  * カルーセルの編集。
@@ -724,20 +725,15 @@ function CarouselEditorInner() {
                             { value: 'action' as const, label: '押されたときに何かする' },
                           ]
                         ).map((o) => (
-                          <button
-                            key={o.value}
-                            type="button"
-                            onClick={() =>
+                          <Button variant="primary" className={(`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`) + ' border-0 h-auto whitespace-normal'} key={o.value} type="button" onClick={() =>
                               update(i, {
                                 actions: panel.actions.map((a, j) =>
                                   j === ai ? { ...a, kind: o.value } : a,
                                 ),
                               })
-                            }
-                            className={`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
-                          >
+                            }>
                             {o.label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                       {panel.actions.length > 1 && (
@@ -794,14 +790,11 @@ function CarouselEditorInner() {
                   </div>
                 ))}
                 {panel.actions.length < MAX_ACTIONS && (
-                  <button
-                    onClick={() =>
+                  <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() =>
                       update(i, { actions: [...panel.actions, emptyChoice()] })
-                    }
-                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs"
-                  >
+                    }>
                     ＋ 選択肢を追加する
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -852,12 +845,9 @@ function CarouselEditorInner() {
           </section>
 
           {panels.length < MAX_COLUMNS && (
-            <button
-              onClick={() => setPanels((prev) => [...prev, emptyPanel()])}
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => setPanels((prev) => [...prev, emptyPanel()])}>
               パネルを追加する（{panels.length} / {MAX_COLUMNS}）
-            </button>
+            </Button>
           )}
 
           {error && (
@@ -950,13 +940,9 @@ function CarouselEditorInner() {
           </section>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={save}
-              disabled={saving || loadFailed}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
+            <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={save} disabled={saving || loadFailed}>
               {saving ? '保存中...' : '保存する'}
-            </button>
+            </Button>
             {/*
               D009: 未保存のままの「キャンセル」は番兵が止めて確認窓を出す。
               素の Link のまま置く（止める役は useUnsavedGuard が受け持つ）。

@@ -842,16 +842,11 @@ export default function TemplatesPage() {
               { key: 'variables', label: '差し込みあり' },
               { key: 'unused', label: '未使用' },
             ] as const).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setTypeFilter(key)}
-                /* #702: 選んだ札は濃い緑＋白文字(5.44:1)。明るいLINE緑だと白文字で2.26:1しかない。 */
-                className={`px-3 py-1.5 text-xs font-medium rounded-pill transition-colors ${
+              <Button variant="primary" className={(`px-3 py-1.5 text-xs font-medium rounded-pill transition-colors ${
                   typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                }`}
-              >
+                }`) + ' border-0 h-auto whitespace-normal'} key={key} onClick={() => setTypeFilter(key)}>
                 {label}
-              </button>
+              </Button>
             ))}
           </>
         }
@@ -1370,13 +1365,9 @@ export default function TemplatesPage() {
 
                 {canMutateTemplates && (editContent !== null || editName !== null) && (
                   <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveEdit}
-                      disabled={savingEdit}
-                      className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                    >
+                    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={handleSaveEdit} disabled={savingEdit}>
                       {savingEdit ? '保存中...' : '保存する'}
-                    </button>
+                    </Button>
                     <button
                       onClick={() => { setEditContent(null); setEditName(null) }}
                       className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-mini"
