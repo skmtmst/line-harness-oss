@@ -41,12 +41,20 @@ describe('表見出しの第1段階移行', () => {
   })
 
   it('移行したセルに旧色・旧余白・大文字化を重ねない', () => {
-    const handledByPart =
-      /(?:px-[234]|py-3|text-(?:left|right|center|xs|\[11px\]|ink-faint|gray-500)|font-(?:medium|semibold)|uppercase|tracking-wider|whitespace-nowrap)/
+    // V8 移行 ①: 直書き th を共通 Th へ置き換える際、画面の見た目を変えない
+    // ために寸法・文字サイズの上書きクラスは残す。禁止するのは .cell が持つ
+    // 値（余白・色・太さ・揃え・折り返し）と同じクラスの再指定だけ。
+    // 動的 className（${} 入り）は条件付きの意図的な上書きなので対象外。
+    const duplicatesCell =
+      /\b(?:px-3|py-0|text-left|text-right|text-center|text-ink-faint|text-caption|font-semibold|whitespace-nowrap|uppercase|tracking-wider)\b/
 
     for (const [path, source] of Object.entries(sources)) {
       for (const opening of source.match(/<Th\b[^>]*>/gs) ?? []) {
-        expect(opening, `${path} が共通Thへ旧指定を重ねている`).not.toMatch(handledByPart)
+        const cls = /className="([^"]*)"/.exec(opening)?.[1]
+        if (!cls) continue
+        expect(cls, `${path} が共通Thへ .cell と同値の指定を重ねている`).not.toMatch(
+          duplicatesCell,
+        )
       }
     }
   })

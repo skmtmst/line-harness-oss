@@ -86,8 +86,9 @@ describe('N-028/N-029 新規DM送信の失敗表示', () => {
       textarea.dispatchEvent(new Event('input', { bubbles: true }))
     })
     // 絞り込みタブにも「送信」(outgoing)があるので、送信ボタンは見た目で分ける。
+    // 共通 Button の主ボタンは CSS Module の `primary` クラスを持つ。
     const button = Array.from(host.querySelectorAll('button'))
-      .find((b) => b.textContent === '送信' && b.className.includes('bg-accent-deep'))!
+      .find((b) => b.textContent === '送信' && b.className.includes('primary'))!
     await act(async () => { button.click() })
   }
 
@@ -128,7 +129,7 @@ describe('N-028/N-029 新規DM送信の失敗表示', () => {
 
     // 入力は残っているので、そのまま送信ボタンを押す
     const button = Array.from(host.querySelectorAll('button'))
-      .find((b) => b.textContent === '送信' && b.className.includes('bg-accent-deep'))!
+      .find((b) => b.textContent === '送信' && b.className.includes('primary'))!
     await act(async () => { button.click() })
 
     await eventually(() => expect(postCalls()).toHaveLength(2))
@@ -179,7 +180,7 @@ describe('N-028/N-029 新規DM送信の失敗表示', () => {
       textarea.dispatchEvent(new Event('input', { bubbles: true }))
     })
     const button = Array.from(host.querySelectorAll('button'))
-      .find((b) => b.textContent!.includes('送信') && b.className.includes('bg-accent-deep'))!
+      .find((b) => b.textContent!.includes('送信') && b.className.includes('primary'))!
     await act(async () => {
       button.click()
       button.click()

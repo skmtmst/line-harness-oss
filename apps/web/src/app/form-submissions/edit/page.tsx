@@ -909,17 +909,14 @@ function FormEditInner() {
                     onFocus={(e) => e.currentTarget.select()}
                     className={`${inputClass} text-xs`}
                   />
-                  <button
-                    onClick={() => {
+                  <Button variant="secondary" className="text-ink-secondary shrink-0 px-2 py-2 text-xs whitespace-nowrap h-auto" onClick={() => {
                       void navigator.clipboard
                         .writeText(answerUrl)
                         .then(() => setNotice('URLをコピーしました'))
                         .catch(() => window.prompt('コピーしてください:', answerUrl))
-                    }}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-2 py-2 text-xs whitespace-nowrap"
-                  >
+                    }}>
                     コピー
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <p className="text-ink-faint rounded-control border-hairline border px-3 py-2 text-sm">
@@ -1123,15 +1120,9 @@ function FormEditInner() {
                   </button>
 
                   <div className="relative">
-                    <button
-                      ref={addMenuButtonRef}
-                      onClick={() => setShowAddMenu((v) => !v)}
-                      aria-expanded={showAddMenu}
-                      aria-haspopup="menu"
-                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
-                    >
+                    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" ref={addMenuButtonRef} onClick={() => setShowAddMenu((v) => !v)} aria-expanded={showAddMenu} aria-haspopup="menu">
                       ＋ ブロックを追加する（12種）
-                    </button>
+                    </Button>
                     <ActionMenu
                       open={showAddMenu}
                       ariaLabel="追加するブロック"
@@ -1246,21 +1237,12 @@ function FormEditInner() {
       <StickyBar
         actions={(
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => void save(false)}
-              disabled={saving}
-              title="フォームを保存（公開中の内容は変わりません）"
-              className="border-hairline text-ink bg-canvas hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
+            <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
               {saving ? '保存中...' : '下書きを保存する'}
-            </button>
-            <button
-              onClick={() => void save(true)}
-              disabled={saving}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
+            </Button>
+            <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void save(true)} disabled={saving}>
               {saving ? '処理中...' : 'この版を公開'}
-            </button>
+            </Button>
           </div>
         )}
       />

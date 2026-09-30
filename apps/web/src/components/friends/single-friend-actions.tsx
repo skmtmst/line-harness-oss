@@ -7,6 +7,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { runOptimistic, runUndoable } from '@/lib/undoable'
 import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
+import Button from '@/components/shared/button'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -90,23 +91,17 @@ export default function SingleFriendActions({
     <div className="w-full">
       <div className="flex flex-wrap gap-2">
         {(Object.keys(LABELS) as Action[]).map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => {
-              setOpen(open === a ? null : a)
-              setError('')
-              setMessage('')
-            }}
-            aria-pressed={open === a}
-            className={`rounded-control border px-2.5 py-1 text-xs ${
+          <Button variant="primary" className={(`rounded-control border px-2.5 py-1 text-xs ${
               open === a
                 ? 'border-accent bg-accent-deep text-on-accent'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-            }`}
-          >
+            }`) + ' h-auto whitespace-normal'} key={a} type="button" onClick={() => {
+              setOpen(open === a ? null : a)
+              setError('')
+              setMessage('')
+            }} aria-pressed={open === a}>
             {LABELS[a]}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -152,14 +147,9 @@ function Row({ children }: { children: React.ReactNode }) {
 
 function Go({ busy, onClick, label = '実行' }: { busy: boolean; onClick: () => void; label?: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-    >
+    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={onClick} disabled={busy}>
       {busy ? '実行中…' : label}
-    </button>
+    </Button>
   )
 }
 
@@ -352,14 +342,9 @@ function TagPanel({
         options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
       />
       <Go busy={busy || !id} onClick={attach} label="付ける" />
-      <button
-        type="button"
-        disabled={busy || !id}
-        onClick={detach}
-        className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-1.5 text-xs disabled:opacity-50"
-      >
+      <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs disabled:opacity-50 h-auto whitespace-normal" type="button" disabled={busy || !id} onClick={detach}>
         外す
-      </button>
+      </Button>
     </Row>
   )
 }
