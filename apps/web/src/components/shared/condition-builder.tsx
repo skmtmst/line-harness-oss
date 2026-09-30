@@ -26,7 +26,7 @@ import Combobox from './combobox'
 import Select from './select'
 import {
   findInvalidRangeIssue,
-  isEmptyCondition,
+  isStructurallyEmpty,
   pruneCondition,
   type FieldOperator,
   type SegmentCondition,
@@ -39,7 +39,9 @@ import Button from '@/components/shared/button'
 export {
   isRuleComplete,
   isEmptyCondition,
+  isStructurallyEmpty,
   pruneCondition,
+  findConditionDraftIssue,
   findInvalidRangeIssue,
 } from '@/lib/segment-condition'
 export type { FieldOperator, SegmentCondition, SegmentRule } from '@/lib/segment-condition'
@@ -201,8 +203,14 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(condition), showCount])
 
+  /*
+   * S4-OR: 足したばかりの空のかたまりは下書きとして残す。
+   * isEmptyCondition（実質空）は保存・数え上げの「絞り込みなし」の
+   * 意味であって、編集中の表示を消す理由にしない。何も足して
+   * いない素の空のときだけ null へ戻す。
+   */
   const update = (next: SegmentCondition) => {
-    onChange(isEmptyCondition(next) ? null : next)
+    onChange(isStructurallyEmpty(next) ? null : next)
   }
 
   const addRule = (kind: (typeof RULE_KINDS)[number], groupIndex: number | null) => {
@@ -327,7 +335,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
         <div className="bg-canvas-sunken rounded-card flex items-baseline justify-between px-4 py-3">
           <span className="text-ink-secondary text-xs">該当件数</span>
           <span className="text-ink text-lg font-bold tabular-nums">
-            {isEmptyCondition(condition)
+            {isStructurallyEmpty(condition)
               ? '絞り込みなし'
               : !pruneCondition(condition)
                 ? '入力するとここに出ます'
