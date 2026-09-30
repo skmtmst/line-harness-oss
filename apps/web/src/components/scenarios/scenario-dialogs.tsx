@@ -55,8 +55,8 @@ function Shell({
   const panelRef = useOverlayFocus(true, onClose)
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-float" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
-        <div className={`border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-float" style={wide ? { marginBlock: 68, height: 912, maxHeight: 'calc(100dvh - 168px)', maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
+        <div className={`border-hairline flex shrink-0 flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
           <div className="min-w-0">
             <h2 id={titleId} className="text-ink text-lg font-bold">{title}</h2>
             {description && <p className="text-ink-secondary mt-0.5 text-sm">{description}</p>}
@@ -70,8 +70,8 @@ function Shell({
             ×
           </button>
         </div>
-        <div className={`flex-1 px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
-        {footer && <div className={`border-hairline flex justify-end gap-2 border-t px-6 ${wide ? 'py-3' : 'py-4'}`}>{footer}</div>}
+        <div className={`min-h-0 flex-1 overflow-y-auto px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
+        {footer && <div className={`border-hairline flex shrink-0 justify-end gap-2 border-t px-6 ${wide ? 'py-3' : 'py-4'}`}>{footer}</div>}
       </div>
     </div>
   )
