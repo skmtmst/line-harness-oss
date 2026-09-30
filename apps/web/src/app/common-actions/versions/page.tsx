@@ -350,11 +350,12 @@ function CommonActionVersionsInner() {
           <DataTable className="mt-3">
               <thead>
                 <TableHeadRow>
-                  <Th style={{ width: '35%' }}>利用先</Th>
-                  <Th style={{ width: '15%' }}>固定中の版</Th>
-                  <Th style={{ width: '14%' }}>実行中</Th>
+                  {/* S1N-layout-1: 操作列にボタンの幅を確保し、狭い幅でも横スクロールさせない。合計100%。 */}
+                  <Th style={{ width: '33%' }}>利用先</Th>
+                  <Th style={{ width: '14%' }}>固定中の版</Th>
+                  <Th style={{ width: '13%' }}>実行中</Th>
                   <Th style={{ width: '14%' }}>待機中</Th>
-                  <Th style={{ width: '22%' }}>操作</Th>
+                  <Th style={{ width: '26%' }}>操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>
@@ -406,13 +407,14 @@ function CommonActionVersionsInner() {
         <DataTable>
             <thead>
               <TableHeadRow>
-                <Th style={{ width: '8%' }}>版</Th>
-                <Th style={{ width: '14%' }}>状態</Th>
-                <Th style={{ width: '15%' }}>作成者</Th>
-                <Th style={{ width: '19%' }}>変更内容</Th>
+                {/* S1N-layout-1: 操作列にボタンの幅を確保し、狭い幅でも横スクロールさせない。合計100%。 */}
+                <Th style={{ width: '7%' }}>版</Th>
+                <Th style={{ width: '13%' }}>状態</Th>
+                <Th style={{ width: '13%' }}>作成者</Th>
+                <Th style={{ width: '17%' }}>変更内容</Th>
                 <Th style={{ width: '12%' }}>中の処理</Th>
                 <Th style={{ width: '14%' }}>公開日時</Th>
-                <Th style={{ width: '18%' }}>操作</Th>
+                <Th style={{ width: '24%' }}>操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>
