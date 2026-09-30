@@ -437,32 +437,37 @@ function CreatePoolModal({
         )}
         {/*
           R617: 項目名がplaceholderだけだと、入力後に何の欄か消える。
-          欄を包むlabel（常時表示）とSelectのhtmlForで結び付ける。
+          labelと入力欄はhtmlForとidで結び付ける。暗黙の関連付けだと、
+          labelの中のHelpTipのbuttonが先に来て入力欄へ結び付かなくなる
+          （実ブラウザで input.labels が空になる）ため、HelpTipはlabelの
+          外へ置き、入力欄の読み上げ名に混ざらないようにする。
           読み上げ名（placeholder・aria-label由来）は元からあるので残す。
         */}
-        <label className="block">
-          <span className="text-ink-secondary mb-1 block text-sm font-medium">
-            slug{' '}
+        <div>
+          <div className="mb-1 flex items-center gap-1">
+            <label htmlFor="create-pool-slug" className="text-ink-secondary text-sm font-medium">slug</label>
             <HelpTip label="slugの説明">
               公開URLに使う識別子です。
             </HelpTip>
-          </span>
+          </div>
           <input
+            id="create-pool-slug"
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
             placeholder="例: brand-a"
             className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 font-mono text-sm"
           />
-        </label>
-        <label className="block">
-          <span className="text-ink-secondary mb-1 block text-sm font-medium">表示名</span>
+        </div>
+        <div>
+          <label htmlFor="create-pool-name" className="text-ink-secondary mb-1 block text-sm font-medium">表示名</label>
           <input
+            id="create-pool-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例: ブランドA"
             className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
           />
-        </label>
+        </div>
         <div>
           <label htmlFor="create-pool-account" className="text-ink-secondary mb-1 block text-sm font-medium">最初の所属アカウント</label>
           <Select
