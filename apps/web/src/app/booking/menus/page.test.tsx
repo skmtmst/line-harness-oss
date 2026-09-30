@@ -894,6 +894,190 @@ describe('一覧の担当欄 (#953 E-05)', () => {
   })
 })
 
+describe('R622 2ページ目の件数案内', () => {
+  function menu(index: number) {
+    return {
+      id: `menu-${index}`,
+      name: `メニュー${index}`,
+      category_label: null,
+      description: null,
+      duration_minutes: 60,
+      buffer_after_minutes: 0,
+      base_price: 1000,
+      price_mode: 'fixed',
+      sort_order: index,
+      is_active: 1,
+      auto_tag_id: null,
+      concurrent_capacity: 1,
+      booking_window_days: null,
+      cutoff_hours_before: null,
+      cancel_deadline_hours_before: null,
+      intake_question: null,
+      assigned_staff: [] as Array<{ id: string; display_name: string }>,
+      version: 1,
+    }
+  }
+
+  test('2ページ目は8件中7〜8件と案内する', async () => {
+    /*
+     * 以前はページにかかわらず先頭1・末尾=表示件数で案内していたため、
+     * 2ページ目で7〜8件目を見せながら「8件中1〜2件」と出ていた。
+     */
+    fixture.listMenus = vi.fn(async () => ({
+      menus: [1, 2, 3, 4, 5, 6, 7, 8].map((index) => menu(index)),
+    }))
+    fixture.getSettings = vi.fn(async () => ({
+      success: true,
+      data: { ...SETTINGS, menuCount: 8, activeMenuCount: 8, inactiveMenuCount: 0 },
+    }))
+    render(<><MenusPage /><ToastHost /></>)
+
+    await screen.findByText(/8件中 1〜6件を表示/)
+    fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    await screen.findByText(/8件中 7〜8件を表示/)
+    expect(screen.queryByText(/8件中 1〜2件を表示/)).toBeNull()
+  })
+
+  test('1ページ目に戻ると8件中1〜6件に戻る', async () => {
+    fixture.listMenus = vi.fn(async () => ({
+      menus: [1, 2, 3, 4, 5, 6, 7, 8].map((index) => menu(index)),
+    }))
+    fixture.getSettings = vi.fn(async () => ({
+      success: true,
+      data: { ...SETTINGS, menuCount: 8, activeMenuCount: 8, inactiveMenuCount: 0 },
+    }))
+    render(<><MenusPage /><ToastHost /></>)
+
+    await screen.findByText(/8件中 1〜6件を表示/)
+    fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    await screen.findByText(/8件中 7〜8件を表示/)
+    fireEvent.click(screen.getByRole('button', { name: '前のページ' }))
+    await screen.findByText(/8件中 1〜6件を表示/)
+  })
+})
+
+describe('R92 メニュー空欄は店舗設定を使う（表示と動きをそろえる）', () => {
+  function menu(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'menu-1',
+      name: 'カット',
+      category_label: null,
+      description: null,
+      duration_minutes: 60,
+      buffer_after_minutes: 0,
+      base_price: 8000,
+      price_mode: 'fixed',
+      sort_order: 0,
+      is_active: 1,
+      auto_tag_id: null,
+      concurrent_capacity: 1,
+      booking_window_days: null,
+      cutoff_hours_before: null,
+      cancel_deadline_hours_before: null,
+      intake_question: null,
+      assigned_staff: [] as Array<{ id: string; display_name: string }>,
+      version: 1,
+      ...overrides,
+    }
+  }
+
+  async function renderRules(menus: Array<Record<string, unknown>>) {
+    fixture.activeTab = 'rules'
+    fixture.listMenus = vi.fn(async () => ({ menus }))
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+  }
+
+  test('上書き表の空欄は「制限なし」ではなく店舗設定を使うと出す', async () => {
+    /*
+     * Worker の effectiveBookingRules は空欄を店舗値で埋めるため、
+     * 「制限なし」は動きと違う。新規作成画面の案内（空欄なら店舗設定）
+     * とそろえる。
+     */
+    await renderRules([menu()])
+    expect(screen.getAllByText('店舗設定を使う').length).toBe(3)
+    expect(screen.queryByText('制限なし')).toBeNull()
+  })
+
+  test('値を入れたメニューは入れた値を出し、空欄だけ店舗設定を使うと出す', async () => {
+    await renderRules([menu({
+      id: 'menu-2',
+      name: 'カラー',
+      booking_window_days: 45,
+      cutoff_hours_before: 2,
+      cancel_deadline_hours_before: null,
+    })])
+    expect(screen.getByText('45日先まで')).toBeTruthy()
+    expect(screen.getByText('2時間前')).toBeTruthy()
+    expect(screen.getAllByText('店舗設定を使う').length).toBe(1)
+  })
+
+  test('編集窓の受付条件は空欄=店舗の予約ルールと案内する', async () => {
+    fixture.listMenus = vi.fn(async () => ({ menus: [menu()] }))
+    render(<><MenusPage /><ToastHost /></>)
+    const row = await screen.findByRole('button', { name: '中身を見る' })
+    await act(async () => { fireEvent.click(row) })
+    await screen.findByText('メニュー編集')
+    expect(screen.getByText(/空欄は店舗の予約ルールを使います/)).toBeTruthy()
+    expect(screen.queryByText(/空欄は「制限しない」/)).toBeNull()
+  })
+})
+
+describe('R161 予約ルールの未保存変更はタブ移動で確認する', () => {
+  async function renderRules() {
+    // 前のテストのリンククリックでURLが動いていても、同じURLへの
+    // 移動はガード対象外になるため、開始位置をルールタブへ戻す。
+    window.history.replaceState(null, '', '/booking/menus?tab=rules')
+    fixture.activeTab = 'rules'
+    fixture.listMenus = vi.fn(async () => ({ menus: [] }))
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+  }
+
+  function menusTabLink(): HTMLAnchorElement {
+    const link = document.querySelector('a[href="/booking/menus?tab=menus"]')
+    expect(link, 'メニュータブのリンクがある').toBeTruthy()
+    return link as HTMLAnchorElement
+  }
+
+  async function clickLink(target: Element) {
+    await act(async () => {
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))
+    })
+  }
+
+  test('変えていなければ確認なしで通す', async () => {
+    await renderRules()
+    await clickLink(menusTabLink())
+    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+  })
+
+  test('キャンセル期限を変えてメニュータブへ行くと確認が出て、残れば入力が残る', async () => {
+    /*
+     * 以前は確認なしでメニュー一覧へ切り替わり、編集窓が外れて
+     * 1440→60 の変更が黙って消えていた。
+     */
+    await renderRules()
+    const cancel = screen.getByRole('spinbutton', { name: 'キャンセルの期限' }) as HTMLInputElement
+    await waitFor(() => expect(cancel.value).toBe('1440'))
+    fireEvent.change(cancel, { target: { value: '60' } })
+    expect(cancel.value).toBe('60')
+
+    await clickLink(menusTabLink())
+    await screen.findByText('保存していない変更があります')
+
+    // 編集に戻れば60が残る。
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    await waitFor(() => {
+      expect(screen.queryByText('保存していない変更があります')).toBeNull()
+    })
+    expect((screen.getByRole('spinbutton', { name: 'キャンセルの期限' }) as HTMLInputElement).value).toBe('60')
+    expect(fixture.saveSettings).not.toHaveBeenCalled()
+  })
+})
+
 describe('監査 R91: メニューがあるときも見出しに作成の入口', () => {
   test('1件ある一覧でも見出しに「＋ 予約メニューを作る」が出る', async () => {
     /*
