@@ -122,6 +122,12 @@ export default function NewAffiliatePage() {
   // 追加情報の保存だけをやり直す。
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [partialSave, setPartialSave] = useState(false)
+  /*
+   * R525残部: 登録で確定した稼働状態（保存済みの真実）と、やり直しで送る
+   * 指定（未保存の切り替え）は別に持つ。切り替えただけで知らせが
+   * 「まだ始まっていない」「既に始まっている」と嘘をつかないようにする。
+   */
+  const [savedIsActive, setSavedIsActive] = useState<boolean | null>(null)
   // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
   // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
   // 作らず、ここと onReset だけで作り直す。
@@ -142,6 +148,7 @@ export default function NewAffiliatePage() {
     draftAccountRef.current = selectedAccountId
     setCreatedId(null)
     setPartialSave(false)
+    setSavedIsActive(null)
     setOperationId(crypto.randomUUID())
     setFriendId('')
     setSelectedFriend(null)
@@ -229,6 +236,7 @@ export default function NewAffiliatePage() {
         setCopied(false)
         setCreatedId(null)
         setPartialSave(false)
+        setSavedIsActive(null)
         setOperationId(crypto.randomUUID())
       }}
       onSave={async () => {
@@ -256,7 +264,11 @@ export default function NewAffiliatePage() {
             setCreatedId(affiliateId)
             // 保存された行の稼働状態へ寄せる。応答消失後の再送が古い行を
             // 回収したときも、画面の表示と再試行の送り先がずれない。
-            setStartTracking(res.data.isActive)
+            // 応答に稼働状態が無いときは送った指定のままにする。
+            const persistedIsActive =
+              typeof res.data.isActive === 'boolean' ? res.data.isActive : startTracking
+            setStartTracking(persistedIsActive)
+            setSavedIsActive(persistedIsActive)
           } catch {
             throw new Error('アフィリエイターを登録できませんでした。入力を確認して、もう一度お試しください。')
           }
@@ -340,17 +352,33 @@ export default function NewAffiliatePage() {
               下の「追加情報の保存を再開する」で続けるか、未保存の追加情報を破棄して一覧へ戻れます。
             </p>
             {/*
-              R525: 作った行の稼働状態は最初の登録で確定している（裏側は
-              INSERT 時に is_active を書き込む）。オンで追加情報の保存に
-              失敗しても、計測は「これから始まる」のではなく登録時に
-              既に始まっている。取り違えさせない文にする。やり直しの前の
-              切り替えは残し、押したときの指定で更新する。
+              R525残部: 知らせの1文目は保存済みの真実（savedIsActive）だけを
+              言う。未保存の切り替え（startTracking）は2文目で「再開するとき
+              どう送るか」として別に言う。混ぜると、オン保存→オフ切替で
+              「まだ始まっていない」、オフ保存→オン切替で「既に始まっている」
+              と嘘をつく。失敗・警告の文なので ? には入れない。
             */}
-            <p className="mt-1">
-              {startTracking
-                ? '「すぐに計測を始める」がオンなので、基本情報の登録で計測は既に始まっています。'
-                : '「すぐに計測を始める」がオフなので、計測は始まらないまま追加情報だけを保存します。'}
-            </p>
+            {savedIsActive === true ? (
+              <p className="mt-1">
+                基本情報の登録で計測は既に始まっています。
+                {startTracking
+                  ? 'このまま追加情報だけを保存します。'
+                  : '再開するときは計測をオフに切り替えて保存します。'}
+              </p>
+            ) : savedIsActive === false ? (
+              <p className="mt-1">
+                基本情報の登録は計測オフで済んでいるので、計測はまだ始まっていません。
+                {startTracking
+                  ? '再開するときは計測をオンに切り替えて保存します。'
+                  : 'このまま追加情報だけを保存します。'}
+              </p>
+            ) : (
+              <p className="mt-1">
+                {startTracking
+                  ? '「すぐに計測を始める」がオンなので、基本情報の登録で計測は既に始まっています。'
+                  : '「すぐに計測を始める」がオフなので、計測は始まらないまま追加情報だけを保存します。'}
+              </p>
+            )}
           </Notice>
         ) : null}
         <div className="grid gap-3 lg:grid-cols-3">
