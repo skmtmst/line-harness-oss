@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useRouter } from 'next/navigation'
 import { MoreHorizontal } from 'lucide-react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { isMileageFriendsV6Overview } from './friends-overview-guard'
 import MileageRewardsTab from './mileage-rewards-tab'
 import ActionMenu from '@/components/shared/action-menu'
 import Breadcrumb from '@/components/shared/breadcrumb'
@@ -131,20 +132,7 @@ function rankLabel(rank: string | null) {
   return null
 }
 
-function isMileageFriendsV6Overview(value: unknown): value is MileageFriendsV6Overview {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<MileageFriendsV6Overview>
-  return Array.isArray(candidate.items)
-    && !!candidate.summary
-    && typeof candidate.summary.totalMembers === 'number'
-    && typeof candidate.summary.withBalanceCount === 'number'
-    && typeof candidate.summary.available === 'number'
-    && typeof candidate.summary.pending === 'number'
-    && !!candidate.pagination
-    && typeof candidate.pagination.total === 'number'
-    && typeof candidate.pagination.limit === 'number'
-    && typeof candidate.pagination.offset === 'number'
-}
+/* D022: 友だち残高の応答検査は friends-overview-guard.ts にある。 */
 
 function isMileageEarningRulesV6Overview(value: unknown): value is MileageEarningRulesV6Overview {
   if (!value || typeof value !== 'object') return false
