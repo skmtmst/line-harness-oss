@@ -85,11 +85,30 @@ function scheduleDismiss(id: number, ms: number): void {
   countdowns.set(id, entry)
 }
 
+/*
+ * 共有期限の後始末。取り消されずに知らせが消えるとき（×・押出し・
+ * unmount・掃除）は、残り時間で必ず一度だけ送信を進める。
+ * 取り消し済み・送信済みなら受け側（settled）が無視するので、
+ * 止まっていたかどうかを問わず呼んでよい。
+ */
+function releaseLifecycle(id: number): void {
+  const hooks = lifecycles.get(id)
+  lifecycles.delete(id)
+  hooks?.onResume?.()
+}
+
+/** 止まっている共有期限をすべて残り時間で進める（ホストを外すとき用）。 */
+function resumeAllLifecycles(): void {
+  for (const id of [...lifecycles.keys()]) {
+    lifecycles.get(id)?.onResume?.()
+  }
+}
+
 export function dismissToast(id: number): void {
   const entry = countdowns.get(id)
   if (entry?.timer) clearTimeout(entry.timer)
   countdowns.delete(id)
-  lifecycles.delete(id)
+  releaseLifecycle(id)
   const before = items.length
   items = items.filter((item) => item.id !== id)
   if (items.length !== before) emit()
@@ -147,12 +166,13 @@ export function notifyToast(message: string, options?: NotifyToastOptions): () =
       onAction: options?.onAction,
     },
   ]
-  // 表示数を超えて押し出された知らせの残り時間タイマーも止める
+  // 表示数を超えて押し出された知らせの残り時間タイマーも止める。
+  // 押し出されても未取消の保存は残り時間で送る（releaseLifecycle）。
   for (const dropped of next.slice(0, Math.max(0, next.length - MAX_ITEMS))) {
     const entry = countdowns.get(dropped.id)
     if (entry?.timer) clearTimeout(entry.timer)
     countdowns.delete(dropped.id)
-    lifecycles.delete(dropped.id)
+    releaseLifecycle(dropped.id)
   }
   items = next.slice(-MAX_ITEMS)
   emit()
@@ -168,6 +188,8 @@ export function clearToastsForTest(): void {
     if (entry?.timer) clearTimeout(entry.timer)
   }
   countdowns.clear()
+  // 消えた分の未取消の保存は残り時間で送る（取り消し済みは settled が無視）。
+  resumeAllLifecycles()
   lifecycles.clear()
   items = []
   emit()
@@ -269,7 +291,12 @@ export default function ToastHost() {
       if (undoLatestToast()) event.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      // 外れた（画面遷移など）ときに止めていた送信期限を置き去りにしない。
+      // 取り消し済み・送信済みなら受け側（settled）が無視する。
+      resumeAllLifecycles()
+    }
   }, [])
   if (live.length === 0) return null
   return (
