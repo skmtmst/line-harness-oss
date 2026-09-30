@@ -363,8 +363,12 @@ function AnalyticsReportFormPage() {
   /*
    * R526: この作成試行の要求キー。応答消失後の押し直しは同じキーで送り、
    * サーバは既にある予約を返す。成功するまで持ち回り、成功・作り直しで捨てる。
+   * キーは選んでいるアカウントに結びつける。裏側はキーをそのまま行の
+   * 主キーにする（全アカウントで1つ）。Aで応答を失ったキーをBで使い回すと、
+   * Bには同キーが見つからずINSERTで主キーが衝突して500になる。
+   * アカウントが違えば新しい試行にし、同じアカウントへ戻れば再送が効く。
    */
-  const createKeyRef = useRef<string | null>(null)
+  const createKeyRef = useRef<{ key: string; accountId: string } | null>(null)
   /*
    * R526: 同じキーで内容の違う予約が既にあるときの、その予約の番号。
    * 2件目を黙って作らず、既にある予約への案内を出す。
@@ -461,9 +465,12 @@ function AnalyticsReportFormPage() {
           : `定期レポートを更新しました。次は${nextLabel}に届きます。`)
       } else {
         // R526: 作成試行の要求キー。応答消失後の押し直しは同じキーで送り、
-        // 既にある予約へ戻す（2件目を作らない）。
-        if (!createKeyRef.current) createKeyRef.current = crypto.randomUUID()
-        const requestKey = createKeyRef.current
+        // 既にある予約へ戻す（2件目を作らない）。別アカウントの試行では
+        // 新しいキーにする（使い回すと裏側の主キーが衝突して500になる）。
+        if (!createKeyRef.current || createKeyRef.current.accountId !== selectedAccountId) {
+          createKeyRef.current = { key: crypto.randomUUID(), accountId: selectedAccountId }
+        }
+        const requestKey = createKeyRef.current.key
         let response
         try {
           response = await api.analytics.reportSchedules.create(selectedAccountId, {
