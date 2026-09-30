@@ -233,7 +233,7 @@ export default function HqFormDefinitionEditor({
         <div className="mt-4 rounded-card border border-hairline bg-canvas p-4"><Field label="説明" htmlFor="hq-form-description"><TextArea id="hq-form-description" rows={2} value={value.description} onChange={event => setValue(current => ({ ...current, description: event.target.value }))} /></Field></div>
       </section>
     </div>
-    <StickyBar actions={<div className="flex gap-2"><Button type="button" onClick={onCancel}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中...' : 'フォームを保存する'}</Button></div>} />
+    <StickyBar actions={<div className="flex gap-2"><Button type="button" onClick={onCancel}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving} busyLabel="保存中...">フォームを保存する</Button></div>} />
     {showOptions && <OptionsDialog value={layout.options} refs={portableRefs} onChange={(options: FormOptions) => setLayout(previous => ({ ...previous, options }))} onClose={() => setShowOptions(false)} onSave={async () => { await save(); setShowOptions(false) }} />}
     <ConfirmDialog open={renameSectionIndex !== null} title="ページの名前を変更" description="ページ名を入力してください。" confirmLabel="変更する" onCancel={() => { setRenameSectionIndex(null); setRenameSectionName('') }} onConfirm={applySectionName}>
       <Field label="ページの名前" htmlFor="hq-form-section-name"><TextInput id="hq-form-section-name" value={renameSectionName} onChange={event => setRenameSectionName(event.target.value)} /></Field>

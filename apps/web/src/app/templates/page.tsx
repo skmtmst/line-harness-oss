@@ -952,9 +952,7 @@ export default function TemplatesPage() {
               <Button
                 onClick={handleCreate}
                 disabled={saving}
-                variant="primary"
-              >
-                {saving ? '作成中...' : '作る'}
+                variant="primary" busy={saving} busyLabel="作成中...">作る
               </Button>
               <Button
                 onClick={() => { setShowCreate(false); setFormError('') }}
@@ -1256,9 +1254,7 @@ export default function TemplatesPage() {
                     <Button
                       variant="primary"
                       onClick={() => void handlePublish(drawerData)}
-                      disabled={publishing}
-                    >
-                      {publishing ? '公開中...' : '公開する'}
+                      disabled={publishing} busy={publishing} busyLabel="公開中...">公開する
                     </Button>
                   )}
                 </div>

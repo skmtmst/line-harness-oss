@@ -96,9 +96,11 @@ describe('#673 A. カード・パネルの立体感', () => {
 })
 
 describe('#673 B. 触った感触', () => {
-  it('ボタンは160msのease-outで scale(0.97) に沈む', () => {
-    expect(GLOBALS_CODE).toMatch(/button:not\(:disabled\):active[\s\S]*?transform:\s*scale\(0\.97\)/)
-    expect(GLOBALS_CODE).toMatch(/transform 160ms var\(--motion-ease-out\)/)
+  it('ボタンは motion-instant(80ms) で 0.98倍に沈む（★V7 仕上げ §2）', () => {
+    expect(GLOBALS_CODE).toMatch(/:active[\s\S]*?scale:\s*0\.98/)
+    expect(GLOBALS_CODE).toMatch(/scale var\(--motion-instant\)/)
+    // 旧 #673 の transform: scale(0.97) は scale 規定と二重に効くため外した
+    expect(GLOBALS_CODE).not.toContain('transform: scale(0.97)')
   })
 
   it('transition: all を使わない（#648の教訓）', () => {

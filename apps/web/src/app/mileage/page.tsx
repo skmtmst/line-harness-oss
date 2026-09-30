@@ -858,9 +858,7 @@ function MileagePageInner() {
           />
           <Button
             onClick={() => void saveRuleOrder()}
-            disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'}
-          >
-            {savingRuleOrder ? '保存しています' : '並び順を保存する'}
+            disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'} busy={savingRuleOrder} busyLabel="保存しています">並び順を保存する
           </Button>
           <Button onClick={exportRulesCsv} disabled={shownRules.length === 0} className="ml-auto">
             CSVで書き出す

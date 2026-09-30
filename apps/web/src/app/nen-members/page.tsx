@@ -16,6 +16,7 @@ import Dialog from '@/components/shared/dialog'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
+import BulkBar from '@/components/shared/bulk-bar'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
@@ -794,7 +795,7 @@ export default function PhotoReviewsPage() {
             </div>
             <div className="flex shrink-0 gap-2">
               <Button variant="secondary" onClick={() => void openDetail(item.photoId)}>大きく見る</Button>
-              <Button variant="secondary" disabled={reviewing === item.photoId} onClick={() => void retryNotification(item.photoId)}>{reviewing === item.photoId ? '再送中...' : 'LINE通知を再送'}</Button>
+              <Button variant="secondary" disabled={reviewing === item.photoId} onClick={() => void retryNotification(item.photoId)} busy={reviewing === item.photoId} busyLabel="再送中...">LINE通知を再送</Button>
             </div>
           </li>)}
         </ul>
@@ -901,18 +902,21 @@ export default function PhotoReviewsPage() {
         {searchQuery && <span className="text-xs font-semibold text-ink-faint">「{searchQuery}」で絞り込んでいます</span>}
       </form>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/*
-         * まとめ操作の帯は1枚以上選んだときだけ出す。0件で「0枚を選択中」と
-         * 押せないボタンを並べると、確認窓が「0枚をまとめて採用」と開く
-         * 事故（Issue #666）の温床になる。選ぶ前は何も出さない。
-         */}
-        {selectedPendingPhotos.length > 0 && <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent-deep">{selectedPendingPhotos.length}枚を選択中</span>
-          <Button variant="primary" disabled={!selectedPhotosAreLowRisk || bulkReviewing} title={!selectedPhotosAreLowRisk ? 'まとめて採用できるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)}>{bulkReviewing ? '処理中...' : 'まとめて採用'}</Button>
-          <Button variant="secondary" disabled={bulkReviewing} onClick={() => setBulkReturnOpen(true)}>まとめて見送り</Button>
-          <span className="text-xs text-ink-faint">審査待ちの写真だけをまとめて処理します</span>
-        </div>}
+      {/*
+       * まとめ操作の帯は1枚以上選んだときだけ出す。0件で「0枚を選択中」と
+       * 押せないボタンを並べると、確認窓が「0枚をまとめて採用」と開く
+       * 事故（Issue #666）の温床になる。選ぶ前は何も出さない。
+       * ★V7 仕上げ §2: surface-pearl の帯＋白地ボタン（黒地・緑ボタンは使わない）。
+       */}
+      <BulkBar
+        count={selectedPendingPhotos.length}
+        unit="枚"
+        hint="審査待ちの写真だけをまとめて処理します"
+      >
+        <Button variant="secondary" disabled={!selectedPhotosAreLowRisk || bulkReviewing} title={!selectedPhotosAreLowRisk ? 'まとめて採用できるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)} busy={bulkReviewing} busyLabel="処理中...">まとめて採用</Button>
+        <Button variant="secondary" disabled={bulkReviewing} onClick={() => setBulkReturnOpen(true)}>まとめて見送り</Button>
+      </BulkBar>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex items-center gap-2">
           <Button variant="secondary" disabled title="並べて見るは一覧の表示形式の追加口を接続後に使えます">▦ 並べて見る</Button>
           <Button
@@ -963,14 +967,14 @@ export default function PhotoReviewsPage() {
              */}
             {photo.status === 'adopted' && <Notice tone="success" className="mt-3">{mileStatusLabel(photo.point_sync_status)}・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</Notice>}
             {photo.status === 'rejected' && <div className="mt-3 rounded-control bg-surface-pearl px-3 py-2 text-xs text-ink-secondary"><span className="font-semibold">見送った理由：</span>{REVIEW_REASONS.find((reason) => reason.value === photo.review_reason_code)?.label ?? '理由未記録'}{text(photo.review_reason_note) && <p className="mt-1 text-ink-faint">{text(photo.review_reason_note)}</p>}</div>}
-            {photo.review_notification_status === 'failed' && <Notice tone="warn" className="mt-2" action={<Button variant="secondary" disabled={reviewing === photo.id} onClick={() => void retryNotification(text(photo.id))} className="shrink-0">{reviewing === photo.id ? '再送中...' : 'LINE通知を再送'}</Button>}>投稿者へのLINE通知を送れませんでした</Notice>}
-            {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を採用する`} disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')}>{reviewing === photo.id ? '処理中...' : '採用する'}</Button><Button data-qa-open={photoId === text(visiblePhotos[0]?.id) && status === 'pending' ? 'N2J629' : undefined} variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を見送る`} disabled={reviewing === photo.id} onClick={() => void openRejectDialog(photoId)}>見送る</Button></div>}
+            {photo.review_notification_status === 'failed' && <Notice tone="warn" className="mt-2" action={<Button variant="secondary" disabled={reviewing === photo.id} onClick={() => void retryNotification(text(photo.id))} className="shrink-0" busy={reviewing === photo.id} busyLabel="再送中...">LINE通知を再送</Button>}>投稿者へのLINE通知を送れませんでした</Notice>}
+            {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を採用する`} disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')} busy={reviewing === photo.id} busyLabel="処理中...">採用する</Button><Button data-qa-open={photoId === text(visiblePhotos[0]?.id) && status === 'pending' ? 'N2J629' : undefined} variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を見送る`} disabled={reviewing === photo.id} onClick={() => void openRejectDialog(photoId)}>見送る</Button></div>}
           </div>
         </article>})}
       </section>}
       {!loading && !loadError && hasMorePhotos && <div className="flex flex-col items-center gap-1 pt-2">
-        <Button variant="secondary" disabled={loadingMore} onClick={() => void loadMore()}>
-          {loadingMore ? '読み込み中...' : `さらに読み込む（いま${photos.length}枚）`}
+        <Button variant="secondary" disabled={loadingMore} onClick={() => void loadMore()} busy={loadingMore} busyLabel="読み込み中...">
+          {`さらに読み込む（いま${photos.length}枚）`}
         </Button>
         <p className="text-xs text-ink-faint">一度に{PHOTO_PAGE_SIZE}枚ずつ読み込みます。続きがあるあいだ、札の件数には「+」が付きます。</p>
       </div>}

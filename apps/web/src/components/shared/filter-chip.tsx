@@ -41,8 +41,7 @@ export default function FilterChip({
       {selected ? <Check aria-hidden="true" className="v6-filter-chip__icon" /> : null}
       {children}
       {count === undefined || count === '' ? null : (
-        <>
-          {' '}
+        <>{' '}
           <span className="v6-filter-chip__count">{count}</span>
         </>
       )}
