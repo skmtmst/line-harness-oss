@@ -57,9 +57,8 @@ export default function UploadButton({
         aria-hidden="true"
         onChange={(event) => void handle(event.target.files?.[0])}
       />
-      <Button onClick={() => inputRef.current?.click()} disabled={disabled || busy}>
-        <Upload aria-hidden="true" className="h-4 w-4" />
-        {busy ? '取り込み中…' : '画像を取り込む'}
+      <Button onClick={() => inputRef.current?.click()} disabled={disabled || busy} busy={busy} busyLabel="取り込み中…">
+        <Upload aria-hidden="true" className="h-4 w-4" />画像を取り込む
       </Button>
     </>
   )

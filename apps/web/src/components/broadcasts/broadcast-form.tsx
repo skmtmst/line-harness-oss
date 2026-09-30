@@ -465,7 +465,7 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
         <Checkbox checked={!trackLinks} onCheckedChange={(checked) => onTrackLinksChange(!checked)} className="mt-3">このメッセージではURLを短縮しない</Checkbox>
         <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
           <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
-          {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>{'短縮して計測'}</span></div>) : (
+          {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>短縮して計測</span></div>) : (
             <p className="border-t border-hairline px-3 py-3 text-ink-faint">本文にURLはありません。</p>
           )}
         </div>
@@ -2609,7 +2609,7 @@ export default function BroadcastForm({
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()}>{currentStep === 'message' && <Save size={15} aria-hidden />}{saving ? '保存中…' : '下書きを保存する'}</Button>
+          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
               {currentStep === 'basic' ? '対象設定へ'
@@ -2618,12 +2618,12 @@ export default function BroadcastForm({
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()}>
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()} busy={saving}>
               {/*
                 予約と下書きを混同しない（IDEA-06）。「今すぐ配信」はここでは
                 送らず、下書きを保存して詳細画面の送信ボタンで実行する。
               */}
-              {saving ? '保存中…' : sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'}
+              {sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'}
             </Button>
           )}
         </>

@@ -431,8 +431,7 @@ function FriendMileageInner() {
                           <Button
                             variant="secondary"
                             disabled={notificationRetryId === item.id}
-                            onClick={() => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId)}
-                          >{notificationRetryId === item.id ? '送り直し中…' : '通知を再送'}</Button>
+                            onClick={() => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId)} busy={notificationRetryId === item.id} busyLabel="送り直し中…">通知を再送</Button>
                         ) : null}
                       </div>
                     </Td>

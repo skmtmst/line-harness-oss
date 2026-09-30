@@ -452,7 +452,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         <Summary step={step} rule={rule} definition={definition} options={options} matchedLast28Days={matchedLast28Days} pendingAction={actionDialogOpen && Boolean(actionTarget)} />
       </div>
 
-      <StickyBar className="friend-add-editor-sticky" status={notice || undefined} actions={<><Button href="/friend-add-settings">キャンセル</Button><Button type="button" onClick={() => void save()} disabled={saving}>下書きを保存する</Button>{step === 'preview' ? <Button type="button" variant="primary" onClick={() => void runTest()} disabled={saving}>{saving ? 'テスト中…' : 'テストを送る'}</Button> : <Button type="button" variant="primary" onClick={() => moveToStep(STEPS[Math.min(currentIndex + 1, 4)].key)} disabled={saving}>{STEPS[Math.min(currentIndex + 1, 4)].label}へ</Button>}</>} />
+      <StickyBar className="friend-add-editor-sticky" status={notice || undefined} actions={<><Button href="/friend-add-settings">キャンセル</Button><Button type="button" onClick={() => void save()} disabled={saving}>下書きを保存する</Button>{step === 'preview' ? <Button type="button" variant="primary" onClick={() => void runTest()} disabled={saving} busy={saving} busyLabel="テスト中…">テストを送る</Button> : <Button type="button" variant="primary" onClick={() => moveToStep(STEPS[Math.min(currentIndex + 1, 4)].key)} disabled={saving}>{STEPS[Math.min(currentIndex + 1, 4)].label}へ</Button>}</>} />
 
       {actionDialogOpen && (
         <div data-design-node="txMO9">

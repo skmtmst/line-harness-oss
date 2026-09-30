@@ -198,8 +198,7 @@ export default function ManualLinksPage() {
           />
         }
         trailing={
-          <Button disabled={checking} onClick={() => void checkAll()}>
-            {checking ? '確かめています…' : 'いま全部を確かめる'}
+          <Button disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…">いま全部を確かめる
           </Button>
         }
       />

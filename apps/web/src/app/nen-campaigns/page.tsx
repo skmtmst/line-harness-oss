@@ -405,7 +405,7 @@ export default function NenCampaignsPage() {
   const headerAction = tab === 'columns' ? (
     <span className="flex flex-wrap items-center justify-end gap-2">
       <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
-      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()} busy={importing} busyLabel="取り込んでいます…">ECのコラムを取り込む</Button>
     </span>
   )
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>

@@ -2410,9 +2410,7 @@ export default function NewAutomationPage() {
                 <Button
                   variant="secondary"
                   disabled={previewRefreshing}
-                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)}
-                >
-                  {previewRefreshing ? '数え直しています' : '人数をもう一度数える'}
+                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)} busy={previewRefreshing} busyLabel="数え直しています">人数をもう一度数える
                 </Button>
               </div>
             ) : null}
@@ -2420,9 +2418,7 @@ export default function NewAutomationPage() {
               <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
               <Button
                 onClick={() => void askOnePersonTest()}
-                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
-              >
-                {preparingTest ? '確認中...' : '1人で試す'}
+                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()} busy={preparingTest} busyLabel="確認中...">1人で試す
               </Button>
               <p className="mt-1 text-xs font-medium leading-relaxed text-ink-faint">保存した時点の内容で試します。変えた後は保存し直してから試してください。</p>
             </div>
@@ -2454,9 +2450,7 @@ export default function NewAutomationPage() {
                   <Button
                     variant="primary"
                     disabled={testing}
-                    onClick={() => void runOnePersonTest()}
-                  >
-                    {testing ? '送信中...' : 'この内容で送る'}
+                    onClick={() => void runOnePersonTest()} busy={testing} busyLabel="送信中...">この内容で送る
                   </Button>
                 </div>
               </div>

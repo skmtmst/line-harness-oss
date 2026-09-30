@@ -302,7 +302,7 @@ function FolderEditor() {
               actions={(
                 <>
                   <button type="button" disabled={saving} onClick={close} className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium hover:bg-canvas-sunken disabled:opacity-40">キャンセル</button>
-                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()}>{saving ? '保存中…' : editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存する</> : 'フォルダを追加する'}</Button>
+                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()} busy={saving}>{editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存する</> : 'フォルダを追加する'}</Button>
                 </>
               )}
             />

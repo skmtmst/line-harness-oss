@@ -198,7 +198,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
                 <div className="flex justify-between gap-2"><dt>採用の記録</dt><dd className="text-right">{text(item.reviewed_at) ? `${formatPhotoReceivedAt(item.reviewed_at)}・${text(item.reviewed_by_name) || '担当未取得'}` : '—（未取得）'}</dd></div>
                 <div className="flex justify-between gap-2"><dt>マイル</dt><dd className="text-right">{mileStatusLabel(item.point_sync_status, Number(item.awarded_points) || 5)}</dd></div>
               </dl>
-              <div className="mt-2 flex items-center gap-2"><Button data-qa-open="J3Wxl8-placements" onClick={() => openPlacements(item)}>使う場所</Button><Button disabled={busyId === item.id} onClick={() => void withdraw(item)}>{busyId === item.id ? '外しています...' : '外す'}</Button></div>
+              <div className="mt-2 flex items-center gap-2"><Button data-qa-open="J3Wxl8-placements" onClick={() => openPlacements(item)}>使う場所</Button><Button disabled={busyId === item.id} onClick={() => void withdraw(item)} busy={busyId === item.id} busyLabel="外しています...">外す</Button></div>
             </div>
           </Card>
         })}
@@ -233,7 +233,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
               </div>
               <div className="mt-1 text-xs text-ink-faint">{placementsOf(item).map((placement) => <PlacementLine key={text(placement.id)} placement={placement} />)}</div>
               <p className="mt-2 border-t border-hairline pt-2 text-xs text-ink-faint">マイル：{mileStatusLabel(item.point_sync_status, Number(item.awarded_points) || 5)}（外しても付与済みのマイルは戻りません）</p>
-              <div className="mt-2"><Button disabled={busyId === item.id} onClick={() => void withdraw(item)}>{busyId === item.id ? '外しています...' : '掲載先から外す'}</Button></div>
+              <div className="mt-2"><Button disabled={busyId === item.id} onClick={() => void withdraw(item)} busy={busyId === item.id} busyLabel="外しています...">掲載先から外す</Button></div>
             </div>
           </Card>
         })}

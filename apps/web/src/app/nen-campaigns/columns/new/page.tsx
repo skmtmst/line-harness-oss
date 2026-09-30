@@ -380,9 +380,7 @@ function NewNenColumnInner() {
               data-qa-open="ymXJK"
               disabled={!canSubmit({ draft, busy })}
               onMouseDown={() => setTouched(true)}
-              onClick={() => void save()}
-            >
-              {busy ? '保存中…' : '下書きを保存する'}
+              onClick={() => void save()} busy={busy}>下書きを保存する
             </Button>
           </>
         )}

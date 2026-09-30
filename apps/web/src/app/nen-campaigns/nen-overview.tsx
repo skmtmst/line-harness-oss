@@ -408,7 +408,7 @@ export function NenOverview({
         footer={previewSetting ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
-            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)}>{testing === previewSetting.campaignKey ? '送信中…' : '自分にテストを送る'}</Button>
+            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)} busy={testing === previewSetting.campaignKey} busyLabel="送信中…">自分にテストを送る</Button>
           </div>
         ) : undefined}
       >
@@ -488,8 +488,7 @@ function AutoPanel({
           <Disclosure size="compact" title="送られる仕組み">
             <p className="text-caption leading-6 text-ink-secondary">
               文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。注文が取り消し・返金になったあとの案内は自動で止まります。きっかけの記録と定期便の次の発送は{' '}
-              <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link>
-              {' '}で確認できます。
+              <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link> で確認できます。
             </p>
           </Disclosure>
         )}
@@ -648,7 +647,7 @@ function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
       description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
       busy={saving}
       onClose={onClose}
-      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave}>{saving ? '保存中…' : '設定を保存する'}</Button>}
+      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave} busy={saving}>設定を保存する</Button>}
     >
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-caption font-medium text-ink">
@@ -930,7 +929,7 @@ function ColumnsPanel({
                 </label>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-micro text-ink-faint">{introDraft.length}／1500文字</span>
-                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)}>{savingColumnId === selected.id ? '保存中…' : '紹介文を保存する'}</Button>
+                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)} busy={savingColumnId === selected.id}>紹介文を保存する</Button>
                 </div>
               </>
             ) : (
@@ -998,7 +997,7 @@ function ColumnsPanel({
         actions={(
           <>
             <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
-            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)}>{selected && testing === selected.id ? '送信中…' : '自分にテストを送る'}</Button>
+            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)} busy={selected && testing === selected.id} busyLabel="送信中…">自分にテストを送る</Button>
             <Button type="button" variant="primary" disabled={!selected || !columnEnabled || scheduleInvalid} onClick={() => selected && setConfirmDeliver({ column: selected, scheduledAt: scheduledIso ?? undefined })}>
               {plan.when === 'now' ? 'この内容で送る' : 'この内容で予約する'}
             </Button>

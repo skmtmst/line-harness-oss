@@ -93,8 +93,7 @@ export default function MergedDeliveryDialog({
           <Button type="button" onClick={onCancel} disabled={busy}>
             キャンセル
           </Button>
-          <Button type="button" variant="primary" onClick={() => onSave(rows)} disabled={!ready}>
-            {busy ? '処理中…' : '保存する'}
+          <Button type="button" variant="primary" onClick={() => onSave(rows)} disabled={!ready} busy={busy} busyLabel="処理中…">保存する
           </Button>
         </div>
       }

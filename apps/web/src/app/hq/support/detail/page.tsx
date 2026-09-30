@@ -307,9 +307,8 @@ export default function HqSupportDetailPage() {
                 <ChevronLeft aria-hidden="true" className="h-4 w-4" />
                 一覧へ戻る
               </Button>
-              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail}>
-                <Send aria-hidden="true" className="h-4 w-4" />
-                {sending ? '送信中…' : '送る'}
+              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail} busy={sending} busyLabel="送信中…">
+                <Send aria-hidden="true" className="h-4 w-4" />送る
               </Button>
             </>
           }
