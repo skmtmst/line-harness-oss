@@ -201,15 +201,10 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
       onClose={onClose}
       footer={(
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-control border border-hairline px-5 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button>
-          <button
-            type="button"
-            disabled={unavailable || (needsResource && !resourceId) || ((selected[0] === 'テキスト送信' || selected[0] === '担当者通知') && !message.trim())}
-            onClick={add}
-            className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-bold text-on-accent hover:brightness-92"
-          >
+          <Button variant="secondary" className="px-5 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onClose}>キャンセル</Button>
+          <Button variant="primary" className="px-5 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={unavailable || (needsResource && !resourceId) || ((selected[0] === 'テキスト送信' || selected[0] === '担当者通知') && !message.trim())} onClick={add}>
             このアクションを追加する
-          </button>
+          </Button>
         </div>
       )}
     >
@@ -217,15 +212,9 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
             <h3 className="mb-3 text-sm font-bold text-ink">1. アクションの種類</h3>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {ACTION_TYPES.map((action) => (
-                <button
-                  key={action[0]}
-                  type="button"
-                  disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))}
-                  onClick={() => setSelected(action)}
-                  className={`rounded-control border px-3 py-3 text-left text-sm font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}
-                >
+                <Button variant="secondary" className={(`rounded-control border px-3 py-3 text-left text-sm font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={action[0]} type="button" disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))} onClick={() => setSelected(action)}>
                   {action[0]}
-                </button>
+                </Button>
               ))}
             </div>
           </section>
@@ -355,8 +344,8 @@ function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, 
         )}
         <Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存する</button>
-          <button type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</button>
+          <Button variant="secondary" className="px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onCancel}>反映しないで保存する</Button>
+          <Button variant="primary" className="px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
         </div>
         <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>
       </section>
@@ -661,7 +650,7 @@ export default function TagEditorV4({
             <Button onClick={onCancel}>キャンセル</Button>
             {mode === 'edit' && !embedded ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して作る</Button> : null}
             {mode === 'create' ? <Button disabled={saving} onClick={() => requestSave(true)}>保存して続けて作る</Button> : null}
-            <Button variant="primary" disabled={saving} onClick={() => requestSave(false)}>{saving ? '保存中…' : mode === 'create' ? 'タグを作る' : 'タグを保存する'}</Button>
+            <Button variant="primary" disabled={saving} onClick={() => requestSave(false)} busy={saving}>{mode === 'create' ? 'タグを作る' : 'タグを保存する'}</Button>
           </>
         )}
       />

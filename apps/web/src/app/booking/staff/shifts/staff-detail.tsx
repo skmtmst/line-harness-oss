@@ -891,8 +891,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               })}
             </div>
             <div className="border-hairline flex flex-wrap items-center gap-3 border-t px-4 py-3">
-              <Button variant="primary" onClick={() => void saveRules()} disabled={savingRules}>
-                {savingRules ? '保存中…' : 'いつもの勤務時間を保存する'}
+              <Button variant="primary" onClick={() => void saveRules()} disabled={savingRules} busy={savingRules}>いつもの勤務時間を保存する
               </Button>
               {rulesSavedAt ? <span className="text-success text-xs">保存しました。下の予約枠に反映されています。</span> : null}
               {ruleError ? <p className="text-danger w-full text-xs">{ruleError}</p> : null}
@@ -960,8 +959,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void saveBreaks()} disabled={savingBreaks}>
-                {savingBreaks ? '保存中…' : '休憩を保存する'}
+              <Button variant="primary" onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks}>休憩を保存する
               </Button>
               {breaksSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {breakError ? <p className="text-danger w-full text-xs">{breakError}</p> : null}
@@ -1020,8 +1018,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void saveBreakDates()} disabled={savingDates}>
-                {savingDates ? '保存中…' : 'この日だけの休憩を保存する'}
+              <Button variant="primary" onClick={() => void saveBreakDates()} disabled={savingDates} busy={savingDates}>この日だけの休憩を保存する
               </Button>
               {datesSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {dateError ? <p className="text-danger w-full text-xs">{dateError}</p> : null}
@@ -1045,7 +1042,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <TimeField aria-label="シフトの終わり" value={newEnd} onChange={setNewEnd} className="mt-1" />
               </span>
               <div className="flex items-end">
-                <Button variant="primary" onClick={() => void addShift()} disabled={savingShift}>{savingShift ? '保存中…' : 'シフトを足す'}</Button>
+                <Button variant="primary" onClick={() => void addShift()} disabled={savingShift} busy={savingShift}>シフトを足す</Button>
               </div>
             </div>
             {shiftError ? <p className="text-danger mt-3 text-xs">{shiftError}</p> : null}
@@ -1093,7 +1090,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                   <input aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
                 </label>
                 <div className="flex items-end">
-                  <Button onClick={() => void generateFromRules()} disabled={generating}>{generating ? '作成中…' : 'まとめて作る'}</Button>
+                  <Button onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">まとめて作る</Button>
                 </div>
               </div>
               <p className="text-ink-faint mt-2 text-xs">すでにある日は残します（上書きしません）。</p>
@@ -1129,8 +1126,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                     className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
                   />
                 </label>
-                <Button variant="primary" onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured}>
-                  {savingCalendar ? '確認中…' : 'つなげる'}
+                <Button variant="primary" onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured} busy={savingCalendar} busyLabel="確認中…">つなげる
                 </Button>
                 {calendarFormError ? <p className="text-danger text-xs">{calendarFormError}</p> : null}
               </div>

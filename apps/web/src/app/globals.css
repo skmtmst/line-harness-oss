@@ -396,6 +396,8 @@
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
+  /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
+  --motion-pulse: 1.2s;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
@@ -453,6 +455,114 @@ aside[aria-label="フォルダ"] .shadow-lg {
   box-shadow: var(--shadow-overlay);
 }
 
+/* ---------------------------------------------------------------------
+ * ★V7 仕上げ「読み込みと初回表示の動き」（`z97zZN` §1・§3 / `sTJsh` §2）
+ * ------------------------------------------------------------------- */
+
+/*
+ * §3 骨組みの明滅。不透明度 1↔0.55・1.2秒の ease-in-out。光が流れる
+ * 演出（shimmer）は使わない。Tailwind 既定の `animate-pulse`（2秒・0.5）
+ * をここで V7 の速さに揃えるので、既存の骨組みもこの規定に乗る。
+ * 新しく骨組みを置くときは shared の `Skeleton` を使う。
+ * 「動きを減らす」設定では末尾の reduced-motion 規定が一瞬にする。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-pulse {
+    animation: v7-skeleton-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
+  }
+}
+
+@keyframes v7-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/*
+ * §1 最初に開いたときの入り方。不透明度 0→1＋下から8px上がる、
+ * --motion-base(200ms) の ease-out。同じ段の中では 1 つずつ 40ms ずらし、
+ * 4 つ目以降は同時に出す（板の「全体 320ms 以内」）。ずらし幅の 40ms は
+ * 板の指定値で、--motion-* は transition の長さの系なのでここでは
+ * 直接値を書く。表の行には使わず、表ごとに 1 回だけかける
+ * （入れ物に `.v7-stagger` を付ける）。`both` の終端が最終表示なので、
+ * reduced-motion で一瞬に潰れても表示は正しい。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .v7-stagger > * {
+    animation: v7-rise var(--motion-base) var(--motion-ease-out) both;
+  }
+  .v7-stagger > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .v7-stagger > :nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .v7-stagger > :nth-child(n + 4) {
+    animation-delay: 120ms;
+  }
+}
+
+@keyframes v7-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/*
+ * `sTJsh` §2 前の表示を残したまま読み直す。読み直し中は中身を 0.55 に
+ * 薄め、上に 2px の線の帯を流す。出す・消すの判定（0.3 秒より早い応答
+ * では出さない）は shared `RefreshCover` が持つ。reduced-motion では
+ * 棒は左端に置いたままにする（止まっていても「読み直し中」の印になる）。
+ */
+.v7-refresh {
+  position: relative;
+}
+
+.v7-refresh-dim {
+  opacity: 0.55;
+}
+
+.v7-refresh-line {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 2px;
+  overflow: hidden;
+}
+
+.v7-refresh-line::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  border-radius: 1px;
+  background: var(--color-accent);
+  content: '';
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .v7-refresh-line::before {
+    animation: v7-refresh-sweep 1s var(--motion-ease-in-out) infinite;
+  }
+}
+
+@keyframes v7-refresh-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
 /*
  * フォルダパネルは枠線だけの平らな面だったので、カードの影で面から
  * 浮かせる。パネル内の「…」メニュー（Tailwind の shadow-lg）は
@@ -464,6 +574,16 @@ aside[aria-label="フォルダ"] {
 
 aside[aria-label="フォルダ"] .shadow-lg {
   box-shadow: var(--shadow-float);
+}
+
+/*
+ * 欄の誤りは枠を赤くする（★V7 sTJsh §6）。共有入力部品は各自の CSS で
+ * 持っているが、画面に直接書いた `<input>` も同じ色になるようここで揃える。
+ */
+input[aria-invalid='true'],
+textarea[aria-invalid='true'],
+select[aria-invalid='true'] {
+  border-color: var(--color-danger);
 }
 
 /*
@@ -495,7 +615,7 @@ aside[aria-label="フォルダ"] .shadow-lg {
 
   @media (prefers-reduced-motion: no-preference) {
     :is(button, [role='button']):not(:disabled, [aria-disabled='true'], .w-full, [role='tab'], [role='option'], [role='menuitem'], [role='switch'], [role='gridcell'] *):active {
-      scale: 0.96;
+      scale: 0.98;
     }
   }
 }
@@ -582,9 +702,9 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   }
 
   /*
-   * #673 押した感触。ボタンは160msかけて少し沈み（scale 0.97）、離すと
-   * 戻る。押した瞬間の反応は `--motion-instant` 系ではなく、指に追従
-   * して見える 160ms にする（#673 の指定値）。
+   * #673 押した感触。★V7 仕上げ §2「押した」にそろえて、沈む動きは
+   * 上の `scale` 規定（0.98倍・motion-instant）に一本化した。
+   * ここに残すのは色と影のなめらか化だけ。
    *
    * 部品が持っている transition（共通 Button の CSS Module、
    * `transition-colors` などのユーティリティ）は base 層より強いので
@@ -594,17 +714,11 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
     transition:
-      transform 160ms var(--motion-ease-out),
       background-color var(--motion-fast) ease-out,
       border-color var(--motion-fast) ease-out,
       color var(--motion-fast) ease-out,
       box-shadow var(--motion-fast) ease-out,
       opacity var(--motion-fast) ease-out;
-  }
-
-  button:not(:disabled):active,
-  [role="button"]:not([aria-disabled="true"]):active {
-    transform: scale(0.97);
   }
 
   /*

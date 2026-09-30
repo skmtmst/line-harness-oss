@@ -163,8 +163,7 @@ function CompleteInner() {
         <AuthField label="パスワード（確認）" htmlFor="complete-confirm" error={messages.confirm}>
           <PasswordField id="complete-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full">
-          {busy ? '登録しています…' : '無料で始める'}
+        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="登録しています…">無料で始める
         </Button>
       </form>
     </AuthCard>

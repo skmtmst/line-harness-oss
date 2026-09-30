@@ -1134,20 +1134,12 @@ function MediaLibraryInner() {
                       <p className="text-danger text-xs" role="alert">{renameError}</p>
                     )}
                     <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => setRenaming(null)}
-                        disabled={renamingBusy}
-                        className="border-hairline text-ink-secondary rounded-mini border px-2 py-1 text-[11px]"
-                      >
+                      <Button variant="secondary" className="text-ink-secondary rounded-mini px-2 py-1 text-[11px] h-auto whitespace-normal" onClick={() => setRenaming(null)} disabled={renamingBusy}>
                         キャンセル
-                      </button>
-                      <button
-                        onClick={() => void rename()}
-                        disabled={renamingBusy}
-                        className="bg-accent-deep text-on-accent rounded-mini px-2 py-1 text-[11px] disabled:opacity-50"
-                      >
+                      </Button>
+                      <Button variant="primary" className="rounded-mini px-2 py-1 text-[11px] disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void rename()} disabled={renamingBusy}>
                         {renamingBusy ? '保存中…' : '保存する'}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -1223,15 +1215,9 @@ function MediaLibraryInner() {
                   読み取り専用の人にも「…」でダウンロードを渡す。
                 */}
                 <div className="mt-auto flex items-center justify-end gap-1 pt-1">
-                  <button
-                    onClick={() => setDetailUrl(item.id)}
-                    disabled={!canManageMedia}
-                    title={canManageMedia ? '使用箇所を見る' : managementPermissionReason}
-                    aria-label={`${item.filename}の使用箇所`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                  <Button variant="secondary" className="text-ink-secondary shrink-0 px-2.5 py-1 text-xs whitespace-nowrap disabled:opacity-50 h-auto" onClick={() => setDetailUrl(item.id)} disabled={!canManageMedia} title={canManageMedia ? '使用箇所を見る' : managementPermissionReason} aria-label={`${item.filename}の使用箇所`}>
                     使用箇所
-                  </button>
+                  </Button>
                   <span className="relative inline-flex shrink-0 items-center">
                     <MoreAction
                       label={`${item.filename}のその他操作`}
@@ -1314,8 +1300,7 @@ function MediaLibraryInner() {
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteMedia({ impact, busy: deleteBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()}>
-                  {deleteBusy ? '処理中…' : '削除する'}
+                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
                 </Button>
               ) : null}
             </div>
@@ -1399,9 +1384,7 @@ function MediaLibraryInner() {
               type="button"
               variant="primary"
               disabled={bulkBusy}
-              onClick={() => void runBulkDelete(bulkConfirm ?? [])}
-            >
-              {bulkBusy ? '処理中…' : '削除する'}
+              onClick={() => void runBulkDelete(bulkConfirm ?? [])} busy={bulkBusy} busyLabel="処理中…">削除する
             </Button>
           </div>
         }
@@ -1443,11 +1426,8 @@ function MediaLibraryInner() {
               type="button"
               variant="primary"
               disabled={archiveBusy || !archiveReason.trim()}
-              onClick={() => void confirmArchiveChange()}
-            >
-              {archiveBusy
-                ? '処理中…'
-                : archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
+              onClick={() => void confirmArchiveChange()} busy={archiveBusy} busyLabel="処理中…">
+              {archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
             </Button>
           </div>
         }

@@ -450,7 +450,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       <StickyBar
         className="mt-4"
         status={blockedReason ?? (editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください')}
-        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saveDisabled} onClick={() => void save()}>{saving ? '保存中…' : editing ? '保存する' : '対応マークを作る'}</Button></>}
+        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saveDisabled} onClick={() => void save()} busy={saving}>{editing ? '保存する' : '対応マークを作る'}</Button></>}
       />
       </>
       )}

@@ -7,6 +7,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import Button from '@/components/shared/button'
 
 type Tag = { id: string; name: string; color: string }
 
@@ -217,12 +218,9 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 )}
               </div>
               <div className="flex justify-end gap-2">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium border border-hairline rounded-control hover:bg-surface-pearl transition-colors"
-                >
+                <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" onClick={onClose}>
                   キャンセル
-                </button>
+                </Button>
                 <button
                   onClick={apply}
                   disabled={mode.kind === 'tag' && !mode.tagId}
@@ -271,12 +269,9 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 {error}
               </div>
               <div className="flex justify-end gap-2">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium border border-hairline rounded-control hover:bg-surface-pearl transition-colors"
-                >
+                <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" onClick={onClose}>
                   閉じる
-                </button>
+                </Button>
                 <button
                   onClick={() => setPhase('config')}
                   className="px-4 py-2 text-sm font-medium text-on-accent rounded-control transition-opacity hover:opacity-90"

@@ -655,6 +655,8 @@ export default function NewBookingMenuPage() {
             {/*
              * R536: 403は権限不足で、押しても直らない再試行は出さない。
              * それ以外は入力を保ったまま同じ画面から取り直せる。
+             * DEEP-17（#1043更新）: 取得失敗は「未登録」と混ぜず、入力保持と
+             * 取り直しの口を出す。空（0人）は下の別の言葉で登録へ誘導する。
              */}
             <p className="text-ink-faint text-sm">
               {classifyApiFailure(staffError) === 'forbidden'

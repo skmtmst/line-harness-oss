@@ -33,7 +33,7 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     // 1件ずつPATCHすると途中失敗で一部だけ反映されるため、全順序を1回で送る。
     expect(PAGE).toContain('api.mileage.saveEarningRulesOrder')
     expect(PAGE).toContain('ids: ruleOrder')
-    expect(PAGE).toContain("{savingRuleOrder ? '保存しています' : '並び順を保存する'}")
+    expect(PAGE).toContain('busy={savingRuleOrder} busyLabel="保存しています">並び順を保存する')
     expect(PAGE).not.toContain('api.mileage.saveEarningRuleDraft')
   })
 

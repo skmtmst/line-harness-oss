@@ -136,8 +136,7 @@ export default function OpsInvitePage() {
               </AuthField>
             </>
           ) : null}
-          <Button type="submit" variant="primary" disabled={busy} className="w-full">
-            {busy ? '進めています…' : '設定して2要素認証へ進む'}
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">設定して2要素認証へ進む
           </Button>
           <p className="text-center text-caption text-ink-faint">
             招待の有効期限は24時間です。期限が切れたときは、招待した運営メンバーに送り直しを依頼してください

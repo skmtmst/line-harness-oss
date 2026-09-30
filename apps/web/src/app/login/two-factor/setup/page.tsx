@@ -10,6 +10,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '../two-factor-error'
 
 type SetupData = { provisioningUri: string; manualKey: string }
@@ -172,7 +173,7 @@ export default function TwoFactorSetupPage() {
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
             <img src={qr} alt="認証アプリ登録用のQRコード" className="h-52 w-52 rounded-control border border-hairline" />
           ) : (
-            <div className="h-52 w-52 animate-pulse rounded-control bg-canvas-sunken" aria-hidden="true" />
+            <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
           )}
           <div className="text-center">
             <p className="text-xs text-ink-faint">読み取れないときは、このキーを手で入力</p>
@@ -185,8 +186,7 @@ export default function TwoFactorSetupPage() {
               <OtpInput id="totp-setup-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
             </div>
           </div>
-          <Button type="submit" variant="primary" disabled={busy} className="w-full">
-            {busy ? '確認しています…' : '確認して登録を完了する'}
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="確認しています…">確認して登録を完了する
           </Button>
         </form>
       ) : null}

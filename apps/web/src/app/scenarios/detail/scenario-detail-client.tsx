@@ -11,6 +11,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TargetMissing from '@/components/shared/target-missing'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -1445,13 +1446,9 @@ export default function ScenarioDetailClient({
           <div className="border-hairline rounded-card border p-4">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h4 className="text-ink text-sm font-bold">質問（分岐）</h4>
-              <button
-                type="button"
-                onClick={() => setStepForm({ ...stepForm, question: null })}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-3 text-xs"
-              >
+              <Button variant="secondary" className="text-ink-secondary h-9 px-3 text-xs whitespace-normal" type="button" onClick={() => setStepForm({ ...stepForm, question: null })}>
                 ふつうの通に戻す
-              </button>
+              </Button>
             </div>
             <QuestionEditor
               value={stepForm.question}
@@ -1475,13 +1472,9 @@ export default function ScenarioDetailClient({
             )}
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setStepForm({ ...stepForm, question: emptyQuestion() })}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 self-start border px-3 text-xs"
-          >
+          <Button variant="secondary" className="text-ink-secondary h-9 self-start px-3 text-xs whitespace-normal" type="button" onClick={() => setStepForm({ ...stepForm, question: emptyQuestion() })}>
             この通を質問（分岐）にする
-          </button>
+          </Button>
         )}
 
         {!stepForm.question && stepForm.inputMode === 'template' && (
@@ -1678,13 +1671,9 @@ export default function ScenarioDetailClient({
         {stepError && <p className="text-danger text-xs">{stepError}</p>}
 
         <div className="flex gap-2">
-          <button
-            onClick={handleSaveStep}
-            disabled={stepSaving}
- className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
-          >
+          <Button variant="primary" className="px-4 py-2 min-h-[44px] font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={handleSaveStep} disabled={stepSaving}>
             {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加する'}
-          </button>
+          </Button>
           <button
             onClick={closeStepForm}
             className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
@@ -1769,10 +1758,18 @@ export default function ScenarioDetailClient({
     return (
       <div>
 
-        <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
-          <div className="bg-canvas-sunken h-6 w-1/3 rounded-mini" />
-          <div className="h-4 bg-canvas-sunken rounded-mini w-2/3" />
-          <div className="h-4 bg-canvas-sunken rounded-mini w-1/2" />
+        {/* ★V7 仕上げ §3: 枠は最初から本物で出し、中身の場所だけ骨組み。 */}
+        <div className="bg-canvas rounded-card border border-hairline p-8 space-y-4">
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div className="space-y-4">
+                <Skeleton className="block h-6 w-1/3" />
+                <Skeleton className="block h-4 w-2/3" />
+                <Skeleton className="block h-4 w-1/2" />
+              </div>
+            }
+          />
         </div>
       </div>
     )
@@ -1846,8 +1843,7 @@ export default function ScenarioDetailClient({
         {editingStepId ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={closeStepForm}>編集を閉じる</Button>
-            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving}>
-              {stepSaving ? '保存中…' : '保存する'}
+            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving} busy={stepSaving}>保存する
             </Button>
           </div>
         ) : null}
@@ -1867,32 +1863,17 @@ export default function ScenarioDetailClient({
               <div className="flex flex-wrap items-center gap-2">
               <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
               {/* ★V7 C6: 押せない「マニュアル」は飾りなので出さない。 */}
-              <button
-                onClick={() => setPreviewOpen(true)}
-                disabled={sortedSteps.length === 0}
-                title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
-              >
+              <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => setPreviewOpen(true)} disabled={sortedSteps.length === 0} title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}>
                 一括プレビュー
-              </button>
-              <button
-                onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
-                disabled={sortedSteps.length === 0}
-                title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
-              >
+              </Button>
+              <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })} disabled={sortedSteps.length === 0} title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}>
                 一括でテストを送る
-              </button>
+              </Button>
               {/* 保存するものは、いま開いている編集の内容。カードの「編集」
                   「変更」を押していないときは、保存するものが無い。 */}
-              <button
-                onClick={handleSaveScenario}
-                disabled={!editing || saving}
-                title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}
-                className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40"
-              >
+              <Button variant="primary" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" onClick={handleSaveScenario} disabled={!editing || saving} title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}>
                 {saving ? '保存中…' : '保存する'}
-              </button>
+              </Button>
               </div>
             }
           />
@@ -2036,13 +2017,9 @@ export default function ScenarioDetailClient({
               </Checkbox>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={handleSaveScenario}
-                disabled={saving}
- className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
-              >
+              <Button variant="primary" className="px-4 py-2 min-h-[44px] font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={handleSaveScenario} disabled={saving}>
                 {saving ? '保存中...' : '保存する'}
-              </button>
+              </Button>
               <button
                 onClick={() => {
                   setEditing(false)
@@ -2248,29 +2225,19 @@ export default function ScenarioDetailClient({
           <h3 className="text-ink text-sm font-semibold">コンテンツ {sortedSteps.length} 通</h3>
           {/* 設計の3つ。一括プレビューは見出しへ移した。 */}
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={openAddStep}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-3 py-2 font-medium h-auto whitespace-normal" onClick={openAddStep}>
               ＋ メッセージを追加する
-            </button>
+            </Button>
             {/* テンプレートは受け口がある（scenario_steps.template_id）。
                 最初からテンプレートを選ぶ状態でフォームを開く。 */}
-            <button
-              onClick={openAddTemplateStep}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-3 py-2 font-medium h-auto whitespace-normal" onClick={openAddTemplateStep}>
               テンプレートを追加する
-            </button>
+            </Button>
             {/* 質問メッセージ。選択肢ごとにタグ・友だち情報・シナリオを動かせる。
                 押されたことは postback で戻ってくる（sq:<stepId>:<index>）。 */}
-            <button
-              onClick={openAddQuestionStep}
-              title="質問メッセージを足します。選択肢ごとにタグ・友だち情報・シナリオを動かせます"
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-3 py-2 font-medium h-auto whitespace-normal" onClick={openAddQuestionStep} title="質問メッセージを足します。選択肢ごとにタグ・友だち情報・シナリオを動かせます">
               分岐を追加する
-            </button>
+            </Button>
           </div>
         </div>
 

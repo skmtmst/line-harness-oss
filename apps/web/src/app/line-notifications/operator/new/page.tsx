@@ -413,7 +413,7 @@ function NewOperatorNotificationInner() {
         status={ruleLoading ? '保存ずみのお知らせを読み込んでいます…' : savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
         actions={<>
           <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
-          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きを保存する'}</Button>
+          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading} busy={saving}>{savedRuleId ? '保存し直す' : '下書きを保存する'}</Button>
           <Button onClick={() => void publish()} disabled={saving || ruleLoading} variant="primary">運用者へのお知らせを公開</Button>
         </>}
       />

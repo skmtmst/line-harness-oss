@@ -198,9 +198,7 @@ function OccurrenceApplicantsPanel({
           <Button
             onClick={onPromote}
             disabled={promoting || waitingCount === 0}
-            data-occurrence-action="promote-waitlist"
-          >
-            {promoting ? '案内を送信中…' : '次の方へ案内'}
+            data-occurrence-action="promote-waitlist" busy={promoting} busyLabel="案内を送信中…">次の方へ案内
           </Button>
         </div>
       </div>
@@ -1154,8 +1152,7 @@ function BookingsInner() {
                     className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm"
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''}>
-                      {broadcastBusy ? '対象を確定中…' : '対象と内容を確認'}
+                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="対象を確定中…">対象と内容を確認
                     </Button>
                     {activeBroadcastPreview && <span className="text-ink-secondary text-sm">送信対象 {activeBroadcastPreview.recipientCount}人</span>}
                     {activeBroadcastPreview && <Button onClick={() => setBroadcastConfirmOpen(true)} disabled={broadcastBusy}>送信前の最終確認へ</Button>}
@@ -1231,7 +1228,7 @@ function BookingsInner() {
                     <th className="px-4 py-2 text-left font-medium">予約枠</th>
                     <th className="px-4 py-2 text-left font-medium">連れてくるペット</th>
                     <th className="px-4 py-2 text-left font-medium">この方について</th>
-                    <th className="px-4 py-2 text-right font-medium">状態と操作</th>
+                    <th className="px-4 py-2 font-medium text-right">状態と操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1341,36 +1338,19 @@ function BookingsInner() {
                         )}
                         {b.status === 'confirmed' && (
                           <div className="ml-2 inline-flex gap-1.5">
-                            <button
-                              data-booking-id={b.id}
-                              data-booking-action="attended"
-                              onClick={() => markStatus(b.id, 'attended')}
-                              disabled={busy || marking}
-                              className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
-                            >
+                            <Button variant="primary" className="px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50 border-0 h-auto whitespace-normal" data-booking-id={b.id} data-booking-action="attended" onClick={() => markStatus(b.id, 'attended')} disabled={busy || marking}>
                               {marking ? '記録中…' : '参加済'}
-                            </button>
-                            <button
-                              data-booking-id={b.id}
-                              data-booking-action="no_show"
-                              onClick={() => markStatus(b.id, 'no_show')}
-                              disabled={busy || marking}
-                              className="bg-danger text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
-                            >
+                            </Button>
+                            <Button variant="danger" className="px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50 border-0 h-auto whitespace-normal" data-booking-id={b.id} data-booking-action="no_show" onClick={() => markStatus(b.id, 'no_show')} disabled={busy || marking}>
                               {marking ? '記録中…' : '無断'}
-                            </button>
-                            <button
-                              data-qa-open="i5SN2j-cancel"
-                              onClick={() => {
+                            </Button>
+                            <Button variant="secondary" className="hover:bg-canvas px-3 py-1 text-xs font-medium disabled:opacity-50 h-auto whitespace-normal" data-qa-open="i5SN2j-cancel" onClick={() => {
                                 if (!selectedAccountId) return
                                 setCancelError('')
                                 setCancelTarget({ booking: b, accountId: selectedAccountId })
-                              }}
-                              disabled={busy}
-                              className="border-hairline rounded-control hover:bg-canvas border px-3 py-1 text-xs font-medium disabled:opacity-50"
-                            >
+                              }} disabled={busy}>
                               キャンセル
-                            </button>
+                            </Button>
                             {markErrors[actionKey] && (
                               <span className="text-danger block max-w-64 text-left text-xs" role="alert">
                                 {markErrors[actionKey]}

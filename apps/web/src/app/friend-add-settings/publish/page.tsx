@@ -442,9 +442,7 @@ function FriendAddPublishInner() {
             variant="primary"
             data-qa-open="ec9vg"
             disabled={!ready}
-            onClick={publish}
-          >
-            {busy ? '処理中…' : '友だち追加時の配信を有効化'}
+            onClick={publish} busy={busy} busyLabel="処理中…">友だち追加時の配信を有効化
           </Button>
         </div>
       </div>
@@ -515,7 +513,7 @@ function PublishedView({ result, detail, accountId }: { result: FriendAddRouting
             <CardHeader title="次にできること" />
             <p className="text-xs leading-5 text-ink-secondary">配信中でも下書きを作って安全に変更できます。</p>
             <div className="grid gap-2">
-              <Button type="button" disabled={!detail || stopping} onClick={() => void stop()}>{stopping ? '停止中…' : '配信を一時停止'}</Button>
+              <Button type="button" disabled={!detail || stopping} onClick={() => void stop()} busy={stopping} busyLabel="停止中…">配信を一時停止</Button>
               <Button href={detail ? `/friend-add-settings?view=edit&id=${encodeURIComponent(detail.rule.id)}&step=basic` : '/friend-add-settings'}>内容を編集する</Button>
               <Button href={detail ? `/friend-add-settings?view=edit&id=${encodeURIComponent(detail.rule.id)}&step=preview` : '/friend-add-settings'}>テストをもう一度送る</Button>
               <Button type="button" disabled title="複製の操作はまだ接続されていません">別の経路用に複製</Button>

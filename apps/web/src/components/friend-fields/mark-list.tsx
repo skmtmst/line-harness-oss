@@ -136,7 +136,7 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
           {blockReason ? <p className="mt-4 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">{blockReason}</p> : null}
           {error ? <Notice tone="danger" className="mt-4">{error}</Notice> : null}
         </div>
-        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>キャンセル</Button><button type="button" onClick={onConfirm} disabled={!canConfirm} className="h-9 rounded-control bg-danger px-4 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : needsReplacement ? '置き換えて保管する' : '保管する'}</button></div>
+        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>キャンセル</Button><Button variant="danger" className="h-9 px-4 font-bold border-0 whitespace-normal" type="button" onClick={onConfirm} disabled={!canConfirm}>{saving ? '保管中…' : needsReplacement ? '置き換えて保管する' : '保管する'}</Button></div>
       </section>
     </div>
   )

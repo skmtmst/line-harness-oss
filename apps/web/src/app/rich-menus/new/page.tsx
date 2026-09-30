@@ -294,7 +294,7 @@ export default function NewRichMenuPage() {
               )}
             </div>
           )}
-          footer={<StickyBar actions={<><Button href="/rich-menus">キャンセル</Button><Button type="submit" variant="primary" disabled={submitting || !selectedAccount}>{submitting ? '作成中...' : '作って編集へ'}</Button></>} />}
+          footer={<StickyBar actions={<><Button href="/rich-menus">キャンセル</Button><Button type="submit" variant="primary" disabled={submitting || !selectedAccount} busy={submitting} busyLabel="作成中...">作って編集へ</Button></>} />}
         />
         {error ? (
           <Notice

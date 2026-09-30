@@ -159,9 +159,8 @@ function BillingInner() {
           tone={banner.tone}
           action={
             summary.portalAvailable ? (
-              <Button onClick={() => void portal()} disabled={busy !== null}>
-                <CreditCard aria-hidden="true" className="h-4 w-4" />
-                {busy === 'portal' ? '開いています…' : '支払い方法を管理'}
+              <Button onClick={() => void portal()} disabled={busy !== null} busy={busy === 'portal'} busyLabel="開いています…">
+                <CreditCard aria-hidden="true" className="h-4 w-4" />支払い方法を管理
               </Button>
             ) : undefined
           }
@@ -232,9 +231,7 @@ function BillingInner() {
                 variant={plan.recommended ? 'primary' : 'secondary'}
                 onClick={() => void checkout(plan, interval)}
                 disabled={busy !== null || !canChoose || !price.available}
-                className="w-full"
-              >
-                {busy === plan.key ? '申込画面へ移動中…' : 'このプランにする'}
+                className="w-full" busy={busy === plan.key} busyLabel="申込画面へ移動中…">このプランにする
               </Button>
             )}
             {!price.available && !plan.current ? <p className="text-caption text-ink-faint">価格がまだ設定されていません</p> : null}

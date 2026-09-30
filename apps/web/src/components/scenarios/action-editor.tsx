@@ -742,15 +742,10 @@ export default function ActionEditor({
                 {actions.indexOf(editing) + 1}. [{KIND_LABEL[editing.actionType]}] の条件設定
               </p>
               <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConditionFor(null)}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-4 text-sm"
-                >
+                <Button variant="secondary" className="text-ink-secondary h-9 px-4 whitespace-normal" type="button" onClick={() => setConditionFor(null)}>
                   戻る
-                </button>
-                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving}>
-                  {conditionSaving ? '保存中…' : '条件を保存する'}
+                </Button>
+                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving} busy={conditionSaving}>条件を保存する
                 </Button>
               </div>
             </div>
@@ -866,17 +861,13 @@ export default function ActionEditor({
                             )}
                           </p>
                           <div className="flex shrink-0 items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => openCondition(action)}
-                              className={`rounded-control h-9 border px-3 text-xs ${
+                            <Button variant="secondary" className={(`rounded-control h-9 border px-3 text-xs ${
                                 action.condition
                                   ? 'border-accent text-accent-deep bg-accent-soft'
                                   : 'border-hairline text-ink-secondary'
-                              }`}
-                            >
+                              }`) + ' whitespace-normal'} type="button" onClick={() => openCondition(action)}>
                               {action.condition ? '条件ON' : '条件OFF'}
-                            </button>
+                            </Button>
                             {/*
                               R244: 開閉は画面側で持つ。保存のたびに作り直して
                               閉じないし、入力焦点も残る。
@@ -914,7 +905,7 @@ export default function ActionEditor({
           </div>
         )}
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
-        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling}>{cancelling ? '戻しています…' : 'キャンセル'}</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
       </div>
     </div>
   )
@@ -1024,21 +1015,16 @@ export function ActionConfigEditor({
             {tags.map((tag) => {
               const on = selected.includes(tag.id)
               return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() =>
+                <Button variant="primary" className={(`rounded-pill h-8 px-3 text-xs transition-colors ${
+                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
+                  }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() =>
                     onChange({
                       ...c,
                       tagIds: on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id],
                     })
-                  }
-                  className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-                  }`}
-                >
+                  }>
                   {tag.name}
-                </button>
+                </Button>
               )
             })}
           </div>

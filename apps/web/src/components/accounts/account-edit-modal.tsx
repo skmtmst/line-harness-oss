@@ -10,6 +10,7 @@ import {
   type AccountFormState,
 } from './account-form-fields'
 import AccountSetupUrls from './account-setup-urls'
+import Button from '@/components/shared/button'
 
 interface Props {
   accountId: string
@@ -304,13 +305,9 @@ export default function AccountEditModal({
           )}
 
           <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-divider-soft bg-canvas px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-control text-sm font-medium border border-hairline hover:bg-surface-pearl"
-            >
+            <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" type="button" onClick={onClose}>
               キャンセル
-            </button>
+            </Button>
             <button
               type="submit"
               disabled={saving}

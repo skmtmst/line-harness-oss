@@ -67,8 +67,7 @@ export default function StaffInvitationPage() {
             </p>
             {error && <Notice tone="danger" message={error} className="mt-4" />}
             <div className="mt-6">
-              <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void accept()}>
-                {view === 'submitting' ? '確認中…' : '参加する'}
+              <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void accept()} busy={view === 'submitting'} busyLabel="確認中…">参加する
               </Button>
             </div>
           </>

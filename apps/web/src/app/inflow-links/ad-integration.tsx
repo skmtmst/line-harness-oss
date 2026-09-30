@@ -845,9 +845,7 @@ export default function AdIntegration({
                 <Button
                   variant="secondary"
                   disabled={importingId === platform.id}
-                  onClick={() => void runImportNow(platform.id)}
-                >
-                  {importingId === platform.id ? '取り込んでいます…' : 'いま取り込む'}
+                  onClick={() => void runImportNow(platform.id)} busy={importingId === platform.id} busyLabel="取り込んでいます…">いま取り込む
                 </Button>
               </li>
             ))}

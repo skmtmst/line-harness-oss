@@ -60,7 +60,8 @@ describe('V6 リマインダの公開フロー', () => {
     for (const label of ['条件を編集', '＋ アクションを追加する']) {
       expect(FLOW, `${label} が公開フローに描かれています`).not.toContain(`>${label}<`)
     }
-    for (const label of ['＋ フォルダを追加する', 'ひな形を管理', 'このひな形を使う']) {
+    /* 「このひな形を使う」は #996 で実装済み（ひな形適用の入口）。押すと置き換え確認が出て実際に動く。 */
+    for (const label of ['＋ フォルダを追加する', 'ひな形を管理']) {
       expect(NEW_PAGE, `${label} が新規作成に描かれています`).not.toContain(`>${label}<`)
     }
     /*
