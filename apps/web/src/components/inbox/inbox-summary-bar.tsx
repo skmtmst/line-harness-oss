@@ -1,8 +1,8 @@
 'use client'
 
 import { formatDurationMinutes } from '@/lib/format-duration'
+import { formatNumber } from '@/lib/format'
 
-const fmt = new Intl.NumberFormat('ja-JP')
 
 function formatOldest(min: number | null): string {
   if (min == null) return '—'
@@ -18,7 +18,7 @@ interface Props {
 export default function InboxSummaryBar({ total, byAccount, oldestWaitMinutes }: Props) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <Card label="未対応" value={fmt.format(total)} hint="人間の返事待ち" />
+      <Card label="未対応" value={formatNumber(total)} hint="人間の返事待ち" />
       <Card label="最古の待ち時間" value={formatOldest(oldestWaitMinutes)} hint="最も古い incoming" />
       <div className="rounded-control bg-canvas p-4 shadow-card ring-1 ring-hairline">
         <div className="text-xs font-medium text-ink-faint">アカウント別</div>

@@ -45,6 +45,7 @@ import {
   restoreFirstStep,
   scheduleToPayload,
 } from './first-step-form'
+import { formatNumber } from '@/lib/format'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -836,7 +837,7 @@ function FirstStepContent() {
       */}
       {bodyOverLimit && (
         <Notice tone="danger" className="mt-4">
-          本文が {LINE_TEXT_LIMIT.toLocaleString('en-US')} 字を超えています。
+          本文が {formatNumber(LINE_TEXT_LIMIT)} 字を超えています。
           LINEが受け付けないため、この状態では保存できません。
         </Notice>
       )}
@@ -863,7 +864,7 @@ function FirstStepContent() {
               disabled={saving || bodyOverLimit || loadState !== 'ready'}
               className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
             >
-              {saving ? '保存中…' : '作成して編集へ →'}
+              {saving ? '保存中…' : '作って編集へ →'}
             </button>
           </>
         )}

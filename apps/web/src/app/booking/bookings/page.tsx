@@ -27,6 +27,7 @@ import BookingCalendar, {
   type CalendarAvailability,
   type CalendarSlot,
 } from './booking-calendar'
+import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -95,35 +96,18 @@ const PAGE_SIZE = 20
 function formatJpDateTime(iso: string): string {
   // 不正な日時が来たら Invalid Date を出さず「—」に逃がす(点検#516軽6)。
   if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 /** 表の日時。設計は年を出していない（08/18 14:00）。 */
 function formatShort(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function formatJpTime(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return new Date(iso).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatTime(iso)
 }
 
 /**
@@ -132,12 +116,7 @@ function formatJpTime(iso: string): string {
  */
 function formatJpDay(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return new Date(iso).toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDay(iso)
 }
 
 function jstDay(iso: string): string {
@@ -1076,8 +1055,7 @@ export default function BookingsPage() {
             trailing={
               /* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */
               selectedAccountId ? (
-                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
-                  {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す
                 </Button>
               ) : null
             }
@@ -1164,7 +1142,7 @@ export default function BookingsPage() {
                           </span>
                         </Td>
                         <Td align="right" className="tabular-nums">
-                          ¥{b.price_at_booking.toLocaleString()}
+                          ¥{formatNumber(b.price_at_booking)}
                         </Td>
                         <Td>
                           <span
@@ -1303,7 +1281,7 @@ function Kpi({
     <div className="bg-canvas rounded-card border-hairline border p-4">
       <p className="text-ink-faint text-xs">{title}</p>
       <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}
+        {value === null ? '—' : formatNumber(value)}
         {value === null ? null : (
           <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
         )}
@@ -1402,7 +1380,7 @@ function BookingDetailPanel({
             </DetailRow>
             <DetailRow label="担当">{b.staff_name}</DetailRow>
             <DetailRow label="料金">
-              <span className="tabular-nums">¥{b.price_at_booking.toLocaleString()}</span>
+              <span className="tabular-nums">¥{formatNumber(b.price_at_booking)}</span>
             </DetailRow>
             <DetailRow label="予約番号">
               <span className="text-ink-secondary font-mono text-xs">{b.id}</span>
@@ -1416,7 +1394,7 @@ function BookingDetailPanel({
             <p className="text-ink-faint mt-1 text-xs">顧客カルテの履歴は、友だち詳細で確認できます。前回のことを覚えていると、話が早くなります。</p>
             <div className="border-hairline mt-4 grid grid-cols-4 gap-3 border-b pb-2 text-xs text-ink-faint"><span>いつ・何を</span><span>担当</span><span>金額</span><span>メモ</span></div>
             {(detail?.history.length ? detail.history : [{ id: b.id, startsAt: b.starts_at, menuName: b.menu_name, staffName: b.staff_name, price: b.price_at_booking, customerNote: b.customer_note, handoverNote: null, status: b.status }]).slice(0, 3).map((item) => (
-              <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{item.price.toLocaleString()}</span><span>{item.customerNote ?? '記入なし'}</span></div>
+              <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{formatNumber(item.price)}</span><span>{item.customerNote ?? '記入なし'}</span></div>
             ))}
             {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-action text-xs font-semibold hover:underline focus-visible:underline">顧客カルテで以前の予約を見る →</Link> : null}
           </section>
@@ -1440,7 +1418,7 @@ function BookingDetailPanel({
             <DetailRow label="ペット">{detail?.customer.petName ?? '登録なし'}</DetailRow>
             <DetailRow label="連絡先">{detail?.customer.phone ?? '登録なし'}</DetailRow>
             {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}
-            {detail?.customer.mileageBalance !== null && detail?.customer.mileageBalance !== undefined ? <DetailRow label="マイル">{detail.customer.mileageBalance.toLocaleString()}</DetailRow> : null}
+            {detail?.customer.mileageBalance !== null && detail?.customer.mileageBalance !== undefined ? <DetailRow label="マイル">{formatNumber(detail.customer.mileageBalance)}</DetailRow> : null}
           </section>
           <section className="border-warning bg-warning-bg rounded-card border p-5">
             <h3 className="text-warning text-sm font-semibold">当日 気をつけること</h3>
@@ -1508,7 +1486,7 @@ function ActionButtons({
           onClick={() => onAction('complete')}
           className="bg-info-bg text-info rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
-          完了
+          閉じる
         </button>
         <button
           onClick={() => onAction('no_show')}

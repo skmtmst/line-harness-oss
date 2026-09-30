@@ -58,7 +58,7 @@ describe('2: テンプレート・成果地点の一覧はこの形になる', (
   it('成果地点の一覧は表（768px以上）とカード（767px以下）を出し分ける', () => {
     expect(CONVERSIONS).toContain('MobileTableCards')
     expect(CONVERSIONS).toContain('hidden md:block')
-    expect(CONVERSIONS).toContain('この30日 ${point.metrics.netCount')
+    expect(CONVERSIONS).toContain('この30日 ${formatNumber(point.metrics.netCount)}件')
     expect(CONVERSIONS).toContain('使う場所を足す')
   })
 })

@@ -159,12 +159,12 @@ function ConnectionsContent() {
           <section className="border-hairline bg-canvas rounded-card min-h-96 border p-6 shadow-card xl:col-span-2">
             <div className="flex items-start justify-between gap-3">
               <div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます</p></div>
-              <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加</Button>
+              <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する</Button>
             </div>
             <div className="mt-16 flex min-h-64 flex-col items-center justify-center rounded-card border border-dashed border-hairline bg-canvas-sunken px-6 text-center">
               <p className="text-ink text-lg font-bold">まだ切替先がありません</p>
               <p className="text-ink-faint mt-2 max-w-md text-sm leading-6">このメニューだけで動きます。切替先を足すと、タブでメニューを行き来できます。</p>
-              <Button className="mt-5" variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加</Button>
+              <Button className="mt-5" variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する</Button>
             </div>
           </section>
           <ConnectionAside />
@@ -180,7 +180,7 @@ function ConnectionsContent() {
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="flex flex-col gap-4 xl:col-span-2">
           <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">緑のタブが「別のメニューへ移る」ボタン</p></div><Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加（最大10枚）</Button></div>
+            <div className="flex items-start justify-between gap-3"><div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">緑のタブが「別のメニューへ移る」ボタン</p></div><Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する（最大10枚）</Button></div>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {pages.map((page, index) => {
                 const outgoing = analysis.edges.filter((edge) => edge.fromPageId === page.id)
@@ -221,7 +221,7 @@ function ConnectionAside() {
 }
 
 function ConnectionFooter({ status, groupId }: { status: string; groupId: string }) {
-  return <div className="border-hairline bg-canvas fixed right-0 bottom-0 left-0 z-20 flex items-center justify-between border-t px-6 py-3 shadow-float"><span className="text-ink-secondary text-sm">{status}</span><div className="flex gap-2"><Button href="/rich-menus">メニュー一覧へ</Button><Button variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(groupId)}`}>リッチメニューを保存</Button></div></div>
+  return <div className="border-hairline bg-canvas fixed right-0 bottom-0 left-0 z-20 flex items-center justify-between border-t px-6 py-3 shadow-float"><span className="text-ink-secondary text-sm">{status}</span><div className="flex gap-2"><Button href="/rich-menus">メニュー一覧へ</Button><Button variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(groupId)}`}>リッチメニューを保存する</Button></div></div>
 }
 
 export default function RichMenuConnectionsPage() {

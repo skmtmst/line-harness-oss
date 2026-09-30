@@ -21,6 +21,7 @@ import Select from '@/components/shared/select'
 import EventKpi from '@/components/events/event-kpi'
 import HelpTip from '@/components/shared/help-tip'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention } from './event-attention'
+import { formatDateTime, formatDay } from '@/lib/format'
 
 /*
  * R601: 読み込みの失敗は「権限不足」と「通信失敗」を分ける。
@@ -41,16 +42,7 @@ const PAGE_SIZE = 20
 
 function formatJpDate(iso: string | null): string {
   if (!iso) return '日時未設定'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(iso))
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}月${get('day')}日 ${get('hour')}:${get('minute')}`
+  return formatDateTime(iso)
 }
 
 function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string): string {
@@ -63,11 +55,7 @@ function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string
 
 function formatShortJpDate(iso: string | null): string {
   if (!iso) return '日時未設定'
-  return new Date(iso).toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDay(iso)
 }
 
 export default function EventsListPage() {
@@ -405,8 +393,7 @@ export default function EventsListPage() {
                     </Td>
                     <Td align="right" className="tabular-nums">
                       {e.total_active}
-                      <span className="text-ink-faint">
-                        {' / '}
+                      <span className="text-ink-faint"> /{' '}
                         {e.total_capacity ?? '—'}
                       </span>
                     </Td>

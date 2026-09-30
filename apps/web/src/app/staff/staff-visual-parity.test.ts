@@ -102,7 +102,7 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).toContain('かたまりから選ぶ')
     expect(staffSource).toContain('項目ごとに決める')
     expect(staffSource).toContain('この決め方で、この人にはこう見えます')
-    expect(staffSource).toContain('見せる範囲を保存')
+    expect(staffSource).toContain('見せる範囲を保存する')
     expect(staffSource).not.toContain('function RolePermissionMatrix')
   })
 })

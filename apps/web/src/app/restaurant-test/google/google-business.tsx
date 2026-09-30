@@ -37,6 +37,7 @@ import {
   type GoogleReviewListData,
   type GoogleReviewOrder,
 } from '@/lib/restaurant-google-api'
+import { formatNumber } from '@/lib/format'
 
 /**
  * ★V6 Googleビジネス（飲食店向け）第1段：設定タブ＋口コミタブ。
@@ -321,14 +322,14 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
                 <p className="text-ink-faint text-label leading-relaxed">未接続</p>
               </div>
             </div>
-            <p className="text-ink-secondary whitespace-pre-line text-sm leading-relaxed">{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
+            <p className="text-ink-secondary whitespace-pre-line text-sm leading-relaxed">店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。</p>
             {!data.oauthConfigured ? <NoteBar tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</NoteBar> : null}
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div>
               <Button className="min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}><Link2 size={17} />Googleアカウントを接続</Button>
             </div>
             <div className="border-hairline border-t pt-5">
-              <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">{'初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。'}</p>
+              <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。</p>
               {!canManage ? <p className="text-ink-faint mt-3 text-xs">Googleアカウントの接続は、統括の管理者へ依頼してください。</p> : null}
             </div>
           </section>
@@ -509,7 +510,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
         {data.summary.newCount > 0 ? <StatusBadge tone="success">新着 {data.summary.newCount}件</StatusBadge> : null}
         <span className="text-ink-secondary text-sm">{data.summary.storedCount}件{connection.lastSyncError === 'partial' ? 'を一部取得済み' : 'すべて取得済み'}</span>
         <span className="grow" />
-        <Button onClick={() => void sync()} disabled={syncing || connection.status !== 'connected'}><RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />{syncing ? '取得中…' : '同期する'}</Button>
+        <Button onClick={() => void sync()} disabled={syncing || connection.status !== 'connected'} busy={syncing} busyLabel="取得中…"><RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />同期する</Button>
       </div>
 
       {connection.status === 'expired' ? <NoteBar tone="danger" className="mb-3" action={<a href="/restaurant-test/google?tab=settings" className="text-sm font-semibold">設定で再接続</a>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</NoteBar> : null}
@@ -561,7 +562,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
                   <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                   <ActionCell>
                     {actionable ? (
-                      <Button size="field" onClick={() => onOpen(review.id)}>{review.replyStatus === 'draft' ? '下書きを確認' : review.replyStatus === 'pending_confirm' ? '状態を確認' : '返信を作成'}</Button>
+                      <Button size="field" onClick={() => onOpen(review.id)}>{review.replyStatus === 'draft' ? '下書きを確認' : review.replyStatus === 'pending_confirm' ? '状態を確認' : '返信を作る'}</Button>
                     ) : (
                       <Button size="field" onClick={() => onOpen(review.id)}>返信を見る</Button>
                     )}
@@ -722,7 +723,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
             {actionError ? <NoteBar tone="danger" className="mt-4">{actionError}</NoteBar> : null}
           </Card>
         </div>
-        <StickyBar actions={<><Button onClick={() => setConfirming(false)} disabled={busy !== null}>修正する</Button><Button variant="primary" onClick={() => void publish()} disabled={!checked || busy !== null}>{busy === 'publish' ? '送信中…' : 'この内容で返信する'}</Button></>} />
+        <StickyBar actions={<><Button onClick={() => setConfirming(false)} disabled={busy !== null}>修正する</Button><Button variant="primary" onClick={() => void publish()} disabled={!checked || busy !== null} busy={busy === 'publish'} busyLabel="送信中…">この内容で返信する</Button></>} />
       </div>
     )
   }
@@ -758,14 +759,14 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
                 <h2 className="text-base font-bold">{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</h2>
                 <StatusBadge tone="neutral">未公開</StatusBadge>
                 <span className="grow" />
-                {data.aiAvailable ? <Button size="field" onClick={() => void generate('new')} disabled={busy !== null} data-gb3-action="generate-draft"><Sparkles size={14} />{busy === 'generate' ? '作成中…' : text ? '作り直す' : 'AIで下書きを作る'}</Button> : null}
+                {data.aiAvailable ? <Button size="field" onClick={() => void generate('new')} disabled={busy !== null} data-gb3-action="generate-draft" busy={busy === 'generate'} busyLabel="作成中…"><Sparkles size={14} />{text ? '作り直す' : 'AIで下書きを作る'}</Button> : null}
               </div>
               {aiGenerated ? <NoteBar className="mb-3">AIが作成した文章です。事実・表現を確認し、必要に応じて修正してください。</NoteBar> : null}
               <TextArea value={text} onChange={(event) => { setText(event.target.value); setSaved('') }} rows={12} placeholder="返信文を入力するか、AIで下書きを作ります。" aria-label="返信文" invalid={textLength > 4096} />
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {data.aiAvailable ? <><Button size="field" onClick={() => void generate('shorter')} disabled={busy !== null || !text} data-gb3-action="shorten-draft">短くする</Button><Button size="field" onClick={() => void generate('polite')} disabled={busy !== null || !text} data-gb3-action="polish-draft">丁寧にする</Button></> : <span className="text-ink-faint text-xs">この環境ではAI下書きは使えません。</span>}
                 <span className="grow" />
-                <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{textLength.toLocaleString()} / 4,096</span>
+                <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{formatNumber(textLength)} / 4,096</span>
               </div>
               {saved ? <p className="text-success mt-3 text-xs">{saved}</p> : null}
               {actionError ? <NoteBar tone="danger" className="mt-3">{actionError}</NoteBar> : null}
@@ -784,7 +785,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
           </Card>
           {!alreadyReplied ? (
             <div className="flex flex-col gap-2">
-              <Button variant="secondary" onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096} data-gb3-action="save-draft">{busy === 'save' ? '保存中…' : '下書き保存'}</Button>
+              <Button variant="secondary" onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096} data-gb3-action="save-draft" busy={busy === 'save'}>下書きを保存する</Button>
               <Button variant="primary" onClick={() => { setChecked(false); setActionError(''); setConfirming(true) }} disabled={!canOpenConfirm} data-gb3-action="open-publish-confirm">返信内容を確認</Button>
             </div>
           ) : null}

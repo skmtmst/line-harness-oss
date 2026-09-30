@@ -138,9 +138,9 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
 
     await fillReason()
     network.saveFails = true
-    await act(async () => { button('機能設定を保存').click(); await settle() })
+    await act(async () => { button('機能設定を保存する').click(); await settle() })
     expect(network.puts).toBe(1)
-    await act(async () => { button('変更を取り消す').click() })
+    await act(async () => { button('キャンセル').click() })
     expect(toggle.getAttribute('aria-checked')).toBe(savedChecked)
     expect(network.puts).toBe(1)
     expect(document.body.textContent).toContain('保存済みの機能設定に戻しました。')
@@ -156,7 +156,7 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
     expect(network.puts).toBe(0)
     await act(async () => { button('初期値を下書きに入れる').click(); button('初期値を下書きに入れる').click() })
     expect(network.puts).toBe(0)
-    expect(button('機能設定を保存').disabled).toBe(false)
+    expect(button('機能設定を保存する').disabled).toBe(false)
     expect(document.body.textContent).toContain('保存すると反映されます。')
   })
 
@@ -185,6 +185,6 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
       await settle()
     })
     expect(mutableSwitch().getAttribute('aria-checked')).toBe('true')
-    expect(button('変更を取り消す').disabled).toBe(true)
+    expect(button('キャンセル').disabled).toBe(true)
   })
 })

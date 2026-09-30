@@ -13,6 +13,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
 import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const EMPTY_SUMMARY: AuditEventSummary = {
   periodDays: null,
@@ -70,13 +71,7 @@ const TAB_GROUP: Record<string, 'deleted' | 'sent' | 'changed' | 'login' | 'atte
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時を取得できませんでした'
-  return date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date)
 }
 
 function actionLabel(row: AuditEventItem): string {
@@ -264,5 +259,5 @@ export default function LoginAudit({ userId }: { userId?: string }) {
 }
 
 function AuditKpi({ label, value, note, attention = false }: { label: string; value: number | null; note: string; attention?: boolean }) {
-  return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-medium leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value === null ? '—' : <>{value.toLocaleString()}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></>}</p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
+  return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-medium leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value === null ? '—' : <>{formatNumber(value)}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></>}</p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
 }

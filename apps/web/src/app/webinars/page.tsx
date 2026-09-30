@@ -36,6 +36,7 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import KpiCard from '@/components/shared/kpi-card'
 import { overviewCards } from './overview-view'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
@@ -76,7 +77,7 @@ function scheduleSummary(w: Webinar): string {
   }
   otherRules.forEach((rule) => {
     if (rule.type === 'weekly') parts.push(`毎週${(rule.days ?? []).map((day) => DAYS[day]).join('・')} ${rule.time}`)
-    if (rule.type === 'once') parts.push(rule.at ? new Date(rule.at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '単発・日時未設定')
+    if (rule.type === 'once') parts.push(rule.at ? formatDateTime(rule.at) : '単発・日時未設定')
   })
   return parts.join(' / ')
 }
@@ -131,8 +132,7 @@ function WebinarFolderDialog({
         {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy}>
-            {busy ? '保存中…' : '保存する'}
+          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy} busy={busy}>保存する
           </Button>
         </div>
       </section>
@@ -142,7 +142,7 @@ function WebinarFolderDialog({
 
 function measuredCount(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')}人`
+    ? `${formatNumber(value)}人`
     : '—'
 }
 

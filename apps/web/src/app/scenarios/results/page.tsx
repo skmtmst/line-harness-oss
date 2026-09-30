@@ -24,6 +24,7 @@ import styles from './scenario-results.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { shortDateTime } from '@/lib/hq-banners'
+import { formatNumber } from '@/lib/format'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -452,7 +453,7 @@ function ResultsInner() {
                       <li key={step.id} className={styles.step}>
                         <div className={styles.stepTitle}>
                           <span>ステップ{step.stepOrder}：{scheduleLabel(step)}</span>
-                          <span className={styles.reached}>{(run?.delivered ?? result?.reachedCount)?.toLocaleString('ja-JP') ?? '—'}人到達</span>
+                          <span className={styles.reached}>{formatNumber((run?.delivered ?? result?.reachedCount))}人到達</span>
                         </div>
                         <p>
                           到達率 {run ? percentLabel(run.delivered, stats.enrolledTotal) : result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—'}
@@ -504,7 +505,7 @@ function ResultsInner() {
                 />
                 {runs ? (
                   <span className="text-ink-faint text-xs tabular-nums">
-                    {runs.subscriptions.length.toLocaleString('ja-JP')} / {runs.pagination.total.toLocaleString('ja-JP')}人
+                    {formatNumber(runs.subscriptions.length)} / {formatNumber(runs.pagination.total)}人
                   </span>
                 ) : null}
               </div>
@@ -663,8 +664,7 @@ function ResultsInner() {
                 ) : null}
                 {runs.pagination.nextCursor ? (
                   <div className="mt-3 flex justify-center">
-                    <Button onClick={loadMoreRuns} disabled={runsLoadingMore}>
-                      {runsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                    <Button onClick={loadMoreRuns} disabled={runsLoadingMore} busy={runsLoadingMore} busyLabel="読み込んでいます…">さらに読み込む
                     </Button>
                   </div>
                 ) : null}
@@ -676,9 +676,9 @@ function ResultsInner() {
           <aside className={styles.side}>
             <Panel title="設定サマリー" lead="現在の参加状況です。">
               <dl className={styles.summaryList}>
-                <div><dt>参加中</dt><dd>{(runs ? runs.summary.active + runs.summary.delivering : stats.activeNow).toLocaleString('ja-JP')}人</dd></div>
-                <div><dt>完了</dt><dd>{(runs?.summary.completed ?? stats.completed).toLocaleString('ja-JP')}人</dd></div>
-                <div><dt>一時停止</dt><dd>{(runs?.summary.paused ?? stats.paused).toLocaleString('ja-JP')}人</dd></div>
+                <div><dt>参加中</dt><dd>{formatNumber((runs ? runs.summary.active + runs.summary.delivering : stats.activeNow))}人</dd></div>
+                <div><dt>完了</dt><dd>{formatNumber((runs?.summary.completed ?? stats.completed))}人</dd></div>
+                <div><dt>一時停止</dt><dd>{formatNumber((runs?.summary.paused ?? stats.paused))}人</dd></div>
                 <div><dt>エラー</dt><dd>—</dd></div>
               </dl>
               <p className={styles.unavailable}>
@@ -732,9 +732,7 @@ function ResultsInner() {
               type="button"
               variant="primary"
               disabled={!moveScenarioId || opBusy !== null}
-              onClick={() => void confirmMove()}
-            >
-              {opBusy ? '移しています…' : 'このシナリオへ移す'}
+              onClick={() => void confirmMove()} busy={opBusy !== null} busyLabel="移しています…">このシナリオへ移す
             </Button>
           </div>
         )}

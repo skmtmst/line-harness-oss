@@ -14,7 +14,7 @@ describe('V6 NEN配信の運用者向け文言契約', () => {
   })
 
   it('使えないヘッダー操作を並べない', () => {
-    expect(PAGE).not.toContain("['マニュアル', '並び替え', 'フォルダを追加']")
+    expect(PAGE).not.toContain("['マニュアル', '並び替え', 'フォルダを追加する']")
     expect(PAGE).not.toContain('title="準備中です"')
   })
 

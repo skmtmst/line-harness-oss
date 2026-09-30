@@ -31,6 +31,7 @@ import {
 } from '@/lib/api'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
 import { validateRuleName, validateTestScore } from './score-rules-validation'
+import { formatDay, formatNumber } from '@/lib/format'
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
@@ -523,13 +524,12 @@ export default function ActionScoreRulesPage() {
                 <Field label="点の上限" htmlFor="score-max"><TextInput id="score-max" type="number" value={bundle.bands.max} disabled={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></Field>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button onClick={() => void previewBands()} disabled={!canEdit || bandPreviewBusy}>
-                  {bandPreviewBusy ? '数えています' : 'この分けかただと何人入るか見る'}
+                <Button onClick={() => void previewBands()} disabled={!canEdit || bandPreviewBusy} busy={bandPreviewBusy} busyLabel="数えています">この分けかただと何人入るか見る
                 </Button>
                 {bandPreview ? (
                   <p className="text-xs text-ink-secondary" role="status">
-                    高い {bandPreview.counts.high.toLocaleString('ja-JP')}人・ふつう {bandPreview.counts.normal.toLocaleString('ja-JP')}人・低い {bandPreview.counts.low.toLocaleString('ja-JP')}人
-                    <span className="text-ink-faint">（全{bandPreview.totalFriends.toLocaleString('ja-JP')}人・{bandPreview.measuredAt.slice(0, 10)}時点・点数は変わりません）</span>
+                    高い {formatNumber(bandPreview.counts.high)}人・ふつう {formatNumber(bandPreview.counts.normal)}人・低い {formatNumber(bandPreview.counts.low)}人
+                    <span className="text-ink-faint">（全{formatNumber(bandPreview.totalFriends)}人・{formatDay(bandPreview.measuredAt)}時点・点数は変わりません）</span>
                   </p>
                 ) : null}
               </div>
@@ -571,7 +571,7 @@ export default function ActionScoreRulesPage() {
           <p className="text-xs text-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p>
           <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
           {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={!canEdit || busy}>公開中のルールを停止</Button> : null}
-          <Button onClick={() => void saveDraft()} disabled={!canEdit || busy}>下書きに保存</Button>
+          <Button onClick={() => void saveDraft()} disabled={!canEdit || busy}>下書きを保存する</Button>
           <Button variant="primary" onClick={() => void preparePublish()} disabled={!canEdit || busy || bundle.rules.every((rule) => !rule.enabled)}>スコアのルールを公開</Button>
           </div>
         </div>
