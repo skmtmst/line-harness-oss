@@ -68,7 +68,7 @@ async function enterSaveStep() {
 }
 
 async function save() {
-  fireEvent.click(screen.getByRole('button', { name: '接続して保存' }))
+  fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
 }
 
 describe('R523 保存の応答消失と重複（本物のReact）', () => {

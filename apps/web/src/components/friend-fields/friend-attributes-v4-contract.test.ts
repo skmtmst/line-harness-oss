@@ -291,7 +291,7 @@ describe('友だち属性 V4 contract', () => {
     }
     expect(dialog).toContain('入らなかった')
     expect(dialog).toContain('failedTagRowsCsv(result.rows)')
-    for (const label of ['新しく作る', '飛ばす', 'エラー', 'やめる', '一覧へ戻る']) {
+    for (const label of ['新しく作る', '飛ばす', 'エラー', 'キャンセル', '一覧へ戻る']) {
       expect(dialog).toContain(label)
     }
     expect(dialog).toContain(".slice(0, 5)")

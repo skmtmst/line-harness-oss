@@ -15,6 +15,7 @@ import Dialog from '@/components/shared/dialog'
 import DateField from '@/components/shared/date-field'
 import { TextField } from '@/components/shared/text-field'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
 type AdView = 'metrics' | 'connections' | 'history'
 
@@ -768,7 +769,7 @@ export default function AdIntegration({
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
-                    {row.friendAdds == null ? '—' : `${row.friendAdds.toLocaleString('ja-JP')}人`}
+                    {row.friendAdds == null ? '—' : `${formatNumber(row.friendAdds)}人`}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-ink">{formatCostTotals(row.totals)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
@@ -844,9 +845,7 @@ export default function AdIntegration({
                 <Button
                   variant="secondary"
                   disabled={importingId === platform.id}
-                  onClick={() => void runImportNow(platform.id)}
-                >
-                  {importingId === platform.id ? '取り込んでいます…' : 'いま取り込む'}
+                  onClick={() => void runImportNow(platform.id)} busy={importingId === platform.id} busyLabel="取り込んでいます…">いま取り込む
                 </Button>
               </li>
             ))}
@@ -959,7 +958,7 @@ function Metric({
     <div className="rounded-card border border-hairline bg-canvas p-4">
       <p className="text-xs text-ink-faint">{label}</p>
       <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-danger' : 'text-ink'}`}>
-        {value == null ? '—' : typeof value === 'number' ? `${prefix}${value.toLocaleString('ja-JP')}` : value}
+        {value == null ? '—' : typeof value === 'number' ? `${prefix}${formatNumber(value)}` : value}
       </p>
       <p className="mt-1 text-xs leading-relaxed text-ink-faint">{detail}</p>
     </div>

@@ -72,8 +72,7 @@ export default function StaffEmailChangePage() {
             </p>
             {error && <Notice tone="danger" message={error} className="mt-4" />}
             <div className="mt-6">
-              <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void applyChange()}>
-                {view === 'submitting' ? '確定中…' : '変更を確定する'}
+              <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void applyChange()} busy={view === 'submitting'} busyLabel="確定中…">変更を確定する
               </Button>
             </div>
           </>

@@ -104,7 +104,7 @@ describe('#641 リッチメニュー一覧の行操作', () => {
     expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
 
     // 行にゴミ箱アイコンだけのボタンは置かない。
-    expect(host.querySelector('button[aria-label="通常メニューを削除"]'), 'ゴミ箱アイコンの直置きが残っています').toBeNull()
+    expect(host.querySelector('button[aria-label="通常メニューを削除する"]'), 'ゴミ箱アイコンの直置きが残っています').toBeNull()
 
     const more = host.querySelector('button[data-qa-open="szXsT"]') as HTMLButtonElement
     expect(more, '「…」の撮影口が消えています').toBeTruthy()

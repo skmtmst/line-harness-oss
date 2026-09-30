@@ -26,6 +26,7 @@ import ConditionBuilder, {
   type SegmentRule,
 } from '@/components/shared/condition-builder'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatDateTime } from '@/lib/format'
 
 function Shell({
   title,
@@ -225,7 +226,7 @@ export function ConditionDialog({
                   }}
                   className="text-danger shrink-0 text-xs"
                 >
-                  削除
+                  削除する
                 </button>
               </li>
             ))}
@@ -248,7 +249,7 @@ export function ConditionDialog({
                   }}
                   className="text-danger shrink-0 text-xs"
                 >
-                  削除
+                  削除する
                 </button>
               </li>
             ))}
@@ -465,7 +466,7 @@ export function OnCompleteDialog({
             onClick={onClose}
             className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
           >
-            やめる
+            キャンセル
           </button>
           <button
             type="button"
@@ -973,7 +974,7 @@ export function TestSendDialog({
                 )}
               </Notice>
             )}
-          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>完了</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()}>{sending ? '送信中…' : result ? 'もう一度送信' : 'テスト送信を開始'}</Button></>)}</div></div>
+          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
         </div>
       </div>
     )
@@ -1023,7 +1024,7 @@ export function TestSendDialog({
 
       {lastTest ? (
         <Notice tone="info" className="mb-4">
-          前回のテスト送信：{new Date(lastTest.sentAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{lastTest.messageCount}通
+          前回のテスト送信：{formatDateTime(lastTest.sentAt)}・{lastTest.messageCount}通
         </Notice>
       ) : null}
 
@@ -1345,7 +1346,7 @@ export function FriendPlanDialog({
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-ink-faint">試算した時刻</dt>
               <dd className="text-ink tabular-nums">
-                {new Date(plan.computedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                {formatDateTime(plan.computedAt)}
               </dd>
             </div>
           </dl>

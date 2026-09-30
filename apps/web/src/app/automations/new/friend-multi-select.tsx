@@ -133,7 +133,7 @@ export function FriendMultiSelect({
                         <span className="shrink-0 text-xs font-medium text-accent-deep">選択中 ✓</span>
                       ) : (
                         <Button variant="secondary" disabled={full} onClick={() => add(option.id, option.name)}>
-                          追加
+                          追加する
                         </Button>
                       )}
                     </li>

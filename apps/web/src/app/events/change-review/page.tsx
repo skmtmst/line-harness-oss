@@ -27,6 +27,7 @@ import {
   type EventDetail,
   type EventSlot,
 } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
 
 const JST_OFFSET_MS = 9 * 3600_000
 
@@ -47,14 +48,7 @@ function localInputToIso(local: string): string | null {
 
 function formatJp(iso: string | null): string {
   if (!iso || !Number.isFinite(Date.parse(iso))) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function previewErrorMessage(code: string): string {
@@ -462,8 +456,7 @@ function ChangeReviewInner({ eventId }: { eventId: string }) {
           </label>
         </div>
         <div className="mt-3">
-          <Button variant="secondary" onClick={() => void runPreview()} disabled={previewBusy}>
-            {previewBusy ? '確かめています…' : '影響を確かめる'}
+          <Button variant="secondary" onClick={() => void runPreview()} disabled={previewBusy} busy={previewBusy} busyLabel="確かめています…">影響を確かめる
           </Button>
           {previewError && (
             <p className="text-danger mt-2 text-sm" role="alert">
@@ -539,8 +532,7 @@ function ChangeReviewInner({ eventId }: { eventId: string }) {
               </label>
               <p className="text-ink-faint mt-1 text-xs">理由は変更の記録に残ります。友だちには送りません。</p>
               <div className="mt-2">
-                <Button variant="primary" onClick={() => void runApply()} disabled={applyBusy}>
-                  {applyBusy ? '変えています…' : 'この内容で変える'}
+                <Button variant="primary" onClick={() => void runApply()} disabled={applyBusy} busy={applyBusy} busyLabel="変えています…">この内容で変える
                 </Button>
               </div>
               {applyError && (

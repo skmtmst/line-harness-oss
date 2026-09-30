@@ -241,7 +241,7 @@ describe('監査 R316: 集計の見出しは選んだ期間を名指しする', 
       />,
     )
     expect(start).toBe('2026-10-05')
-    expect(screen.getByText(/10\/5〜10\/11 の週.*の予約/)).toBeTruthy()
+    expect(screen.getByText(/10月5日〜10月11日 の週.*の予約/)).toBeTruthy()
     expect(screen.queryByText('今週の予約')).toBeNull()
     expect(screen.queryByText('今週 気をつけること')).toBeNull()
   })

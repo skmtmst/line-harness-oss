@@ -23,6 +23,7 @@ import {
 } from './mileage-display'
 import { validateHistoryPeriod } from './mileage-history-period'
 import { mileagePaginationTotal } from './mileage-response-state'
+import { formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 50
 
@@ -185,7 +186,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
   return (
     <section aria-label="マイルの履歴" data-design-node="MvZm5" className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${grantedCount.toLocaleString('ja-JP')}・使った ${spentCount.toLocaleString('ja-JP')}` : (periodError ?? inputRejected) ? '' : '内訳を取得できませんでした'} />
+        <KpiCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${formatNumber(grantedCount)}・使った ${formatNumber(spentCount)}` : (periodError ?? inputRejected) ? '' : '内訳を取得できませんでした'} />
         <KpiCard variant="v6" title="手で動かした分" value={periodSummary?.manualCount ?? null} unit="件" detail="" help="担当者が直接増減したものです" />
         <KpiCard variant="v6" title="取り消し" value={periodSummary ? reversalCount : null} unit="件" detail="" help="予約取消などに伴うものです" />
         <KpiCard variant="v6" title="反映を待っている" value={periodSummary?.pendingCount ?? null} unit="件" detail="確定条件を待っている記録" />
@@ -262,7 +263,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
       <div className="overflow-hidden rounded-card border border-hairline bg-canvas">
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
           <h2 className="text-base font-bold text-ink">マイルの履歴</h2>
-          <span className="text-xs text-ink-faint">{loading || error || total === null ? '—' : `${total.toLocaleString('ja-JP')}件`}</span>
+          <span className="text-xs text-ink-faint">{loading || error || total === null ? '—' : `${formatNumber(total)}件`}</span>
         </div>
 
         {loading ? (
@@ -306,7 +307,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
                     </p>
                     <p className="mt-1 truncate text-xs text-ink-faint">{mileageEntryTypeLabel(item.entryType)}・{mileageStatusLabel(item.status)}</p>
                   </Td>
-                  <Td align="right" className="tabular-nums">{item.balanceAfter === null ? <span className="text-ink-faint">— 未取得</span> : item.balanceAfter.toLocaleString('ja-JP')}</Td>
+                  <Td align="right" className="tabular-nums">{item.balanceAfter === null ? <span className="text-ink-faint">— 未取得</span> : formatNumber(item.balanceAfter)}</Td>
                   <Td>{item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : item.entryType === 'spend' ? '本人' : '自動'}</Td>
                   <Td align="right">
                     <div className="flex justify-end gap-2">
@@ -327,7 +328,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
 
         {!loading && !error && total !== null && total > PAGE_SIZE ? (
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
-            <span className="text-xs text-ink-faint">{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString('ja-JP')}件</span>
+            <span className="text-xs text-ink-faint">{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} / {formatNumber(total)}件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} />
           </div>
         ) : null}

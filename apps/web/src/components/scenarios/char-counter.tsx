@@ -10,6 +10,7 @@
  */
 
 import { TEMPLATE_TEXT_MAX_CHARACTERS } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /** LINEのテキストメッセージの上限。Workerと同じ正本を使う。 */
 export const LINE_TEXT_LIMIT = TEMPLATE_TEXT_MAX_CHARACTERS
@@ -21,7 +22,7 @@ export const LINE_TEXT_LIMIT = TEMPLATE_TEXT_MAX_CHARACTERS
  * 端末によって区切りが変わり、設計と突き合わせられない。
  */
 export function formatCharCount(length: number, limit: number = LINE_TEXT_LIMIT): string {
-  return `${length.toLocaleString('en-US')} / ${limit.toLocaleString('en-US')}`
+  return `${formatNumber(length)} / ${formatNumber(limit)}`
 }
 
 export function isOverCharLimit(length: number, limit: number = LINE_TEXT_LIMIT): boolean {

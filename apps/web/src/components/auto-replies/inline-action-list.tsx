@@ -180,7 +180,7 @@ export default function InlineActionList({
                 onClick={() => remove(action.key)}
                 className="text-danger hover:underline"
               >
-                削除
+                削除する
               </button>
             </div>
           </div>

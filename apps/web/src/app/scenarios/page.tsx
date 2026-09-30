@@ -12,7 +12,7 @@ function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
   if (enrolled === 0) return '—'
   const rate = Math.round((completed / enrolled) * 100)
-  return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
+  return `登録合計 ${formatNumber(enrolled)}人のうち ${rate}%`
 }
 import type { Folder } from '@line-crm/shared'
 import FilterChip from '@/components/shared/filter-chip'
@@ -26,6 +26,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
@@ -35,6 +36,7 @@ import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/s
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import type { ScenarioTriggerItem } from '@/lib/api'
 import { startChecklist } from './start-checklist'
+import { formatNumber } from '@/lib/format'
 
 type ScenarioWithCount = Scenario & {
   stepCount?: number
@@ -210,7 +212,7 @@ function StartScenarioDialog({
           ? '送信数の上限はありません'
           : runs.quota.remaining === null
             ? runs.quota.reason ?? '送信枠を取得できませんでした'
-            : `残り${runs.quota.remaining.toLocaleString('ja-JP')}通です`,
+            : `残り${formatNumber(runs.quota.remaining)}通です`,
       }
     }
     return item
@@ -270,7 +272,7 @@ function StartScenarioDialog({
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">シナリオ</dt><dd className="text-ink text-right font-medium">{scenario.name}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">LINEアカウント</dt><dd className="text-ink text-right font-medium">{accountLabel}</dd></div>
-              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `予約中 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `予約中 ${formatNumber(simulation.audience.newStartPlanned)}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerSummary}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">配信ステップ</dt><dd className="text-ink text-right font-medium">{simulation ? `${simulation.steps.length}通` : scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">{completeSummary}</dd></div>
@@ -307,13 +309,13 @@ function StartScenarioDialog({
 
         <Notice tone="warn" className="mx-6 mb-5">
           <p className="text-sm font-bold">開始後に起きること</p>
-          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・稼働中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
+          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{formatNumber(simulation?.audience.newStartPlanned) ?? '—'}人が購読を開始します</li><li>・稼働中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
         </Notice>
         <Checkbox checked={confirmed} disabled={preflightState !== 'ready'} onCheckedChange={setConfirmed} className="mx-6 mb-4">対象人数・内容・送信枠を確認しました</Checkbox>
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'}>{busy ? '開始中…' : '配信を開始'}</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'} busy={busy} busyLabel="開始中…">配信を開始</Button>
         </div>
       </div>
     </div>
@@ -860,7 +862,7 @@ export default function ScenariosPage() {
       */}
       {(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter) && scenarioList.loaded && (
         <p className="text-ink-faint text-xs tabular-nums">
-          条件に一致したシナリオ：{scenarioList.total.toLocaleString('ja-JP')}件
+          条件に一致したシナリオ：{formatNumber(scenarioList.total)}件
         </p>
       )}
 
@@ -881,6 +883,11 @@ export default function ScenariosPage() {
           onRetry={() => void loadScenarios()}
         />
       ) : (
+        /*
+         * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。読み直し中は
+         * 行を消さず、表を薄めて上に 2px の線の帯を出す。
+         */
+        <RefreshCover refreshing={scenarioList.refreshing}>
         <ScenarioList
           scenarios={scenarios}
           isFiltered={scenarioFilterActive}
@@ -892,7 +899,6 @@ export default function ScenariosPage() {
           onDelete={handleDelete}
           onCreate={() => void handleCreate()}
         />
-      )}
       {scenarioList.pageCount > 1 ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <ListRange
@@ -903,6 +909,8 @@ export default function ScenariosPage() {
           <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
         </div>
       ) : null}
+        </RefreshCover>
+      )}
         </div>
       </div>
       </div>

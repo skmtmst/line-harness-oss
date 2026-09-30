@@ -1,5 +1,6 @@
 import type { StaffMember } from '@line-crm/shared'
 import { parseJstDateTime } from './hq-banners'
+import { formatRelative } from '@/lib/format'
 
 /**
  * 統括のメンバー管理（★V6 36-5）の小さな計算。通信は持たない。
@@ -39,16 +40,7 @@ export function lastLoginLabel(iso: string | undefined, now = new Date()): strin
   if (!iso) return '—'
   const date = parseJstDateTime(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  const dayOf = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
-  const time = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(date)
-  const today = dayOf(now)
-  const yesterday = dayOf(new Date(now.getTime() - 24 * 60 * 60 * 1000))
-  const target = dayOf(date)
-  if (target === today) return `今日 ${time}`
-  if (target === yesterday) return `昨日 ${time}`
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}`
+  return formatRelative(date, now)
 }
 
 /** 担当範囲の文。「全アカウント」かアカウント名の列挙。 */

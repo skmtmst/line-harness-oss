@@ -27,6 +27,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 契約先アカウント詳細。★V6 37-4 `vhwld`。第 1 段は 概要／店舗／権限者／監査 のタブ。
@@ -215,7 +216,7 @@ function OpsTenantDetailContent() {
               {accounts.map((a) => (
                 <Tr key={a.id}>
                   <Td><span className="block truncate text-label font-medium text-ink" title={a.name}>{a.name}</span></Td>
-                  <Td align="right"><span className="text-label text-ink">{a.friend_count.toLocaleString()}</span></Td>
+                  <Td align="right"><span className="text-label text-ink">{formatNumber(a.friend_count)}</span></Td>
                   <Td>{a.archived_at ? <Chip tone="neutral">アーカイブ</Chip> : a.is_active ? <Chip tone="ok">接続中</Chip> : <Chip tone="danger">停止</Chip>}</Td>
                   <Td><span className="text-caption text-ink-secondary">{formatDateTime(a.updated_at)}</span></Td>
                 </Tr>

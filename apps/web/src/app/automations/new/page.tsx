@@ -48,6 +48,7 @@ import {
 } from './trigger-helpers'
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
+import { formatNumber, formatTime } from '@/lib/format'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -650,7 +651,7 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
 
 /** 保存した時刻の表示（DETAIL-15）。分まであれば「いつ保存したか」は読める。 */
 const formatClock = (time: number): string =>
-  new Date(time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  formatTime(time)
 
 /**
  * 「この内容で送る」と押したときに送る中身を、押す前に固めた控え（N-358）。
@@ -2196,7 +2197,7 @@ export default function NewAutomationPage() {
                         setActions((current) => current.filter((item) => item.key !== row.key))
                       }
                     >
-                      この動きを消す
+                      この動きを削除する
                     </button>
                   </div>
 
@@ -2292,7 +2293,7 @@ export default function NewAutomationPage() {
                 className={`${styles.action} ${styles.actionSecondary} ${styles.addAction}`}
                 onClick={() => setActions((current) => [...current, newActionDraft()])}
               >
-                動きを追加
+                動きを追加する
               </button>
             </div>
           </Step>
@@ -2324,7 +2325,7 @@ export default function NewAutomationPage() {
 
           <section className={styles.sideCard}>
             <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
-            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
+            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${formatNumber(previewCount)}人`}</p>
             <p className={styles.sideMissingNote}>
               {/* AUTOMATION-03: 人数の失敗は保存の失敗ではない。下書きは残っている。 */}
               {previewFailed
@@ -2338,9 +2339,7 @@ export default function NewAutomationPage() {
                 <Button
                   variant="secondary"
                   disabled={previewRefreshing}
-                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)}
-                >
-                  {previewRefreshing ? '数え直しています' : '人数をもう一度数える'}
+                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)} busy={previewRefreshing} busyLabel="数え直しています">人数をもう一度数える
                 </Button>
               </div>
             ) : null}
@@ -2348,9 +2347,7 @@ export default function NewAutomationPage() {
               <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
               <Button
                 onClick={() => void askOnePersonTest()}
-                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
-              >
-                {preparingTest ? '確認中...' : '1人で試す'}
+                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()} busy={preparingTest} busyLabel="確認中...">1人で試す
               </Button>
               <p className="mt-1 text-xs font-medium leading-relaxed text-ink-faint">保存した時点の内容で試します。変えた後は保存し直してから試してください。</p>
             </div>
@@ -2377,14 +2374,12 @@ export default function NewAutomationPage() {
                       setTestConfirmation(null)
                     }}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                   <Button
                     variant="primary"
                     disabled={testing}
-                    onClick={() => void runOnePersonTest()}
-                  >
-                    {testing ? '送信中...' : 'この内容で送る'}
+                    onClick={() => void runOnePersonTest()} busy={testing} busyLabel="送信中...">この内容で送る
                   </Button>
                 </div>
               </div>
@@ -2479,7 +2474,7 @@ export default function NewAutomationPage() {
               disabled={saving || Boolean(blockedReason)}
               onClick={() => void save(false)}
             >
-              下書きに保存
+              下書きを保存する
             </button>
             <button
               type="button"
@@ -2528,7 +2523,7 @@ export default function NewAutomationPage() {
             <dt className="text-xs font-medium text-ink-faint">だれに</dt>
             <dd className="text-ink">
               {targetSummary}
-              {previewCount !== null ? ` 見込み ${previewCount.toLocaleString('ja-JP')}人` : ''}
+              {previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}
             </dd>
           </div>
           <div>

@@ -13,6 +13,7 @@ import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
 import { TextField, TextArea } from '@/components/shared/text-field'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -269,7 +270,7 @@ export default function SiteScript() {
                 {`動いています。最後にデータが届いたのは ${lastSeen} です。`}
               </p>
               <p className="mt-1 text-xs text-ink-faint">
-                {`今日は ${summary?.todayEvents.toLocaleString('ja-JP')}件、${summary?.pathCount.toLocaleString('ja-JP')}種類のページから届いています。`}
+                {`今日は ${formatNumber(summary?.todayEvents)}件、${formatNumber(summary?.pathCount)}種類のページから届いています。`}
               </p>
             </div>
             <Button onClick={() => void load()}>いま届いているか確かめる</Button>
@@ -336,7 +337,7 @@ export default function SiteScript() {
                   variant="secondary"
                   onClick={() => setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null })}
                 >
-                  サイトを追加
+                  サイトを追加する
                 </Button>
               ) : null}
             </div>
@@ -417,7 +418,7 @@ export default function SiteScript() {
                       </div>
                       {site.rejectedCount > 0 ? (
                         <p className="mt-2 text-xs text-status-warn-deep">
-                          許可にない場所から届いた分: {site.rejectedCount.toLocaleString('ja-JP')}件
+                          許可にない場所から届いた分: {formatNumber(site.rejectedCount)}件
                           {site.lastRejectedHost ? `（最後: ${site.lastRejectedHost}）` : ''}
                         </p>
                       ) : null}
@@ -456,13 +457,13 @@ export default function SiteScript() {
                     {summary.consent.grantedRate == null ? '—' : `${Math.round(summary.consent.grantedRate * 100)}%`}
                   </p>
                   <p className="mt-1 text-xs text-ink-faint">
-                    {summary.consent.granted.toLocaleString('ja-JP')}件が記録を許可
-                    {summary.consent.declined > 0 ? `・${summary.consent.declined.toLocaleString('ja-JP')}件が拒否` : ''}
+                    {formatNumber(summary.consent.granted)}件が記録を許可
+                    {summary.consent.declined > 0 ? `・${formatNumber(summary.consent.declined)}件が拒否` : ''}
                   </p>
                 </div>
                 <div className="rounded-control border border-hairline p-4">
                   <p className="text-xs text-ink-faint">数えなかった</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{summary.consent.suppressed.toLocaleString('ja-JP')}件</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{formatNumber(summary.consent.suppressed)}件</p>
                   <p className="mt-1 text-xs text-ink-faint">同意がなかったため記録していません</p>
                 </div>
               </div>
@@ -493,8 +494,8 @@ export default function SiteScript() {
                     return <tr key={`${page.host ?? ''}:${page.path}`}>
                       <td className="truncate px-4 py-3 text-ink-secondary" title={page.host ?? '以前の記録'}>{page.host ?? '以前の記録'}</td>
                       <td className="truncate px-4 py-3 font-semibold text-ink" title={page.path}>{page.path}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.views.toLocaleString('ja-JP')}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.visitors.toLocaleString('ja-JP')}人</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{formatNumber(page.views)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{formatNumber(page.visitors)}人</td>
                     </tr>
                   })}
                 </tbody>
@@ -614,13 +615,7 @@ function formatLastReceived(value: string | null | undefined): string | null {
   if (!value) return null
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
-  return date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date)
 }
 
 function Capability({ title, description }: { title: string; description: string }) {

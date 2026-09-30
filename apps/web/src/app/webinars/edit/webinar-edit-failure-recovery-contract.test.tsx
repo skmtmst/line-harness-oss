@@ -553,8 +553,8 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(optionLabels(view.container)).not.toContain('旧フォームA')
     expect(inputValues(view.container)).not.toContain('旧CTA・A')
     expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(true)
-    expect(isDisabled(findExactButton(view.container, '保存'))).toBe(true)
+    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(true)
+    expect(isDisabled(findExactButton(view.container, '保存する'))).toBe(true)
 
     formsB.resolve({ success: true, data: [{ id: 'form-b', name: '新フォームB', isActive: true }] })
     ctasB.resolve({ data: [ctaCard('新CTA・B', 60, 'form-b')] })
@@ -612,18 +612,18 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(optionLabels(view.container)).toContain('旧フォームA')
 
     await changeSelect(view.container, '申込に使う回答フォーム', 'form-a')
-    await clickButton(view.container, '申込フォームを保存')
+    await clickButton(view.container, '申込フォームを保存する')
 
     /* サーバーが拒否したので候補を取り直す。取り直しの間は前の候補を出さない。 */
     expect(apiMocks.fetchApi).toHaveBeenCalledTimes(2)
     expect(optionLabels(view.container)).not.toContain('旧フォームA')
     expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(true)
+    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(true)
 
     retry.resolve({ success: true, data: [{ id: 'form-c', name: '選び直し用フォームC', isActive: true }] })
     await flush()
     expect(optionLabels(view.container)).toContain('選び直し用フォームC')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(false)
+    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(false)
   })
 
   it('R98 分析の見出し移動は表示中の節だけを指し、指し先が実在する', async () => {

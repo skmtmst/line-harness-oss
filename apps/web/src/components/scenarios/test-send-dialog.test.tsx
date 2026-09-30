@@ -112,7 +112,7 @@ const openConfirm = async (props: Partial<Props> = {}) => {
 const checkboxes = () =>
   Array.from(document.querySelectorAll<HTMLInputElement>('input[type=checkbox]'))
 
-const sendButton = () => screen.getByText('テスト送信を開始').closest('button')!
+const sendButton = () => screen.getByText('テストを送る').closest('button')!
 
 describe('NEXT-01: 実際の送信先を正直に説明する', () => {
   it('一般の友だちを選んでもアカウント・相手名・区分が正しく出る', async () => {
@@ -212,9 +212,9 @@ describe('NEXT-03: 結果は画面を戻さず確認できる', () => {
     expect(document.body.textContent).toContain('送信が完了しました')
     expect(document.body.textContent).toContain('1 件のメッセージを送りました。')
     // 完了へ切り替わり、開始ボタンは消える。
-    expect(screen.getByText('完了')).toBeTruthy()
-    expect(screen.queryByText('テスト送信を開始')).toBeNull()
-    expect(screen.queryByText('もう一度送信')).toBeNull()
+    expect(screen.getByText('閉じる')).toBeTruthy()
+    expect(screen.queryByText('テストを送る')).toBeNull()
+    expect(screen.queryByText('もう一度送る')).toBeNull()
   })
 
   it('失敗すると原因と再試行条件がその場に出る', async () => {
@@ -228,7 +228,7 @@ describe('NEXT-03: 結果は画面を戻さず確認できる', () => {
     expect(document.body.textContent).toContain('監査用の送信失敗')
     expect(document.body.textContent).toContain('原因を解決してから、もう一度実行してください')
     // 再試行は同じ画面からできる。
-    expect(screen.getByText('もう一度送信')).toBeTruthy()
+    expect(screen.getByText('もう一度送る')).toBeTruthy()
   })
 
   it('送信中は二重押下できない', async () => {

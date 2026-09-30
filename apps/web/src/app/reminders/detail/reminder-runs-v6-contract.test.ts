@@ -56,7 +56,7 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(API).toMatch(/runs:\s*\(\s*\n?\s*reminderId: string,/)
     expect(PAGE).not.toContain('1,284')
     expect(PAGE).not.toContain('360人')
-    expect(PAGE).toContain("value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'}")
+    expect(PAGE).toContain("value={data ? `${formatNumber(data.summary.sent)}通` : '—'}")
     expect(PAGE).not.toContain('data?.summary.sent ?? 0')
   })
 

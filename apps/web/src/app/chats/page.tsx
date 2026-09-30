@@ -27,6 +27,7 @@ import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { startVisiblePoll } from '@/lib/visible-polling'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { runOptimistic } from '@/lib/undoable'
 import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -98,6 +99,7 @@ import { savedViewFailureMessage } from './saved-view-failure'
 import { savedViewSummary } from './saved-view-summary'
 import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
 import { describeSendFailure } from './send-failure'
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 type InboxSavedView = {
   id: string
@@ -225,12 +227,7 @@ function ChatImageMessage({ content }: { content: string }) {
 
 function formatInboxDatetime(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(iso)
 }
 
 /*
@@ -243,13 +240,7 @@ const INBOX_TIME_ZONE = 'Asia/Tokyo'
 function formatJstScheduledAt(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('ja-JP', {
-    timeZone: INBOX_TIME_ZONE,
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(d)
 }
 
 /**
@@ -1728,7 +1719,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (!messageContent.trim() && !pendingImage) return
     // INBOX-29: 上限を超えた本文は送らない(下書きは消さない)。
     if (messageContent.length > MESSAGE_MAX_LENGTH) {
-      setError(`メッセージは${MESSAGE_MAX_LENGTH.toLocaleString()}文字までです。`)
+      setError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
       return
     }
     const sendingChatId = selectedChatId  // capture the chat id for this send
@@ -1992,7 +1983,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (!content) return
     // INBOX-29: 上限を超えた本文は予約もさせない。
     if (messageContent.length > MESSAGE_MAX_LENGTH) {
-      setError(`メッセージは${MESSAGE_MAX_LENGTH.toLocaleString()}文字までです。`)
+      setError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
       return
     }
     if (!scheduleInput) {
@@ -2174,17 +2165,32 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     })
   }, [quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
 
-  const handleStatusUpdate = async (newStatus: Chat['status']) => {
+  /*
+   * 対応状況の切替は取り消せる軽い操作。押した瞬間に画面へ反映して
+   * 裏で保存する（★V7 sTJsh §1）。失敗したら元の状況へ戻す。
+   */
+  const handleStatusUpdate = (newStatus: Chat['status']) => {
     if (!selectedChatId || !chatDetail) return
-    try {
-      await api.chats.update(selectedChatId, { status: newStatus, revision: chatDetail.revision })
-      loadChatDetail(selectedChatId)
-      loadChats()
-      // 対応済み/未読の切替は未対応バッジに影響するので即時更新させる
-      window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-    } catch {
-      setError('ステータスの更新に失敗しました。')
+    const chatId = selectedChatId
+    const previous = chatDetail.status
+    const revision = chatDetail.revision
+    const apply = (status: Chat['status']) => {
+      setChatDetail((current) => (current?.id === chatId ? { ...current, status } : current))
+      setChats((prev) => prev.map((chat) => (chat.id === chatId ? { ...chat, status } : chat)))
     }
+    apply(newStatus)
+    runOptimistic({
+      request: () => api.chats.update(chatId, { status: newStatus, revision }),
+      revert: () => apply(previous),
+      failureMessage: '対応状況を変えられませんでした。',
+      retry: () => handleStatusUpdate(newStatus),
+      onSuccess: () => {
+        loadChatDetail(chatId)
+        loadChats()
+        // 対応済み/未読の切替は未対応バッジに影響するので即時更新させる
+        window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
+      },
+    })
   }
 
   /** 友だち一覧と同じ「注目」を受信箱の★から切り替える。 */
@@ -2513,7 +2519,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   setSavedViewSuccess(false)
                   setSaveDialogOpen(true)
                 }}>
-                  現在の条件を保存
+                  現在の条件を保存する
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
@@ -3257,10 +3263,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     }
 
                     if (msg.source === 'scenario') {
-                      const startedAt = new Date(msg.createdAt).toLocaleString('ja-JP', {
-                        year: 'numeric', month: '2-digit', day: '2-digit',
-                        hour: '2-digit', minute: '2-digit',
-                      })
+                      const startedAt = formatDateTime(msg.createdAt)
                       return (
                         <div key={msg.id}>
                           {showDateSep && (
@@ -3334,7 +3337,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             {/* 時刻と引用操作 */}
                             <span className="mt-0.5 flex items-center gap-2 px-1">
                               <span className="text-xs text-on-accent/50">
-                                {new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                                {formatTime(msg.createdAt)}
                               </span>
                               {!msg.isUnsent && (
                                 <button
@@ -3559,9 +3562,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <Button
                         variant="primary"
                         onClick={() => void handleSaveMemo()}
-                        disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
-                      >
-                        {memoSaving ? '保存中...' : 'メモを保存'}
+                        disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')} busy={memoSaving} busyLabel="保存中...">メモを保存する
                       </Button>
                     </div>
                   </div>
@@ -3613,9 +3614,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         variant="primary"
                         type="button"
                         onClick={() => void handleScheduleSend()}
-                        disabled={scheduling || messageOverLimit || !messageContent.trim() || !scheduleInput}
-                      >
-                        {scheduling ? '予約中...' : 'この日時で予約する'}
+                        disabled={scheduling || messageOverLimit || !messageContent.trim() || !scheduleInput} busy={scheduling} busyLabel="予約中...">この日時で予約する
                       </Button>
                     </div>
                     {scheduledSendsFailed && (
@@ -3745,7 +3744,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <p className="mt-1 flex items-center justify-between gap-2 text-xs">
                     {/* INBOX-29: 残りを送る前に見せる。超えたら送らせない。 */}
                     <span className={messageOverLimit ? 'text-danger font-semibold' : 'text-ink-faint'}>
-                      {messageLength.toLocaleString()} / {MESSAGE_MAX_LENGTH.toLocaleString()}
+                      {formatNumber(messageLength)} / {formatNumber(MESSAGE_MAX_LENGTH)}
                       {messageOverLimit ? ' ・ 文字数が上限を超えています' : ''}
                     </span>
                     <span className="text-ink-faint shrink-0">

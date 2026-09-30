@@ -296,13 +296,13 @@ function FolderEditor() {
               className="-mx-5 -mb-4 mt-4 rounded-none border-x-0 border-b-0"
               destructive={editId ? (
                 <Button type="button" className="border-danger/30 text-danger" disabled={saving} onClick={() => setDeleteOpen(true)}>
-                  <Trash2 size={16} aria-hidden="true" /> フォルダを削除
+                  <Trash2 size={16} aria-hidden="true" /> フォルダを削除する
                 </Button>
               ) : undefined}
               actions={(
                 <>
                   <button type="button" disabled={saving} onClick={close} className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium hover:bg-canvas-sunken disabled:opacity-40">キャンセル</button>
-                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()}>{saving ? '保存中…' : editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存</> : 'フォルダを追加'}</Button>
+                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()} busy={saving}>{editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存する</> : 'フォルダを追加する'}</Button>
                 </>
               )}
             />
@@ -315,7 +315,7 @@ function FolderEditor() {
         open={deleteOpen}
         title={`「${name}」を削除しますか？`}
         description="フォルダだけを削除します。中にあるタグは削除されず、未分類へ戻ります。"
-        confirmLabel="このフォルダを削除"
+        confirmLabel="このフォルダを削除する"
         destructive
         busy={saving}
         onCancel={() => { if (!saving) setDeleteOpen(false) }}

@@ -1,3 +1,4 @@
+import { formatYmd } from '@/lib/format'
 /**
  * 流入経路の書き出し（設計 `Q4bkTg` の「CSVで書き出す」）。
  *
@@ -53,10 +54,5 @@ export function exportFileName(count: number, today: string): string {
 
 /** ファイル名の日付を日本時間で組み立てる。UTC のまま切ると JST と1日ずれる。 */
 export function jstTodayString(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now).replaceAll('/', '-')
+  return formatYmd(now)
 }

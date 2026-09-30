@@ -21,26 +21,15 @@ import {
   type EventDetail,
   type EventSlot,
 } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
 
 function formatJpRange(startsAt: string, endsAt: string): string {
   const start = Date.parse(startsAt)
   const end = Date.parse(endsAt)
   if (!Number.isFinite(start) || !Number.isFinite(end)) return '日時未取得'
   const format = (time: number) =>
-    new Date(time).toLocaleString('ja-JP', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-      timeZone: 'Asia/Tokyo',
-    })
-  return `${format(start)}〜${new Date(end).toLocaleString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    timeZone: 'Asia/Tokyo',
-  })}`
+    formatDateTime(time)
+  return `${format(start)}〜${formatDateTime(end)}`
 }
 
 function PreviewInner({ eventId }: { eventId: string }) {

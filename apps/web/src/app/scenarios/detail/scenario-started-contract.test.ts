@@ -16,7 +16,7 @@ describe('V6 シナリオ開始完了', () => {
   it('完了画面は試算と開始記録の実値を使い、開始後の結果へ進める', () => {
     expect(DETAIL).toContain('api.scenarios.simulate(id, lineAccountId)')
     expect(DETAIL).toContain('api.scenarios.runs(id, lineAccountId, { limit: 50 })')
-    expect(DETAIL).toContain('simulation.audience.newStartPlanned.toLocaleString')
+    expect(DETAIL).toContain('formatNumber(simulation.audience.newStartPlanned)')
     expect(DETAIL).toContain('開始履歴を確認')
     // 設計 B：状態の札は共通の StatusChip（旧「配信中」「配信可」「一時停止中」の直書き）。
     expect(DETAIL).toContain('<StatusChip')

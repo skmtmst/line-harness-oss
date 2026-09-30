@@ -208,7 +208,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       title="下書きを仕上げる"
       description="見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。"
       parent={['オートメーション', '/automations?tab=templates']}
-      saveLabel="下書きを保存"
+      saveLabel="下書きを保存する"
       validate={() => {
         if (!name.trim()) return 'ルール名を入力してください'
         if (eventType === 'tag_change' && !triggerTagId) return 'きっかけのタグを選んでください'

@@ -11,6 +11,7 @@ import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -61,10 +62,7 @@ function formatJst(value: string | null): string {
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -578,19 +576,15 @@ export default function NotificationRunList({
                       </Link>
                     ) : null}
                     {mode === 'failures' && item.retryAvailable && canRetry ? (
-                      <Button className="mt-2" disabled={visibleRetryingId !== null} onClick={() => void retry(item)}>
-                        {visibleRetryingId === item.id ? '再試行中' : '送信を再試行'}
+                      <Button className="mt-2" disabled={visibleRetryingId !== null} onClick={() => void retry(item)} busy={visibleRetryingId === item.id} busyLabel="再試行中">送信を再試行する
                       </Button>
                     ) : null}
                     {mode === 'failures' && canResolve ? (
                       <Button
                         className="mt-2"
                         disabled={visibleRetryingId !== null}
-                        onClick={() => void resolve(item, !item.resolved)}
-                      >
-                        {visibleRetryingId === item.id
-                          ? '保存中'
-                          : item.resolved ? '未対応に戻す' : '対応済みにする'}
+                        onClick={() => void resolve(item, !item.resolved)} busy={visibleRetryingId === item.id} busyLabel="保存中">
+                        {item.resolved ? '未対応に戻す' : '対応済みにする'}
                       </Button>
                     ) : null}
                   </Td>
@@ -600,7 +594,7 @@ export default function NotificationRunList({
           </DataTable>
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs text-ink-faint">
-              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{scopedTotal.toLocaleString('ja-JP')}件
+              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{formatNumber(scopedTotal)}件
             </p>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>

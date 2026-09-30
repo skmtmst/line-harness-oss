@@ -181,7 +181,7 @@ async function setup() {
 }
 
 function retryButton(container: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(container.querySelectorAll('button')).find((el) => el.textContent === '送信を再試行')
+  const button = Array.from(container.querySelectorAll('button')).find((el) => el.textContent === '送信を再試行する')
   if (!button) throw new Error('再試行ボタンが見つかりません')
   return button as HTMLButtonElement
 }
@@ -214,8 +214,8 @@ describe('LINE通知一覧のReact実mount試験', () => {
       nextDelivery('account-a').resolve(ok([detailed], 0))
       await drainMicrotasks()
     })
-    expect(container.textContent).toContain('次回 2026/09/09 12:00')
-    expect(container.textContent).toContain('対応済み 2026/09/09 11:30／店長')
+    expect(container.textContent).toContain('次回 9月9日（水）12:00')
+    expect(container.textContent).toContain('対応済み 9月9日（水）11:30／店長')
     expect(container.textContent).toContain('試行履歴を確認')
     expect(container.textContent).toContain('未対応に戻す')
     expect(container.textContent).not.toContain('送信を再試行')

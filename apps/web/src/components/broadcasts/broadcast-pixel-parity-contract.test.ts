@@ -31,11 +31,11 @@ describe('一斉配信の画素比較対象', () => {
       全員へ送る。「送信先を選択」という題や、先頭だけ緑の丸を付ける
       見た目は、実処理と食い違う選ばせる画面に見える。
     */
-    expect(FORM).toContain('title="テスト送信"')
+    expect(FORM).toContain('title="テストを送る"')
     expect(FORM).toContain('登録済みのテスト送信先')
     expect(FORM).not.toContain('テスト送信先を選択')
     expect(FORM).not.toContain('開発担当')
-    expect(FORM).toContain('confirmLabel={testSending ? \'送信中…\' : \'テスト送信する\'}')
+    expect(FORM).toContain('confirmLabel={testSending ? \'送信中…\' : \'テストを送る\'}')
     expect(FORM).toContain('cancelLabel="キャンセル"')
     expect(FORM).toContain("[data-design-node='h0kahp']")
   })

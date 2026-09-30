@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
 /** 監査ログ。★V6 37-8 `oEzZz`。 */
 
@@ -90,7 +91,7 @@ export default function OpsAuditPage() {
     a.click()
     URL.revokeObjectURL(url)
     setExportNote(truncated
-      ? `いまの条件の ${collected.length} 件を書き出しました（${expected} 件中・上限 ${CSV_MAX.toLocaleString()} 件まで。全部を残すには期間で絞ってください）`
+      ? `いまの条件の ${collected.length} 件を書き出しました（${expected} 件中・上限 ${formatNumber(CSV_MAX)} 件まで。全部を残すには期間で絞ってください）`
       : `いまの条件の ${collected.length} 件を書き出しました`)
     setExporting(false)
   }
@@ -133,9 +134,8 @@ export default function OpsAuditPage() {
           見出しの横では繰り返さない。
         */}
         <div className="flex items-center gap-2">
-          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0}>
-            <Download aria-hidden="true" className="h-4 w-4" />
-            {exporting ? '書き出しています…' : 'CSVで書き出す'}
+          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
+            <Download aria-hidden="true" className="h-4 w-4" />CSVで書き出す
           </Button>
         </div>
       </div>

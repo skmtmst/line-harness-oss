@@ -14,6 +14,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Checkbox from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import { formatDay } from '@/lib/format'
 
 const steps = [
   ['利用規約への同意', 'musuboの利用規約と、個人情報の取扱いをご確認ください。'],
@@ -29,11 +30,7 @@ function formatAgreementDate(value: string | null): string | null {
   if (!value) return null
   const parsed = new Date(value.replace(' ', 'T'))
   if (Number.isNaN(parsed.getTime())) return null
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(parsed)
+  return formatDay(parsed)
 }
 
 function ManualLink({ href, children }: { href: string; children: ReactNode }) {

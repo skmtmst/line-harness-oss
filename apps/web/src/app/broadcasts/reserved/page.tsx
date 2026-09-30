@@ -16,6 +16,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api, type ApiBroadcast } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { audienceSummary } from '@/lib/broadcast-summary'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -34,30 +35,14 @@ function formatJst(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function formatJstSentence(value: string | null): string {
   if (!value) return '日時未設定'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時未設定'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | null): boolean {
@@ -248,7 +233,7 @@ function ReservedBroadcastContent() {
         (scenarioId) => audienceNames.scenarios.find((s) => s.id === scenarioId)?.name ?? null,
       )
     : TARGET_LABELS[broadcast.targetType]
-  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${audienceCount.toLocaleString('ja-JP')}人`}`
+  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)}人`}`
   const scheduledLabel = formatJst(broadcast.scheduledAt)
   const scheduledSentenceLabel = formatJstSentence(broadcast.scheduledAt)
 
@@ -324,7 +309,7 @@ function ReservedBroadcastContent() {
           <p className="text-ink-secondary mt-3 text-sm font-semibold">
             {audienceCount === null
               ? `${scheduledSentenceLabel}に配信します。対象人数は現在確認できません。`
-              : `${scheduledSentenceLabel}に、${audienceCount.toLocaleString('ja-JP')}人へ配信します。`}
+              : `${scheduledSentenceLabel}に、${formatNumber(audienceCount)}人へ配信します。`}
           </p>
 
           <dl className="bg-canvas-sunken border-hairline mx-auto mt-5 max-w-3xl rounded-card border px-5 text-sm">
@@ -360,11 +345,11 @@ function ReservedBroadcastContent() {
             <Button href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
               <Eye size={16} aria-hidden="true" />予約の内容を見る
             </Button>
-            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full">
-              <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テスト送信する'}
+            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full" busy={actionBusy === 'test'} busyLabel="テスト送信中…">
+              <Send size={16} aria-hidden="true" />テストを送る
             </Button>
-            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full">
-              <Copy size={16} aria-hidden="true" />{actionBusy === 'duplicate' ? '複製中…' : '複製して別配信を作る'}
+            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full" busy={actionBusy === 'duplicate'} busyLabel="複製中…">
+              <Copy size={16} aria-hidden="true" />複製して別配信を作る
             </Button>
             {broadcast.status === 'scheduled' && !cancelled && (
               <Button onClick={() => { setCancelError(''); setCancelOpen(true) }} disabled={actionBusy !== null} className="w-full">
@@ -373,7 +358,7 @@ function ReservedBroadcastContent() {
             )}
           </div>
           <p className="text-ink-faint mt-4 text-xs">配信内容: {bubbleCount}通</p>
-          {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {estimate.hiddenExcluded.toLocaleString('ja-JP')}人</p> : null}
+          {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {formatNumber(estimate.hiddenExcluded)}人</p> : null}
           {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} className="mt-3" /> : null}
         </aside>
       </div>
