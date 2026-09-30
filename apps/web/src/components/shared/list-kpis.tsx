@@ -86,7 +86,7 @@ export default function ListKpis({
       }))
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4" data-kpi-strip>
       {cards.map((card, i) => (
         // key は props に混ぜない。混ぜて spread すると React が
         // 「key を spread で渡すな」と毎回警告を出す。
