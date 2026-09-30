@@ -6942,12 +6942,21 @@ export const api = {
         fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; recentOneTime?: RecentOneTimeReport[]; options: AnalyticsReportScheduleOptions }>>(
           `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         ),
+      /*
+       * R526: 応答消失後の再送で二重予約にしない要求キー。同じ試行の
+       * やり直しは同じキー、別の新規作成は別のキーで呼ぶ。サーバは
+       * 同じキー＋同じ内容なら既にある予約を返す（`replayed`）。
+       */
       create: (accountId: string, data: Omit<
         AnalyticsReportSchedule,
         'id' | 'lineAccountId' | 'status' | 'isOneTime' | 'nextRunAt' | 'createdBy' | 'createdAt' | 'updatedAt'
-      > & { sendOnce?: boolean }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+      > & { sendOnce?: boolean }, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<AnalyticsReportSchedule> & { replayed?: boolean }>(
         `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify(data) },
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+          ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
+        },
       ),
       update: (accountId: string, id: string, data: Omit<
         AnalyticsReportSchedule,
@@ -9629,6 +9638,8 @@ export const api = {
       lineAccountId?: string
       /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
       operationId?: string
+      /** R525: オフで登録したら最初の行から停止で作る。省略時は稼働。 */
+      isActive?: boolean
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -10731,16 +10742,16 @@ export const api = {
           `/api/line-notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       get: (id: string, lineAccountId: string) =>
-        fetchApi<ApiResponse<NotificationRule>>(
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>(
           `/api/line-notifications/operator-rules/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       create: (data: { lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
-        fetchApi<ApiResponse<NotificationRule>>('/api/line-notifications/operator-rules', {
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>('/api/line-notifications/operator-rules', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      updateDraft: (id: string, lineAccountId: string, data: { name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
-        fetchApi<ApiResponse<NotificationRule>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
+      updateDraft: (id: string, lineAccountId: string, data: { expectedVersion: number; name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
           method: 'PATCH',
           body: JSON.stringify({ ...data, lineAccountId }),
         }),
@@ -11135,9 +11146,17 @@ export const api = {
       `/api/nen-campaigns/columns/import?lineAccountId=${encodeURIComponent(accountId)}`,
       { method: 'POST' },
     ),
-    duplicateColumn: (id: string, accountId: string) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }>>(
+    /*
+     * M506: 複製の要求キー。同じコラムのやり直しは同じキーで送り、
+     * サーバは同じ複製を返す（`replayed`）。別の複製は別のキーで呼ぶ。
+     */
+    duplicateColumn: (id: string, accountId: string, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }> & { replayed?: boolean }>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/duplicate`,
-      { method: 'POST', body: JSON.stringify({ accountId }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+        ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
+      },
     ),
     testColumn: (id: string, accountId: string, friendId: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/test-send`,
@@ -11994,13 +12013,18 @@ export const api = {
       fetchApi<ApiResponse<ActionScoreBands>>(
         `/api/action-scores/bands?accountId=${encodeURIComponent(accountId)}`,
       ),
+    /*
+     * M505: 応答消失後の再送の要求キー。同じ内容のやり直しは同じキーで送り、
+     * サーバは保存済みの結果を返す（`replayed`）。内容を変えたら別のキーにする。
+     */
     saveDraft: (data: {
       accountId: string
       expectedDraftVersionId: string | null
       configuration: ActionScoreRuleBundle
-    }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/draft', {
+    }, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration> & { replayed?: boolean }>('/api/action-scores/rules/draft', {
       method: 'PATCH',
       body: JSON.stringify(data),
+      ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
     }),
     testRules: (data: {
       accountId: string

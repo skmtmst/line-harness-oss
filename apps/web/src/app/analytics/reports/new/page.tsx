@@ -18,6 +18,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   api,
+  ApiError,
   type AnalyticsReportRun,
   type AnalyticsReportSchedule,
   type AnalyticsReportScheduleOptions,
@@ -253,6 +254,7 @@ function AnalyticsReportFormPage() {
     let active = true
     setLoading(true)
     setError('')
+    setConflictId(null)
     setOptions(null)
     // id が外れた/変わったとき前の編集対象が残ると、新規作成のつもりが旧レポートへ
     // PUT してしまう。取り直すたびに編集状態も初期化する。
@@ -358,6 +360,63 @@ function AnalyticsReportFormPage() {
   accountRef.current = selectedAccountId
   const editIdRef = useRef(editId)
   editIdRef.current = editId
+  /*
+   * R526: 別アカウント・別編集対象へ移ったら、前の保存の進行表示を
+   * 残さない。終わらない作成をAに残したままBへ移ると、Bの保存ボタンが
+   * 「作っています」のまま押せなくなる（finally の setSaving(false) は
+   * sameTarget の内側なので、移った後の決着では戻らない）。
+   * 遅れて戻るAの応答は R455 の sameTarget が捨てるので、ここで戻しても
+   * Aの結果がBの画面を上書きしない。読み直し（reloadSeq）では戻さない。
+   * 読み直しは同じ対象の再取得であり、進行中の保存と競わせないため。
+   */
+  const saveTargetRef = useRef<{ accountId: string | null; editId: string | null } | null>(null)
+  /*
+   * R526・ABA: 保存の試行の世代と、その試行の中身（キー＋内容の署名）。
+   * 新しく押すたびに世代が進む。保存の対象（アカウント・編集ID）が
+   * 切り替わっても世代を進め、切替前の試行の応答を永続無効化する
+   * （読み直し reloadSeq とは別。要求キー自体は残すので、押し直しは
+   * 同じキー・同じ内容なら既にある予約へ戻る＝再送の意味は維持）。
+   * 古い試行の応答は捨てるのが基本だが、同じキー・同じ内容の正当な
+   * 再送の応答だけは受け付ける（同じ行に戻るだけなので害がない）。
+   * 下の submit 内の isFresh が比べる。
+   */
+  const saveSeqRef = useRef(0)
+  const latestAttemptRef = useRef<{ seq: number; key: string; signature: string } | null>(null)
+  /*
+   * R526・ABA: 保存の対象（アカウント・編集ID）の世代。対象が切り替わる
+   * たびに進む。試行は始まったときの対象世代を掴み、切替後に戻った古い
+   * 応答は内容が同じでも受け付けない（下の isFresh）。
+   */
+  const switchSeqRef = useRef(0)
+  useEffect(() => {
+    const prev = saveTargetRef.current
+    saveTargetRef.current = { accountId: selectedAccountId, editId }
+    if (prev && (prev.accountId !== selectedAccountId || prev.editId !== editId)) {
+      setSaving(false)
+      /*
+       * R526・ABA: 対象を移ったら切替前の保存の応答を永続無効化する。
+       * 戻ってきても古い応答は受け付けない。古い作成が成功して古い予約の
+       * 画面へ飛ぶと、未送信の編集（新しい保存の内容）が消えるため。
+       * 要求キーは残すので、押し直しは再送として効く。
+       */
+      switchSeqRef.current += 1
+    }
+  }, [selectedAccountId, editId])
+  /*
+   * R526: アカウントごとの作成試行の要求キー。応答消失後の押し直しは
+   * 同じアカウントの同じキーで送り、サーバは既にある予約を返す。
+   * 成功・作り直しではそのアカウントの分だけ捨てる（別アカウントの
+   * 試行は残す）。1枠だと、Aで応答を失いBで作るとBがAを上書きし、
+   * Aへ戻った押し直しが別物として二重予約になる。
+   * 裏側はキーをそのまま行の主キーにする（全アカウントで1つ）ため、
+   * アカウントが違えば新しい試行にする。
+   */
+  const createKeysRef = useRef<Record<string, string>>({})
+  /*
+   * R526: 同じキーで内容の違う予約が既にあるときの、その予約の番号。
+   * 2件目を黙って作らず、既にある予約への案内を出す。
+   */
+  const [conflictId, setConflictId] = useState<string | null>(null)
 
   const submit = async (sendOnce: boolean) => {
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
@@ -416,6 +475,29 @@ function AnalyticsReportFormPage() {
     const wantAccount = selectedAccountId
     const wantEditId = editId
     const sameTarget = () => accountRef.current === wantAccount && editIdRef.current === wantEditId
+    /*
+     * R526・ABA: 同じ依頼・同じアカウントへ戻って作り直すと、sameTarget
+     * だけでは切替前の古い応答が通過する。古い作成が成功すると古い予約の
+     * 画面へ飛び、新しい保存の状態と要求キーが消える。失敗でも新しい保存
+     * の文を汚し、保存中の表示を落とす。保存の試行ごとに世代を数え、
+     * 新しい試行が始まったら古い応答（成功・失敗とも）を捨てる。ただし
+     * 同じキー・同じ内容の再送（正当な再送）の応答は受け付ける。
+     */
+    const mySeq = (saveSeqRef.current += 1)
+    // R526・ABA: 試行が始まったときの対象世代。切替後に戻った古い応答は
+    // 内容が同じでも受け付けない（対象切替で永続無効化）。
+    const mySwitchSeq = switchSeqRef.current
+    const myAttempt: { current: { key: string; signature: string } | null } = { current: null }
+    const isFresh = () => {
+      if (!sameTarget() || mySwitchSeq !== switchSeqRef.current) return false
+      const latest = latestAttemptRef.current
+      if (!latest || latest.seq === mySeq) return true
+      // 対象を移らない新しい試行がある。同じキー・同じ内容の再送なら
+      // 同じ行の結果なので受ける。
+      const mine = myAttempt.current
+      if (!mine) return false
+      return latest.key === mine.key && latest.signature === mine.signature
+    }
     const recipients = [
       ...options.recipients.filter((item) => staffIds.includes(item.id)).map((item) => ({
         kind: 'staff' as const, staffId: item.id, label: item.name,
@@ -438,21 +520,49 @@ function AnalyticsReportFormPage() {
     }
     try {
       if (editing) {
+        myAttempt.current = { key: `update:${editing.id}`, signature: JSON.stringify(payload) }
+        latestAttemptRef.current = { seq: mySeq, ...myAttempt.current }
         const response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
           ...payload, expectedUpdatedAt: editing.updatedAt,
         })
-        if (!sameTarget()) return
+        if (!isFresh()) return
         if (!response.success) throw new Error(response.error)
         setEditing(response.data)
         notifyToast(response.data.status === 'paused'
           ? '定期レポートを更新しました。止まっている間は届きません。再開すると次の予定から届きます。'
           : `定期レポートを更新しました。次は${nextLabel}に届きます。`)
       } else {
-        const response = await api.analytics.reportSchedules.create(selectedAccountId, {
-          ...payload, sendOnce,
-        })
-        if (!sameTarget()) return
+        // R526: 作成試行の要求キー。応答消失後の押し直しは同じアカウントの
+        // 同じキーで送り、既にある予約へ戻す（2件目を作らない）。
+        // 別アカウントの試行は別のキーにする（使い回すと裏側の主キーが
+        // 衝突して500になる）。Aへ戻ればAのキーが残っているので再送が効く。
+        const requestKey = createKeysRef.current[selectedAccountId]
+          ?? (createKeysRef.current[selectedAccountId] = crypto.randomUUID())
+        myAttempt.current = { key: `create:${requestKey}`, signature: JSON.stringify(payload) }
+        latestAttemptRef.current = { seq: mySeq, ...myAttempt.current }
+        let response
+        try {
+          response = await api.analytics.reportSchedules.create(selectedAccountId, {
+            ...payload, sendOnce,
+          }, { idempotencyKey: requestKey })
+        } catch (caught) {
+          // 失敗後に内容を変えて押し直すと、同じキーで内容の違う予約が
+          // 既にある。2件目を黙って作らず、既にある予約への案内を出す。
+          if (caught instanceof ApiError && caught.status === 409) {
+            const existingId = (caught.data as { existingId?: unknown } | undefined)?.existingId
+            if (typeof existingId === 'string' && existingId && isFresh()) {
+              setConflictId(existingId)
+              setError('')
+              return
+            }
+          }
+          throw caught
+        }
+        if (!isFresh()) return
         if (!response.success) throw new Error(response.error)
+        // R526: 解決したのはこの保存の試行だけ。別アカウントの試行は残す。
+        delete createKeysRef.current[wantAccount]
+        setConflictId(null)
         /*
           R76。作ったあとも新規のまま残すと、時刻を直してもう一度押したときに
           更新ではなく別の定期配信が増える。作りたての編集画面へ移せば、
@@ -461,18 +571,22 @@ function AnalyticsReportFormPage() {
           一覧からは消えるため、結果の行き先をここで渡す。
         */
         if (sendOnce) {
-          notifyToast('1回だけ送る依頼を受け付けました。結果はこの画面で確認できます。')
+          notifyToast(response.replayed
+            ? '依頼は既に受け付けられていました。作り直さず、既にある依頼の結果を開きました。'
+            : '1回だけ送る依頼を受け付けました。結果はこの画面で確認できます。')
           router.push(`/analytics/reports/new?id=${response.data.id}`)
         } else {
-          notifyToast(`${nextLabel}から届く定期レポートを作りました。`)
+          notifyToast(response.replayed
+            ? '予約は既に作られていました。作り直さず、既にある予約を開きました。内容を確認してください。'
+            : `${nextLabel}から届く定期レポートを作りました。`)
           router.push(`/analytics/reports/new?id=${response.data.id}`)
         }
       }
     } catch (caught) {
-      if (!sameTarget()) return
+      if (!isFresh()) return
       setError(caught instanceof Error ? caught.message : editing ? '定期レポートを更新できませんでした' : '定期レポートを作れませんでした')
     } finally {
-      if (sameTarget()) setSaving(false)
+      if (isFresh()) setSaving(false)
     }
   }
 
@@ -531,6 +645,26 @@ function AnalyticsReportFormPage() {
       />
       {!canManage && <div className="bg-canvas-sunken mb-4 rounded-control px-4 py-3 text-sm">運用担当は内容を確認できます。作成は統括または管理者が行います。</div>}
       {error && <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />}
+      {/*
+        R526: 失敗後に内容を変えて押し直すと、同じ操作の予約が既にある。
+        2件目を黙って作らず、既にある予約への案内を出す。別の新規として
+        作り直すときだけ、要求キーを捨てて新しい試行にする（明示の選択）。
+      */}
+      {conflictId && (
+        <Notice
+          tone="warn"
+          className="mb-4"
+          onClose={() => setConflictId(null)}
+          action={(
+            <>
+              <Button variant="secondary" href={`/analytics/reports/new?id=${encodeURIComponent(conflictId)}`}>既にある予約を確認</Button>
+              <Button variant="secondary" onClick={() => { delete createKeysRef.current[selectedAccountId]; setConflictId(null) }}>内容を変えた新しい予約として作り直す</Button>
+            </>
+          )}
+        >
+          同じ操作で作った予約が既にあります。内容を変えて送り直したため、新しい予約は作りませんでした。
+        </Notice>
+      )}
 
       <div className="grid items-start gap-4 xl:grid-cols-3">
         <div className="grid gap-4 xl:col-span-2">

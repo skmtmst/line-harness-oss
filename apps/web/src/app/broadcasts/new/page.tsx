@@ -104,6 +104,8 @@ function NewBroadcastPageContent() {
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [tags, setTags] = useState<Tag[]>([])
+  /** R581: タグ候補の取得状態。失敗と真の0件を分けて案内するために持つ。 */
+  const [tagsStatus, setTagsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loading, setLoading] = useState(true)
   const audienceId = searchParams.get('audienceId')?.trim() ?? ''
   const [audience, setAudience] = useState<AudienceHandoff | null>(null)
@@ -135,12 +137,23 @@ function NewBroadcastPageContent() {
   }
 
   const load = useCallback(async () => {
+    /*
+     * R581: 取得失敗を「候補なし」と誤案内しない。成功以外・通信失敗は
+     * 失敗として持ち、フォーム側で再試行できるようにする。
+     * m23m: タグ候補が取れなくても配信は作れる。取れない失敗で画面を落とさない。
+     */
+    setTagsStatus('loading')
     try {
       // R23横展開: 条件づくりのタグ候補は今のアカウントだけ。切替で取り直す。
       const res = await api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
-      if (res.success) setTags(res.data)
+      if (res.success) {
+        setTags(res.data)
+        setTagsStatus('ready')
+      } else {
+        setTagsStatus('error')
+      }
     } catch {
-      // m23m: タグ候補が取れなくても配信は作れる。取れない失敗で画面を落とさない。
+      setTagsStatus('error')
     } finally {
       setLoading(false)
     }
@@ -240,6 +253,8 @@ function NewBroadcastPageContent() {
           ) : null}
           <BroadcastForm
             tags={tags}
+            tagsStatus={tagsStatus}
+            onRetryTags={() => { void load() }}
           onSuccess={(broadcast) => router.push(
             broadcast.status === 'scheduled'
               ? `/broadcasts/reserved?id=${encodeURIComponent(broadcast.id)}`
