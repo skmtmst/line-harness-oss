@@ -76,8 +76,10 @@ function lotOf(ledgerId: string) {
 }
 
 function grantLedgerIds(): string[] {
+  // 同一ミリ秒の作成で created_at が並ぶと id（乱数）の順で裏返るため、
+  // 投入順そのものの rowid で割る（付与の生成順＝この試験の前提）。
   return (sqlite.prepare(
-    `SELECT id FROM mileage_ledger WHERE entry_type = 'grant' AND status = 'available' ORDER BY created_at, id`,
+    `SELECT id FROM mileage_ledger WHERE entry_type = 'grant' AND status = 'available' ORDER BY created_at, rowid`,
   ).all() as Array<{ id: string }>).map((row) => row.id);
 }
 
