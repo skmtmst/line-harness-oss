@@ -186,7 +186,7 @@ export default function MediaReplacementDialog({
               placeholder="名前で探す"
               value={candidateQueryInput}
               onChange={(event) => setCandidateQueryInput(event.target.value)}
-              className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
             />
             <Button type="submit">検索</Button>
           </form>

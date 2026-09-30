@@ -18,7 +18,7 @@ import Notice from '@/components/shared/notice'
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 const inputClass =
-  'w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
+  'w-full border border-hairline rounded-control px-3 py-2 text-sm focus:border-accent'
 const labelClass = 'block text-sm font-medium text-ink-secondary mb-1.5'
 
 function timeToMinutes(value: string): number {

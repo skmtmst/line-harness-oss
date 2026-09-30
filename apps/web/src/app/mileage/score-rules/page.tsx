@@ -484,7 +484,7 @@ export default function ActionScoreRulesPage() {
                      * 文字が #7d8590（3.54:1）まで落ちて読めない。
                      */
                     <div key={rule.id} className="grid min-h-10 grid-cols-12 items-center gap-x-3 gap-y-1 rounded-control px-3 py-2" style={{ background: rule.enabled ? 'var(--color-surface-pearl)' : 'var(--color-canvas-sunken)' }}>
-                      <button type="button" disabled={!canEdit} className="col-span-12 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default sm:col-span-6" aria-label={`${rule.name}を編集`} onClick={() => { setEditDraft({ ...rule, frequency: { ...rule.frequency } }); setEditRuleIndex(index) }}>
+                      <button type="button" disabled={!canEdit} className="col-span-12 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action disabled:cursor-default sm:col-span-6" aria-label={`${rule.name}を編集`} onClick={() => { setEditDraft({ ...rule, frequency: { ...rule.frequency } }); setEditRuleIndex(index) }}>
                         <span style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-ink-secondary)' }}><RuleIcon eventType={rule.eventType} /></span>
                         <span className="truncate" title={rule.name}>{rule.name}</span>
                         {canEdit ? <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" /> : null}

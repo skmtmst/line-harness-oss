@@ -799,7 +799,7 @@ function EditCommonVarInner() {
                       maxLength={200}
                       value={name}
                       onChange={(e) => { setSaved(false); setName(e.target.value) }}
-                      className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                     />
                     <p className="text-ink-faint mt-1 text-xs">管理画面の中で探すときの名前</p>
                   </div>

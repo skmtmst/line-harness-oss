@@ -60,8 +60,8 @@
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--color-status-info); /* keyboard focus */
-  outline-offset: 1px;
+  outline: 2px solid var(--color-action); /* keyboard focus */
+  outline-offset: 2px;
 }
 
 /* 箱の中の「?」。★V7 `LYs5d`：11px 太字 `ink-secondary`。 */
@@ -99,7 +99,7 @@
 }
 
 .tip a:focus-visible {
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 1px;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 }

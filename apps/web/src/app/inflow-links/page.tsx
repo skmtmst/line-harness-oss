@@ -12,6 +12,7 @@ import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, T
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import { exportFileName, jstTodayString, toCsv } from './inflow-export'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -199,7 +200,7 @@ function InflowLinksPageInner({
   const [editing, setEditing] = useState<
     EntryRoute | 'new' | { register: string } | null
   >(null)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const { copied, copy } = useCopy()
   const [copyFailedId, setCopyFailedId] = useState<string | null>(null)
   const [selectedGenre, setSelectedGenre] = useState('')
   const [search, setSearch] = useState('')
@@ -421,15 +422,13 @@ function InflowLinksPageInner({
 
   const onCopy = async (refCode: string, id: string) => {
     const url = referralUrl(refCode)
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedId(id)
-      setCopyFailedId(null)
-      setTimeout(() => setCopiedId(null), 1200)
-    } catch {
+    const ok = await copy(url, id)
+    if (!ok) {
       // 失敗に気づかず URL 未コピーのまま配布作業が進むのを防ぐ。
       setCopyFailedId(id)
       setTimeout(() => setCopyFailedId(null), 3000)
+    } else {
+      setCopyFailedId(null)
     }
   }
 
@@ -1147,8 +1146,9 @@ function InflowLinksPageInner({
                           aria-label={`${r.name}のURLをコピー`}
                           title={r.isActive === false ? '停止中のため、このURLを開いても友だち追加できません' : undefined}
                         >
-                          {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
+                          {copyFailedId === r.refCode ? 'コピー失敗' : copied(r.refCode) ? '✓' : 'コピー'}
                         </button>
+                        <CopyAnnounce show={copied(r.refCode)} />
                         {/*
                           停止中の経路のQRは出さない。読み取っても友だち追加
                           できないQRを配る事故を防ぐ。押せない飾りは置かず、

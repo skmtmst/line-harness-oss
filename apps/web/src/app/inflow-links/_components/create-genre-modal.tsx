@@ -74,7 +74,7 @@ export default function GenreModal({
           }}
           maxLength={80}
           placeholder="例: A店"
-          className="mt-2 w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-success focus:outline-none focus:ring-2 focus:ring-success/25"
+          className="mt-2 w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-success"
         />
         <div className="mt-6 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-control px-4 py-2 text-sm text-ink-secondary">

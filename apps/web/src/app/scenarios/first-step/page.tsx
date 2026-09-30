@@ -729,7 +729,7 @@ function FirstStepContent() {
                       value={body}
                       onChange={e => editBody(e.target.value)}
                       placeholder="はじめまして。友だち追加ありがとうございます。"
-                      className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
+                      className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink w-full resize-y border px-3 py-2 text-sm`}
                     />
                     <CharCounter length={bodyLength} />
                   </div>

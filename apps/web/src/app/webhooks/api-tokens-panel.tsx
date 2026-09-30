@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { formatDateTime } from '@/lib/format'
@@ -52,7 +53,7 @@ export default function ApiTokensPanel() {
   const [creating, setCreating] = useState(false)
   // 発行・再発行の直後に1回だけ見せる平文。閉じるか切り替えたら消える。
   const [issued, setIssued] = useState<{ name: string; token: string } | null>(null)
-  const [copied, setCopied] = useState(false)
+  const { copied, copy, reset: resetCopied } = useCopy()
   const [rotateTarget, setRotateTarget] = useState<IntegrationApiTokenInfo | null>(null)
   const [revokeTarget, setRevokeTarget] = useState<IntegrationApiTokenInfo | null>(null)
   const [mutating, setMutating] = useState(false)
@@ -106,7 +107,6 @@ export default function ApiTokensPanel() {
   // （発行・再発行の直後に一覧を読み直しても、1回だけの表示が保たれる）。
   useEffect(() => {
     setIssued(null)
-    setCopied(false)
   }, [selectedAccountId])
 
   const toggleScope = (scope: string) => {
@@ -140,7 +140,7 @@ export default function ApiTokensPanel() {
         return
       }
       setIssued({ name: res.data.name, token: res.data.token })
-      setCopied(false)
+      resetCopied()
       setName('')
       setShowCreate(false)
       await load()
@@ -172,7 +172,7 @@ export default function ApiTokensPanel() {
         return
       }
       setIssued({ name: res.data.name, token: res.data.token })
-      setCopied(false)
+      resetCopied()
       setRotateTarget(null)
       await load()
     } catch (caught) {
@@ -236,12 +236,8 @@ export default function ApiTokensPanel() {
 
   const copyIssued = async () => {
     if (!issued) return
-    try {
-      await navigator.clipboard.writeText(issued.token)
-      setCopied(true)
-    } catch {
-      // 手で選んで写せるので、失敗しても文は出さない。
-    }
+    await copy(issued.token)
+    // 手で選んで写せるので、失敗しても文は出さない。
   }
 
   return (
@@ -264,9 +260,10 @@ export default function ApiTokensPanel() {
             {issued.token}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => void copyIssued()}>
-              {copied ? '写しました' : '鍵を写す'}
+            <Button variant="secondary" onClick={() => void copyIssued()} done={copied()} doneLabel="コピーしました">
+              鍵を写す
             </Button>
+            <CopyAnnounce show={copied()} />
             <Button variant="secondary" onClick={() => setIssued(null)}>
               閉じる
             </Button>

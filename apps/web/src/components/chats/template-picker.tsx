@@ -371,7 +371,7 @@ export default function TemplatePicker({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="テンプレート名・本文で検索"
               aria-label="テンプレート名・本文で検索"
-              className="w-full rounded-control border border-hairline py-2.5 pr-3 pl-9 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+              className="w-full rounded-control border border-hairline py-2.5 pr-3 pl-9 text-sm focus:border-accent"
             />
           </div>
           <TemplateFolderSelect

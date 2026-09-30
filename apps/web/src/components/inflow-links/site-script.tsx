@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
 import { TextField, TextArea } from '@/components/shared/text-field'
@@ -39,7 +40,7 @@ export default function SiteScript() {
   const [summary, setSummary] = useState<TrackingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopy()
   const [copyFailed, setCopyFailed] = useState(false)
   // アカウント別の計測鍵。取れるまで・取れないときはコードを出さない
   // (固定の鍵を出すと他アカウントの計測が混ざる)。
@@ -212,14 +213,8 @@ export default function SiteScript() {
 
   const copy = async () => {
     if (!snippet) return
-    try {
-      await navigator.clipboard.writeText(snippet)
-      setCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
+    const ok = await copyText(snippet)
+    setCopyFailed(!ok)
   }
 
   const receiving = summary?.lastEventAt != null
@@ -307,7 +302,8 @@ export default function SiteScript() {
                   <p className="text-xs text-on-accent">あなたのアカウントで使うコード</p>
                   <div className="mt-2 flex items-center gap-3">
                     <code className="min-w-0 flex-1 overflow-x-auto text-xs">{snippet}</code>
-                    <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
+                    <Button onClick={copy} done={copied()} doneLabel="コピーしました">コピー</Button>
+                    <CopyAnnounce show={copied()} />
                   </div>
                 </div>
                 {copyFailed && <p className="mt-2 text-xs text-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}

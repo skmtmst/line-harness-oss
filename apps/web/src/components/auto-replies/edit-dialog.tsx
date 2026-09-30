@@ -692,7 +692,7 @@ export default function EditDialog({
                 onChange={(e) => setRuleName(e.target.value)}
                 maxLength={250}
                 placeholder="例：営業時間外の案内"
-                className="border-hairline rounded-control focus:ring-accent mt-1 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
               />
             </label>
 
@@ -889,7 +889,7 @@ export default function EditDialog({
                         setKeywordRules(next)
                         if (index === 0) setKeyword(event.target.value)
                       }}
-                      className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                      className="border-hairline rounded-control min-w-0 flex-1 border px-3 py-2 text-sm"
                       placeholder={index === 0 ? '例：予約変更' : 'キーワードを追加'}
                     />
                     {keywordRules.length > 1 && (
@@ -1348,7 +1348,7 @@ export default function EditDialog({
                   placeholder={mode === 'inline-flex' ? '{"type":"bubble", ...}' : '返信する内容を入力'}
                   className={page
                     ? 'border-hairline rounded-control mt-2 w-full resize-y border bg-canvas px-3 py-3 text-sm leading-relaxed'
-                    : 'border-hairline rounded-control focus:ring-accent mt-1 w-full resize-y border px-3 py-2 font-mono text-xs focus:ring-2 focus:outline-none'}
+                    : 'border-hairline rounded-control mt-1 w-full resize-y border px-3 py-2 font-mono text-xs'}
                 />
               </label>
               {page && mode === 'inline-text' && (

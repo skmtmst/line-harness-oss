@@ -81,7 +81,8 @@
 }
 
 .panel:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 /* 見出しと右上の×を1行に並べる。中身は今までどおり縦に積む。 */

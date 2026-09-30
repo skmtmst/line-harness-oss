@@ -86,7 +86,8 @@
 }
 
 .undo:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 /* 閉じる印。 */
@@ -109,6 +110,7 @@
 }
 
 .close:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 }

@@ -466,7 +466,7 @@ function NewCommonVarInner() {
                   type={type === 'number' ? 'number' : 'text'}
                   value={fallbackValue}
                   onChange={(e) => setFallbackValue(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
                 />
               )}
               {fallbackFieldError ? <p className="text-danger mt-1 text-xs">{fallbackFieldError}</p> : null}
@@ -552,7 +552,7 @@ function NewCommonVarInner() {
               setSecretWarningFields(null)
             }}
             placeholder={spec.placeholder}
-            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
+            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
           /> : type === 'date' ? (
             <DateField
               id="cv-value"
@@ -573,7 +573,7 @@ function NewCommonVarInner() {
             value={value}
             onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }}
             placeholder={spec.placeholder}
-            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
+            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
           />}
           {valueFieldError ? <p className="text-danger mt-1 max-w-md text-xs">{valueFieldError}</p> : null}
           {type !== 'number' && type !== 'boolean' && (

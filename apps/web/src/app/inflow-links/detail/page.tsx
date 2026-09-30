@@ -10,6 +10,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import EditRouteModal from '../_components/edit-route-modal'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -73,7 +74,7 @@ function InflowLinkDetailPageContent() {
   const [routeLoading, setRouteLoading] = useState(false)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [routeMissing, setRouteMissing] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopy()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -204,14 +205,8 @@ function InflowLinkDetailPageContent() {
 
   async function copyUrl() {
     if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
+    const ok = await copy(url)
+    setCopyFailed(!ok)
   }
 
   async function applyDeleteChoice() {
@@ -326,7 +321,7 @@ function InflowLinkDetailPageContent() {
       ) : <>
         <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span>{/* R273: 一覧・一括操作と同じ言葉で受付状態を出す。赤は使わない（★V7）。 */}<span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.isActive ? '受付中' : '停止中'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
-          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除する' : '受付を止める'}</Button></div>
+          <div className="flex gap-2"><Button onClick={copyUrl} done={copied()} doneLabel="コピーしました">URLをコピー</Button><CopyAnnounce show={copied()} /><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除する' : '受付を止める'}</Button></div>
         </div>
         {copyFailed && url && (
           <div role="alert" className="mb-4 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">

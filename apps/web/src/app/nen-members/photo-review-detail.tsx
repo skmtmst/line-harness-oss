@@ -343,7 +343,7 @@ export function PhotoReviewDetail({
     >
       {stepUpMethod === 'none' ? null : stepUpMethod === 'password' ? (
         <label className="block text-sm font-semibold text-ink">パスワード
-          <input type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" className="mt-2 w-full rounded-control border border-shell-gray bg-canvas px-3 py-2 text-sm font-normal text-ink outline-none focus:border-action" />
+          <input type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" className="mt-2 w-full rounded-control border border-shell-gray bg-canvas px-3 py-2 text-sm font-normal text-ink focus:border-action" />
         </label>
       ) : (
         <label className="block text-sm font-semibold text-ink">再認証コード

@@ -23,7 +23,7 @@
 
 .link:focus-visible {
   border-radius: var(--radius-mini);
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 

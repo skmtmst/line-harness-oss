@@ -220,10 +220,10 @@ export default function NewRestaurantStorePage() {
 
           {step === STEP.BASICS && <div className="mt-7 space-y-6">
             <Field label="店舗名" required help="お客様にも伝わる正式な店舗名を入力してください。" error={errors.name}>
-              <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="organization" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
+              <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="organization" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink focus:border-accent" />
             </Field>
             <Field label="店舗の略称" required={false} help="管理画面で店舗を見分ける短い名前です。空欄の場合は店舗名を使います。">
-              <input value={alias} onChange={(event) => setAlias(event.target.value)} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
+              <input value={alias} onChange={(event) => setAlias(event.target.value)} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink focus:border-accent" />
             </Field>
             <StickyBar actions={<button type="button" onClick={nextFromBasics} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button>} />
           </div>}
@@ -240,10 +240,10 @@ export default function NewRestaurantStorePage() {
           {step === STEP.CREDENTIALS && <div className="mt-7 space-y-6">
             <p className="rounded-control bg-info-bg px-4 py-3 text-sm leading-6 text-ink-secondary">LINE公式アカウントのチャネルIDとチャネルシークレットを使用して、アカウントセットアップを行います。</p>
             <Field label="チャネルID" required help="LINE Developersの「チャネル基本設定」にある数字をコピーしてください。" error={errors.channelId}>
-              <input value={channelId} onChange={(event) => setChannelId(event.target.value)} inputMode="numeric" autoComplete="off" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
+              <input value={channelId} onChange={(event) => setChannelId(event.target.value)} inputMode="numeric" autoComplete="off" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink focus:border-accent" />
             </Field>
             <Field label="チャネルシークレット" required help="同じ「チャネル基本設定」のチャネルシークレットをコピーしてください。保存後、この値は画面に表示されません。" error={errors.channelSecret}>
-              <input type="password" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} autoComplete="new-password" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
+              <input type="password" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} autoComplete="new-password" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink focus:border-accent" />
             </Field>
             <StickyBar actions={<><button type="button" onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" onClick={nextFromCredentials} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button></>} />
           </div>}

@@ -1377,7 +1377,7 @@ export default function ScenarioDetailClient({
           <input
             type="number"
             min={1}
-            className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
             value={stepForm.stepOrder}
             onChange={(e) => setStepForm({ ...stepForm, stepOrder: Number(e.target.value) })}
           />
@@ -1575,7 +1575,7 @@ export default function ScenarioDetailClient({
                 )}
                 <textarea
                   ref={stepBodyRef}
-                  className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm"
                   rows={4}
                   placeholder="メッセージ内容を入力..."
                   value={stepForm.messageContent}
@@ -1967,7 +1967,7 @@ export default function ScenarioDetailClient({
               <label className="block text-xs font-medium text-ink-secondary mb-1">シナリオ名 <span className="text-danger">*</span></label>
               <input
                 type="text"
-                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               />
@@ -1975,7 +1975,7 @@ export default function ScenarioDetailClient({
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">説明</label>
               <textarea
-                className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm"
                 rows={2}
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}

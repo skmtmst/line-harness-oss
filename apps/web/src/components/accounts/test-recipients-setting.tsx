@@ -198,7 +198,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
           placeholder="友だちを検索して追加..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full border border-hairline rounded-control px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-action"
+          className="w-full border border-hairline rounded-control px-3 py-1.5 text-xs"
         />
         {searching && <span className="absolute right-2 top-1.5 text-xs text-ink-faint">検索中...</span>}
         {saving && <span className="absolute right-2 top-1.5 text-xs text-success">保存中...</span>}

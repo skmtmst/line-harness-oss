@@ -39,7 +39,7 @@ interface Props {
 }
 
 const inputCls =
-  'w-20 border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent'
+  'w-20 border border-hairline rounded-control px-3 py-2 text-sm'
 
 export default function ScheduleInput({ mode, value, onChange }: Props) {
   if (mode === 'relative') {

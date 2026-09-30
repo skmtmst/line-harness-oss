@@ -366,7 +366,7 @@ function FeatureSection({ group, features, ordering, usageByItemId, usageByFeatu
             type="button"
             aria-disabled={total === 0}
             onClick={() => total > 0 && onGroupToggle(group, !allEnabled)}
-            className={`text-action focus-visible:outline-info whitespace-nowrap text-[11px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
+            className={`text-action focus-visible:outline-action whitespace-nowrap text-[11px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
           >
             まとめて切替
           </button>

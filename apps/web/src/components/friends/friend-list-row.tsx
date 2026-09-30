@@ -78,7 +78,7 @@ export default function FriendListRow({
           openDetail()
         }
       }}
-      className="grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none"
+      className="grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl"
       style={{ gridTemplateColumns }}
     >
       <div onClick={(event) => event.stopPropagation()}>

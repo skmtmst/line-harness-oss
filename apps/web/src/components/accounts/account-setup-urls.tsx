@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+
+
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 
 interface Props {
   liffId: string | null
@@ -57,17 +59,12 @@ export default function AccountSetupUrls({ liffId, heading }: Props) {
 }
 
 function UrlRow({ label, hint, url }: { label: string; hint: string; url: string }) {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopy()
   const onCopy = async () => {
     if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    } catch {
-      // navigator.clipboard requires HTTPS / secure context. If it ever fails
-      // the user can still select-copy from the visible text.
-    }
+    await copy(url)
+    // navigator.clipboard requires HTTPS / secure context. If it ever fails
+    // the user can still select-copy from the visible text.
   }
 
   return (
@@ -90,8 +87,9 @@ function UrlRow({ label, hint, url }: { label: string; hint: string; url: string
           disabled={!url}
           className="shrink-0 rounded-mini border border-hairline px-2 text-xs font-medium hover:bg-surface-pearl disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {copied ? '✓' : 'コピー'}
+          {copied() ? '✓' : 'コピー'}
         </button>
+        <CopyAnnounce show={copied()} />
       </div>
     </div>
   )

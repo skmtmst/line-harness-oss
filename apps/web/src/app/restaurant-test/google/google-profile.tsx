@@ -128,7 +128,7 @@ function PillTabs({ label, items }: { label: string; items: Array<{ key: string;
           aria-selected={item.current}
           disabled={item.disabled}
           onClick={item.onClick}
-          className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-control border px-3.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info disabled:cursor-not-allowed disabled:opacity-40 ${item.current ? 'bg-accent-soft text-accent-deep' : 'bg-canvas text-ink hover:bg-canvas-sunken'}`}
+          className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-control border px-3.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action disabled:cursor-not-allowed disabled:opacity-40 ${item.current ? 'bg-accent-soft text-accent-deep' : 'bg-canvas text-ink hover:bg-canvas-sunken'}`}
           style={{ borderColor: item.current ? 'transparent' : 'var(--color-hairline)' }}
         >
           {item.label}

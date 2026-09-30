@@ -59,6 +59,7 @@
 }
 
 .action:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 }

@@ -126,7 +126,7 @@ function WebinarFolderDialog({
           onKeyDown={(event) => {
             if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
           }}
-          className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm"
           placeholder="例: 商品説明"
         />
         {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}

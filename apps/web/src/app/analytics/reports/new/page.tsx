@@ -644,7 +644,7 @@ function AnalyticsReportFormPage() {
                     <div className="flex min-h-11 items-center gap-3">
                       <span className="text-ink-secondary shrink-0 text-xs font-semibold">メールだけ</span>
                       <input
-                        className="text-ink min-w-0 flex-1 bg-transparent text-sm outline-none"
+                        className="text-ink min-w-0 flex-1 bg-transparent text-sm"
                         type="email"
                         value={email}
                         onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}

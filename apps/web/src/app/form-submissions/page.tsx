@@ -1063,7 +1063,7 @@ export default function FormSubmissionsPage() {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') void saveName()
                 }}
-                className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent"
+                className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-accent"
               />
             </label>
             {renameError && <p className="mt-2 text-xs text-status-danger">{renameError}</p>}
@@ -1182,7 +1182,7 @@ export default function FormSubmissionsPage() {
             onKeyDown={(event) => {
               if (event.key === 'Enter') void duplicateForm()
             }}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
       </ConfirmDialog>

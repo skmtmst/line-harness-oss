@@ -2617,7 +2617,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               maxLength={SEARCH_QUERY_MAX_LENGTH}
               placeholder="名前・メールアドレス・内容で検索"
               aria-label="名前・メールアドレス・内容で検索"
-              className="w-full rounded-control border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15"
+              className="w-full rounded-control border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink focus:border-accent-deep"
               />
             </div>
             {/*
@@ -3543,7 +3543,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       onChange={(event) => setMemoDraft(event.target.value)}
                       rows={4}
                       placeholder="例：次回返信時に配送先住所を確認する"
-                      className="border-hairline focus:border-accent focus:ring-accent/15 rounded-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
+                      className="border-hairline focus:border-accent rounded-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6"
                     />
                     {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
                     {/*
@@ -3720,7 +3720,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
-                <div className="rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
+                <div className="rounded-card border border-hairline bg-canvas p-2 focus-within:outline-2 focus-within:outline-action focus-within:outline-offset-2">
                   {/* 中段 */}
                   {/*
                     INBOX-20: この入力欄に textareaRef を付ける。
@@ -3940,7 +3940,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               aria-modal={wideInfoPanel ? undefined : true}
               aria-label="顧客情報"
               tabIndex={-1}
-              className="fixed inset-y-0 right-0 z-[70] h-full w-[340px] max-w-full shrink-0 overflow-hidden bg-canvas shadow-overlay focus:outline-none 2xl:relative 2xl:z-auto 2xl:w-[300px] 2xl:shadow-none"
+              className="fixed inset-y-0 right-0 z-[70] h-full w-[340px] max-w-full shrink-0 overflow-hidden bg-canvas shadow-overlay 2xl:relative 2xl:z-auto 2xl:w-[300px] 2xl:shadow-none"
             >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、

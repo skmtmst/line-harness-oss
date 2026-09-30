@@ -19,7 +19,7 @@ import { Field, LinePreview, ReminderFooter, ReminderPanel, ReminderWizard, Remi
 import { usePageTitle } from '@/components/shell/page-chrome'
 import styles from './page.module.css'
 
-const inputClass = 'border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+const inputClass = 'border-hairline rounded-control block w-full border px-3 py-2 text-sm'
 
 /*
  * #996 DEEP-06/07: ひな形。選んだときだけ用途に合う基準日・タイミング・本文を

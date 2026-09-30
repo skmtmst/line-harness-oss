@@ -231,9 +231,9 @@ export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice 
  * この画面だけ枠や余白が違うと、同じアプリに見えない。
  */
 const inputClass =
-  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+  'border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm'
 const areaClass =
-  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+  'border-hairline rounded-control bg-canvas text-ink w-full resize-y border px-3 py-2 text-sm'
 
 /** 上限に対する残りを出す。超えた時点で赤くする。 */
 function CharCount({ value, max }: { value: string; max: number }) {

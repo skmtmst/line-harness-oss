@@ -95,7 +95,8 @@
 }
 
 .close:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 /*
@@ -103,7 +104,7 @@
  * HelpTip 側が持つ見た目は変えない。ここでは存在だけ示す。
  */
 .notice a:focus-visible {
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 1px;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 }

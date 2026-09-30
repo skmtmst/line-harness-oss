@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatDateTime } from '@/lib/format'
+import { useCopy } from '@/lib/copy'
 
 /**
  * 友だち追加のQRコード（設計 V2 1-1-1）。
@@ -115,7 +116,7 @@ export default function QrDialog({
    * コピーの結果は3状態。失敗しても押す前と同じ見た目だと、
    * 配布に使うURLを取れていないことに気づけない（DASH-29）。
    */
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [copyState, setCopyState] = useState<'idle' | 'failed'>('idle')
   const [qrDataUrl, setQrDataUrl] = useState('')
 
   // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
@@ -222,12 +223,10 @@ export default function QrDialog({
       ? null
       : resolveOfficialProfileUrl(officialProfileUrl, accountBasicId)
 
+  const { copied, copy: copyLink } = useCopy()
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopyState('copied')
-      setTimeout(() => setCopyState('idle'), 1200)
-    } catch {
+    const ok = await copyLink(link)
+    if (!ok) {
       /*
        * 権限拒否・安全なコンテキストでない環境では書けない。
        * 黙って終わらせず、手動で選択してコピーする案内を出す（DASH-29）。
@@ -464,13 +463,15 @@ export default function QrDialog({
                   rows={3}
                   value={blocked ? '' : link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 resize-none border px-3 py-2 font-mono text-xs leading-relaxed focus:outline-none"
+                  className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 resize-none border px-3 py-2 font-mono text-xs leading-relaxed"
                 />
                 <Button
                   variant="secondary"
                   type="button"
                   onClick={copy}
                   disabled={blocked}
+                  done={copied()}
+                  doneLabel="コピーしました"
                   className="min-h-11 shrink-0"
                 >
                   コピー
@@ -480,10 +481,10 @@ export default function QrDialog({
                 コピーの成否は読み上げにも通知する（DASH-29）。
                 失敗時は欄から手動で選択してコピーできる案内を残す。
               */}
-              <p aria-live="polite" className={`mt-1 text-xs ${copyState === 'failed' ? 'text-danger' : copyState === 'copied' ? 'text-success' : 'text-ink-faint'}`}>
+              <p aria-live="polite" className={`mt-1 text-xs ${copyState === 'failed' ? 'text-danger' : copied() ? 'text-success' : 'text-ink-faint'}`}>
                 {copyState === 'failed'
                   ? 'コピーできませんでした。上のURLを選択してコピーしてください'
-                  : copyState === 'copied'
+                  : copied()
                     ? 'コピーしました ✓'
                     : 'このURLから追加された友だちは、流入元を記録して計測できます。'}
               </p>

@@ -464,7 +464,7 @@ export default function NotificationRunList({
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">
           <span className="sr-only">お客様の名前・注文番号で検索</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-accent" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm focus:border-accent" />
         </label>
         {filters.map((item) => <FilterChip key={item.value} selected={filter === item.value} onChange={() => setFilter(item.value)}>{item.label}</FilterChip>)}
         <Select

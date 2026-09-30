@@ -244,18 +244,18 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       {selectedStep ? <ReminderPanel title={`${selectedIndex + 1 || 1}通目のお知らせ`} note="送るタイミングと文面を決めます。">
         <div className="grid gap-3">
           <div className="grid gap-3 md:grid-cols-4">
-            <Field label="起点"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="基準日" readOnly /></Field>
+            <Field label="起点"><TextInput className="border-hairline rounded-control border px-3 py-2 text-sm" value="基準日" readOnly /></Field>
             {settings.deliveryMode === 'countdown' ? (
-              <Field label="基準日の何分前" note="後ろにずらすときは負の数"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" type="number" min={-525600} max={525600} value={String(-(selectedStep.offsetMinutes ?? 0))} onChange={(event) => {
+              <Field label="基準日の何分前" note="後ろにずらすときは負の数"><TextInput className="border-hairline rounded-control border px-3 py-2 text-sm" type="number" min={-525600} max={525600} value={String(-(selectedStep.offsetMinutes ?? 0))} onChange={(event) => {
                 const minutesBefore = Number(event.target.value)
                 if (Number.isInteger(minutesBefore)) updateStep(selectedStep.stableStepId, { offsetMinutes: -minutesBefore })
               }} /></Field>
             ) : (<>
-              <Field label="基準日の何日前" note="後ろにずらすときは負の数"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" type="number" min={-365} max={365} value={String(-(selectedStep.offsetDays ?? 0))} onChange={(event) => {
+              <Field label="基準日の何日前" note="後ろにずらすときは負の数"><TextInput className="border-hairline rounded-control border px-3 py-2 text-sm" type="number" min={-365} max={365} value={String(-(selectedStep.offsetDays ?? 0))} onChange={(event) => {
                 const daysBefore = Number(event.target.value)
                 if (Number.isInteger(daysBefore)) updateStep(selectedStep.stableStepId, { offsetDays: -daysBefore })
               }} /></Field>
-              <Field label="送信時刻"><TextInput className="border-hairline rounded-control focus:ring-accent min-w-24 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.sendAtTime ?? ''} placeholder="HH:MM" onChange={(event) => updateStep(selectedStep.stableStepId, { sendAtTime: event.target.value || null })} /></Field>
+              <Field label="送信時刻"><TextInput className="border-hairline rounded-control min-w-24 border px-3 py-2 text-sm" value={selectedStep.sendAtTime ?? ''} placeholder="HH:MM" onChange={(event) => updateStep(selectedStep.stableStepId, { sendAtTime: event.target.value || null })} /></Field>
             </>)}
           </div>
           <InsertToolbar
@@ -263,7 +263,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
             value={selectedStep.messageContent}
             onChange={(next) => updateStep(selectedStep.stableStepId, { messageContent: next.slice(0, 5000) })}
           />
-          <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea ref={bodyRef} rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
+          <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea ref={bodyRef} rows={3} className="border-hairline rounded-control border px-3 py-2 text-sm" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
           {/\{\{[^}]+\}\}/.test(selectedStep.messageContent)
             ? <p className="text-ink-secondary text-xs">見本：{renderReminderBodySample(selectedStep.messageContent)}</p>
             : null}

@@ -14,6 +14,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 
 export default function PoolsPage() {
   usePageTitle('プール管理')
@@ -152,16 +153,8 @@ function PoolCard({
   const isMain = pool.slug === 'main'
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const publicUrl = `${apiBase}/pool/${pool.slug}`
-  const [copied, setCopied] = useState(false)
-  const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(publicUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    } catch {
-      // clipboard requires secure context — silent fallback
-    }
-  }
+  const { copied, copy } = useCopy()
+  const onCopy = () => void copy(publicUrl)
   /**
    * 削除の確認。ブラウザの `confirm()` は「プール「x」を削除しますか?」と
    * しか言えず、公開URLが止まることも、記録が残ることも読めない。失敗は
@@ -205,9 +198,10 @@ function PoolCard({
           <p className="text-xs text-ink-faint font-mono truncate" title={pool.slug}>{pool.slug}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="secondary" onClick={onCopy}>
-            {copied ? '✓ コピー済' : '公開 URL コピー'}
+          <Button variant="secondary" onClick={onCopy} done={copied()} doneLabel="コピーしました">
+            公開 URL コピー
           </Button>
+          <CopyAnnounce show={copied()} />
           {!isMain && (
             <button
               type="button"

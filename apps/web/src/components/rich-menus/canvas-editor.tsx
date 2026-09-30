@@ -401,7 +401,7 @@ export function CanvasEditor({
                         }
                       }
                 }
-                className="absolute focus-visible:outline-2 focus-visible:outline-status-info"
+                className="absolute focus-visible:outline-2 focus-visible:outline-action"
                 style={{
                   left: area.boundsX * scale,
                   top: area.boundsY * scale,
@@ -467,7 +467,7 @@ export function CanvasEditor({
                     type="button"
                     aria-current={selected ? true : undefined}
                     onClick={() => onSelectArea(area.id)}
-                    className={`flex-1 px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-status-info ${
+                    className={`flex-1 px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-action ${
                       selected ? 'bg-accent-soft text-ink font-semibold' : 'text-ink hover:bg-canvas-sunken'
                     }`}
                   >
@@ -478,7 +478,7 @@ export function CanvasEditor({
                     type="button"
                     aria-label={`${name}を消す`}
                     onClick={() => onDeleteArea(area.id)}
-                    className="text-status-danger mr-2 px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-status-info"
+                    className="text-status-danger mr-2 px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-action"
                   >
                     消す
                   </button>

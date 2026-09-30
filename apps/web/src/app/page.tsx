@@ -56,6 +56,7 @@ import {
   type DashboardNotificationFilter,
 } from '@/components/dashboard/notification-summary'
 import { formatNumber, formatTime } from '@/lib/format'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 
 /** 共通トップバーの通知ベル。件数と一覧は選択中アカウントの通知センターから読む。 */
 function BellIcon() {
@@ -203,7 +204,7 @@ function FriendAddLinkCard({
   const { selectedAccount, selectedAccountId } = useAccount()
   const router = useRouter()
   const params = useSearchParams()
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [copyState, setCopyState] = useState<'idle' | 'failed'>('idle')
   /* null は取得中。アカウントを切り替えた直後は前のアカウントの経路を残さない。 */
   const [routes, setRoutes] = useState<EntryRoute[] | null>(null)
   const [routeId, setRouteId] = useState('')
@@ -260,12 +261,10 @@ function FriendAddLinkCard({
   const route = (routes ?? []).find((entry) => entry.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
 
+  const { copied, copy } = useCopy()
   const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopyState('copied')
-      window.setTimeout(() => setCopyState('idle'), 1200)
-    } catch {
+    const ok = await copy(link)
+    if (!ok) {
       /*
        * 権限拒否・安全なコンテキストでない環境では書けない（DASH-29）。
        * 黙って終わらせず失敗を出し、欄から手動で選べることを伝える。
@@ -308,8 +307,9 @@ function FriendAddLinkCard({
           className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2.5 font-mono text-xs"
         />
         <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-semibold">
-          {copyState === 'copied' ? 'コピーしました ✓' : 'コピー'}
+          {copied() ? '✓ コピーしました' : 'コピー'}
         </button>
+        <CopyAnnounce show={copied()} />
         <button type="button" onClick={() => writeQr(routeId || 'base')} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-semibold">QRを表示</button>
       </div>
       {copyState === 'failed' ? (

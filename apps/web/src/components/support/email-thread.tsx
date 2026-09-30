@@ -802,7 +802,7 @@ export default function EmailThread({
                   rows={7}
                   autoFocus
                   placeholder="メモを追加"
-                  className="mt-2 w-full resize-y rounded-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+                  className="mt-2 w-full resize-y rounded-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 focus:border-accent"
                 />
                 {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
               </div>
@@ -835,7 +835,7 @@ export default function EmailThread({
           </p>
         )}
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
-        <div className="rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
+        <div className="rounded-card border border-hairline bg-canvas p-2 focus-within:outline-2 focus-within:outline-action focus-within:outline-offset-2">
           <textarea
             value={reply}
             onChange={(e) => setReplyDraft(e.target.value)}

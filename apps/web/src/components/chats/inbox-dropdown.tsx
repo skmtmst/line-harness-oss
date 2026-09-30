@@ -216,7 +216,7 @@ export function OperatorDropdown({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="担当者名を検索"
               aria-label="担当者名を検索"
-              className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1 text-xs outline-none"
+              className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1 text-xs"
             />
           </div>
           {shown.length === 0 ? (
@@ -414,7 +414,7 @@ export function FolderDropdown({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="フォルダを検索"
               aria-label="フォルダを検索"
-              className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1.5 text-xs outline-none"
+              className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1.5 text-xs"
             />
           </div>
           <button

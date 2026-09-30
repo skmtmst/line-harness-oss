@@ -18,6 +18,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ActionCell, DataTable, NameCell, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
@@ -681,6 +682,7 @@ export function IncomingOverview({
    */
   canResolveUnmatched: boolean
 }) {
+  const { copied, copy } = useCopy()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<IncomingWebhookDetail | null>(null)
   const [detailStatus, setDetailStatus] = useState<LoadStatus>('loading')
@@ -926,9 +928,10 @@ export function IncomingOverview({
             </div>
             <div className="bg-canvas-sunken rounded-control mb-4 flex flex-wrap items-center justify-between gap-3 p-3">
               <code className="text-ink break-all text-sm">{endpointUrl(selected.id)}</code>
-              <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(endpointUrl(selected.id))}>
+              <Button variant="secondary" onClick={() => void copy(endpointUrl(selected.id))} done={copied()} doneLabel="コピーしました">
                 コピー
               </Button>
+              <CopyAnnounce show={copied()} />
             </div>
             <dl className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>

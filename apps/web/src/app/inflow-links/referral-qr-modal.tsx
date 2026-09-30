@@ -1,8 +1,9 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import Button from '@/components/shared/button'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
@@ -33,7 +34,7 @@ export default function ReferralQrModal({
   route: ReferralQrRoute
   onClose: () => void
 }) {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopy()
   const titleId = useId()
   const panelRef = useOverlayFocus(true, onClose)
   const stopped = route.isActive === false
@@ -41,9 +42,7 @@ export default function ReferralQrModal({
   const qrBase = `${WORKER_BASE.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}`
   const downloadUrl = `${qrBase}&download=1&filename=${encodeURIComponent(`referral-${route.refCode}`)}`
   const copy = async () => {
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    await copyText(url)
   }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
@@ -64,9 +63,10 @@ export default function ReferralQrModal({
           <>
             <div className="mt-5 rounded-card bg-canvas-sunken p-3">
               <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-              <Button variant="secondary" onClick={copy} className="mt-3 w-full">
-                {copied ? 'コピーしました' : 'URLをコピー'}
+              <Button variant="secondary" onClick={copy} done={copied()} doneLabel="コピーしました" className="mt-3 w-full">
+                URLをコピー
               </Button>
+              <CopyAnnounce show={copied()} />
             </div>
             <div className="mt-5 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}

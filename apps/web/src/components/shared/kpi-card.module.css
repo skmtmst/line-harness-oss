@@ -51,7 +51,8 @@
 }
 
 .retry:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 .label {
@@ -114,7 +115,8 @@
 }
 
 .link:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 .value {

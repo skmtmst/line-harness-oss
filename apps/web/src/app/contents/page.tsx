@@ -894,7 +894,7 @@ function MediaLibraryInner() {
                 }}
                 placeholder="フォルダ名を入力"
                 aria-label="フォルダ名"
-                className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
+                className="border-hairline rounded-control w-full border px-2 py-1.5 text-sm"
               />
               <div className="flex justify-end gap-2">
                 <Button type="button" onClick={() => setAddingFolder(false)}>キャンセル</Button>
@@ -1455,7 +1455,7 @@ function MediaLibraryInner() {
             onChange={(event) => setArchiveReason(event.target.value)}
             placeholder={archiveTarget?.mode === 'archive' ? '例：古いキャンペーンの素材のため' : '例：再び使うため'}
             aria-label="理由"
-            className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
           />
         </label>
       </Dialog>

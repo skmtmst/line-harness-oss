@@ -208,7 +208,7 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
                       </span>
                       <label className="text-ink-secondary text-xs">
                         同時受付数
-                        <input aria-label={`${day.label} ${index + 1}件目の同時受付数`} type="number" min={1} max={1000} value={interval.capacity ?? 1} onChange={(event) => updateInterval(day.weekday, index, { capacity: Number(event.target.value) })} className="border-hairline rounded-control mt-1 block w-24 border bg-canvas px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+                        <input aria-label={`${day.label} ${index + 1}件目の同時受付数`} type="number" min={1} max={1000} value={interval.capacity ?? 1} onChange={(event) => updateInterval(day.weekday, index, { capacity: Number(event.target.value) })} className="border-hairline rounded-control mt-1 block w-24 border bg-canvas px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
                       </label>
                       <button type="button" className="text-danger mb-1.5 px-2 py-1 text-xs underline" onClick={() => updateDay(day.weekday, (current) => current.filter((_, currentIndex) => currentIndex !== index))}>この時間を削除する</button>
                     </div>
@@ -440,13 +440,13 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
     <div className="border-hairline rounded-control border p-3">
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-ink-secondary text-xs">設備名
-          <input aria-label={`${resource.name}の設備名`} value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage || saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+          <input aria-label={`${resource.name}の設備名`} value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage || saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
         </label>
         <label className="text-ink-secondary text-xs">種類
-          <input aria-label={`${resource.name}の種類`} value={type} onChange={(event) => setType(event.target.value)} disabled={!canManage || saving} maxLength={50} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+          <input aria-label={`${resource.name}の種類`} value={type} onChange={(event) => setType(event.target.value)} disabled={!canManage || saving} maxLength={50} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
         </label>
         <label className="text-ink-secondary text-xs">受付上限
-          <input aria-label={`${resource.name}の受付上限`} type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={!canManage || saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+          <input aria-label={`${resource.name}の受付上限`} type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={!canManage || saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
         </label>
       </div>
       <p className="text-ink-faint mt-2 text-xs">
@@ -544,13 +544,13 @@ function NewResourceEditor({ accountId, onCreated }: {
     <div className="border-hairline bg-canvas-sunken rounded-control border p-3">
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-ink-secondary text-xs">設備名
-          <input aria-label="新しい設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+          <input aria-label="新しい設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
         </label>
         <label className="text-ink-secondary text-xs">種類
-          <input aria-label="新しい設備の種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例: 部屋・席・機器" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+          <input aria-label="新しい設備の種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例: 部屋・席・機器" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
         </label>
         <label className="text-ink-secondary text-xs">受付上限
-          <input aria-label="新しい設備の受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+          <input aria-label="新しい設備の受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
         </label>
       </div>
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
@@ -1012,7 +1012,7 @@ function StoreShiftsView() {
                   </span>
                   <label className="text-ink-secondary text-xs">
                     理由
-                    <input aria-label="休業の理由" value={closedReason} onChange={(event) => setClosedReason(event.target.value)} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+                    <input aria-label="休業の理由" value={closedReason} onChange={(event) => setClosedReason(event.target.value)} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
                   </label>
                   {saveError ? <p className="text-danger text-xs sm:col-span-2">{saveError}</p> : <span className="sm:col-span-2" />}
                   <Button variant="primary" onClick={() => void saveClosedDay()} disabled={savingClosed} busy={savingClosed}>休業日を保存する</Button>
@@ -1038,7 +1038,7 @@ function StoreShiftsView() {
                           </span>
                           <label className="text-ink-secondary block text-xs">
                             理由
-                            <input aria-label="休業日の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={exceptionBusy} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+                            <input aria-label="休業日の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={exceptionBusy} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action" />
                           </label>
                           {exceptionError ? <p className="text-danger text-xs" role="alert">{exceptionError}</p> : null}
                           <div className="flex flex-wrap gap-2">

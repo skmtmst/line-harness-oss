@@ -885,7 +885,7 @@ export default function TemplatesPage() {
               <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-status-danger">*</span></label>
               <input
                 type="text"
-                className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
                 placeholder="例: コスト比較 flex"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -895,7 +895,7 @@ export default function TemplatesPage() {
               <label className="block text-xs font-medium text-ink-secondary mb-1">カテゴリ</label>
               <input
                 type="text"
-                className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
                 placeholder="例: general, 挨拶, 返信"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -937,7 +937,7 @@ export default function TemplatesPage() {
                 />
               ) : (
                 <textarea
-                  className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                  className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono resize-y"
                   rows={form.messageType === 'flex' ? 10 : 4}
                   placeholder={form.messageType === 'flex' ? '{"type":"bubble","body":...}' : 'メッセージ内容'}
                   value={form.messageContent}
@@ -1086,7 +1086,7 @@ export default function TemplatesPage() {
                         setDrawerId(t.id)
                       }
                     }}
-                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors focus:bg-canvas-sunken focus:outline-none ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
+                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors focus:bg-canvas-sunken ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
                     {/* 1列目は表の幅に合わせて縮む（以前は抜粋が最大 448px で、1440px でも表が右へはみ出した）。 */}
                     <td className="w-2/5 max-w-0 px-4 py-3">
@@ -1203,7 +1203,7 @@ export default function TemplatesPage() {
                     autoFocus
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 border border-hairline rounded-mini px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="flex-1 border border-hairline rounded-mini px-2 py-1 text-sm"
                   />
                 ) : (
                   <h3
@@ -1360,7 +1360,7 @@ export default function TemplatesPage() {
                   <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
-                    className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                    className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono resize-y"
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     readOnly={!canMutateTemplates}

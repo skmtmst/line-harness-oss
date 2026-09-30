@@ -655,7 +655,7 @@ function VarsPageInner() {
         }}
         placeholder="フォルダ名を入力"
         aria-label="フォルダ名"
-        className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
+        className="border-hairline rounded-control w-full border px-2 py-1.5 text-sm"
       />
       <div className="flex justify-end gap-2">
         <button

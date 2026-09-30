@@ -59,7 +59,7 @@ export default function TermsConsent({ onAgree }: { onAgree: () => Promise<void>
       tabIndex={0}
       role="region"
       aria-label="利用規約"
-      className="max-h-[420px] overflow-y-auto rounded-card border border-hairline bg-canvas-sunken p-5 outline-none focus:border-accent"
+      className="max-h-[420px] overflow-y-auto rounded-card border border-hairline bg-canvas-sunken p-5 focus:border-accent"
     >
       <TermsDocumentContent />
     </div>

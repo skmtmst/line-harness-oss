@@ -1,6 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+
+import { Check } from 'lucide-react'
+
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 
 /**
  * 省略表示される識別子（差し込みキー・フォーム名など）を1操作で全文
@@ -8,7 +12,8 @@ import { useEffect, useRef, useState } from 'react'
  *
  * `title` 属性は「見える」だけで「取れない」。一覧で `…` に切れた値を
  * 配信文面などへ貼るには、コピーの口を列へ添える必要がある。
- * 成功すると「コピー済み」へ一時的に変わって結果が画面上で分かる。
+ * 成功すると印が約1.2秒 ✓ に変わる。知らせ（Toast）は出さず、
+ * 読み上げは「コピーしました」（★V7 §11）。
  *
  * `navigator.clipboard` が使えない環境（非HTTPS・権限拒否）では、省略
  * 表示のままでは全文を取り出せないので、読み取り専用の欄へ切り替えて
@@ -23,28 +28,15 @@ export default function CopyTextButton({
   /** 何をコピーするボタンか。一覧では行の名前を含めて特定できるようにする。 */
   'aria-label': string
 }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const timerRef = useRef<number | null>(null)
+  const { copied, copy } = useCopy()
+  const [failed, setFailed] = useState(false)
 
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-    },
-    [],
-  )
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setState('copied')
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-      timerRef.current = window.setTimeout(() => setState('idle'), 1500)
-    } catch {
-      setState('failed')
-    }
+  const onCopy = async () => {
+    const ok = await copy(value)
+    if (!ok) setFailed(true)
   }
 
-  if (state === 'failed') {
+  if (failed) {
     /*
      * 隣の表示は `truncate` で切れているため、そのままでは全文を選べない。
      * 失敗したときだけ全文入りの読み取り専用欄を出し、手動で選べるようにする。
@@ -67,22 +59,30 @@ export default function CopyTextButton({
 
   /*
    * 表の中の「編集」「削除」と同じく枠なしの文字操作にそろえる。
-   * 「コピー」と「コピー済み」で幅が変わると列が揺れるので、
-   * 長いほうに合わせて固定幅（w-16）にする。
+   * 「コピー」と「コピーしました」で幅が変わると列が揺れるので、
+   * 長いほうに合わせて固定幅にする。
    */
   return (
-    <button
-      type="button"
-      onClick={() => void copy()}
-      aria-label={ariaLabel}
-      title={state === 'copied' ? 'コピーしました' : 'コピー'}
-      className={`w-16 shrink-0 cursor-pointer px-1 py-0.5 text-center text-xs ${
-        state === 'copied'
-          ? 'text-success font-semibold'
-          : 'text-action hover:underline'
-      }`}
-    >
-      {state === 'copied' ? 'コピー済み' : 'コピー'}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => void onCopy()}
+        aria-label={ariaLabel}
+        title={copied() ? 'コピーしました' : 'コピー'}
+        className={`inline-flex w-20 shrink-0 cursor-pointer items-center justify-center gap-1 px-1 py-0.5 text-center text-xs ${
+          copied() ? 'text-success font-semibold' : 'text-action hover:underline'
+        }`}
+      >
+        {copied() ? (
+          <>
+            <Check size={12} aria-hidden="true" />
+            コピー済み
+          </>
+        ) : (
+          'コピー'
+        )}
+      </button>
+      <CopyAnnounce show={copied()} />
+    </>
   )
 }

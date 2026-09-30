@@ -943,7 +943,7 @@ function RuleNumberField({ label, unit, min, max, value, onChange, trackEmpty, h
             trackEmpty(raw === '')
             if (raw !== '') onChange(Number(raw))
           }}
-          className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
+          className="border-hairline rounded-control w-full border px-3 h-10 text-sm tabular-nums"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
       </div>
@@ -1215,7 +1215,7 @@ function EditMenuModal({
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
+              className="border-hairline rounded-control w-full border px-3 h-10 text-sm"
               placeholder="例: カット"
             />
           </Field>
@@ -1224,7 +1224,7 @@ function EditMenuModal({
               type="text"
               value={form.category_label ?? ''}
               onChange={(e) => set('category_label', e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
+              className="border-hairline rounded-control w-full border px-3 h-10 text-sm"
               placeholder="例: カット / カラー / パーマ"
             />
           </Field>
@@ -1232,7 +1232,7 @@ function EditMenuModal({
             <textarea
               value={form.description ?? ''}
               onChange={(e) => set('description', e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-y"
+              className="border-hairline rounded-control w-full border px-3 py-2 text-sm resize-y"
               rows={2}
               placeholder="顧客に表示される説明文"
             />
@@ -1425,7 +1425,7 @@ function EditMenuModal({
                 onChange={(e) => set('intake_question', e.target.value === '' ? null : e.target.value)}
                 placeholder="例: 気になっている箇所はありますか？"
                 maxLength={200}
-                className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
+                className="border-hairline rounded-control w-full border px-3 h-10 text-sm"
               />
               <p className="text-ink-faint mt-1 text-xs">
                 空欄なら質問しません。回答は予約のメモとして残ります。
@@ -1505,7 +1505,7 @@ function NullableNumField({
           value={value ?? ''}
           placeholder="なし"
           onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-          className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
+          className="border-hairline rounded-control w-full border px-3 h-10 text-sm tabular-nums"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
       </div>
@@ -1525,7 +1525,7 @@ function NumField({
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2 tabular-nums"
+        className="border-hairline rounded-control w-full border px-3 h-10 text-sm tabular-nums"
       />
     </Field>
   )

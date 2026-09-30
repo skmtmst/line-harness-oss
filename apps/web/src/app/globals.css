@@ -813,6 +813,32 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
     outline: 2px solid var(--color-action);
     outline-offset: 2px;
   }
+
+  /*
+   * 押せる要素のフォーカスの網（★V7 §15・キーボードの枠）。
+   * 共通部品を通っていない a / button / summary / tabindex 付き要素にも、
+   * 入力欄と同じ形（2px・action 色・外側に2pxの隙間）を当てる。
+   * キーボードで動かした時だけ出る（マウスの押下では出ない）。
+   * :where() で詳細度0・base 層なので、部品側の輪郭があればそちらが勝つ。
+   * tabindex="-1"（スクリプトで合わせる器）は除く。
+   */
+  :where(
+    a[href],
+    button,
+    summary,
+    [role='button'],
+    [role='tab'],
+    [role='link'],
+    [role='switch'],
+    [role='option'],
+    [role='menuitem'],
+    [role='radio'],
+    [role='checkbox'],
+    [tabindex]:not([tabindex='-1'])
+  ):focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 2px;
+  }
 }
 
 /*
@@ -894,7 +920,7 @@ select:not([multiple]):not(.appearance-none) {
 }
 /* Googleビジネス V6（GB-1/2/3/16）：実画面幅でもタブと操作を見切れさせない。 */
 .gb-location-option:focus-within {
-  outline: 2px solid var(--color-status-info);
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 

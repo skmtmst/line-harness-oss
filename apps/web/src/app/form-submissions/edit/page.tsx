@@ -40,6 +40,7 @@ import FormPreview from '@/components/forms/form-preview'
 import FormDesignSettings from './form-design-settings'
 import { ogImageUrlError, validateLayoutForSave } from './form-validate'
 import OptionsDialog from '@/components/forms/options-dialog'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import { describeFormUpdates } from '@/components/forms/form-update-summary'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -119,6 +120,8 @@ function FormEditInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const { copied: copiedAnswer, copy: copyAnswer } = useCopy()
+  const { copied: copiedTest, copy: copyTest } = useCopy()
   /** 本体が読めたかどうか。読めていないときの保存・入力の失敗と分ける。 */
   const [formLoaded, setFormLoaded] = useState(false)
   /** 取得の失敗の内訳（保存・入力の失敗とは分ける）。403は権限不足で再試行しない（M002）。 */
@@ -911,15 +914,15 @@ function FormEditInner() {
                   />
                   <button
                     onClick={() => {
-                      void navigator.clipboard
-                        .writeText(answerUrl)
-                        .then(() => setNotice('URLをコピーしました'))
-                        .catch(() => window.prompt('コピーしてください:', answerUrl))
+                      void copyAnswer(answerUrl).then((ok) => {
+                        if (!ok) window.prompt('コピーしてください:', answerUrl)
+                      })
                     }}
                     className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-2 py-2 text-xs whitespace-nowrap"
                   >
-                    コピー
+                    {copiedAnswer() ? '✓ コピーしました' : 'コピー'}
                   </button>
+                  <CopyAnnounce show={copiedAnswer()} />
                 </div>
               ) : (
                 <p className="text-ink-faint rounded-control border-hairline border px-3 py-2 text-sm">
@@ -968,14 +971,17 @@ function FormEditInner() {
                     className={`${inputClass} text-xs`}
                   />
                   <Button
+                    done={copiedTest()}
+                    doneLabel="コピーしました"
                     onClick={() => {
-                      void navigator.clipboard
-                        .writeText(testUrl)
-                        .catch(() => window.prompt('コピーしてください:', testUrl))
+                      void copyTest(testUrl).then((ok) => {
+                        if (!ok) window.prompt('コピーしてください:', testUrl)
+                      })
                     }}
                   >
                     コピー
                   </Button>
+                  <CopyAnnounce show={copiedTest()} />
                 </div>
                 <p className="text-ink-faint mt-1 text-xs">
                   {testExpiresAt ? `このURLは${formatDateTime(testExpiresAt)}まで使えます。` : ''}

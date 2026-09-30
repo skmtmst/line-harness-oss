@@ -260,7 +260,7 @@ function PayoutStepUpDialog({
             onChange={(event) => setCode(event.target.value)}
             autoFocus
             autoComplete="current-password"
-            className="border-shell-gray rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm font-normal text-ink outline-none focus:border-action"
+            className="border-shell-gray rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm font-normal text-ink focus:border-action"
           />
         </label>
       ) : stepUpMethod === 'totp' ? (

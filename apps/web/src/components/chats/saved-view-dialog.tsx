@@ -190,7 +190,7 @@ export default function SavedViewDialog({
                 */
                 aria-invalid={nameInvalid}
                 aria-describedby={error ? 'saved-view-error' : nameMissing ? 'saved-view-name-hint' : undefined}
-                className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${nameInvalid ? 'border-danger' : 'border-hairline'}`}
+                className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm  ${nameInvalid ? 'border-danger' : 'border-hairline'}`}
               />
             </div>
 

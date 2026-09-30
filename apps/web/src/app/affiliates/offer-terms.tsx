@@ -155,7 +155,7 @@ export function OfferTermsFields({
           value={values.windowDays}
           onChange={(e) => onChange({ ...values, windowDays: e.target.value })}
           placeholder="例: 30（空は今のまま）"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
         />
       </div>
 
@@ -174,7 +174,7 @@ export function OfferTermsFields({
           value={values.capTotal}
           onChange={(e) => onChange({ ...values, capTotal: e.target.value })}
           placeholder="例: 200（空は上限なし）"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
         />
       </div>
 
@@ -193,7 +193,7 @@ export function OfferTermsFields({
           value={values.capMonthly}
           onChange={(e) => onChange({ ...values, capMonthly: e.target.value })}
           placeholder="例: 10（空は上限なし）"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
         />
       </div>
 
@@ -205,7 +205,7 @@ export function OfferTermsFields({
             type="date"
             value={values.receptionFrom}
             onChange={(e) => onChange({ ...values, receptionFrom: e.target.value })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           />
         </div>
         <div>
@@ -215,7 +215,7 @@ export function OfferTermsFields({
             type="date"
             value={values.receptionTo}
             onChange={(e) => onChange({ ...values, receptionTo: e.target.value })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           />
         </div>
       </div>

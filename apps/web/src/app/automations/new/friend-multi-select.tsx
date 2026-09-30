@@ -97,7 +97,7 @@ export function FriendMultiSelect({
                 type="button"
                 onClick={() => remove(id)}
                 aria-label={`${labelOf(id)}を外す`}
-                className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-pill text-ink-faint hover:text-ink focus-visible:outline-2 focus-visible:outline-status-info"
+                className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-pill text-ink-faint hover:text-ink focus-visible:outline-2 focus-visible:outline-action"
               >
                 ×
               </button>

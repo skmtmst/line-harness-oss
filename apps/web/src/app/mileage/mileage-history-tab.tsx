@@ -206,7 +206,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="名前で検索"
-              className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-normal text-ink outline-none focus:border-accent"
+              className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-normal text-ink focus:border-accent"
             />
           </label>
           <Select

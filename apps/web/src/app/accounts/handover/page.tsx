@@ -23,6 +23,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import { useStepUpGate } from '@/components/step-up-prompt'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import {
   DIFFERENT_PROVIDER_NOTE,
   HANDOVER_STEPS,
@@ -79,7 +80,7 @@ function Handover() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
-  const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
+  const { copied, copy } = useCopy()
   const [refreshing, setRefreshing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [executing, setExecuting] = useState(false)
@@ -298,10 +299,9 @@ function Handover() {
     }
   }
 
-  const copyCode = async () => {
+  const copyCode = () => {
     if (!handover?.code) return
-    await navigator.clipboard.writeText(handover.code)
-    setCopyState('copied')
+    void copy(handover.code)
   }
 
   /**
@@ -726,9 +726,10 @@ function Handover() {
             <p className="text-ink text-sm font-bold">引き継ぎコード</p>
             <div className="bg-canvas-sunken rounded-control mt-3 p-4 text-center">
               <p className="text-ink text-xl font-bold tracking-wider">{handover.code}</p>
-              <Button type="button" className="mt-3" onClick={() => void copyCode()}>
-                {copyState === 'copied' ? 'コピーしました' : 'コピー'}
+              <Button type="button" className="mt-3" onClick={copyCode} done={copied()} doneLabel="コピーしました">
+                コピー
               </Button>
+              <CopyAnnounce show={copied()} />
             </div>
             <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
               受け取り先のアカウントでこのコードを読むと、つながります。期限は発行から72時間で、1回だけ使えます。

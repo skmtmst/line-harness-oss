@@ -350,7 +350,7 @@ function Modal({
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.name}
-              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
               placeholder="例: yamada-taro"
             />
           </Field>
@@ -360,7 +360,7 @@ function Modal({
               value={form.display_name ?? ''}
               onChange={(e) => set('display_name', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.displayName}
-              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
               placeholder="顧客に表示される名前"
             />
           </Field>
@@ -370,7 +370,7 @@ function Modal({
               value={form.role ?? ''}
               onChange={(e) => set('role', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.role}
-              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
               placeholder="例: トップスタイリスト"
             />
           </Field>
@@ -388,7 +388,7 @@ function Modal({
               value={form.bio ?? ''}
               onChange={(e) => set('bio', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.bio}
-              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm resize-y"
               rows={2}
             />
           </Field>
@@ -400,7 +400,7 @@ function Modal({
               min={BOOKING_STAFF_LIMITS.sortOrderMin}
               max={BOOKING_STAFF_LIMITS.sortOrderMax}
               step={1}
-              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent tabular-nums"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm tabular-nums"
             />
           </Field>
           <Checkbox

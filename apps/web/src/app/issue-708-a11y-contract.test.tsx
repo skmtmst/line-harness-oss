@@ -8,8 +8,9 @@
  *   （案件・成果承認などは「成果とアフィリエイト」、成果地点・レポートは「コンバージョン」）
  * - 隠れ動線: 受付枠 /booking/staff/shifts がメニュー上の所属を持つ
  *   （担当者は「自分の勤務」、管理者は「予約設定」）
- * - 10: ウェビナー画面で focus:outline-none に見える置き換え
- *   （focus:ring-*）が無い要素を作らない
+ * - 10: ウェビナー画面で輪郭を消す focus:outline-none を使わない
+ *   （globals.css の標準リングに統一したので、消すとキーボードの
+ *   輪郭まで消える）
  */
 import React, { act } from 'react'
 import { readFileSync } from 'node:fs'
@@ -129,15 +130,21 @@ describe('#708 ウェビナーのフォーカス可視性（10）', () => {
     'webinars/edit/page.tsx',
   ]
 
-  it('focus:outline-none には必ず focus:ring-* を伴わせる', () => {
+  it('輪郭を消す focus:outline-none を使わない', () => {
+    /*
+     * かつては focus:outline-none + focus:ring-* の組で独自リングを
+     * 描いていたが、★V7 §15 で globals.css の標準リング（2px・
+     * action 色・外側に2pxの隙間・キーボード時だけ）へ統一した。
+     * focus:outline-none は utilities 層で base 層の輪郭を潰すため、
+     * 残っているとキーボードの輪郭だけ消える。
+     */
     for (const rel of WEBINAR_SOURCES) {
       const src = readFileSync(join(HERE, rel), 'utf8')
       for (const [index, line] of src.split('\n').entries()) {
-        if (!line.includes('focus:outline-none')) continue
         expect(
-          /focus:ring/.test(line),
-          `${rel}:${index + 1} で outline を消すのに代替の輪が無い`,
-        ).toBe(true)
+          /focus:outline-none|focus:ring-/.test(line),
+          `${rel}:${index + 1} で独自リングを使っている`,
+        ).toBe(false)
       }
     }
   })

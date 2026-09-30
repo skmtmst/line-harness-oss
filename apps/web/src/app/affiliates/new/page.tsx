@@ -15,6 +15,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import { formatNumber } from '@/lib/format'
 
 /**
@@ -117,6 +118,7 @@ export default function NewAffiliatePage() {
   const [friendError, setFriendError] = useState('')
   const [friendReload, setFriendReload] = useState(0)
   const [copied, setCopied] = useState(false)
+  const { copied: copiedFlash, copy } = useCopy()
   // 作成後の追加情報保存だけが失敗した場合、再押下で同じ紹介者を増やさず
   // 追加情報の保存だけをやり直す。
   const [createdId, setCreatedId] = useState<string | null>(null)
@@ -547,18 +549,20 @@ export default function NewAffiliatePage() {
               {previewUrl ?? '—'}
             </code>
             {previewUrl && (
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(previewUrl).then(
-                    () => setCopied(true),
-                    () => setCopied(false),
-                  )
-                }}
-                className="border-hairline text-ink rounded-control hover:bg-canvas-sunken border px-2 py-1 text-xs font-semibold"
-              >
-                コピー
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copy(previewUrl).then((ok) => {
+                      if (ok) setCopied(true)
+                    })
+                  }}
+                  className="border-hairline text-ink rounded-control hover:bg-canvas-sunken border px-2 py-1 text-xs font-semibold"
+                >
+                  {copiedFlash() ? '✓ コピーしました' : 'コピー'}
+                </button>
+                <CopyAnnounce show={copiedFlash()} />
+              </>
             )}
           </div>
           <p className="text-ink-faint text-micro mt-1">

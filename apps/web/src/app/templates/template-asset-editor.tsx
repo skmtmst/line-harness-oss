@@ -431,7 +431,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   <div className="border-hairline rounded-control mt-2 border border-dashed p-5 text-center">
                     <Button type="button" onClick={() => setPickerFor('rich_message')}>登録メディアから選ぶ</Button>
                     {pickedMedia ? <p className="text-success mt-2 text-xs">選択中: {pickedMedia.filename}</p> : null}
-                    <input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-3 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={imageUrl} onChange={(event) => { setImageUrl(event.target.value); setPickedMedia(null) }} placeholder="画像URL" />
+                    <input className="border-hairline rounded-control bg-canvas text-ink mt-3 w-full border px-3 py-2 text-sm" value={imageUrl} onChange={(event) => { setImageUrl(event.target.value); setPickedMedia(null) }} placeholder="画像URL" />
                   </div>
                 </Field>
               </section>
@@ -458,7 +458,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                         {draft.kind === 'uri' ? (
                           <input
                             type="url"
-                            className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                            className="border-hairline rounded-control bg-canvas text-ink mt-2 w-full border px-3 py-2 text-sm"
                             value={draft.uri}
                             onChange={(event) => updateArea(area.label, { uri: event.target.value })}
                             placeholder="https://example.com"
@@ -506,7 +506,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   </div>
                   <span className="text-caption mt-1 block font-normal text-ink-faint">この管理画面の時刻（日本時間）で入ります。</span>
                 </div>
-                <Field label="使い方のご案内（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+                <Field label="使い方のご案内（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink mt-2 w-full resize-y border px-3 py-2 text-sm" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
                 <div className="grid gap-3 text-sm">
                   <Field label="使える回数">
                     <Select aria-label="使える回数" value={couponOnce} onChange={(value) => setCouponOnce(value as 'once' | 'unlimited')} options={[{ value: 'once', label: '1人1回だけ' }, { value: 'unlimited', label: '期間中なら何回でも' }]} size="full" />
@@ -524,13 +524,13 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   <>
                     <Field label="当たる確率">
                       <span className="mt-2 flex items-center gap-2">
-                        <input type="number" min={1} max={100} className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} aria-label="当たる確率" />
+                        <input type="number" min={1} max={100} className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm" value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} aria-label="当たる確率" />
                         <span className="font-normal">%</span>
                       </span>
                     </Field>
                     <Field label="当選人数の上限">
                       <span className="mt-2 flex items-center gap-2">
-                        <input type="number" min={1} className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} aria-label="当選人数の上限" />
+                        <input type="number" min={1} className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm" value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} aria-label="当選人数の上限" />
                         <span className="font-normal">人</span>
                       </span>
                     </Field>
@@ -576,7 +576,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   />
                 </Field>
                 <div className="md:col-span-3">
-                  <Field label="説明（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={2} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+                  <Field label="説明（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink mt-2 w-full resize-y border px-3 py-2 text-sm" rows={2} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
                 </div>
               </section>
               <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
@@ -603,7 +603,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
                   <h2 className="font-bold">質問 {previewQuestionIndex + 1} の中身</h2>
                   <Field label="質問文" required>
-                    <textarea aria-label="質問文" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={previewQuestion.text} onChange={(event) => updateQuestion(previewQuestionIndex, { text: event.target.value })} />
+                    <textarea aria-label="質問文" className="border-hairline rounded-control bg-canvas text-ink mt-2 w-full resize-y border px-3 py-2 text-sm" rows={3} value={previewQuestion.text} onChange={(event) => updateQuestion(previewQuestionIndex, { text: event.target.value })} />
                   </Field>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <Field label="答え方">
@@ -624,7 +624,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                         {previewQuestion.choices.map((choice, choiceIndex) => (
                           <div key={choiceIndex} className="flex items-center gap-2">
                             <input
-                              className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                              className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
                               value={choice}
                               onChange={(event) => updateQuestion(previewQuestionIndex, { choices: previewQuestion.choices.map((c, i) => (i === choiceIndex ? event.target.value : c)) })}
                               placeholder={`選択肢 ${choiceIndex + 1}`}

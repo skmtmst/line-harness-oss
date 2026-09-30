@@ -28,6 +28,7 @@ import BookingCalendar, {
   type CalendarSlot,
 } from './booking-calendar'
 import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -293,12 +294,7 @@ export default function BookingsPage() {
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
   // 自動で「コピー済」が消えるので、A の URL をコピーしたまま B 画面で
   // 「B フォームと思い込んで送信」する事故を防ぐ。
-  const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
-  // コピー済み表示を消すタイマー。外したままにすると警告の元になる(点検#516軽6)。
-  const copyTimer = useRef<number | null>(null)
-  useEffect(() => () => {
-    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
-  }, [])
+  const { copied, copy, reset: resetCopied } = useCopy()
   const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
@@ -342,21 +338,16 @@ export default function BookingsPage() {
     workerBase && liffId
       ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book&view=history`
       : null
-  const isCopied = (url: string | null) => url !== null && copiedUrl === url
+  const isCopied = (url: string | null) => url !== null && copied(url)
   /** コピーできなかったURL。隣の欄を選んでもらう一言を出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
   const [copyFailedUrl, setCopyFailedUrl] = useState<string | null>(null)
 
   async function copyUrl(url: string | null) {
     if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedUrl(url)
+    const ok = await copy(url)
+    if (ok) {
       setCopyFailedUrl(null)
-      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
-      copyTimer.current = window.setTimeout(() => {
-        setCopiedUrl((cur) => (cur === url ? null : cur))
-      }, 2000)
-    } catch {
+    } else {
       // URL は押したボタンの隣の読取専用欄に出ている。窓は出さず、選んでコピーしてもらう。
       setCopyFailedUrl(url)
     }
@@ -447,7 +438,7 @@ export default function BookingsPage() {
     setError(null)
     setMenus([])
     setStaffList([])
-    setCopiedUrl(null)
+    resetCopied()
     setCandidatesStatus('loading')
     setAvailability({ status: 'loading', slots: [] })
     setSummaryError(false)
@@ -1203,8 +1194,9 @@ export default function BookingsPage() {
                     onClick={() => copyUrl(shareUrl)}
                     className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
                   >
-                    {isCopied(shareUrl) ? 'コピー済' : 'コピー'}
+                    {isCopied(shareUrl) ? '✓ コピーしました' : 'コピー'}
                   </button>
+                  <CopyAnnounce show={isCopied(shareUrl)} />
                   <span className="text-ink-faint text-xs">お客さまが新しく予約を入れるURL</span>
                 </div>
                 {/* N-396: 履歴URLは別画面を開く。両方発行できることを注記と揃える。 */}
@@ -1222,8 +1214,9 @@ export default function BookingsPage() {
                       onClick={() => copyUrl(historyUrl)}
                       className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
                     >
-                      {isCopied(historyUrl) ? 'コピー済' : 'コピー'}
+                      {isCopied(historyUrl) ? '✓ コピーしました' : 'コピー'}
                     </button>
+                    <CopyAnnounce show={isCopied(historyUrl)} />
                     <span className="text-ink-faint text-xs">お客さまが自分の予約履歴を見るURL</span>
                   </div>
                 ) : null}

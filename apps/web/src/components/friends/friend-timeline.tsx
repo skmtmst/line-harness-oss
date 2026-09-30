@@ -259,7 +259,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
           rows={2}
           placeholder="メッセージを入力"
           aria-label="メッセージを入力"
-          className="border-hairline rounded-control w-full resize-none border px-3 py-2 text-sm focus:outline-none"
+          className="border-hairline rounded-control w-full resize-none border px-3 py-2 text-sm"
         />
         {error && <p className="text-danger mt-1 text-xs">{error}</p>}
         <div className="mt-2 flex items-center justify-between gap-2">

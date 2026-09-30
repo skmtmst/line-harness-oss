@@ -11,6 +11,7 @@ import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -107,18 +108,13 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const [copiedValue, setCopiedValue] = useState<string | null>(null)
+  const { copied, copy } = useCopy()
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
 
   async function copyValue(v: string) {
-    try {
-      await navigator.clipboard.writeText(v)
-      setCopiedValue(v)
-      setTimeout(() => setCopiedValue(null), 2000)
-    } catch {
-      // 押した欄の隣に読取専用の選択欄があるので何も出さない(点検#520の軽15)。
-      // 書けない環境では欄を押して範囲選択し、手でコピーできる。
-    }
+    await copy(v)
+    // 押した欄の隣に読取専用の選択欄があるので何も出さない(点検#520の軽15)。
+    // 書けない環境では欄を押して範囲選択し、手でコピーできる。
   }
 
   const liffId = selectedAccount?.liffId ?? null
@@ -341,9 +337,12 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                   <Button
                     type="button"
                     onClick={() => copyValue(templateUrl)}
+                    done={copied(templateUrl)}
+                    doneLabel="コピーしました"
                   >
-                    {copiedValue === templateUrl ? 'コピー済' : 'コピー'}
+                    コピー
                   </Button>
+                  <CopyAnnounce show={copied(templateUrl)} />
                 </div>
                 <p className="text-ink-secondary mt-2 text-xs">
                   broadcast 編集で「リンクするイベント」から選ぶと自動挿入。
@@ -378,9 +377,12 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                         />
                         <Button
                           onClick={() => copyValue(url)}
+                          done={copied(url)}
+                          doneLabel="コピーしました"
                         >
-                          {copiedValue === url ? 'コピー済' : 'コピー'}
+                          コピー
                         </Button>
+                        <CopyAnnounce show={copied(url)} />
                       </div>
                     )
                   })}
@@ -405,9 +407,12 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                 <Button
                   type="button"
                   onClick={() => copyValue(liffUrl)}
+                  done={copied(liffUrl)}
+                  doneLabel="コピーしました"
                 >
-                  {copiedValue === liffUrl ? 'コピー済' : 'コピー'}
+                  コピー
                 </Button>
+                <CopyAnnounce show={copied(liffUrl)} />
               </div>
               <p className="text-ink-secondary mt-2 text-xs">
                 LINE / OpenChat / IG DM どこでも貼れます。受信者がタップすると LINE で予約画面が開きます。

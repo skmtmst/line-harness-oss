@@ -14,6 +14,7 @@ import Notice from '@/components/shared/notice'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 
 const WIZARD_STEPS = [
   { number: 1, label: '基本情報', designNode: 'a8qMXX' },
@@ -428,9 +429,9 @@ function Field({ id, label, value, onChange, placeholder, required = false, type
 }
 
 function EndpointRow({ label, value, help }: { label: string; value: string; help: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = async () => { if (value === '—') return; try { await navigator.clipboard.writeText(value); setCopied(true); window.setTimeout(() => setCopied(false), 1200) } catch { /* 表示値を選択してコピーできる。 */ } }
-  return <div><p className="text-ink-faint text-xs font-medium">{label}</p><div className="mt-1 flex items-stretch gap-2"><p className="bg-canvas-sunken rounded-control text-ink min-w-0 flex-1 select-all break-all px-3 py-2 text-xs leading-relaxed">{value}</p><Button type="button" onClick={() => void copy()} disabled={value === '—'} className="shrink-0">{copied ? 'コピー済み' : 'コピー'}</Button></div><p className="text-ink-faint mt-1 text-xs">{help}</p></div>
+  const { copied, copy } = useCopy()
+  const onCopy = () => { if (value === '—') return; void copy(value) /* 失敗時は表示値を選択してコピーできる。 */ }
+  return <div><p className="text-ink-faint text-xs font-medium">{label}</p><div className="mt-1 flex items-stretch gap-2"><p className="bg-canvas-sunken rounded-control text-ink min-w-0 flex-1 select-all break-all px-3 py-2 text-xs leading-relaxed">{value}</p><Button type="button" onClick={onCopy} disabled={value === '—'} done={copied()} doneLabel="コピーしました" className="shrink-0">コピー</Button><CopyAnnounce show={copied()} /></div><p className="text-ink-faint mt-1 text-xs">{help}</p></div>
 }
 
 function ReviewGroup({ title, children }: { title: string; children: ReactNode }) { return <section className="border-hairline rounded-control border p-4"><h3 className="text-ink text-sm font-bold">{title}</h3><dl className="mt-3 divide-y divide-hairline">{children}</dl></section> }

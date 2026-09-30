@@ -222,7 +222,7 @@ function StickerThumb({ stickerId, label }: { stickerId: string; label: string }
 }
 
 const inputClass =
-  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+  'border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm'
 const labelClass = 'text-ink-secondary mb-1 block text-xs font-medium'
 const hintClass = 'text-ink-faint mt-1 text-xs leading-relaxed'
 

@@ -17,6 +17,7 @@ import { MoreAction } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
@@ -428,7 +429,7 @@ export function AffiliatorsTab({
     URLは作れるので、ここでは失敗の面を出さない。
   */
   const [linkBaseUrl, setLinkBaseUrl] = useState<string | null>(null)
-  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
+  const { copied: copiedLink, copy: copyText } = useCopy()
   useEffect(() => {
     let cancelled = false
     void api.accountSettings.getLinkBaseUrl().then((res) => {
@@ -444,14 +445,9 @@ export function AffiliatorsTab({
   const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
     const url = distributionUrl(link.ref_code, linkBaseUrl)
     if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedLinkId(link.id)
-      window.setTimeout(() => {
-        setCopiedLinkId((current) => (current === link.id ? null : current))
-      }, 2000)
-    } catch { /* 書けないときは選んで写せる（URLは表示のまま） */ }
-  }, [linkBaseUrl])
+    await copyText(url, link.id)
+    /* 書けないときは選んで写せる（URLは表示のまま） */
+  }, [linkBaseUrl, copyText])
 
   useEffect(() => {
     let cancelled = false
@@ -1155,8 +1151,9 @@ export function AffiliatorsTab({
                                                     aria-label={`${linkCode}の配布URLをコピー`}
                                                     onClick={() => { void copyLinkUrl(link) }}
                                                   >
-                                                    {copiedLinkId === link.id ? 'コピー済' : 'コピー'}
+                                                    {copiedLink(link.id) ? '✓ コピーしました' : 'コピー'}
                                                   </AffiliateButton>
+                                                  <CopyAnnounce show={copiedLink(link.id)} />
                                                 </span>
                                               ) : null}
                                             </td>
@@ -1312,7 +1309,7 @@ export function CreateAffiliateModal({
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [issuedUrl, setIssuedUrl] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopy()
 
   // Incremental friend search (debounced). Skipped once a friend is selected.
   useEffect(() => {
@@ -1401,12 +1398,9 @@ export function CreateAffiliateModal({
 
   const handleCopy = useCallback(async () => {
     if (!issuedUrl) return
-    try {
-      await navigator.clipboard.writeText(issuedUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch { /* clipboard unavailable — user can select manually */ }
-  }, [issuedUrl])
+    await copy(issuedUrl)
+    /* clipboard unavailable — user can select manually */
+  }, [issuedUrl, copy])
 
   /*
     R295: 手作りの窓をやめ、共通の窓（Dialog）を使う。初期フォーカス・
@@ -1421,9 +1415,10 @@ export function CreateAffiliateModal({
       onCancel={onClose}
       footer={issuedUrl ? (
         <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-          <Button variant="primary" onClick={() => { void handleCopy() }}>
-            {copied ? 'コピー済' : 'コピー'}
+          <Button variant="primary" onClick={() => { void handleCopy() }} done={copied()} doneLabel="コピーしました">
+            コピー
           </Button>
+          <CopyAnnounce show={copied()} />
         </div>
       ) : (
         <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
@@ -1785,7 +1780,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例: 無料体験申込"
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           />
         </div>
 
@@ -1797,7 +1792,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             placeholder="案件の説明（任意）"
-            className="border-hairline rounded-control bg-canvas text-ink w-full resize-none border px-3 py-2 text-sm focus:outline-none"
+            className="border-hairline rounded-control bg-canvas text-ink w-full resize-none border px-3 py-2 text-sm"
           />
         </div>
 
@@ -1811,7 +1806,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
             value={rewardAmount}
             onChange={(e) => setRewardAmount(e.target.value)}
             placeholder="例: 3000"
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           />
         </div>
 
@@ -1825,7 +1820,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
             value={rewardMiles}
             onChange={(e) => setRewardMiles(e.target.value)}
             placeholder="例: 500"
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           />
           <p className="text-ink-faint mt-1 text-[11px]">承認された紹介1件ごとに紹介者へ付与します</p>
         </div>
@@ -3166,7 +3161,7 @@ function SettlementEditor({
               setSaved(false)
             }}
             placeholder="partner@example.com"
-            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm"
           />
         </div>
         <div>
@@ -3188,7 +3183,7 @@ function SettlementEditor({
                 setSaved(false)
               }}
               placeholder="なし"
-              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-action"
+              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums"
             />
             <span className="whitespace-nowrap text-xs text-ink-faint">日</span>
           </div>
@@ -3210,7 +3205,7 @@ function SettlementEditor({
             }}
             placeholder="例: 月末締め翌月末払い"
             maxLength={100}
-            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm"
           />
         </div>
       </div>

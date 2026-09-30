@@ -86,6 +86,23 @@ describe('押せる部品のフォーカスが見える', () => {
     }
   })
 
+  it('輪郭は全面で同じ形（2px・action 色）', () => {
+    // ★V7 §15：輪郭は「全面で同じ形」。共有部品の focus/focus-visible
+    // 輪郭は全部 `2px solid var(--color-action)` にそろえる。
+    // 別の色・別の太さが混ざると画面ごとに見え方が違ってしまう。
+    for (const name of files.filter((n) => n.endsWith('.css'))) {
+      const css = withoutComments(read(name))
+      const rules = css.match(/[^{}]*:focus[^{]*\{[^}]*\}/g) ?? []
+      for (const rule of rules) {
+        const m = rule.match(/outline:\s*([^;]+);/)
+        if (!m || /(?:none|0)\b/.test(m[1])) continue
+        expect(m[1], `${name} の輪郭が標準形ではない: ${m[1].trim()}`).toBe(
+          '2px solid var(--color-action)'
+        )
+      }
+    }
+  })
+
   it('Tailwind でもフォーカスの輪郭を消さない', () => {
     // **CSS だけ見ていると素通りする。** `focus:outline-none` は class 名なので、
     // CSS モジュールの検査に当たらない。実際 3 部品がこれで消していた。

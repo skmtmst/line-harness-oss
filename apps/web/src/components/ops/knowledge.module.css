@@ -62,7 +62,7 @@
 .referenceLink { display: flex; align-items: center; gap: 10px; flex: 1 1 240px; min-width: 0; text-align: left; font-size: var(--text-micro); color: var(--color-accent-deep); cursor: pointer; }
 .referenceLink span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .referenceLink svg { width: 16px; height: 16px; flex: 0 0 auto; }
-.referenceLink:focus-visible { outline: 2px solid var(--color-accent-deep); outline-offset: 2px; }
+.referenceLink:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
 .referenceLink:disabled { opacity: .5; cursor: wait; }
 .referenceKind.referenceKind { flex: 0 0 auto; max-width: 188px; min-height: 22px; font-size: var(--text-nano); }
 .referenceRow > button:not(.referenceLink) { height: 32px; padding: 0 8px; flex: 0 0 auto; font-size: var(--text-micro); border-radius: var(--radius-control); }

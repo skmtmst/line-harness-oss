@@ -241,7 +241,7 @@ function GoogleBusinessTabs({ items, mapsUrl }: { items: Array<{ label: string; 
           disabled={item.disabled}
           tabIndex={item.current ? 0 : -1}
           onClick={item.onClick}
-          className={`h-9 shrink-0 rounded-control border px-3.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info disabled:cursor-not-allowed disabled:opacity-40 ${
+          className={`h-9 shrink-0 rounded-control border px-3.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action disabled:cursor-not-allowed disabled:opacity-40 ${
             item.current
               ? 'bg-accent-soft text-accent-deep'
               : 'bg-canvas text-ink hover:bg-canvas-sunken'

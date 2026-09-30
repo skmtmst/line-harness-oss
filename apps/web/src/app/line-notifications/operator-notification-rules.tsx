@@ -155,7 +155,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     </div>
 
     <div className="flex flex-wrap items-center gap-2">
-      <label className="flex min-w-72 max-w-md flex-1 items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2"><Search aria-hidden="true" size={17} className="text-ink-faint" /><span className="sr-only">お知らせを検索</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お知らせ名・きっかけで探す" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
+      <label className="flex min-w-72 max-w-md flex-1 items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2 focus-within:outline-2 focus-within:outline-action focus-within:outline-offset-2"><Search aria-hidden="true" size={17} className="text-ink-faint" /><span className="sr-only">お知らせを検索</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お知らせ名・きっかけで探す" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
       <RadioCardGroup legend="公開状態で絞り込む" className="flex flex-wrap gap-2">
         {(['all', 'published', 'draft', 'missing'] as const).map((value) => <RadioCard key={value} name="operator-filter" value={value} checked={filter === value} onChange={() => setFilter(value)} title={{ all: `すべて ${summary?.total ?? '—'}`, published: `出している ${summary?.published ?? '—'}`, draft: `止めている ${summary?.stopped ?? '—'}`, missing: `受け取る人がいない ${summary?.missingRecipients ?? '—'}` }[value]} />)}
       </RadioCardGroup>

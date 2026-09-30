@@ -349,7 +349,7 @@ function ScenarioModeContent() {
               placeholder="例: 友だち追加ウェルカム"
               aria-invalid={nameError ? true : undefined}
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
-              className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
             />
             {nameError ? (
               <span id="scenario-name-error" className="mt-1 block text-xs font-semibold text-danger">

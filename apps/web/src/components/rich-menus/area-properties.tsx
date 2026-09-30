@@ -126,7 +126,7 @@ function Field({
 }
 
 const inputClass =
-  'border-hairline rounded-control focus:ring-accent block w-full border px-2 py-1 text-sm focus:ring-2 focus:outline-none'
+  'border-hairline rounded-control block w-full border px-2 py-1 text-sm'
 
 function NumField({
   label,

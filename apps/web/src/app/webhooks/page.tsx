@@ -20,6 +20,7 @@ import ApiTokensPanel from './api-tokens-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
+import { CopyAnnounce, useCopy } from '@/lib/copy'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
 type Tab = 'incoming' | 'outgoing'
@@ -270,7 +271,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   // After a successful create the API returns the secret exactly once.
   // Show it to the operator with a copy affordance, then forget it.
   const [createdSecret, setCreatedSecret] = useState<{ name: string; secret: string } | null>(null)
-  const [secretCopied, setSecretCopied] = useState(false)
+  const { copied: secretCopied, copy, reset: resetSecretCopied } = useCopy()
 
   // Rotate-secret modal state. Used to recover legacy webhooks deactivated
   // by migration 034, or to rotate a leaked secret in place.
@@ -293,7 +294,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   })
   const secretModalRef = useOverlayFocus(!!createdSecret, () => {
     setCreatedSecret(null)
-    setSecretCopied(false)
+    resetSecretCopied()
   })
 
   /**
@@ -375,7 +376,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       && lastLoadedAccountIdRef.current !== selectedAccountId
     loadGenerationRef.current += 1
     setCreatedSecret(null)
-    setSecretCopied(false)
+    resetSecretCopied()
     setRotateTarget(null)
     setRotateSecretValue('')
     // d23b R420: アカウントを切り替えたら、前のアカウントへ紐付いた
@@ -620,7 +621,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setCreatedSecret({ name: res.data.name, secret: res.data.secret })
-      setSecretCopied(false)
+      resetSecretCopied()
       setInForm({ name: '', sourceType: '', secret: '' })
       setSourceIsOther(false)
       setShowCreate(false)
@@ -648,12 +649,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   }
 
   const copySecret = async (secret: string) => {
-    try {
-      await navigator.clipboard.writeText(secret)
-      setSecretCopied(true)
-    } catch {
-      // ignore — operator can still copy manually
-    }
+    await copy(secret)
+    // ignore failures — operator can still copy manually
   }
 
   const handleRotateSubmit = async (e: React.FormEvent, stepUpToken?: string) => {
@@ -860,7 +857,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                 className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"
                 onClick={() => {
                   setCreatedSecret(null)
-                  setSecretCopied(false)
+                  resetSecretCopied()
                 }}
               >
                 <X aria-hidden="true" className="h-5 w-5" />
@@ -877,13 +874,16 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
             <div className="flex gap-2 justify-end">
               <Button
                 onClick={() => copySecret(createdSecret.secret)}
+                done={secretCopied()}
+                doneLabel="コピーしました"
               >
-                {secretCopied ? 'コピー済み' : 'クリップボードにコピー'}
+                クリップボードにコピー
               </Button>
+              <CopyAnnounce show={secretCopied()} />
               <button
                 onClick={() => {
                   setCreatedSecret(null)
-                  setSecretCopied(false)
+                  resetSecretCopied()
                 }}
                 className="px-4 py-2 text-sm rounded-control text-on-accent font-medium"
                 style={{ backgroundColor: 'var(--color-accent)' }}
