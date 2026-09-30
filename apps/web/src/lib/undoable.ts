@@ -39,9 +39,23 @@ export function runUndoable(options: {
   /** commit が通ったあとに呼ぶ（一覧の読み直しなど）。 */
   onCommitted?: () => void
 }): void {
-  let undone = false
-  const timer = setTimeout(() => {
-    if (undone) return
+  /*
+   * 送信期限は知らせの期限と一つのもの（R623）。知らせの hover/focus で
+   * 止まったら送信も止まり、離したら一緒に動く。期限が来る・戻すの
+   * どちらかが先に決まったら `settled` になり、遅れた方は何もしない。
+   * 送信を始めたあとの取り消しは画面だけ戻さない。
+   */
+  let settled = false
+  let remaining = UNDO_WINDOW_MS
+  let deadline = Date.now() + remaining
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  const fire = () => {
+    if (settled) return
+    settled = true
+    timer = null
+    // 期限が来たら知らせを消す。残った取り消し操作は効かない。
+    dismiss()
     void Promise.resolve()
       .then(() => options.commit())
       .then((res) => {
@@ -52,15 +66,33 @@ export function runUndoable(options: {
         ;(options.onCommitError ?? options.undo)()
         notifyToast(options.failureMessage ?? 'できませんでした。もう一度お試しください。', { tone: 'error' })
       })
-  }, UNDO_WINDOW_MS)
+  }
+  const arm = (ms: number) => {
+    deadline = Date.now() + ms
+    timer = setTimeout(fire, ms)
+  }
+  const pauseCommit = () => {
+    if (settled || timer === null) return
+    clearTimeout(timer)
+    timer = null
+    remaining = Math.max(0, deadline - Date.now())
+  }
+  const resumeCommit = () => {
+    if (settled || timer !== null) return
+    arm(remaining)
+  }
+  arm(remaining)
 
-  notifyToast(options.message, {
+  const dismiss = notifyToast(options.message, {
     actionLabel: '元に戻す',
     onAction: () => {
-      undone = true
-      clearTimeout(timer)
+      if (settled) return
+      settled = true
+      if (timer !== null) clearTimeout(timer)
+      timer = null
       options.undo()
     },
+    lifecycle: { onPause: pauseCommit, onResume: resumeCommit },
   })
 }
 
