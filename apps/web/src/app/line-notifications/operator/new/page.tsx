@@ -195,7 +195,12 @@ function NewOperatorNotificationInner() {
       return null
     }
     if (recipientIds.length === 0) {
-      setError('受け取るスタッフを1人以上選んでください。')
+      // R612: 候補0人では選ぶ操作自体ができない。準備と次の画面を案内する。
+      if (recipients !== null && recipients.items.length === 0) {
+        setError('受け取る人がいません。先にログインユーザーでスタッフ登録とLINE連携を済ませてください。')
+      } else {
+        setError('受け取るスタッフを1人以上選んでください。')
+      }
       return null
     }
     setSaving(true)
@@ -311,9 +316,15 @@ function NewOperatorNotificationInner() {
             <p className="mt-1 text-xs text-ink-faint">LINEログイン済みの人にだけ届きます。担当が決まっていないと届きません。</p>
             <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><Select aria-label="送り先" id="operator-recipient-kind" size="full" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><Select aria-label="チーム" id="operator-recipient-team" size="full" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <Checkbox key={recipient.id} checked={selected} onCheckedChange={(checked) => setRecipientIds((current) => checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))}>{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</Checkbox> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
+              {!recipients ? <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p> : recipients.items.length === 0 ? (
+                <div>
+                  <p className="text-sm font-semibold text-ink">受け取る人がいません</p>
+                  <p className="mt-1 text-xs text-ink-secondary">スタッフを登録し、LINE連携が済んだ人が宛先になります。</p>
+                  <Link href="/staff" className="mt-2 inline-block text-xs text-action hover:underline">ログインユーザーでスタッフを確認する</Link>
+                </div>
+              ) : recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <Checkbox key={recipient.id} checked={selected} onCheckedChange={(checked) => setRecipientIds((current) => checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))}>{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</Checkbox> })}
             </div>
-            {recipients ? <p className="mt-3 text-xs text-ink-secondary">選択 {recipientIds.length}人 ／ LINEで受け取れる {recipients.items.filter((item) => recipientIds.includes(item.id) && item.channels.line).length}人 ／ 管理画面で受け取れる {recipientIds.length}人</p> : null}
+            {recipients && recipients.items.length > 0 ? <p className="mt-3 text-xs text-ink-secondary">選択 {recipientIds.length}人 ／ LINEで受け取れる {recipients.items.filter((item) => recipientIds.includes(item.id) && item.channels.line).length}人 ／ 管理画面で受け取れる {recipientIds.length}人</p> : null}
           </section>
 
           <section className="border-hairline bg-canvas rounded-card border p-5">
