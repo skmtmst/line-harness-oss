@@ -151,7 +151,7 @@ describe('月次集計だけ失敗しても版詳細は読める（監査 R586�
     await flush()
 
     // 月次件数だけ未取得と分かる。
-    expect(container.textContent).toContain('月次件数を取得できませんでした')
+    expect(container.textContent).toContain('月次件数を読み込めませんでした')
     const retry = retryMonthlyButton()
     expect(retry, '月次件数だけの再試行ボタンがある').toBeTruthy()
 
@@ -168,7 +168,7 @@ describe('月次集計だけ失敗しても版詳細は読める（監査 R586�
     expect(net.getCount).toBe(getBeforeRetry)
     // 復旧すれば集計値が更新される。
     expect(container.textContent).toContain('10')
-    expect(container.textContent).not.toContain('月次件数を取得できませんでした')
+    expect(container.textContent).not.toContain('月次件数を読み込めませんでした')
   })
 
   it('詳細そのものの失敗とは別の表示になる', async () => {
@@ -182,6 +182,6 @@ describe('月次集計だけ失敗しても版詳細は読める（監査 R586�
     // この試験では一覧だけが失敗なので出てはいけない。）
     expect(container.textContent).not.toContain('版と利用先を読み込めませんでした')
     // 代わりに月次件数の未取得が出る。
-    expect(container.textContent).toContain('月次件数を取得できませんでした')
+    expect(container.textContent).toContain('月次件数を読み込めませんでした')
   })
 })
