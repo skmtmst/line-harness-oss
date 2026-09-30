@@ -113,9 +113,9 @@ function hiddenAncestor(element: Element | null): Element | null {
 
 function saveDraftButton(): HTMLButtonElement {
   const button = [...container.querySelectorAll('button')].find(
-    (item) => (item.textContent ?? '').includes('下書き保存') && !item.disabled,
+    (item) => (item.textContent ?? '').includes('下書きを保存する') && !item.disabled,
   )
-  if (!button) throw new Error('下書き保存ボタンがありません')
+  if (!button) throw new Error('下書きを保存するボタンがありません')
   return button as HTMLButtonElement
 }
 
