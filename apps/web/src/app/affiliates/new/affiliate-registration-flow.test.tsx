@@ -24,6 +24,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /* ------------------------------------------------------------------ 差し替え */
@@ -282,6 +283,63 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(affiliatesUpdate.mock.calls[1][0]).toBe('affiliate-1')
     expect(affiliatesUpdate.mock.calls[1][1]).toMatchObject({ name: '直した名前' })
     expect(pushed[0]).toContain('highlight=affiliate-1')
+  })
+
+  it('途中保存の知らせは、計測が既に始まっているか正しく伝える（R525）', async () => {
+    // オンで作ると行は最初から稼働で残る。追加情報の保存に失敗しても、
+    // 「追加情報を保存すると計測も始まります」とは言わない。
+    affiliatesCreate.mockImplementationOnce(async () => (
+      { success: true, data: { id: 'affiliate-1', isActive: true } }
+    ))
+    affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
+    await mount(<NewAffiliatePage />)
+
+    await type(byId<HTMLInputElement>('af-name'), '計測ありのパートナー')
+    await click(buttonByText('登録して、紹介リンクを発行する'))
+
+    expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: true })
+    expect(hasText('基本情報は保存済みです')).toBe(true)
+    expect(hasText('基本情報の登録で計測は既に始まっています')).toBe(true)
+    expect(hasText('追加情報を保存すると計測も始まります')).toBe(false)
+
+    // やり直しの前にオフへ変えられる。文も切り替わり、更新はオフで送る。
+    // DBが既に変わったとは言わない（変わるのはこの更新が通ってから）。
+    const tracking = [...container.querySelectorAll('label')]
+      .find((label) => (label.textContent ?? '').includes('すぐに計測を始める'))
+      ?.querySelector('input')
+    if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
+    await act(async () => { fireEvent.click(tracking) })
+    expect(hasText('計測は始まらないまま追加情報だけを保存します')).toBe(true)
+
+    await click(buttonByText('追加情報の保存を再開する'))
+    expect(affiliatesCreate).toHaveBeenCalledTimes(1)
+    expect(affiliatesUpdate).toHaveBeenLastCalledWith(
+      'affiliate-1', expect.objectContaining({ isActive: false }),
+    )
+    expect(pushed[0]).toContain('highlight=affiliate-1')
+  })
+
+  it('オフで作ると、計測を止めたまま追加情報だけを保存し直す（R525）', async () => {
+    affiliatesCreate.mockImplementationOnce(async () => (
+      { success: true, data: { id: 'affiliate-2', isActive: false } }
+    ))
+    affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
+    await mount(<NewAffiliatePage />)
+
+    const tracking = [...container.querySelectorAll('label')]
+      .find((label) => (label.textContent ?? '').includes('すぐに計測を始める'))
+      ?.querySelector('input')
+    if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
+    await act(async () => { fireEvent.click(tracking) })
+
+    await type(byId<HTMLInputElement>('af-name'), '計測なしのパートナー')
+    await click(buttonByText('登録して、紹介リンクを発行する'))
+
+    // オフが作るときに渡り、行は止まったまま残る。
+    expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: false })
+    expect(hasText('基本情報は保存済みです')).toBe(true)
+    expect(hasText('計測は始まらないまま追加情報だけを保存します')).toBe(true)
+    expect(hasText('計測は既に始まっています')).toBe(false)
   })
 
   it('途中保存のあとでLINEアカウントを切り替えたら、前の店の登録を更新しない', async () => {
