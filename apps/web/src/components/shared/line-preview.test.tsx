@@ -75,6 +75,11 @@ describe('LINEプレビュー共通部品', () => {
     expect(tsx).toContain('bg-line-talk')
     expect(tsx).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(tsx).not.toMatch(/bg-(white|black|gray|slate|blue|green|red)-/)
-    expect(tsx).not.toContain('.module.css')
+    // ★V8 の枠だけモジュール CSS に切り出した（`cfVyj` の板の決まり）。
+    // モジュール内も値はトークンだけ。生の #16進・rgb() を置かない。
+    const css = read('line-preview.module.css')
+    expect(css).toContain("[data-theme='v8']")
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+    expect(css).not.toMatch(/\brgba?\(/)
   })
 })

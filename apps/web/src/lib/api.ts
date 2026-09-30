@@ -14736,6 +14736,8 @@ export interface EventSlot {
   client_key?: string | null;
   /** 再送で既存枠に解決された場合 true。新規作成分は false。 */
   deduplicated?: boolean;
+  /** 枠の版。更新時はこの版を期待版として送り、古ければ409になる(m26g)。 */
+  version?: number;
 }
 
 /** createSlots に渡す1枠分の入力。client_key は再送を吸収するための任意キー。 */
@@ -15085,10 +15087,14 @@ export const eventsApi = {
     }
     return { items }
   })(),
-  updateSlot: (accountId: string, eventId: string, slotId: string, body: Partial<EventSlot>) =>
+  /**
+   * m26g: 枠の更新は期待版が必須。古い画面からの更新は409になり、
+   * 応答の data.current に最新の枠が入る。画面は読み直して差分を見せる。
+   */
+  updateSlot: (accountId: string, eventId: string, slotId: string, body: Partial<EventSlot>, expectedVersion: number) =>
     fetchApi<EventSlot>(
       withAccount(`/api/events/admin/events/${eventId}/slots/${slotId}`, accountId),
-      { method: 'PUT', body: JSON.stringify(body) },
+      { method: 'PUT', body: JSON.stringify({ ...body, expected_version: expectedVersion }) },
     ),
   deleteSlot: (accountId: string, eventId: string, slotId: string) =>
     fetchApi<void>(

@@ -141,4 +141,12 @@
   color: var(--color-status-danger); /* fill: $status-danger */
   font-size: 12px; /* fontSize: 12 */
 }
+
+/*
+ * ★V8「チェック」（dQCCN・S9U7v）：箱・印・色は v7 と同じ。
+ * 違うのは文字だけ（13px）。
+ */
+[data-theme='v8'] .label {
+  font-size: var(--text-label);
+}
 }

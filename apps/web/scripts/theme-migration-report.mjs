@@ -28,31 +28,52 @@ const MANIFEST = join(WEB, 'design', 'v8-parts.json')
 
 const V8_SELECTOR = /\[data-theme=["']?v8["']?\]/
 
-/** 部品を構成する実ファイル（コード + 同名の CSS Module）を返す。 */
+/** 部品を構成する実ファイル（コード + 同名の CSS Module／素の .css）を返す。 */
 function partFiles(codePaths) {
   const files = []
   for (const rel of codePaths) {
     const full = join(COMPONENTS, rel)
     if (!existsSync(full)) continue
     files.push(full)
-    const css = full.replace(/\.tsx?$/, '.module.css')
-    if (existsSync(css)) files.push(css)
+    for (const css of [full.replace(/\.tsx?$/, '.module.css'), full.replace(/\.tsx?$/, '.css')]) {
+      if (existsSync(css)) files.push(css)
+    }
   }
   return files
 }
 
 export function collectReport() {
   const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
+  /*
+   * `v8In: "globals"` の部品（骨格の行など、Tailwind 直書きで
+   * CSS Module を持たないもの）は globals.css 側に v8 規定を置く。
+   * `v8Selector` で指す規定が globals に実際にあるときだけ v8対応済み
+   * と数える（書き忘れ・消し忘れは v7 のままと出る）。
+   */
+  const globals = readFileSync(join(SRC, 'app', 'globals.css'), 'utf8')
+  const globalsHasV8 = (selector) =>
+    new RegExp(`\\[data-theme=["']?v8["']?\\][^{]*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(globals)
   const parts = manifest.parts.map((part) => {
     const codePaths = part.code ? [part.code].flat() : []
     const files = partFiles(codePaths)
     const v8Files = files.filter((f) => V8_SELECTOR.test(readFileSync(f, 'utf8')))
+    const inGlobals = part.v8In === 'globals' && typeof part.v8Selector === 'string' && globalsHasV8(part.v8Selector)
     return {
       name: part.name,
       pencil: part.pencil,
       files,
       v8Files,
-      status: codePaths.length === 0 ? '未作成' : files.length === 0 ? 'コード不明' : v8Files.length > 0 ? 'v8対応済み' : 'v7 のまま',
+      // `v8Same: true` は「V8 と値が同じで上書きが要らない」部品（例: 入力欄）。
+      // `v8Only: true` は V8 で新たに生えた部品（削除ボタン・色を選ぶなど）で、
+      // V7 の見た目が存在しないためテーマ規定を分けないもの。
+      status:
+        codePaths.length === 0
+          ? '未作成'
+          : files.length === 0
+            ? 'コード不明'
+            : v8Files.length > 0 || part.v8Same === true || part.v8Only === true || inGlobals
+              ? 'v8対応済み'
+              : 'v7 のまま',
     }
   })
 

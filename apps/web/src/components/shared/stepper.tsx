@@ -50,7 +50,7 @@ export default function Stepper({
   currentKey?: string
 }) {
   return (
-    <nav aria-label={label} className="border-hairline bg-canvas rounded-card mb-4 border p-4">
+    <nav aria-label={label} data-part="stepper" className="border-hairline bg-canvas rounded-card mb-4 border p-4">
       <ol data-design="Steps" aria-label={label} className="flex flex-wrap items-center gap-y-3">
         {steps.map((raw, index) => {
           const step = { ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }
