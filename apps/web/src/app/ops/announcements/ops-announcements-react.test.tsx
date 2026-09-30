@@ -284,7 +284,7 @@ describe('二重押しと同時保存（M512/M513）', () => {
         data: { latest: { subject: 'ほかの人の件名', updatedAt: '2026-09-18T00:00:00.000+09:00' } },
       },
     }
-    await act(async () => { button('下書きとして保存')!.click() })
+    await act(async () => { button('下書きを保存する')!.click() })
     await flush()
     const put = calls.find((c) => c.url.includes('/api/ops/announcements/a2') && c.method === 'PUT')!
     expect(put.body).toMatchObject({ subject: '料金改定のご案内（修正）', expectedUpdatedAt: '2026-09-17T10:00:00.000+09:00' })
