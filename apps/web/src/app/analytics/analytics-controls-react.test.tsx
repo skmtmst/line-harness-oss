@@ -405,7 +405,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
       .map((input) => input.value)
     expect(stepInputs).toContain('案内')
     expect(stepInputs).toContain('form-1')
-    expect(host.textContent).toContain('新版として保存')
+    expect(host.textContent).toContain('新版として保存する')
 
     await act(async () => { type('fn-name', '申込導線（改訂）'); await Promise.resolve() })
     net.handler = (async (path: string, init?: RequestInit) => {
@@ -419,7 +419,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
       }
       return funnelHandler([FUNNEL_ACTIVE])(path)
     }) as typeof net.handler
-    await click('新版として保存')
+    await click('新版として保存する')
     const request = net.calls.find((call) => call.path.includes('/versions?'))
     expect(request).toBeDefined()
     expect(request!.path).toContain('/api/analytics/funnels/funnel-1/versions')
@@ -509,7 +509,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
 
     await click('定義を編集')
     await act(async () => { await Promise.resolve() })
-    await click('新版として保存')
+    await click('新版として保存する')
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     expect(host.textContent).toContain('他の人が先に変更しています')
   })
@@ -546,7 +546,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
       }
       return funnelHandler([FUNNEL_ACTIVE], detail)(path)
     }) as typeof net.handler
-    await click('新版として保存')
+    await click('新版として保存する')
 
     expect(sent).not.toBeNull()
     expect(sent!.segment).toEqual({ kind: 'tag', tagId: 'tag-vip' })

@@ -10,7 +10,7 @@
 .preview {
   width: 100%;
   max-width: 500px;
-  border-radius: 10px;
+  border-radius: var(--radius-card);
 }
 
 /* 届く日時の帯。設計 h=26・角丸は全周。 */
@@ -20,5 +20,5 @@
 
 /* 吹き出し。設計は左下だけ角を落とす。 */
 .bubble {
-  border-radius: 14px 14px 14px 4px;
+  border-radius: var(--radius-card) var(--radius-card) var(--radius-card) var(--radius-mini);
 }

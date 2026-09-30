@@ -32,6 +32,8 @@ import {
   type SegmentCondition,
   type SegmentRule,
 } from '@/lib/segment-condition'
+import { formatNumber } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 // これまでどおりこのファイルからも取れるようにしておく。呼び出し側が多い。
 export {
@@ -247,14 +249,9 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           key={`${groupIndex ?? 'root'}-${i}`}
           className="border-hairline bg-canvas rounded-card flex flex-wrap items-start gap-2 border p-3"
         >
-          <button
-            type="button"
-            onClick={() => removeRule(i, groupIndex)}
-            className="text-ink-faint hover:text-danger rounded-control border-hairline h-9 shrink-0 border px-2 text-xs"
-            aria-label="この条件を外す"
-          >
+          <Button variant="secondary" className="text-ink-faint hover:text-danger h-9 shrink-0 px-2 text-xs whitespace-normal" type="button" onClick={() => removeRule(i, groupIndex)} aria-label="この条件を外す">
             外す
-          </button>
+          </Button>
           <div className="min-w-0 flex-1 space-y-2">
             <RuleEditor
               rule={rule}
@@ -306,33 +303,25 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
               「いずれか1つ以上を満たす」必要がある条件
               <span className="text-ink-faint ml-1 font-normal">(or条件)</span>
             </p>
-            <button
-              type="button"
-              onClick={() =>
+            <Button variant="secondary" className="text-ink-faint hover:text-danger h-9 px-3 text-xs whitespace-normal" type="button" onClick={() =>
                 update({ ...condition, groups: (condition.groups ?? []).filter((_, i) => i !== gi) })
-              }
-              className="text-ink-faint hover:text-danger rounded-control border-hairline h-9 border px-3 text-xs"
-            >
+              }>
               このかたまりを外す
-            </button>
+            </Button>
           </div>
           <div className="mt-3">{renderRules(group.rules, gi)}</div>
           {kindButtons(gi)}
         </div>
       ))}
 
-      <button
-        type="button"
-        onClick={() =>
+      <Button variant="secondary" className="text-ink-secondary rounded-card h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
           update({
             ...condition,
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],
           })
-        }
-        className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-card h-10 w-full border border-dashed text-sm"
-      >
+        }>
         ＋「いずれか1つ以上を満たす」必要がある条件(or条件)を追加
-      </button>
+      </Button>
 
       {showCount && (
         <div className="bg-canvas-sunken rounded-card flex items-baseline justify-between px-4 py-3">
@@ -346,7 +335,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
                   ? '…'
                   : count === null
                     ? '—'
-                    : `${count.toLocaleString('ja-JP')} 人`}
+                    : `${formatNumber(count)} 人`}
           </span>
         </div>
       )}
@@ -421,16 +410,11 @@ function TagPicker({
   const shown = collapsed ? rest.slice(0, LIMIT) : rest
 
   const chip = (tag: Option, on: boolean) => (
-    <button
-      key={tag.id}
-      type="button"
-      onClick={() => onToggle(tag.id)}
-      className={`rounded-pill h-8 px-3 text-xs transition-colors ${
+    <Button variant="primary" className={(`rounded-pill h-8 px-3 text-xs transition-colors ${
         on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-      }`}
-    >
+      }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() => onToggle(tag.id)}>
       {tag.name}
-    </button>
+    </Button>
   )
 
   return (
@@ -450,13 +434,9 @@ function TagPicker({
         {shown.map((tag) => chip(tag, false))}
       </div>
       {collapsed && (
-        <button
-          type="button"
-          onClick={() => setShowAll(true)}
-          className="text-ink-secondary hover:bg-canvas-sunken border-hairline rounded-control h-8 border px-3 text-xs"
-        >
+        <Button variant="secondary" className="text-ink-secondary h-8 px-3 text-xs whitespace-normal" type="button" onClick={() => setShowAll(true)}>
           残り {rest.length - LIMIT} 件を表示
-        </button>
+        </Button>
       )}
       {query !== '' && rest.length === 0 && chosen.length === 0 && (
         <p className="text-ink-faint text-xs">「{query}」に当てはまるタグがありません</p>
@@ -497,7 +477,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     return (
       <>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">タグ</span>
+          <span className="text-ink text-sm font-semibold">タグ</span>
           <Select
             aria-label="タグの条件"
             value={rule.type}
@@ -535,7 +515,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">名前</span>
+            <span className="text-ink text-sm font-semibold">名前</span>
             <input
               value={nameText}
               onChange={(e) => changeName({ ...v, text: e.target.value })}
@@ -589,7 +569,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'status_message':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
+          <span className="text-ink text-sm font-semibold">
             {rule.type === 'private_memo' ? '個別メモ' : 'ステータスメッセージ'}
           </span>
           <input
@@ -605,7 +585,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'last_reaction_at':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
+          <span className="text-ink text-sm font-semibold">
             {rule.type === 'registered_at' ? '友だち登録日' : '最終反応日'}
           </span>
           <DateField
@@ -629,7 +609,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">対応マーク</span>
+            <span className="text-ink text-sm font-semibold">対応マーク</span>
             <Select
               aria-label="マークの含め方"
               value={v.exclude ? 'exclude' : 'include'}
@@ -646,10 +626,9 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             {marks.map((mark) => {
               const on = selected.includes(mark.id)
               return (
-                <button
-                  key={mark.id}
-                  type="button"
-                  onClick={() =>
+                <Button variant="primary" className={(`rounded-pill h-8 px-3 text-xs transition-colors ${
+                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
+                  }`) + ' whitespace-normal'} key={mark.id} type="button" onClick={() =>
                     onChange({
                       type: rule.type,
                       value: {
@@ -657,13 +636,9 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
                         markIds: on ? selected.filter((id) => id !== mark.id) : [...selected, mark.id],
                       },
                     })
-                  }
-                  className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-                  }`}
-                >
+                  }>
                   {mark.name}
-                </button>
+                </Button>
               )
             })}
           </div>
@@ -676,7 +651,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       const needsText = op !== 'exists' && op !== 'not_exists'
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">友だち情報</span>
+          <span className="text-ink text-sm font-semibold">友だち情報</span>
           <Select
             aria-label="友だち情報の項目"
             value={String(v.fieldId ?? '')}
@@ -704,7 +679,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'scenario_subscribed':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">シナリオ購読</span>
+          <span className="text-ink text-sm font-semibold">シナリオ購読</span>
           <Select
             aria-label="購読中のシナリオ"
             value={String(rule.value ?? '')}
@@ -717,7 +692,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'scenario_state':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">シナリオ</span>
+          <span className="text-ink text-sm font-semibold">シナリオ</span>
           <Select
             aria-label="シナリオ"
             value={String(v.scenarioId ?? '')}
@@ -736,7 +711,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'form_answered':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">回答フォーム</span>
+          <span className="text-ink text-sm font-semibold">回答フォーム</span>
           <input
             value={String(rule.value ?? '')}
             onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
@@ -750,7 +725,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'reaction_state':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">反応状態</span>
+          <span className="text-ink text-sm font-semibold">反応状態</span>
           <Select
             aria-label="反応の種類"
             value={String(rule.value ?? 'reply_or_postback')}
@@ -769,7 +744,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">行動スコア</span>
+            <span className="text-ink text-sm font-semibold">行動スコア</span>
             <TextField
               type="number"
               step={1}
@@ -804,7 +779,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'is_hidden':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
+          <span className="text-ink text-sm font-semibold">
             {rule.type === 'is_following' ? 'ブロック状態' : '表示状態'}
           </span>
           <Select

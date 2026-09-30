@@ -8,6 +8,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatDateTime } from '@/lib/format'
 
 /**
  * 友だち追加のQRコード（設計 V2 1-1-1）。
@@ -264,7 +265,7 @@ export default function QrDialog({
     const reason = route.stoppedReason?.trim() || null
     const at = route.stoppedAt ? new Date(route.stoppedAt) : null
     const when = at && Number.isFinite(at.getTime())
-      ? at.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })
+      ? formatDateTime(at)
       : null
     if (reason && when) return `${reason}（${when}に停止）`
     return reason ?? (when ? `${when}に停止` : null)
@@ -298,7 +299,7 @@ export default function QrDialog({
   return (
     <div
       data-design="QR"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
       role="dialog"
       aria-modal="true"
       aria-label="友だち追加のQRコード"

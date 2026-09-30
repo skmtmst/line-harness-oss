@@ -16,7 +16,7 @@ function MosaicCell({ image }: { image: BannerImage | null }) {
   if (failed) {
     return (
       <span
-        className="grid h-full w-full place-items-center bg-canvas-sunken px-1 text-center text-micro font-bold leading-tight text-ink-faint"
+        className="grid h-full w-full place-items-center bg-canvas-sunken px-1 text-center text-micro font-medium leading-tight text-ink-faint"
         title="画像を表示できません"
       >
         画像を表示できません

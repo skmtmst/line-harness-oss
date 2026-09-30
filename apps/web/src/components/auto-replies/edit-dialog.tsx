@@ -38,6 +38,7 @@ import {
   messageKindWord,
   responseTypeWord,
 } from '@/app/auto-replies/auto-reply-words'
+import { formatNumber } from '@/lib/format'
 
 export interface AutoReplyDraft {
   id?: string
@@ -596,8 +597,7 @@ export default function EditDialog({
     <>
       {page ? (
         <>
-          <Button type="button" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '下書き保存'}
+          <Button type="button" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">下書きを保存する
           </Button>
           {step === 'basic' && <Button type="button" variant="primary" onClick={() => moveTo('trigger')}>反応条件へ</Button>}
           {step === 'trigger' && <Button type="button" variant="primary" onClick={() => moveTo('response')}>何を返すかへ</Button>}
@@ -606,8 +606,7 @@ export default function EditDialog({
       ) : (
         <>
           <Button type="button" onClick={onClose}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '保存'}
+          <Button type="button" variant="primary" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">保存する
           </Button>
         </>
       )}
@@ -616,7 +615,7 @@ export default function EditDialog({
 
   return (
     <div
-      className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'}
+      className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4'}
       data-design-node={page ? step === 'basic' ? 'K7vg2' : step === 'trigger' ? 'nzWIX' : 'ivDoe' : undefined}
       role={page ? undefined : 'presentation'}
       onMouseDown={page ? undefined : (event) => {
@@ -631,7 +630,7 @@ export default function EditDialog({
       <div className={page ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]' : ''}>
       <div
         ref={dialogRef}
-        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl'}
+        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-control bg-canvas shadow-float'}
         role={page ? undefined : 'dialog'}
         aria-modal={page ? undefined : true}
         aria-labelledby={page ? undefined : 'auto-reply-edit-dialog-title'}
@@ -806,8 +805,8 @@ export default function EditDialog({
                   <Button type="button" className="shrink-0 self-start" onClick={() => moveTo('trigger')}>反応条件を開く</Button>
                 </div>
                 <dl className="mt-4 grid gap-3">
-                  <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">受信メッセージ</dt><dd className="text-ink mt-1 text-sm font-bold">{conditionSummary}</dd></div>
-                  <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">時間帯</dt><dd className="text-ink mt-1 text-sm font-bold">{timeSummary}</dd></div>
+                  <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">受信メッセージ</dt><dd className="text-ink mt-1 text-sm font-medium">{conditionSummary}</dd></div>
+                  <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">時間帯</dt><dd className="text-ink mt-1 text-sm font-medium">{timeSummary}</dd></div>
                 </dl>
               </section>
               <section className="rounded-card border border-hairline p-4">
@@ -845,7 +844,7 @@ export default function EditDialog({
                 type="button"
                 aria-pressed={!respondToAll}
                 onClick={() => setRespondToAll(false)}
-                className={`rounded-control border px-3 py-1.5 text-xs ${!respondToAll ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                className={`rounded-control border px-3 py-1.5 text-xs ${!respondToAll ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
               >
                 キーワードで応答
               </button>
@@ -853,7 +852,7 @@ export default function EditDialog({
                 type="button"
                 aria-pressed={respondToAll}
                 onClick={() => setRespondToAll(true)}
-                className={`rounded-control border px-3 py-1.5 text-xs ${respondToAll ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                className={`rounded-control border px-3 py-1.5 text-xs ${respondToAll ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
               >
                 一律で応答
               </button>
@@ -874,7 +873,7 @@ export default function EditDialog({
                 {keywordRules.map((rule, index) => (
                   <div key={`keyword-${index}`} className="flex items-center gap-2">
                     {index > 0 && (
-                      <span className="text-ink-faint w-10 shrink-0 text-center text-xs font-bold">
+                      <span className="text-ink-faint w-10 shrink-0 text-center text-xs font-medium">
                         {keywordMatchMode === 'all' ? 'かつ' : 'または'}
                       </span>
                     )}
@@ -903,7 +902,7 @@ export default function EditDialog({
                           setKeyword(next[0]?.keyword ?? '')
                         }}
                       >
-                        削除
+                        削除する
                       </Button>
                     )}
                   </div>
@@ -912,7 +911,7 @@ export default function EditDialog({
                   type="button"
                   onClick={() => setKeywordRules((current) => [...current, emptyKeywordRule(matchType)])}
                 >
-                  ＋ キーワードを追加
+                  ＋ キーワードを追加する
                 </Button>
               </div>
             )}
@@ -932,7 +931,7 @@ export default function EditDialog({
                   type="button"
                   aria-pressed={keywordMatchMode === o.value}
                   onClick={() => setKeywordMatchMode(o.value)}
-                  className={`rounded-control border px-3 py-1.5 text-xs ${keywordMatchMode === o.value ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${keywordMatchMode === o.value ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {o.label}
                 </button>
@@ -960,7 +959,7 @@ export default function EditDialog({
                   type="button"
                   aria-pressed={matchType === mt}
                   onClick={() => changeMatchType(mt)}
-                  className={`rounded-control border px-3 py-1.5 text-xs ${matchType === mt ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${matchType === mt ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {mt === 'exact' ? '完全一致' : '部分一致'}
                 </button>
@@ -968,7 +967,7 @@ export default function EditDialog({
             </div>
           </div>
           {/* 返す条件。キーワードが合っても、ここに当てはまらなければ返さない。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink text-sm font-semibold">2. いつ・誰に反応するか</p>
             <p className="text-ink-faint text-xs">
               複数のキーワードは、下の「すべて必須／どれか1つ」でつなぎ方を決めます。
@@ -1001,11 +1000,11 @@ export default function EditDialog({
                 {WEEKDAY_LABELS.map((label, day) => {
                   const on = weekdays.length === 0 || weekdays.includes(day)
                   return (
-                    <button
-                      key={day}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => {
+                    <Button variant="secondary" className={(`rounded-control border px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'border-accent bg-accent-soft text-ink'
+                          : 'border-hairline text-ink-faint'
+                      }`) + ' h-auto whitespace-normal'} key={day} type="button" aria-pressed={on} onClick={() => {
                         // 何も選ばない＝すべての曜日。最初の1つを押したときは
                         // 「その曜日だけ」にする（全部入りから1つ外す、ではない）。
                         if (weekdays.length === 0) {
@@ -1031,15 +1030,9 @@ export default function EditDialog({
                         }
                         setWeekdays([...weekdays, day].sort((a, b) => a - b))
                         setWeekdayNotice(null)
-                      }}
-                      className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
-                        on
-                          ? 'border-accent bg-accent-soft text-ink'
-                          : 'border-hairline text-ink-faint'
-                      }`}
-                    >
+                      }}>
                       {label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -1124,13 +1117,11 @@ export default function EditDialog({
                 {MESSAGE_KIND_WORDS.map(({ key, label }) => {
                   const on = messageKinds.length === 0 || messageKinds.includes(key)
                   return (
-                    <button
-                      key={key}
-                      type="button"
-                      // R254: 選・不選を読み上げで区別できるようにする。
-                      // 曜日・一致のしかたの切り替えと同じ押した状態。
-                      aria-pressed={on}
-                      onClick={() =>
+                    <Button variant="primary" className={(`rounded-pill px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'bg-accent-deep text-on-accent'
+                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                      }`) + ' border-0 h-auto whitespace-normal'} key={key} type="button" aria-pressed={on} onClick={() =>
                         setMessageKinds((prev) => {
                           // 何も選んでいない状態は「全部」を意味する。そこから
                           // 1つ外すには、いったん全部を入れてから外す。
@@ -1139,15 +1130,9 @@ export default function EditDialog({
                             ? base.filter((k) => k !== key)
                             : [...base, key]
                         })
-                      }
-                      className={`rounded-pill px-2.5 py-1 text-xs transition-colors ${
-                        on
-                          ? 'bg-accent-deep text-on-accent'
-                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                      }`}
-                    >
+                      }>
                       {label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -1189,7 +1174,7 @@ export default function EditDialog({
                       ? <span className="text-ink-faint">受信なし</span>
                       : draft.receiveSourceCounts.map((item) => (
                         <span key={item.source} className="bg-canvas-sunken rounded-pill px-2 py-1 text-xs">
-                          {messageKindWord(item.source)} {item.count.toLocaleString()}件
+                          {messageKindWord(item.source)} {formatNumber(item.count)}件
                         </span>
                       ))}
                 </div>
@@ -1259,7 +1244,7 @@ export default function EditDialog({
                   />
                   <p className="text-ink-faint mt-1 text-xs">条件を入れないと、全員に応答します。</p>
                   <div className="bg-canvas-sunken mt-3 rounded-control p-3 text-xs">
-                    <p className="text-ink font-medium">この条件に当たった受信</p>
+                    <p className="text-ink font-semibold">この条件に当たった受信</p>
                     <p className="text-ink-faint mt-1">過去28日の受信に、この条件をあてはめた結果です。これから来る受信の件数ではありません。</p>
                     <p className="text-ink-faint mt-2">標準互換15軸：名前・個別メモ・ステータスメッセージ・友だち登録日・タグ・友だち情報・シナリオ・イベント予約・カレンダー予約・共通情報・リマインダ・回答フォーム・最終反応日・その他・対応マーク</p>
                     <p className="text-ink-faint mt-1">この画面だけの6軸：担当者・流入経路・配信状況・予約状況・購入履歴・ブロック状態</p>
@@ -1291,7 +1276,7 @@ export default function EditDialog({
                   type="button"
                   aria-pressed={mode === key}
                   onClick={() => setMode(key)}
-                  className={`rounded-control border px-3 py-1.5 text-xs ${mode === key ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${mode === key ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {label}
                 </button>
@@ -1422,7 +1407,7 @@ export default function EditDialog({
            * ページ表示に置いていた見本の文章と処理の無い追加ボタンは、実設定と
            * 見分けが付かないので、ダイアログと同じ実編集部品へ結び付ける（U003）。
            */}
-          <div className={page ? 'border-hairline rounded-card space-y-3 border p-4' : 'border-hairline space-y-3 rounded-lg border p-3'}>
+          <div className={page ? 'border-hairline rounded-card space-y-3 border p-4' : 'border-hairline space-y-3 rounded-control border p-3'}>
             <div>
               <p className="text-ink text-sm font-semibold">
                 {page ? '配信後のアクション' : '4. 応答したときに行うこと'}
@@ -1516,7 +1501,7 @@ export default function EditDialog({
           </section>
             </>
           ) : null}
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-danger">{error}</p>}
         </div>
         {/* ★V7: 窓の中身だけをスクロールさせ、保存の段は窓の下に固定する。 */}
         {!page && <StickyBar className="mx-5 mb-4 shrink-0" actions={stickyActions} />}
@@ -1546,30 +1531,30 @@ export default function EditDialog({
               {step === 'trigger' ? 'この条件の判定' : step === 'response' ? '返信の設定' : '設定内容'}
             </h3>
             <dl className="divide-hairline mt-3 divide-y text-xs">
-              <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-medium">{isActive ? '有効' : '停止中'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-semibold">{isActive ? '有効' : '停止中'}</dd></div>
               {step === 'basic' && (
                 <>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">動く順番</dt><dd className="text-ink font-medium">{orderHint?.position != null && orderHint?.total != null ? `上から ${orderHint.position} 番目` : '一覧の「評価順」のとおり'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">過去28日の応答</dt><dd className="text-ink font-medium">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">同時に当たるルール</dt><dd className="text-ink font-medium">{draft.conflictAttentionCount == null ? '—（未取得）' : draft.conflictAttentionCount === 0 ? 'なし' : `${draft.conflictAttentionCount}件`}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">動く順番</dt><dd className="text-ink font-semibold">{orderHint?.position != null && orderHint?.total != null ? `上から ${orderHint.position} 番目` : '一覧の「評価順」のとおり'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">過去28日の応答</dt><dd className="text-ink font-semibold">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">同時に当たるルール</dt><dd className="text-ink font-semibold">{draft.conflictAttentionCount == null ? '—（未取得）' : draft.conflictAttentionCount === 0 ? 'なし' : `${draft.conflictAttentionCount}件`}</dd></div>
                 </>
               )}
               {step === 'trigger' && (
                 <>
                   <div className="py-3"><dt className="text-ink-faint">受信メッセージ</dt><dd className="text-ink mt-1 font-medium">{conditionSummary}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">曜日・時間</dt><dd className="text-ink font-medium">{timeSummary}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">相手</dt><dd className="text-ink font-medium">{friendConditions ? '条件あり' : 'すべての友だち'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">28日間の一致</dt><dd className="text-ink font-medium">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">曜日・時間</dt><dd className="text-ink font-semibold">{timeSummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">相手</dt><dd className="text-ink font-semibold">{friendConditions ? '条件あり' : 'すべての友だち'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">28日間の一致</dt><dd className="text-ink font-semibold">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
                 </>
               )}
               {step === 'response' && (
                 <>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">返信</dt><dd className="text-ink font-medium">{responseSummary}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">実行すること</dt><dd className="text-ink font-medium">{actions.length}件</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">連続返信</dt><dd className="text-ink font-medium">{cooldown ? `${cooldown}分あける` : '制限なし'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">待ち時間</dt><dd className="text-ink font-medium">{replyDelaySummary}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">対応中のトーク</dt><dd className="text-ink font-medium">{skipWhenOperatorActive ? '返さない' : '返す'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">不一致時</dt><dd className="text-ink font-medium">{unmatchedSummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">返信</dt><dd className="text-ink font-semibold">{responseSummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">実行すること</dt><dd className="text-ink font-semibold">{actions.length}件</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">連続返信</dt><dd className="text-ink font-semibold">{cooldown ? `${cooldown}分あける` : '制限なし'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">待ち時間</dt><dd className="text-ink font-semibold">{replyDelaySummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">対応中のトーク</dt><dd className="text-ink font-semibold">{skipWhenOperatorActive ? '返さない' : '返す'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">不一致時</dt><dd className="text-ink font-semibold">{unmatchedSummary}</dd></div>
                 </>
               )}
             </dl>
@@ -1611,7 +1596,7 @@ export default function EditDialog({
                     {['予約を確認', '日程を変更', 'キャンセル'].map((label) => (
                       <p
                         key={label}
-                        className="border-line-answer text-line-answer rounded-control border py-1.5 text-center text-xs font-bold"
+                        className="border-line-answer text-line-answer rounded-control border py-1.5 text-center text-xs font-medium"
                       >
                         {label}
                       </p>
@@ -1626,8 +1611,8 @@ export default function EditDialog({
             <p className="text-ink font-semibold">{step === 'trigger' ? '過去28日の受信' : '動作の確認'}</p>
             {step === 'trigger' ? (
               <>
-                <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{draft.matchedLast28Days == null ? '—' : `${draft.matchedLast28Days.toLocaleString()}件`}</p>
-                <p className="text-ink-faint mt-1 leading-relaxed">{receiveCount == null ? '受信総数は未取得です。' : `受信 ${receiveCount.toLocaleString()}件の実測集計です。`}</p>
+                <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{draft.matchedLast28Days == null ? '—' : `${formatNumber(draft.matchedLast28Days)}件`}</p>
+                <p className="text-ink-faint mt-1 leading-relaxed">{receiveCount == null ? '受信総数は未取得です。' : `受信 ${formatNumber(receiveCount)}件の実測集計です。`}</p>
                 <p className="text-ink-faint mt-3 leading-relaxed">利用できる条件：タグ・友だち情報・シナリオ・予約・流入経路・対応状況など</p>
               </>
             ) : (

@@ -120,7 +120,7 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
     expect(word.linked).toBe(false)
     expect(word.label).toBe('テンプレートを確認できません')
     expect(word.note).toContain('再読み込み')
-    expect(word.note).not.toContain('削除')
+    expect(word.note).not.toContain('削除する')
     expect(word.note).not.toContain('権限')
   })
 

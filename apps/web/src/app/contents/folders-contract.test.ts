@@ -45,7 +45,7 @@ describe('R37 フォルダの名前変更・削除の接続', () => {
   it('共通情報一覧はスマホの選択欄からも名前変更・削除に届く', () => {
     // 狭い幅では縦パネルが出ないため、選んでいるフォルダの操作口を置く。
     expect(VARS).toContain('フォルダ名を変える')
-    expect(VARS).toContain('フォルダを削除')
+    expect(VARS).toContain('フォルダを削除する')
     expect(VARS).toContain('canManageFolders && selectedUserFolder')
   })
 

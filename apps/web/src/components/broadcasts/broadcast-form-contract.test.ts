@@ -33,8 +33,8 @@ describe('一斉配信の作成', () => {
   })
 
   it('送信対象の未取得を半角ハイフンで書かない', () => {
-    expect(FORM).not.toMatch(/toLocaleString\('ja-JP'\) \?\? '-'/)
-    expect(FORM).toContain("toLocaleString('ja-JP') ?? '—'")
+    expect(FORM).not.toMatch(/formatNumber\([^)]+\) \?\? '-'/)
+    expect(FORM).toContain("formatNumber(audienceCount)")
   })
 
   it('上限を超えたまま保存・送信できない', () => {

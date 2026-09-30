@@ -27,7 +27,7 @@ describe('V6 シナリオ編集の契約', () => {
   })
 
   it('一括テスト送信の操作を画面内に重複させない', () => {
-    expect(PAGE.match(/>\s*一括テスト送信\s*<\/button>/g)).toHaveLength(1)
+    expect(PAGE.match(/>\s*一括でテストを送る\s*<\/Button>/g)).toHaveLength(1)
   })
 
   it('テスト送信先を同じLINEアカウントから取得し、失敗後も操作へ戻れる', () => {

@@ -1,171 +1,6 @@
 {
-  "app/accounts/handover/page.tsx": {
-    "color": 0,
-    "radius": 4,
-    "shadow": 0
-  },
-  "app/accounts/new/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/affiliates/action-dialogs.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 1
-  },
-  "app/affiliates/tabs.tsx": {
-    "color": 0,
-    "radius": 12,
-    "shadow": 1
-  },
-  "app/analytics/page.tsx": {
-    "color": 1,
-    "radius": 4,
-    "shadow": 0
-  },
-  "app/analytics/reports/new/page.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/auto-replies/page.tsx": {
-    "color": 0,
-    "radius": 10,
-    "shadow": 0
-  },
-  "app/auto-replies/runs/auto-reply-runs.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/automations/new/friend-multi-select.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 1
-  },
-  "app/automations/new/page.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 0
-  },
-  "app/automations/page.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/automations/runs/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 3
-  },
-  "app/booking/bookings/booking-calendar.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 2
-  },
-  "app/booking/bookings/detail/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/booking/bookings/new/page.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/booking/bookings/page.tsx": {
-    "color": 0,
-    "radius": 8,
-    "shadow": 1
-  },
-  "app/booking/menus/new/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/booking/menus/page.tsx": {
-    "color": 0,
-    "radius": 7,
-    "shadow": 0
-  },
-  "app/booking/staff/new/page.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 0
-  },
-  "app/booking/staff/page.tsx": {
-    "color": 0,
-    "radius": 12,
-    "shadow": 1
-  },
-  "app/booking/staff/shifts/liff-preview.tsx": {
-    "color": 0,
-    "radius": 4,
-    "shadow": 0
-  },
-  "app/booking/staff/shifts/page.tsx": {
-    "color": 0,
-    "radius": 4,
-    "shadow": 0
-  },
-  "app/broadcasts/detail/broadcast-activity.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/broadcasts/detail/broadcast-status-rail.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/broadcasts/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/broadcasts/reserved/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 2
-  },
-  "app/chats/page.tsx": {
-    "color": 36,
-    "radius": 48,
-    "shadow": 8
-  },
   "app/contents/contents-permission-behavior.spec.mjs": {
     "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
-  "app/contents/media-upload-dialog.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/contents/page.tsx": {
-    "color": 0,
-    "radius": 4,
-    "shadow": 0
-  },
-  "app/contents/vars/edit/page.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/contents/vars/new/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/conversions/page.tsx": {
-    "color": 0,
-    "radius": 6,
-    "shadow": 0
-  },
-  "app/duplicates/page.tsx": {
-    "color": 15,
     "radius": 0,
     "shadow": 0
   },
@@ -174,54 +9,14 @@
     "radius": 0,
     "shadow": 0
   },
-  "app/emergency/page.tsx": {
-    "color": 0,
-    "radius": 5,
-    "shadow": 3
-  },
   "app/form-submissions/edit/form-design-settings.tsx": {
     "color": 1,
-    "radius": 1,
-    "shadow": 1
+    "radius": 0,
+    "shadow": 0
   },
   "app/form-submissions/page.tsx": {
     "color": 1,
-    "radius": 6,
-    "shadow": 1
-  },
-  "app/form-submissions/responses/page.tsx": {
-    "color": 0,
     "radius": 0,
-    "shadow": 1
-  },
-  "app/friend-add-settings/friend-add-rule-editor.css": {
-    "color": 6,
-    "radius": 0,
-    "shadow": 2
-  },
-  "app/friend-add-settings/friend-add-rule-editor.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/friend-add-settings/runs/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/friends/detail/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/friends/page.tsx": {
-    "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
-  "app/getting-started/getting-started.module.css": {
-    "color": 0,
-    "radius": 1,
     "shadow": 0
   },
   "app/global-error.tsx": {
@@ -229,454 +24,59 @@
     "radius": 2,
     "shadow": 0
   },
-  "app/health/page.tsx": {
-    "color": 0,
-    "radius": 5,
-    "shadow": 0
-  },
-  "app/hq/open/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/hq/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/inflow-links/_components/create-genre-modal.tsx": {
-    "color": 0,
-    "radius": 4,
-    "shadow": 1
-  },
-  "app/inflow-links/_components/ref-orders.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/inflow-links/detail/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 1
-  },
   "app/inflow-links/new/page.tsx": {
     "color": 2,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/inflow-links/page.tsx": {
-    "color": 0,
-    "radius": 6,
-    "shadow": 1
-  },
-  "app/inflow-links/referral-qr-modal.tsx": {
-    "color": 0,
-    "radius": 4,
-    "shadow": 1
-  },
-  "app/line-notifications/operator-notification-rules.tsx": {
-    "color": 0,
     "radius": 0,
-    "shadow": 1
-  },
-  "app/line-notifications/page.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 3
-  },
-  "app/login/two-factor/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 1
-  },
-  "app/login/two-factor/setup/page.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/mileage/action-score-tab.tsx": {
-    "color": 0,
-    "radius": 5,
-    "shadow": 0
-  },
-  "app/mileage/friends/detail/page.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 0
-  },
-  "app/mileage/mileage-history-tab.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/mileage/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/nen-campaigns/line-preview.tsx": {
-    "color": 0,
-    "radius": 1,
     "shadow": 0
   },
   "app/nen-members/page.tsx": {
     "color": 0,
-    "radius": 1,
+    "radius": 0,
     "shadow": 1
-  },
-  "app/nen/members/rank-settings-tab.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 2
-  },
-  "app/nen/pets/feeding-tab.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 2
-  },
-  "app/notifications/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/ops/members/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
   },
   "app/ops/support/format.ts": {
     "color": 0,
     "radius": 5,
     "shadow": 0
   },
-  "app/page.tsx": {
-    "color": 0,
-    "radius": 8,
-    "shadow": 0
-  },
-  "app/pools/new/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 1
-  },
-  "app/pools/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/reminders/edit/issue469-reminder-screens.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/reminders/new/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/restaurant-test/restaurant-console.tsx": {
-    "color": 0,
-    "radius": 6,
-    "shadow": 2
-  },
-  "app/restaurant-test/stores/new/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/restaurant-test/stores/store-context-banner.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/rich-menus/connections/page.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 4
-  },
-  "app/rich-menus/edit/page.tsx": {
-    "color": 1,
-    "radius": 24,
-    "shadow": 8
-  },
-  "app/rich-menus/edit/publish-history.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/scenarios/detail/scenario-detail-client.tsx": {
-    "color": 0,
-    "radius": 6,
-    "shadow": 0
-  },
-  "app/scenarios/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 1
-  },
-  "app/search-console/page.tsx": {
-    "color": 0,
-    "radius": 8,
-    "shadow": 0
-  },
-  "app/settings/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/staff/email-change/page.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/staff/invite/page.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/staff/new/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
   "app/staff/page.tsx": {
     "color": 2,
-    "radius": 5,
-    "shadow": 2
-  },
-  "app/tags/fields/migrate/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 5
+    "radius": 0,
+    "shadow": 0
   },
   "app/tags/folders/new/page.tsx": {
     "color": 8,
-    "radius": 3,
-    "shadow": 1
-  },
-  "app/templates/carousel/page.tsx": {
-    "color": 0,
-    "radius": 7,
-    "shadow": 0
-  },
-  "app/templates/detail/page.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "app/templates/page.tsx": {
-    "color": 0,
-    "radius": 15,
-    "shadow": 2
-  },
-  "app/templates/template-asset-editor.tsx": {
-    "color": 0,
-    "radius": 5,
+    "radius": 0,
     "shadow": 0
   },
   "app/visual-qa/v7-progress-filedrop/page.tsx": {
     "color": 1,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/webhooks/page.tsx": {
-    "color": 0,
-    "radius": 10,
-    "shadow": 2
-  },
-  "app/webhooks/webhook-overviews.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 1
-  },
-  "app/webinars/edit/page.tsx": {
-    "color": 0,
-    "radius": 54,
-    "shadow": 9
-  },
-  "app/webinars/published/page.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/accounts/account-edit-modal.tsx": {
-    "color": 0,
-    "radius": 6,
-    "shadow": 1
-  },
-  "components/accounts/account-form-fields.tsx": {
-    "color": 0,
-    "radius": 4,
+    "radius": 0,
     "shadow": 0
   },
   "components/accounts/account-ordering.tsx": {
     "color": 0,
-    "radius": 1,
-    "shadow": 2
-  },
-  "components/accounts/account-setup-urls.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/accounts/account-switcher.tsx": {
-    "color": 0,
-    "radius": 6,
-    "shadow": 2
-  },
-  "components/accounts/test-recipients-setting.tsx": {
-    "color": 0,
-    "radius": 10,
-    "shadow": 1
-  },
-  "components/app-shell.module.css": {
-    "color": 1,
     "radius": 0,
-    "shadow": 0
-  },
-  "components/auth-guard.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/auto-replies/edit-dialog.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 1
-  },
-  "components/broadcasts/broadcast-asset-manager.tsx": {
-    "color": 0,
-    "radius": 21,
     "shadow": 2
-  },
-  "components/broadcasts/broadcast-form.tsx": {
-    "color": 0,
-    "radius": 10,
-    "shadow": 13
-  },
-  "components/broadcasts/broadcast-kpis.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/broadcasts/broadcast-message-preview.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 3
-  },
-  "components/chats/friend-info-sidebar.tsx": {
-    "color": 7,
-    "radius": 16,
-    "shadow": 0
-  },
-  "components/chats/inbox-dropdown.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 1
-  },
-  "components/chats/inbox-filter-panel.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "components/chats/inbox-kpis.tsx": {
-    "color": 13,
-    "radius": 4,
-    "shadow": 0
-  },
-  "components/chats/saved-view-dialog.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "components/chats/template-folder-select.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "components/chats/template-picker.tsx": {
-    "color": 47,
-    "radius": 13,
-    "shadow": 2
-  },
-  "components/dashboard/dashboard-editor.tsx": {
-    "color": 0,
-    "radius": 4,
-    "shadow": 1
-  },
-  "components/dashboard/friend-trend-table.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
   },
   "components/dashboard/qr-dialog.tsx": {
     "color": 4,
     "radius": 0,
     "shadow": 0
   },
-  "components/dashboard/shipment-panel.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/dashboard/side-cards.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 0
-  },
-  "components/events/event-form.tsx": {
-    "color": 0,
-    "radius": 24,
-    "shadow": 3
-  },
-  "components/events/event-wizard.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/feature-disabled-gate.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
   "components/flex-preview.tsx": {
-    "color": 8,
-    "radius": 4,
+    "color": 6,
+    "radius": 2,
     "shadow": 1
-  },
-  "components/forms/options-dialog.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 2
   },
   "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "color": 10,
-    "radius": 3,
-    "shadow": 1
-  },
-  "components/friend-attributes-v3/friend-attributes-v3-static.module.css": {
-    "color": 61,
-    "radius": 11,
-    "shadow": 3
-  },
-  "components/friend-fields/field-list.tsx": {
-    "color": 0,
+    "color": 7,
     "radius": 0,
-    "shadow": 2
-  },
-  "components/friend-fields/mark-list.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 3
-  },
-  "components/friend-fields/saved-search-list.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
+    "shadow": 0
   },
   "components/friend-fields/support-mark-editor.tsx": {
     "color": 6,
-    "radius": 1,
+    "radius": 0,
     "shadow": 0
   },
   "components/friend-fields/tag-archived-edit.spec.mjs": {
@@ -684,99 +84,19 @@
     "radius": 0,
     "shadow": 0
   },
-  "components/friend-fields/tag-csv-import-dialog.module.css": {
-    "color": 2,
-    "radius": 2,
-    "shadow": 1
-  },
   "components/friend-fields/tag-editor-v4.tsx": {
     "color": 1,
-    "radius": 8,
-    "shadow": 3
-  },
-  "components/friend-fields/tags-page-v4.tsx": {
-    "color": 10,
-    "radius": 4,
-    "shadow": 2
-  },
-  "components/friends/advanced-search-dialog.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 1
-  },
-  "components/friends/bulk-run-dialog.module.css": {
-    "color": 0,
-    "radius": 1,
+    "radius": 0,
     "shadow": 0
   },
-  "components/friends/friend-list-row.tsx": {
-    "color": 0,
-    "radius": 5,
+  "components/friend-fields/tags-page-v4.tsx": {
+    "color": 3,
+    "radius": 0,
     "shadow": 0
   },
   "components/friends/tag-badge.tsx": {
     "color": 1,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/hq/account-list.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 1
-  },
-  "components/hq/banners/generation-panel.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/hq/operator-history.tsx": {
-    "color": 0,
     "radius": 0,
-    "shadow": 1
-  },
-  "components/inbox/inbox-filters.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 1
-  },
-  "components/inbox/inbox-list.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 1
-  },
-  "components/inbox/inbox-row.tsx": {
-    "color": 0,
-    "radius": 5,
-    "shadow": 0
-  },
-  "components/inbox/inbox-summary-bar.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 2
-  },
-  "components/inflow-links/site-script.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "components/layout/breadcrumb.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/layout/merged-tabs.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/layout/sidebar.module.css": {
-    "color": 2,
-    "radius": 0,
-    "shadow": 1
-  },
-  "components/layout/sidebar.tsx": {
-    "color": 0,
-    "radius": 6,
     "shadow": 0
   },
   "components/ops/impersonation-bar.tsx": {
@@ -784,149 +104,29 @@
     "radius": 0,
     "shadow": 0
   },
-  "components/ops/knowledge.module.css": {
-    "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
-  "components/ops/ops-shell.tsx": {
-    "color": 0,
-    "radius": 10,
-    "shadow": 3
-  },
-  "components/reminders/reminder-publish-flow.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 1
-  },
   "components/reminders/reminder-v6-ui.module.css": {
     "color": 1,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/rich-menus/apply-to-tag-modal.tsx": {
-    "color": 0,
-    "radius": 8,
-    "shadow": 1
-  },
-  "components/rich-menus/canvas-editor.tsx": {
-    "color": 8,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/rich-menus/rich-menu-create-form.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 1
-  },
-  "components/root-landing-gate.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/scenarios/action-editor.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/scenarios/action-editor.tsx": {
-    "color": 0,
     "radius": 0,
-    "shadow": 1
-  },
-  "components/scenarios/bulk-preview-modal.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/scenarios/insert-toolbar.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 2
-  },
-  "components/scenarios/message-type-tabs.module.css": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/scenarios/scenario-dialogs.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 2
-  },
-  "components/scenarios/schedule-input.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/scenarios/step-preview.module.css": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/session-lost-notice.tsx": {
-    "color": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "components/shared/action-menu.module.css": {
-    "color": 0,
-    "radius": 1,
     "shadow": 0
   },
   "components/shared/avatar.module.css": {
     "color": 1,
-    "radius": 2,
+    "radius": 1,
     "shadow": 1
-  },
-  "components/shared/bar-chart.module.css": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
   },
   "components/shared/combobox.module.css": {
-    "color": 6,
-    "radius": 3,
-    "shadow": 2
-  },
-  "components/shared/create-page.tsx": {
     "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/shared/date-field.module.css": {
-    "color": 6,
-    "radius": 4,
-    "shadow": 3
-  },
-  "components/shared/date-time-field.module.css": {
-    "color": 6,
-    "radius": 1,
+    "radius": 0,
     "shadow": 1
   },
-  "components/shared/file-drop.module.css": {
+  "components/shared/date-field.module.css": {
     "color": 0,
-    "radius": 5,
-    "shadow": 0
+    "radius": 1,
+    "shadow": 2
   },
   "components/shared/folder-add-dialog.tsx": {
     "color": 8,
     "radius": 0,
-    "shadow": 1
-  },
-  "components/shared/help-tip.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/shared/image-uploader.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 0
-  },
-  "components/shared/kpi-card.module.css": {
-    "color": 0,
-    "radius": 2,
     "shadow": 0
   },
   "components/shared/menu-portal.tsx": {
@@ -935,24 +135,14 @@
     "shadow": 0
   },
   "components/shared/multi-select.module.css": {
-    "color": 6,
-    "radius": 6,
-    "shadow": 2
-  },
-  "components/shared/og-editor.tsx": {
     "color": 0,
-    "radius": 3,
-    "shadow": 0
+    "radius": 0,
+    "shadow": 1
   },
   "components/shared/otp-input.module.css": {
     "color": 0,
     "radius": 0,
     "shadow": 1
-  },
-  "components/shared/progress.module.css": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 0
   },
   "components/shared/radio-card.module.css": {
     "color": 0,
@@ -967,71 +157,6 @@
   "components/shared/select.module.css": {
     "color": 0,
     "radius": 1,
-    "shadow": 0
-  },
-  "components/shared/stepper.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/shared/target-missing.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/store-selection-gate.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 1
-  },
-  "components/support/email-thread.tsx": {
-    "color": 33,
-    "radius": 13,
-    "shadow": 2
-  },
-  "components/support/support-inbox.tsx": {
-    "color": 0,
-    "radius": 14,
-    "shadow": 4
-  },
-  "components/templates/message-template-editor.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/ui/copy-text-button.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/ui/notification-switch.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/update/progress-modal.tsx": {
-    "color": 0,
-    "radius": 3,
-    "shadow": 1
-  },
-  "components/update/update-button.tsx": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/users/user-row.tsx": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
-  "components/webinars/webinar-form.tsx": {
-    "color": 0,
-    "radius": 12,
-    "shadow": 3
-  },
-  "components/webinars/webinar-notifications.tsx": {
-    "color": 0,
-    "radius": 3,
     "shadow": 0
   },
   "lib/hq-banners.ts": {

@@ -715,7 +715,7 @@ export default function ActionEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-editor-title" data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-lg`}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-editor-title" data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-float`}>
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
           <div className="min-w-0">
@@ -742,15 +742,10 @@ export default function ActionEditor({
                 {actions.indexOf(editing) + 1}. [{KIND_LABEL[editing.actionType]}] の条件設定
               </p>
               <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConditionFor(null)}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-4 text-sm"
-                >
+                <Button variant="secondary" className="text-ink-secondary h-9 px-4 whitespace-normal" type="button" onClick={() => setConditionFor(null)}>
                   戻る
-                </button>
-                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving}>
-                  {conditionSaving ? '保存中…' : '条件を保存'}
+                </Button>
+                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving} busy={conditionSaving}>条件を保存する
                 </Button>
               </div>
             </div>
@@ -819,7 +814,7 @@ export default function ActionEditor({
                           key={kind.type}
                           type="button"
                           onClick={() => void add(kind)}
-                          className={`${styles.kindButton} border-hairline text-ink hover:bg-canvas-sunken flex flex-col items-center justify-center gap-1 border text-caption font-bold transition-colors`}
+                          className={`${styles.kindButton} border-hairline text-ink hover:bg-canvas-sunken flex flex-col items-center justify-center gap-1 border text-caption font-medium transition-colors`}
                         >
                           <Icon aria-hidden size={18} strokeWidth={1.75} />
                           {kind.label}
@@ -849,7 +844,7 @@ export default function ActionEditor({
                         <div className={`${styles.actionRow} bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 px-4 py-2.5`}>
                           <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
                             {/* 実行順の丸番号（設計 26x26）。並べ替えるとここが変わる。 */}
-                            <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-bold`}>
+                            <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-medium`}>
                               {index + 1}
                             </span>
                             {/*
@@ -866,17 +861,13 @@ export default function ActionEditor({
                             )}
                           </p>
                           <div className="flex shrink-0 items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => openCondition(action)}
-                              className={`rounded-control h-9 border px-3 text-xs ${
+                            <Button variant="secondary" className={(`rounded-control h-9 border px-3 text-xs ${
                                 action.condition
                                   ? 'border-accent text-accent-deep bg-accent-soft'
                                   : 'border-hairline text-ink-secondary'
-                              }`}
-                            >
+                              }`) + ' whitespace-normal'} type="button" onClick={() => openCondition(action)}>
                               {action.condition ? '条件ON' : '条件OFF'}
-                            </button>
+                            </Button>
                             {/*
                               R244: 開閉は画面側で持つ。保存のたびに作り直して
                               閉じないし、入力焦点も残る。
@@ -895,7 +886,7 @@ export default function ActionEditor({
                           <div className="border-hairline border-t p-4">
                             <ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={(config) => save(action, { config })} />
                             <Checkbox className="mt-3" checked={action.repeatOnRefire} onCheckedChange={(checked) => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox>
-                            <div className="mt-3 flex gap-2"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => remove(action)} className="text-danger">削除</button></div>
+                            <div className="mt-3 flex gap-2"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => remove(action)} className="text-danger">削除する</button></div>
                           </div>
                         )}
                       </div>
@@ -914,7 +905,7 @@ export default function ActionEditor({
           </div>
         )}
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
-        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling}>{cancelling ? '戻しています…' : 'キャンセル'}</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
       </div>
     </div>
   )
@@ -1024,21 +1015,16 @@ export function ActionConfigEditor({
             {tags.map((tag) => {
               const on = selected.includes(tag.id)
               return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() =>
+                <Button variant="primary" className={(`rounded-pill h-8 px-3 text-xs transition-colors ${
+                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
+                  }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() =>
                     onChange({
                       ...c,
                       tagIds: on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id],
                     })
-                  }
-                  className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-                  }`}
-                >
+                  }>
                   {tag.name}
-                </button>
+                </Button>
               )
             })}
           </div>
@@ -1085,7 +1071,7 @@ export function ActionConfigEditor({
     case 'support_mark':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">対応マーク</span>
+          <span className="text-ink text-sm font-semibold">対応マーク</span>
           <Select
             aria-label="対応マーク"
             value={String(c.markId ?? '')}
@@ -1126,7 +1112,7 @@ export function ActionConfigEditor({
           </div>
           {c.op === 'start' && (
             <div className="bg-canvas-sunken rounded-card space-y-2 px-3 py-2.5">
-              <p className="text-ink text-xs font-bold">シナリオを購読する場合</p>
+              <p className="text-ink text-xs font-medium">シナリオを購読する場合</p>
               <RadioCardGroup legend="シナリオを購読する場合">
                 {(
                   [
@@ -1195,7 +1181,7 @@ export function ActionConfigEditor({
       return (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">テンプレート</span>
+            <span className="text-ink text-sm font-semibold">テンプレート</span>
             <TargetSelector
               label="テンプレート"
               kindName="テンプレート"
@@ -1214,7 +1200,7 @@ export function ActionConfigEditor({
     case 'reminder':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">リマインダ</span>
+          <span className="text-ink text-sm font-semibold">リマインダ</span>
           <TargetSelector
             label="リマインダ"
             kindName="リマインダ"
@@ -1228,7 +1214,7 @@ export function ActionConfigEditor({
     case 'event_booking':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">イベント予約</span>
+          <span className="text-ink text-sm font-semibold">イベント予約</span>
           <TargetSelector
             label="イベント予約"
             kindName="イベント予約"

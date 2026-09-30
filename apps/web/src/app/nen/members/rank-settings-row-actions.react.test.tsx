@@ -118,7 +118,7 @@ describe('m18s ランク表の行操作は一覧共通の形', () => {
       fireEvent.click(more!)
     })
     await settle(50)
-    expect(document.body.textContent).toContain('ランクを削除')
+    expect(document.body.textContent).toContain('ランクを削除する')
   })
 
   it('「…」→削除では確認が出て、確定で行が外れる', async () => {
@@ -129,7 +129,7 @@ describe('m18s ランク表の行操作は一覧共通の形', () => {
       fireEvent.click(more!)
     })
     await settle(50)
-    const del = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'ランクを削除')
+    const del = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'ランクを削除する')
     expect(del).toBeTruthy()
     await act(async () => {
       fireEvent.click(del!)
@@ -150,7 +150,7 @@ describe('m18s ランク表の行操作は一覧共通の形', () => {
   it('追加したばかりの行は「行を外す」で確認なしに外せる', async () => {
     await renderTab()
     await settle(50)
-    const add = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('ランクを追加'))
+    const add = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('ランクを追加する'))
     expect(add).toBeTruthy()
     await act(async () => {
       fireEvent.click(add!)

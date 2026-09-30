@@ -85,7 +85,7 @@ export default function OpsInvitePage() {
       title="運営メンバーの招待"
       description={
         <>
-          <span className="mb-1 block text-caption font-bold text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
           {check?.needsPassword
             ? 'musubo 運営コンソールに招待されています。名前とパスワードを設定してください。設定のあと、2要素認証の登録に進みます。'
             : 'musubo 運営コンソールに招待されています。続けると 2要素認証の登録に進みます。'}
@@ -117,8 +117,7 @@ export default function OpsInvitePage() {
               </AuthField>
             </>
           ) : null}
-          <Button type="submit" variant="primary" disabled={busy} className="w-full">
-            {busy ? '進めています…' : '設定して2要素認証へ進む'}
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">設定して2要素認証へ進む
           </Button>
           <p className="text-center text-caption text-ink-faint">
             招待の有効期限は24時間です。期限が切れたときは、招待した運営メンバーに送り直しを依頼してください

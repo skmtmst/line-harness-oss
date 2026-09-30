@@ -19,7 +19,7 @@
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .text {
@@ -32,7 +32,7 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;

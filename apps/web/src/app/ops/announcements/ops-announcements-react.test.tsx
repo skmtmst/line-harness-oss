@@ -190,7 +190,7 @@ describe('画面', () => {
     await flush()
     expect(host.textContent).toContain('まだお知らせはありません')
     // 件名も本文も空のまま「下書きとして保存」→ 入力の検証エラー
-    await act(async () => { button('下書きとして保存')!.click() })
+    await act(async () => { button('下書きを保存する')!.click() })
     await flush()
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('件名を入力してください')
     // 一覧は「読み込み失敗」に変わらず、空の案内のまま保つ
@@ -218,7 +218,7 @@ describe('画面', () => {
     expect(navigation.push).not.toHaveBeenCalled()
   })
 
-  it('離脱の確認で「保存せずに移動」を押すと移動する（監査 R155）', async () => {
+  it('離脱の確認で「保存せずに移る」を押すと移動する（監査 R155）', async () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     await act(async () => {
@@ -230,7 +230,7 @@ describe('画面', () => {
     await act(async () => { link.click() })
     await flush()
     link.remove()
-    await act(async () => { button('保存せずに移動')!.click() })
+    await act(async () => { button('保存せずに移る')!.click() })
     await flush()
     expect(navigation.push).toHaveBeenCalledWith('/ops/knowledge')
   })

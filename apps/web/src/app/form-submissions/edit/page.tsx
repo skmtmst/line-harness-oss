@@ -49,6 +49,7 @@ import { conflictMessage } from './form-conflict-message'
 import { formSavedContentMatches, type FormSavedContent } from './form-save-reconcile'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ActionMenu from '@/components/shared/action-menu'
@@ -59,6 +60,7 @@ import {
   takenFormAnswerNames as takenAnswerNames,
   uniqueFormCopyName as uniqueCopyName,
 } from '@/components/forms/form-definition-operations'
+import { formatDateTime } from '@/lib/format'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
@@ -460,7 +462,7 @@ function FormEditInner() {
   const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
 
   /*
-   * 「保存せずに移動」を選んだとき、保存済み・読み直し直後の姿へ戻す。
+   * 「保存せずに移る」を選んだとき、保存済み・読み直し直後の姿へ戻す。
    *
    * `?tab=` だけ変わる移動や、移動先から同じ画面へ戻ったときに「消えます」と
    * 言ったはずの変更が残っていると困る。画面がアンマウントされない
@@ -907,17 +909,14 @@ function FormEditInner() {
                     onFocus={(e) => e.currentTarget.select()}
                     className={`${inputClass} text-xs`}
                   />
-                  <button
-                    onClick={() => {
+                  <Button variant="secondary" className="text-ink-secondary shrink-0 px-2 py-2 text-xs whitespace-nowrap h-auto" onClick={() => {
                       void navigator.clipboard
                         .writeText(answerUrl)
                         .then(() => setNotice('URLをコピーしました'))
                         .catch(() => window.prompt('コピーしてください:', answerUrl))
-                    }}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-2 py-2 text-xs whitespace-nowrap"
-                  >
+                    }}>
                     コピー
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <p className="text-ink-faint rounded-control border-hairline border px-3 py-2 text-sm">
@@ -951,9 +950,7 @@ function FormEditInner() {
               <Button
                 onClick={() => void startTest()}
                 disabled={testBusy || !answerUrl}
-                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'}
-              >
-                {testBusy ? '用意しています...' : 'テスト回答を始める'}
+                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'} busy={testBusy} busyLabel="用意しています...">テスト回答を始める
               </Button>
             </div>
             {testError && <p role="alert" className="text-danger mt-2 text-xs">{testError}</p>}
@@ -978,7 +975,7 @@ function FormEditInner() {
                   </Button>
                 </div>
                 <p className="text-ink-faint mt-1 text-xs">
-                  {testExpiresAt ? `このURLは${new Date(testExpiresAt).toLocaleString('ja-JP', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで使えます。` : ''}
+                  {testExpiresAt ? `このURLは${formatDateTime(testExpiresAt)}まで使えます。` : ''}
                   試しは友だち登録済みのLINEで開いてください。
                 </p>
               </div>
@@ -988,7 +985,7 @@ function FormEditInner() {
           <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">
             {/* ---- 出来上がり ---- */}
             <section data-design="Preview" className="min-w-0 xl:sticky xl:top-4 xl:self-start">
-              <h2 className="text-ink-secondary mb-1 text-xs font-medium">お客さまに見える形</h2>
+              <h2 className="text-ink-secondary mb-1 text-xs font-semibold">お客さまに見える形</h2>
               <p className="mb-2 text-xs text-ink-faint">実際にお客さまが見る画面です</p>
               <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
               <p className="mt-2 text-center text-xs text-ink-faint">
@@ -1057,7 +1054,7 @@ function FormEditInner() {
                             className="text-danger px-1 text-xs"
                             title="このページを削除"
                           >
-                            削除
+                            削除する
                           </button>
                         )}
                       </span>
@@ -1119,19 +1116,13 @@ function FormEditInner() {
                     disabled={selectedIndex < 0}
                     className="text-danger hover:bg-danger-bg rounded-control px-2 py-1 text-xs disabled:opacity-40"
                   >
-                    削除
+                    削除する
                   </button>
 
                   <div className="relative">
-                    <button
-                      ref={addMenuButtonRef}
-                      onClick={() => setShowAddMenu((v) => !v)}
-                      aria-expanded={showAddMenu}
-                      aria-haspopup="menu"
-                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
-                    >
-                      ＋ ブロックを追加（12種）
-                    </button>
+                    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" ref={addMenuButtonRef} onClick={() => setShowAddMenu((v) => !v)} aria-expanded={showAddMenu} aria-haspopup="menu">
+                      ＋ ブロックを追加する（12種）
+                    </Button>
                     <ActionMenu
                       open={showAddMenu}
                       ariaLabel="追加するブロック"
@@ -1246,21 +1237,12 @@ function FormEditInner() {
       <StickyBar
         actions={(
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => void save(false)}
-              disabled={saving}
-              title="フォームを保存（公開中の内容は変わりません）"
-              className="border-hairline text-ink bg-canvas hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '下書きを保存'}
-            </button>
-            <button
-              onClick={() => void save(true)}
-              disabled={saving}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
+            <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
+              {saving ? '保存中...' : '下書きを保存する'}
+            </Button>
+            <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void save(true)} disabled={saving}>
               {saving ? '処理中...' : 'この版を公開'}
-            </button>
+            </Button>
           </div>
         )}
       />
@@ -1304,12 +1286,9 @@ function FormEditInner() {
         未保存のまま画面を離れようとしたときの確認。保存済みのフォームと
         集まった回答は変わらないが、画面上の下書きは消えるので聞く。
       */}
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、保存していない変更は消えます。先に保存しますか。"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="フォームへの変更"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />

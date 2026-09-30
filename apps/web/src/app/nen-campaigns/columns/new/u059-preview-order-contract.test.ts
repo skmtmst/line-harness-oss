@@ -25,6 +25,6 @@ describe('NENコラム作成のプレビュー位置（#975 U059）', () => {
 
   it('保存は下部追従バーに置いたまま', () => {
     expect(PAGE).toContain('<StickyBar')
-    expect(PAGE).toContain('下書きに保存')
+    expect(PAGE).toContain('下書きを保存する')
   })
 })

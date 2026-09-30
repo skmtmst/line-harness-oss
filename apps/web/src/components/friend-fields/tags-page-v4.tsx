@@ -32,6 +32,7 @@ import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import type { FeatureKey } from '@/lib/feature-settings'
 import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
+import { formatDay, formatNumber } from '@/lib/format'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -214,7 +215,7 @@ function hasLinkedActions(tag: Tag): boolean {
  */
 function isThisMonth(value: string): boolean {
   const month = (d: Date) =>
-    new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit' }).format(d)
+    formatDay(d)
   return month(new Date(value)) === month(new Date())
 }
 
@@ -226,12 +227,7 @@ function isThisMonth(value: string): boolean {
 function formatDate(value: string): string {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return value
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(d)
+  return formatDay(d)
 }
 
 /**
@@ -248,13 +244,13 @@ const QUICK_FILTERS: Array<[string, string]> = [
   ['starred', '★のみ表示'],
 ]
 
-const cardShadow = '[box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
+const cardShadow = 'shadow-card'
 
 export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
-  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
-  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
-  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
-  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
+  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: 'var(--color-status-warn-deep)', createdAt: '', updatedAt: '' },
+  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: 'var(--color-status-danger)', createdAt: '', updatedAt: '' },
+  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: 'var(--color-accent)', createdAt: '', updatedAt: '' },
+  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: 'var(--color-status-info)', createdAt: '', updatedAt: '' },
 ]
 
 export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
@@ -267,7 +263,7 @@ export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
 ].map(([name, groupId, friendCount, mileageReward, referralMileageReward, mileageMultiplierBps], index) => ({
   id: `qa-${index}`,
   name: String(name),
-  color: '#8b938d',
+  color: 'var(--color-ink-faint)',
   groupId: String(groupId),
   friendCount: Number(friendCount),
   mileageReward: Number(mileageReward),
@@ -290,9 +286,9 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
      * 未分類の数）だけを出し、総数は一覧の上の「1–20 / N件」だけにする
      * （同じ数を重ねて出さない。#946 の「絞り込み後の件数は一覧の側」）。
      */
-    { id: '', name: 'すべて', count: null, color: '#06c755' },
+    { id: '', name: 'すべて', count: null, color: 'var(--color-accent)' },
     ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length as number | null, color: group.color ?? '#8b938d' })),
-    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length as number | null, color: '#c3c8c4' },
+    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length as number | null, color: 'var(--color-ink-disabled)' },
   ]
   const move = async (group: TagGroup, direction: -1 | 1) => {
     const index = groups.findIndex((item) => item.id === group.id)
@@ -334,7 +330,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span>{row.count !== null ? <span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span> : null}</button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-pill" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span>{row.count !== null ? <span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span> : null}</button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -354,7 +350,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
         open={Boolean(deleteGroup)}
         title={deleteGroup ? `「${deleteGroup.name}」を削除しますか？` : 'フォルダを削除しますか？'}
         description="削除しても、中のタグは未分類に残ります。この操作は元に戻せません。"
-        confirmLabel="フォルダを削除"
+        confirmLabel="フォルダを削除する"
         destructive
         busy={busy}
         onCancel={() => setDeleteGroup(null)}
@@ -434,7 +430,7 @@ function deleteImpactRows(
     {
       name: '付与人数',
       // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
-      value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
+      value: `${formatNumber((impact?.friendCount ?? tag.friendCount ?? 0))}人`,
       result: 'タグが外れます',
     },
     { name: '参照先', value: refs ? manualRefSummary(refs) : '—', result: '絞り込み条件から外れます' },
@@ -505,13 +501,13 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
+      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-overlay" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
           <X aria-hidden="true" className="h-5 w-5" />
         </button>
         <div>
           {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-danger-bg text-danger">
             <TrashIcon />
           </span>
           <div className="mt-5 min-w-0">
@@ -551,12 +547,9 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
-          <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
+          <Button variant="secondary" className="shrink-0 px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onCancel}>キャンセル</Button>
           {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}
-          <button
-            type="button"
-            disabled={blocked || text !== tag.name}
-            onClick={async () => {
+          <Button variant="danger" className="shrink-0 px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={blocked || text !== tag.name} onClick={async () => {
               if (!impact || !accountId) return
               setSaving(true); setSaveError('')
               try {
@@ -579,9 +572,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
                 setSaveError('保管できませんでした。影響を読み直して、もう一度お試しください。')
                 setSaving(false)
               }
-            }}
-            className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
-          >{saving ? '保管中…' : 'このタグを保管する'}</button>
+            }}>{saving ? '保管中…' : 'このタグを保管する'}</Button>
         </div>
       </section>
     </div>
@@ -823,7 +814,7 @@ export default function TagsPageV4({
             `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
             まで同じ操作の中で進む。
           */
-          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
+          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録する</Button>
         ) : tab === 'marks' ? (
           <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button>
         ) : tab === 'fields' ? (
@@ -903,7 +894,7 @@ export default function TagsPageV4({
         */}
         {status === 'forbidden' ? null : (
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Button href="/tags/folders/new">フォルダを追加</Button>
+            <Button href="/tags/folders/new">フォルダを追加する</Button>
             {/* 作る操作は一覧のすぐ上の左の並びにまとめる。右上には置かない。 */}
             <Button href="/tags/new" variant="primary">＋ タグを作る</Button>
           </div>
@@ -1079,17 +1070,17 @@ export default function TagsPageV4({
                         </Td>
                         <Td>
                           <div className="flex min-w-0 items-center gap-2">
-                            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
+                            <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
                             {/* 名前は黒文字の太字。押すと編集へ行く（編集ボタンは置かない）。 */}
-                            <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-bold text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
+                            <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-medium text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
                             {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
-                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-medium text-ink-faint">保管済み</span>}
                             {/*
                               IDEA-04: 整理候補の「重複名」を行ごとに示す。
                               KPIの「整理候補」だけだと、どのタグが重複候補か分からない。
                               理由はサーバーの cleanupReasons だけを見る（画面で再判定しない）。
                             */}
-                            {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
+                            {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-medium text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                           </div>
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
@@ -1180,11 +1171,11 @@ export default function TagsPageV4({
                             </span>
                             <div className="min-w-0 flex-1">
                               <div className="flex min-w-0 items-center gap-2">
-                                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
-                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-bold text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
-                                {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                                <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
+                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-medium text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
+                                {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-medium text-ink-faint">保管済み</span>}
                                 {/* IDEA-04: 重複名の整理候補はカード表示でも行ごとに示す。 */}
-                                {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
+                                {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-medium text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                               </div>
                               <p className="mt-0.5 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録・{sourceLabel(tag)}</p>
                               {chips.length > 0 ? (

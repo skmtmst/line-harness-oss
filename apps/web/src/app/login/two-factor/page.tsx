@@ -7,6 +7,7 @@ import { useBrand } from '@/lib/use-brand'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 import { twoFactorFailureMessage } from './two-factor-error'
+import Button from '@/components/shared/button'
 
 export default function TwoFactorLoginPage() {
   const [code, setCode] = useState('')
@@ -68,7 +69,7 @@ export default function TwoFactorLoginPage() {
   }
 
   return <main className="flex min-h-[100svh] items-center justify-center bg-canvas-sunken px-4 py-8">
-    <section className="w-full max-w-md rounded-card bg-canvas px-6 py-8 shadow-sm sm:px-10">
+    <section className="w-full max-w-md rounded-card bg-canvas px-6 py-8 shadow-card sm:px-10">
       <div className="flex items-center justify-center gap-3 text-sm font-semibold text-ink">
         <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">然</span>
         {brand.name ?? '然-NEN- 公式'}
@@ -82,7 +83,7 @@ export default function TwoFactorLoginPage() {
         <div className="rounded-control bg-accent-soft px-3 py-2 font-medium text-accent-deep">2　二段階認証</div>
       </div>
       <div className="mt-7 text-center">
-        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-accent-deep">♢</div>
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-pill bg-accent-soft text-accent-deep">♢</div>
         <h1 className="mt-3 text-xl font-bold text-ink">二段階認証</h1>
         <p className="mt-2 text-xs text-ink-secondary">認証アプリに表示されている6桁コードを入力してください</p>
       </div>
@@ -102,7 +103,7 @@ export default function TwoFactorLoginPage() {
         />
       </div>
       <p className="mt-2 text-xs text-ink-faint">◷ コードは約30秒ごとに更新されます</p>
-      <button onClick={() => void submit()} disabled={loading || code.length !== 6} className="mt-6 h-12 w-full cursor-pointer rounded-control bg-accent-deep font-bold text-on-accent hover:brightness-92 disabled:cursor-not-allowed disabled:opacity-50">{loading ? '確認中…' : '確認してログイン'}</button>
+      <Button variant="primary" className="mt-6 h-12 w-full font-bold disabled:opacity-50 border-0 whitespace-normal" onClick={() => void submit()} disabled={loading || code.length !== 6}>{loading ? '確認中…' : '確認してログイン'}</Button>
       <p className="mt-5 text-center text-xs text-ink-secondary">コードを入力できない場合</p>
       <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-2 block text-center text-xs font-medium text-action hover:underline">別のLINEアカウントでログイン</Link>
     </section>

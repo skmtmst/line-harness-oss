@@ -24,6 +24,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { ActionCell, DataTable, Td, Tr } from '@/components/shared/table'
 
 import styles from './webhook-interactions.module.css'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type Direction = 'all' | 'outgoing' | 'incoming'
 type Status = 'all' | 'succeeded' | 'failed'
@@ -61,11 +62,7 @@ function eventLabel(item: WebhookInteraction): string {
 function formatJst(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function directionLabel(direction: WebhookInteraction['direction']): string {
@@ -379,10 +376,8 @@ export default function WebhookInteractions() {
         <Button
           onClick={() => void retryFailed()}
           disabled={loading || bulkRetrying || data.summary.retryable === 0}
-          title={data.summary.retryable === 0 ? '今ここから送り直せる失敗はありません' : undefined}
-        >
-          <RefreshCw size={16} aria-hidden="true" />
-          {bulkRetrying ? '失敗したものを確認中' : '失敗したものをまとめてやり直す'}
+          title={data.summary.retryable === 0 ? '今ここから送り直せる失敗はありません' : undefined} busy={bulkRetrying} busyLabel="失敗したものを確認中">
+          <RefreshCw size={16} aria-hidden="true" />失敗したものをまとめてやり直す
         </Button>
       </div> : null}
 
@@ -400,8 +395,8 @@ export default function WebhookInteractions() {
       ) : (
         <>
           <div className={styles.cards}>
-            <KpiCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${data.summary.outgoing.toLocaleString('ja-JP')}・受け取った ${data.summary.incoming.toLocaleString('ja-JP')}`} />
-            <KpiCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`この${periodDays}日で ${successRate.toLocaleString('ja-JP')}%`} />
+            <KpiCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${formatNumber(data.summary.outgoing)}・受け取った ${formatNumber(data.summary.incoming)}`} />
+            <KpiCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`この${periodDays}日で ${formatNumber(successRate)}%`} />
             <KpiCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
             <KpiCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs, periodDays)} />
           </div>
@@ -424,10 +419,10 @@ export default function WebhookInteractions() {
           </div>
 
           <div className={styles.filters} aria-label="やり取りの絞り込み">
-            <FilterChip selected={direction === 'all' && status === 'all'} onChange={() => { setDirection('all'); setStatus('all'); setPage(1) }} count={data.summary.total.toLocaleString('ja-JP')}>すべて</FilterChip>
-            <FilterChip selected={direction === 'outgoing'} onChange={() => { setDirection('outgoing'); setStatus('all'); setPage(1) }} count={data.summary.outgoing.toLocaleString('ja-JP')}>送った</FilterChip>
-            <FilterChip selected={direction === 'incoming'} onChange={() => { setDirection('incoming'); setStatus('all'); setPage(1) }} count={data.summary.incoming.toLocaleString('ja-JP')}>受け取った</FilterChip>
-            <FilterChip selected={status === 'failed'} onChange={() => { setDirection('all'); setStatus('failed'); setPage(1) }} count={data.summary.failed.toLocaleString('ja-JP')}>失敗</FilterChip>
+            <FilterChip selected={direction === 'all' && status === 'all'} onChange={() => { setDirection('all'); setStatus('all'); setPage(1) }} count={formatNumber(data.summary.total)}>すべて</FilterChip>
+            <FilterChip selected={direction === 'outgoing'} onChange={() => { setDirection('outgoing'); setStatus('all'); setPage(1) }} count={formatNumber(data.summary.outgoing)}>送った</FilterChip>
+            <FilterChip selected={direction === 'incoming'} onChange={() => { setDirection('incoming'); setStatus('all'); setPage(1) }} count={formatNumber(data.summary.incoming)}>受け取った</FilterChip>
+            <FilterChip selected={status === 'failed'} onChange={() => { setDirection('all'); setStatus('failed'); setPage(1) }} count={formatNumber(data.summary.failed)}>失敗</FilterChip>
           </div>
 
           {data.items.length === 0 ? (
@@ -454,7 +449,7 @@ export default function WebhookInteractions() {
                     <Td><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
                     <Td><StatusBadge tone={item.eventType === 'incoming_webhook.test' ? 'info' : item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
                     <Td>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
-                    <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => item.failureReasonCode === 'unknown' ? setConfirmingRetry(item) : void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
+                    <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => item.failureReasonCode === 'unknown' ? setConfirmingRetry(item) : void retry(item)} disabled={retrying === item.id} busy={retrying === item.id} busyLabel="やり直し中">やり直す</Button> : null}</div></ActionCell>
                   </Tr>
                 ))}
               </tbody>

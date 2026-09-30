@@ -22,7 +22,7 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(source).toContain('text-base font-bold text-ink">何を止めますか')
     expect(source).toContain('text-base font-bold text-ink">復旧</h2>')
     expect(source).toContain('text-base font-bold text-ink">止めた・戻した記録')
-    expect(source).toContain('text-[11px] font-bold')
+    expect(source).toContain('text-[11px] font-semibold')
   })
 
   it('緊急停止と更新履歴を設計の本文＋右欄へ分ける', () => {

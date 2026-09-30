@@ -99,7 +99,7 @@ export default function HqAccountMenu() {
             {me?.email ? <p className="truncate text-caption text-ink-faint">{me.email}</p> : null}
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {role ? (
-                <span className="inline-flex h-5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">{role}</span>
+                <span className="inline-flex h-5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">{role}</span>
               ) : null}
               {chip ? <PlanChip chip={chip} /> : null}
               {billing?.state === 'trialing' && billing.trialEndsLabel ? (
@@ -149,7 +149,7 @@ export default function HqAccountMenu() {
             type="button"
             role="menuitem"
             onClick={() => void logoutAndGoToLogin()}
-            className="flex h-11 items-center gap-3 px-4 text-label font-bold text-danger hover:bg-status-danger-soft focus-visible:bg-status-danger-soft"
+            className="flex h-11 items-center gap-3 px-4 text-label font-medium text-danger hover:bg-status-danger-soft focus-visible:bg-status-danger-soft"
           >
             <LogOut aria-hidden="true" className="h-4.5 w-4.5" />
             ログアウト
@@ -166,16 +166,16 @@ export default function HqAccountMenu() {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-canvas-sunken focus-visible:bg-canvas-sunken"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-ink text-label font-bold text-on-accent" aria-hidden="true">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-ink text-label font-medium text-on-accent" aria-hidden="true">
           {initial}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-label font-bold text-ink">{name}</span>
+          <span className="truncate text-label font-medium text-ink">{name}</span>
           <span className="flex items-center gap-1.5">
             {chip ? (
               <PlanChip chip={chip} />
             ) : role ? (
-              <span className="inline-flex h-4.5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">{role}</span>
+              <span className="inline-flex h-4.5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">{role}</span>
             ) : null}
             {daysLeft ? <span className="text-nano text-ink-faint">{daysLeft}</span> : null}
           </span>
@@ -192,12 +192,12 @@ function PlanChip({ chip }: { chip: { label: string; tone: string } }) {
     <span
       className={
         chip.tone === 'warn'
-          ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+          ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
           : chip.tone === 'danger'
-            ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger'
+            ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger'
             : chip.tone === 'ok'
-              ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
-              : 'inline-flex h-4.5 w-fit items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+              ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
+              : 'inline-flex h-4.5 w-fit items-center rounded-pill bg-step-idle px-2 text-nano font-medium text-ink-secondary'
       }
     >
       {chip.label}

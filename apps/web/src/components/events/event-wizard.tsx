@@ -40,6 +40,8 @@ import {
   parseDeadlineSelect,
   resolveEventMultiAccountIds,
 } from './event-draft-shared'
+import { formatDay, formatNumber } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /**
  * イベントを作る（設計 V2 8-3-2 / 8-3-3 / 8-3-4）。
@@ -440,7 +442,7 @@ function StepNav({ current }: { current: 1 | 2 | 3 }) {
         return (
           <div key={s.no} className="flex flex-1 items-start gap-2">
             <span
-              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill text-xs font-semibold ${
                 active
                   ? 'bg-accent-deep text-on-accent'
                   : done
@@ -475,20 +477,12 @@ function StepFooter({
 }) {
   return (
     <div className="border-hairline mt-5 flex flex-wrap justify-between gap-2 border-t pt-4">
-      <button
-        onClick={back.onClick}
-        disabled={saving}
-        className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-      >
+      <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={back.onClick} disabled={saving}>
         {back.label}
-      </button>
-      <button
-        onClick={next.onClick}
-        disabled={saving}
-        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-      >
+      </Button>
+      <Button variant="primary" className="px-5 py-2 font-medium border-0 h-auto whitespace-normal" onClick={next.onClick} disabled={saving}>
         {saving ? '保存中...' : next.label}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -517,9 +511,7 @@ function OverviewStep({
   const descLen = (draft.description ?? '').length
   const previewCapacity = Number(firstSlot.capacity)
   const previewDate = firstSlot.date
-    ? new Intl.DateTimeFormat('ja-JP', {
-        month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
-      }).format(new Date(`${firstSlot.date}T00:00:00+09:00`))
+    ? formatDay(new Date(`${firstSlot.date}T00:00:00+09:00`))
     : '開催日を入力'
   const previewEnd = (() => {
     const [hour, minute] = firstSlot.startTime.split(':').map(Number)
@@ -533,9 +525,7 @@ function OverviewStep({
     if (total < 24 * 60 || !firstSlot.date) return hhmm
     const endDate = new Date(new Date(`${firstSlot.date}T00:00:00+09:00`).getTime() + total * 60_000)
     if (Number.isNaN(endDate.getTime())) return hhmm
-    const endDay = new Intl.DateTimeFormat('ja-JP', {
-      month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
-    }).format(endDate)
+    const endDay = formatDay(endDate)
     return `${endDay} ${hhmm}`
   })()
   return (
@@ -592,7 +582,7 @@ function OverviewStep({
               イベント詳細
             </label>
             <span className={`text-xs ${descLen > 20000 ? 'text-danger' : 'text-ink-faint'}`}>
-              {descLen.toLocaleString()} / 20,000
+              {formatNumber(descLen)} / 20,000
             </span>
           </div>
           <textarea
@@ -781,20 +771,12 @@ function OverviewStep({
       </div>
 
       <div className="border-hairline mt-5 flex flex-wrap justify-between gap-2 border-t pt-4">
-        <button
-          onClick={onDraftSave}
-          disabled={saving}
-          className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-        >
-          下書きとして保存
-        </button>
-        <button
-          onClick={onNext}
-          disabled={saving}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-        >
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={onDraftSave} disabled={saving}>
+          下書きを保存する
+        </Button>
+        <Button variant="primary" className="px-5 py-2 font-medium border-0 h-auto whitespace-normal" onClick={onNext} disabled={saving}>
           {saving ? '保存中...' : '概要を保存して次へ'}
-        </button>
+        </Button>
       </div>
       </div>
 
@@ -1068,13 +1050,9 @@ function SlotsStep({
               />
             </Field>
           </div>
-          <button
-            onClick={addOne}
-            disabled={busy}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-          >
-            この枠を追加
-          </button>
+          <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={addOne} disabled={busy}>
+            この枠を追加する
+          </Button>
         </FormSection>
 
         <FormSection
@@ -1104,21 +1082,15 @@ function SlotsStep({
               {['日', '月', '火', '水', '木', '金', '土'].map((w, i) => {
                 const on = weekdays.includes(i)
                 return (
-                  <button
-                    key={w}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() =>
+                  <Button variant="secondary" className={(`rounded-control border px-3 py-1.5 text-sm ${
+                      on ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-faint'
+                    }`) + ' h-auto whitespace-normal'} key={w} type="button" aria-pressed={on} onClick={() =>
                       setWeekdays((cur) =>
                         cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i],
                       )
-                    }
-                    className={`rounded-control border px-3 py-1.5 text-sm ${
-                      on ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-faint'
-                    }`}
-                  >
+                    }>
                     {w}
-                  </button>
+                  </Button>
                 )
               })}
             </div>
@@ -1160,13 +1132,9 @@ function SlotsStep({
               />
             </Field>
           </div>
-          <button
-            onClick={addBulk}
-            disabled={busy}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-          >
-            まとめて追加
-          </button>
+          <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={addBulk} disabled={busy}>
+            まとめて追加する
+          </Button>
         </FormSection>
 
         <FormSection
@@ -1213,7 +1181,7 @@ function SlotsStep({
                             title={taken > 0 ? '申込が入っているため削除できません' : undefined}
                             className="text-danger text-xs hover:underline disabled:no-underline disabled:opacity-30"
                           >
-                            削除
+                            削除する
                           </button>
                         </ActionCell>
                       </Tr>
@@ -1549,7 +1517,7 @@ function PublishStep({
               EVENT-02: ボタン名は実際の保存結果と合わせる。公開OFFのまま
               「保存して公開」と出すと、下書き保存を公開と誤認する。
             */
-            label: draft.is_published === 1 ? '保存して公開' : '下書きとして保存',
+            label: draft.is_published === 1 ? '保存して公開' : '下書きを保存する',
             onClick: onPublish,
           }}
           saving={saving}
@@ -1560,7 +1528,7 @@ function PublishStep({
         <AsideCard title="確定したときに届くメッセージ" note="プレビュー">
           <div className="bg-canvas-sunken rounded-card p-3">
             <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-            <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+            <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
               {preview}
             </p>
           </div>

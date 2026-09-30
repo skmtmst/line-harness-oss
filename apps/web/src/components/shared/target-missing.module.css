@@ -28,7 +28,7 @@
   height: 40px;
   align-items: center;
   justify-content: center;
-  border-radius: 20px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
 }
@@ -37,7 +37,7 @@
 .title {
   color: var(--color-ink);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 

@@ -45,6 +45,7 @@ import {
   type CommonVarOrder,
 } from './list-model'
 import VarsExportPanel from './export-panel'
+import { formatDay, formatNumber } from '@/lib/format'
 
 /**
  * 共通情報の一覧。
@@ -77,11 +78,7 @@ function formatListDate(value: string): string {
    */
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
+  return formatDay(date)
 }
 
 /*
@@ -661,22 +658,15 @@ function VarsPageInner() {
         className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
       />
       <div className="flex justify-end gap-2">
-        <button
-          onClick={() => {
+        <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" onClick={() => {
             setAddingFolder(false)
             setFolderName('')
-          }}
-          className="border-hairline text-ink-secondary rounded-control border px-3 py-1 text-xs"
-        >
+          }}>
           キャンセル
-        </button>
-        <button
-          onClick={() => void addFolder()}
-          disabled={!folderName.trim() || savingFolder}
-          className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
-        >
+        </Button>
+        <Button variant="primary" className="px-3 py-1 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => void addFolder()} disabled={!folderName.trim() || savingFolder}>
           決定
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -732,7 +722,7 @@ function VarsPageInner() {
 
       {emptyInUseCount > 0 ? (
         <div className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm font-semibold" role="status">
-          中身が空のまま使われているものが {emptyInUseCount.toLocaleString('ja-JP')}件あります。差し込んだところが空欄のまま送られます。
+          中身が空のまま使われているものが {formatNumber(emptyInUseCount)}件あります。差し込んだところが空欄のまま送られます。
         </div>
       ) : null}
 
@@ -757,7 +747,7 @@ function VarsPageInner() {
           {addingFolder ? (
             folderForm
           ) : (
-            <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
+            <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加する</Button>
           )}
           {/*
             R37: 狭い幅では縦パネルが出ないため、選んでいるフォルダの
@@ -769,7 +759,7 @@ function VarsPageInner() {
                 フォルダ名を変える
               </Button>
               <Button type="button" onClick={() => { setFolderError(''); setDeletingFolder(selectedUserFolder) }}>
-                フォルダを削除
+                フォルダを削除する
               </Button>
             </div>
           ) : null}
@@ -959,7 +949,7 @@ function VarsPageInner() {
                     <Th align="right" className="bg-canvas-sunken sticky right-0 w-36 px-4 py-3" title="編集・削除">操作</Th>
                   </TableHeadRow>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-divider-soft">
                   {current.map((item) => {
                       const pending = item.nextSchedule
                       return (
@@ -1027,13 +1017,13 @@ function VarsPageInner() {
                               ? '使われている場所（未取得）'
                               : item.usageCount === 0
                                 ? '使われていません'
-                                : `${item.usageCount.toLocaleString('ja-JP')}か所で使われています`}
+                                : `${formatNumber(item.usageCount)}か所で使われています`}
                           >
                             {item.usageCount === undefined
                               ? '—（未取得）'
                               : item.usageCount === 0
                                 ? '使われていません'
-                                : `${item.usageCount.toLocaleString('ja-JP')}か所`}
+                                : `${formatNumber(item.usageCount)}か所`}
                           </td>
                           {/* 更新日と次の変更が長いと切れるため、セル全体に
                               全文が読める title を付ける（第5パス D-3）。 */}
@@ -1077,7 +1067,7 @@ function VarsPageInner() {
                                 data-qa-open="yPkWe"
                                 aria-label={`${item.name}を削除`}
                               >
-                                削除
+                                削除する
                               </Button>
                             </span>
                           </td>
@@ -1141,9 +1131,7 @@ function VarsPageInner() {
                   type="button"
                   variant="primary"
                   onClick={() => void confirmReplacement()}
-                  disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()}
-                >
-                  {singleBusy ? '差し替え中…' : '差し替えて削除'}
+                  disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()} busy={singleBusy} busyLabel="差し替え中…">差し替えて削除する
                 </Button>
               ) : null}
               {singleImpact && !singleImpact.canDelete ? (
@@ -1152,13 +1140,12 @@ function VarsPageInner() {
                   disabled
                   title="使用中の共通情報は削除できません"
                 >
-                  このまま削除
+                  このまま削除する
                 </Button>
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteVar({ impact: singleImpact, typedKey, reason: singleReason, busy: singleBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()}>
-                  {singleBusy ? '処理中…' : 'このまま削除する'}
+                <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()} busy={singleBusy} busyLabel="処理中…">このまま削除する
                 </Button>
               ) : null}
             </div>
@@ -1187,7 +1174,7 @@ function VarsPageInner() {
                   <div className="border-accent bg-accent-soft rounded-control border p-3">
                     <p className="text-ink text-sm font-bold">別の共通情報に差し替えてから削除する（おすすめ）</p>
                     <p className="text-ink-secondary mt-1 text-xs leading-5">
-                      {singleImpact.blockingTotal.toLocaleString('ja-JP')}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
+                      {formatNumber(singleImpact.blockingTotal)}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                     </p>
                     <label className="text-ink-secondary mt-2 block text-xs font-semibold">
                       差し替え先
@@ -1212,8 +1199,8 @@ function VarsPageInner() {
                     ) : replacementImpact ? (
                       <p className={replacementImpact.canReplace ? 'text-success mt-2 text-xs font-semibold' : 'text-danger mt-2 text-xs font-semibold'}>
                         {replacementImpact.canReplace
-                          ? `${replacementImpact.replaceableTotal.toLocaleString('ja-JP')}か所を差し替え、元の共通情報を保管できます。`
-                          : `${replacementImpact.blockedTotal.toLocaleString('ja-JP')}か所は自動で差し替えられません。先に個別に確認してください。`}
+                          ? `${formatNumber(replacementImpact.replaceableTotal)}か所を差し替え、元の共通情報を保管できます。`
+                          : `${formatNumber(replacementImpact.blockedTotal)}か所は自動で差し替えられません。先に個別に確認してください。`}
                       </p>
                     ) : null}
                   </div>
@@ -1222,7 +1209,7 @@ function VarsPageInner() {
                     <p className="text-ink-secondary mt-1 text-xs leading-5">
                       {singleImpact.canDelete
                         ? '使われている場所が無いことを確認してから削除します。'
-                        : `${singleImpact.blockingTotal.toLocaleString('ja-JP')}か所が空欄になるため、先に使用先を直してください。`}
+                        : `${formatNumber(singleImpact.blockingTotal)}か所が空欄になるため、先に使用先を直してください。`}
                     </p>
                   </div>
                 </div>
@@ -1230,7 +1217,7 @@ function VarsPageInner() {
 
               {splitItems(singleImpact.items).blocking.length > 0 ? (
                 <div>
-                  <p className="text-ink text-xs font-bold">削除できない理由になっている場所</p>
+                  <p className="text-ink text-xs font-medium">削除できない理由になっている場所</p>
                   <ul className="mt-1.5 space-y-1.5">
                     {splitItems(singleImpact.items).blocking.map((item) => (
                       <li key={`${item.kind}-${item.href}`} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded-control border px-3 py-2 text-xs">

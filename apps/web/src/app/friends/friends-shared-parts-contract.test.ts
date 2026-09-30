@@ -29,7 +29,7 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY, '手書きの検索入力が残っている').not.toMatch(/<input\s+type="search"/)
     expect(FRIENDS_BODY, '手書きのプルダウンが残っている').not.toContain('<select')
     expect(FRIENDS_BODY, '手書きのプルダウン装飾が残っている').not.toContain('v6-select')
-    expect(FRIENDS_BODY, '保存条件の札が手書きのまま').not.toContain('rounded-full bg-canvas px-2.5')
+    expect(FRIENDS_BODY, '保存条件の札が手書きのまま').not.toContain('rounded-pill bg-canvas px-2.5')
     expect(FRIENDS_BODY).toContain('<Chip key={summary} tone="neutral">')
   })
 
@@ -66,8 +66,8 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
 
   it('行の担当者に丸アイコンを出し、未割り当ては全角ハイフンで埋める', () => {
     expect(ROW_BODY).toContain('data-operator-avatar={friend.operator ? \'assigned\' : \'unassigned\'}')
-    expect(ROW_BODY, '担当者アイコンが16pxでない').toContain('h-4 w-4 shrink-0 items-center justify-center rounded-full')
-    expect(ROW_BODY, '頭文字が10px/800でない').toContain('text-nano font-extrabold')
+    expect(ROW_BODY, '担当者アイコンが16pxでない').toContain('h-4 w-4 shrink-0 items-center justify-center rounded-pill')
+    expect(ROW_BODY, '頭文字が10px/500でない').toContain('text-nano font-medium')
     expect(ROW_BODY, '未割り当てが全角ハイフンでない').toContain("'－'")
     expect(ROW_BODY).toContain("担当：{friend.operator?.name ?? '未割り当て'}")
   })

@@ -152,7 +152,7 @@ describe('サイトスクリプトの計測状況', () => {
     await settle()
 
     expect(text()).toContain('動いています')
-    expect(text()).toContain('最後にデータが届いたのは 9/26 18:02')
+    expect(text()).toContain('最後にデータが届いたのは 9月26日（土）18:02')
     expect(text()).toContain('今日は 5件')
     expect(host.querySelector('[aria-label="サイトの計測は未接続"]')).toBeFalsy()
     expect(text()).toContain('/thanks')
@@ -187,7 +187,7 @@ describe('サイトスクリプトの計測状況', () => {
     await settle()
 
     expect(text()).toContain('サイトの計測を読み込めませんでした')
-    expect(text()).toContain('最後に受け取ったのは 9/26 18:02')
+    expect(text()).toContain('最後に受け取ったのは 9月26日（土）18:02')
   })
 })
 

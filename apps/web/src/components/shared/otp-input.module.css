@@ -26,7 +26,7 @@
   color: var(--color-ink); /* fill: $ink */
   font-family: inherit;
   font-size: 22px; /* fontSize: 22 */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
   text-align: center;
   caret-color: var(--color-accent);
 }

@@ -69,7 +69,7 @@ async function flush() {
 
 function saveButton(): HTMLButtonElement {
   const buttons = Array.from(host.querySelectorAll('button'))
-  const button = buttons.find((b) => b.textContent?.trim() === '保存')
+  const button = buttons.find((b) => b.textContent?.trim() === '保存する')
   if (!button) throw new Error('保存ボタンが見つかりません')
   return button as HTMLButtonElement
 }

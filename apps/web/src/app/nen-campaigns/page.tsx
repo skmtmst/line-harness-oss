@@ -6,6 +6,7 @@ import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
@@ -388,7 +389,7 @@ export default function NenCampaignsPage() {
   const headerAction = tab === 'columns' ? (
     <span className="flex flex-wrap items-center justify-end gap-2">
       <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
-      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()} busy={importing} busyLabel="取り込んでいます…">ECのコラムを取り込む</Button>
     </span>
   )
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
@@ -423,11 +424,9 @@ export default function NenCampaignsPage() {
         onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
       />
       {/* #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。 */}
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="入力した紹介文が保存されていません"
-        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
+        subject="入力した紹介文"
         cancelLabel="書き続ける"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}

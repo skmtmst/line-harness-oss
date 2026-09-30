@@ -16,8 +16,9 @@ import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
 import { photoReviewReasonLabel, mileStatusLabel, text } from './photo-text'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
+import { formatDay, formatNumber } from '@/lib/format'
 
-const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
+const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : '—'
 
 export function PhotoReviewDetail({
   photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
@@ -108,7 +109,7 @@ export function PhotoReviewDetail({
   const duplicateDate = (() => {
     const date = new Date(String(duplicate?.createdAt ?? duplicate?.created_at ?? ''))
     if (Number.isNaN(date.getTime())) return '—'
-    return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
+    return formatDay(date)
   })()
   const duplicateImageUrl = safePhotoSrc(duplicate ? text(duplicate.imageUrl ?? duplicate.image_url) : '')
   return <div data-photo-view="detail">
@@ -116,11 +117,11 @@ export function PhotoReviewDetail({
     {accountNotice && <Notice tone="warn" className="mb-4" message={accountNotice} />}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
-        <p className="text-xs font-bold text-ink-faint">写真審査</p>
+        <p className="text-xs font-medium text-ink-faint">写真審査</p>
         <h2 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })} の写真</h2>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-2 text-xs font-bold text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : '—'}</span>
+        <span className="mr-2 text-xs font-medium text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : '—'}</span>
         <Button disabled={position <= 0} onClick={() => onMove(-1)}>前の写真</Button>
         <Button disabled={position >= total - 1} onClick={() => onMove(1)}>次の写真</Button>
         <Button onClick={onBack}>並べて見るへ戻る</Button>
@@ -142,9 +143,9 @@ export function PhotoReviewDetail({
               src={reviewUrl}
               alt="今回の投稿の写真"
               className="h-full w-full object-contain"
-            /> : <p className="text-xs font-bold text-ink-faint">審査用の画像を作成中です</p>}
+            /> : <p className="text-xs font-medium text-ink-faint">審査用の画像を作成中です</p>}
           </div>
-          <figcaption className="mt-1 truncate text-xs font-bold text-ink" title={`今回の投稿 ${formatPhotoReceivedAt(photo.created_at)}`}>
+          <figcaption className="mt-1 truncate text-xs font-medium text-ink" title={`今回の投稿 ${formatPhotoReceivedAt(photo.created_at)}`}>
             今回の投稿
           </figcaption>
           <p className="truncate text-xs text-ink-secondary" title={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })} ${formatPhotoReceivedAt(photo.created_at)}`}>
@@ -157,9 +158,9 @@ export function PhotoReviewDetail({
               src={duplicateImageUrl}
               alt="前に採用された同じ写真"
               className="h-full w-full object-contain"
-            /> : <p className="text-xs font-bold text-ink-faint">前の写真を読み込めませんでした</p>}
+            /> : <p className="text-xs font-medium text-ink-faint">前の写真を読み込めませんでした</p>}
           </div>
-          <figcaption className="mt-1 truncate text-xs font-bold text-ink" title="前の投稿（採用済み）">
+          <figcaption className="mt-1 truncate text-xs font-medium text-ink" title="前の投稿（採用済み）">
             前の投稿（採用済み）
           </figcaption>
           <p className="truncate text-xs text-ink-secondary" title={`${text(duplicate.petName ?? duplicate.pet_name)} ${formatPhotoReceivedAt(duplicate.createdAt ?? duplicate.created_at)}`}>
@@ -179,7 +180,7 @@ export function PhotoReviewDetail({
             alt={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の審査用写真`}
             className="h-full w-full object-contain transition-transform"
             style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }}
-          /> : <p className="text-xs font-bold text-ink-faint">審査用の画像を作成中です</p>}
+          /> : <p className="text-xs font-medium text-ink-faint">審査用の画像を作成中です</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3">
           <Button onClick={() => setScale((value) => Math.min(1.5, value + 0.1))}>大きく</Button>
@@ -192,11 +193,10 @@ export function PhotoReviewDetail({
           <Button
             disabled={rotation === savedRotation || rotationSaving}
             onClick={() => onSaveRotation(rotation)}
-            title={rotation === savedRotation ? '回したあとに保存できます' : '回した向きをこの写真へ保存します'}
-          >{rotationSaving ? '保存中...' : '向きを保存'}</Button>
+            title={rotation === savedRotation ? '回したあとに保存できます' : '回した向きをこの写真へ保存します'} busy={rotationSaving} busyLabel="保存中...">向きを保存する</Button>
           <Button disabled title="切り取りは派生画像の生成口を接続後に使えます">切り取る</Button>
-          <Button disabled={assetProcessing} onClick={onProcessReviewAsset}>{assetProcessing ? '作成中...' : '審査用画像を作り直す'}</Button>
-          <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存</Button>
+          <Button disabled={assetProcessing} onClick={onProcessReviewAsset} busy={assetProcessing} busyLabel="作成中...">審査用画像を作り直す</Button>
+          <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存する</Button>
         </div>
         <p className="px-4 pb-4 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}　派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
         {assetsFailed ? <div className="flex items-center gap-2 px-4 pb-4"><p className="text-xs text-ink-faint">審査用画像の状態を読み込めませんでした。</p><Button onClick={onReloadAssets}>状態を読み直す</Button></div> : null}
@@ -205,10 +205,10 @@ export function PhotoReviewDetail({
       <aside className="flex flex-col gap-3">
         <Card padding="default">
           <dl>
-            <div><dt className="text-xs font-bold text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)}回目 ／ 見送ったこと {numberOrDash(photo.returned_count)}回</small></div>
-            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-bold text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', callName: photo.pet_call_name, gender: photo.pet_gender })}（{petAnimalTypeLabel(text(photo.animal_type))}・{text(photo.breed) || '品種未取得'}）</dd></div>
-            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">届いた日時</dt><dd className="mt-1 text-xs font-bold text-ink">{formatPhotoReceivedAt(photo.created_at)}</dd></div>
-            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">そえられた言葉</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.caption) ? `「${text(photo.caption)}」` : 'コメントなし'}</dd></div>
+            <div><dt className="text-xs font-medium text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-medium text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)}回目 ／ 見送ったこと {numberOrDash(photo.returned_count)}回</small></div>
+            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-medium text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', callName: photo.pet_call_name, gender: photo.pet_gender })}（{petAnimalTypeLabel(text(photo.animal_type))}・{text(photo.breed) || '品種未取得'}）</dd></div>
+            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">届いた日時</dt><dd className="mt-1 text-xs font-medium text-ink">{formatPhotoReceivedAt(photo.created_at)}</dd></div>
+            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">そえられた言葉</dt><dd className="mt-1 text-xs font-medium text-ink">{text(photo.caption) ? `「${text(photo.caption)}」` : 'コメントなし'}</dd></div>
           </dl>
         </Card>
         <Card padding="default">
@@ -227,7 +227,7 @@ export function PhotoReviewDetail({
           <h2 className="text-sm font-bold text-ink">採用・同意・公開の記録</h2>
           <dl className="text-xs">
             <div className="mt-3 border-t border-hairline pt-3">
-              <dt className="font-bold text-ink-faint">審査の記録</dt>
+              <dt className="font-medium text-ink-faint">審査の記録</dt>
               {history.length === 0
                 ? <dd className="mt-1 font-bold text-ink">まだ審査の記録はありません</dd>
                 : history.map((event, index) => <dd key={`${text(event.created_at)}-${index}`} className="mt-1 font-bold text-ink">
@@ -239,7 +239,7 @@ export function PhotoReviewDetail({
                 </dd>)}
             </div>
             <div className="mt-3 border-t border-hairline pt-3">
-              <dt className="font-bold text-ink-faint">公開の同意</dt>
+              <dt className="font-medium text-ink-faint">公開の同意</dt>
               <dd className="mt-1 font-bold text-ink">
                 {text(photo.publication_consent_at)
                   ? `${formatPhotoReceivedAt(photo.publication_consent_at)}に同意${text(photo.publication_consent_version) ? `（${text(photo.publication_consent_version)}）` : ''}`
@@ -250,7 +250,7 @@ export function PhotoReviewDetail({
                 : null}
             </div>
             <div className="mt-3 border-t border-hairline pt-3">
-              <dt className="font-bold text-ink-faint">公開先</dt>
+              <dt className="font-medium text-ink-faint">公開先</dt>
               {!publication
                 ? <dd className="mt-1 font-bold text-ink">まだ公開先はありません</dd>
                 : <>
@@ -268,7 +268,7 @@ export function PhotoReviewDetail({
                 </>}
             </div>
             <div className="mt-3 border-t border-hairline pt-3">
-              <dt className="font-bold text-ink-faint">マイル</dt>
+              <dt className="font-medium text-ink-faint">マイル</dt>
               {/*
                * 派生状態（state）はサーバーが一覧と同じ分岐で出す
                * （PHOTO-06）。古い口から来た応答は生のstatusへ倒す。
@@ -281,15 +281,13 @@ export function PhotoReviewDetail({
                   : 'マイルの対象は採用した写真だけです'}
               </dd>
               {reward && (text(reward.reason_label) || text(reward.last_error))
-                ? <dd className="mt-1 font-medium text-status-warn-deep">確認が必要：{text(reward.reason_label) || text(reward.last_error)}</dd>
+                ? <dd className="mt-1 font-semibold text-status-warn-deep">確認が必要：{text(reward.reason_label) || text(reward.last_error)}</dd>
                 : null}
               {reward && ['stale', 'failed_retryable'].includes(text(reward.state))
                 ? <dd className="mt-2 flex flex-wrap gap-2">
-                  <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('retry')}>
-                    {pointActionBusy === 'retry' ? '送り直しています…' : 'マイル手続きをもう一度送る'}
+                  <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('retry')} busy={pointActionBusy === 'retry'} busyLabel="送り直しています…">マイル手続きをもう一度送る
                   </Button>
-                  <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('reconcile')}>
-                    {pointActionBusy === 'reconcile' ? '照合しています…' : 'EC側と照合する'}
+                  <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('reconcile')} busy={pointActionBusy === 'reconcile'} busyLabel="照合しています…">EC側と照合する
                   </Button>
                 </dd>
                 : null}
@@ -314,11 +312,11 @@ export function PhotoReviewDetail({
         actions={duplicate ? <>
         <Button disabled={reviewing} onClick={onReturn}>却下する</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
-        <Button variant="primary" disabled={reviewing} onClick={adoptWithoutReward}>{reviewing ? '処理中...' : '報酬なしで採用'}</Button>
+        <Button variant="primary" disabled={reviewing} onClick={adoptWithoutReward} busy={reviewing} busyLabel="処理中...">報酬なしで採用</Button>
         </> : <>
         <Button disabled={reviewing} onClick={onReturn}>見送る（理由を選ぶ）</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
-        <Button variant="primary" disabled={reviewing} onClick={onApprove}>{reviewing ? '処理中...' : 'このまま採用'}</Button>
+        <Button variant="primary" disabled={reviewing} onClick={onApprove} busy={reviewing} busyLabel="処理中...">このまま採用</Button>
         </>}
       />
     </div>
@@ -330,8 +328,8 @@ export function PhotoReviewDetail({
         : `原本には個人情報が含まれる場合があります。${stepUpMethod === 'password' ? 'パスワード' : '6桁の再認証コード'}を入力すると、一度だけ保存できます。`}
       busy={downloadBusy}
       error={downloadError}
-      confirmLabel="再認証して保存"
-      cancelLabel="やめる"
+      confirmLabel="再認証して保存する"
+      cancelLabel="キャンセル"
       onCancel={() => { setDownloadOpen(false); setDownloadError('') }}
       onConfirm={stepUpMethod === 'none' ? undefined : () => {
         if (!downloadReady) { setDownloadError(stepUpMethod === 'password' ? 'パスワードを入力してください。' : '6桁の再認証コードを入力してください。'); return }

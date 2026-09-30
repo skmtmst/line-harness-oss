@@ -194,7 +194,7 @@ function PoolCard({
     <div className="bg-canvas border-hairline rounded-card border p-4">
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="min-w-0">
-          <h3 className="flex items-center gap-2 font-medium">
+          <h3 className="flex items-center gap-2 font-semibold">
             <span className="min-w-0 truncate" title={pool.name}>{pool.name}</span>
             {isMain && (
               <StatusBadge tone="info" size="compact">
@@ -214,7 +214,7 @@ function PoolCard({
               onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
               className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
             >
-              削除
+              削除する
             </button>
           )}
         </div>
@@ -426,7 +426,7 @@ function CreatePoolModal({
         className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6"
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 id="create-pool-title" className="text-lg font-medium">新規プール</h2>
+          <h2 id="create-pool-title" className="text-lg font-semibold">新規プール</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
@@ -460,9 +460,7 @@ function CreatePoolModal({
             variant="primary"
             onClick={() => { void onSubmit() }}
             disabled={submitting || !slug || !name || !activeAccountId}
-            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:brightness-90 disabled:opacity-50"
-          >
-            {submitting ? '作成中…' : '作成'}
+            className="text-sm px-3 py-1.5 rounded-mini bg-action text-on-accent hover:brightness-90 disabled:opacity-50" busy={submitting} busyLabel="作成中…">作る
           </Button>
         </div>
       </div>

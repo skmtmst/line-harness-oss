@@ -25,7 +25,7 @@ describe('V6共通トップバー', () => {
     expect(css).toContain('border-bottom: 1px solid var(--color-hairline);')
     // 画面名は $size-title(20)。素の 20px ではなくトークンで書く。
     expect(css).toContain('font-size: var(--text-title);')
-    expect(css).toContain('font-weight: 700;')
+    expect(css).toContain('font-weight: 600;')
   })
 
   it('押せる要素のキーボードフォーカスを消さない', () => {
