@@ -529,6 +529,63 @@ export async function postMileageAdjustment(
   }>;
   const ledgerChanges = Number(batchResults[0]?.meta?.changes ?? 0);
 
+  // R359: 同時減算で古い内訳を読んだ側は、条件付きのロット更新が
+  // 効かず（changes 0）残高だけが減る。足りなかった分を取り直して
+  // 消費し直す。取り直しも条件付きで、無ければある分だけにする
+  // （期限切れ・過去の不整合の不足受容は従来どおり）。
+  // 台帳を書かなかった再送（ledgerChanges 0）は直した本人が直している
+  // ため、ここでは何もしない（二重消費防止）。
+  if (input.amount < 0 && ledgerChanges > 0 && lotSpends.length > 0) {
+    let shortfall = 0;
+    for (let index = 0; index < lotSpends.length; index += 1) {
+      if (Number(batchResults[1 + index]?.meta?.changes ?? 0) === 0) {
+        shortfall += lotSpends[index].amount;
+      }
+    }
+    const friendKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
+    let guard = 0;
+    while (shortfall > 0 && guard < 8) {
+      guard += 1;
+      const fresh = await db
+        .prepare(
+          `SELECT ledger_entry_id, remaining_amount FROM mileage_grant_lots
+            WHERE program_id = ? AND beneficiary_key = ? AND status = 'available'
+              AND remaining_amount > 0 AND (expires_at IS NULL OR expires_at > ?)
+            ORDER BY ${adjustmentLotSpendOrderSql()}`,
+        )
+        .bind(programId, friendKey, now)
+        .all<{ ledger_entry_id: string; remaining_amount: number }>();
+      const retry: Array<{ lotId: string; amount: number }> = [];
+      let need = shortfall;
+      for (const lot of fresh.results) {
+        if (need <= 0) break;
+        const take = Math.min(need, lot.remaining_amount);
+        retry.push({ lotId: lot.ledger_entry_id, amount: take });
+        need -= take;
+      }
+      if (retry.length === 0) break;
+      const retryResults = (await db.batch(
+        retry.map((spend) =>
+          db.prepare(
+            `UPDATE mileage_grant_lots
+                SET remaining_amount = remaining_amount - ?,
+                    status = CASE WHEN remaining_amount - ? = 0 THEN 'exhausted' ELSE status END
+              WHERE ledger_entry_id = ? AND remaining_amount >= ?
+                AND EXISTS (SELECT 1 FROM mileage_ledger WHERE id = ?)`,
+          ).bind(spend.amount, spend.amount, spend.lotId, spend.amount, id),
+        ),
+      )) as Array<{ meta?: { changes?: unknown } }>;
+      let progressed = 0;
+      for (let index = 0; index < retry.length; index += 1) {
+        if (Number(retryResults[index]?.meta?.changes ?? 0) > 0) {
+          progressed += retry[index].amount;
+        }
+      }
+      if (progressed === 0) break;
+      shortfall -= progressed;
+    }
+  }
+
   const inserted = await db
     .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
     .bind(programId, input.idempotencyKey)

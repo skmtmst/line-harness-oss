@@ -301,4 +301,20 @@ describe('R359 手動減算と付与内訳の一致', () => {
       }),
     ).rejects.toMatchObject({ code: 'insufficient_miles' });
   });
+
+  it('複数ロットにまたがる同時減算は両方通っても残高と内訳が一致する', async () => {
+    await grant(100, { key: 'seed-multi-a' });
+    await grant(100, { key: 'seed-multi-b' });
+    const results = await Promise.allSettled([
+      adjust(-80, { idempotencyKey: 'race-multi-a', reason: '同時調整A' }),
+      adjust(-80, { idempotencyKey: 'race-multi-b', reason: '同時調整B' }),
+    ]);
+
+    // 残高は両方を通す（200 - 160 = 40）。
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(2);
+    expect(await balance()).toBe(40);
+    // 内訳も同じだけ減る。負けた側が古い内訳で同じロットを触っても、
+    // 取り直した残りから消費し直すため、合計は残高と一致する。
+    expect(usableLotsTotal()).toBe(40);
+  });
 });
