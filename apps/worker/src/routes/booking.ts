@@ -1068,15 +1068,29 @@ booking.post(
      */
     const idemKey = c.req.header('Idempotency-Key')?.trim() || null;
     const staffSubject = c.get('staff')?.id ?? 'admin';
+    /*
+     * 冪等表の主キーは key 単独のため、素のキーでは別アカウントの確保と
+     * 衝突する。照合は (key, account, staff) に閉じると決めているので、
+     * 保存キー自体にアカウントと口を埋め込み、アカウント越しの衝突を無くす。
+     * 名前空間化前の完了行（24時間窓）は読むだけ残し、取りこぼしで
+     * 作り直さない。migration は要らない（同じ表・同じ列）。
+     */
     const idemScope = {
-      key: idemKey ?? '',
+      key: idemKey ? `${accountId}:admin-customer:${idemKey}` : '',
       lineAccountId: accountId,
       friendId: staffSubject,
       now: new Date(),
     };
     if (idemKey) {
       const cached = await findIdempotencyResponse(c.env.DB, idemScope);
-      if (cached) return c.json(cached.body as Record<string, unknown>, cached.status as 201);
+      if (cached && cached.status !== 202) {
+        return c.json(cached.body as Record<string, unknown>, cached.status as 201);
+      }
+      if (cached) return c.json({ error: 'request_in_progress' }, 409);
+      const legacy = await findIdempotencyResponse(c.env.DB, { ...idemScope, key: idemKey });
+      if (legacy && legacy.status !== 202) {
+        return c.json(legacy.body as Record<string, unknown>, legacy.status as 201);
+      }
     }
     const body = await c.req.json<{
       display_name?: string;
@@ -1086,6 +1100,27 @@ booking.post(
     }>();
     if (!body.display_name || !body.phone) {
       return c.json({ error: 'missing_customer_fields' }, 400);
+    }
+    /*
+     * R559残差: 同じキーで同時に届いた2件がどちらも未保存と判断し、
+     * 別の顧客を2件作っていた。完了後の保存だけでは同時到着に負けるので、
+     * 代理予約と同じく先に202の仮応答を1行だけ確保し、確保できた
+     * 呼び出しだけが作成へ進む。検証落ちは確保前に返すので、入力を
+     * 直して同じキーで送り直せるのは従来どおり。
+     */
+    if (idemKey) {
+      const reserved = await reserveIdempotencyResponse(c.env.DB, {
+        ...idemScope,
+        body: { error: 'request_in_progress' },
+        ttlMinutes: BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES,
+      });
+      if (!reserved) {
+        const raced = await findIdempotencyResponse(c.env.DB, idemScope);
+        if (raced && raced.status !== 202) {
+          return c.json(raced.body as Record<string, unknown>, raced.status as 201);
+        }
+        return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
+      }
     }
     try {
       const customer = await createBookingCustomer(c.env.DB, {
@@ -1099,15 +1134,26 @@ booking.post(
       });
       // R559: 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
       if (idemKey) {
-        await saveIdempotencyResponse(c.env.DB, {
+        await completeIdempotencyResponse(c.env.DB, {
           ...idemScope,
           status: 201,
           body: { customer },
-          ttlMinutes: BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES,
         });
       }
       return c.json({ customer }, 201);
     } catch (error) {
+      // 確保だけ残すと後の再送が進行中扱いで詰まるので、作れなかった
+      // 呼び出し自身の仮応答は消す（完了行・別呼び出しの行は触らない）。
+      if (idemKey) {
+        await c.env.DB
+          .prepare(
+            `DELETE FROM booking_idempotency_keys
+              WHERE key = ? AND line_account_id = ? AND friend_id = ?
+                AND response_status = 202`,
+          )
+          .bind(idemScope.key, idemScope.lineAccountId, idemScope.friendId)
+          .run();
+      }
       const code = error instanceof Error ? error.message : '';
       if (code.startsWith('booking_customer_') && code.endsWith('_invalid')) {
         return c.json({ error: code }, 422);
@@ -3694,14 +3740,22 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
           notification_policy_snapshot: string | null;
         }>();
       if (created) {
-        // R560: 予約は残っているのに履歴・予定処理が欠けているときは、
-        // 成功を返す前に不足を埋める。あるものは作り直さない。
-        await ensureProxyBookingSideEffects(
-          c.env.DB,
-          created,
-          { lineAccountId: accountId, friendId },
-          staffAuditActor(c),
-        );
+        /*
+         * R560残差: 仮応答のまま取り消された予約へ同じキーで再送したとき、
+         * 補完がカレンダー作成などの副作用を積み直していた。取り消し済みの
+         * 予約に作り直しは要らないので、今の状態をそのまま返し、
+         * 副作用は確定中の予約にだけ足す。
+         */
+        if (created.status === 'confirmed') {
+          // R560: 予約は残っているのに履歴・予定処理が欠けているときは、
+          // 成功を返す前に不足を埋める。あるものは作り直さない。
+          await ensureProxyBookingSideEffects(
+            c.env.DB,
+            created,
+            { lineAccountId: accountId, friendId },
+            staffAuditActor(c),
+          );
+        }
         return c.json({
           booking_id: created.id,
           booking_customer_id: bookingCustomerId,

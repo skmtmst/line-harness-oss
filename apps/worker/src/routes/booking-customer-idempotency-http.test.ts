@@ -165,6 +165,21 @@ describe('R559 電話客の保存の応答再送は作り直さない', () => {
     expect(customerCount('account-a')).toBe(2);
   });
 
+  test('R559残差: 同じキーでの同時到着は1件だけ作り、もう一方は409', async () => {
+    const { app, env } = makeApp(db, bookingRoute);
+    const [first, second] = await Promise.all([
+      postCustomer(app, env, 'account-a', 'customer-race-1'),
+      postCustomer(app, env, 'account-a', 'customer-race-1'),
+    ]);
+    // どちらか一方が通り、もう一方は進行中ではじく。台帳は1件のまま。
+    expect([first.status, second.status].sort()).toEqual([201, 409]);
+    expect(customerCount('account-a')).toBe(1);
+    // 仮応答が残らないので、後の再送は作成済みを返す。
+    const retry = await postCustomer(app, env, 'account-a', 'customer-race-1');
+    expect(retry.status).toBe(201);
+    expect(customerCount('account-a')).toBe(1);
+  });
+
   test('同じキーでも別アカウントは別顧客として作成する', async () => {
     const { app, env } = makeApp(db, bookingRoute);
     const first = await postCustomer(app, env, 'account-a', 'customer-shared-key');

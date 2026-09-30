@@ -165,6 +165,65 @@ describe('R560 予約後の履歴不足は再送で補完する', () => {
     expect(auditCount(bookingId)).toBe(1);
   });
 
+  test('R560残差: 取り消し済み予約への再送は副作用を積まず今の状態を返す', async () => {
+    const { app, env } = makeApp(db, bookingRoute);
+    const customerRes = await app.request('/api/booking/admin/customers?account_id=account-a', {
+      method: 'POST', headers: JSON_HEADERS,
+      body: JSON.stringify({ display_name: '山田 花子', phone: '090-1234-5678' }),
+    }, env);
+    expect(customerRes.status).toBe(201);
+    const customerId = ((await customerRes.json()) as { customer: { id: string } }).customer.id;
+
+    // 仮応答のまま取り消された予約（取消API自体ではなく取消後の状態を再現）。
+    const bookingId = 'booking-r560-cancelled';
+    const nowIso = new Date().toISOString();
+    sqlite.prepare(`INSERT INTO bookings
+      (id, line_account_id, friend_id, booking_customer_id, staff_id, menu_id,
+       starts_at, ends_at, block_ends_at, status, price_at_booking,
+       requested_at, decided_at, source, created_by_staff_id,
+       notification_policy_snapshot)
+      VALUES (?, 'account-a', NULL, ?, 'staff-1', 'menu-1',
+       ?, ?, ?, 'cancelled', 5000,
+       ?, ?, 'phone', 'owner-1', ?)`)
+      .run(
+        bookingId, customerId,
+        BOOKING_BODY.starts_at, BOOKING_BODY.starts_at, BOOKING_BODY.starts_at,
+        nowIso, nowIso,
+        JSON.stringify({ send_line_confirmation: false, day_before: false, hours_before: false }),
+      );
+    await reserveIdempotencyResponse(db, {
+      key: 'proxy-try-r560-cancelled',
+      lineAccountId: 'account-a',
+      friendId: `booking-customer:${customerId}`,
+      body: { error: 'request_in_progress', booking_id: bookingId },
+      ttlMinutes: 5,
+      now: new Date(),
+    });
+    const queuedBefore = (sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM booking_operation_runs WHERE booking_id = ?`,
+    ).get(bookingId) as { n: number }).n;
+
+    const retry = await app.request('/api/booking/admin/bookings?account_id=account-a', {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, 'Idempotency-Key': 'proxy-try-r560-cancelled' },
+      body: JSON.stringify({ booking_customer_id: customerId, ...BOOKING_BODY }),
+    }, env);
+    expect(retry.status).toBe(201);
+    const retryBody = await retry.json() as { booking_id: string; status: string; replayed?: boolean };
+    expect(retryBody.booking_id).toBe(bookingId);
+    expect(retryBody.status).toBe('cancelled');
+    expect(retryBody.replayed).toBe(true);
+    // 取消済みへの再送でカレンダー作成などの副作用を積まない。
+    const queuedAfter = (sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM booking_operation_runs WHERE booking_id = ?`,
+    ).get(bookingId) as { n: number }).n;
+    expect(queuedAfter).toBe(queuedBefore);
+    const calendarOps = (sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM booking_operation_runs WHERE booking_id = ? AND kind = 'google_calendar'`,
+    ).get(bookingId) as { n: number }).n;
+    expect(calendarOps).toBe(0);
+  });
+
   test('予約の無い保留キーへの再送は進行中として扱う', async () => {
     const { app, env } = makeApp(db, bookingRoute);
     const customerRes = await app.request('/api/booking/admin/customers?account_id=account-a', {
