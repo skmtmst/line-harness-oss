@@ -124,6 +124,34 @@ describe('S4-OR 条件窓は空のかたまりを黙って落とさない', () =
     expect(onSave.mock.calls[0][0]).toBeNull()
   })
 
+  it('上の一覧でroot条件だけ消しても、残すべき空ORは残る', async () => {
+    const onSave = vi.fn(async (_next: SegmentCondition | null) => {})
+    renderDialog({
+      value: {
+        operator: 'AND',
+        rules: [{ type: 'tag_exists', value: 'tag-1' }],
+        groups: [{ operator: 'OR', rules: [] }],
+      },
+      onSave,
+    })
+    // 上の一覧の「削除する」は条件行→かたまり行の順。最初の1つがroot条件。
+    const removers = screen.getAllByText('削除する')
+    expect(removers.length).toBeGreaterThanOrEqual(2)
+    await act(async () => {
+      fireEvent.click(removers[0])
+    })
+
+    // 削除対象のroot条件だけ消え、空ORのかたまりは下書きとして残る。
+    expect(screen.queryByText('条件 1')).toBeNull()
+    expect(groupRemovers()).toHaveLength(1)
+    expect(kindPickers()).toHaveLength(2)
+
+    // 空のまま反映すると送らずに案内する。
+    await reflect()
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByText(/空の「いずれか」の条件のかたまりがあります/)).toBeTruthy()
+  })
+
   it('取り消すと送らずに閉じる（下書きは残さない）', async () => {
     const onSave = vi.fn(async (_next: SegmentCondition | null) => {})
     const onClose = vi.fn(() => {})
