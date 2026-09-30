@@ -107,7 +107,7 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
     dirty,
     busy,
     onDiscard: () => {
-      // 「保存せずに移動」が確定したら、段の中に留まる遷移でも書きかけを
+      // 「保存せずに移る」が確定したら、段の中に留まる遷移でも書きかけを
       // 残さない。「変更は消えます」の約束どおり、保存済みの下書きへ戻す。
       const saved = draftRef.current
       if (saved) {
