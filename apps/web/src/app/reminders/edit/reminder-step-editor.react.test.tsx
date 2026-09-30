@@ -220,7 +220,7 @@ describe('通知ステップの複数通編集', () => {
     await screen.findByText('保存していない変更があります')
     expect(fixture.routerPush).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: '保存せずに移動' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
     await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/reminders'))
   })
 

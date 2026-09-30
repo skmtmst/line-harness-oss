@@ -52,6 +52,10 @@ function memberFixture() {
   }
 }
 
+/*
+ * D022: 見本は実APIの形に合わせる（実APIは nextExpiringAt・measuredAt を
+ * 必ず返す）。欠けた見本は応答検査で弾かれ、検索欄まで届かない。
+ */
 const friendsOverview = {
   items: [memberFixture()],
   summary: {
@@ -62,8 +66,10 @@ const friendsOverview = {
     monthChange: 0,
     rankCounts: [],
     expiringMiles30d: null,
+    nextExpiringAt: null,
   },
   pagination: { total: 1, limit: 20, offset: 0 },
+  measuredAt: '2026-09-10T00:00:00.000Z',
 }
 
 /*

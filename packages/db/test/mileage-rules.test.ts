@@ -82,14 +82,25 @@ function asD1(sqlite: Database.Database): D1Database {
             },
             async first<T>() { return (statement.get(...params) as T) ?? null; },
             async all<T>() { return { success: true, results: statement.all(...params) as T[], meta: {} }; },
+            // 本物の D1 が持つ batch 用の同期実行口。postMileageAdjustment は
+            // 台帳と内訳を同じ batch で書く（m25d R359）ため、ここでも必須。
+            runSyncForBatch<T>() {
+              const result = statement.run(...params);
+              return { success: true, results: [], meta: { changes: result.changes } } as T;
+            },
           };
         },
       };
     },
     // 本物の D1 batch と同じく全部まとめて確定する。途中で落ちたら
     // 巻き戻る（better-sqlite3 の transaction が保証する）。
-    async batch(statements: D1PreparedStatement[]) {
+    // 本物の D1 が持つ batch 用の同期実行口 runSyncForBatch を優先し
+    // （m25d R359 の原修正）、読み取り文は同期で結果を返す
+    // （m23w 088fa3b の原子性）。両方を1つの transaction に保つ。
+    async batch<T>(statements: D1PreparedStatement[]) {
       const runBatch = sqlite.transaction((list: D1PreparedStatement[]) => list.map((item) => {
+        const sync = (item as unknown as { runSyncForBatch?: () => unknown }).runSyncForBatch;
+        if (sync) return sync();
         const { sql, params } = item as unknown as { sql: string; params: unknown[] };
         if (/^\s*(SELECT|WITH|PRAGMA)/i.test(sql)) {
           return { success: true, results: sqlite.prepare(sql).all(...params), meta: {} };
@@ -97,7 +108,8 @@ function asD1(sqlite: Database.Database): D1Database {
         const info = sqlite.prepare(sql).run(...params);
         return { success: true, results: [], meta: { changes: info.changes } };
       }));
-      return runBatch(statements);
+      return runBatch(statements) as unknown as T;
+    },
     },
   } as unknown as D1Database;
 }

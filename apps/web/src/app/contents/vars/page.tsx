@@ -33,6 +33,7 @@ import {
   usageText,
 } from './delete-impact'
 import ListState from '@/components/shared/list-state'
+import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import CopyTextButton from '@/components/ui/copy-text-button'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
@@ -106,6 +107,17 @@ function VarsPageInner() {
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+    R590: 一覧の取得失敗は原因どおりに言い分ける。403は権限案内、
+    503などは通信障害と再試行にするため、捕まえた失敗そのものも持つ。
+  */
+  const [listFailure, setListFailure] = useState<unknown>(null)
+  /*
+    R589: フォルダの取得失敗は一覧と切り分ける。フォルダだけ503/403でも
+    取得済みの共通情報と空欄警告は残し、フォルダ欄だけ失敗を示す。
+  */
+  const [folderFailure, setFolderFailure] = useState<unknown>(null)
+  const [folderReloading, setFolderReloading] = useState(false)
   /** 一覧が件数上限で切られたときに絞り込み誘導を出す。 */
   const [listLimited, setListLimited] = useState(false)
 
@@ -172,6 +184,34 @@ function VarsPageInner() {
   }, [])
   const [savingFolder, setSavingFolder] = useState(false)
 
+  /** R589: フォルダは一覧と独立して読む。成否を一覧と混ぜない。 */
+  const loadFolders = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setFolders([])
+      setUnfiledCount(null)
+      setFolderFailure(null)
+      return
+    }
+    setFolderReloading(true)
+    setFolderFailure(null)
+    try {
+      // #730: 選択中の1件に閉じた母集団で数える。
+      const folderList = await api.folders.list('common_var', accountAtRequest)
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (folderList.success) {
+        setFolders(folderList.data)
+        setUnfiledCount(folderList.unfiledCount ?? null)
+      } else {
+        setFolderFailure(new ApiError(500, folderList.error))
+      }
+    } catch (caught) {
+      if (accountAtRequest === latestAccountRef.current) setFolderFailure(caught)
+    } finally {
+      if (accountAtRequest === latestAccountRef.current) setFolderReloading(false)
+    }
+  }, [selectedAccountId])
+
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
@@ -181,25 +221,23 @@ function VarsPageInner() {
     }
     setLoading(true)
     setError('')
+    setListFailure(null)
     try {
-      const [vars, folderList] = await Promise.all([
-        api.commonVars.list(accountAtRequest),
-        // #730: 選択中の1件に閉じた母集団で数える。
-        api.folders.list('common_var', accountAtRequest),
-      ])
+      const vars = await api.commonVars.list(accountAtRequest)
       if (accountAtRequest !== latestAccountRef.current) return
       if (vars.success) {
         setItems(vars.data)
         setListLimited(vars.meta?.limited ?? false)
-      }
-      if (folderList.success) {
-        setFolders(folderList.data)
-        setUnfiledCount(folderList.unfiledCount ?? null)
+      } else {
+        // R589: 200で失敗が返っても黙って古い一覧を残さない。通信失敗として扱う。
+        setListFailure(new ApiError(500, vars.error))
+        setError('読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
       }
     } catch (e) {
       // 権限なしと通信障害で文言を分ける。同じ文言だと運用者が接続を
       // 確かめ続け、権限申請に気づけない。
       if (accountAtRequest === latestAccountRef.current) {
+        setListFailure(e)
         setError(e instanceof ApiError && e.status === 403
           ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
           : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
@@ -212,7 +250,8 @@ function VarsPageInner() {
   useEffect(() => {
     if (accountLoading) return
     void load()
-  }, [accountLoading, load])
+    void loadFolders()
+  }, [accountLoading, load, loadFolders])
 
   useEffect(() => {
     singleRequestRef.current = {
@@ -282,6 +321,7 @@ function VarsPageInner() {
       setFolderName('')
       setAddingFolder(false)
       void load()
+      void loadFolders()
     } catch {
       setError('フォルダを作れませんでした')
     } finally {
@@ -302,6 +342,7 @@ function VarsPageInner() {
       setDeletingFolder(null)
       if (folderFilter === deletingFolder.id) setFolderFilter('')
       void load()
+      void loadFolders()
     } catch {
       if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
     } finally {
@@ -658,32 +699,54 @@ function VarsPageInner() {
         className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
       />
       <div className="flex justify-end gap-2">
-        <button
-          onClick={() => {
+        <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" onClick={() => {
             setAddingFolder(false)
             setFolderName('')
-          }}
-          className="border-hairline text-ink-secondary rounded-control border px-3 py-1 text-xs"
-        >
+          }}>
           キャンセル
-        </button>
-        <button
-          onClick={() => void addFolder()}
-          disabled={!folderName.trim() || savingFolder}
-          className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
-        >
+        </Button>
+        <Button variant="primary" className="px-3 py-1 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => void addFolder()} disabled={!folderName.trim() || savingFolder}>
           決定
-        </button>
+        </Button>
       </div>
     </div>
   )
+
+  /** R589: フォルダ欄の失敗は403（権限）とそれ以外（通信）で案内を分ける。 */
+  const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
+
+  /*
+   * R589: フォルダだけの失敗の置き場所。縦パネルと狭い幅の選択欄の
+   * 両方から同じものを使う。一覧全体の失敗とは別に、ここだけ出す。
+   */
+  const folderFailureNote = folderFailure ? (
+    <div role="alert" className="space-y-1.5">
+      <p className="text-ink-secondary text-xs">
+        {folderForbidden
+          ? 'フォルダを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+          : 'フォルダを読み込めませんでした。登録した共通情報は消えていません。'}
+      </p>
+      {folderForbidden ? null : (
+        <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
+          {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
+        </Button>
+      )}
+    </div>
+  ) : null
+
+  /*
+   * m26m: 一覧の取得失敗（403・503）は件数が未知。読めていないのに
+   * `items.length`（初期値0）を出すと、実在する7件を0件と誤案内する。
+   * 成功時0件と区別するため、失敗中は「—」にする。復旧後は実件数に戻る。
+   */
+  const listFailed = listFailure != null
 
   /*
    * 狭い幅で出すフォルダの選択欄（#973 U026）。縦パネルは長い一覧が
    * 本文の前に来て、親グリッドの右へはみ出す元にもなっていた。
    */
   const folderOptions = [
-    { value: '', label: `すべて（${items.length}件）` },
+    { value: '', label: listFailed ? 'すべて（—）' : `すべて（${items.length}件）` },
     { value: UNGROUPED, label: `未分類（${unfiledCount === null ? '—' : `${unfiledCount}件`}）` },
     ...folders.map((folder) => ({
       value: folder.id,
@@ -756,6 +819,7 @@ function VarsPageInner() {
           ) : (
             <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加する</Button>
           )}
+          {folderFailureNote}
           {/*
             R37: 狭い幅では縦パネルが出ないため、選んでいるフォルダの
             名前変更・削除を選べる口をここに置く。PCの「…」と同じ窓へ届く。
@@ -778,7 +842,8 @@ function VarsPageInner() {
             onSelect={setFolderFilter}
             onAddFolder={() => setAddingFolder(true)}
             rows={[
-              { id: '', label: 'すべて', count: items.length },
+              // m26m: 一覧の取得失敗中は件数未知（nullは数えない約束）。0と出さない。
+              { id: '', label: 'すべて', count: listFailed ? null : items.length },
               {
                 id: UNGROUPED,
                 label: '未分類',
@@ -801,6 +866,7 @@ function VarsPageInner() {
               })),
             ]}
           >
+            {folderFailureNote}
             {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
             {addingFolder ? (
               folderForm
@@ -888,12 +954,25 @@ function VarsPageInner() {
               // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
               // 消えたように読めるため、空の案内と作成ボタンは出さない。
               <div className="text-ink-faint px-4 py-8 text-center text-sm">
-                <ListState
-                  kind="error"
-                  title="共通情報を読み込めませんでした"
-                  description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
-                  onRetry={() => void load()}
-                />
+                {/*
+                  R590: 403は権限案内にする。押しても直らない再試行は
+                  出さない。503などは通信障害と再試行のまま残す。
+                */}
+                {isForbidden(listFailure) ? (
+                  <ListState
+                    kind="forbidden"
+                    title="共通情報を見る権限がありません"
+                    description={error}
+                  />
+                ) : (
+                  <ListState
+                    kind="error"
+                    title="共通情報を読み込めませんでした"
+                    description={error}
+                    error={listFailure ?? undefined}
+                    onRetry={() => void load()}
+                  />
+                )}
               </div>
             ) : current.length === 0 ? (
               <div className="text-ink-faint px-4 py-8 text-center text-sm">
@@ -914,7 +993,7 @@ function VarsPageInner() {
             ) : (
             <div className="overflow-x-auto @container">
               {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「更新・次の変更」を畳む。 */}
-              <table className="w-full min-w-[664px] table-fixed @[870px]:min-w-[820px]">
+              <table className="w-full min-w-[696px] table-fixed @[870px]:min-w-[820px]">
                 <thead>
                   <TableHeadRow className="bg-canvas-sunken border-hairline border-b">
                     <Th className="w-10 px-3 py-3">
@@ -952,8 +1031,13 @@ function VarsPageInner() {
                     <Th className="cq-hide-below-870 px-4 py-3" style={{ width: '19%' }} title="最終更新日・次の変更予定">
                       更新・次の変更
                     </Th>
-                    {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                    <Th align="right" className="bg-canvas-sunken sticky right-0 w-36 px-4 py-3" title="編集・削除">操作</Th>
+                    {/*
+                      #768: 表が横に流れる帯でも操作列は右端に留める。
+                      #1057で「削除」→「削除する」に延び、w-36では行のボタンが
+                      隣列へ被った（1152px）。2個と間隔で約148px要るため、
+                      列幅176px（w-44）・内余白8px（px-2）にする。
+                    */}
+                    <Th align="right" className="bg-canvas-sunken sticky right-0 w-44 px-2 py-3" title="編集・削除">操作</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-divider-soft">
@@ -1055,7 +1139,7 @@ function VarsPageInner() {
                               </>
                             )}
                           </td>
-                          <td className="bg-canvas group-hover:bg-canvas-sunken whitespace-nowrap sticky right-0 px-4 py-3 text-right" title="編集・削除">
+                          <td className="bg-canvas group-hover:bg-canvas-sunken whitespace-nowrap sticky right-0 px-2 py-3 text-right" title="編集・削除">
                             {/*
                               行の操作は同じ高さ（32）にそろえる。削除は撮影入口
                              （data-qa-open="yPkWe"）のため行に残す。
@@ -1087,6 +1171,13 @@ function VarsPageInner() {
             )}
           </div>
 
+          {/*
+            m26m: 一覧の取得失敗中は表の下の「0件」も出さない。
+            失敗の1枚（権限案内・再試行）が件数の置き場所になる。
+            復旧後は実件数を戻す。フォルダだけの失敗では一覧は読めて
+            いるので、この行は残す（R589の「取得済み7件を維持」を守る）。
+          */}
+          {listFailed ? null : (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             {/* m18s: 絞り込み後の件数は一覧の側に出す。見出しには出さない。 */}
             <ListRange
@@ -1106,6 +1197,7 @@ function VarsPageInner() {
               {selected.size > 0 && <span className="tabular-nums">（{selected.size}）</span>}
             </button>
           </div>
+          )}
         </div>
       </div>
 

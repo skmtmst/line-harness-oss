@@ -70,7 +70,7 @@ describe('R161: 店舗追加の書きかけがある間の離脱確認', () => {
     fireEvent.click(screen.getByRole('link', { name: '統括へ戻る' }))
     await screen.findByText('保存していない変更があります')
 
-    fireEvent.click(screen.getByRole('button', { name: '保存せずに移動' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
     await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/hq'))
   })
 })

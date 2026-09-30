@@ -58,4 +58,16 @@
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
+
+/*
+ * ★V8「トグル」（bkjTv・LxHpj）：大きさ・つまみ・オンの緑は v7 と同じ。
+ * オフの地だけ Pencil の #c9ced6 に合わせる。
+ */
+[data-theme='v8'] .toggle {
+  background: var(--color-toggle-off);
+}
+
+[data-theme='v8'] .on {
+  background: var(--color-accent-deep);
+}
 }

@@ -66,6 +66,10 @@ function seed(raw: Raw, opts: { capacity: number | null; waitlist: 0 | 1 }): voi
         max_bookings_per_friend, waitlist_enabled)
      VALUES ('ev-1', 'account-1', '体験会', 'single', 1, 0, 3, ?)`,
   ).run(opts.waitlist);
+  // m26g: 本番では移行 492 が is_published=1 を lifecycle published へ
+  // 埋め直す。直 INSERT の DEFAULT(draft)のままでは公開中の想定が崩れる
+  // ため、試験の前提（公開中の体験会）どおりに状態も公開にする。
+  raw.prepare(`UPDATE events SET lifecycle_status = 'published' WHERE id = 'ev-1'`).run();
   raw.prepare(
     `INSERT INTO event_slots (id, event_id, starts_at, ends_at, capacity, is_active)
      VALUES ('slot-1', 'ev-1', ?, ?, ?, 1)`,
@@ -511,6 +515,7 @@ describe('同時申込で負けた申込', () => {
       VALUES ('friend-other', 'U-other', 'account-2', 1, 'shared-user')`).run();
     raw.prepare(`INSERT INTO events (id, line_account_id, name, target_type, is_published)
       VALUES ('ev-other', 'account-2', '別の催し', 'single', 1)`).run();
+    raw.prepare(`UPDATE events SET lifecycle_status = 'published' WHERE id = 'ev-other'`).run();
     raw.prepare(`INSERT INTO event_slots (id, event_id, starts_at, ends_at, capacity, is_active)
       VALUES ('slot-other', 'ev-other', ?, ?, 1, 1)`).run(FUTURE, FUTURE);
     raw.prepare(`INSERT INTO event_bookings

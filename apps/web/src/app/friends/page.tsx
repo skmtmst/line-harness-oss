@@ -102,6 +102,12 @@ function FriendsPageInner({
   const scoredOnly = searchParams.get('scoredOnly') === '1'
   const audienceId = searchParams.get('audienceId')?.trim() || ''
   const directSavedSearchId = searchParams.get('savedSearch')
+  /*
+   * ★V8：上の帯の探す欄からの受け口（`/friends?q=…`）。URL に語が
+   * あれば最初からその言葉で絞る。保存してある一覧の状態では
+   * 上書きしない（明示の指示を優先）。
+   */
+  const directQuery = (searchParams.get('q') ?? '').trim()
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -114,8 +120,8 @@ function FriendsPageInner({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(20)
   const [selectedTagId, setSelectedTagId] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [searchSubmitted, setSearchSubmitted] = useState('')
+  const [searchInput, setSearchInput] = useState(directQuery)
+  const [searchSubmitted, setSearchSubmitted] = useState(directQuery)
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [responseFilter, setResponseFilter] = useState<ResponseFilter>('all')
   const [operatorId, setOperatorId] = useState('')
@@ -151,7 +157,7 @@ function FriendsPageInner({
    */
   const restoredRef = useRef(false)
   const [restored, setRestored] = useState(false)
-  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId)
+  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directQuery !== ''
   useEffect(() => {
     if (restoredRef.current || accountLoading) return
     restoredRef.current = true
@@ -367,6 +373,22 @@ function FriendsPageInner({
   }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
+  /*
+   * タグの付け外しは押した瞬間に一覧へ反映する（★V7 sTJsh §1）。
+   * 返す関数を呼ぶと変更前の並びへ戻る（元に戻す・失敗時の復元用）。
+   */
+  const applyFriendTags = useCallback((friendId: string, next: Tag[]) => {
+    const previous = friends.find((friend) => friend.id === friendId)?.tags ?? []
+    setFriends((current) =>
+      current.map((friend) => (friend.id === friendId ? { ...friend, tags: next } : friend)),
+    )
+    return () => {
+      setFriends((current) =>
+        current.map((friend) => (friend.id === friendId ? { ...friend, tags: previous } : friend)),
+      )
+    }
+  }, [friends])
+
   useEffect(() => void loadMarks(), [loadMarks])
   useEffect(() => setPage(1), [selectedAccountId])
   useEffect(() => {
@@ -547,7 +569,7 @@ function FriendsPageInner({
               保存した検索
             </button>
           ) : null}
-          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-control bg-accent-deep text-label font-medium text-on-accent hover:brightness-92">検索</button>
+          <Button variant="primary" className="h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap text-label font-medium border-0" type="submit">検索</Button>
         </form>
 
         {advanced?.summary.length ? (
@@ -699,7 +721,15 @@ function FriendsPageInner({
           hint="対象を確認してから操作を選んでください"
           below={selectedIds.size === 1 ? (
             <div className="mt-2">
-              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
+              <SingleFriendActions
+                friendId={[...selectedIds][0]}
+                friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'}
+                tags={allTags}
+                accountId={selectedAccountId}
+                onDone={loadFriends}
+                friendTags={friends.find((friend) => friend.id === [...selectedIds][0])?.tags ?? []}
+                onFriendTagsChange={(next) => applyFriendTags([...selectedIds][0], next)}
+              />
             </div>
           ) : undefined}
         >
@@ -843,7 +873,7 @@ function FriendsPageHost() {
           active={tab}
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken disabled:text-ink-disabled">表示中をCSVで書き出す</button> : null}
+              {tab === 'list' ? <Button variant="secondary" className="h-9.5 px-4 text-ink-secondary disabled:text-ink-disabled whitespace-normal" type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage}>表示中をCSVで書き出す</Button> : null}
             </div>
           )}
         />

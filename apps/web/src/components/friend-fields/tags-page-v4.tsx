@@ -547,12 +547,9 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
-          <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button>
+          <Button variant="secondary" className="shrink-0 px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onCancel}>キャンセル</Button>
           {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}
-          <button
-            type="button"
-            disabled={blocked || text !== tag.name}
-            onClick={async () => {
+          <Button variant="danger" className="shrink-0 px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={blocked || text !== tag.name} onClick={async () => {
               if (!impact || !accountId) return
               setSaving(true); setSaveError('')
               try {
@@ -575,9 +572,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
                 setSaveError('保管できませんでした。影響を読み直して、もう一度お試しください。')
                 setSaving(false)
               }
-            }}
-            className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
-          >{saving ? '保管中…' : 'このタグを保管する'}</button>
+            }}>{saving ? '保管中…' : 'このタグを保管する'}</Button>
         </div>
       </section>
     </div>

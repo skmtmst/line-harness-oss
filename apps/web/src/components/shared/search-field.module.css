@@ -115,4 +115,18 @@
     animation: none;
   }
 }
+
+/*
+ * ★V8「探す欄」（TkVyB）：高さ36・余白 0 12・アイコンとの間 8・
+ * 文字は 13px（v7 の40px/14px から小さく引き締める）。
+ */
+[data-theme='v8'] .search {
+  height: 36px;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+[data-theme='v8'] .input {
+  font-size: var(--text-label);
+}
 }

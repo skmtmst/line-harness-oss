@@ -71,12 +71,21 @@ describe('標準ボタンの第1段階移行', () => {
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
-    const handledByPart =
-      /(?:bg-accent|border-hairline|text-on-accent|rounded-|px-|py-|text-(?:xs|sm)|font-(?:medium|semibold|bold)|hover:bg-|min-h-)/
+    // V8 移行 ①: 直書きボタンを共通 Button へ置き換える際、画面の見た目を
+    // 変えないために px-/py-/text-*/font-*/min-h- 等のレイアウト・寸法クラスは
+    // 残す（部品の既定値への意図的な上書き）。禁止するのは variant と同値の
+    // クラスの再指定だけ——静的な className で部品の役割を二重に書くのを防ぐ。
+    // 動的 className（${} 入り）は条件で見た目を切り替える正当な利用なので対象外。
+    const duplicatesVariant =
+      /\b(?:bg-accent|bg-accent-deep|text-on-accent|border-hairline|rounded-control|bg-danger|bg-canvas|hover:brightness-92|hover:bg-canvas-sunken)\b/
 
     for (const [path, source] of Object.entries(sources)) {
       for (const opening of buttonOpenings(path, source)) {
-        expect(opening, `${path} が共通Buttonへ旧指定を重ねている`).not.toMatch(handledByPart)
+        const cls = /className="([^"]*)"/.exec(opening)?.[1]
+        if (!cls) continue
+        expect(cls, `${path} が共通Buttonへ variant と同値の指定を重ねている`).not.toMatch(
+          duplicatesVariant,
+        )
       }
     }
   })

@@ -266,12 +266,9 @@ function MenuStaffMatrixContent() {
             * 姿で置き、理由を行き先ではなくこの場で言う。
             */}
           {canAddStaff ? (
-            <Link
-              href="/booking/staff/new"
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-3 py-2 h-auto whitespace-normal" href="/booking/staff/new">
               スタッフを追加する
-            </Link>
+            </Button>
           ) : (
             <span
               aria-disabled="true"
