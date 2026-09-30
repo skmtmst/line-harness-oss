@@ -114,6 +114,6 @@
 }
 
 [data-theme='v8'] .tip a {
-  color: var(--color-accent);
+  color: var(--color-canvas);
 }
 }
