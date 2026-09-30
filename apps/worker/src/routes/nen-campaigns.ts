@@ -53,7 +53,6 @@ import {
 } from '../services/nen-campaign-metrics.js';
 import { auditLog } from '../lib/audit-log.js';
 import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
-import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { listLimit, listOffset } from './list-pagination.js';
 
 const nenCampaigns = new Hono<Env>();
