@@ -80,9 +80,24 @@ describe('V8 移行④b — 一覧まわり', () => {
     expect(blocks).toContain('border-color: var(--color-accent-deep)')
   })
 
+  it('ダイアログ：大きさは 800/560・余白24・下から8px浮き出して入る', () => {
+    const blocks = v8Blocks(css('dialog.module.css'), 'dialog')
+    expect(blocks).toContain('width: min(800px, 100%)')
+    expect(blocks).toContain('width: min(560px, 100%)')
+    expect(blocks).toContain('padding: 24px')
+    expect(css('dialog.module.css')).toContain('@keyframes dialog-v8-enter')
+    expect(blocks).toContain('var(--motion-base)')
+  })
+
+  it('知らせ：下から 8px 浮き出しながら入る（200ms ease-out）', () => {
+    const blocks = v8Blocks(css('toast.module.css'), 'toast')
+    expect(blocks).toContain('animation: toast-v8-enter var(--motion-base) var(--motion-ease-out)')
+    expect(css('toast.module.css')).toContain('@keyframes toast-v8-enter')
+  })
+
   it('台帳がこの回の部品を v8対応済みと数える', { timeout: 60_000 }, () => {
     const report = collectReport()
-    const done = ['板の頭', '表（見出し・行・横に送れる表）', '道具の1段', 'ページ送り', '数のマス・数の帯', '選ぶカード', '経路の札', '進みの棒']
+    const done = ['板の頭', '表（見出し・行・横に送れる表）', '道具の1段', 'ページ送り', '数のマス・数の帯', '選ぶカード', '経路の札', '進みの棒', 'ダイアログ', '知らせ']
     for (const name of done) {
       const part = report.parts.find((p) => p.name === name)
       expect(part?.status, `${name} が v8対応済みになっていない`).toBe('v8対応済み')
