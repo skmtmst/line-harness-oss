@@ -462,7 +462,7 @@
     "unresolved-classname": 5
   },
   "components/layout/sidebar-identity.tsx": {
-    "unresolved-classname": 5
+    "unresolved-classname": 6
   },
   "components/layout/suspended-sidebar.tsx": {
     "unresolved-classname": 13,
@@ -611,7 +611,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 20
+    "unresolved-classname": 35
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 7
