@@ -415,6 +415,20 @@
   --color-icon-tile-purple: #8b5cf6;
   --color-icon-tile-slate: #64748b;
   --color-icon-tile-red: #ef4444;
+
+  /*
+   * 主ボタンの緑の影＋内側の白い照り（Pencil V8 ボタン/主 doYdE の
+   * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
+   * なりすぎないようにする。
+   */
+  --shadow-primary-action:
+    0 1px 2px #087a3e40,
+    inset 0 1px 0 rgb(255 255 255 / 0.15);
+  /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
+  --color-toggle-off: #c9ced6;
+  /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
+  --color-star-on: #fbbf24;
+  --color-star-on-edge: #f59e0b;
 }
 
 :root {
@@ -493,6 +507,46 @@ html:not([data-theme="v8"]) .v8-only {
   [data-theme="v8"] .v8-topbar-wrap {
     display: block;
   }
+}
+
+/*
+ * ★V8「骨格の行」（MOTION.md）：v7 の点滅（animate-pulse）ではなく、
+ * 光が左から右へ流れる（1200ms・繰り返し）。`data-skeleton` は
+ * shared/skeleton.tsx が付ける印。Tailwind の animate-pulse（utilities
+ * 層）よりここ（層なし）が強いので、v8 ではこの動きが勝つ。
+ * 「動きを減らす」設定では末尾の規定で一瞬になる。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-skeleton] {
+    background-image: linear-gradient(
+      100deg,
+      transparent 40%,
+      rgb(255 255 255 / 0.55) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: v8-skeleton-shimmer 1200ms linear infinite;
+  }
+}
+
+@keyframes v8-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * ★V8「手順」（NUOgw）：白い板の中に枠付きカードを重ねない。
+ * 段の丸・文字・つなぎ線は変えず、囲い（枠・地・余白）だけを取る。
+ */
+[data-theme="v8"] [data-part="stepper"] {
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 /* ---------------------------------------------------------------------

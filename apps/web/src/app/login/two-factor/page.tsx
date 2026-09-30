@@ -11,6 +11,8 @@ import Button from '@/components/shared/button'
 
 export default function TwoFactorLoginPage() {
   const [code, setCode] = useState('')
+  /* 認証が通ったあと、緑の輪郭（V8 の動き）を見せてから画面を移す。 */
+  const [succeeded, setSucceeded] = useState(false)
   /** 失敗のたびに入力欄を作り直し、1マス目へ戻す。 */
   const [attempt, setAttempt] = useState(0)
   const [challenge, setChallenge] = useState('')
@@ -29,6 +31,12 @@ export default function TwoFactorLoginPage() {
    * コード不足と案内せず、ログインのやり直しを示す。
    */
   const missingChallenge = ready && !challenge
+
+  /* 成功の印を見せてから画面を移す（V8 の動き。値は MOTION.md の OTP）。 */
+  const finish = (href: string) => {
+    setSucceeded(true)
+    window.setTimeout(() => window.location.assign(href), 420)
+  }
 
   const submit = async () => {
     if (!challenge) return setError('ログインの情報が見つかりませんでした。ログインからやり直してください。')
@@ -61,14 +69,14 @@ export default function TwoFactorLoginPage() {
         if (!sessionBody.data.platformAdmin) {
           if (sessionBody.data.platformAdminState === 'awaiting_totp') {
             clearTwoFactorChallenge()
-            window.location.assign(adminSessionHandoffPath('/ops/two-factor', body.data?.sessionToken, body.csrfToken))
+            finish(adminSessionHandoffPath('/ops/two-factor', body.data?.sessionToken, body.csrfToken))
             return
           }
           throw new Error('このアカウントは運営メンバーとして有効ではありません。招待メールのリンクから登録を完了してください')
         }
       }
       clearTwoFactorChallenge()
-      window.location.assign(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
+      finish(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
       // R506: 通信断の技術文言をそのまま出さない。
       setError(twoFactorFailureMessage(caught))
@@ -110,13 +118,14 @@ export default function TwoFactorLoginPage() {
           labelledBy="two-factor-code-label"
           describedBy={missingChallenge ? 'two-factor-missing' : error ? 'two-factor-error' : undefined}
           invalid={Boolean(error)}
-          disabled={loading || missingChallenge}
+          success={succeeded}
+          disabled={loading || missingChallenge || succeeded}
           autoFocus
         />
       </div>
       <p className="mt-2 text-xs text-ink-faint">◷ コードは約30秒ごとに更新されます</p>
       {/* R614: 合言葉なしでは押せない（V8移行後も共通Buttonで条件を維持）。 */}
-      <Button variant="primary" className="mt-6 h-12 w-full font-bold disabled:opacity-50 border-0 whitespace-normal" onClick={() => void submit()} disabled={loading || missingChallenge || code.length !== 6}>{loading ? '確認中…' : '確認してログイン'}</Button>
+      <Button variant="primary" className="mt-6 h-12 w-full font-bold disabled:opacity-50 border-0 whitespace-normal" onClick={() => void submit()} disabled={loading || missingChallenge || succeeded || code.length !== 6}>{loading || succeeded ? '確認中…' : '確認してログイン'}</Button>
       <p className="mt-5 text-center text-xs text-ink-secondary">コードを入力できない場合</p>
       {/* R507残部: メール経路と合言葉なし直リンクの戻り先はLINEに限定しない。LINE経路は既存どおり。 */}
       <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-2 block text-center text-xs font-medium text-action hover:underline">{missingChallenge || method === 'password' ? 'ログインに戻る' : '別のLINEアカウントでログイン'}</Link>

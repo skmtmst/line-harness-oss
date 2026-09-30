@@ -111,4 +111,13 @@
     height: 44px;
   }
 }
+
+/*
+ * ★V8「入力欄・ラジオ」（Ume2U・y4YQSB）：欄そのものは v7 と同じ
+ * （高さ40・枠 hairline・文字14）。ラベルは墨の 13px/500。
+ */
+[data-theme='v8'] .label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
 }
