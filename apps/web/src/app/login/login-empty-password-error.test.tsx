@@ -15,6 +15,7 @@ import LoginPage from './page'
 const fixture = vi.hoisted(() => ({
   bodies: [] as Array<Record<string, unknown>>,
   loginResponse: { success: true, data: { twoFactorSetup: true, challengeToken: 'setup-tok-1' }, csrfToken: 'csrf-1' } as Record<string, unknown>,
+  loginStatus: 200,
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
@@ -39,12 +40,13 @@ function flush(): Promise<void> {
 beforeEach(() => {
   fixture.bodies = []
   fixture.loginResponse = { success: true, data: { twoFactorSetup: true, challengeToken: 'setup-tok-1' }, csrfToken: 'csrf-1' }
+  fixture.loginStatus = 200
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   window.history.replaceState(null, '', '/login')
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
     if (init?.body) fixture.bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
-    if (url.endsWith('/api/auth/password/login')) return json(fixture.loginResponse)
+    if (url.endsWith('/api/auth/password/login')) return json(fixture.loginResponse, fixture.loginStatus)
     if (url.endsWith('/api/auth/session')) return json({ success: true, data: { id: 's1', name: 'x' }, csrfToken: 'c' })
     return json({ success: false, error: 'unexpected' }, 500)
   }))
@@ -109,5 +111,21 @@ describe('R613: 空パスワードの古い案内を消す', () => {
 
     await type('#login-password', 'Wrongpass2')
     expect(alertText()).toBe('メールアドレスまたはパスワードが正しくありません')
+  })
+
+  it('サーバーエラー(503)の表示もパスワード入力だけでは消えず、次の送信まで残る', async () => {
+    // 監査 247-005 の状態方針: 503 など通信・サーバー側の失敗の表示は
+    // 意図どおり残す。消すのは空パスワードの案内だけ。
+    fixture.loginStatus = 503
+    fixture.loginResponse = { success: false, error: 'しばらくしてからもう一度お試しください' }
+    await render()
+    await type('#login-email', 'owner@example.com')
+    await type('#login-password', 'Correct1')
+    await submit()
+
+    expect(alertText()).toBe('しばらくしてからもう一度お試しください')
+
+    await type('#login-password', 'Correct2')
+    expect(alertText()).toBe('しばらくしてからもう一度お試しください')
   })
 })
