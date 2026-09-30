@@ -357,6 +357,9 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
     });
     // 実送信の代わりに1回だけ落とす。本物の送信部は投げない契約だが、
     // 途中で落ちた場合の欠落防止を隔離して確かめる。
+    // 注記: この「欠落なし」は通知口の投げに限る。実際の配信側の失敗
+    // （503など）は呑み込む best-effort のままで、再送の回復は未検証。
+    // R354の守りは承認の決定・台帳と送信権（CAS）の1回限り。
     notifyAffiliateApproval.mockRejectedValueOnce(new Error('push down'));
 
     const failed = await req('PATCH', '/api/conversions/events/ev-1/approval', {
