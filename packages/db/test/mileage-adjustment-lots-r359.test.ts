@@ -353,4 +353,43 @@ describe('R359 手動減算と付与内訳の一致', () => {
     expect(await balance()).toBe(40);
     expect(usableLotsTotal()).toBe(40);
   });
+
+  it('同じ依頼の並行再送が重なっても内訳は1回分だけ取り直す', async () => {
+    // 失敗した依頼キーを2本同時に送り直す。両方とも受け付けるが、
+    // 取り直しは文の実行時点の超過分で止まるため合計は1回分。
+    // 台帳の二重書き込みと残高の二重減算はしない。
+    await grant(100, { key: 'seed-concurrent-retry-a' });
+    await grant(100, { key: 'seed-concurrent-retry-b' });
+    const good = db;
+    let batches = 0;
+    let faulted = false;
+    db = {
+      ...good,
+      batch: (async (stmts: D1PreparedStatement[]) => {
+        batches += 1;
+        if (batches === 3) {
+          faulted = true;
+          throw new Error('fixture transient reconciliation batch failure');
+        }
+        return good.batch(stmts);
+      }) as D1Database['batch'],
+    } as D1Database;
+    const failedKey = { idempotencyKey: 'race-concurrent-retry-a' };
+    const otherKey = { idempotencyKey: 'race-concurrent-retry-b' };
+    const results = await Promise.allSettled([
+      adjust(-60, failedKey),
+      adjust(-60, otherKey),
+    ]);
+    db = good;
+    expect(faulted).toBe(true);
+
+    const failed = results[0].status === 'rejected' ? failedKey : otherKey;
+    const retried = await Promise.all([
+      adjust(-60, failed),
+      adjust(-60, failed),
+    ]);
+    expect(retried.map((result) => result.replayed)).toEqual([true, true]);
+    expect(await balance()).toBe(80);
+    expect(usableLotsTotal()).toBe(80);
+  });
 });

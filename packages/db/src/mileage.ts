@@ -447,6 +447,26 @@ async function recordLotConsumed(
 }
 
 /**
+ * R359: 取り直しの1件ごとに「いまの超過分」を確かめる条件。
+ * 同じ不足の再送が重なっても、文の実行時点で使える内訳が残高を
+ * 上回っている分だけしか消費しない。batch 内では前の文の効果が見える
+ * ため、直列化された2件目は超過が無くなり止まる（二重消費防止）。
+ * 残高側の範囲は再送の上限と同じ受益者一致（概算の守りとして十分）。
+ */
+function lotRepairLiveExcessGateSql(): string {
+  return `AND ? <= (
+    (SELECT COALESCE(SUM(remaining_amount), 0) FROM mileage_grant_lots
+      WHERE program_id = ? AND beneficiary_key = ? AND status = 'available'
+        AND remaining_amount > 0 AND (expires_at IS NULL OR expires_at > ?))
+    -
+    (SELECT COALESCE(SUM(CASE WHEN status = 'available' THEN amount ELSE 0 END), 0)
+       FROM mileage_ledger
+      WHERE program_id = ?
+        AND (beneficiary_user_id = ? OR beneficiary_friend_id = ?))
+  )`;
+}
+
+/**
  * R359: 同じ依頼キーの再送で、残っている内訳の不足を取り直す。
  * 初回の取り直し batch が落ちると台帳はあるのに内訳が残り、
  * 従来は再送が何もせずずれが固定されていた。請求は印の残りだけに絞り、
@@ -507,8 +527,13 @@ async function repairAdjustmentLotShortfall(
               SET remaining_amount = remaining_amount - ?,
                   status = CASE WHEN remaining_amount - ? = 0 THEN 'exhausted' ELSE status END
             WHERE ledger_entry_id = ? AND remaining_amount >= ?
-              AND EXISTS (SELECT 1 FROM mileage_ledger WHERE id = ?)`,
-        ).bind(spend.amount, spend.amount, spend.lotId, spend.amount, entry.id),
+              AND EXISTS (SELECT 1 FROM mileage_ledger WHERE id = ?)
+              ${lotRepairLiveExcessGateSql()}`,
+        ).bind(
+          spend.amount, spend.amount, spend.lotId, spend.amount, entry.id,
+          spend.amount, entry.program_id, key, now,
+          entry.program_id, entry.beneficiary_user_id, entry.beneficiary_friend_id,
+        ),
       ),
     )) as Array<{ meta?: { changes?: unknown } }>;
     const applied: AdjustmentLotConsumption[] = [];
@@ -716,8 +741,13 @@ export async function postMileageAdjustment(
                 SET remaining_amount = remaining_amount - ?,
                     status = CASE WHEN remaining_amount - ? = 0 THEN 'exhausted' ELSE status END
               WHERE ledger_entry_id = ? AND remaining_amount >= ?
-                AND EXISTS (SELECT 1 FROM mileage_ledger WHERE id = ?)`,
-          ).bind(spend.amount, spend.amount, spend.lotId, spend.amount, id),
+                AND EXISTS (SELECT 1 FROM mileage_ledger WHERE id = ?)
+                ${lotRepairLiveExcessGateSql()}`,
+          ).bind(
+            spend.amount, spend.amount, spend.lotId, spend.amount, id,
+            spend.amount, programId, friendKey, now,
+            programId, friend.user_id, friend.id,
+          ),
         ),
       )) as Array<{ meta?: { changes?: unknown } }>;
       let progressed = 0;
