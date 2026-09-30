@@ -5,7 +5,7 @@ import { X } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
 import { validateFlexContent } from '@line-crm/shared'
-import type { SegmentCondition } from '@/lib/segment-condition'
+import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InlineActionList, { useActionOptions } from './inline-action-list'
 import {
@@ -457,6 +457,14 @@ export default function EditDialog({
       // テキストのまま画像形式で保存させない（画像選択部品がJSONを書く）。
       setError('返信する画像を選んでください'); return
     }
+    /*
+     * R243: 空の「いずれか」のかたまり・未完成の行がある下書きは保存しない。
+     * そのまま送ると「絞り込みなし」へ黙って落ちる。編集中の表示は消さず、
+     * 不足の案内だけ出してAPI要求は0にする（page/listどちらの保存口もここ）。
+     * 素の空（null）は「絞り込みなし」として有効なので通す。
+     */
+    const conditionIssue = findConditionDraftIssue(friendConditions)
+    if (conditionIssue) { setError(conditionIssue); return }
     setError('')
     setConflictInfo(null)
     setDraftSaved(false)
