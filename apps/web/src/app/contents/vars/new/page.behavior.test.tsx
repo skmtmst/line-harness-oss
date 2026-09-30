@@ -253,7 +253,7 @@ describe('共通情報の新規作成(実React)', () => {
     expect(api.create).not.toHaveBeenCalled()
   })
 
-  it('入力中に一覧へのリンクを押すと確認を出し、「保存せずに移動」だけが遷移する（VAR-01 監査）', async () => {
+  it('入力中に一覧へのリンクを押すと確認を出し、「保存せずに移る」だけが遷移する（VAR-01 監査）', async () => {
     await render()
     await setValue(byId('cv-name'), '途中の下書き')
 
@@ -274,9 +274,9 @@ describe('共通情報の新規作成(実React)', () => {
     expect((byId('cv-name') as HTMLInputElement).value).toBe('途中の下書き')
     expect(routerPush).not.toHaveBeenCalled()
 
-    // 「保存せずに移動」を選んだときだけ一覧へ進む。
+    // 「保存せずに移る」を選んだときだけ一覧へ進む。
     await click(backLink)
-    await click(byExactTextInBody('button', '保存せずに移動'))
+    await click(byExactTextInBody('button', '保存せずに移る'))
     expect(routerPush).toHaveBeenCalledWith('/contents/vars')
   })
 

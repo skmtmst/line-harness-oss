@@ -461,7 +461,7 @@ function EditCommonVarInner() {
    * 離脱の確認はどの画面状態にいても出す。影響確認の一覧へ切り替えた表示
    * （ImpactReview）は別ツリーへ早期 return するため、要素化して両方の
    * 経路へ差し込む。片方だけに置くと dirty 中のリンクが黙って止まり、
-   * 「保存せずに移動」を選ぶ手段がなくなる。
+   * 「保存せずに移る」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="共通情報への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
