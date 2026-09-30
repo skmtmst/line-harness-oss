@@ -99,13 +99,16 @@ describe('PERF-12 テンプレート選択のサーバー絞り込み', () => {
   });
 
   it('quick=frequent は送信実績の多い順で返す', async () => {
+    // 当月アンカー（固定09月は10月に当月0件になり既存順位が崩れる）。製品の月間0は0のまま。
+    const month = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 7);
+    const at = `${month}-01T00:00:00.000+09:00`;
     db.raw.prepare(`INSERT INTO friends (id, line_user_id, display_name, line_account_id) VALUES ('fr-1', 'u-1', '友だち', 'account-a')`).run();
     const send = db.raw.prepare(`INSERT INTO messages_log
       (id, friend_id, direction, message_type, content, template_id_at_send, created_at)
       VALUES (?, 'fr-1', 'outgoing', 'text', 'sent', ?, ?)`);
-    send.run('lg-1', 'tp-04', '2026-09-01T00:00:00Z');
-    send.run('lg-2', 'tp-04', '2026-09-02T00:00:00Z');
-    send.run('lg-3', 'tp-01', '2026-09-01T00:00:00Z');
+    send.run('lg-1', 'tp-04', at);
+    send.run('lg-2', 'tp-04', at);
+    send.run('lg-3', 'tp-01', at);
     const data = ((await (await get('message_type=text&quick=frequent&page=1&limit=5')).json()) as Body).data;
     // 実績 2 > 1 > 0 の順。実績なし同士は新しい順。
     expect(data.items.map((t) => t.id)).toEqual(['tp-04', 'tp-01', 'tp-03', 'tp-02']);
