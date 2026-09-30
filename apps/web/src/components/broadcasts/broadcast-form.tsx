@@ -1556,17 +1556,23 @@ export default function BroadcastForm({
       autosavingRef.current = false
       setAutosaving(false)
       /*
-       * R625: 保存中に追記されていたら置き去りにしない。
-       * 指紋が進んでいたら2秒後にもう一度静かに送る。
-       * アカウントが変わっていたら今のアカウントの入力は触らない。
+       * R625/R626: 保存中に追記されていたら置き去りにしない。
+       * 同じアカウントなら進んだ指紋を2秒後にもう一度静かに送る。
+       * 違うアカウントへ移っていたら、Aの応答でBを保存ずみにはしない
+       * まま、今のアカウントが未保存なら送り直す（Bの間合いが先行の
+       * 保存中に捨てられていても、autosavingの変化だけでは effect が
+       * 起きないため、ここで拾う）。
        */
-      if (
-        (selectedAccountIdRef.current || null) === requestAccountId
-        && formFingerprintRef.current !== fingerprintAtSave
-        && leaveTargetRef.current === null
-      ) {
-        if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
-        autosaveRetryTimer.current = setTimeout(() => autosaveDraftRef.current(), 2000)
+      if (leaveTargetRef.current === null) {
+        const stillSameAccount = (selectedAccountIdRef.current || null) === requestAccountId
+        const pendingFingerprint = stillSameAccount
+          ? formFingerprintRef.current !== fingerprintAtSave
+          : cleanFingerprintRef.current !== null
+            && formFingerprintRef.current !== cleanFingerprintRef.current
+        if (pendingFingerprint) {
+          if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
+          autosaveRetryTimer.current = setTimeout(() => autosaveDraftRef.current(), 2000)
+        }
       }
     }
   }

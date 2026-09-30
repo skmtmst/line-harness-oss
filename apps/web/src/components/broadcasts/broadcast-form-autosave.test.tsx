@@ -384,6 +384,42 @@ describe('自動保存の競合（R625/R626/R627）', () => {
     expect(container.textContent).toContain('下書き保存済み')
   })
 
+  it('R625/R626: Aの保存中にBへ移って追記したらBが置き去りにならない', async () => {
+    await renderWithDraftSaved()
+    const req = deferred<{ success: boolean; data: { id: string; version: number; lineAccountId: string } }>()
+    createApi.mockReturnValueOnce(req.promise)
+    createApi.mockResolvedValue({ success: true, data: { id: 'b-for-acc2', version: 1 } })
+    await validInput()
+    await tick(2000)
+    expect(createApi).toHaveBeenCalledTimes(1)
+
+    // Bへ移って追記し、間合いが来ても先行の保存中は投げない。
+    testAccount.id = 'acc-2'
+    await rerenderWithDraftSaved()
+    await enter(messageInput(), 'body B newest')
+    await tick(2500)
+    expect(createApi).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      req.resolve({ success: true, data: { id: 'a-for-acc1', version: 1, lineAccountId: 'acc-1' } })
+    })
+    await flushFake()
+    // Aの応答でBを保存済みにしない。
+    expect(container.textContent).toContain('下書きはまだ保存していません')
+    expect(container.textContent).not.toContain('下書き保存済み')
+    expect(onDraftSavedSpy).not.toHaveBeenCalled()
+
+    // 追記の分が自動で送られる。
+    await tick(3000)
+    expect(createApi).toHaveBeenCalledTimes(2)
+    expect(createApi.mock.calls[1][0].lineAccountId).toBe('acc-2')
+    expect(createApi.mock.calls[1][0].messageContent).toBe('body B newest')
+    expect(onDraftSavedSpy).toHaveBeenCalledTimes(1)
+    expect((onDraftSavedSpy.mock.calls[0][0] as { id: string }).id).toBe('b-for-acc2')
+    expect(messageInput().value).toBe('body B newest')
+    expect(container.textContent).toContain('下書き保存済み')
+  })
+
   it('R627: 複数の待ちが最新の先行へ付け替わり作成は1回', async () => {
     await renderWithDraftSaved()
     const req = deferred<{ success: boolean; data: { id: string; version: number } }>()
