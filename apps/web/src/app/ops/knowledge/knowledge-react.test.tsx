@@ -139,16 +139,16 @@ describe('V6 knowledge UI', () => {
   it('recovers from a rejected save without issuing approval or trapping the dialog', async () => {
     mocks.update.mockRejectedValue(new TypeError('offline'))
     await act(async () => root.render(<KnowledgeEditor article={article} onClose={() => {}} onSaved={() => {}} />))
-    await act(async () => button('下書き保存').click())
+    await act(async () => button('下書きを保存する').click())
     expect(mocks.review).not.toHaveBeenCalled()
-    expect(button('下書き保存').disabled).toBe(false)
+    expect(button('下書きを保存する').disabled).toBe(false)
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('通信できませんでした')
   })
   it('warns that editing an approved article invalidates approval', async () => {
     await act(async () => root.render(<KnowledgeEditor article={{ ...article, reviewState: 'approved', status: 'active' }} onClose={() => {}} onSaved={() => {}} />))
     expect(document.querySelector('[data-design-node="ZAOc7"]')).not.toBeNull()
     expect(document.body.textContent).toContain('再承認するまで')
-    expect(button('承認待ちで保存')).toBeDefined()
+    expect(button('承認待ちで保存する')).toBeDefined()
     expect(button('承認して有効にする')).toBeUndefined()
   })
   it('shows fetch failures rather than a misleading empty list, and can retry', async () => {

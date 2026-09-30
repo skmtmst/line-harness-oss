@@ -33,7 +33,7 @@ describe('シナリオ一覧の列幅と並び替え案内', () => {
 
   it('複数選択でフォルダを一括移動できる（NEXT-25）', () => {
     expect(LIST).toContain('aria-label="このページのシナリオをすべて選択"')
-    expect(LIST).toContain('件を選択中')
+    expect(LIST).toContain('<BulkBar count={selectedCount}')
     expect(LIST).toContain('onMoveFolders')
     expect(LIST).toContain('移動先のフォルダ')
   })

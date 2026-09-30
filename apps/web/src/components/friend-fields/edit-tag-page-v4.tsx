@@ -71,9 +71,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
           <Button
             variant="danger"
             onClick={onDelete}
-            disabled={deleting || blocked || confirmation !== tag.name}
-          >
-            {deleting ? '削除中…' : 'タグを削除'}
+            disabled={deleting || blocked || confirmation !== tag.name} busy={deleting} busyLabel="削除中…">タグを削除する
           </Button>
         </div>
       )}
@@ -144,7 +142,7 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
       <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel}>キャンセル</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()}>{saving ? '保存中…' : '保存'}</Button>
+        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
       </div>
     </div>
   )

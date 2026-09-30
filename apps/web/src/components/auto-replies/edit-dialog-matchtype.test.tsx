@@ -120,7 +120,7 @@ describe('R29 新規作成：部分一致を選んだら行も部分一致で送
     await flush()
     await setInputValue(keywordInput(1), '予約')
     await click(buttonByText('部分一致'))
-    await click(buttonByText('保存'))
+    await click(buttonByText('保存する'))
     await flush()
     expect(mocks.create).toHaveBeenCalledTimes(1)
     const body = mocks.create.mock.calls[0][0] as SavedBody
@@ -144,7 +144,7 @@ describe('R29 編集：完全一致の保存済みを行ごと部分一致へ変
     mountDialog(staleDraft)
     await flush()
     await click(buttonByText('部分一致'))
-    await click(buttonByText('保存'))
+    await click(buttonByText('保存する'))
     await flush()
     expect(mocks.update).toHaveBeenCalledTimes(1)
     const body = mocks.update.mock.calls[0][1] as SavedBody
@@ -159,10 +159,10 @@ describe('R29 複数キーワード：足した行もいまの選択を引き継
     await flush()
     await setInputValue(keywordInput(1), '予約')
     await click(buttonByText('部分一致'))
-    await click(buttonByText('＋ キーワードを追加'))
+    await click(buttonByText('＋ キーワードを追加する'))
     await flush()
     await setInputValue(keywordInput(2), '変更')
-    await click(buttonByText('保存'))
+    await click(buttonByText('保存する'))
     await flush()
     expect(mocks.create).toHaveBeenCalledTimes(1)
     const body = mocks.create.mock.calls[0][0] as SavedBody

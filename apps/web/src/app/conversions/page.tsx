@@ -924,8 +924,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button href="/conversions/new" variant="primary">＋ 成果地点を作る</Button>
-        <Button onClick={() => void exportCsv()} disabled={exporting}>
-          {exporting ? '書き出しています' : 'CSVで書き出す'}
+        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">CSVで書き出す
         </Button>
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
@@ -1190,9 +1189,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               <Button
                 variant="primary"
                 disabled={publishing}
-                onClick={() => void publishDraft(detailTarget)}
-              >
-                {publishing ? '公開しています' : '計測をはじめる（公開）'}
+                onClick={() => void publishDraft(detailTarget)} busy={publishing} busyLabel="公開しています">計測をはじめる（公開）
               </Button>
             ) : null}
             {detailTarget.status !== 'stopped' ? (
@@ -1202,7 +1199,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             ) : null}
             {detailTarget.status !== 'stopped' ? (
               <Button onClick={() => void openStop(detailTarget)}>
-                停止・削除
+                停止・削除する
               </Button>
             ) : null}
           </div>
@@ -1421,9 +1418,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         onCancel={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}
         footer={(
           <div className="flex justify-end gap-2">
-            <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>やめる</Button>
-            <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()}>
-              {editSaving ? '保存中...' : 'この内容にする'}
+            <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>キャンセル</Button>
+            <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()} busy={editSaving} busyLabel="保存中...">この内容にする
             </Button>
           </div>
         )}
@@ -1811,8 +1807,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
           ]}
           onChange={(value) => setPeriodDays(Number(value))}
         />
-        <Button onClick={() => void exportCsv()} disabled={exporting}>
-          {exporting ? '書き出しています' : '成果地点の一覧をCSVで書き出す'}
+        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">成果地点の一覧をCSVで書き出す
         </Button>
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}

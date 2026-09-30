@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Chat, Reminder, Scenario, Tag, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import { runOptimistic, runUndoable } from '@/lib/undoable'
 import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 
@@ -47,6 +48,8 @@ export default function SingleFriendActions({
   tags,
   accountId,
   onDone,
+  friendTags,
+  onFriendTagsChange,
 }: {
   friendId: string
   friendName: string
@@ -54,6 +57,13 @@ export default function SingleFriendActions({
   /** この友だちの所属アカウント。候補はこのアカウントだけに絞る（R23横展開）。 */
   accountId: string | null
   onDone: () => void
+  /** その友だちに今付いているタグ（楽観的更新の起点）。 */
+  friendTags?: Tag[]
+  /**
+   * タグの付け外しを先に画面へ反映する（★V7 sTJsh §1）。返す関数を
+   * 呼ぶと変更前へ戻る。省略したらタグ操作は従来どおり返事を待つ。
+   */
+  onFriendTagsChange?: (next: Tag[]) => () => void
 }) {
   const [open, setOpen] = useState<Action | null>(null)
   const [busy, setBusy] = useState(false)
@@ -111,7 +121,18 @@ export default function SingleFriendActions({
           {open === 'status' && <StatusPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'template' && <TemplatePanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
           {open === 'scenario' && <ScenarioPanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
-          {open === 'tag' && <TagPanel friendId={friendId} tags={tags} busy={busy} run={run} />}
+          {open === 'tag' && (
+            <TagPanel
+              friendId={friendId}
+              tags={tags}
+              friendTags={friendTags ?? []}
+              onTagsChange={onFriendTagsChange}
+              onDone={onDone}
+              closePanel={() => setOpen(null)}
+              busy={busy}
+              run={run}
+            />
+          )}
           {open === 'field' && <FieldPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'reminder' && <ReminderPanel friendId={friendId} busy={busy} run={run} />}
         </div>
@@ -248,18 +269,80 @@ function ScenarioPanel({ friendId, accountId, busy, run }: { friendId: string; a
   )
 }
 
+/*
+ * タグの付け外しは取り消せる軽い操作（★V7 sTJsh §1・§4）。
+ * 付ける: 押した瞬間に一覧へ反映して裏で保存し、失敗したら元に戻す。
+ * 外す: 先に外した形にして、サーバーへは5秒後に送る。
+ *       知らせの「元に戻す」で止めたら送らず、付いたままに戻す。
+ * 親が `onTagsChange` を渡さない限り、従来どおり返事を待つ動きのまま。
+ */
 function TagPanel({
   friendId,
   tags,
+  friendTags,
+  onTagsChange,
+  onDone,
+  closePanel,
   busy,
   run,
 }: {
   friendId: string
   tags: Tag[]
+  friendTags: Tag[]
+  onTagsChange?: (next: Tag[]) => () => void
+  onDone: () => void
+  closePanel: () => void
   busy: boolean
   run: Run
 }) {
   const [id, setId] = useState('')
+  const picked = tags.find((t) => t.id === id)
+
+  const attach = () => {
+    if (!picked || !onTagsChange) {
+      void run(() => api.friends.addTag(friendId, id), 'タグを付けました')
+      return
+    }
+    if (friendTags.some((tag) => tag.id === picked.id)) {
+      closePanel()
+      return
+    }
+    const revert = onTagsChange([...friendTags, picked])
+    closePanel()
+    runOptimistic({
+      request: () => api.friends.addTag(friendId, picked.id),
+      revert,
+      failureMessage: `「${picked.name}」を付けられませんでした。`,
+      retry: attach,
+      onSuccess: onDone,
+    })
+  }
+
+  const detach = () => {
+    if (!onTagsChange) {
+      void run(() => api.friends.removeTag(friendId, id), 'タグを外しました')
+      return
+    }
+    if (!picked) return
+    if (!friendTags.some((tag) => tag.id === picked.id)) {
+      closePanel()
+      return
+    }
+    const revert = onTagsChange(friendTags.filter((tag) => tag.id !== picked.id))
+    closePanel()
+    runUndoable({
+      message: `「${picked.name}」を外しました`,
+      commit: () => api.friends.removeTag(friendId, picked.id),
+      undo: revert,
+      onCommitError: () => {
+        revert()
+        onDone()
+      },
+      failureMessage: `「${picked.name}」を外せませんでした。`,
+      onCommitted: onDone,
+    })
+  }
+
   return (
     <Row>
       <Select
@@ -268,15 +351,11 @@ function TagPanel({
         onChange={setId}
         options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
       />
-      <Go
-        busy={busy || !id}
-        onClick={() => void run(() => api.friends.addTag(friendId, id), 'タグを付けました')}
-        label="付ける"
-      />
+      <Go busy={busy || !id} onClick={attach} label="付ける" />
       <button
         type="button"
         disabled={busy || !id}
-        onClick={() => void run(() => api.friends.removeTag(friendId, id), 'タグを外しました')}
+        onClick={detach}
         className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-1.5 text-xs disabled:opacity-50"
       >
         外す

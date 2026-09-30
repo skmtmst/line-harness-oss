@@ -576,19 +576,15 @@ export default function NotificationRunList({
                       </Link>
                     ) : null}
                     {mode === 'failures' && item.retryAvailable && canRetry ? (
-                      <Button className="mt-2" disabled={visibleRetryingId !== null} onClick={() => void retry(item)}>
-                        {visibleRetryingId === item.id ? '再試行中' : '送信を再試行'}
+                      <Button className="mt-2" disabled={visibleRetryingId !== null} onClick={() => void retry(item)} busy={visibleRetryingId === item.id} busyLabel="再試行中">送信を再試行する
                       </Button>
                     ) : null}
                     {mode === 'failures' && canResolve ? (
                       <Button
                         className="mt-2"
                         disabled={visibleRetryingId !== null}
-                        onClick={() => void resolve(item, !item.resolved)}
-                      >
-                        {visibleRetryingId === item.id
-                          ? '保存中'
-                          : item.resolved ? '未対応に戻す' : '対応済みにする'}
+                        onClick={() => void resolve(item, !item.resolved)} busy={visibleRetryingId === item.id} busyLabel="保存中">
+                        {item.resolved ? '未対応に戻す' : '対応済みにする'}
                       </Button>
                     ) : null}
                   </Td>

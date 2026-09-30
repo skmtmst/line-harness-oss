@@ -137,7 +137,7 @@ describe('「もっと見る」パネル', () => {
     const titleInput = container.querySelector('input[placeholder="タイトル"]') as HTMLInputElement | null
     if (!titleInput) throw new Error('title input not found')
     setNativeValue(titleInput, 'パネル1')
-    clickText('保存')
+    clickText('保存する')
     await flush()
     expect(create).toHaveBeenCalled()
     const payload = (create.mock.calls[0][0] as { payload: { moreCard: boolean } }).payload

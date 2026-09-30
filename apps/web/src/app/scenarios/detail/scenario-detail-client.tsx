@@ -11,6 +11,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TargetMissing from '@/components/shared/target-missing'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -1683,7 +1684,7 @@ export default function ScenarioDetailClient({
             disabled={stepSaving}
  className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
           >
-            {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加'}
+            {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加する'}
           </button>
           <button
             onClick={closeStepForm}
@@ -1769,10 +1770,18 @@ export default function ScenarioDetailClient({
     return (
       <div>
 
-        <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
-          <div className="bg-canvas-sunken h-6 w-1/3 rounded-mini" />
-          <div className="h-4 bg-canvas-sunken rounded-mini w-2/3" />
-          <div className="h-4 bg-canvas-sunken rounded-mini w-1/2" />
+        {/* ★V7 仕上げ §3: 枠は最初から本物で出し、中身の場所だけ骨組み。 */}
+        <div className="bg-canvas rounded-card border border-hairline p-8 space-y-4">
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div className="space-y-4">
+                <Skeleton className="block h-6 w-1/3" />
+                <Skeleton className="block h-4 w-2/3" />
+                <Skeleton className="block h-4 w-1/2" />
+              </div>
+            }
+          />
         </div>
       </div>
     )
@@ -1846,8 +1855,7 @@ export default function ScenarioDetailClient({
         {editingStepId ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={closeStepForm}>編集を閉じる</Button>
-            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving}>
-              {stepSaving ? '保存中…' : '変更を保存'}
+            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving} busy={stepSaving}>保存する
             </Button>
           </div>
         ) : null}
@@ -1881,7 +1889,7 @@ export default function ScenarioDetailClient({
                 title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
                 className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
               >
-                一括テスト送信
+                一括でテストを送る
               </button>
               {/* 保存するものは、いま開いている編集の内容。カードの「編集」
                   「変更」を押していないときは、保存するものが無い。 */}
@@ -1891,7 +1899,7 @@ export default function ScenarioDetailClient({
                 title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}
                 className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40"
               >
-                {saving ? '保存中…' : '保存'}
+                {saving ? '保存中…' : '保存する'}
               </button>
               </div>
             }
@@ -2041,7 +2049,7 @@ export default function ScenarioDetailClient({
                 disabled={saving}
  className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
               >
-                {saving ? '保存中...' : '保存'}
+                {saving ? '保存中...' : '保存する'}
               </button>
               <button
                 onClick={() => {
@@ -2252,7 +2260,7 @@ export default function ScenarioDetailClient({
               onClick={openAddStep}
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
-              ＋ メッセージを追加
+              ＋ メッセージを追加する
             </button>
             {/* テンプレートは受け口がある（scenario_steps.template_id）。
                 最初からテンプレートを選ぶ状態でフォームを開く。 */}
@@ -2260,7 +2268,7 @@ export default function ScenarioDetailClient({
               onClick={openAddTemplateStep}
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
-              テンプレートを追加
+              テンプレートを追加する
             </button>
             {/* 質問メッセージ。選択肢ごとにタグ・友だち情報・シナリオを動かせる。
                 押されたことは postback で戻ってくる（sq:<stepId>:<index>）。 */}
@@ -2269,7 +2277,7 @@ export default function ScenarioDetailClient({
               title="質問メッセージを足します。選択肢ごとにタグ・友だち情報・シナリオを動かせます"
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
-              分岐を追加
+              分岐を追加する
             </button>
           </div>
         </div>
@@ -2500,7 +2508,7 @@ export default function ScenarioDetailClient({
                                 /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
                                 { id: 'action', label: `アクション${actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}`, onSelect: () => setActionTarget({ hook: 'step_sent', stepId: step.id, choiceIndex: null, title: `${step.stepOrder}通目を送ったあと` }) },
                                 { id: 'duplicate', label: duplicatingStepId === step.id ? '複製中…' : '複製', disabled: duplicatingStepId === step.id, disabledReason: 'この通を複製しています', onSelect: () => { void handleDuplicateStep(step) } },
-                                { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteStepError(''); setDeleteStepTarget(step) } },
+                                { id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteStepError(''); setDeleteStepTarget(step) } },
                               ]}
                             />
                           </span>
@@ -2576,7 +2584,7 @@ export default function ScenarioDetailClient({
               }}
               className="text-danger font-medium hover:underline"
             >
-              作りかけのコピーを削除
+              作りかけのコピーを削除する
             </button>
           </div>
         </div>
@@ -2625,7 +2633,7 @@ export default function ScenarioDetailClient({
           }}
           className="text-danger hover:underline text-sm font-medium"
         >
-          このシナリオを削除
+          このシナリオを削除する
         </button>
       </div>
       </>
@@ -2643,7 +2651,7 @@ export default function ScenarioDetailClient({
         description={deleteStepTarget
           ? `${deleteStepTarget.stepOrder}通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
           : ''}
-        confirmLabel="この通を削除"
+        confirmLabel="この通を削除する"
         destructive
         busy={deletingStepId !== null}
         error={deleteStepError}
@@ -2668,7 +2676,7 @@ export default function ScenarioDetailClient({
           'これまでの配信履歴は監査記録として残ります。',
           'この操作は取り消せません。',
         ].join(' ')}
-        confirmLabel="このシナリオを削除"
+        confirmLabel="このシナリオを削除する"
         destructive
         busy={deletingScenario}
         error={deleteScenarioError}
@@ -2690,7 +2698,7 @@ export default function ScenarioDetailClient({
         open={discardDuplicateOpen && duplicateRemainder !== null}
         title={duplicateRemainder ? `作りかけのコピー「${duplicateRemainder.copyName}」を削除しますか？` : ''}
         description={`複製が「${duplicateRemainder?.stage ?? ''}」の途中で止まったため、内容が欠けた状態で残っています。削除しても元のシナリオは変わりません。この操作は取り消せません。`}
-        confirmLabel="作りかけのコピーを削除"
+        confirmLabel="作りかけのコピーを削除する"
         destructive
         busy={discardingDuplicate}
         error={discardDuplicateError}

@@ -339,8 +339,7 @@ export default function ApiTokensPanel() {
                 ))}
               </fieldset>
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" disabled={creating} onClick={() => void handleCreate()}>
-                  {creating ? '発行しています…' : '発行する'}
+                <Button variant="secondary" disabled={creating} onClick={() => void handleCreate()} busy={creating} busyLabel="発行しています…">発行する
                 </Button>
                 <Button
                   variant="secondary"
@@ -351,7 +350,7 @@ export default function ApiTokensPanel() {
                     setNameError('')
                   }}
                 >
-                  やめる
+                  キャンセル
                 </Button>
               </div>
             </section>

@@ -754,7 +754,7 @@ function VarsPageInner() {
           {addingFolder ? (
             folderForm
           ) : (
-            <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
+            <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加する</Button>
           )}
           {/*
             R37: 狭い幅では縦パネルが出ないため、選んでいるフォルダの
@@ -766,7 +766,7 @@ function VarsPageInner() {
                 フォルダ名を変える
               </Button>
               <Button type="button" onClick={() => { setFolderError(''); setDeletingFolder(selectedUserFolder) }}>
-                フォルダを削除
+                フォルダを削除する
               </Button>
             </div>
           ) : null}
@@ -1074,7 +1074,7 @@ function VarsPageInner() {
                                 data-qa-open="yPkWe"
                                 aria-label={`${item.name}を削除`}
                               >
-                                削除
+                                削除する
                               </Button>
                             </span>
                           </td>
@@ -1138,9 +1138,7 @@ function VarsPageInner() {
                   type="button"
                   variant="primary"
                   onClick={() => void confirmReplacement()}
-                  disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()}
-                >
-                  {singleBusy ? '差し替え中…' : '差し替えて削除'}
+                  disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()} busy={singleBusy} busyLabel="差し替え中…">差し替えて削除する
                 </Button>
               ) : null}
               {singleImpact && !singleImpact.canDelete ? (
@@ -1149,13 +1147,12 @@ function VarsPageInner() {
                   disabled
                   title="使用中の共通情報は削除できません"
                 >
-                  このまま削除
+                  このまま削除する
                 </Button>
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteVar({ impact: singleImpact, typedKey, reason: singleReason, busy: singleBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()}>
-                  {singleBusy ? '処理中…' : 'このまま削除する'}
+                <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()} busy={singleBusy} busyLabel="処理中…">このまま削除する
                 </Button>
               ) : null}
             </div>

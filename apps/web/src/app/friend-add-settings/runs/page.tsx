@@ -397,11 +397,11 @@ function FriendAddRunsInner() {
                   { value: 'partial_failed', label: '再送待ち' },
                 ]}
               />
-              <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
+              <Button onClick={() => void load()} disabled={loading}>一覧を更新する</Button>
             </div>
             </MenuPortal>
           </span>
-          <Button onClick={() => void exportCsv()} disabled={!data?.items.length || csvBusy}>{csvBusy ? '書き出し中…' : '実行結果をCSVで書き出す'}</Button>
+          <Button onClick={() => void exportCsv()} disabled={!data?.items.length || csvBusy} busy={csvBusy} busyLabel="書き出し中…">実行結果をCSVで書き出す</Button>
         </div>
       </div>
 
@@ -575,8 +575,8 @@ function FriendAddRunsInner() {
             {(() => {
               const href = editHref('preview')
               return href
-                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテスト</Button>
-                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテスト</Button>
+                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテストする</Button>
+                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテストする</Button>
             })()}
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
@@ -589,7 +589,7 @@ function FriendAddRunsInner() {
         </aside>
       </div>
 
-      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)}>{stopBusy ? '停止中…' : '配信を一時停止'}</Button>{(() => {
+      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)} busy={stopBusy} busyLabel="停止中…">配信を一時停止</Button>{(() => {
         const href = editHref('basic')
         return href
           ? <Button href={href} variant="primary">友だち追加時の設定を編集</Button>

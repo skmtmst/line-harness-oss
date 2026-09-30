@@ -494,11 +494,9 @@ function MileageRewardEditorInner() {
         actions={(
           <>
             <Button href="/mileage?tab=rewards">キャンセル</Button>
-            <Button onClick={() => void testExchange()} disabled={saving || testing}>
-              {testing ? '交換テスト中' : '自分で交換をテスト'}
+            <Button onClick={() => void testExchange()} disabled={saving || testing} busy={testing} busyLabel="交換テスト中">自分で交換をテスト
             </Button>
-            <Button onClick={() => void save(false)} disabled={saving || testing}>
-              {saving ? '保存中' : '下書きを保存'}
+            <Button onClick={() => void save(false)} disabled={saving || testing} busy={saving} busyLabel="保存中">下書きを保存する
             </Button>
             <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
               保存して出す

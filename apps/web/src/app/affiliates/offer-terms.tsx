@@ -343,8 +343,7 @@ export default function OfferTermsDialog({
               <ul className="mt-1 space-y-1 text-xs">
                 {versions.map((row) => (
                   <li key={row.id} className="text-ink-secondary">
-                    <span className="text-ink font-medium tabular-nums">版{row.versionNumber}</span>
-                    {' '}{versionSummary(row)}
+                    <span className="text-ink font-medium tabular-nums">版{row.versionNumber}</span> {versionSummary(row)}
                     <span className="text-ink-faint">（{formatSavedAt(row.createdAt)}）</span>
                   </li>
                 ))}

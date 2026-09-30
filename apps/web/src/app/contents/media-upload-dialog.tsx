@@ -356,8 +356,8 @@ export default function MediaUploadDialog({
             {errorCount > 0 ? `${errorCount}件は登録できません` : `${entries.length}件を選択中`}
           </p>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId}>
-              {busy ? '登録しています…' : `${readyCount}件を登録する`}
+            <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
+              {`${readyCount}件を登録する`}
             </Button>
           </div>
         </div>

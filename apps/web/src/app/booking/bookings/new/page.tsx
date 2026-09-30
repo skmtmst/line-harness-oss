@@ -1096,12 +1096,10 @@ export default function NewProxyBookingPage() {
             <>
               {(step === 'confirm' || step === 'conflict') && <Button onClick={() => { setStep('input'); setError('') }}>入力に戻る</Button>}
               {step === 'input' ? (
-                <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()}>
-                  {loading ? '空きを再確認しています' : '予約内容を確認する'}
+                <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()} busy={loading} busyLabel="空きを再確認しています">予約内容を確認する
                 </Button>
               ) : step === 'confirm' ? (
-                <Button variant="primary" disabled={loading} data-qa-open="GfceK" onClick={() => void createBooking()}>
-                  {loading ? '登録中です' : 'この内容で予約を入れる'}
+                <Button variant="primary" disabled={loading} data-qa-open="GfceK" onClick={() => void createBooking()} busy={loading} busyLabel="登録中です">この内容で予約を入れる
                 </Button>
               ) : <Button variant="primary" disabled>この内容で予約を入れる</Button>}
             </>

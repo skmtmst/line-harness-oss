@@ -179,7 +179,7 @@ function setInputValue(input: HTMLInputElement, next: string) {
 }
 
 async function clickSave() {
-  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '保存')
+  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '保存する')
   if (!button) throw new Error('保存ボタンが見つかりません')
   await act(async () => {
     button.click()

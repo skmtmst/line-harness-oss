@@ -1045,16 +1045,14 @@ function BookingDetailInner() {
                     variant="primary"
                     type="button"
                     onClick={() => void saveEdit()}
-                    disabled={saving}
-                  >
-                    {saving ? '保存しています' : 'この内容で変更する'}
+                    disabled={saving} busy={saving} busyLabel="保存しています">この内容で変更する
                   </Button>
                   <Button
                     type="button"
                     onClick={() => { setEditing(false); setError('') }}
                     disabled={saving}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                 </div>
               </section>

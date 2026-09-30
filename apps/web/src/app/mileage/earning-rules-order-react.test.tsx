@@ -230,7 +230,7 @@ async function waitForText(text: string): Promise<void> {
 
 function saveOrderButton(): HTMLButtonElement {
   const button = [...container.querySelectorAll('button')]
-    .find((b) => b.textContent === '並び順を保存')
+    .find((b) => b.textContent === '並び順を保存する')
   if (!button) throw new Error('並び順を保存ボタンが見つかりません')
   return button as HTMLButtonElement
 }

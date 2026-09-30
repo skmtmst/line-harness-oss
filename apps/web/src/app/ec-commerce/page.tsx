@@ -547,7 +547,7 @@ function EcCommercePageInner() {
         actions={tab === 'events'
           ? <Button href="/ec-commerce?tab=connector" variant="secondary">つなぎ先の設定</Button>
           : tab === 'subscriptions'
-            ? <Button href="/broadcasts/new" variant="primary">対象を選んで配信</Button>
+            ? <Button href="/broadcasts/new" variant="primary">対象を選んで送る</Button>
             : undefined}
       />
       <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />

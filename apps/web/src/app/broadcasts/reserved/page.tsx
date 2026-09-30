@@ -345,11 +345,11 @@ function ReservedBroadcastContent() {
             <Button href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
               <Eye size={16} aria-hidden="true" />予約の内容を見る
             </Button>
-            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full">
-              <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テスト送信する'}
+            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full" busy={actionBusy === 'test'} busyLabel="テスト送信中…">
+              <Send size={16} aria-hidden="true" />テストを送る
             </Button>
-            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full">
-              <Copy size={16} aria-hidden="true" />{actionBusy === 'duplicate' ? '複製中…' : '複製して別配信を作る'}
+            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full" busy={actionBusy === 'duplicate'} busyLabel="複製中…">
+              <Copy size={16} aria-hidden="true" />複製して別配信を作る
             </Button>
             {broadcast.status === 'scheduled' && !cancelled && (
               <Button onClick={() => { setCancelError(''); setCancelOpen(true) }} disabled={actionBusy !== null} className="w-full">

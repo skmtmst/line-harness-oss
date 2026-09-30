@@ -442,9 +442,7 @@ export default function GoogleSheetsPanel() {
                     variant="primary"
                     className="mt-3"
                     disabled={busy !== null}
-                    onClick={() => void handleConnect()}
-                  >
-                    {busy === 'connect' ? 'Googleへ移動しています…' : 'Googleアカウントを接続する'}
+                    onClick={() => void handleConnect()} busy={busy === 'connect'} busyLabel="Googleへ移動しています…">Googleアカウントを接続する
                   </Button>
                 ) : (
                   <p className="text-ink-faint mt-3 text-xs">
@@ -521,18 +519,15 @@ export default function GoogleSheetsPanel() {
                   <Button
                     variant="primary"
                     disabled={busy !== null}
-                    onClick={() => void handleConnect()}
-                  >
-                    {busy === 'connect' ? 'Googleへ移動しています…' : '再接続する'}
+                    onClick={() => void handleConnect()} busy={busy === 'connect'} busyLabel="Googleへ移動しています…">再接続する
                   </Button>
                 ) : (
                   <>
                     <Button
                       variant="primary"
                       disabled={busy !== null || effectivelyRunning || !connection.spreadsheetId}
-                      onClick={() => void handleSync()}
-                    >
-                      {busy === 'sync' ? '同期しています…' : effectivelyRunning ? '同期中' : '今すぐ同期'}
+                      onClick={() => void handleSync()} busy={busy === 'sync'} busyLabel="同期しています…">
+                      {effectivelyRunning ? '同期中' : '今すぐ同期'}
                     </Button>
                     <Button
                       variant="secondary"
@@ -581,8 +576,7 @@ export default function GoogleSheetsPanel() {
                     placeholder="https://docs.google.com/spreadsheets/d/…"
                     required
                   />
-                  <Button type="submit" variant="primary" disabled={busy !== null}>
-                    {busy === 'target' ? '確認しています…' : '保存'}
+                  <Button type="submit" variant="primary" disabled={busy !== null} busy={busy === 'target'} busyLabel="確認しています…">保存する
                   </Button>
                 </div>
               </form>
@@ -594,8 +588,7 @@ export default function GoogleSheetsPanel() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-ink text-sm font-semibold">同期の記録</h3>
                 {runsError && (
-                  <Button variant="secondary" onClick={() => selectedAccountId && void loadRuns(selectedAccountId)}>
-                    {runsLoading ? '読み込んでいます…' : '記録を読み直す'}
+                  <Button variant="secondary" onClick={() => selectedAccountId && void loadRuns(selectedAccountId)} busy={runsLoading} busyLabel="読み込んでいます…">記録を読み直す
                   </Button>
                 )}
               </div>

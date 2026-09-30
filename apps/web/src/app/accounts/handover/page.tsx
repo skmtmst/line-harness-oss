@@ -403,8 +403,7 @@ function Handover() {
             {executeError && <Notice tone="danger" className="mt-3"><p>{executeError}</p></Notice>}
             {canManage && (
               <Button type="button" variant="primary" className="mt-3" disabled={issuing}
-                onClick={() => { setExecuteError(''); void issueCode() }}>
-                {issuing ? '発行中…' : '引き継ぎコードを出す'}
+                onClick={() => { setExecuteError(''); void issueCode() }} busy={issuing} busyLabel="発行中…">引き継ぎコードを出す
               </Button>
             )}
           </Card>
@@ -425,8 +424,7 @@ function Handover() {
                   aria-label="引き継ぎコード"
                 />
                 <Button type="button" variant="primary" disabled={linking || !linkCode.trim()}
-                  onClick={() => void submitLinkCode()}>
-                  {linking ? '確認中…' : 'コードを読む'}
+                  onClick={() => void submitLinkCode()} busy={linking} busyLabel="確認中…">コードを読む
                 </Button>
               </div>
             )}
@@ -631,8 +629,7 @@ function Handover() {
                   ? <p role="alert" className="text-danger text-xs">{decisionError}</p>
                   : <p className="text-ink-secondary text-xs">{Object.keys(decisionEdits).length}件の書き換えをまだ保存していません。</p>}
                 <Button type="button" variant="primary" disabled={savingDecisions}
-                  onClick={() => void saveDecisions()}>
-                  {savingDecisions ? '保存中…' : '判断を保存する'}
+                  onClick={() => void saveDecisions()} busy={savingDecisions}>判断を保存する
                 </Button>
               </div>
             )}
@@ -643,7 +640,7 @@ function Handover() {
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              <Button href={`/accounts/detail?id=${account.id}`}>やめる</Button>
+              <Button href={`/accounts/detail?id=${account.id}`}>キャンセル</Button>
               {/* 取り消しは進行中だけ。終わった引き継ぎは切り戻しで戻す。変更なので見るだけには出さない。 */}
               {canManage && handover.status !== 'completed' && handover.status !== 'failed' && (
                 <Button type="button" variant="danger"
@@ -654,8 +651,7 @@ function Handover() {
             </div>
             {canManage && (
               <div className="flex flex-wrap gap-2">
-                <Button type="button" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()}>
-                  {refreshing ? '確認中…' : '事前確認をやり直す'}
+                <Button type="button" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()} busy={refreshing} busyLabel="確認中…">事前確認をやり直す
                 </Button>
                 <Button
                   type="button"
@@ -667,9 +663,7 @@ function Handover() {
                       && handover.declaredFriendTotal !== undefined
                       && handover.counts !== null
                       && handover.declaredFriendTotal !== handover.counts.sourceTotal)}
-                  onClick={() => { setExecuteError(''); setConfirmOpen(true) }}
-                >
-                  {executing ? '実行中…' : '本実行へ進む'}
+                  onClick={() => { setExecuteError(''); setConfirmOpen(true) }} busy={executing} busyLabel="実行中…">本実行へ進む
                 </Button>
               </div>
             )}

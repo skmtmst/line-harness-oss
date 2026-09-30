@@ -1193,7 +1193,7 @@ function InflowLinksPageInner({
                           onClick={() => setEditing({ register: r.refCode })}
                           title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
                         >
-                          登録
+                          登録する
                         </Button>
                       )}
                     </td>
@@ -1452,8 +1452,8 @@ function BulkRoutesDialog({
             キャンセル
           </Button>
           {action && affected.length > 0 ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }}>
-              {busy ? '実行中…' : `${formatNumber(affected.length)}件に実行する`}
+            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
+              {`${formatNumber(affected.length)}件に実行する`}
             </Button>
           ) : null}
         </div>

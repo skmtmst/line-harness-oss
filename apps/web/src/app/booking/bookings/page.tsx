@@ -1055,8 +1055,7 @@ export default function BookingsPage() {
             trailing={
               /* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */
               selectedAccountId ? (
-                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
-                  {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す
                 </Button>
               ) : null
             }
@@ -1487,7 +1486,7 @@ function ActionButtons({
           onClick={() => onAction('complete')}
           className="bg-info-bg text-info rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
-          完了
+          閉じる
         </button>
         <button
           onClick={() => onAction('no_show')}

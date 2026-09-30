@@ -27,6 +27,7 @@ import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { startVisiblePoll } from '@/lib/visible-polling'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { runOptimistic } from '@/lib/undoable'
 import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -2164,17 +2165,32 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     })
   }, [quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
 
-  const handleStatusUpdate = async (newStatus: Chat['status']) => {
+  /*
+   * 対応状況の切替は取り消せる軽い操作。押した瞬間に画面へ反映して
+   * 裏で保存する（★V7 sTJsh §1）。失敗したら元の状況へ戻す。
+   */
+  const handleStatusUpdate = (newStatus: Chat['status']) => {
     if (!selectedChatId || !chatDetail) return
-    try {
-      await api.chats.update(selectedChatId, { status: newStatus, revision: chatDetail.revision })
-      loadChatDetail(selectedChatId)
-      loadChats()
-      // 対応済み/未読の切替は未対応バッジに影響するので即時更新させる
-      window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-    } catch {
-      setError('ステータスの更新に失敗しました。')
+    const chatId = selectedChatId
+    const previous = chatDetail.status
+    const revision = chatDetail.revision
+    const apply = (status: Chat['status']) => {
+      setChatDetail((current) => (current?.id === chatId ? { ...current, status } : current))
+      setChats((prev) => prev.map((chat) => (chat.id === chatId ? { ...chat, status } : chat)))
     }
+    apply(newStatus)
+    runOptimistic({
+      request: () => api.chats.update(chatId, { status: newStatus, revision }),
+      revert: () => apply(previous),
+      failureMessage: '対応状況を変えられませんでした。',
+      retry: () => handleStatusUpdate(newStatus),
+      onSuccess: () => {
+        loadChatDetail(chatId)
+        loadChats()
+        // 対応済み/未読の切替は未対応バッジに影響するので即時更新させる
+        window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
+      },
+    })
   }
 
   /** 友だち一覧と同じ「注目」を受信箱の★から切り替える。 */
@@ -2503,7 +2519,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   setSavedViewSuccess(false)
                   setSaveDialogOpen(true)
                 }}>
-                  現在の条件を保存
+                  現在の条件を保存する
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
@@ -3546,9 +3562,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <Button
                         variant="primary"
                         onClick={() => void handleSaveMemo()}
-                        disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
-                      >
-                        {memoSaving ? '保存中...' : 'メモを保存'}
+                        disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')} busy={memoSaving} busyLabel="保存中...">メモを保存する
                       </Button>
                     </div>
                   </div>
@@ -3600,9 +3614,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         variant="primary"
                         type="button"
                         onClick={() => void handleScheduleSend()}
-                        disabled={scheduling || messageOverLimit || !messageContent.trim() || !scheduleInput}
-                      >
-                        {scheduling ? '予約中...' : 'この日時で予約する'}
+                        disabled={scheduling || messageOverLimit || !messageContent.trim() || !scheduleInput} busy={scheduling} busyLabel="予約中...">この日時で予約する
                       </Button>
                     </div>
                     {scheduledSendsFailed && (

@@ -253,8 +253,7 @@ export default function MileageAdjustmentDialog({
         ) : step === 'completed' ? (
           <div className="flex justify-end gap-2">
             {completedResult?.notificationStatus === 'failed' ? (
-              <Button variant="secondary" disabled={retrying} onClick={() => void retryNotification()}>
-                {retrying ? '通知を送り直しています…' : '通知をもう一度送る'}
+              <Button variant="secondary" disabled={retrying} onClick={() => void retryNotification()} busy={retrying} busyLabel="通知を送り直しています…">通知をもう一度送る
               </Button>
             ) : null}
             <Button onClick={onCancel}>閉じる</Button>
@@ -358,7 +357,7 @@ export default function MileageAdjustmentDialog({
                     <Field label="別のオーナー承認が必要になるマイル数" htmlFor="mileage-adjustment-threshold" required>
                       <TextInput id="mileage-adjustment-threshold" inputMode="numeric" value={policyThresholdText} onChange={(event) => setPolicyThresholdText(event.target.value.replace(/[^0-9]/g, ''))} />
                     </Field>
-                    <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存</Button>
+                    <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存する</Button>
                   </div>
                 </section>
               ) : null}

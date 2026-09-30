@@ -154,7 +154,7 @@ export default function MenuVersionHistory({
         title={`第${selected}版に戻しますか？`}
         description="いまの版は残ります。この版の中身で新しい版を作ります。"
         confirmLabel="新しい版を作る"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         busy={reverting}
         onCancel={() => setConfirming(false)}
         onConfirm={() => void doRevert()}

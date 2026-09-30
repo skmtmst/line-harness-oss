@@ -634,7 +634,7 @@ function CarouselEditorInner() {
                     onClick={() => setPanels((prev) => prev.filter((_, j) => j !== i))}
                     className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
                   >
-                    削除
+                    削除する
                   </button>
                 )}
                 </div>
@@ -800,7 +800,7 @@ function CarouselEditorInner() {
                     }
                     className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs"
                   >
-                    ＋ 選択肢を追加
+                    ＋ 選択肢を追加する
                   </button>
                 )}
               </div>
@@ -856,7 +856,7 @@ function CarouselEditorInner() {
               onClick={() => setPanels((prev) => [...prev, emptyPanel()])}
               className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
             >
-              パネルを追加（{panels.length} / {MAX_COLUMNS}）
+              パネルを追加する（{panels.length} / {MAX_COLUMNS}）
             </button>
           )}
 
@@ -955,7 +955,7 @@ function CarouselEditorInner() {
               disabled={saving || loadFailed}
               className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
             >
-              {saving ? '保存中...' : '保存'}
+              {saving ? '保存中...' : '保存する'}
             </button>
             {/*
               D009: 未保存のままの「キャンセル」は番兵が止めて確認窓を出す。

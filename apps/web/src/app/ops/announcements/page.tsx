@@ -179,7 +179,7 @@ export default function OpsAnnouncementsPage() {
         title="お知らせ"
         actions={
           <>
-            <Button onClick={() => void submit('draft')} disabled={busy}>下書きとして保存</Button>
+            <Button onClick={() => void submit('draft')} disabled={busy}>下書きを保存する</Button>
             <Button variant="primary" onClick={() => (scheduled ? void submit('schedule') : setConfirmSend(true))} disabled={busy}>
               <Send aria-hidden="true" className="h-4 w-4" />
               {scheduled ? '配信を予約する' : '今すぐ送る'}
@@ -242,7 +242,7 @@ export default function OpsAnnouncementsPage() {
             <DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" />
             <span className="text-micro text-ink-faint">空のまま「今すぐ送る」を押すとすぐに送ります。日時を入れると「配信を予約する」に変わります（日本時間）。</span>
           </div>
-          {editingId ? <Button onClick={() => { setEditingId(null); setBaseline(EMPTY); setForm(EMPTY); setFormError('') }}>直すのをやめる</Button> : null}
+          {editingId ? <Button onClick={() => { setEditingId(null); setBaseline(EMPTY); setForm(EMPTY); setFormError('') }}>キャンセル</Button> : null}
         </section>
 
         <section aria-label="配信済みの表" className="rounded-card border border-hairline bg-canvas xl:col-span-3">
@@ -307,7 +307,7 @@ export default function OpsAnnouncementsPage() {
                       {a.status === 'draft' || a.status === 'scheduled' ? (
                         <span className="inline-flex gap-2">
                           <Button size="field" onClick={() => edit(a)} disabled={busy}>直す</Button>
-                          <Button size="field" onClick={() => setDeleting(a)} disabled={busy}>消す</Button>
+                          <Button size="field" onClick={() => setDeleting(a)} disabled={busy}>削除する</Button>
                         </span>
                       ) : null}
                     </Td>
@@ -333,7 +333,7 @@ export default function OpsAnnouncementsPage() {
         open={deleting !== null}
         title={deleting ? `「${deleting.subject}」を消しますか？` : ''}
         description="下書き・予約を消します。配信済みのものは消せません。"
-        confirmLabel="消す"
+        confirmLabel="削除する"
         destructive
         busy={busy}
         error={formError}

@@ -350,7 +350,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
         open={Boolean(deleteGroup)}
         title={deleteGroup ? `「${deleteGroup.name}」を削除しますか？` : 'フォルダを削除しますか？'}
         description="削除しても、中のタグは未分類に残ります。この操作は元に戻せません。"
-        confirmLabel="フォルダを削除"
+        confirmLabel="フォルダを削除する"
         destructive
         busy={busy}
         onCancel={() => setDeleteGroup(null)}
@@ -547,7 +547,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
-          <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
+          <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button>
           {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}
           <button
             type="button"
@@ -819,7 +819,7 @@ export default function TagsPageV4({
             `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
             まで同じ操作の中で進む。
           */
-          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
+          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録する</Button>
         ) : tab === 'marks' ? (
           <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button>
         ) : tab === 'fields' ? (
@@ -899,7 +899,7 @@ export default function TagsPageV4({
         */}
         {status === 'forbidden' ? null : (
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Button href="/tags/folders/new">フォルダを追加</Button>
+            <Button href="/tags/folders/new">フォルダを追加する</Button>
             {/* 作る操作は一覧のすぐ上の左の並びにまとめる。右上には置かない。 */}
             <Button href="/tags/new" variant="primary">＋ タグを作る</Button>
           </div>

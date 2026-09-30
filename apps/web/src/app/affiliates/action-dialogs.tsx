@@ -114,9 +114,8 @@ export function AffiliateArchiveDialog({
               type="button"
               variant="primary"
               disabled={busy || phase !== 'ready' || archiveDisabled}
-              onClick={() => { void apply() }}
-            >
-              {busy ? '処理中…' : choice === 'pause' ? '紹介を止める' : 'アーカイブする'}
+              onClick={() => { void apply() }} busy={busy} busyLabel="処理中…">
+              {choice === 'pause' ? '紹介を止める' : 'アーカイブする'}
             </Button>
           )}
         </div>
@@ -403,10 +402,10 @@ export function AffiliatePaymentConfirmDialog({
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
           <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
           <div className="flex shrink-0 items-center gap-2">
-            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />やめる</Button>
+            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />キャンセル</Button>
             {phase === 'ready' && preview ? (
-              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5">
-                <Check size={15} />{busy ? '処理中…' : `${yen(preview.amount)} で確定する`}
+              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
+                <Check size={15} />{`${yen(preview.amount)} で確定する`}
               </Button>
             ) : null}
           </div>

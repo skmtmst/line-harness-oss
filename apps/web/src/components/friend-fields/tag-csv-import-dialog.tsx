@@ -308,9 +308,9 @@ export default function TagCsvImportDialog({
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
           <div className={styles.footerRow}>
             <div className={styles.actions}>
-              <Button type="button" disabled={busy} onClick={resetSelection}>やめる</Button>
-              <Button type="button" variant="primary" disabled={busy || !preview || preview.summary.ready === 0} onClick={() => void saveRows()}>
-                {busy ? '登録中…' : `${preview?.summary.ready ?? 0}件を登録する`}
+              <Button type="button" disabled={busy} onClick={resetSelection}>キャンセル</Button>
+              <Button type="button" variant="primary" disabled={busy || !preview || preview.summary.ready === 0} onClick={() => void saveRows()} busy={busy} busyLabel="登録中…">
+                {`${preview?.summary.ready ?? 0}件を登録する`}
               </Button>
             </div>
           </div>

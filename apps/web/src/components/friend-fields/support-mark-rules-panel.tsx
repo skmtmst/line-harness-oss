@@ -382,9 +382,7 @@ export default function SupportMarkRulesPanel({
               data-qa-open="GMvBd-save"
               onMouseDown={() => setTouched(true)}
               onClick={() => void save()}
-              disabled={saving || errors.length > 0}
-            >
-              {saving ? '保存中…' : '保存'}
+              disabled={saving || errors.length > 0} busy={saving}>保存する
             </Button>
           </div>
         </div>
