@@ -583,7 +583,7 @@ function AutoReplyPublishInner() {
           <div className={"arp-stickyBar"}>
             <div />
             <div className={"arp-stickyActions"}>
-              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}&step=response`}>下書き保存</Button>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}&step=response`}>下書きを保存する</Button>
               <Button
                 data-qa-open="g46ja"
                 variant="primary"
@@ -739,7 +739,7 @@ function AutoReplyPublishInner() {
               </section>
               <AutoReplyPreview lead="［テスト］受信から 3秒後に返信" message={previewMessage} actionLabel="空き枠を見る" />
               <div className={"arp-previewActions"}>
-                <Button onClick={() => setTestDialogOpen(true)}><Send aria-hidden="true" />テスト送信</Button>
+                <Button onClick={() => setTestDialogOpen(true)}><Send aria-hidden="true" />テストを送る</Button>
                 <Button onClick={() => setTestDialogOpen(true)}><Eye aria-hidden="true" />応答イメージを見る</Button>
               </div>
             </aside>
@@ -748,7 +748,7 @@ function AutoReplyPublishInner() {
           <div className={"arp-stickyBar"}>
             <div />
             <div className={"arp-stickyActions"}>
-              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存</Button>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存する</Button>
               <Button variant="primary" onClick={() => setTestDialogOpen(true)} disabled={busy || !selectedFriendId}>
                 自動応答をテスト
               </Button>
@@ -829,7 +829,7 @@ function AutoReplyPublishInner() {
             <div />
             <div className={"arp-stickyActions"}>
               <Button onClick={() => setStage('test')}><ArrowLeft aria-hidden="true" />戻って修正</Button>
-              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存</Button>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存する</Button>
               <Button
                 variant="primary"
                 disabled={busy || !ready}
@@ -906,7 +906,7 @@ function AutoReplyPublishInner() {
                   )}
                   <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}><Pencil aria-hidden="true" />内容を編集する</Button>
                   <Button onClick={openTestStage}><FlaskConical aria-hidden="true" />テストを再実行</Button>
-                  <Button onClick={duplicate} disabled={busy}><Copy aria-hidden="true" />自動応答を複製して作成</Button>
+                  <Button onClick={duplicate} disabled={busy}><Copy aria-hidden="true" />自動応答を複製して作る</Button>
                 </div>
               </section>
               <section className={"arp-panel"}>

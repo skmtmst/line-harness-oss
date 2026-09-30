@@ -181,7 +181,7 @@ async function setup() {
 }
 
 function retryButton(container: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(container.querySelectorAll('button')).find((el) => el.textContent === '送信を再試行')
+  const button = Array.from(container.querySelectorAll('button')).find((el) => el.textContent === '送信を再試行する')
   if (!button) throw new Error('再試行ボタンが見つかりません')
   return button as HTMLButtonElement
 }

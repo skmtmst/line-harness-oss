@@ -209,7 +209,7 @@ async function setValue(
   })
 }
 
-const saveButton = () => buttonByText('下書き保存')
+const saveButton = () => buttonByText('下書きを保存する')
 
 describe('U001: ページ表示でもテンプレートを選べる', () => {
   it('新規作成で「テンプレートから」を選ぶと選択欄が出る', async () => {
@@ -407,7 +407,7 @@ describe('R200: 連投を防ぐの範囲外は日本語で止める', () => {
     return { onSaved }
   }
 
-  const modalSave = () => buttonByText('保存')
+  const modalSave = () => buttonByText('保存する')
 
   it.each(['-1', '1.5'])('「%s」では送らず欄の名前と許容範囲を出す', async (value) => {
     mountModal()
@@ -438,7 +438,7 @@ describe('R200: 連投を防ぐの範囲外は日本語で止める', () => {
       'trigger',
     )
     await flush()
-    await click(buttonByText('＋ キーワードを追加'))
+    await click(buttonByText('＋ キーワードを追加する'))
     expect(host.querySelector<HTMLInputElement>('input[aria-label="キーワード2"]')).not.toBeNull()
     await click(saveButton())
     await flush()
@@ -471,7 +471,7 @@ describe('R201: 構造のないカード内容は保存しない', () => {
     await flush()
     await click(buttonByText('カードを直接作る'))
     await setValue(cardTextarea(), value)
-    await click(buttonByText('保存'))
+    await click(buttonByText('保存する'))
     await flush()
     expect(mocks.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('バブルかカルーセル')
@@ -485,7 +485,7 @@ describe('R201: 構造のないカード内容は保存しない', () => {
       cardTextarea(),
       '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[]}}',
     )
-    await click(buttonByText('保存'))
+    await click(buttonByText('保存する'))
     await flush()
     expect(mocks.create).toHaveBeenCalledTimes(1)
     expect((mocks.create.mock.calls[0][0] as Record<string, unknown>).responseType).toBe('flex')

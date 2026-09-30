@@ -351,7 +351,7 @@ export default function ApiTokensPanel() {
                     setNameError('')
                   }}
                 >
-                  やめる
+                  キャンセル
                 </Button>
               </div>
             </section>

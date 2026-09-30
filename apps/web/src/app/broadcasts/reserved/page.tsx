@@ -346,7 +346,7 @@ function ReservedBroadcastContent() {
               <Eye size={16} aria-hidden="true" />予約の内容を見る
             </Button>
             <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full">
-              <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テスト送信する'}
+              <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テストを送る'}
             </Button>
             <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full">
               <Copy size={16} aria-hidden="true" />{actionBusy === 'duplicate' ? '複製中…' : '複製して別配信を作る'}

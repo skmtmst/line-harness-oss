@@ -66,7 +66,7 @@ const CREATED = {
 
 function previewButton(): HTMLButtonElement {
   // 本文と追従バーの2か所に同じボタンがある。どちらも同じ操作を呼ぶ。
-  return screen.getAllByRole('button', { name: '項目を作成して事前確認' })[0] as HTMLButtonElement
+  return screen.getAllByRole('button', { name: '項目を作って事前確認' })[0] as HTMLButtonElement
 }
 
 beforeEach(() => {

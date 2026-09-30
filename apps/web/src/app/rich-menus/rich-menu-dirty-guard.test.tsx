@@ -305,7 +305,7 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
     const nameInput = await screen.findByDisplayValue('メインメニュー')
     await type(nameInput, 'メインメニュー改')
     // 保存（update→再読込で署名が更新される）
-    fireEvent.click(screen.getByText('下書きに保存'))
+    fireEvent.click(screen.getByText('下書きを保存する'))
     await act(async () => { await Promise.resolve() })
     await flush()
 
@@ -458,7 +458,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     await fillPublishSchedule()
 
     richMenuUpdate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'x' }))
-    fireEvent.click(screen.getByText('下書きに保存'))
+    fireEvent.click(screen.getByText('下書きを保存する'))
     await flush()
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)

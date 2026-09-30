@@ -385,7 +385,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
 
       <div className="flex justify-end">
         <Button variant="primary" onClick={() => void save()} disabled={saving}>
-          {saving ? '保存中…' : '通知の設定を保存'}
+          {saving ? '保存中…' : '通知の設定を保存する'}
         </Button>
       </div>
     </section>

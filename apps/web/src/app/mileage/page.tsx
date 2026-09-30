@@ -860,7 +860,7 @@ function MileagePageInner() {
             onClick={() => void saveRuleOrder()}
             disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'}
           >
-            {savingRuleOrder ? '保存しています' : '並び順を保存'}
+            {savingRuleOrder ? '保存しています' : '並び順を保存する'}
           </Button>
           <Button onClick={exportRulesCsv} disabled={shownRules.length === 0} className="ml-auto">
             CSVで書き出す
@@ -1030,7 +1030,7 @@ function MileagePageInner() {
                           */
                           ...(rule.publishedVersion == null ? [{
                             id: 'delete',
-                            label: 'この決めごとを削除',
+                            label: 'この決めごとを削除する',
                             tone: 'danger' as const,
                             dividerBefore: true,
                             disabled: savingRuleId !== null,
@@ -1120,7 +1120,7 @@ function MileagePageInner() {
         description={rejectTarget ? `${rejectTarget.friend_display_name ?? rejectTarget.friend_id} への変更は行われず、台帳は変わりません。` : undefined}
         tone="destructive"
         confirmLabel="差し戻す"
-        cancelLabel="戻る"
+        cancelLabel="キャンセル"
         busy={approvalBusyId !== null}
         error={approvalError || undefined}
         onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}

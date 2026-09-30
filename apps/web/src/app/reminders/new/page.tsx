@@ -354,7 +354,7 @@ export default function NewReminderPage() {
           {appliedTemplate ? appliedTemplate.step.messageContent : 'メッセージは STEP 3 で作成します。基準日を選ぶと、差し込める項目がここに出ます。'}
         </LinePreview>
         <div className={styles.previewActions}>
-          <Button disabled>テスト送信</Button>
+          <Button disabled>テストを送る</Button>
           <Button disabled>通知イメージを見る</Button>
         </div>
         <p className={styles.previewNote}>テスト送信と表示確認は、STEP 3 で通知を作ると使えます。</p>
@@ -455,7 +455,7 @@ export default function NewReminderPage() {
       </ReminderWorkspace>
       <ReminderFooter status={saveStatusLabel} primary={saving ? '保存中…' : '下書きを保存して対象設定へ'} primaryDisabled={saving || candidatesPending} onPrimary={() => void save()} />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-      <ConfirmDialog open={pendingTemplate !== null} title="ひな形で入力を置き換えますか？" description={pendingTemplate ? `「${pendingTemplate.title}」を使うと、基準日・タイミング・本文の設定がひな形の内容に置き換わります。` : ''} confirmLabel="このひな形を使う" cancelLabel="やめる" onConfirm={() => { if (pendingTemplate) applyTemplate(pendingTemplate); setPendingTemplate(null) }} onCancel={() => setPendingTemplate(null)} />
+      <ConfirmDialog open={pendingTemplate !== null} title="ひな形で入力を置き換えますか？" description={pendingTemplate ? `「${pendingTemplate.title}」を使うと、基準日・タイミング・本文の設定がひな形の内容に置き換わります。` : ''} confirmLabel="このひな形を使う" cancelLabel="キャンセル" onConfirm={() => { if (pendingTemplate) applyTemplate(pendingTemplate); setPendingTemplate(null) }} onCancel={() => setPendingTemplate(null)} />
     </div>
   )
 }

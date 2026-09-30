@@ -54,7 +54,7 @@ describe('R294 友だち検索の0件・失敗を案内する', () => {
     await settleDebounce()
     await screen.findByText('該当なし。検索語を変えてお試しください。')
     // 作成は押せないまま。
-    expect((screen.getByRole('button', { name: '作成' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '作る' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   test('失敗は「読み込めませんでした」と再試行。直れば候補が出る', async () => {
@@ -89,6 +89,6 @@ describe('R294 友だち検索の0件・失敗を案内する', () => {
     const option = await screen.findByText('Kenta Kawano(Obama)')
     fireEvent.click(option)
     // 選んだら作成できる。
-    expect((screen.getByRole('button', { name: '作成' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: '作る' }) as HTMLButtonElement).disabled).toBe(false)
   })
 })

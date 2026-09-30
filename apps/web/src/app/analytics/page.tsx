@@ -276,15 +276,15 @@ function SaveAnalysisAction({
             placeholder="保存する分析名"
           />
           <Button onClick={() => void save()} disabled={saving || !name.trim()} variant="primary">
-            {saving ? '保存中' : 'この名前で保存'}
+            {saving ? '保存中' : 'この名前で保存する'}
           </Button>
           <Button onClick={() => setOpen(false)} disabled={saving} variant="secondary">
-            やめる
+            キャンセル
           </Button>
         </div>
       ) : (
         <Button onClick={() => setOpen(true)} variant="secondary">
-          この分析結果を保存
+          この分析結果を保存する
         </Button>
       )}
       {error && <p className="text-danger text-xs">{error}</p>}
@@ -2183,7 +2183,7 @@ function FunnelForm({
           disabled={saving}
           variant="primary"
         >
-          {saving ? '保存中...' : edit ? '新版として保存' : '作成'}
+          {saving ? '保存中...' : edit ? '新版として保存する' : '作る'}
         </Button>
         <Button
           onClick={onCancel}
@@ -3197,7 +3197,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                   {visibleItems.length === 0 && (
                     <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">
                       条件に合う保存済み分析はありません。
-                      <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setQuery('')}>検索をやめる</button>
+                      <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setQuery('')}>キャンセル</button>
                     </td></tr>
                   )}
                   {visibleItems.map((item) => {

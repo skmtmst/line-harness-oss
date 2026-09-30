@@ -2197,7 +2197,7 @@ export default function NewAutomationPage() {
                         setActions((current) => current.filter((item) => item.key !== row.key))
                       }
                     >
-                      この動きを消す
+                      この動きを削除する
                     </button>
                   </div>
 
@@ -2293,7 +2293,7 @@ export default function NewAutomationPage() {
                 className={`${styles.action} ${styles.actionSecondary} ${styles.addAction}`}
                 onClick={() => setActions((current) => [...current, newActionDraft()])}
               >
-                動きを追加
+                動きを追加する
               </button>
             </div>
           </Step>
@@ -2378,7 +2378,7 @@ export default function NewAutomationPage() {
                       setTestConfirmation(null)
                     }}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                   <Button
                     variant="primary"
@@ -2480,7 +2480,7 @@ export default function NewAutomationPage() {
               disabled={saving || Boolean(blockedReason)}
               onClick={() => void save(false)}
             >
-              下書きに保存
+              下書きを保存する
             </button>
             <button
               type="button"

@@ -562,7 +562,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
                   <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                   <ActionCell>
                     {actionable ? (
-                      <Button size="field" onClick={() => onOpen(review.id)}>{review.replyStatus === 'draft' ? '下書きを確認' : review.replyStatus === 'pending_confirm' ? '状態を確認' : '返信を作成'}</Button>
+                      <Button size="field" onClick={() => onOpen(review.id)}>{review.replyStatus === 'draft' ? '下書きを確認' : review.replyStatus === 'pending_confirm' ? '状態を確認' : '返信を作る'}</Button>
                     ) : (
                       <Button size="field" onClick={() => onOpen(review.id)}>返信を見る</Button>
                     )}
@@ -785,7 +785,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
           </Card>
           {!alreadyReplied ? (
             <div className="flex flex-col gap-2">
-              <Button variant="secondary" onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096} data-gb3-action="save-draft">{busy === 'save' ? '保存中…' : '下書き保存'}</Button>
+              <Button variant="secondary" onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096} data-gb3-action="save-draft">{busy === 'save' ? '保存中…' : '下書きを保存する'}</Button>
               <Button variant="primary" onClick={() => { setChecked(false); setActionError(''); setConfirming(true) }} disabled={!canOpenConfirm} data-gb3-action="open-publish-confirm">返信内容を確認</Button>
             </div>
           ) : null}

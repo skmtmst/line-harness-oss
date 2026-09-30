@@ -196,7 +196,7 @@ export default function LifetimeTab({
             disabled={drafts.length >= 12}
             onClick={() => { setDrafts((current) => [...current, { id: null, threshold: '', title: '', notify: true, reachedCount: 0 }]); setDirty(true) }}
           >
-            ＋ 節目を追加
+            ＋ 節目を追加する
           </button>
         </div>
       </section>
@@ -206,7 +206,7 @@ export default function LifetimeTab({
         actions={(
           <>
             <Button variant="secondary" onClick={() => { setDirty(false); setError(''); setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期する</Button>
           </>
         )}
       />

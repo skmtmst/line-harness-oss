@@ -286,7 +286,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           {/* #935 N-305: 以前は実在しないタブ名を指していた。設計の語「配信フロー」は残し、行き先を実在するタブへ直す。 */}
           <Link href="/nen-campaigns?tab=auto" className="text-action hover:underline">配信フロー</Link><span>›</span><span>{setting.label}</span>
         </nav>
-        <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテスト送信</Button>
+        <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテストを送る</Button>
       </div>
 
       {error && <Notice tone="danger" message={error} />}
@@ -376,7 +376,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         ? pendingCount !== null && pendingCount > 0
           ? `動いています。配信待ちの${formatNumber(pendingCount)}通は予約したときの中身のまま届きます。保存した新しい中身は、次のきっかけからの配信に使われます。`
           : '動いています。保存した新しい中身は、次のきっかけからの配信に使われます。すでに配信待ちの分は、予約したときの中身のまま届きます。'
-        : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
+        : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテストを送る</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存する'}</Button></>} />
       {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>

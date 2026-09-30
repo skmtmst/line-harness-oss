@@ -577,7 +577,7 @@ export default function NotificationRunList({
                     ) : null}
                     {mode === 'failures' && item.retryAvailable && canRetry ? (
                       <Button className="mt-2" disabled={visibleRetryingId !== null} onClick={() => void retry(item)}>
-                        {visibleRetryingId === item.id ? '再試行中' : '送信を再試行'}
+                        {visibleRetryingId === item.id ? '再試行中' : '送信を再試行する'}
                       </Button>
                     ) : null}
                     {mode === 'failures' && canResolve ? (

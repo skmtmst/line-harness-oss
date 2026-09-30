@@ -643,7 +643,7 @@ function Handover() {
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              <Button href={`/accounts/detail?id=${account.id}`}>やめる</Button>
+              <Button href={`/accounts/detail?id=${account.id}`}>キャンセル</Button>
               {/* 取り消しは進行中だけ。終わった引き継ぎは切り戻しで戻す。変更なので見るだけには出さない。 */}
               {canManage && handover.status !== 'completed' && handover.status !== 'failed' && (
                 <Button type="button" variant="danger"

@@ -120,7 +120,7 @@ export default function NewAffiliateOfferPage() {
       showHeader={false}
       parent={['案件', OFFER_LIST_PATH]}
       successHref={(id) => `${OFFER_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
-      saveLabel={createdId ? '変更を保存する' : publishNow ? '公開する' : '下書きに保存'}
+      saveLabel={createdId ? '変更を保存する' : publishNow ? '公開する' : '下書きを保存する'}
       variant="v6"
       designNode="GPWzq"
       validate={() => {

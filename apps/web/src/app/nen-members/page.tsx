@@ -1028,7 +1028,7 @@ export default function PhotoReviewsPage() {
       </dl>
       <p className="mt-3 text-xs text-ink-faint">写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
     </Dialog>
-    {rejectingPhoto && <Dialog open designNode="N2J629" title="この写真を見送りますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。" busy={Boolean(reviewing)} error={reasonError} confirmLabel="見送って、この文章を送る" cancelLabel="やめる" onCancel={() => { setRejectingPhotoId(null); setRejectingPhotoDetail(null); setReasonError('') }} onConfirm={() => {
+    {rejectingPhoto && <Dialog open designNode="N2J629" title="この写真を見送りますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。" busy={Boolean(reviewing)} error={reasonError} confirmLabel="見送って、この文章を送る" cancelLabel="キャンセル" onCancel={() => { setRejectingPhotoId(null); setRejectingPhotoDetail(null); setReasonError('') }} onConfirm={() => {
       if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
       void review(text(rejectingPhoto.id), 'rejected', { reasonCode, reasonNote: reasonNote.trim(), resubmitInvite, watchSubmitter })
     }}>

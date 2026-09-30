@@ -337,7 +337,7 @@ export default function SiteScript() {
                   variant="secondary"
                   onClick={() => setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null })}
                 >
-                  サイトを追加
+                  サイトを追加する
                 </Button>
               ) : null}
             </div>

@@ -34,7 +34,7 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     const panel = detail.closest('section')!
     fireEvent.click(within(panel).getByRole('button', { name: '変更' }))
     fireEvent.change(screen.getByDisplayValue('窓際'), { target: { value: '奥席' } })
-    fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'table-1', expect.objectContaining({ label: '奥席' })))
     fireEvent.click(within(panel).getByRole('button', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
@@ -46,7 +46,7 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     const panel = (await screen.findByRole('heading', { name: 'メニュー一覧' })).closest('section')!
     fireEvent.click(within(panel).getByRole('button', { name: '変更' }))
     fireEvent.change(screen.getByDisplayValue('ランチ'), { target: { value: '夜コース' } })
-    fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ name: '夜コース' })))
     fireEvent.click(within(panel).getByRole('button', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
@@ -69,7 +69,7 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     render(<RestaurantConsole view="menu" />)
     const panel = (await screen.findByRole('heading', { name: 'メニュー一覧' })).closest('section')!
     fireEvent.click(within(panel).getByRole('button', { name: '変更' }))
-    fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ servicePeriods: ['lunch', 'dinner'] })))
   })
 
@@ -78,7 +78,7 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     const panel = (await screen.findByRole('heading', { name: 'アカウント一覧' })).closest('section')!
     fireEvent.click(within(panel).getByRole('button', { name: '変更' }))
     fireEvent.change(screen.getByDisplayValue('佐藤'), { target: { value: '田中' } })
-    fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMembership).toHaveBeenCalledWith('account-1', 'member-1', expect.objectContaining({ staffName: '田中' })))
     fireEvent.click(within(panel).getByRole('button', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
