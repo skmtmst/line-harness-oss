@@ -148,6 +148,13 @@ function MediaLibraryInner() {
     総数を出すため、同じ棚（アーカイブの扱い）で数えた総数を別に持つ。
   */
   const [overallTotal, setOverallTotal] = useState<number | null>(null)
+  /*
+    m26m: 一覧の総数が「分かっている」かどうか。初期値の total=0 や
+    失敗時の残留値をそのまま出すと、実在する件を0件と誤案内する。
+    成功したときだけ真にし、フォルダ欄の「すべて」と表の下の件数は
+    真のときだけ出す（vars 側の listFailed と同じ約束）。
+  */
+  const [listKnown, setListKnown] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [quota, setQuota] = useState<MediaQuota | null>(null)
@@ -467,8 +474,10 @@ function MediaLibraryInner() {
       if (res?.success) {
         setItems(res.data.items)
         setTotal(res.data.total)
+        setListKnown(true)
       } else {
         setLoadFailed(true)
+        setListKnown(false)
       }
       if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
       if (quotaResponse?.success) setQuota(quotaResponse.data)
@@ -477,7 +486,10 @@ function MediaLibraryInner() {
         setQuotaFailed(true)
       }
     } catch {
-      if (accountAtRequest === latestAccountRef.current) setLoadFailed(true)
+      if (accountAtRequest === latestAccountRef.current) {
+        setLoadFailed(true)
+        setListKnown(false)
+      }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
@@ -490,6 +502,9 @@ function MediaLibraryInner() {
     setReplacementFor(null)
     setPreview(null)
     setPage(1)
+    // m26m: 別アカウントの総数を残さない。読み直すまで「すべて」は未知。
+    setListKnown(false)
+    setOverallTotal(null)
   }, [accountLoading, selectedAccountId])
 
   useEffect(() => {
@@ -957,7 +972,9 @@ function MediaLibraryInner() {
           rows={[
             // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
             // 入れると「すべて0・未分類2」のように母集団が混ざる。
-            { id: '', label: 'すべて', count: overallTotal ?? total },
+            // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
+            // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
+            { id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
             ...folders.map((folder) => ({
               id: folder.id,
               label: folder.name,
@@ -1151,7 +1168,7 @@ function MediaLibraryInner() {
       />
 
       <div data-design-node="h8pBZr" className="flex flex-col gap-4">
-      {total > 200 ? (
+      {listKnown && !loadFailed && total > 200 ? (
         <p className="text-ink-faint text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
       ) : null}
       {loading ? (
@@ -1569,6 +1586,12 @@ function MediaLibraryInner() {
         </label>
       </Dialog>
 
+      {/*
+        m26m: 一覧が読めていない間の表の下の「0件」は偽ゼロなので出さない。
+        失敗の1枚（再試行）が件数の置き場所になる。復旧後は実件数を戻す。
+        vars 側と同じ約束。フォルダだけ503の側は listKnown が真なので残る。
+      */}
+      {listKnown && !loadFailed ? (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
@@ -1603,6 +1626,7 @@ function MediaLibraryInner() {
           )}
         </div>
       </div>
+      ) : null}
         </div>
       </div>
 
