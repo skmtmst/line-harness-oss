@@ -76,6 +76,28 @@ async function flush() {
   })
 }
 
+// どちらの describe の mount もここで片付ける。
+// 2つ目の describe には afterEach がなく、破棄漏れの木に残った
+// 実作業が環境破棄の後に走って落ちていた。製品側のタイマーは
+// 破棄時に自前で消えるため、ここでは破棄漏れと残務の排出だけ行う。
+afterEach(async () => {
+  if (root) {
+    await act(async () => {
+      root.unmount()
+    })
+  }
+  // scheduler に残った実作業を環境が生きているうちに流し切る。
+  await act(async () => {
+    for (let round = 0; round < 5; round += 1) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0)
+      })
+    }
+  })
+  host?.remove()
+  vi.clearAllMocks()
+})
+
 const AUDIENCE = {
   id: 'aud-1',
   sourceKind: 'cross',
@@ -92,12 +114,6 @@ describe('配信作成への分析対象者の受け渡し(N-274)', () => {
     mocks.accountLoading = false
     mocks.tagsList.mockResolvedValue({ success: true, data: [] })
     mocks.audience.mockResolvedValue({ success: true, data: AUDIENCE })
-  })
-
-  afterEach(async () => {
-    if (root) await act(async () => { root.unmount() })
-    host?.remove()
-    vi.clearAllMocks()
   })
 
   it('有効な対象者は人数と期限を出してフォームを開く', async () => {
