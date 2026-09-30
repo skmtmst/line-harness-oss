@@ -32,6 +32,7 @@ import {
   type SegmentCondition,
   type SegmentRule,
 } from '@/lib/segment-condition'
+import { formatNumber } from '@/lib/format'
 
 // これまでどおりこのファイルからも取れるようにしておく。呼び出し側が多い。
 export {
@@ -346,7 +347,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
                   ? '…'
                   : count === null
                     ? '—'
-                    : `${count.toLocaleString('ja-JP')} 人`}
+                    : `${formatNumber(count)} 人`}
           </span>
         </div>
       )}
@@ -497,7 +498,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     return (
       <>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">タグ</span>
+          <span className="text-ink text-sm font-semibold">タグ</span>
           <Select
             aria-label="タグの条件"
             value={rule.type}
@@ -535,7 +536,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">名前</span>
+            <span className="text-ink text-sm font-semibold">名前</span>
             <input
               value={nameText}
               onChange={(e) => changeName({ ...v, text: e.target.value })}
@@ -589,7 +590,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'status_message':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
+          <span className="text-ink text-sm font-semibold">
             {rule.type === 'private_memo' ? '個別メモ' : 'ステータスメッセージ'}
           </span>
           <input
@@ -605,7 +606,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'last_reaction_at':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
+          <span className="text-ink text-sm font-semibold">
             {rule.type === 'registered_at' ? '友だち登録日' : '最終反応日'}
           </span>
           <DateField
@@ -629,7 +630,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">対応マーク</span>
+            <span className="text-ink text-sm font-semibold">対応マーク</span>
             <Select
               aria-label="マークの含め方"
               value={v.exclude ? 'exclude' : 'include'}
@@ -676,7 +677,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       const needsText = op !== 'exists' && op !== 'not_exists'
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">友だち情報</span>
+          <span className="text-ink text-sm font-semibold">友だち情報</span>
           <Select
             aria-label="友だち情報の項目"
             value={String(v.fieldId ?? '')}
@@ -704,7 +705,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'scenario_subscribed':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">シナリオ購読</span>
+          <span className="text-ink text-sm font-semibold">シナリオ購読</span>
           <Select
             aria-label="購読中のシナリオ"
             value={String(rule.value ?? '')}
@@ -717,7 +718,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'scenario_state':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">シナリオ</span>
+          <span className="text-ink text-sm font-semibold">シナリオ</span>
           <Select
             aria-label="シナリオ"
             value={String(v.scenarioId ?? '')}
@@ -736,7 +737,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'form_answered':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">回答フォーム</span>
+          <span className="text-ink text-sm font-semibold">回答フォーム</span>
           <input
             value={String(rule.value ?? '')}
             onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
@@ -750,7 +751,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'reaction_state':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">反応状態</span>
+          <span className="text-ink text-sm font-semibold">反応状態</span>
           <Select
             aria-label="反応の種類"
             value={String(rule.value ?? 'reply_or_postback')}
@@ -769,7 +770,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">行動スコア</span>
+            <span className="text-ink text-sm font-semibold">行動スコア</span>
             <TextField
               type="number"
               step={1}
@@ -804,7 +805,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'is_hidden':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
+          <span className="text-ink text-sm font-semibold">
             {rule.type === 'is_following' ? 'ブロック状態' : '表示状態'}
           </span>
           <Select

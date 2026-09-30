@@ -87,8 +87,7 @@ export default function VideoStages({ webinarId, hasVideo }: { webinarId: string
   if (asset === null) {
     return (
       <div className="mt-3">
-        <Button onClick={() => void advance('uploaded')} disabled={busy}>
-          {busy ? '始めています…' : '動画の準備を始める'}
+        <Button onClick={() => void advance('uploaded')} disabled={busy} busy={busy} busyLabel="始めています…">動画の準備を始める
         </Button>
         {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       </div>

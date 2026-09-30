@@ -11,7 +11,7 @@ describe('共通フォルダ欄', () => {
 
   it('フォルダ追加操作を一覧の下へ出す', () => {
     expect(PANEL).toContain('onAddFolder?: () => void')
-    expect(PANEL).toContain("addFolderLabel = 'フォルダを追加'")
+    expect(PANEL).toContain("addFolderLabel = 'フォルダを追加する'")
     expect(PANEL.indexOf('{rows.map')).toBeLessThan(PANEL.indexOf('onClick={onAddFolder}'))
     expect(PANEL).toContain('className="w-full"')
   })

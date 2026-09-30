@@ -95,7 +95,7 @@ function setInputValue(el: HTMLDivElement, id: string, value: string): void {
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存')
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存する')
   if (!button) throw new Error('「下書きを保存」ボタンが見つかりません')
   return button as HTMLButtonElement
 }

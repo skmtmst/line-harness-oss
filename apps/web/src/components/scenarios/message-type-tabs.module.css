@@ -7,10 +7,10 @@
 
 .rail {
   min-height: 38px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .tab {
   height: 30px;
-  border-radius: 6px;
+  border-radius: var(--radius-mini);
 }

@@ -39,6 +39,7 @@ import MileageAdjustmentDialog from './mileage-adjustment-dialog'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { Field, TextArea } from '@/components/shared/form-controls'
+import { formatDay, formatNumber } from '@/lib/format'
 
 type MileageDetail = {
   summary: MileageSummary
@@ -268,7 +269,7 @@ function FriendMileageInner() {
    * 「M月D日」で短く添える。
    */
   const nextExpiringLabel = v6Friend?.nextExpiringAt
-    ? new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(new Date(v6Friend.nextExpiringAt))
+    ? formatDay(new Date(v6Friend.nextExpiringAt))
     : null
   /* R387: 権限の外側のアカウントの記録は理由が null で返る。まとめて一枠で数える。 */
   const reasonSummary = displayedHistory.reduce<Array<{ reason: string; count: number; amount: number }>>((items, item) => {
@@ -304,9 +305,9 @@ function FriendMileageInner() {
           title="生涯付与"
           value={v6Friend?.lifetimeEarned ?? mileage.summary.lifetimeEarned}
           unit=" マイル"
-          detail={rewardedActions === null ? '付与記録の回数は未取得' : `${rewardedActions.toLocaleString('ja-JP')}回の付与記録`}
+          detail={rewardedActions === null ? '付与記録の回数は未取得' : `${formatNumber(rewardedActions)}回の付与記録`}
         />
-        <KpiCard variant="v6" title="使用済み" value={v6Friend?.spent ?? mileage.summary.spent} unit=" マイル" detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${v6Friend.monthChange.toLocaleString('ja-JP')} マイル` : '交換などで使った合計'} />
+        <KpiCard variant="v6" title="使用済み" value={v6Friend?.spent ?? mileage.summary.spent} unit=" マイル" detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)} マイル` : '交換などで使った合計'} />
       </div>
 
       <Card overflow="hidden">
@@ -316,7 +317,7 @@ function FriendMileageInner() {
           action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="secondary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
         />
         <div className="flex flex-wrap items-center gap-4 p-4">
-          {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent-deep">{displayName.slice(0, 1)}</div>}
+          {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-pill object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-pill bg-accent-soft text-lg font-bold text-accent-deep">{displayName.slice(0, 1)}</div>}
           <div className="min-w-44">
             <p className="font-bold text-ink">{displayName}</p>
             <p className="mt-1 text-xs text-ink-faint">本人確認済みの接続先だけを表示します</p>
@@ -325,7 +326,7 @@ function FriendMileageInner() {
             {connectedAccounts === null ? (
               <span className="text-sm text-ink-faint">接続先を確認できませんでした</span>
             ) : connectedAccounts.length > 0 ? connectedAccounts.map((connection) => (
-              <span key={connection.accountId} className="rounded-full border border-hairline bg-surface-pearl px-3 py-1 text-xs font-semibold text-ink-secondary">{connection.accountName}</span>
+              <span key={connection.accountId} className="rounded-pill border border-hairline bg-surface-pearl px-3 py-1 text-xs font-semibold text-ink-secondary">{connection.accountName}</span>
             )) : <span className="text-sm text-ink-faint">接続先はありません</span>}
           </div>
         </div>
@@ -365,7 +366,7 @@ function FriendMileageInner() {
       </div>
 
       <Card overflow="hidden">
-        <CardHeader title="付与・使用・失効・調整の履歴" meta={`最新${displayedHistory.length.toLocaleString('ja-JP')}件`} />
+        <CardHeader title="付与・使用・失効・調整の履歴" meta={`最新${formatNumber(displayedHistory.length)}件`} />
         {notificationRetryError ? (
           <div className="px-4 pt-3"><Notice tone="error">{notificationRetryError}</Notice></div>
         ) : null}
@@ -380,7 +381,7 @@ function FriendMileageInner() {
                   <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
                   <Td><p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
                   <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent-deep'}>{formatMileageChange(item.amount)} マイル</span></Td>
-                  <Td align="right" className="tabular-nums">{'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `${item.balanceAfter.toLocaleString('ja-JP')} マイル` : '—'}</Td>
+                  <Td align="right" className="tabular-nums">{'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `${formatNumber(item.balanceAfter)} マイル` : '—'}</Td>
                   <Td>
                     {item.restricted || item.reason == null ? (
                       <p className="max-w-56 text-sm text-ink-faint">権限の外側にあるアカウントの記録</p>
@@ -430,8 +431,7 @@ function FriendMileageInner() {
                           <Button
                             variant="secondary"
                             disabled={notificationRetryId === item.id}
-                            onClick={() => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId)}
-                          >{notificationRetryId === item.id ? '送り直し中…' : '通知を再送'}</Button>
+                            onClick={() => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId)} busy={notificationRetryId === item.id} busyLabel="送り直し中…">通知を再送</Button>
                         ) : null}
                       </div>
                     </Td>
@@ -462,7 +462,7 @@ function FriendMileageInner() {
         busy={pendingBusy}
         error={pendingError}
         confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         onConfirm={() => void runPendingAction()}
         onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
       >

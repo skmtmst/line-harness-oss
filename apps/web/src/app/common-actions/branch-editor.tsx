@@ -205,7 +205,7 @@ export default function BranchEditors({
           <section key={step.id} className="border-hairline bg-canvas-sunken mt-3 rounded-card border p-4" data-common-action-branch>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink font-semibold">{branchNumber}. 条件で分ける</h3>
-              <Button onClick={() => onRemove(step.id)}>分岐を削除</Button>
+              <Button onClick={() => onRemove(step.id)}>分岐を削除する</Button>
             </div>
             <div className="mt-3">
               <span className="text-ink-secondary text-sm">条件の組み合わせ</span>

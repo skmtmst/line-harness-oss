@@ -17,6 +17,6 @@ const SOURCE = readFileSync(join(__dirname, '..', '..', 'app', 'broadcasts', 'de
 describe('配信詳細の予約日時は日本時間で出す（TECH-02）', () => {
   it('詳細の日時は Asia/Tokyo で出す', () => {
     expect(SOURCE).toContain('formatBroadcastDateTime')
-    expect(SOURCE).toContain("timeZone: 'Asia/Tokyo'")
+    expect(SOURCE).toMatch(/import \{[^}]*formatDateTime[^}]*\} from '@\/lib\/format'/)
   })
 })

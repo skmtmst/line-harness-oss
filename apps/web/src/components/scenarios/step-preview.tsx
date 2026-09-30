@@ -243,7 +243,7 @@ export default function StepPreview({
           {templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">テンプレート</span>
-              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
             </Bubble>
           ) : body.trim() ? (
             <Bubble>{renderPreviewBody(body)}</Bubble>
@@ -275,7 +275,7 @@ export default function StepPreview({
         {templateName ? (
           <Bubble>
             <span className="text-ink-faint text-micro">テンプレート</span>
-            <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+            <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
           </Bubble>
         ) : kind === 'image' ? (
           imageUrl ? (
@@ -293,14 +293,14 @@ export default function StepPreview({
           <>
             {question.intro?.trim() ? <Bubble>{question.intro}</Bubble> : null}
             <Bubble>
-              <span className="text-ink block text-label font-bold">
+              <span className="text-ink block text-label font-medium">
                 {question.text.trim() || '（質問文がまだ空です）'}
               </span>
               <span className="mt-2 block space-y-1.5">
                 {question.choices.map((choice, i) => (
                   <span
                     key={i}
-                    className={`rounded-control block px-3 py-2 text-center text-label font-bold ${
+                    className={`rounded-control block px-3 py-2 text-center text-label font-medium ${
                       i === 0
                         ? 'bg-accent-deep text-on-accent'
                         : 'border-hairline text-ink-secondary border'
@@ -316,7 +316,7 @@ export default function StepPreview({
           templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">カルーセル</span>
-              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
               <span className="text-ink-faint mt-1 block text-micro">
                 実際の見た目は、カルーセルの編集画面で確かめられます。
               </span>
@@ -327,7 +327,7 @@ export default function StepPreview({
         ) : kind === 'location' ? (
           kindState?.location.latitude && kindState.location.longitude ? (
             <Bubble>
-              <span className="text-ink block text-label font-bold">
+              <span className="text-ink block text-label font-medium">
                 {kindState.location.title.trim() || '場所'}
               </span>
               {kindState.location.address.trim() && (

@@ -42,7 +42,7 @@ describe('LAY-08: 保存バーが画面外へ逃げない', () => {
 
   it('バーの高さを固定せず、下部はキャンセルと保存に絞る', () => {
     expect(staffSource).not.toContain('height: 72')
-    expect(staffSource).toContain('見せる範囲を保存')
+    expect(staffSource).toContain('見せる範囲を保存する')
     expect(staffSource).toContain('キャンセル')
   })
 })

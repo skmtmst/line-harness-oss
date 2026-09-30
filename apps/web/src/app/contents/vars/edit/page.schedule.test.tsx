@@ -174,7 +174,7 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
     await setValue(byId('cv-value'), '入力中の値')
     await setValue(memoInput(), '入力中のメモ')
 
-    await click(byExactText('button', '予定を削除'))
+    await click(byExactText('button', '予定を削除する'))
     await settle()
 
     expect(api.deleteSchedule).toHaveBeenCalledWith('var-1', 's-1', 'account-1')
@@ -197,7 +197,7 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
     const checkbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement
     await act(async () => { checkbox.click() })
     await setValue(byId('sc-value'), '切替後の値')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
     await settle()
 
     expect(api.addSchedule).toHaveBeenCalled()
@@ -221,7 +221,7 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
 
     // 確認すると全件消して一覧を取り直す。入力中の値は残る。
     await setValue(byId('cv-name'), '入力中の名前')
-    await click(byExactText('button', 'すべて消す'))
+    await click(byExactText('button', 'すべて削除する'))
     await settle()
     expect(api.deleteSchedule).toHaveBeenCalledWith('var-1', 's-1', 'account-1')
     expect((byId('cv-name') as HTMLInputElement).value).toBe('入力中の名前')

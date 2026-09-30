@@ -114,6 +114,6 @@ describe('テスト送信先の設定欄 (N-070)', () => {
     await flush()
     expect(screen.getByText('テスト送信先を保存できませんでした。')).toBeTruthy()
     // 保存失敗後は真値（空）へ戻り、追加した人が送信先として残らない。
-    expect(screen.queryByTitle('候補 花子を削除')).toBeNull()
+    expect(screen.queryByTitle('候補 花子を削除する')).toBeNull()
   })
 })

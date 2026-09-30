@@ -4,7 +4,7 @@ import { useSyncExternalStore } from 'react'
 import { CircleAlert, CircleCheck, X } from 'lucide-react'
 import styles from './toast.module.css'
 
-/** 知らせの種類。色分けはしない（黒地に白字で統一）。印だけ変える。 */
+/** 知らせの種類。白地に印の色で分ける（緑=うまくいった、赤=できなかった）。 */
 export type ToastTone = 'success' | 'error'
 
 export type ToastItem = {

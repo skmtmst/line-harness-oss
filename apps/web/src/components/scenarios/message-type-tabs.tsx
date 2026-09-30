@@ -95,7 +95,7 @@ export default function MessageTypeTabs({ value, onChange, children }: MessageTy
               disabled={disabled}
               title={kind.disabledReason}
               onClick={() => !disabled && onChange(kind.value)}
-              className={`${styles.tab} px-3 text-micro font-bold transition-colors ${
+              className={`${styles.tab} px-3 text-micro font-medium transition-colors ${
                 active
                   ? 'border-hairline bg-canvas text-ink border'
                   : disabled

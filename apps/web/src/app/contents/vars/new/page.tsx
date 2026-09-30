@@ -495,7 +495,7 @@ function NewCommonVarInner() {
               <>
                 <br />
                 テンプレートには{' '}
-                <code className="bg-canvas-sunken rounded px-1">{`{{var.${varKey}}}`}</code>{' '}
+                <code className="bg-canvas-sunken rounded-mini px-1">{`{{var.${varKey}}}`}</code>{' '}
                 と書きます。
               </>
             )}
@@ -525,7 +525,7 @@ function NewCommonVarInner() {
                 note={
                   <>
                     <span
-                      className="bg-canvas border-hairline text-ink-secondary mr-2 inline-flex h-8 w-11 items-center justify-center rounded border text-xs"
+                      className="bg-canvas border-hairline text-ink-secondary mr-2 inline-flex h-8 w-11 items-center justify-center rounded-mini border text-xs"
                       aria-hidden="true"
                     >
                       {t.mark}
@@ -654,10 +654,9 @@ function NewCommonVarInner() {
             <Button href="/contents/vars">共通情報一覧へ戻る</Button>
             {/* Q: まだ配信へ出したくないものは下書きで残せる。下書きは差し込みに使われない。 */}
             <Button type="button" disabled={saving} onClick={() => void save(false, true)}>
-              下書きとして保存
+              下書きを保存する
             </Button>
-            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
-              {saving ? '登録中…' : '登録'}
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving} busyLabel="登録中…">登録する
             </Button>
           </>
         )}

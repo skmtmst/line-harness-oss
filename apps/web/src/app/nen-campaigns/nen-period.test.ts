@@ -16,9 +16,9 @@ describe('NEN配信の今月・先月（日本時間）', () => {
   })
 
   it('短い日付表記は日本時間で出す', () => {
-    expect(jstShortDate('2026-09-19T15:30:00.000Z')).toBe('9/20')
-    expect(jstShortDateTime('2026-09-20T01:00:00.000Z')).toBe('9/20 10:00')
-    expect(jstLongDateTime('2026-09-20T01:00:00.000Z')).toBe('2026/09/20（日）10:00')
+    expect(jstShortDate('2026-09-19T15:30:00.000Z')).toBe('9月20日（日）')
+    expect(jstShortDateTime('2026-09-20T01:00:00.000Z')).toBe('9月20日（日）10:00')
+    expect(jstLongDateTime('2026-09-20T01:00:00.000Z')).toBe('9月20日（日）10:00')
     expect(jstShortDate(null)).toBe('—')
     expect(jstShortDateTime('not a date')).toBe('—')
   })

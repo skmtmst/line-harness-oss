@@ -38,6 +38,6 @@ describe('タグの編集', () => {
   })
 
   it('編集からタグを複製できる', () => {
-    expect(EDITOR).toContain('複製して新規作成')
+    expect(EDITOR).toContain('複製して作る')
   })
 })

@@ -80,11 +80,11 @@
   width: 32px;
   height: 32px;
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
   color: var(--color-ink-secondary); /* fill: $ink-secondary */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .markDone {
@@ -111,7 +111,7 @@
 .stepTitle {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-heading); /* fontSize: $size-heading */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .stepLine {
@@ -136,7 +136,7 @@
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-action); /* ただの行き先は緑にしない */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 /* 止まっているだけ（進んでいない）は警告色。赤は「壊れている」に見えるため使わない。 */
@@ -152,7 +152,7 @@
 
 .step[data-step-state='stalled'] .stepLine:last-of-type {
   color: var(--color-warning);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 /* 主役は「いまの手順」（終わっていない最初の段）だけ。他の段の行き先は枠。 */
@@ -217,7 +217,7 @@
 .reasonTitle {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .reasonLine {

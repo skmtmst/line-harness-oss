@@ -12,12 +12,12 @@
   border-radius: var(--radius-pill);
   background: var(--color-surface-pearl);
   color: var(--color-ink-faint);
-  font-size: var(--text-micro); font-weight: 700;
+  font-size: var(--text-micro); font-weight: 500;
 }
 .stepDone { background: var(--color-accent-deep); color: var(--color-on-accent); }
 .stepNow { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .stepText { display: flex; flex-direction: column; }
-.stepNo { color: var(--color-ink-faint); font-size: var(--text-nano); font-weight: 700; }
+.stepNo { color: var(--color-ink-faint); font-size: var(--text-nano); font-weight: 500; }
 .stepLabel { color: var(--color-ink); font-size: var(--text-micro); font-weight: 600; }
 
 .split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
@@ -38,7 +38,7 @@
 .checkLabel { color: var(--color-ink); font-weight: 600; }
 .checkDetail { color: var(--color-ink-faint); font-size: var(--text-micro); }
 
-.tag { border-radius: var(--radius-pill); padding: 2px 8px; font-size: var(--text-nano); font-weight: 700; line-height: 1.6; white-space: nowrap; }
+.tag { border-radius: var(--radius-pill); padding: 2px 8px; font-size: var(--text-nano); font-weight: 500; line-height: 1.6; white-space: nowrap; }
 .tagOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .tagWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
 .tagBad { background: var(--color-status-danger-soft); color: var(--color-danger); }
@@ -52,7 +52,7 @@
   font-size: var(--text-micro); font-weight: 600; line-height: 1.5;
 }
 
-.doneTitle { color: var(--color-ink); font-size: var(--text-lead); font-weight: 700; line-height: 1.3; }
+.doneTitle { color: var(--color-ink); font-size: var(--text-lead); font-weight: 600; line-height: 1.3; }
 
 .footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }

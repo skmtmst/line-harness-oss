@@ -8,6 +8,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 出荷予定。
@@ -152,14 +153,14 @@ export default function ShipmentPanel({
                 <button
                   key={key}
                   onClick={() => setBucket(key)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
                     bucket === key ? 'bg-action text-on-action' : 'bg-canvas-sunken text-ink-secondary'
                   }`}
                 >
                   {label}
                   <span
-                    className={`rounded-full px-1.5 text-[10px] tabular-nums ${
-                      bucket === key ? 'bg-white/25' : 'bg-canvas text-ink-faint'
+                    className={`rounded-pill px-1.5 text-[10px] tabular-nums ${
+                      bucket === key ? 'bg-canvas/25' : 'bg-canvas text-ink-faint'
                     }`}
                   >
                     {count}
@@ -216,7 +217,7 @@ export default function ShipmentPanel({
                           入ったら繋ぐ。docs/v025-open-questions.md に残す。
                         */}
                         <Td align="right" className="text-ink-faint tabular-nums">
-                          {row.quantity > 0 ? row.quantity.toLocaleString('ja-JP') : '—'}
+                          {row.quantity > 0 ? formatNumber(row.quantity) : '—'}
                         </Td>
                         <Td className="whitespace-nowrap">
                           <StatusBadge tone={statusTone[tone]} size="compact">{label}</StatusBadge>

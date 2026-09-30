@@ -121,8 +121,7 @@ function ResetInner() {
         <AuthField label="パスワード（確認）" htmlFor="reset-confirm" error={messages.confirm}>
           <PasswordField id="reset-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full">
-          {busy ? '設定しています…' : 'パスワードを設定してログインへ'}
+        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">パスワードを設定してログインへ
         </Button>
       </form>
     </AuthCard>

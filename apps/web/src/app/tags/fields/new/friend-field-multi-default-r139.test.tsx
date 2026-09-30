@@ -91,7 +91,7 @@ describe('R139 複数選択の既定値', () => {
     })
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '項目を作成' }))
+      fireEvent.click(screen.getByRole('button', { name: '項目を作る' }))
     })
 
     expect(mockState.payload).not.toBeNull()
@@ -115,7 +115,7 @@ describe('R139 複数選択の既定値', () => {
     })
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '項目を作成' }))
+      fireEvent.click(screen.getByRole('button', { name: '項目を作る' }))
     })
 
     expect(mockState.payload?.defaultValue).toBeNull()

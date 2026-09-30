@@ -1,4 +1,5 @@
 import type { WebinarOverview, WebinarOverviewMetric } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 export const NOT_AVAILABLE = '—'
 
@@ -21,7 +22,7 @@ export function metricView(
   }
 
   return {
-    text: `${metric.value.toLocaleString('ja-JP')}${unit}`,
+    text: `${formatNumber(metric.value)}${unit}`,
     note: null,
     available: true,
   }
@@ -96,7 +97,7 @@ export function overviewCards(overview: WebinarOverview | null): OverviewCard[] 
       status: webinars.available ? null : UNAVAILABLE_SHORT,
       detail:
         activeWebinars?.state === 'available' && activeWebinars.value !== null
-          ? `公開中 ${activeWebinars.value.toLocaleString('ja-JP')}件`
+          ? `公開中 ${formatNumber(activeWebinars.value)}件`
           : null,
       description: describeReasons([
         ['ウェビナー数', webinars.note],
@@ -148,7 +149,7 @@ export function audienceText(
   }
 
   return {
-    people: `${audience.people.toLocaleString('ja-JP')}人`,
-    note: `取消を除いた有効な申込。延べ予約は${audience.bookings.toLocaleString('ja-JP')}件`,
+    people: `${formatNumber(audience.people)}人`,
+    note: `取消を除いた有効な申込。延べ予約は${formatNumber(audience.bookings)}件`,
   }
 }

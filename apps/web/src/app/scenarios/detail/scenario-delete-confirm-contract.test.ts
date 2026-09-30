@@ -8,7 +8,7 @@ describe('V6 dqFft シナリオ全体を削除する確認', () => {
     expect(PAGE).not.toContain('if (!confirm(message)) return')
     expect(PAGE).toContain('data-qa-open="dqFft-scenario"')
     expect(PAGE).toContain('open={deleteScenarioOpen && scenario !== null}')
-    expect(PAGE).toContain('confirmLabel="このシナリオを削除"')
+    expect(PAGE).toContain('confirmLabel="このシナリオを削除する"')
     expect(PAGE).toContain('destructive')
   })
 

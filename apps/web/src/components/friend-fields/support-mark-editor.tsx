@@ -348,7 +348,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           <fieldset className="mb-4">
             <legend className="mb-2 text-xs font-semibold text-ink-secondary">色</legend>
             <div className="flex flex-wrap gap-2">
-              {COLORS.map((item) => <button key={item.value} type="button" onClick={() => setColor(item.value)} aria-label={item.name} title={item.name} aria-pressed={color === item.value} className={`h-8 w-8 rounded-full ${color === item.value ? 'ring-2 ring-ink ring-offset-2' : ''}`} style={{ backgroundColor: item.value }} />)}
+              {COLORS.map((item) => <button key={item.value} type="button" onClick={() => setColor(item.value)} aria-label={item.name} title={item.name} aria-pressed={color === item.value} className={`h-8 w-8 rounded-pill ${color === item.value ? 'ring-2 ring-ink ring-offset-2' : ''}`} style={{ backgroundColor: item.value }} />)}
             </div>
           </fieldset>
           <label className="mb-4 block">
@@ -450,7 +450,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       <StickyBar
         className="mt-4"
         status={blockedReason ?? (editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください')}
-        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saveDisabled} onClick={() => void save()}>{saving ? '保存中…' : editing ? '変更を保存' : '対応マークを作る'}</Button></>}
+        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saveDisabled} onClick={() => void save()} busy={saving}>{editing ? '保存する' : '対応マークを作る'}</Button></>}
       />
       </>
       )}

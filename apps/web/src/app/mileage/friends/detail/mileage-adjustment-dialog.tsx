@@ -10,6 +10,7 @@ import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
 import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 type Direction = 'increase' | 'decrease'
 type ReasonCategory = 'customer_support' | 'order_correction' | 'grant_correction' | 'campaign' | 'other'
@@ -252,8 +253,7 @@ export default function MileageAdjustmentDialog({
         ) : step === 'completed' ? (
           <div className="flex justify-end gap-2">
             {completedResult?.notificationStatus === 'failed' ? (
-              <Button variant="secondary" disabled={retrying} onClick={() => void retryNotification()}>
-                {retrying ? '通知を送り直しています…' : '通知をもう一度送る'}
+              <Button variant="secondary" disabled={retrying} onClick={() => void retryNotification()} busy={retrying} busyLabel="通知を送り直しています…">通知をもう一度送る
               </Button>
             ) : null}
             <Button onClick={onCancel}>閉じる</Button>
@@ -264,7 +264,7 @@ export default function MileageAdjustmentDialog({
           <section className="rounded-control bg-canvas-sunken p-4">
             <p className="text-xs font-semibold text-ink-faint">だれのマイルを動かしますか</p>
             <p className="mt-2 font-bold text-ink">{friendName}</p>
-            <p className="mt-1 text-sm text-ink-secondary">いまの残高 {currentBalance.toLocaleString('ja-JP')} マイル</p>
+            <p className="mt-1 text-sm text-ink-secondary">いまの残高 {formatNumber(currentBalance)} マイル</p>
           </section>
 
           {step === 'completed' ? (
@@ -282,8 +282,8 @@ export default function MileageAdjustmentDialog({
                 <Notice tone="success">友だちへの通知を送り直しました。</Notice>
               )}
               <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
-                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">内容</dt><dd className="col-span-2 text-ink">{direction === 'increase' ? '増やす' : '減らす'} {amount.toLocaleString('ja-JP')} マイル</dd></div>
-                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">変更後の残高</dt><dd className="col-span-2 font-semibold text-ink">{completedResult?.balanceAfter.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">内容</dt><dd className="col-span-2 text-ink">{direction === 'increase' ? '増やす' : '減らす'} {formatNumber(amount)} マイル</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">変更後の残高</dt><dd className="col-span-2 font-semibold text-ink">{formatNumber(completedResult?.balanceAfter)} マイル</dd></div>
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">LINE通知</dt><dd className="col-span-2 text-ink">{completedResult?.notificationStatus === 'sent' ? '送信済み' : completedResult?.notificationStatus === 'pending' ? '送信中' : '未送信'}</dd></div>
               </dl>
               {completedResult?.notificationStatus === 'failed' ? (
@@ -297,7 +297,7 @@ export default function MileageAdjustmentDialog({
                 承認されると記録され、依頼の内容は取り下げるまで残ります。
               </Notice>
               <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
-                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">内容</dt><dd className="col-span-2 text-ink">{direction === 'increase' ? '増やす' : '減らす'} {amount.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">内容</dt><dd className="col-span-2 text-ink">{direction === 'increase' ? '増やす' : '減らす'} {formatNumber(amount)} マイル</dd></div>
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由</dt><dd className="col-span-2 whitespace-pre-wrap text-ink">{reason.trim()}</dd></div>
               </dl>
             </section>
@@ -357,7 +357,7 @@ export default function MileageAdjustmentDialog({
                     <Field label="別のオーナー承認が必要になるマイル数" htmlFor="mileage-adjustment-threshold" required>
                       <TextInput id="mileage-adjustment-threshold" inputMode="numeric" value={policyThresholdText} onChange={(event) => setPolicyThresholdText(event.target.value.replace(/[^0-9]/g, ''))} />
                     </Field>
-                    <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存</Button>
+                    <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存する</Button>
                   </div>
                 </section>
               ) : null}
@@ -369,9 +369,9 @@ export default function MileageAdjustmentDialog({
             <section aria-label="変更内容の確認" className="space-y-3">
               <h3 className="text-sm font-bold text-ink">この変更で起きること</h3>
               <dl className="overflow-hidden rounded-panel border border-hairline text-sm">
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentBalance.toLocaleString('ja-JP')} マイル</dd></div>
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent-deep'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} マイル</dd></div>
-                <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{balanceAfter.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{formatNumber(currentBalance)} マイル</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-medium text-danger' : 'font-medium text-accent-deep'}>{delta > 0 ? '+' : ''}{formatNumber(delta)} マイル</dd></div>
+                <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-medium text-ink">{formatNumber(balanceAfter)} マイル</dd></div>
               </dl>
               <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由区分</dt><dd className="col-span-2 text-ink">{reasonLabel}</dd></div>
@@ -382,7 +382,7 @@ export default function MileageAdjustmentDialog({
               </dl>
               {highValue ? (
                 <Notice tone="warn">
-                  {policy?.approvalThreshold?.toLocaleString('ja-JP')} マイル以上の変更は、この画面では実行されません。
+                  {formatNumber(policy?.approvalThreshold)} マイル以上の変更は、この画面では実行されません。
                   依頼した人とは別のオーナーが承認した時点で、残高へ反映されます。
                 </Notice>
               ) : null}

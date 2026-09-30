@@ -179,7 +179,7 @@ export default function OpsAnnouncementsPage() {
         title="お知らせ"
         actions={
           <>
-            <Button onClick={() => void submit('draft')} disabled={busy}>下書きとして保存</Button>
+            <Button onClick={() => void submit('draft')} disabled={busy}>下書きを保存する</Button>
             <Button variant="primary" onClick={() => (scheduled ? void submit('schedule') : setConfirmSend(true))} disabled={busy}>
               <Send aria-hidden="true" className="h-4 w-4" />
               {scheduled ? '配信を予約する' : '今すぐ送る'}
@@ -198,7 +198,7 @@ export default function OpsAnnouncementsPage() {
       <div className="grid gap-4 xl:grid-cols-5">
         <section aria-label="作成" className="grid gap-4 rounded-card border border-hairline bg-canvas p-5 xl:col-span-2">
           <div className="grid gap-2">
-            <span className="text-label font-bold text-ink">宛先</span>
+            <span className="text-label font-medium text-ink">宛先</span>
             <div className="flex flex-wrap gap-1.5">
               {AUDIENCES.map((a) => (
                 <FilterChip key={a.key} selected={form.audienceKind === a.key} onChange={(sel) => { if (sel) setForm((f) => ({ ...f, audienceKind: a.key })) }}>{a.label}</FilterChip>
@@ -222,15 +222,15 @@ export default function OpsAnnouncementsPage() {
           </div>
 
           <label className="grid gap-1.5">
-            <span className="text-label font-bold text-ink">件名</span>
+            <span className="text-label font-medium text-ink">件名</span>
             <TextField value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-label font-bold text-ink">本文</span>
+            <span className="text-label font-medium text-ink">本文</span>
             <TextArea rows={7} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつもmusuboをご利用いただきありがとうございます。…" maxLength={4000} />
           </label>
           <div className="grid gap-1.5">
-            <span className="text-label font-bold text-ink">送り方</span>
+            <span className="text-label font-medium text-ink">送り方</span>
             <div className="flex flex-wrap gap-1.5">
               {CHANNELS.map((ch) => (
                 <FilterChip key={ch.key} selected={form.channels.includes(ch.key)} onChange={() => setForm((f) => ({ ...f, channels: toggle(f.channels, ch.key) }))}>{ch.label}</FilterChip>
@@ -238,16 +238,16 @@ export default function OpsAnnouncementsPage() {
             </div>
           </div>
           <div className="grid gap-1.5">
-            <span className="text-label font-bold text-ink">公開日時</span>
+            <span className="text-label font-medium text-ink">公開日時</span>
             <DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" />
             <span className="text-micro text-ink-faint">空のまま「今すぐ送る」を押すとすぐに送ります。日時を入れると「配信を予約する」に変わります（日本時間）。</span>
           </div>
-          {editingId ? <Button onClick={() => { setEditingId(null); setBaseline(EMPTY); setForm(EMPTY); setFormError('') }}>直すのをやめる</Button> : null}
+          {editingId ? <Button onClick={() => { setEditingId(null); setBaseline(EMPTY); setForm(EMPTY); setFormError('') }}>キャンセル</Button> : null}
         </section>
 
         <section aria-label="配信済みの表" className="rounded-card border border-hairline bg-canvas xl:col-span-3">
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
-            <h3 className="text-label font-bold text-ink">配信済み・予約・下書き</h3>
+            <h3 className="text-label font-semibold text-ink">配信済み・予約・下書き</h3>
             <span className="text-micro text-ink-faint">{linked ? `契約者専用LINEの登録 ${linked.linked}人 / ${linked.total}人` : ''}</span>
           </header>
           {!loaded ? (
@@ -280,7 +280,7 @@ export default function OpsAnnouncementsPage() {
                 {rows.map((a) => (
                   <Tr key={a.id}>
                     <Td>
-                      <span className="block truncate text-label font-bold text-ink" title={a.subject}>{a.subject}</span>
+                      <span className="block truncate text-label font-medium text-ink" title={a.subject}>{a.subject}</span>
                       <span
                         className="block truncate text-micro text-ink-faint"
                         title={`${a.channelLabels.join('・')}・${a.audienceLabel}${a.lastError ? `・${a.lastError}` : ''}`}
@@ -307,7 +307,7 @@ export default function OpsAnnouncementsPage() {
                       {a.status === 'draft' || a.status === 'scheduled' ? (
                         <span className="inline-flex gap-2">
                           <Button size="field" onClick={() => edit(a)} disabled={busy}>直す</Button>
-                          <Button size="field" onClick={() => setDeleting(a)} disabled={busy}>消す</Button>
+                          <Button size="field" onClick={() => setDeleting(a)} disabled={busy}>削除する</Button>
                         </span>
                       ) : null}
                     </Td>
@@ -333,7 +333,7 @@ export default function OpsAnnouncementsPage() {
         open={deleting !== null}
         title={deleting ? `「${deleting.subject}」を消しますか？` : ''}
         description="下書き・予約を消します。配信済みのものは消せません。"
-        confirmLabel="消す"
+        confirmLabel="削除する"
         destructive
         busy={busy}
         error={formError}

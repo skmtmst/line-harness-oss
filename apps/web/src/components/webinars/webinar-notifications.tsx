@@ -15,6 +15,7 @@ import Select from '@/components/shared/select'
 import { audienceText } from '@/app/webinars/overview-view'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
+import { formatNumber } from '@/lib/format'
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -30,7 +31,7 @@ import { notifyToast } from '@/components/shared/toast'
 /** 数を出してよいのは読めたときだけ。**読めていないものを 0 と書かない。** */
 function countText(value: number | undefined, available: boolean): string {
   return available && typeof value === 'number' && Number.isFinite(value)
-    ? value.toLocaleString('ja-JP')
+    ? formatNumber(value)
     : '—'
 }
 
@@ -315,7 +316,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         待ち・送信済み・失敗・見送り・取消を分けて出す。
         読めていないときは `—`——「失敗 0 件」と「まだ数えていない」を混ぜない。
       */}
-      <dl className="border-hairline grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-hairline sm:grid-cols-3">
+      <dl className="border-hairline grid grid-cols-2 gap-px overflow-hidden rounded-card border bg-hairline sm:grid-cols-3">
         {[
           ['予定', overview?.pending],
           ['送信済み', overview?.sent],
@@ -340,13 +341,13 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         0 件のときは出さない——常に空の枠があると、誰も見なくなる。
       */}
       {available && (overview?.skippedReasons?.length ?? 0) > 0 && (
-        <div className="border-hairline rounded-xl border p-4" data-testid="webinar-skip-reasons">
-          <p className="text-ink text-xs font-bold">見送りの内訳</p>
+        <div className="border-hairline rounded-card border p-4" data-testid="webinar-skip-reasons">
+          <p className="text-ink text-xs font-medium">見送りの内訳</p>
           <ul className="mt-2 space-y-1">
             {overview!.skippedReasons.map((reason) => (
               <li key={reason.code ?? 'unknown'} className="text-ink-secondary flex justify-between gap-4 text-xs">
                 <span>{reason.label}</span>
-                <span className="text-ink font-bold tabular-nums">{reason.count.toLocaleString('ja-JP')}件</span>
+                <span className="text-ink font-bold tabular-nums">{formatNumber(reason.count)}件</span>
               </li>
             ))}
           </ul>
@@ -364,7 +365,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         <p className="text-ink-faint mt-1 text-xs">{audience.note}</p>
       </div>
 
-      <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-xl border">
+      <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-card border">
         {rows.map((row) => (
           <li key={row.key} className="bg-canvas flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <Checkbox
@@ -383,8 +384,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       {error && <Notice tone="danger">{error}</Notice>}
 
       <div className="flex justify-end">
-        <Button variant="primary" onClick={() => void save()} disabled={saving}>
-          {saving ? '保存中…' : '通知の設定を保存'}
+        <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving}>通知の設定を保存する
         </Button>
       </div>
     </section>

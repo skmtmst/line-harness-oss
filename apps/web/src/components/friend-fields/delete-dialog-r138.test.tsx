@@ -77,7 +77,7 @@ describe('R138 タグ削除の確認窓', () => {
     })
     // 背後の保存ではなく窓内の最後（タグを削除）へ回る。
     expect(dialog.contains(document.activeElement)).toBe(true)
-    expect((document.activeElement as HTMLElement).textContent).toContain('タグを削除')
+    expect((document.activeElement as HTMLElement).textContent).toContain('タグを削除する')
   })
 
   test('Escape で閉じる', async () => {

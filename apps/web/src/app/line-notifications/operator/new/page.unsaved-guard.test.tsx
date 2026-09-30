@@ -81,7 +81,7 @@ async function typeName(value: string) {
 }
 
 function quitLink(): HTMLAnchorElement {
-  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent === 'やめる')
+  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent === 'キャンセル')
   if (!link) throw new Error('やめるのリンクが見つかりません')
   return link as HTMLAnchorElement
 }

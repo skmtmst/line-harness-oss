@@ -45,9 +45,9 @@ describe('「？」の正円', () => {
   it('箱は枠つき（ink-faint・canvas）で、中の「?」は 11px 太字 ink-secondary', () => {
     expect(CSS).toContain('border: 1px solid var(--color-ink-faint);')
     expect(CSS).toContain('background: var(--color-canvas);')
-    expect(CSS).toContain('border-radius: 50%;')
+    expect(CSS).toContain('border-radius: var(--radius-pill);')
     expect(CSS).toContain('font-size: var(--text-micro);')
-    expect(CSS).toContain('font-weight: 700;')
+    expect(CSS).toContain('font-weight: 500;')
   })
 
   it('lucide の丸いアイコン・枠なし・透明地は使わない', () => {

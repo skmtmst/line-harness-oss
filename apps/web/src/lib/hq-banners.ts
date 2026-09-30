@@ -6,6 +6,8 @@
  * テストしやすくしておく。
  */
 
+import { formatDateTime, formatRelative } from './format'
+
 export type BannerPresetGroup = 'line' | 'sns'
 
 export interface BannerPreset {
@@ -306,46 +308,21 @@ export function parseJstDateTime(value: string): Date {
   return new Date(hasOffset ? normalized : `${normalized}+09:00`)
 }
 
-/** 「9/12 21:40」。運用画面の基準は日本時間。 */
+/** 「9月12日（土）21:40」。運用画面の基準は日本時間（`@/lib/format`）。 */
 export function shortDateTime(iso: string, now = new Date()): string {
   const date = parseJstDateTime(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  const fmt = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-  const parts = fmt.formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  const sameYear =
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(date) ===
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(now)
-  const dayPart = `${get('month')}/${get('day')}`
-  const timePart = `${get('hour')}:${get('minute')}`
-  return sameYear ? `${dayPart} ${timePart}` : `${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(date)}/${dayPart} ${timePart}`
+  return formatDateTime(date, '—', now)
 }
 
 /**
- * 「3分前」「昨日」「9/5」。プロジェクトカードの「更新」に使う。
+ * 「3分前」「昨日 21:40」「9月5日（金）」。プロジェクトカードの「更新」に使う。
  * `docs/v6-common-rules.md` §2-7: 分の生表示は日で丸める。
  */
 export function relativeUpdated(iso: string, now = new Date()): string {
   const date = parseJstDateTime(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  const diffMs = now.getTime() - date.getTime()
-  const minutes = Math.floor(diffMs / 60000)
-  if (minutes < 1) return 'たった今'
-  if (minutes < 60) return `${minutes}分前`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}時間前`
-  const days = Math.floor(hours / 24)
-  if (days === 1) return '昨日'
-  if (days < 7) return `${days}日前`
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}`
+  return formatRelative(date, now)
 }
 
 /** 「412KB」「1.2MB」 */

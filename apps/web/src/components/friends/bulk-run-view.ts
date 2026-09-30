@@ -5,6 +5,7 @@ import type {
   FriendBulkRunStatus,
   FriendBulkItemStatus,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 友だちの一括操作（設計 `IAf7j` 3-1-C）。
@@ -42,7 +43,7 @@ export function operationLabel(kind: string): string {
 /** 人数の見え方。**未取得は `—`。実値0は `0`。** */
 export function countText(value: number | null | undefined, unit: string): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return NOT_AVAILABLE
-  return `${value.toLocaleString('ja-JP')}${unit}`
+  return `${formatNumber(value)}${unit}`
 }
 
 /**

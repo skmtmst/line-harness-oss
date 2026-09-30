@@ -37,7 +37,8 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-panel);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-card);
+  /* ★V7 の影は3段。画面の真ん中に開く窓は最前面（段3）。 */
+  box-shadow: var(--shadow-overlay);
   padding: 18px;
   color: var(--color-ink);
 }
@@ -110,7 +111,7 @@
 
 .title {
   margin: 0;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 

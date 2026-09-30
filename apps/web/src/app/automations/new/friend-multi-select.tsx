@@ -82,7 +82,7 @@ export function FriendMultiSelect({
 
   return (
     <div>
-      <p id="au-friends-label" className="text-xs font-bold text-ink">
+      <p id="au-friends-label" className="text-xs font-medium text-ink">
         対象の友だち（{ids.length}人）<RequiredBadge />
       </p>
       {ids.length > 0 ? (
@@ -90,14 +90,14 @@ export function FriendMultiSelect({
           {ids.map((id) => (
             <li
               key={id}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary"
             >
               <span className="max-w-40 truncate" title={labelOf(id)}>{labelOf(id)}</span>
               <button
                 type="button"
                 onClick={() => remove(id)}
                 aria-label={`${labelOf(id)}を外す`}
-                className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-full text-ink-faint hover:text-ink focus-visible:outline-2 focus-visible:outline-status-info"
+                className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-pill text-ink-faint hover:text-ink focus-visible:outline-2 focus-visible:outline-status-info"
               >
                 ×
               </button>
@@ -114,7 +114,7 @@ export function FriendMultiSelect({
           disabled={!accountId}
         />
         {query.trim() ? (
-          <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-control border border-hairline bg-canvas shadow-md">
+          <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-control border border-hairline bg-canvas shadow-card">
             {searching ? (
               <p className="px-3 py-2 text-xs text-ink-faint" role="status">探しています…</p>
             ) : searchFailed ? (
@@ -130,10 +130,10 @@ export function FriendMultiSelect({
                     <li key={option.id} className="flex items-center justify-between gap-2 border-t border-hairline px-3 py-2 first:border-t-0">
                       <span className="min-w-0 truncate text-sm text-ink" title={option.name}>{option.name}</span>
                       {selected ? (
-                        <span className="shrink-0 text-xs font-bold text-accent-deep">選択中 ✓</span>
+                        <span className="shrink-0 text-xs font-medium text-accent-deep">選択中 ✓</span>
                       ) : (
                         <Button variant="secondary" disabled={full} onClick={() => add(option.id, option.name)}>
-                          追加
+                          追加する
                         </Button>
                       )}
                     </li>

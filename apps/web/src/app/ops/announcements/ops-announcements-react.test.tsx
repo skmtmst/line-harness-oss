@@ -190,7 +190,7 @@ describe('画面', () => {
     await flush()
     expect(host.textContent).toContain('まだお知らせはありません')
     // 件名も本文も空のまま「下書きとして保存」→ 入力の検証エラー
-    await act(async () => { button('下書きとして保存')!.click() })
+    await act(async () => { button('下書きを保存する')!.click() })
     await flush()
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('件名を入力してください')
     // 一覧は「読み込み失敗」に変わらず、空の案内のまま保つ
