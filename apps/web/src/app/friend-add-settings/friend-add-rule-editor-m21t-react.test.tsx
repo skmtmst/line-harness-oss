@@ -157,6 +157,13 @@ async function choose(label: string, value: string) {
   })
 }
 
+function deliverySummaryValue() {
+  const label = [...host.querySelectorAll('.friend-add-editor-summary span')]
+    .find((item) => item.textContent === '配信')
+  if (!label?.nextElementSibling) throw new Error(`delivery row: ${host.textContent}`)
+  return label.nextElementSibling.textContent
+}
+
 function button(label: string) {
   const node = [...host.querySelectorAll('button')].find((item) => item.textContent?.includes(label))
   if (!node) throw new Error(`${label}: ${host.textContent}`)
@@ -246,6 +253,19 @@ describe('R261 再追加「何も配信しない」は配信欄を適用外に�
     await renderExisting({ returningMode: 'other', messageText: 'おかえりなさい' })
     expect(host.querySelector('[data-caption="再追加では配信しません"]')).toBeNull()
     expect(host.textContent).toContain('おかえりなさい')
+  })
+
+  it('R261残部: 基本段のサマリーは配信なし設定を「なし」と出す', async () => {
+    // 保存済みの本文が残っていても、届く設定かのように見せない。
+    state.search = 'step=basic'
+    await renderExisting({ returningMode: 'none', messageText: 'おかえりなさい' })
+    expect(deliverySummaryValue()).toBe('なし')
+  })
+
+  it('基本段のサマリーは「別のシナリオ」の保存済み本文を配信ありと出す', async () => {
+    state.search = 'step=basic'
+    await renderExisting({ returningMode: 'other', messageText: 'おかえりなさい' })
+    expect(deliverySummaryValue()).toBe('テキストメッセージ')
   })
 
   it('「別のシナリオ」では通常どおり本文・シナリオ欄を出す', async () => {
