@@ -1250,6 +1250,22 @@ function FriendDetailInner() {
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
 
+  /*
+   * M012：読み込み 403（権限不足）は見つからない案内より先に分ける。
+   * 403 のとき error は空文字なので、後の `!error && !friend` の受け皿に
+   * 先に捕まると権限の面が出ない（監査 228-003 の再発）。順番で守る。
+   * 再試行口は出さない（押し直しても直らないため）。誰に確認するかを添える。
+   */
+  if (!loading && loadForbidden) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="この友だちを見る権限がありません"
+        description="見るには権限が要ります。オーナーか管理者の方に確認してください。"
+      />
+    )
+  }
+
   if (!loading && (friendMissing || (!error && !friend))) {
     return (
       <TargetMissing
@@ -1259,20 +1275,6 @@ function FriendDetailInner() {
         accountName={selectedAccount?.name}
         backHref="/friends"
         backLabel="友だち一覧へ戻る"
-      />
-    )
-  }
-
-  /*
-   * M012：読み込み 403（権限不足）。汎用の失敗面とは分け、再試行口は
-   * 出さない（押し直しても直らないため）。誰に確認するかを添える。
-   */
-  if (!loading && loadForbidden) {
-    return (
-      <TargetMissing
-        kind="error"
-        title="この友だちを見る権限がありません"
-        description="見るには権限が要ります。オーナーか管理者の方に確認してください。"
       />
     )
   }

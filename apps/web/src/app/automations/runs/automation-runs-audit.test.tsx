@@ -257,3 +257,29 @@ describe('R494・R495: 再試行の応答消失とCSVの上限', () => {
     expect(el.textContent).toContain('分けて出してください')
   })
 })
+
+describe('R493直リンク: ?runの詳細取得失敗も見せて再試行できる', () => {
+  it('503でも一覧は残し、詳細の失敗と「もう一度読む」を出す', async () => {
+    window.history.replaceState({}, '', '/automations/runs?run=run-1')
+    try {
+      mockFetch.mockImplementation(async () => listResponse([rowA], 1))
+      mockGetRun.mockReset()
+      mockGetRun.mockRejectedValueOnce(new ApiError(503, '読み込めませんでした'))
+      mockGetRun.mockResolvedValue(ok({ ...detailA, id: 'run-1' }))
+      const el = await mountPage()
+      // 合成正常の一覧は使えるまま。
+      expect(el.textContent).toContain('田中さん')
+      // 直リンクの失敗が見える。
+      expect(el.textContent).toContain('詳細を読み込めませんでした')
+      const retry = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'もう一度読む')
+      expect(retry).toBeTruthy()
+      await act(async () => { (retry as HTMLButtonElement).click() })
+      await act(async () => { await drainMicrotasks() })
+      expect(mockGetRun.mock.calls.length).toBeGreaterThanOrEqual(2)
+      // 再試行で詳細が開く。
+      expect(el.textContent).toContain('実行記録の中身')
+    } finally {
+      window.history.replaceState({}, '', '/automations/runs')
+    }
+  })
+})
