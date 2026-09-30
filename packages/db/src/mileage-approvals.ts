@@ -1,7 +1,7 @@
 import { postMileageAdjustment } from './mileage.js';
 import type { MileageLedgerEntry, MileageRuleRow } from './mileage.js';
 import { matchesCondition, parseCondition } from './segment-conditions.js';
-import { jstNow } from './utils.js';
+import { dbTableExists, jstNow } from './utils.js';
 import { MileageV6Error, type MileageEarningRuleDraft } from './mileage-admin-v6.js';
 
 /**
@@ -61,7 +61,14 @@ async function getScopedLedgerEntry(
     .first<MileageLedgerEntry>();
 }
 
-/** 確定待ちの行を利用可能へ進める。確定済みへの再送はそのまま返す。 */
+/**
+ * 確定待ちの行を利用可能へ進める。確定済みへの再送はそのまま返す。
+ *
+ * m25d R359の続き: 確定は UPDATE のため INSERT 時の trigger が発火せず、
+ * 財布の利用可能分も付与内訳も動かないままだった（残高だけ増える）。
+ * 台帳の確定・財布の移動・内訳の作成を同じ batch で書き、再送や同時操作の
+ * 負け分は今回書いた確定印に合うときだけ動かす。
+ */
 export async function confirmPendingMileageEntry(
   db: D1Database,
   input: {
@@ -75,8 +82,30 @@ export async function confirmPendingMileageEntry(
 ): Promise<{ entry: MileageLedgerEntry; alreadyConfirmed: boolean }> {
   const reason = requireReason(input.reason);
   const now = input.occurredAt ?? jstNow();
-  const wrote = await db
-    .prepare(
+  const pending = await getScopedLedgerEntry(db, input.entryId, input.lineAccountId);
+  if (!pending) {
+    throw new MileageV6Error('mileage_entry_not_found', 'マイルの記録が見つかりません', 404);
+  }
+  if (pending.status !== 'pending') {
+    if (pending.status === 'available') return { entry: pending, alreadyConfirmed: true };
+    throw new MileageV6Error(
+      'mileage_entry_invalid_transition',
+      '取り消された記録は確定できません',
+      409,
+    );
+  }
+
+  // 今回だけの確定印。同時操作の負け分は台帳が動かず、この印も付かないため
+  // 財布・内訳の書き込みは印に合うときだけ通る（原子性は batch が守る）。
+  const confirmMarkerSql = `EXISTS (
+    SELECT 1 FROM mileage_ledger
+     WHERE id = ?
+       AND status = 'available'
+       AND json_extract(metadata, '$.confirmedByStaffId') = ?
+       AND json_extract(metadata, '$.confirmedAt') = ?
+  )`;
+  const statements: D1PreparedStatement[] = [
+    db.prepare(
       `UPDATE mileage_ledger
           SET status = 'available',
               metadata = json_set(COALESCE(metadata, '{}'),
@@ -85,14 +114,98 @@ export async function confirmPendingMileageEntry(
                 '$.confirmedReason', ?,
                 '$.confirmedAt', ?)
         WHERE id = ? AND status = 'pending'`,
-    )
-    .bind(input.staffId, input.staffName, reason, now, input.entryId)
-    .run();
+    ).bind(input.staffId, input.staffName, reason, now, input.entryId),
+  ];
+  if (await dbTableExists(db, 'mileage_wallets')) {
+    statements.push(
+      db.prepare(
+        `INSERT INTO mileage_wallets
+           (program_id, beneficiary_key, beneficiary_user_id, beneficiary_friend_id,
+            available, pending, version, updated_at)
+         SELECT ?, CASE
+              WHEN COALESCE(?, f.user_id) IS NOT NULL
+              THEN 'user:' || COALESCE(?, f.user_id)
+              ELSE 'friend:' || ?
+            END,
+            COALESCE(?, f.user_id),
+            CASE WHEN COALESCE(?, f.user_id) IS NULL THEN ? ELSE NULL END,
+            ?, ?, 1, ?
+           FROM (SELECT 1) seed
+           LEFT JOIN friends f ON f.id = ?
+          WHERE ${confirmMarkerSql}
+         ON CONFLICT(program_id, beneficiary_key) DO UPDATE SET
+           available = mileage_wallets.available + excluded.available,
+           pending = mileage_wallets.pending + excluded.pending,
+           version = mileage_wallets.version + 1,
+           updated_at = excluded.updated_at`,
+      ).bind(
+        pending.program_id,
+        pending.beneficiary_user_id,
+        pending.beneficiary_user_id,
+        pending.beneficiary_friend_id,
+        pending.beneficiary_user_id,
+        pending.beneficiary_user_id,
+        pending.beneficiary_friend_id,
+        pending.amount,
+        -pending.amount,
+        now,
+        pending.beneficiary_friend_id,
+        input.entryId,
+        input.staffId,
+        now,
+      ),
+    );
+  }
+  if (
+    pending.amount > 0 &&
+    (pending.entry_type === 'grant' || pending.entry_type === 'adjustment') &&
+    (await dbTableExists(db, 'mileage_grant_lots'))
+  ) {
+    statements.push(
+      db.prepare(
+        `INSERT OR IGNORE INTO mileage_grant_lots
+           (ledger_entry_id, program_id, beneficiary_key, original_amount, remaining_amount,
+            available_at, expires_at, status, created_at)
+         SELECT ?, ?,
+                CASE
+                  WHEN COALESCE(?, f.user_id) IS NOT NULL
+                  THEN 'user:' || COALESCE(?, f.user_id)
+                  ELSE 'friend:' || ?
+                END,
+                ?, ?, ?,
+                json_extract(?, '$.expiresAt'),
+                'available', ?
+           FROM (SELECT 1) seed
+           LEFT JOIN friends f ON f.id = ?
+          WHERE ${confirmMarkerSql}`,
+      ).bind(
+        pending.id,
+        pending.program_id,
+        pending.beneficiary_user_id,
+        pending.beneficiary_user_id,
+        pending.beneficiary_friend_id,
+        pending.amount,
+        pending.amount,
+        pending.occurred_at,
+        pending.metadata,
+        pending.created_at,
+        pending.beneficiary_friend_id,
+        input.entryId,
+        input.staffId,
+        now,
+      ),
+    );
+  }
+  const batchResults = (await db.batch(statements)) as Array<{
+    meta?: { changes?: unknown };
+  }>;
+  const ledgerChanges = Number(batchResults[0]?.meta?.changes ?? 0);
+
   const entry = await getScopedLedgerEntry(db, input.entryId, input.lineAccountId);
   if (!entry) {
     throw new MileageV6Error('mileage_entry_not_found', 'マイルの記録が見つかりません', 404);
   }
-  if (wrote.meta.changes > 0) return { entry, alreadyConfirmed: false };
+  if (ledgerChanges > 0) return { entry, alreadyConfirmed: false };
   if (entry.status === 'available') return { entry, alreadyConfirmed: true };
   throw new MileageV6Error(
     'mileage_entry_invalid_transition',
@@ -110,6 +223,24 @@ export async function confirmPendingMileageEntry(
  *   残高を下回る取消は受け付けない。
  * - void: 再送とみなして既存の逆向き行を返す。
  */
+/**
+ * m25d R359: 取り消した付与の未使用分を交換対象から外す。
+ * 交換の内訳はロットから選ぶため、台帳の取消だけでは取消済みロットが
+ * 使われてしまう。使い切った分は交換側の予約が残り、未使用分だけを
+ * 無効化する（紹介成果の却下と同じ考え方）。条件付きなので冪等。
+ */
+async function voidGrantLotForEntry(db: D1Database, entryId: string): Promise<void> {
+  if (!(await dbTableExists(db, 'mileage_grant_lots'))) return;
+  await db
+    .prepare(
+      `UPDATE mileage_grant_lots
+          SET remaining_amount = 0, status = 'void'
+        WHERE ledger_entry_id = ? AND status = 'available'`,
+    )
+    .bind(entryId)
+    .run();
+}
+
 export async function voidMileageLedgerEntry(
   db: D1Database,
   input: {
@@ -134,6 +265,9 @@ export async function voidMileageLedgerEntry(
     .bind(idempotencyKey)
     .first<{ id: string }>();
   if (existingReversal) {
+    // m25d R359: 再送時も内訳を無効化し直す（冪等で二重の影響なし）。
+    // 初回が落ちた後に残った使用可能ロットをここで閉じる。
+    await voidGrantLotForEntry(db, entry.id);
     return { entry, reversalEntryId: existingReversal.id, replayed: true };
   }
 
@@ -254,13 +388,18 @@ export async function voidMileageLedgerEntry(
         .prepare(`SELECT id FROM mileage_ledger WHERE idempotency_key = ?`)
         .bind(idempotencyKey)
         .first<{ id: string }>();
-      if (raced) return { entry, reversalEntryId: raced.id, replayed: true };
+      if (raced) {
+        await voidGrantLotForEntry(db, entry.id);
+        return { entry, reversalEntryId: raced.id, replayed: true };
+      }
       throw new MileageV6Error(
         'insufficient_balance',
         '利用可能な残高が足りないため取消できません',
         409,
       );
     }
+    // m25d R359: 台帳の取消と同時に内訳も使用不可にする（同じ処理で整合）。
+    await voidGrantLotForEntry(db, entry.id);
     return { entry, reversalEntryId: reversalId, replayed: false };
   }
 
