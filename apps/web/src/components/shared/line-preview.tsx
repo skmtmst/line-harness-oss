@@ -16,6 +16,7 @@
  */
 import type { ReactNode } from 'react'
 import HelpTip from './help-tip'
+import styles from './line-preview.module.css'
 
 export interface LinePreviewProps {
   /** 枠の中身。各画面の吹き出し・カードをそのまま渡す。 */
@@ -44,7 +45,7 @@ export default function LinePreview({
   empty = false,
 }: LinePreviewProps) {
   return (
-    <section aria-label="LINEプレビュー" className="rounded-card bg-line-talk p-4">
+    <section aria-label="LINEプレビュー" className={`${styles.frame} rounded-card bg-line-talk p-4`}>
       <p className="flex items-center justify-center gap-1.5 text-center text-sm font-bold text-ink">
         <span>LINEプレビュー</span>
         {note ? <HelpTip label="LINEプレビューの説明">{note}</HelpTip> : null}

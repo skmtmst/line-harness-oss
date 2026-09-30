@@ -29,6 +29,7 @@ export default function OtpInput({
   invalid = false,
   disabled = false,
   autoFocus = false,
+  success = false,
 }: {
   value: string
   onChange: (value: string) => void
@@ -45,6 +46,11 @@ export default function OtpInput({
   invalid?: boolean
   disabled?: boolean
   autoFocus?: boolean
+  /**
+   * 確認できた（コードが合った）とき true。V8 では6マスに緑の輪郭が
+   * 順に描かれる。呼び出し側が検証結果を持っているときだけ渡す。
+   */
+  success?: boolean
 }) {
   const refs = useRef<Array<HTMLInputElement | null>>([])
   /**
@@ -147,6 +153,7 @@ export default function OtpInput({
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
       className={styles.group}
+      data-state={invalid ? 'error' : success ? 'success' : undefined}
     >
       {Array.from({ length }, (_, index) => (
         <input

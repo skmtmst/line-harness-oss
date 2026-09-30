@@ -536,6 +536,9 @@
   "components/shared/chip.tsx": {
     "unresolved-classname": 1
   },
+  "components/shared/color-well.tsx": {
+    "unresolved-classname": 13
+  },
   "components/shared/condition-builder.tsx": {
     "unresolved-classname": 4
   },
@@ -550,6 +553,9 @@
   "components/shared/date-time-field.tsx": {
     "unresolved-classname": 25
   },
+  "components/shared/delete-button.tsx": {
+    "unresolved-classname": 5
+  },
   "components/shared/disclosure.tsx": {
     "unresolved-classname": 6
   },
@@ -558,6 +564,9 @@
   },
   "components/shared/help-tip.tsx": {
     "unresolved-classname": 4
+  },
+  "components/shared/line-preview.tsx": {
+    "unresolved-classname": 1
   },
   "components/shared/list-kpis.tsx": {
     "unresolved-classname": 1

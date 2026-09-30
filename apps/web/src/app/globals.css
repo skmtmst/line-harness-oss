@@ -509,6 +509,46 @@ html:not([data-theme="v8"]) .v8-only {
   }
 }
 
+/*
+ * ★V8「骨格の行」（MOTION.md）：v7 の点滅（animate-pulse）ではなく、
+ * 光が左から右へ流れる（1200ms・繰り返し）。`data-skeleton` は
+ * shared/skeleton.tsx が付ける印。Tailwind の animate-pulse（utilities
+ * 層）よりここ（層なし）が強いので、v8 ではこの動きが勝つ。
+ * 「動きを減らす」設定では末尾の規定で一瞬になる。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-skeleton] {
+    background-image: linear-gradient(
+      100deg,
+      transparent 40%,
+      rgb(255 255 255 / 0.55) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: v8-skeleton-shimmer 1200ms linear infinite;
+  }
+}
+
+@keyframes v8-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * ★V8「手順」（NUOgw）：白い板の中に枠付きカードを重ねない。
+ * 段の丸・文字・つなぎ線は変えず、囲い（枠・地・余白）だけを取る。
+ */
+[data-theme="v8"] [data-part="stepper"] {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
 /* ---------------------------------------------------------------------
  * #673 触った感触（emil/apple/interaction-design）
  *

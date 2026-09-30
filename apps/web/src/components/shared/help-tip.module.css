@@ -102,4 +102,18 @@
   outline: 2px solid var(--color-status-info);
   outline-offset: 1px;
 }
+
+/*
+ * ★V8 `f6zwfs`：ふきだしは黒（ink）の地に白い字。印の18px正円は変えない。
+ */
+[data-theme='v8'] .tip {
+  border-color: transparent;
+  background: var(--color-ink);
+  box-shadow: var(--shadow-float);
+  color: var(--color-canvas);
+}
+
+[data-theme='v8'] .tip a {
+  color: var(--color-accent);
+}
 }

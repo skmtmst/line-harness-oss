@@ -17,6 +17,7 @@ import { collectReport } from '../../scripts/theme-migration-report.mjs'
 
 const WEB = join(__dirname, '..', '..')
 const SHARED = join(WEB, 'src/components/shared')
+const globals = readFileSync(join(WEB, 'src/app/globals.css'), 'utf8')
 const css = (name: string) => readFileSync(join(SHARED, name), 'utf8')
 const tsx = (name: string) => readFileSync(join(SHARED, name), 'utf8')
 
@@ -95,10 +96,72 @@ describe('V8 移行④b — 一覧まわり', () => {
     expect(css('toast.module.css')).toContain('@keyframes toast-v8-enter')
   })
 
+  it('骨格の行：v8 では光が左から右へ流れる（globals の data-skeleton 規定）', () => {
+    expect(globals).toContain('[data-theme="v8"] [data-skeleton]')
+    expect(globals).toContain('@keyframes v8-skeleton-shimmer')
+    expect(globals).toContain('1200ms')
+  })
+
+  it('？・ふきだし：v8 では吹き出しが黒い地に白い字（Pencil `f6zwfs`）', () => {
+    const blocks = v8Blocks(css('help-tip.module.css'), 'help-tip')
+    expect(blocks).toContain('background: var(--color-ink)')
+    expect(blocks).toContain('color: var(--color-canvas)')
+  })
+
+  it('手順：v8 では白い板の中に枠付きカードを重ねない（globals 規定）', () => {
+    expect(tsx('stepper.tsx')).toContain('data-part="stepper"')
+    expect(globals).toContain('[data-theme="v8"] [data-part="stepper"]')
+  })
+
+  it('空の表示：v8 では真珠地のカードを重ねず平らにする', () => {
+    const blocks = v8Blocks(css('list-state.module.css'), 'list-state')
+    expect(blocks).toContain('background: transparent')
+  })
+
+  it('LINE の見え方：v8 では板の決まり（細い枠・radius-panel・board の影）にそろえる', () => {
+    expect(tsx('line-preview.tsx')).toContain('styles.frame')
+    const blocks = v8Blocks(css('line-preview.module.css'), 'line-preview')
+    expect(blocks).toContain('border: 1px solid var(--color-board-line)')
+    expect(blocks).toContain('border-radius: var(--radius-panel)')
+  })
+
   it('台帳がこの回の部品を v8対応済みと数える', { timeout: 60_000 }, () => {
     const report = collectReport()
-    const done = ['板の頭', '表（見出し・行・横に送れる表）', '道具の1段', 'ページ送り', '数のマス・数の帯', '選ぶカード', '経路の札', '進みの棒', 'ダイアログ', '知らせ']
+    const done = ['板の頭', '表（見出し・行・横に送れる表）', '道具の1段', 'ページ送り', '数のマス・数の帯', '選ぶカード', '経路の札', '進みの棒', 'ダイアログ', '知らせ', '骨格の行', '顔', '？・ふきだし', '帯／案内', '手順', '空の表示', 'LINE の見え方']
     for (const name of done) {
+      const part = report.parts.find((p) => p.name === name)
+      expect(part?.status, `${name} が v8対応済みになっていない`).toBe('v8対応済み')
+    }
+  })
+})
+
+describe('V8 移行④c — V8 で新たに生えた部品', () => {
+  it('OTP入力：success 状態があり、v8 では緑の輪郭の規定を持つ', () => {
+    expect(tsx('otp-input.tsx')).toContain('success')
+    const blocks = v8Blocks(css('otp-input.module.css'), 'otp-input')
+    expect(blocks).toContain('var(--color-accent-deep)')
+  })
+
+  it('削除ボタン：タイル → 確認の帯（✓/×）。Esc でやめられる', () => {
+    const src = tsx('delete-button.tsx')
+    expect(src).toContain('onConfirm')
+    expect(src).toContain("event.key === 'Escape'")
+    expect(css('delete-button.module.css')).toContain('.confirm')
+    expect(css('delete-button.module.css')).toContain('var(--color-status-danger)')
+  })
+
+  it('色を選ぶ：macOS カラーウェル（見本＋格子＋十六進の欄）', () => {
+    const src = tsx('color-well.tsx')
+    expect(src).toContain('role="listbox"')
+    expect(src).toContain('EyeDropper')
+    const sheet = css('color-well.module.css')
+    expect(sheet).toContain('grid-template-columns: repeat(8, 1fr)')
+    expect(sheet).toContain('@keyframes color-well-pop')
+  })
+
+  it('台帳が新部品3件を v8対応済み（v8Only）と数える', { timeout: 60_000 }, () => {
+    const report = collectReport()
+    for (const name of ['OTP入力', '削除ボタン', '色を選ぶ']) {
       const part = report.parts.find((p) => p.name === name)
       expect(part?.status, `${name} が v8対応済みになっていない`).toBe('v8対応済み')
     }
