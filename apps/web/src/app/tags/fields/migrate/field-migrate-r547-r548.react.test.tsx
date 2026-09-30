@@ -97,7 +97,7 @@ function runData(status: string) {
 }
 
 function previewButtons(): HTMLButtonElement[] {
-  return screen.getAllByRole('button', { name: '項目を作成して事前確認' }) as HTMLButtonElement[]
+  return screen.getAllByRole('button', { name: '項目を作って事前確認' }) as HTMLButtonElement[]
 }
 
 function executeButton(): HTMLButtonElement | null {
