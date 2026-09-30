@@ -54,6 +54,11 @@
     "radius": 0,
     "shadow": 0
   },
+  "app/visual-qa/v8-parts/page.tsx": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
   "components/accounts/account-ordering.tsx": {
     "color": 0,
     "radius": 0,
@@ -114,10 +119,25 @@
     "radius": 1,
     "shadow": 1
   },
+  "components/shared/color-well.module.css": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 2
+  },
+  "components/shared/color-well.tsx": {
+    "color": 24,
+    "radius": 0,
+    "shadow": 0
+  },
   "components/shared/combobox.module.css": {
     "color": 0,
     "radius": 0,
     "shadow": 1
+  },
+  "components/shared/data-table.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
   },
   "components/shared/date-field.module.css": {
     "color": 0,
@@ -127,6 +147,16 @@
   "components/shared/folder-add-dialog.tsx": {
     "color": 8,
     "radius": 0,
+    "shadow": 0
+  },
+  "components/shared/kpi-card.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/list-state.module.css": {
+    "color": 0,
+    "radius": 1,
     "shadow": 0
   },
   "components/shared/menu-portal.tsx": {
@@ -142,7 +172,7 @@
   "components/shared/otp-input.module.css": {
     "color": 0,
     "radius": 0,
-    "shadow": 1
+    "shadow": 3
   },
   "components/shared/radio-card.module.css": {
     "color": 0,

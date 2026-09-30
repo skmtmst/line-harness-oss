@@ -66,4 +66,16 @@ button.item:disabled {
     min-height: 44px;
   }
 }
+
+/*
+ * ★V8「ページ送り」（jX2Uw）：高さ 36・角丸 control・数字のマスは
+ * 36×36 にそろえる。いまのページの緑は変えない。
+ */
+[data-theme='v8'] .item {
+  height: 36px;
+}
+
+[data-theme='v8'] .page {
+  width: 36px;
+}
 }
