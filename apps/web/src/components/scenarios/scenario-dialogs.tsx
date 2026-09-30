@@ -22,6 +22,7 @@ import ConditionBuilder, {
   findInvalidRangeIssue,
   isEmptyCondition,
   isRuleComplete,
+  isStructurallyEmpty,
   pruneCondition,
   type SegmentCondition,
   type SegmentRule,
@@ -229,7 +230,11 @@ export function ConditionDialog({
                   type="button"
                   onClick={() => {
                     const next = { ...draft, rules: draft.rules.filter((_, r) => r !== i) }
-                    setDraft(isEmptyCondition(next) ? null : next)
+                    /*
+                     * S4-OR: 残った空のかたまりは下書きとして残す。素の空
+                     * （行もかたまりも無し）のときだけ null へ戻す。
+                     */
+                    setDraft(isStructurallyEmpty(next) ? null : next)
                   }}
                   className="text-danger shrink-0 text-xs"
                 >
@@ -252,7 +257,8 @@ export function ConditionDialog({
                       ...draft,
                       groups: (draft.groups ?? []).filter((_, g) => g !== gi),
                     }
-                    setDraft(isEmptyCondition(next) ? null : next)
+                    /* S4-OR: 消したかたまり以外は残す。素の空のときだけ null。 */
+                    setDraft(isStructurallyEmpty(next) ? null : next)
                   }}
                   className="text-danger shrink-0 text-xs"
                 >
