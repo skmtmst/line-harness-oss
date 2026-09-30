@@ -263,7 +263,7 @@ describe('文言と実態の一致・書きかけの保護（実mount・#935）'
     expect(navigation.push).not.toHaveBeenCalled()
 
     const leave = Array.from(document.body.querySelectorAll('button'))
-      .find((b) => b.textContent === '保存せずに移動')
+      .find((b) => b.textContent === '保存せずに移る')
     await click(leave!)
     expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns?tab=auto')
   })

@@ -793,7 +793,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
       </div>
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        description="このまま移動すると、返信文の変更は失われます。下書き保存をしてから移動するか、保存せずに移動してください。"
+        description="このまま移ると、返信文の変更は失われます。下書き保存をしてから移るか、保存せずに移ってください。"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
