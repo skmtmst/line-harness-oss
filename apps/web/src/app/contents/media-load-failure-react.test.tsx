@@ -15,7 +15,7 @@ import type { MediaItem } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
-  mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse',
+  mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse' | 'empty',
   foldersBehavior: 'ok' as 'ok' | 'fail503',
   detailBehavior: 'ok' as 'ok' | 'fail503' | 'fail404' | 'fail403' | 'failFalse',
   detailCalls: [] as Array<{ id: string; accountId: string }>,
@@ -78,6 +78,12 @@ vi.mock('@/lib/api', () => {
           }
           if (fixture.mediaBehavior === 'failFalse') {
             return Promise.resolve({ success: false, error: 'unknown failure' })
+          }
+          if (fixture.mediaBehavior === 'empty') {
+            return Promise.resolve({
+              success: true,
+              data: { items: [], total: 0, limit: 20, offset: 0 },
+            })
           }
           return Promise.resolve({
             success: true,
@@ -311,5 +317,55 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeUndefined()
+  })
+})
+
+describe('m26m 初回503の偽ゼロを出さない', () => {
+  function folderRowButton(label: string): HTMLButtonElement {
+    const found = [...folderPanel().querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent === label || button.textContent?.startsWith(label))
+    if (!found) throw new Error(`フォルダ行「${label}」がありません`)
+    return found
+  }
+
+  it('初回一覧503では「すべて」に件数を出さず、表の下に0件も出さない', async () => {
+    fixture.mediaBehavior = 'fail503'
+    await renderPage()
+    await waitForText('表示できませんでした')
+    // 総数不明なので「すべて0」とは出さない（数は出さない約束）。
+    expect(folderRowButton('すべて').textContent).toBe('すべて')
+    // 表の下の件数も偽ゼロにしない（「20件表示」の選択欄と混同しないよう完全一致で見る）。
+    const zeroRanges = [...host.querySelectorAll('span')].filter((element) => element.textContent === '0件')
+    expect(zeroRanges).toHaveLength(0)
+    expect(host.textContent).not.toContain('件中')
+    // 容量の取得は生きているので残る。
+    expect(host.textContent).toContain('使っている容量')
+    expect(host.textContent).not.toContain('—（未取得）')
+  })
+
+  it('一覧503後の読み直しで正しい件数が戻る', async () => {
+    fixture.mediaBehavior = 'fail503'
+    await renderPage()
+    await waitForText('表示できませんでした')
+    expect(folderRowButton('すべて').textContent).toBe('すべて')
+
+    fixture.mediaBehavior = 'ok'
+    const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent === 'もう一度読み込む')!
+    await act(async () => { retry.click(); await settle() })
+    await waitForText(MEDIA_A.filename)
+    // 復旧後は実件数に戻る。
+    expect(folderRowButton('すべて').textContent).toBe('すべて1')
+    expect(host.textContent).toContain('1件中 1〜1件を表示')
+  })
+
+  it('成功時の純粋0件は0と出す（不明と区別する）', async () => {
+    fixture.mediaBehavior = 'empty'
+    await renderPage()
+    await waitForText('まだメディアがありません')
+    // 成功確定の0はそのまま出す。
+    expect(folderRowButton('すべて').textContent).toBe('すべて0')
+    const zeroRanges = [...host.querySelectorAll('span')].filter((element) => element.textContent === '0件')
+    expect(zeroRanges.length).toBeGreaterThan(0)
   })
 })
