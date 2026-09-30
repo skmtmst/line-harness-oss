@@ -75,6 +75,9 @@ function Handover() {
   const canManage = staffRole === null || canManageRole(staffRole)
   const [account, setAccount] = useState<LineAccount | null>(null)
   const [accounts, setAccounts] = useState<LineAccount[]>([])
+  /** 補助の一覧（受け取り先の名前）だけの失敗。本体は隠さず、ここだけ読み直す（R521）。 */
+  const [accountsFailed, setAccountsFailed] = useState(false)
+  const [accountsRetrying, setAccountsRetrying] = useState(false)
   const [handover, setHandover] = useState<HandoverView | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
@@ -104,22 +107,54 @@ function Handover() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
+  /**
+   * 補助の一覧（受け取り先の名前）だけを読む。本体とは成否を分ける。
+   * ここが503でも引継ぎの内容は隠さない（R521）。成功したら印を消す。
+   */
+  const loadAccounts = useCallback(async () => {
+    try {
+      const accountsRes = await api.lineAccounts.list()
+      if (!accountsRes.success) {
+        setAccountsFailed(true)
+        return
+      }
+      setAccounts(accountsRes.data)
+      setAccountsFailed(false)
+    } catch {
+      setAccountsFailed(true)
+    }
+  }, [])
+
+  /** 補助の一覧だけ読み直す。二度押しを止める。 */
+  const retryAccounts = useCallback(async () => {
+    if (accountsRetrying) return
+    setAccountsRetrying(true)
+    try {
+      await loadAccounts()
+    } finally {
+      setAccountsRetrying(false)
+    }
+  }, [accountsRetrying, loadAccounts])
+
   const load = useCallback(async () => {
     if (!id) return
     setStatus('loading')
     setMissing(false)
+    /*
+      補助の一覧は本体と並行に読むが、成否は分けて持つ。ここが失敗しても
+      下の本体の読み込みは続け、画面全体を失敗にしない（R521）。
+    */
+    void loadAccounts()
     try {
-      const [accountRes, accountsRes, handoversRes] = await Promise.all([
+      const [accountRes, handoversRes] = await Promise.all([
         api.lineAccounts.get(id),
-        api.lineAccounts.list(),
         api.accountHandovers.listForAccount(id),
       ])
-      if (!accountRes.success || !accountsRes.success || !handoversRes.success) {
+      if (!accountRes.success || !handoversRes.success) {
         setStatus('error')
         return
       }
       setAccount(accountRes.data)
-      setAccounts(accountsRes.data)
       const current = handoversRes.data[0]
       if (!current) {
         setHandover(null)
@@ -148,7 +183,7 @@ function Handover() {
       }
       setStatus('error')
     }
-  }, [id])
+  }, [id, loadAccounts])
 
   useEffect(() => { void load() }, [load])
   usePageTitle('乗り換え・引き継ぎ')
@@ -496,6 +531,30 @@ function Handover() {
                 <div className="border-hairline border-l px-3 py-2">受け取り先</div>
               </div>
             </div>
+            {/*
+              補助の一覧だけ読めないとき。本体は隠さず、この帯だけ出す。
+              全体失敗の1枚（TargetMissing）とは別に、ここだけ読み直せる（R521）。
+              赤は使わない（読み込めなかった時の決まり）。
+            */}
+            {accountsFailed && (
+              <Notice
+                tone="warn"
+                className="mt-3"
+                message="受け取り先の一覧だけ読み込めませんでした。引き継ぎの内容はそのまま見られます。"
+                action={(
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={accountsRetrying}
+                    onClick={() => void retryAccounts()}
+                    busy={accountsRetrying}
+                    busyLabel="読み込んでいます"
+                  >
+                    一覧だけ読み直す
+                  </Button>
+                )}
+              />
+            )}
             {handover.providerMatch === 'different' && (
               <Notice tone="warn" className="mt-3">
                 <p className="font-bold">プロバイダーが違うので、友だちのIDは自動でつなげません</p>
