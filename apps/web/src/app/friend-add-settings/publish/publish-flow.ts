@@ -4,6 +4,7 @@ import type {
   FriendAddRoutingVersion,
 } from '@line-crm/shared'
 import { resendSuppressionText } from '../friend-add-text'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 友だち追加時配信の公開（設計 `ec9vg` 最終確認 ／ `quhg6` 有効化完了）。
@@ -24,7 +25,7 @@ export const NOT_AVAILABLE = '—（未取得）'
  */
 export function audienceText(count: number | null | undefined): string {
   if (count === null || count === undefined) return NOT_AVAILABLE
-  return `${count.toLocaleString('ja-JP')}人`
+  return `${formatNumber(count)}人`
 }
 
 const CHECK_TONE = {

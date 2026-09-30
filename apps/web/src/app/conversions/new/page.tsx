@@ -39,6 +39,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { originInfoOf } from '../origin-labels'
 import { useAccount } from '@/contexts/account-context'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 成果地点を作る（設計 V6 19-1-B）。
@@ -364,7 +365,7 @@ export default function NewConversionPointPage() {
       showHeader={false}
       parent={['コンバージョン', '/conversions?tab=points']}
       successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}
-      saveLabel={saveAsDraft ? '下書きとして保存する' : 'つくって数えはじめる'}
+      saveLabel={saveAsDraft ? '下書きを保存する' : 'つくって数えはじめる'}
       designNode="GtylA"
       variant="v6"
       validate={() => {
@@ -436,14 +437,14 @@ export default function NewConversionPointPage() {
             <h2 className="text-info text-sm font-bold">この決めごとをこの30日にあてはめると</h2>
             <div className="mt-3 flex items-end justify-between gap-4" aria-busy={previewLoading}>
               <div>
-                <p className="text-info text-2xl font-bold tabular-nums">{preview ? `${preview.estimatedCount.toLocaleString()}件` : '—'}</p>
-                <p className="text-info mt-1 text-xs tabular-nums">1日あたり {preview ? `${preview.dailyAverage.toLocaleString()}件` : '—'}</p>
+                <p className="text-info text-2xl font-bold tabular-nums">{preview ? `${formatNumber(preview.estimatedCount)}件` : '—'}</p>
+                <p className="text-info mt-1 text-xs tabular-nums">1日あたり {preview ? `${formatNumber(preview.dailyAverage)}件` : '—'}</p>
               </div>
               <div className="text-right">
-                <p className="text-info text-xl font-bold tabular-nums">{preview ? `¥${preview.estimatedValue.toLocaleString()}` : '—'}</p>
+                <p className="text-info text-xl font-bold tabular-nums">{preview ? `¥${formatNumber(preview.estimatedValue)}` : '—'}</p>
                 <p className="text-info mt-1 text-xs tabular-nums">
                   {preview && preview.estimatedCount > 0
-                    ? `1件あたり ¥${Math.round(preview.estimatedValue / preview.estimatedCount).toLocaleString()}`
+                    ? `1件あたり ¥${formatNumber(Math.round(preview.estimatedValue / preview.estimatedCount))}`
                     : '1件あたり —'}
                 </p>
               </div>

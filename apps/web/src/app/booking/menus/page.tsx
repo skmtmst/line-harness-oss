@@ -872,9 +872,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           <Button
             onClick={() => void submit()}
             disabled={saving}
-            variant="primary"
-          >
-            {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作成' : '変更を保存'}
+            variant="primary" busy={saving}>
+            {initial.version === 0 ? '基本ルールを作る' : '保存する'}
           </Button>
         </div>
       ) : (
@@ -1205,9 +1204,7 @@ function EditMenuModal({
               variant="primary"
               onClick={() => void submit()}
               disabled={saving || !canEdit}
-              title={canEdit ? undefined : '予約メニューの変更権限がありません'}
-            >
-              {saving ? '保存中…' : '保存'}
+              title={canEdit ? undefined : '予約メニューの変更権限がありません'} busy={saving}>保存する
             </Button>
           </div>
         }
@@ -1379,7 +1376,7 @@ function EditMenuModal({
                 disabled={resourceSaving || resourceLoadError !== null}
                 className="border-accent text-accent-deep rounded-control border px-3 py-2 text-sm font-semibold disabled:opacity-50"
               >
-                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存'}
+                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存する'}
               </button>
             ) : (
               <p className="text-ink-faint text-xs">設備の割当は閲覧のみです。変更は管理者へ依頼してください。</p>

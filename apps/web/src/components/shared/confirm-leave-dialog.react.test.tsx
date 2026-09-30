@@ -58,12 +58,12 @@ describe('未保存の離脱確認の向き（★V7）', () => {
       open
       title="テスト送信しますか？"
       description="1通だけ送ります。"
-      confirmLabel="テスト送信"
-      cancelLabel="やめる"
+      confirmLabel="テストを送る"
+      cancelLabel="キャンセル"
       onConfirm={vi.fn()}
       onCancel={vi.fn()}
     />)
-    const go = screen.getByRole('button', { name: 'テスト送信' })
+    const go = screen.getByRole('button', { name: 'テストを送る' })
     expect(primaryClass(go)).toMatch(/primary/)
     expect(document.querySelector('svg.lucide-circle-check')).not.toBeNull()
   })

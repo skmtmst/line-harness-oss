@@ -214,7 +214,7 @@ function PoolCard({
               onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
               className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
             >
-              削除
+              削除する
             </button>
           )}
         </div>
@@ -460,9 +460,7 @@ function CreatePoolModal({
             variant="primary"
             onClick={() => { void onSubmit() }}
             disabled={submitting || !slug || !name || !activeAccountId}
-            className="text-sm px-3 py-1.5 rounded-mini bg-action text-on-accent hover:brightness-90 disabled:opacity-50"
-          >
-            {submitting ? '作成中…' : '作成'}
+            className="text-sm px-3 py-1.5 rounded-mini bg-action text-on-accent hover:brightness-90 disabled:opacity-50" busy={submitting} busyLabel="作成中…">作る
           </Button>
         </div>
       </div>

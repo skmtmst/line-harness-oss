@@ -160,7 +160,7 @@ describe('#676 一覧の並び・件数・回答導線（N-172/N-173/N-180/N-181
 
 describe('V6回答フォームの未実装3画面', () => {
   it('vCqUj は12種の追加口・顧客プレビュー・作成元を表示する', () => {
-    expect(EDIT_PAGE).toContain('ブロックを追加（12種）')
+    expect(EDIT_PAGE).toContain('ブロックを追加する（12種）')
     expect(EDIT_PAGE).toContain('お客さまに見える形')
     expect(EDIT_PAGE).toContain('実際にお客さまが見る画面です')
     expect(EDIT_PAGE).toContain('このフォームは {selectedAccount?.name')
@@ -261,7 +261,7 @@ describe('V6回答フォームの未実装3画面', () => {
     expect(RESPONSES_PAGE).toContain('responseResult.data.summary ?? null')
     expect(RESPONSES_PAGE).toContain('completedDestinationWrites(summary)')
     expect(RESPONSES_PAGE).toContain('nextVisitPeople(summary)')
-    expect(RESPONSES_PAGE).toContain('summary.completionRate.toLocaleString')
+    expect(RESPONSES_PAGE).toContain('formatNumber(summary.completionRate)')
     expect(RESPONSES_PAGE).toContain('destinationWriteText(item.destinationWrite)')
     expect(RESPONSES_PAGE).toContain('回答単位の版は未取得')
   })
@@ -325,8 +325,8 @@ describe('V6回答フォームの中項目(#503 M3・M9)', () => {
 
 describe('P 一覧の数・公開前の試し・読みにくい色', () => {
   it('一覧の行に今月の件数と完了率を出し、「？」は見出しに1つだけ置く', () => {
-    expect(PAGE).toContain('今月 ${form.monthlySubmitCount')
-    expect(PAGE).toContain('完了率 ${form.monthlyCompletionRate')
+    expect(PAGE).toContain('今月 ${formatNumber(form.monthlySubmitCount)}件')
+    expect(PAGE).toContain('完了率 ${formatNumber(form.monthlyCompletionRate)}%')
     expect(PAGE).toContain('今月 —')
     expect(PAGE).toContain('完了率 —')
     expect(PAGE).toContain('今月の完了率の説明')

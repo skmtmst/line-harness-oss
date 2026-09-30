@@ -1,3 +1,4 @@
+import { formatNumber } from '@/lib/format'
 /**
  * 成果・アフィリエイト画面の言葉づかい（設計 `PouPn` / `n5VVTb`）。
  *
@@ -50,7 +51,7 @@ export const DUPLICATE_FLAG_TITLE = '同じ友だちの重複'
 
 /** 重複の見出し。件数は実値なので `0件` と混ぜない（0件なら節ごと出さない）。 */
 export function duplicateFlagHeading(count: number): string {
-  return `${DUPLICATE_FLAG_TITLE}（${count.toLocaleString('ja-JP')}件）`
+  return `${DUPLICATE_FLAG_TITLE}（${formatNumber(count)}件）`
 }
 
 /**

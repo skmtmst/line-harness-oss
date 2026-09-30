@@ -374,7 +374,7 @@ describe('ひな形から作る', () => {
     const row = screen.getByText('予約の前日案内').closest('tr') as HTMLElement
     fireEvent.click(within(row).getByRole('button', { name: 'このひな形を使う' }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'やめる' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
 
     expect((screen.getByLabelText('基準日に使う情報欄') as HTMLSelectElement).value).toBe('field-birthday-account-1')
   })
@@ -386,7 +386,7 @@ describe('保存状態の表示', () => {
     render(<NewReminderPage />)
     await screen.findByRole('button', { name: /対象設定へ/ })
     expect(fixture.createDraft).not.toHaveBeenCalled()
-    expect(screen.queryByText('下書き保存')).toBeNull()
+    expect(screen.queryByText('下書きを保存する')).toBeNull()
     expect(screen.getAllByText('未保存').length).toBeGreaterThan(0)
   })
 

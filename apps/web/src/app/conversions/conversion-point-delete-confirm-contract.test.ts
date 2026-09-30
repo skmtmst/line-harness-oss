@@ -69,7 +69,7 @@ describe('成果地点の削除確認', () => {
     for (const choice of ['数えるのをやめる（おすすめ）', '別の成果地点に差し替えてから削除する', 'このまま削除する']) {
       expect(dialog).toContain(choice)
     }
-    expect(dialog).toContain('stopTarget.metrics.netCount.toLocaleString')
+    expect(dialog).toContain('formatNumber(stopTarget.metrics.netCount')
     expect(dialog).toContain('stopImpact?.canDelete')
     expect(dialog).toContain('replacementCandidates')
   })

@@ -33,7 +33,7 @@ describe('飲食店向けHQと店舗追加動線', () => {
   it('デモ作成UIと公開bootstrap呼出しを持たず、空組織を統括へ案内する', () => {
     expect(api).not.toContain('bootstrap:')
     expect(consolePage).not.toContain('restaurantTestApi.bootstrap')
-    expect(consolePage).not.toContain('テスト領域を作成')
+    expect(consolePage).not.toContain('テスト領域を作る')
     expect(consolePage).toContain('統括から店舗を登録してください。')
   })
 

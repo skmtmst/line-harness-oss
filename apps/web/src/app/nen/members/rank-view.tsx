@@ -1,7 +1,8 @@
+import { formatNumber } from '@/lib/format'
 /** 金額（円）。画面の数字はすべてこの形。 */
 export function yen(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  return `¥${Math.round(value).toLocaleString('ja-JP')}`
+  return `¥${formatNumber(Math.round(value))}`
 }
 
 /**

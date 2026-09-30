@@ -17,7 +17,7 @@ describe('カルーセルの呼び方', () => {
   it('「カード」と呼ばない', () => {
     /* 設計・要件の言葉に寄せる。実装だけ違う言葉を使わない。 */
     expect(PART).toContain('パネル {index + 1}')
-    expect(PART).toContain('＋ パネルを追加（{cards.length}/{MAX_PANELS}）')
+    expect(PART).toContain('＋ パネルを追加する（{cards.length}/{MAX_PANELS}）')
     expect(PART).toContain('末尾に「もっと見る」パネルを表示')
     expect(PART, '「カード」が画面に残っている').not.toMatch(/>カード\s|カードを追加|カードを表示/)
   })

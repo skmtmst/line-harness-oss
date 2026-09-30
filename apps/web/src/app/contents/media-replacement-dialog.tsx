@@ -155,12 +155,11 @@ export default function MediaReplacementDialog({
       footer={(
         <div className="flex flex-wrap items-center justify-end gap-2">
           {impact?.canPartiallyReplace && !impact.canReplace ? (
-            <Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy}>
-              {busy ? '差し替えています…' : `差し替え可能な${impact.replaceableCount}か所だけ差し替える`}
+            <Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy} busy={busy} busyLabel="差し替えています…">
+              {`差し替え可能な${impact.replaceableCount}か所だけ差し替える`}
             </Button>
           ) : (
-            <Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace}>
-              {busy ? '差し替えています…' : '使用先を差し替える'}
+            <Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace} busy={busy} busyLabel="差し替えています…">使用先を差し替える
             </Button>
           )}
         </div>

@@ -195,7 +195,7 @@ export default function SegmentPresetControls({
               : undefined}
           className="min-h-0 px-3 py-1 text-xs"
         >
-          この条件を保存
+          この条件を保存する
         </Button>
         <Button
           type="button"
