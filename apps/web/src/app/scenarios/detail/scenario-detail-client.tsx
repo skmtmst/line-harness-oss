@@ -1723,6 +1723,7 @@ export default function ScenarioDetailClient({
           question={stepForm.question}
           kindState={kindState}
           audienceLabel={describeStepAudience(stepForm.targetCondition, tags)}
+          afterSend={stepForm.afterSend}
         />
 
         <div className="bg-canvas border-hairline rounded-card border p-4">
