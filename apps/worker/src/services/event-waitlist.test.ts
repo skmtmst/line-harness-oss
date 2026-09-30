@@ -9,6 +9,7 @@ import {
   getEventOccurrenceApplicants,
   processEventWaitlistPromotionJobs,
   promoteEventWaitlist,
+  reorderEventWaitlist,
 } from './event-waitlist.js';
 import type { EventWaitlistOfferSender } from './event-waitlist.js';
 
@@ -582,5 +583,41 @@ describe('V6 event waitlist and applicants', () => {
     ]);
     expect(sqlite.prepare(`SELECT version FROM event_slots WHERE id = 'slot-a'`).get())
       .toEqual({ version: 3 });
+  });
+
+  test('同じ期待版の並べ替えが並走したら一件だけ確定し、敗者は競合になる', async () => {
+    seedWaitlist();
+    sqlite.exec(`
+      INSERT INTO event_waitlist (
+        id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
+        created_at, updated_at
+      ) VALUES
+        ('wait-b', 'account-a', 'event-a', 'slot-a', 'friend-c', 'friend-c', 'waiting',
+          '2026-09-02T00:00:00.000Z', '2026-09-02T00:00:00.000Z'),
+        ('wait-c', 'account-a', 'event-a', 'slot-a', 'friend-a', 'friend-a', 'waiting',
+          '2026-09-03T00:00:00.000Z', '2026-09-03T00:00:00.000Z');
+    `);
+    const plainDb = asD1(sqlite);
+    let winner: Awaited<ReturnType<typeof reorderEventWaitlist>> | undefined;
+    db = asD1(sqlite, async (query) => {
+      // Aのbatchが始まる直前でBを最後まで通し、Aを後から再開させる。
+      if (winner === undefined && /UPDATE event_waitlist/.test(query)) {
+        winner = await reorderEventWaitlist(plainDb, {
+          occurrenceId: 'slot-a', lineAccountId: 'account-a',
+          orderedIds: ['wait-c', 'wait-a', 'wait-b'], expectedVersion: 1,
+        });
+      }
+    });
+    const loser = await reorderEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a',
+      orderedIds: ['wait-b', 'wait-c', 'wait-a'], expectedVersion: 1,
+    });
+    expect(winner).toMatchObject({ kind: 'reordered', occurrenceVersion: 2 });
+    expect(loser).toEqual({ kind: 'conflict', currentVersion: 2 });
+    // 勝者の順番だけが残り、版は1つだけ進む。
+    expect(sqlite.prepare(`SELECT id FROM event_waitlist ORDER BY sort_order, created_at`).all())
+      .toEqual([{ id: 'wait-c' }, { id: 'wait-a' }, { id: 'wait-b' }]);
+    expect(sqlite.prepare(`SELECT version FROM event_slots WHERE id = 'slot-a'`).get())
+      .toEqual({ version: 2 });
   });
 });
