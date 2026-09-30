@@ -331,7 +331,8 @@ function MediaLibraryInner() {
       if (detailRequestRef.current !== request || latestAccountRef.current !== accountAtRequest) return
       if (!response.success) {
         setDetailPhase('unavailable')
-        setDetailFailure('missing')
+        // R588: 原因不明の失敗を「存在しない」と断定しない。読み直せる側に倒す。
+        setDetailFailure('retryable')
         return
       }
       setDetailsFor(response.data.item)
@@ -438,6 +439,10 @@ function MediaLibraryInner() {
     setQuotaFailed(false)
     setError('')
     try {
+      /*
+        R587: 一覧の失敗で容量まで隠さない。一覧だけ捕まえてnull化し、
+        容量・総数はそれぞれの成否で決める（Promise.allの連鎖で消さない）。
+      */
       const [res, quotaResponse, overallResponse] = await Promise.all([
         api.media.list(accountAtRequest, {
           kind: kinds.size === 1 ? [...kinds][0] : undefined,
@@ -449,7 +454,7 @@ function MediaLibraryInner() {
           sort,
           limit: pageSize,
           offset: (page - 1) * pageSize,
-        }),
+        }).catch(() => null),
         api.media.quota(accountAtRequest).catch(() => null),
         // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
         api.media.list(accountAtRequest, {
@@ -459,9 +464,11 @@ function MediaLibraryInner() {
         }).catch(() => null),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
-      if (res.success) {
+      if (res?.success) {
         setItems(res.data.items)
         setTotal(res.data.total)
+      } else {
+        setLoadFailed(true)
       }
       if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
       if (quotaResponse?.success) setQuota(quotaResponse.data)

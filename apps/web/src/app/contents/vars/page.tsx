@@ -228,6 +228,10 @@ function VarsPageInner() {
       if (vars.success) {
         setItems(vars.data)
         setListLimited(vars.meta?.limited ?? false)
+      } else {
+        // R589: 200で失敗が返っても黙って古い一覧を残さない。通信失敗として扱う。
+        setListFailure(new ApiError(500, vars.error))
+        setError('読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
       }
     } catch (e) {
       // 権限なしと通信障害で文言を分ける。同じ文言だと運用者が接続を
