@@ -16,12 +16,23 @@ export type ToastItem = {
   onAction?: () => void
 }
 
+/**
+ * 通知の消える期限と連動させたい処理（R623: runUndoable の送信期限）。
+ * hover/focus で止めるとき一緒に止め、離すと一緒に動かす。
+ */
+export type ToastLifecycle = {
+  onPause?: () => void
+  onResume?: () => void
+}
+
 export type NotifyToastOptions = {
   tone?: ToastTone
   /** 4秒で消える。「元に戻す」付きは5秒。0以下で消さない（長押しの確認待ちなど）。 */
   duration?: number
   actionLabel?: string
   onAction?: () => void
+  /** 期限を共有する処理（取り消せる送信など）。 */
+  lifecycle?: ToastLifecycle
 }
 
 const DEFAULT_DURATION = 4000
@@ -37,11 +48,21 @@ let items: ToastItem[] = []
 const listeners = new Set<() => void>()
 
 /*
- * 各知らせの残り時間。マウスを乗せている間は止める。
+ * 各知らせの残り時間。マウスを乗せている間・中のボタンに触れている間は止める。
  * `timer` が止まっている間は `remaining` だけが残る。
+ * `holds` は止めている理由（pointer=hover、focus=キーボード操作）。
+ * どれか1つでも残っていれば止めたままにする。
  */
-type Countdown = { remaining: number; deadline: number; timer: ReturnType<typeof setTimeout> | null }
+type ToastPauseReason = 'pointer' | 'focus'
+type Countdown = {
+  remaining: number
+  deadline: number
+  timer: ReturnType<typeof setTimeout> | null
+  holds: Set<ToastPauseReason>
+}
 const countdowns = new Map<number, Countdown>()
+/** 期限を共有する処理（R623）。止める・動かすの切り替わりで呼ぶ。 */
+const lifecycles = new Map<number, ToastLifecycle>()
 
 function emit() {
   for (const listener of listeners) listener()
@@ -59,34 +80,64 @@ function subscribe(listener: () => void): () => void {
 }
 
 function scheduleDismiss(id: number, ms: number): void {
-  const entry: Countdown = { remaining: ms, deadline: Date.now() + ms, timer: null }
+  const entry: Countdown = { remaining: ms, deadline: Date.now() + ms, timer: null, holds: new Set() }
   entry.timer = setTimeout(() => dismissToast(id), ms)
   countdowns.set(id, entry)
+}
+
+/*
+ * 共有期限の後始末。取り消されずに知らせが消えるとき（×・押出し・
+ * unmount・掃除）は、残り時間で必ず一度だけ送信を進める。
+ * 取り消し済み・送信済みなら受け側（settled）が無視するので、
+ * 止まっていたかどうかを問わず呼んでよい。
+ */
+function releaseLifecycle(id: number): void {
+  const hooks = lifecycles.get(id)
+  lifecycles.delete(id)
+  hooks?.onResume?.()
+}
+
+/** 止まっている共有期限をすべて残り時間で進める（ホストを外すとき用）。 */
+function resumeAllLifecycles(): void {
+  for (const id of [...lifecycles.keys()]) {
+    lifecycles.get(id)?.onResume?.()
+  }
 }
 
 export function dismissToast(id: number): void {
   const entry = countdowns.get(id)
   if (entry?.timer) clearTimeout(entry.timer)
   countdowns.delete(id)
+  releaseLifecycle(id)
   const before = items.length
   items = items.filter((item) => item.id !== id)
   if (items.length !== before) emit()
 }
 
-/** 乗せている間は消えるまでの時間を止める（★V7 sTJsh §4）。 */
-function pauseToast(id: number): void {
+/** 乗せている間・触れている間は消えるまでの時間を止める（★V7 sTJsh §4）。 */
+function pauseToast(id: number, reason: ToastPauseReason = 'pointer'): void {
   const entry = countdowns.get(id)
-  if (!entry || entry.timer === null) return
-  clearTimeout(entry.timer)
-  entry.timer = null
-  entry.remaining = Math.max(0, entry.deadline - Date.now())
+  if (!entry || entry.holds.has(reason)) return
+  const wasHeld = entry.holds.size > 0
+  entry.holds.add(reason)
+  if (entry.timer !== null) {
+    clearTimeout(entry.timer)
+    entry.timer = null
+    entry.remaining = Math.max(0, entry.deadline - Date.now())
+  }
+  // 初めて止まったときだけ、期限を共有する送信側も止める（R623）
+  if (!wasHeld) lifecycles.get(id)?.onPause?.()
 }
 
-function resumeToast(id: number): void {
+function resumeToast(id: number, reason: ToastPauseReason = 'pointer'): void {
   const entry = countdowns.get(id)
-  if (!entry || entry.timer !== null) return
+  if (!entry || !entry.holds.has(reason)) return
+  entry.holds.delete(reason)
+  // まだ他の理由で止まっていたら動かさない
+  if (entry.holds.size > 0 || entry.timer !== null) return
   entry.deadline = Date.now() + entry.remaining
   entry.timer = setTimeout(() => dismissToast(id), entry.remaining)
+  lifecycles.get(id)?.onResume?.()
 }
 
 /**
@@ -115,14 +166,17 @@ export function notifyToast(message: string, options?: NotifyToastOptions): () =
       onAction: options?.onAction,
     },
   ]
-  // 表示数を超えて押し出された知らせの残り時間タイマーも止める
+  // 表示数を超えて押し出された知らせの残り時間タイマーも止める。
+  // 押し出されても未取消の保存は残り時間で送る（releaseLifecycle）。
   for (const dropped of next.slice(0, Math.max(0, next.length - MAX_ITEMS))) {
     const entry = countdowns.get(dropped.id)
     if (entry?.timer) clearTimeout(entry.timer)
     countdowns.delete(dropped.id)
+    releaseLifecycle(dropped.id)
   }
   items = next.slice(-MAX_ITEMS)
   emit()
+  if (options?.lifecycle && duration > 0) lifecycles.set(id, options.lifecycle)
   if (duration > 0) scheduleDismiss(id, duration)
   return () => dismissToast(id)
 }
@@ -134,13 +188,20 @@ export function clearToastsForTest(): void {
     if (entry?.timer) clearTimeout(entry.timer)
   }
   countdowns.clear()
+  // 消えた分の未取消の保存は残り時間で送る（取り消し済みは settled が無視）。
+  resumeAllLifecycles()
+  lifecycles.clear()
   items = []
   emit()
 }
 
 /** 直前の「元に戻す」を実行する（⌘Z）。戻せる知らせが無いとき何もしない。 */
 export function undoLatestToast(): boolean {
-  const target = [...items].reverse().find((item) => item.actionLabel && item.onAction)
+  /*
+   * 本物の「元に戻す」だけを選ぶ。「もう一度」（runOptimistic の再試行）や
+   * その他の操作は選ばない（R624）。押しての再試行はボタンのまま残す。
+   */
+  const target = [...items].reverse().find((item) => item.actionLabel === '元に戻す' && item.onAction)
   if (!target) return false
   target.onAction?.()
   dismissToast(target.id)
@@ -165,8 +226,25 @@ export function Toast({
       className={styles.toast}
       role="status"
       aria-live="polite"
-      onPointerEnter={item.id !== undefined ? () => pauseToast(item.id as number) : undefined}
-      onPointerLeave={item.id !== undefined ? () => resumeToast(item.id as number) : undefined}
+      onPointerEnter={item.id !== undefined ? () => pauseToast(item.id as number, 'pointer') : undefined}
+      onPointerLeave={item.id !== undefined ? () => resumeToast(item.id as number, 'pointer') : undefined}
+      onFocus={
+        item.id !== undefined
+          ? (e) => {
+              // 中のボタンへTabで移った間も期限を止める。中の移動では止め直さない。
+              if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+              pauseToast(item.id as number, 'focus')
+            }
+          : undefined
+      }
+      onBlur={
+        item.id !== undefined
+          ? (e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+              resumeToast(item.id as number, 'focus')
+            }
+          : undefined
+      }
     >
       <Icon
         className={[styles.icon, item.tone === 'success' ? styles.iconSuccess : styles.iconError].join(' ')}
@@ -213,7 +291,12 @@ export default function ToastHost() {
       if (undoLatestToast()) event.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      // 外れた（画面遷移など）ときに止めていた送信期限を置き去りにしない。
+      // 取り消し済み・送信済みなら受け側（settled）が無視する。
+      resumeAllLifecycles()
+    }
   }, [])
   if (live.length === 0) return null
   return (
