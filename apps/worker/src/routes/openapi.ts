@@ -932,9 +932,18 @@ const spec = {
         parameters: [
           { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu'] } },
           { name: 'filename', in: 'query', required: true, schema: { type: 'string', minLength: 1, maxLength: 200 } },
+          { name: 'width', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる幅。画像が違う寸法なら登録せず422' },
+          { name: 'height', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる高さ。画像が違う寸法なら登録せず422' },
         ],
         requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } } } },
         responses: { '201': { description: 'Immutable tenant-scoped image receipt; identical retries reuse it' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
+      },
+      delete: {
+        tags: ['HQ Templates'], summary: '採用されなかった統括ひな形の画像を回収（所有確認つき）',
+        parameters: [
+          { name: 'r2Key', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Deleted flag; missing objects are a no-op' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '404': { description: 'Outside the caller tenant ownership' }, '422': { description: 'Invalid image key' } },
       },
     },
     '/api/hq/templates/accounts': {
