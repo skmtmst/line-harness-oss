@@ -4,6 +4,8 @@ import type { BookingRequest, DashboardOverview, DashboardUpcoming, DeliveryFail
 import { api } from '@/lib/api'
 import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 /**
  * 右カラムのカード。
@@ -76,7 +78,7 @@ function Figure({ label, value, unit }: { label: string; value: number | null; u
     <div>
       <p className="text-ink-faint text-xs">{label}</p>
       <p className="text-ink mt-0.5 text-lg font-bold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}
+        {value === null ? '—' : formatNumber(value)}
         <span className="text-ink-secondary ml-1 text-xs font-normal">{unit}</span>
       </p>
     </div>
@@ -166,7 +168,7 @@ export function SupportMarkStatusCard({
           >
             <span className="min-w-0 truncate">{row.label}</span>
             <span className="shrink-0 tabular-nums">
-              {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}件`}
+              {row.value === null ? '—' : `${formatNumber(row.value)}件`}
             </span>
           </Link>
         ))}
@@ -201,14 +203,14 @@ export function RecentResultsCard({
             <div key={point.name} className="flex items-baseline justify-between gap-3">
               <span className="text-ink-secondary truncate text-xs">{point.name}</span>
               <span className="text-ink shrink-0 text-sm font-bold tabular-nums">
-                {point.count.toLocaleString('ja-JP')} 件
+                {formatNumber(point.count)} 件
               </span>
             </div>
           ))}
           <div className="border-hairline flex items-baseline justify-between border-t pt-2.5">
             <span className="text-ink-secondary text-xs">合計</span>
             <span className="text-ink text-sm font-bold tabular-nums">
-              {conversions.total.toLocaleString('ja-JP')} 件
+              {formatNumber(conversions.total)} 件
             </span>
           </div>
         </div>
@@ -229,13 +231,7 @@ export function activeUpcomingBookings(bookings: BookingRequest[], now = Date.no
 }
 
 function formatUpcomingDate(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 const upcomingKindLabel: Record<string, string> = {
@@ -297,7 +293,7 @@ export function UpcomingCard({
       <SideCard
         title="今後の予定"
         helpTip="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
-        freshness={upcomingAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {upcomingAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+        freshness={upcomingAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(upcomingAt)}</span> : undefined}
       >
         {merged.items.length === 0 ? (
           <p className="text-ink-faint text-xs leading-relaxed">予定されている配信・予約はありません。</p>
@@ -335,13 +331,18 @@ export function UpcomingCard({
       title="今後の予定"
       helpTip="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
       action={{ label: 'すべて見る →', href: '/booking/bookings?view=list' }}
-      freshness={updatedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {updatedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+      freshness={updatedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(updatedAt)}</span> : undefined}
     >
       {legacyLoading ? (
-        <div className="space-y-2">
-          <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
-          <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
-        </div>
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div className="space-y-2">
+              <Skeleton className="block h-5 w-full" />
+              <Skeleton className="block h-5 w-full" />
+            </div>
+          }
+        />
       ) : legacyFailed ? (
         <p className="text-ink-faint text-xs leading-relaxed">予定を読み込めませんでした。</p>
       ) : legacy.length === 0 ? (
@@ -366,13 +367,7 @@ export function UpcomingCard({
 }
 
 function formatAsOfMonthDay(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 /**
@@ -417,11 +412,11 @@ export function DeliveryFailuresCard({ accountId }: { accountId?: string | null 
       helpTip={asOf
         ? `出どころ：通知の送達台帳・${asOf}時点。同じ失敗は1件として数えています（送り直しは数えません）。`
         : '出どころ：通知の送達台帳。同じ失敗は1件として数えています（送り直しは数えません）。'}
-      freshness={fetchedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {fetchedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+      freshness={fetchedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(fetchedAt)}</span> : undefined}
     >
       {origins ? (
         <p className="text-ink text-2xl leading-9 font-bold tabular-nums">
-          {`${origins.total.toLocaleString('ja-JP')}件`}
+          {`${formatNumber(origins.total)}件`}
         </p>
       ) : failed ? (
         <>
@@ -429,9 +424,10 @@ export function DeliveryFailuresCard({ accountId }: { accountId?: string | null 
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">読み込めませんでした。</p>
         </>
       ) : (
-        <div className="space-y-2">
-          <div className="bg-canvas-sunken h-7 w-20 animate-pulse rounded-mini" />
-        </div>
+        <DelayedSkeleton
+          loading
+          skeleton={<Skeleton className="block h-7 w-20" />}
+        />
       )}
     </SideCard>
   )
@@ -451,23 +447,23 @@ export function FriendStatusCard({ friends, freshness }: { friends: DashboardOve
       <dl className="space-y-2.5 text-sm">
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">友だち総数</dt>
-          <dd className="text-ink font-bold tabular-nums">{friends.total.toLocaleString('ja-JP')}人</dd>
+          <dd className="text-ink font-bold tabular-nums">{formatNumber(friends.total)}人</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">有効</dt>
-          <dd className="text-ink font-bold tabular-nums">{friends.active.toLocaleString('ja-JP')}人</dd>
+          <dd className="text-ink font-bold tabular-nums">{formatNumber(friends.active)}人</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">ブロック・非表示</dt>
           <dd className="text-ink font-bold tabular-nums">
-            {blocked.toLocaleString('ja-JP')}人（{rate.toFixed(1)}%）
+            {formatNumber(blocked)}人（{rate.toFixed(1)}%）
           </dd>
         </div>
       </dl>
       <p className="text-ink-faint mt-3 text-[11px] leading-relaxed">
-        内訳 相手から{friends.blockedByThem.toLocaleString('ja-JP')}人
-        ・自分から{friends.hiddenByUs.toLocaleString('ja-JP')}人
-        ・相互に{friends.blockedBoth.toLocaleString('ja-JP')}人
+        内訳 相手から{formatNumber(friends.blockedByThem)}人
+        ・自分から{formatNumber(friends.hiddenByUs)}人
+        ・相互に{formatNumber(friends.blockedBoth)}人
       </p>
     </SideCard>
   )

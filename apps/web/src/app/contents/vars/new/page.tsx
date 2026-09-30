@@ -718,10 +718,9 @@ function NewCommonVarInner() {
             <Button href="/contents/vars">共通情報一覧へ戻る</Button>
             {/* Q: まだ配信へ出したくないものは下書きで残せる。下書きは差し込みに使われない。 */}
             <Button type="button" disabled={saving} onClick={() => void save(false, true)}>
-              下書きとして保存
+              下書きを保存する
             </Button>
-            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
-              {saving ? '登録中…' : '登録'}
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving} busyLabel="登録中…">登録する
             </Button>
           </>
         )}

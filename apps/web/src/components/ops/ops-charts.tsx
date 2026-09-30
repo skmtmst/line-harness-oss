@@ -1,4 +1,5 @@
 'use client'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 運営ダッシュボード（★V6 37-2）の絵。棒グラフ `月ごとの売上` とドーナツ `プラン別の契約`。
@@ -12,13 +13,13 @@
 export function formatYen(yen: number): string {
   // 数字でない値が来ても「¥NaN」を出さない。未取得は「—」が決まり。
   if (typeof yen !== 'number' || !Number.isFinite(yen)) return '—'
-  return `¥${Math.round(yen).toLocaleString('ja-JP')}`
+  return `¥${formatNumber(Math.round(yen))}`
 }
 
 /** 軸の目盛り。¥450万 のように「万」で丸める。 */
 export function formatYenShort(yen: number): string {
   if (yen === 0) return '¥0'
-  if (yen >= 10_000) return `¥${Math.round(yen / 10_000).toLocaleString('ja-JP')}万`
+  if (yen >= 10_000) return `¥${formatNumber(Math.round(yen / 10_000))}万`
   return formatYen(yen)
 }
 

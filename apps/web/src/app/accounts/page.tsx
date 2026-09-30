@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
@@ -25,6 +24,7 @@ import {
 } from './account-list-view'
 import AccountMigration from './migration'
 import ListRange from '@/components/ui/list-range'
+import { formatNumber } from '@/lib/format'
 
 type AccountWithStats = LineAccount & {
   stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
@@ -97,7 +97,7 @@ export default function AccountsPage() {
           <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
             {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
           </Button>
-          <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>
+          <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録する</Button>
         </div>
       </div>
 
@@ -218,7 +218,7 @@ export default function AccountsPage() {
                   <details className="mt-3">
                     <summary className="text-ink-secondary cursor-pointer text-xs font-semibold">詳しい情報を見る</summary>
                     <dl className="mt-2 space-y-1 text-xs">
-                      <div className="flex justify-between gap-3"><dt className="text-ink-faint">友だち</dt><dd className="text-ink-secondary tabular-nums">{account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : '—'}</dd></div>
+                      <div className="flex justify-between gap-3"><dt className="text-ink-faint">友だち</dt><dd className="text-ink-secondary tabular-nums">{account.stats ? `${formatNumber(account.stats.friendCount)}人` : '—'}</dd></div>
                       <div className="flex justify-between gap-3"><dt className="text-ink-faint">親アカウント</dt><dd className="text-ink-secondary truncate" title={parentName(account, accounts)}>{parentName(account, accounts)}</dd></div>
                     </dl>
                   </details>
@@ -263,7 +263,7 @@ export default function AccountsPage() {
                       <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
                     </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
-                      {account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : '—'}
+                      {account.stats ? `${formatNumber(account.stats.friendCount)}人` : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {account.isDefault

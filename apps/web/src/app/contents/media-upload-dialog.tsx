@@ -14,6 +14,7 @@ import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
+import { formatNumber } from '@/lib/format'
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
@@ -257,15 +258,15 @@ export default function MediaUploadDialog({
                 state="active"
                 title="登録しています"
                 percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
-                countText={`${doneCount.toLocaleString()} / ${entries.length.toLocaleString()} 件`}
+                countText={`${formatNumber(doneCount)} / ${formatNumber(entries.length)} 件`}
                 className="mb-3"
               />
             ) : attempted ? (
               <Progress
                 state={uploadErrorCount > 0 ? 'partial' : 'done'}
                 title={uploadErrorCount > 0
-                  ? `${doneCount.toLocaleString()}件を登録し、${uploadErrorCount.toLocaleString()}件は入りませんでした`
-                  : `${doneCount.toLocaleString()}件を登録しました`}
+                  ? `${formatNumber(doneCount)}件を登録し、${formatNumber(uploadErrorCount)}件は入りませんでした`
+                  : `${formatNumber(doneCount)}件を登録しました`}
                 percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
                 className="mb-3"
               />
@@ -355,8 +356,8 @@ export default function MediaUploadDialog({
             {errorCount > 0 ? `${errorCount}件は登録できません` : `${entries.length}件を選択中`}
           </p>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId}>
-              {busy ? '登録しています…' : `${readyCount}件を登録する`}
+            <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
+              {`${readyCount}件を登録する`}
             </Button>
           </div>
         </div>

@@ -17,6 +17,7 @@ import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
 import { clearFeatureSettingsCache, loadFeatureSettings } from '@/lib/feature-settings-cache'
 import { createAccountRequestGuard } from './account-request-guard'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ThemePreviewSwitch from '@/components/theme-preview-switch'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   groupEnabledCount,
@@ -39,6 +40,7 @@ import {
   normalizeFeatureSettings,
   splitFeatureGroups,
 } from './feature-settings-view'
+import { formatDay, formatNumber } from '@/lib/format'
 
 function LockIcon() {
   return (
@@ -155,16 +157,16 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
   return (
     <span
       className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
-      title={`${category.label}：作成 ${created.toLocaleString('ja-JP')}、利用中 ${inUse.toLocaleString('ja-JP')}`}
+      title={`${category.label}：作成 ${formatNumber(created)}、利用中 ${formatNumber(inUse)}`}
     >
-      利用中 {inUse.toLocaleString('ja-JP')} / 作成 {created.toLocaleString('ja-JP')}
+      利用中 {formatNumber(inUse)} / 作成 {formatNumber(created)}
     </span>
   )
 }
 
 /** 最終利用の日付だけを短く出す。時刻はバッジに入らないのでタイトルへ残す。 */
 function shortUsageDate(value: string): string {
-  return value.slice(0, 10).replaceAll('-', '/')
+  return formatDay(value)
 }
 
 /**
@@ -222,7 +224,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
       </>
     )
   }
-  const count = activity.value.toLocaleString('ja-JP')
+  const count = formatNumber(activity.value)
   if (activityBasis === 'current') {
     return (
       <span
@@ -925,7 +927,7 @@ export default function SettingsPage() {
   }
 
   const impactSummary = (group: FeatureImpactGroup) => group.items
-    .map((item) => `${item.targetType} ${item.count.toLocaleString('ja-JP')}件`)
+    .map((item) => `${item.targetType} ${formatNumber(item.count)}件`)
     .join('、')
 
   return (
@@ -957,7 +959,7 @@ export default function SettingsPage() {
             disabled={loading || saving || loadFailed || !dirty}
             title={!dirty && !loading ? '変更すると取り消せます' : undefined}
           >
-            変更を取り消す
+            キャンセル
           </Button>
           <Button
             variant="secondary"
@@ -970,12 +972,10 @@ export default function SettingsPage() {
             variant="primary"
             onClick={() => void save()}
             disabled={loading || saving || loadFailed || !dirty}
-            title={!dirty && !loading ? '変更すると保存できます' : undefined}
-          >
+            title={!dirty && !loading ? '変更すると保存できます' : undefined} busy={saving}>
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {saving ? '保存中…' : '機能設定を保存'}
+            </svg>機能設定を保存する
           </Button>
           {!loading && !loadFailed && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
           </>
@@ -1031,6 +1031,7 @@ export default function SettingsPage() {
               onRetry={() => void load()}
             />
           ) : (
+            <>
             <div className={ordering ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'grid gap-4'}>
               {/*
                 利用状況の取得自体に失敗したとき。バッジは付かないので、
@@ -1098,6 +1099,14 @@ export default function SettingsPage() {
                 </Link>
               </div>}
             </div>
+
+            {/*
+              ★V8 移行②: 新しい見た目を担当者が試すための切り替え。
+              設定画面のいちばん下に1つだけ置く（このブラウザだけに効く）。
+              読み込み中・読み込み失敗の画面には出さない（偽の操作を置かない決まり）。
+            */}
+            <ThemePreviewSwitch />
+            </>
           )}
         </>
       )}
@@ -1137,7 +1146,7 @@ export default function SettingsPage() {
         open={impactOpen}
         title="オフにする前に確認"
         description="止まる仕事があります。オフにしてもデータは削除されず、再度オンにすると再開できます。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。"
-        confirmLabel="確認して保存"
+        confirmLabel="確認して保存する"
         destructive
         busy={impactBusy || saving}
         error={impactError || undefined}

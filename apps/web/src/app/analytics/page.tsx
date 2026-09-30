@@ -50,6 +50,7 @@ import {
   summarizeMenuFeatures,
   usageObservation,
 } from './analytics-usage'
+import { formatNumber, formatTime } from '@/lib/format'
 
 // 実行間隔ガード(点検#508の中4)の符号を、運用の言葉に言い換える。
 function explainStartError(code: string, fallback: string): string {
@@ -140,15 +141,9 @@ function RangePicker({ days, onChange }: { days: number; onChange: (days: number
     // aria-pressedで、読み上げにも同じ選択状態を伝える。
     <div className="flex gap-1" role="group" aria-label="集計期間">
       {RANGES.map((range) => (
-        <button
-          type="button"
-          key={range}
-          onClick={() => onChange(range)}
-          aria-pressed={days === range}
-          className={`rounded-control px-3 py-2 text-xs font-medium ${days === range ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary'}`}
-        >
+        <Button variant="primary" className={(`rounded-control px-3 py-2 text-xs font-medium ${days === range ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary'}`) + ' border-0 h-auto whitespace-normal'} type="button" key={range} onClick={() => onChange(range)} aria-pressed={days === range}>
           {range}日
-        </button>
+        </Button>
       ))}
     </div>
   )
@@ -274,16 +269,15 @@ function SaveAnalysisAction({
             className="border-hairline rounded-control min-w-64 flex-1 border px-3 py-2 text-sm"
             placeholder="保存する分析名"
           />
-          <Button onClick={() => void save()} disabled={saving || !name.trim()} variant="primary">
-            {saving ? '保存中' : 'この名前で保存'}
+          <Button onClick={() => void save()} disabled={saving || !name.trim()} variant="primary" busy={saving} busyLabel="保存中">この名前で保存する
           </Button>
           <Button onClick={() => setOpen(false)} disabled={saving} variant="secondary">
-            やめる
+            キャンセル
           </Button>
         </div>
       ) : (
         <Button onClick={() => setOpen(true)} variant="secondary">
-          この分析結果を保存
+          この分析結果を保存する
         </Button>
       )}
       {error && <p className="text-danger text-xs">{error}</p>}
@@ -303,12 +297,7 @@ type CrossQueueStatus = {
 function formatCrossNextTick(nextTickAt: string): string {
   const parsed = new Date(nextTickAt)
   if (Number.isNaN(parsed.getTime())) return ''
-  return new Intl.DateTimeFormat('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Tokyo',
-  }).format(parsed)
+  return formatTime(parsed)
 }
 
 function formatCrossWaitMinutes(estimatedWaitMs: number): string {
@@ -816,8 +805,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               }))}
             />
           </div>
-          <Button onClick={() => void runCross()} disabled={loading || !crossStorageRestored || !fieldId || Boolean(crossRunId)} variant="primary">
-            {loading ? '集計中' : `この${crossDays}日を集計`}
+          <Button onClick={() => void runCross()} disabled={loading || !crossStorageRestored || !fieldId || Boolean(crossRunId)} variant="primary" busy={loading} busyLabel="集計中">
+            {`この${crossDays}日を集計`}
           </Button>
         </div>
         <dl className="mt-3 grid gap-3 border-t border-hairline pt-3 sm:grid-cols-2">
@@ -935,15 +924,15 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             <table className="w-full table-fixed">
               <thead>
                 <tr className="bg-canvas-sunken border-hairline border-b">
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                  <Th className="px-4 py-3 text-xs whitespace-normal">
                     {rowLabel} ＼ {fieldName}
-                  </th>
+                  </Th>
                   {cols.map((col) => (
-                    <th key={col.key} className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">
+                    <Th align="right" className="px-4 py-3 text-xs whitespace-normal" key={col.key}>
                       {col.label}
-                    </th>
+                    </Th>
                   ))}
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">合計</th>
+                  <Th align="right" className="px-4 py-3 text-xs whitespace-normal">合計</Th>
                 </tr>
               </thead>
               <tbody className="divide-hairline divide-y">
@@ -981,13 +970,13 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                                 : undefined
                             }
                           >
-                            {n === 0 ? '—' : n.toLocaleString('ja-JP')}
+                            {n === 0 ? '—' : formatNumber(n)}
                           </button>
                         </td>
                       )
                     })}
                     <td className="text-ink px-4 py-3 text-right text-sm font-medium tabular-nums">
-                      {(rowTotals.get(row.key) ?? 0).toLocaleString('ja-JP')}
+                      {formatNumber((rowTotals.get(row.key) ?? 0))}
                     </td>
                   </tr>
                 ))}
@@ -995,11 +984,11 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                   <td className="text-ink-secondary px-4 py-3 text-sm font-medium">合計</td>
                   {cols.map((col) => (
                     <td key={col.key} className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                      {(colTotals.get(col.key) ?? 0).toLocaleString('ja-JP')}
+                      {formatNumber((colTotals.get(col.key) ?? 0))}
                     </td>
                   ))}
                   <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                    {grandTotal.toLocaleString('ja-JP')}
+                    {formatNumber(grandTotal)}
                   </td>
                 </tr>
               </tbody>
@@ -1041,8 +1030,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                   <Notice tone="success">
                     {audience.memberCount}人を24時間の対象者として準備しました
                     {' '}
-                    <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>
-                    {' '}
+                    <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>{' '}
                     <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(audience.id)}`} className="font-medium text-action hover:underline">この対象者へ配信を作成</Link>
                   </Notice>
                 )}
@@ -1487,17 +1475,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                 <Button
                   onClick={() => void runNow()}
                   disabled={running || selectedFunnel?.status !== 'active'}
-                  variant="secondary"
-                >
-                  {running ? '再集計中' : `この${funnelDays}日を再集計`}
+                  variant="secondary" busy={running} busyLabel="再集計中">
+                  {`この${funnelDays}日を再集計`}
                 </Button>
                 {canManage && (
-                  <button
-                    onClick={() => setCreating(true)}
-                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
-                  >
+                  <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs font-medium h-auto whitespace-normal" onClick={() => setCreating(true)}>
                     ＋ 段を足す
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -1543,9 +1527,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                       <Button
                         onClick={() => void startEdit()}
                         disabled={editLoading || !selectedFunnel.currentVersion}
-                        variant="secondary"
-                      >
-                        {editLoading ? '定義を読み込み中' : '定義を編集'}
+                        variant="secondary" busy={editLoading} busyLabel="定義を読み込み中">定義を編集
                       </Button>
                       <Button
                         onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'stopped' })}
@@ -1711,7 +1693,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                           {i + 1}. {step.label}
                         </p>
                         <p className="text-ink-secondary text-sm tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>
-                          {measurable ? `${step.reached.toLocaleString('ja-JP')} 人` : '—'}
+                          {measurable ? `${formatNumber(step.reached)} 人` : '—'}
                           {measurable && i > 0 && (
                             <span className="text-ink-faint ml-2 text-xs">
                               （{step.conversionFromPrevious == null ? '—' : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`}）
@@ -1742,15 +1724,15 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                           書けないので出さない。 */}
                       {measurable && prev != null && lost > 0 && (
                         <p className={`mt-1 text-xs ${isWorst ? 'text-warning' : 'text-ink-faint'}`}>
-                          {lost.toLocaleString('ja-JP')}人（
+                          {formatNumber(lost)}人（
                           {Math.round((lost / prevReached) * 1000) / 10}%）がここで止まっています。
-                          {inProgress > 0 ? ` ほかに${inProgress.toLocaleString('ja-JP')}人はまだ途中です。` : ''}
+                          {inProgress > 0 ? ` ほかに${formatNumber(inProgress)}人はまだ途中です。` : ''}
                           {isWorst && ' この分析でいちばん落ちる段です。'}
                         </p>
                       )}
                       {measurable && prev != null && lost === 0 && inProgress > 0 && (
                         <p className="text-ink-faint mt-1 text-xs">
-                          {inProgress.toLocaleString('ja-JP')}人はまだ途中です。期限までに次の段へ進むと数が変わります。
+                          {formatNumber(inProgress)}人はまだ途中です。期限までに次の段へ進むと数が変わります。
                         </p>
                       )}
                     </div>
@@ -1802,8 +1784,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   <Notice tone="success" className="mt-3">
                     {funnelAudience.memberCount}人を24時間の対象者として準備しました
                     {' '}
-                    <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>
-                    {' '}
+                    <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>{' '}
                     <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="font-medium text-action hover:underline">この対象者へ配信を作成</Link>
                   </Notice>
                 )}
@@ -2166,12 +2147,9 @@ function FunnelForm({
           </div>
         ))}
         {steps.length < 10 && (
-          <button
-            onClick={() => setSteps((prev) => [...prev, { label: '', kind: 'tag', value: '' }])}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-sm"
-          >
+          <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 h-auto whitespace-normal" onClick={() => setSteps((prev) => [...prev, { label: '', kind: 'tag', value: '' }])}>
             ＋ 段を足す
-          </button>
+          </Button>
         )}
       </div>
 
@@ -2185,9 +2163,8 @@ function FunnelForm({
         <Button
           onClick={save}
           disabled={saving}
-          variant="primary"
-        >
-          {saving ? '保存中...' : edit ? '新版として保存' : '作成'}
+          variant="primary" busy={saving} busyLabel="保存中...">
+          {edit ? '新版として保存する' : '作る'}
         </Button>
         <Button
           onClick={onCancel}
@@ -2241,8 +2218,8 @@ function metricText(
   if (value.value === null) return '—'
   if (typeof value.value === 'string') return value.value
   if (options?.percent) return `${Math.round(value.value * 1000) / 10}%`
-  if (options?.currency) return `${value.value.toLocaleString('ja-JP')}円`
-  return value.value.toLocaleString('ja-JP')
+  if (options?.currency) return `${formatNumber(value.value)}円`
+  return formatNumber(value.value)
 }
 
 /**
@@ -2537,7 +2514,7 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
   return <div data-design-node="YBGtm" className="space-y-4">
     <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title={`この${days}日の成果`} value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${revenue.toLocaleString('ja-JP')}円`} />
+      <KpiCard title={`この${days}日の成果`} value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${formatNumber(revenue)}円`} />
       <KpiCard title="かかった広告費" value={adCost} unit="円" detail="" help="接続済みの経路の広告費を合計した金額です" />
       <KpiCard title="差し引き" value={profit} unit="円" detail="" help="売上から広告費を引いた残りです" />
       <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="" help="0円として計算していません" />
@@ -2616,7 +2593,7 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         title="自動で動いた回数"
         value={shownValue(overview.summary.automaticRuns)}
         unit="回"
-        {...metricCardState(overview.summary.automaticRuns, { detail: `この${days}日。実行記録から集計。手で送ったのは${overview.summary.manualSends.value?.toLocaleString('ja-JP') ?? '—'}回` }, state.retry)}
+        {...metricCardState(overview.summary.automaticRuns, { detail: `この${days}日。実行記録から集計。手で送ったのは${formatNumber(overview.summary.manualSends.value)}回` }, state.retry)}
       />
       <KpiCard
         title="手作業が減った時間"
@@ -2750,7 +2727,7 @@ function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: str
       return
     }
     if (typeof node === 'number' || typeof node === 'string' || typeof node === 'boolean') {
-      rows.push({ path, text: typeof node === 'number' ? node.toLocaleString('ja-JP') : String(node) })
+      rows.push({ path, text: typeof node === 'number' ? formatNumber(node) : String(node) })
       return
     }
     if (Array.isArray(node)) {
@@ -3201,7 +3178,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                   {visibleItems.length === 0 && (
                     <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">
                       条件に合う保存済み分析はありません。
-                      <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setQuery('')}>検索をやめる</button>
+                      <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setQuery('')}>キャンセル</button>
                     </td></tr>
                   )}
                   {visibleItems.map((item) => {

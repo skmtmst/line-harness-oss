@@ -17,6 +17,7 @@
 import type { ReactNode } from 'react'
 import Button from './button'
 import styles from './not-connected.module.css'
+import { formatNumber } from '@/lib/format'
 
 /** 取れていない数字の代わりに出す字。**0 とは別物。** */
 export const NOT_AVAILABLE = '—'
@@ -64,7 +65,7 @@ export function isCountableValue(value: unknown): value is number {
  */
 export function countOrDash(value: number | null | undefined, unit = ''): string {
   return isCountableValue(value)
-    ? `${value.toLocaleString('ja-JP')}${unit}`
+    ? `${formatNumber(value)}${unit}`
     : NOT_AVAILABLE
 }
 

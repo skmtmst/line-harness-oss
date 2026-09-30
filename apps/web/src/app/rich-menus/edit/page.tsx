@@ -38,6 +38,7 @@ import { PublishHistorySection } from './publish-history'
 import { PublishProgressSection } from './publish-progress-section'
 import { PrepublishCheckSection } from './prepublish-check-section'
 import { TestApplySection } from './test-apply-section'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
  * 保存されている条件を読む。
@@ -309,7 +310,7 @@ function Editor({
    * 公開のしかた（STEP3）の入力。工程の行き来（STEP1/2/3）で工程の部品が
    * 付け替わっても消えないよう、工程をまたぐここで持つ。予約の保存が
    * 成功した時点の入力を publishBaseline に写し、そこから変えた間だけ
-   * 未保存として扱う。「保存せずに移動」を選んだときだけ初期値へ戻す。
+   * 未保存として扱う。「保存せずに移る」を選んだときだけ初期値へ戻す。
    *
    * 入力はメニューIDごとに localStorage へ下書きとして残す
    * （publish-plan-draft.ts）。サーバーの下書きpayloadに公開予定の欄が
@@ -474,7 +475,7 @@ function Editor({
     busy: saving || publishing || unpublishing || deleting || busy,
   })
   /*
-   * 「保存せずに移動」を選んだときだけ、公開入力を初期値へ戻す。
+   * 「保存せずに移る」を選んだときだけ、公開入力を初期値へ戻す。
    * 取消・Escape（cancelLeave）では触らず、入力はそのまま残る。
    * 実際の遷移では画面ごと外れるが、確認の選択として明示しておく。
    */
@@ -486,7 +487,7 @@ function Editor({
    * N-162: 離脱確認の窓は step 1/2/3 のどこにいても出す。
    * targeting/publish は早期 return で別ツリーになるため、ここで要素化して
    * 全経路へ差し込む。step 1 だけに置くと、dirty 中のリンクが黙って止まり
-   * 「保存せずに移動」を選ぶ手段がなくなる。
+   * 「保存せずに移る」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューへの変更" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
@@ -1151,32 +1152,25 @@ function Editor({
         {pages.map((p) => {
           const active = p.id === activePageId
           return (
-            <button
-              key={p.id}
-              onClick={() => {
-                setActivePageId(p.id)
-                setSelectedAreaId(null)
-              }}
-              className={`px-3 py-1.5 rounded-control text-sm font-medium transition-colors ${
+            <Button variant="primary" className={(`px-3 py-1.5 rounded-control text-sm font-medium transition-colors ${
                 active
                   ? 'bg-accent-deep text-on-accent'
                   : 'bg-shell text-ink-secondary hover:bg-shell-gray'
-              }`}
-            >
+              }`) + ' border-0 h-auto whitespace-normal'} key={p.id} onClick={() => {
+                setActivePageId(p.id)
+                setSelectedAreaId(null)
+              }}>
               {p.name}
               {active && <span className="ml-1 text-xs opacity-80">編集中</span>}
               {p.id.startsWith('tmp-') && (
                 <span className="ml-1 text-xs opacity-70">(未保存)</span>
               )}
-            </button>
+            </Button>
           )
         })}
-        <button
-          onClick={addPage}
-          className="px-3 py-1.5 text-sm font-medium border border-hairline rounded-control hover:bg-surface-pearl transition-colors"
-        >
-          + ページ追加
-        </button>
+        <Button variant="secondary" className="px-3 py-1.5 font-medium hover:bg-surface-pearl h-auto whitespace-normal" onClick={addPage}>
+          ＋ ページを追加する
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
@@ -1343,13 +1337,9 @@ function Editor({
                   }}
                 />
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => fileInput.current?.click()}
-                    disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-hairline rounded-control hover:bg-surface-pearl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                  <Button variant="secondary" className="px-3 py-1.5 text-xs font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={() => fileInput.current?.click()} disabled={busy || activePage.id.startsWith('tmp-')}>
                     {activePage.imageR2Key ? '画像を差し替え' : '画像を選択'}
-                  </button>
+                  </Button>
                   {/*
                     隣の「画像を選択」と同じ見た目。ただし hover の色だけは
                     生の gray-50 ではなく既存トークン canvas-sunken（同じ
@@ -1358,13 +1348,9 @@ function Editor({
                     素の button に書くと direct-secondary-button の借金に
                     数えられる）。
                   */}
-                  <button
-                    onClick={() => setMediaPickerOpen(true)}
-                    disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-hairline rounded-control hover:bg-canvas-sunken disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                  <Button variant="secondary" className="px-3 py-1.5 text-xs font-medium disabled:opacity-50 h-auto whitespace-normal" onClick={() => setMediaPickerOpen(true)} disabled={busy || activePage.id.startsWith('tmp-')}>
                     登録メディアから選ぶ
-                  </button>
+                  </Button>
                 </div>
                 <p className="mt-1.5 text-[11px] text-ink-faint">
                   PNG / JPEG, {SIZE_LABEL[group.size]}, 1MB 以下
@@ -1535,7 +1521,7 @@ function Editor({
                 onClick={() => askRemovePage(activePage)}
                 className="shrink-0 px-3 py-2 text-sm font-medium border border-status-danger-border text-danger bg-canvas rounded-control hover:bg-danger-bg transition-colors"
               >
-                ページ削除
+                ページを削除する
               </button>
             </div>
           )}
@@ -1555,7 +1541,7 @@ function Editor({
               className="shrink-0 px-3 py-2 text-sm font-medium text-on-accent rounded-control transition-opacity hover:opacity-90"
               style={{ backgroundColor: 'var(--color-danger)' }}
             >
-              削除
+              削除する
             </button>
           </div>
         </div>
@@ -1720,13 +1706,9 @@ function Editor({
           >
             プレビュー
           </Checkbox>
-          <button
-            onClick={handleSave}
-            disabled={saving || publishing || unpublishing || busy}
-            className="rounded-control border border-hairline px-4 py-2 text-sm font-medium transition-colors hover:bg-surface-pearl disabled:opacity-50"
-          >
-            {saving ? '保存中...' : '下書きに保存'}
-          </button>
+          <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={handleSave} disabled={saving || publishing || unpublishing || busy}>
+            {saving ? '保存中...' : '下書きを保存する'}
+          </Button>
           {/* #702: 共有Buttonのprimaryはaccent-deep＋白文字(5.44:1)。生のLINE緑だと2.78:1で落ちる。 */}
           <Button
             variant="primary"
@@ -1734,13 +1716,10 @@ function Editor({
               setConfirmError('')
               setConfirmKind('publish')
             }}
-            disabled={saving || publishing || unpublishing || busy}
-          >
-            {publishing
-              ? 'LINE 登録中...'
-              : group.status === 'published'
-                ? 'LINE に再登録'
-                : 'LINE に登録'}
+            disabled={saving || publishing || unpublishing || busy} busy={publishing} busyLabel="LINE 登録中...">
+            {group.status === 'published'
+                ? 'LINE に再登録する'
+                : 'LINE に登録する'}
           </Button>
         </div>
       )} />
@@ -1788,7 +1767,7 @@ function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | un
   if (!metric || metric.state === 'unavailable' || metric.value === null) {
     return <span title={metric?.reason ?? '未取得'}>— <small className="text-ink-faint text-xs">（未取得）</small></span>
   }
-  return <>{metric.value.toLocaleString('ja-JP')}人</>
+  return <>{formatNumber(metric.value)}人</>
 }
 
 function TargetingStep({
@@ -1919,7 +1898,7 @@ function TargetingStep({
           ) : null}
           {conditionEmpty ? (
             <Notice tone="warn" className="mt-4">条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。</Notice>
-          ) : preview?.overlap.value ? <Notice tone="warn" className="mt-4">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</Notice> : null}
+          ) : preview?.overlap.value ? <Notice tone="warn" className="mt-4">このうち {formatNumber(preview.overlap.value)}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</Notice> : null}
           {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
           <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
         </section>
@@ -1937,7 +1916,7 @@ function TargetingStep({
         </aside>
       </div>
 
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button>{readOnly ? null : <Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button>}<Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button>{readOnly ? null : <Button onClick={onSave} disabled={saving} busy={saving}>下書きを保存する</Button>}<Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
     </div>
   )
 }
@@ -2129,7 +2108,7 @@ function PublishStep({
               )}
               <li className={imageReady ? 'text-success' : 'text-warning'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
               <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-warning'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
-              {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
+              {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {formatNumber(preview.overlap.value)}人 が重なっています</li> : null}
             </ul>
           </div>
         </section>
@@ -2171,8 +2150,8 @@ function PublishStep({
             {schedules.map((item) => (
               <li key={item.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded-mini border px-3 py-2 text-xs">
                 <span className="text-ink">
-                  {new Date(item.startsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })} 開始
-                  {item.mode === 'period' && item.endsAt ? ` 〜 ${new Date(item.endsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {formatDateTime(item.startsAt)} 開始
+                  {item.mode === 'period' && item.endsAt ? ` 〜 ${formatDateTime(item.endsAt)}` : ''}
                   {' ・ '}
                   {item.status === 'scheduled' ? '予約中'
                     : item.status === 'publishing' ? '公開処理中'
@@ -2182,15 +2161,13 @@ function PublishStep({
                     : item.status === 'cancelled' ? '取消済み'
                     : item.status === 'failed' ? '失敗・要対応' : item.status}
                   {item.status === 'failed' && item.lastErrorCode ? `（${item.lastErrorCode.slice(0, 40)}）` : ''}
-                  {item.nextRetryAt ? ` ・ 次回 ${new Date(item.nextRetryAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {item.nextRetryAt ? ` ・ 次回 ${formatDateTime(item.nextRetryAt)}` : ''}
                   {item.mode === 'period' ? (item.restoreGroupId ? ` ・ 戻し先 ${restoreMenus.find((menu) => menu.id === item.restoreGroupId)?.name ?? item.restoreGroupId}` : item.restoreDefaultState === 'captured' ? ' ・ 戻し先確定済み（切替前の表示へ戻す）' : item.restoreDefaultState === 'no_default' ? ' ・ 戻し先なし（終了時に表示を外す）' : ' ・ 戻し先は実行開始時に確定') : ''}
                 </span>
                 {item.status === 'scheduled' ? (
                   <Button
                     onClick={() => void cancelSchedule(item.id)}
-                    disabled={cancellingId === item.id}
-                  >
-                    {cancellingId === item.id ? '取消中…' : '予約を取り消す'}
+                    disabled={cancellingId === item.id} busy={cancellingId === item.id} busyLabel="取消中…">予約を取り消す
                   </Button>
                 ) : null}
               </li>
@@ -2203,7 +2180,7 @@ function PublishStep({
       {/* N-151: 公開の履歴・失敗だけの再試行・LINEとの照合修復。 */}
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きを保存する</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)} busy={publishing} busyLabel="公開中…">{mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
     </div>
   )
 }

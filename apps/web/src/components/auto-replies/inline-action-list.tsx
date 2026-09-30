@@ -9,6 +9,7 @@ import { actionIncompleteReason } from './action-completeness'
 import { newActionKey, type InlineAction } from './draft-fields'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import Button from '@/components/shared/button'
 
 /**
  * 応答したときに行うことの並び。
@@ -180,7 +181,7 @@ export default function InlineActionList({
                 onClick={() => remove(action.key)}
                 className="text-danger hover:underline"
               >
-                削除
+                削除する
               </button>
             </div>
           </div>
@@ -234,14 +235,9 @@ export default function InlineActionList({
 
       <div className="flex flex-wrap gap-1.5">
         {ACTION_KINDS.filter((kind) => !kind.feature || actionFeatureVisibility.enabled(kind.feature)).map((kind) => (
-          <button
-            key={kind.type}
-            type="button"
-            onClick={() => add(kind.type)}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs transition-colors"
-          >
+          <Button variant="secondary" className="text-ink-secondary px-2.5 py-1 text-xs h-auto whitespace-normal" key={kind.type} type="button" onClick={() => add(kind.type)}>
             ＋ {kind.label}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

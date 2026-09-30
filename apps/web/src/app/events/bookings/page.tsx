@@ -29,6 +29,7 @@ import {
   type EventSlot,
 } from '@/lib/api'
 import { describeBookingCapacity } from '../event-attention'
+import { formatDateTime } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -101,14 +102,7 @@ function formatJp(iso: string | null | undefined, fallback: string): string {
   if (!iso) return fallback
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return fallback
-  return date.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(date)
 }
 
 /**
@@ -204,9 +198,7 @@ function OccurrenceApplicantsPanel({
           <Button
             onClick={onPromote}
             disabled={promoting || waitingCount === 0}
-            data-occurrence-action="promote-waitlist"
-          >
-            {promoting ? '案内を送信中…' : '次の方へ案内'}
+            data-occurrence-action="promote-waitlist" busy={promoting} busyLabel="案内を送信中…">次の方へ案内
           </Button>
         </div>
       </div>
@@ -1160,8 +1152,7 @@ function BookingsInner() {
                     className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm"
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''}>
-                      {broadcastBusy ? '対象を確定中…' : '対象と内容を確認'}
+                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="対象を確定中…">対象と内容を確認
                     </Button>
                     {activeBroadcastPreview && <span className="text-ink-secondary text-sm">送信対象 {activeBroadcastPreview.recipientCount}人</span>}
                     {activeBroadcastPreview && <Button onClick={() => setBroadcastConfirmOpen(true)} disabled={broadcastBusy}>送信前の最終確認へ</Button>}
@@ -1172,8 +1163,8 @@ function BookingsInner() {
                   open={broadcastConfirmOpen && activeBroadcastPreview !== null}
                   title="この申込者へ送信を開始しますか？"
                   description={`確認済みの ${activeBroadcastPreview?.recipientCount ?? 0} 人へ送信します。送信開始後は取り消せません。`}
-                  confirmLabel="送信を開始"
-                  cancelLabel="戻る"
+                  confirmLabel="送る"
+                  cancelLabel="キャンセル"
                   busy={broadcastBusy}
                   error={broadcastError}
                   onConfirm={() => void sendOccurrenceBroadcast()}
@@ -1237,7 +1228,7 @@ function BookingsInner() {
                     <th className="px-4 py-2 text-left font-medium">予約枠</th>
                     <th className="px-4 py-2 text-left font-medium">連れてくるペット</th>
                     <th className="px-4 py-2 text-left font-medium">この方について</th>
-                    <th className="px-4 py-2 text-right font-medium">状態と操作</th>
+                    <th className="px-4 py-2 font-medium text-right">状態と操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1347,36 +1338,19 @@ function BookingsInner() {
                         )}
                         {b.status === 'confirmed' && (
                           <div className="ml-2 inline-flex gap-1.5">
-                            <button
-                              data-booking-id={b.id}
-                              data-booking-action="attended"
-                              onClick={() => markStatus(b.id, 'attended')}
-                              disabled={busy || marking}
-                              className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
-                            >
+                            <Button variant="primary" className="px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50 border-0 h-auto whitespace-normal" data-booking-id={b.id} data-booking-action="attended" onClick={() => markStatus(b.id, 'attended')} disabled={busy || marking}>
                               {marking ? '記録中…' : '参加済'}
-                            </button>
-                            <button
-                              data-booking-id={b.id}
-                              data-booking-action="no_show"
-                              onClick={() => markStatus(b.id, 'no_show')}
-                              disabled={busy || marking}
-                              className="bg-danger text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
-                            >
+                            </Button>
+                            <Button variant="danger" className="px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50 border-0 h-auto whitespace-normal" data-booking-id={b.id} data-booking-action="no_show" onClick={() => markStatus(b.id, 'no_show')} disabled={busy || marking}>
                               {marking ? '記録中…' : '無断'}
-                            </button>
-                            <button
-                              data-qa-open="i5SN2j-cancel"
-                              onClick={() => {
+                            </Button>
+                            <Button variant="secondary" className="hover:bg-canvas px-3 py-1 text-xs font-medium disabled:opacity-50 h-auto whitespace-normal" data-qa-open="i5SN2j-cancel" onClick={() => {
                                 if (!selectedAccountId) return
                                 setCancelError('')
                                 setCancelTarget({ booking: b, accountId: selectedAccountId })
-                              }}
-                              disabled={busy}
-                              className="border-hairline rounded-control hover:bg-canvas border px-3 py-1 text-xs font-medium disabled:opacity-50"
-                            >
+                              }} disabled={busy}>
                               キャンセル
-                            </button>
+                            </Button>
                             {markErrors[actionKey] && (
                               <span className="text-danger block max-w-64 text-left text-xs" role="alert">
                                 {markErrors[actionKey]}
@@ -1406,7 +1380,7 @@ function BookingsInner() {
         title="この予約を運営側でキャンセルしますか？"
         description="予約は「キャンセル」になり、枠が空きます。友だちにはLINEでキャンセルのお知らせが届きます。送ったお知らせは取り消せません。この画面から元の「確定」に戻すことはできません。"
         confirmLabel="キャンセルにする"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
         destructive
         busy={cancelling}
@@ -1460,7 +1434,7 @@ function BookingsInner() {
               ? '順番を変える'
               : '見送る'
         }
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         busy={promotingWaitlist}
         error={waitlistOpError}
         /* 理由が必須。空のまま送らせない（確認ボタンを出さない）。 */
@@ -1497,7 +1471,7 @@ function BookingsInner() {
         title="この申し込みを断りますか？"
         description="予約は「拒否」になり、枠が空きます。友だちにはLINEで断りのお知らせが届きます。送ったお知らせは取り消せません。"
         confirmLabel="申し込みを断る"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
         destructive
         busy={busy}

@@ -23,6 +23,7 @@ import {
   toActionPayload,
   type InlineAction,
 } from '@/components/auto-replies/draft-fields'
+import Button from '@/components/shared/button'
 
 /**
  * カルーセルの編集。
@@ -634,7 +635,7 @@ function CarouselEditorInner() {
                     onClick={() => setPanels((prev) => prev.filter((_, j) => j !== i))}
                     className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
                   >
-                    削除
+                    削除する
                   </button>
                 )}
                 </div>
@@ -724,20 +725,15 @@ function CarouselEditorInner() {
                             { value: 'action' as const, label: '押されたときに何かする' },
                           ]
                         ).map((o) => (
-                          <button
-                            key={o.value}
-                            type="button"
-                            onClick={() =>
+                          <Button variant="primary" className={(`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`) + ' border-0 h-auto whitespace-normal'} key={o.value} type="button" onClick={() =>
                               update(i, {
                                 actions: panel.actions.map((a, j) =>
                                   j === ai ? { ...a, kind: o.value } : a,
                                 ),
                               })
-                            }
-                            className={`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
-                          >
+                            }>
                             {o.label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                       {panel.actions.length > 1 && (
@@ -794,14 +790,11 @@ function CarouselEditorInner() {
                   </div>
                 ))}
                 {panel.actions.length < MAX_ACTIONS && (
-                  <button
-                    onClick={() =>
+                  <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() =>
                       update(i, { actions: [...panel.actions, emptyChoice()] })
-                    }
-                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs"
-                  >
-                    ＋ 選択肢を追加
-                  </button>
+                    }>
+                    ＋ 選択肢を追加する
+                  </Button>
                 )}
               </div>
             </div>
@@ -852,12 +845,9 @@ function CarouselEditorInner() {
           </section>
 
           {panels.length < MAX_COLUMNS && (
-            <button
-              onClick={() => setPanels((prev) => [...prev, emptyPanel()])}
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-            >
-              パネルを追加（{panels.length} / {MAX_COLUMNS}）
-            </button>
+            <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => setPanels((prev) => [...prev, emptyPanel()])}>
+              パネルを追加する（{panels.length} / {MAX_COLUMNS}）
+            </Button>
           )}
 
           {error && (
@@ -938,7 +928,7 @@ function CarouselEditorInner() {
             <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
               <li>・パネルは{MAX_COLUMNS}枚まで。多いと最後まで見てもらえません</li>
               <li>・ボタンは1パネルにつき{MAX_ACTIONS}つまでです（LINEの仕様）</li>
-              <li>・パネル本文は{TEXT_MAX_WITH_IMAGE}文字まで。超えると途中で切れて表示されます</li>
+              <li>・パネル本文はタイトルか画像があると{TEXT_MAX_WITH_IMAGE}文字まで、両方なければ{TEXT_MAX_WITHOUT_IMAGE}文字までです。超えると途中で切れて表示されます</li>
               <li>
                 ・画像は横1024 × 縦678pxを推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
               </li>
@@ -950,13 +940,9 @@ function CarouselEditorInner() {
           </section>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={save}
-              disabled={saving || loadFailed}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
+            <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={save} disabled={saving || loadFailed}>
+              {saving ? '保存中...' : '保存する'}
+            </Button>
             {/*
               D009: 未保存のままの「キャンセル」は番兵が止めて確認窓を出す。
               素の Link のまま置く（止める役は useUnsavedGuard が受け持つ）。

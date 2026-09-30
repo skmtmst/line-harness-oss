@@ -32,6 +32,7 @@ import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import type { FeatureKey } from '@/lib/feature-settings'
 import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
+import { formatDay, formatNumber } from '@/lib/format'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -214,7 +215,7 @@ function hasLinkedActions(tag: Tag): boolean {
  */
 function isThisMonth(value: string): boolean {
   const month = (d: Date) =>
-    new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit' }).format(d)
+    formatDay(d)
   return month(new Date(value)) === month(new Date())
 }
 
@@ -226,12 +227,7 @@ function isThisMonth(value: string): boolean {
 function formatDate(value: string): string {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return value
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(d)
+  return formatDay(d)
 }
 
 /**
@@ -354,7 +350,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
         open={Boolean(deleteGroup)}
         title={deleteGroup ? `「${deleteGroup.name}」を削除しますか？` : 'フォルダを削除しますか？'}
         description="削除しても、中のタグは未分類に残ります。この操作は元に戻せません。"
-        confirmLabel="フォルダを削除"
+        confirmLabel="フォルダを削除する"
         destructive
         busy={busy}
         onCancel={() => setDeleteGroup(null)}
@@ -434,7 +430,7 @@ function deleteImpactRows(
     {
       name: '付与人数',
       // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
-      value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
+      value: `${formatNumber((impact?.friendCount ?? tag.friendCount ?? 0))}人`,
       result: 'タグが外れます',
     },
     { name: '参照先', value: refs ? manualRefSummary(refs) : '—', result: '絞り込み条件から外れます' },
@@ -551,12 +547,9 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
-          <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
+          <Button variant="secondary" className="shrink-0 px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onCancel}>キャンセル</Button>
           {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}
-          <button
-            type="button"
-            disabled={blocked || text !== tag.name}
-            onClick={async () => {
+          <Button variant="danger" className="shrink-0 px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={blocked || text !== tag.name} onClick={async () => {
               if (!impact || !accountId) return
               setSaving(true); setSaveError('')
               try {
@@ -579,9 +572,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
                 setSaveError('保管できませんでした。影響を読み直して、もう一度お試しください。')
                 setSaving(false)
               }
-            }}
-            className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
-          >{saving ? '保管中…' : 'このタグを保管する'}</button>
+            }}>{saving ? '保管中…' : 'このタグを保管する'}</Button>
         </div>
       </section>
     </div>
@@ -823,7 +814,7 @@ export default function TagsPageV4({
             `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
             まで同じ操作の中で進む。
           */
-          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
+          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録する</Button>
         ) : tab === 'marks' ? (
           <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button>
         ) : tab === 'fields' ? (
@@ -903,7 +894,7 @@ export default function TagsPageV4({
         */}
         {status === 'forbidden' ? null : (
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Button href="/tags/folders/new">フォルダを追加</Button>
+            <Button href="/tags/folders/new">フォルダを追加する</Button>
             {/* 作る操作は一覧のすぐ上の左の並びにまとめる。右上には置かない。 */}
             <Button href="/tags/new" variant="primary">＋ タグを作る</Button>
           </div>

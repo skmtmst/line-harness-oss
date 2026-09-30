@@ -260,7 +260,7 @@ function LifecycleSection({ accountId, eventId }: { accountId: string; eventId: 
               : '状態を変えます。'
         }
         confirmLabel={pending?.label ?? '変える'}
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         busy={busy}
         error={error}
         onConfirm={() => void runSwitch()}

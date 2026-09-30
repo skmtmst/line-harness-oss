@@ -79,7 +79,7 @@ describe('V6 37-6 NEN配信の画面契約', () => {
   })
 
   it('コラムは一覧と右パネル（LINEに届くカード／誰に・いつ送るか）と下部追従バー', () => {
-    for (const label of ['LINEに届くカード', '誰に・いつ送るか', '送る相手', '送る時', '今すぐ', '日時を予約', '自分にテスト送信', 'この内容で予約する', 'この内容で送る']) {
+    for (const label of ['LINEに届くカード', '誰に・いつ送るか', '送る相手', '送る時', '今すぐ', '日時を予約', '自分にテストを送る', 'この内容で予約する', 'この内容で送る']) {
       expect(OVERVIEW).toContain(label)
     }
     expect(OVERVIEW).toContain('<StickyBar')

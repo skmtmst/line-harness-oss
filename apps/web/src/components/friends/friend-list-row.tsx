@@ -9,6 +9,7 @@ import type { FriendListItem } from '@/lib/api'
 import type { FriendListColumn } from './friend-list-table'
 import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
+import { formatDay } from '@/lib/format'
 
 interface Props {
   friend: FriendListItem
@@ -372,12 +373,9 @@ function messageTypeLabel(messageType: string): string {
   } as Record<string, string>)[messageType] ?? 'メッセージ'
 }
 
-/** 今年は「8月14日」、それ以外は「2025年8月14日」（★V7：数字の斜線より読みやすい）。 */
+/** M月D日（曜）。年が違う記録は YYYY年M月D日（★V7：数字の斜線より読みやすい）。 */
 function formatDate(iso: string): string {
-  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
-  if (!year || !month || !day) return iso.slice(0, 10)
-  const thisYear = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(new Date()))
-  return year === thisYear ? `${month}月${day}日` : `${year}年${month}月${day}日`
+  return formatDay(iso)
 }
 
 function avatarTone(name: string): string {

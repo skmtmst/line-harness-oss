@@ -3,7 +3,7 @@
  * useUnsavedGuard の回帰テスト（FORM-19系）。
  *
  * - dirty の間、画面内リンク（一覧へのパンくず含む）を止めて確認へ出す
- * - 「保存せずに移動」は onDiscard を呼んでから移動する——同じページ内の
+ * - 「保存せずに移る」は onDiscard を呼んでから移動する——同じページ内の
  *   クエリ遷移（コンポーネントが外れない）でも「消えます」の約束を守るため
  * - 同じパス・同じクエリで hash だけ変わる移動は画面内ジャンプなので止めない
  */
@@ -20,16 +20,20 @@ vi.mock('next/navigation', () => ({
 }))
 
 function Harness({ dirty, onDiscard }: { dirty: boolean; onDiscard?: () => void }) {
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, onDiscard })
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, onDiscard })
   return (
     <div>
       <a href="/form-submissions">回答フォーム</a>
       <a href="/form-submissions/edit?id=form-1&tab=design">デザイン設定</a>
       <a href="#section-jump">見出し</a>
+      {/* router.push を直接呼ぶボタン（リンクではない離れる操作） */}
+      <button type="button" data-action="leave-button" onClick={() => guarded(() => router.push('/broadcasts'))}>
+        一覧に戻る
+      </button>
       {leaveTarget ? (
         <div role="dialog">
           <p>leave:{leaveTarget.kind}:{leaveTarget.kind === 'link' ? leaveTarget.href : ''}</p>
-          <button type="button" data-action="confirm" onClick={confirmLeave}>保存せずに移動</button>
+          <button type="button" data-action="confirm" onClick={confirmLeave}>保存せずに移る</button>
           <button type="button" data-action="cancel" onClick={cancelLeave}>編集を続ける</button>
         </div>
       ) : null}
@@ -87,7 +91,7 @@ describe('useUnsavedGuard', () => {
     expect(router.push).not.toHaveBeenCalled()
   })
 
-  it('「保存せずに移動」は捨てる処理を呼んでから移動する（FORM-19b）', async () => {
+  it('「保存せずに移る」は捨てる処理を呼んでから移動する（FORM-19b）', async () => {
     const order: string[] = []
     discard.mockImplementation(() => { order.push('discard') })
     router.push.mockImplementation(() => { order.push('push') })
@@ -130,6 +134,27 @@ describe('useUnsavedGuard', () => {
     await render(<Harness dirty={true} />)
     const event = await click(anchor('見出し'))
     expect(event.defaultPrevented).toBe(false)
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('リンクではない離れる操作も dirty の間は止めて確認を出す', async () => {
+    await render(<Harness dirty={true} onDiscard={discard} />)
+    const button = host.querySelector('[data-action="leave-button"]')!
+    await act(async () => { button.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    // 操作は保留され、まだ動いていない
+    expect(router.push).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('leave:action')
+    // 「保存せずに移る」で保留していた操作が実行される
+    await clickDialogButton('confirm')
+    expect(discard).toHaveBeenCalledTimes(1)
+    expect(router.push).toHaveBeenCalledWith('/broadcasts')
+  })
+
+  it('未変更ならリンクではない操作もそのまま実行する', async () => {
+    await render(<Harness dirty={false} />)
+    const button = host.querySelector('[data-action="leave-button"]')!
+    await act(async () => { button.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(router.push).toHaveBeenCalledWith('/broadcasts')
     expect(host.querySelector('[role="dialog"]')).toBeNull()
   })
 })

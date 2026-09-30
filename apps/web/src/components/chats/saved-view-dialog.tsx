@@ -7,6 +7,7 @@ import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Button from '@/components/shared/button'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -321,24 +322,17 @@ export default function SavedViewDialog({
         */}
         <footer className="border-hairline flex shrink-0 flex-wrap items-center justify-end gap-3 border-t px-6 py-4">
           {done ? (
-            <button type="button" onClick={onClose} className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold">
+            <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={onClose}>
               閉じる
-            </button>
+            </Button>
           ) : (
             <>
-              <button type="button" onClick={onClose} className="border-hairline rounded-control text-ink-secondary whitespace-nowrap border px-4 py-2 text-sm">
+              <Button variant="secondary" className="text-ink-secondary whitespace-nowrap px-4 py-2 h-auto" type="button" onClick={onClose}>
                 キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => void submit()}
-                disabled={saving || nameMissing}
-                title={nameMissing ? '検索名を入力してください' : undefined}
-                /* 主ボタンの緑は本流が `accent-deep` へそろえた（白文字の読みやすさ）。 */
-                className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold disabled:opacity-40"
-              >
-                {saving ? '保存中' : '検索条件を保存'}
-              </button>
+              </Button>
+              <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={() => void submit()} disabled={saving || nameMissing} title={nameMissing ? '検索名を入力してください' : undefined}>
+                {saving ? '保存中' : '検索条件を保存する'}
+              </Button>
             </>
           )}
         </footer>

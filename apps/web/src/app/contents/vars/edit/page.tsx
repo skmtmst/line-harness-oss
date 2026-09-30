@@ -48,6 +48,7 @@ import {
   type ChangeImpactState,
 } from '../change-impact'
 import ImpactReview from '../impact-review'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 共通情報の編集。
@@ -537,7 +538,7 @@ function EditCommonVarInner() {
    * 離脱の確認はどの画面状態にいても出す。影響確認の一覧へ切り替えた表示
    * （ImpactReview）は別ツリーへ早期 return するため、要素化して両方の
    * 経路へ差し込む。片方だけに置くと dirty 中のリンクが黙って止まり、
-   * 「保存せずに移動」を選ぶ手段がなくなる。
+   * 「保存せずに移る」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="共通情報への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
@@ -853,11 +854,11 @@ function EditCommonVarInner() {
                     />
                     {statusError ? <p className="text-danger text-xs">{statusError}</p> : null}
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="primary" disabled={statusBusy} onClick={() => void applyStatus()}>
-                        {statusBusy ? '変更中…' : statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
+                      <Button type="button" variant="primary" disabled={statusBusy} onClick={() => void applyStatus()} busy={statusBusy} busyLabel="変更中…">
+                        {statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
                       </Button>
                       <Button type="button" disabled={statusBusy} onClick={() => setStatusAction(null)}>
-                        やめる
+                        キャンセル
                       </Button>
                     </div>
                   </div>
@@ -1087,7 +1088,7 @@ function EditCommonVarInner() {
                     <span className="text-ink-secondary">
                       {formatStamp(schedule.effectiveFrom)} に「{schedule.value || '（空）'}」へ変更
                     </span>
-                    <Button type="button" onClick={() => void removeSchedule(schedule.id)}>予定を削除</Button>
+                    <Button type="button" onClick={() => void removeSchedule(schedule.id)}>予定を削除する</Button>
                   </div>
                 ))}
                 {/*
@@ -1147,7 +1148,7 @@ function EditCommonVarInner() {
                       <h2 className="text-ink text-sm font-bold">使われている場所</h2>
                     </div>
                     <span className="text-action text-xs font-medium">
-                      {impactState === 'ready' && impact ? `${impact.total.toLocaleString('ja-JP')}か所` : NOT_AVAILABLE}
+                      {impactState === 'ready' && impact ? `${formatNumber(impact.total)}か所` : NOT_AVAILABLE}
                     </span>
                   </div>
                   {impactState !== 'ready' || !impact ? (
@@ -1184,7 +1185,7 @@ function EditCommonVarInner() {
                           {usageGroups.map((group) => (
                             <li key={group.kind} className="px-4 py-3">
                               <p className="text-ink text-sm font-semibold">
-                                {group.kindLabel} {group.count.toLocaleString('ja-JP')}件
+                                {group.kindLabel} {formatNumber(group.count)}件
                               </p>
                               <p className="text-ink-faint mt-1 truncate text-xs" title={group.names.join(' ／ ')}>
                                 {group.names.join(' ／ ')}
@@ -1209,7 +1210,7 @@ function EditCommonVarInner() {
                           言うと、存在しない操作を探させることになる。 */}
                       {'canSave' in impact && impact.blockingTotal > 0 ? (
                         <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
-                          1件ずつ確かめるときは「{impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る」へ進んでください。
+                          1件ずつ確かめるときは「{formatNumber(impact.blockingTotal)}か所を1件ずつ見る」へ進んでください。
                         </p>
                       ) : null}
                     </>
@@ -1279,13 +1280,9 @@ function EditCommonVarInner() {
           */}
           <StickyBar
             destructive={(
-              <button
-                type="button"
-                onClick={() => void openDelete()}
-                className="rounded-control bg-danger text-on-accent px-4 py-2 text-sm font-bold"
-              >
-                この共通情報を削除
-              </button>
+              <Button variant="danger" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" type="button" onClick={() => void openDelete()}>
+                この共通情報を削除する
+              </Button>
             )}
             actions={(
               <>
@@ -1301,7 +1298,7 @@ function EditCommonVarInner() {
                     data-qa-open="uNBlA"
                     onClick={() => setShowImpactReview(true)}
                   >
-                    {impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る
+                    {formatNumber(impact.blockingTotal)}か所を1件ずつ見る
                   </Button>
                 ) : null}
                 <Button
@@ -1314,9 +1311,7 @@ function EditCommonVarInner() {
                       return
                     }
                     void save()
-                  }}
-                >
-                  {saving ? '保存中…' : '共通情報を保存'}
+                  }} busy={saving}>共通情報を保存する
                 </Button>
               </>
             )}
@@ -1386,18 +1381,12 @@ function EditCommonVarInner() {
               {scheduleFieldError ? <p className="text-danger mt-1 text-xs">{scheduleFieldError}</p> : null}
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setDraft(null)}
-                className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm"
-              >
+              <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" onClick={() => setDraft(null)}>
                 キャンセル
-              </button>
-              <button
-                onClick={() => void addSchedule()}
-                className="bg-accent-deep text-on-accent rounded-control px-6 py-2 text-sm font-medium"
-              >
-                登録
-              </button>
+              </Button>
+              <Button variant="primary" className="px-6 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void addSchedule()}>
+                登録する
+              </Button>
             </div>
           </div>
         </div>
@@ -1498,7 +1487,7 @@ function EditCommonVarInner() {
         open={clearSchedulesOpen}
         title="更新の予定をすべて消しますか？"
         description="予定の時刻に値が変わる設定をすべて取り消します。いま入力中の内容はそのまま残ります。"
-        confirmLabel="すべて消す"
+        confirmLabel="すべて削除する"
         destructive
         busy={clearSchedulesBusy}
         error={clearSchedulesError || undefined}

@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
 import Notice from '@/components/shared/notice'
@@ -10,6 +9,8 @@ import ListState from '@/components/shared/list-state'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
+import { formatDateTime } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 type Channel = 'all' | 'line' | 'email'
 type ThreadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
@@ -98,7 +99,7 @@ function isStaleUnresolved(item: Pick<InboxItem, 'status' | 'lastIncomingAt'>): 
 }
 
 function dateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return formatDateTime(iso)
 }
 
 /**
@@ -388,7 +389,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               <h2 className="text-lg font-bold text-ink">{selected.customerName}</h2>
               <p className="mt-2 max-w-md text-sm leading-6 text-ink-secondary">LINEの会話履歴と送信機能は、既存の個別チャット画面でそのまま使えます。</p>
               <p className="mt-4 rounded-card bg-canvas px-4 py-3 text-sm text-ink shadow-card">{selected.preview}</p>
-              <Link href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`} className="mt-6 rounded-card bg-accent-deep px-6 py-3 text-sm font-bold text-on-accent shadow-card hover:brightness-90">LINEで返信する →</Link>
+              <Button variant="primary" className="mt-6 rounded-card px-6 py-3 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`}>LINEで返信する →</Button>
             </div>
           ) : detail ? (
             <>
@@ -424,7 +425,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-card border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-[11px] text-ink-faint">From: contact-shed@nen-petfood.com</p>
-                  <button onClick={() => void sendReply()} disabled={!reply.trim() || sending} className="rounded-card bg-accent-deep px-6 py-2.5 text-sm font-bold text-on-accent shadow-card hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40">{sending ? '送信中…' : 'メールで返信'}</button>
+                  <Button variant="primary" className="rounded-card px-6 py-2.5 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" onClick={() => void sendReply()} disabled={!reply.trim() || sending}>{sending ? '送信中…' : 'メールで返信'}</Button>
                 </div>
               </div>
             </>

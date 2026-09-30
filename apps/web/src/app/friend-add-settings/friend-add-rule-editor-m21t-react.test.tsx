@@ -157,6 +157,13 @@ async function choose(label: string, value: string) {
   })
 }
 
+function deliverySummaryValue() {
+  const label = [...host.querySelectorAll('.friend-add-editor-summary span')]
+    .find((item) => item.textContent === '配信')
+  if (!label?.nextElementSibling) throw new Error(`delivery row: ${host.textContent}`)
+  return label.nextElementSibling.textContent
+}
+
 function button(label: string) {
   const node = [...host.querySelectorAll('button')].find((item) => item.textContent?.includes(label))
   if (!node) throw new Error(`${label}: ${host.textContent}`)
@@ -197,7 +204,7 @@ describe('R263 再追加シナリオの開始位置を選び・保存・再読�
     await renderExisting({ returningMode: 'other', startPosition: 'beginning' })
     expect(select('再追加時の開始位置').value).toBe('beginning')
     await choose('再追加時の開始位置', 'resume')
-    await act(async () => { button('下書き保存').click(); await Promise.resolve() })
+    await act(async () => { button('下書きを保存する').click(); await Promise.resolve() })
     expect(api.saveDraft).toHaveBeenCalled()
     const payload = api.saveDraft.mock.calls[0][1] as { definition: { startPosition: string } }
     expect(payload.definition.startPosition).toBe('resume')
@@ -232,6 +239,35 @@ describe('R261 再追加「何も配信しない」は配信欄を適用外に�
     expect(host.querySelector('[data-caption="再追加では配信しません"]')).not.toBeNull()
   })
 
+  it('R261残部: 確認段の右側プレビューにも保存済み本文を出さない', async () => {
+    // 保存済みの本文は設定データとして残るが、届くかのようには見せない。
+    state.search = 'step=preview'
+    await renderExisting({ returningMode: 'none', messageText: 'おかえりなさい' })
+    expect(host.querySelector('[data-caption="再追加では配信しません"]')).not.toBeNull()
+    expect(host.textContent).toContain('メッセージは届きません')
+    expect(host.textContent).not.toContain('おかえりなさい')
+  })
+
+  it('確認段では「別のシナリオ」の保存済み本文はそのまま出す', async () => {
+    state.search = 'step=preview'
+    await renderExisting({ returningMode: 'other', messageText: 'おかえりなさい' })
+    expect(host.querySelector('[data-caption="再追加では配信しません"]')).toBeNull()
+    expect(host.textContent).toContain('おかえりなさい')
+  })
+
+  it('R261残部: 基本段のサマリーは配信なし設定を「なし」と出す', async () => {
+    // 保存済みの本文が残っていても、届く設定かのように見せない。
+    state.search = 'step=basic'
+    await renderExisting({ returningMode: 'none', messageText: 'おかえりなさい' })
+    expect(deliverySummaryValue()).toBe('なし')
+  })
+
+  it('基本段のサマリーは「別のシナリオ」の保存済み本文を配信ありと出す', async () => {
+    state.search = 'step=basic'
+    await renderExisting({ returningMode: 'other', messageText: 'おかえりなさい' })
+    expect(deliverySummaryValue()).toBe('テキストメッセージ')
+  })
+
   it('「別のシナリオ」では通常どおり本文・シナリオ欄を出す', async () => {
     state.search = 'step=message'
     await renderExisting({ returningMode: 'other' })
@@ -257,7 +293,7 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
       .find((item) => item.textContent?.includes('山田 太郎'))
     if (!result) throw new Error(`friend result: ${host.textContent}`)
     await act(async () => { (result as HTMLButtonElement).click() })
-    await act(async () => { button('テスト送信').click(); await Promise.resolve() })
+    await act(async () => { button('テストを送る').click(); await Promise.resolve() })
     expect(api.test).toHaveBeenCalledWith('account-a', 'rule-1', {
       routeId: 'route-1', expectedAt: '2026-09-28T10:00', friendId: 'friend-1',
     })
@@ -266,7 +302,7 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
   it('試行条件を指定しなければ「いま・どの経路でも・友だち不問」で送る', async () => {
     state.search = 'step=preview'
     await renderExisting()
-    await act(async () => { button('テスト送信').click(); await Promise.resolve() })
+    await act(async () => { button('テストを送る').click(); await Promise.resolve() })
     expect(api.test).toHaveBeenCalledWith('account-a', 'rule-1', {
       routeId: null, expectedAt: null, friendId: null,
     })

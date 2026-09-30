@@ -175,7 +175,7 @@ describe('R513 古い版の保存は止めて最新と比べられる', () => {
       code: 'SUPPORT_MARK_VERSION_CONFLICT',
       data: { latest: { name: 'Bの名前', color: '#2563D4', displayOrder: 5, version: 2 } },
     })
-    fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await screen.findByText('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
     // 入力は残り、最新の名前が見える。
     expect((screen.getByPlaceholderText('例：要確認') as HTMLInputElement).value).toBe('Aの名前')
@@ -189,7 +189,7 @@ describe('R513 古い版の保存は止めて最新と比べられる', () => {
     expect((screen.getByPlaceholderText('例：要確認') as HTMLInputElement).value).toBe('Bの名前')
 
     fixture.marksUpdate.mockResolvedValueOnce({ success: true, data: { id: 'm-1' } })
-    fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.marksUpdate).toHaveBeenCalledTimes(2))
     // 最新の版（2）で送り直す。
     expect(fixture.marksUpdate).toHaveBeenLastCalledWith(

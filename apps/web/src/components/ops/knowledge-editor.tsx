@@ -67,7 +67,7 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
     designNode={editing ? 'ZAOc7' : 'DHdsw'} busy={busy} error={error} onCancel={onClose}
     footer={<div className={styles.footer}>
       <Button onClick={editing ? onClose : () => void dismiss()} disabled={busy}>{editing ? '保存せず閉じる' : '見送る'}</Button>
-      <Button onClick={() => void save()} disabled={busy} variant={editing ? 'primary' : 'secondary'}>{editing ? '承認待ちで保存' : '下書き保存'}</Button>
+      <Button onClick={() => void save()} disabled={busy} variant={editing ? 'primary' : 'secondary'}>{editing ? '承認待ちで保存する' : '下書きを保存する'}</Button>
       {!editing && <Button variant="primary" disabled={busy || !canApprove || !confirmed} onClick={() => void save(true)}>承認して有効にする</Button>}
     </div>}>
     <div className={styles.editor}>

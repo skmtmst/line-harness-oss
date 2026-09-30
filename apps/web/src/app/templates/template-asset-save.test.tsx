@@ -180,7 +180,7 @@ async function nameAndSave() {
     await settle()
   })
   await act(async () => {
-    buttonByText('テンプレートを保存').click()
+    buttonByText('テンプレートを保存する').click()
     await settle()
   })
 }
@@ -347,7 +347,7 @@ describe('NEXT-19: リサーチの質問が保存値へ入る', () => {
     await renderEditor('research')
     // 初期は1問。追加すると2問目が選ばれた状態になる。
     await act(async () => {
-      buttonByText('質問を追加（あと9問）').click()
+      buttonByText('質問を追加する（あと9問）').click()
       await settle()
     })
     expect(host.textContent).toContain('2 / 10 問')
@@ -398,12 +398,12 @@ describe('NEXT-19: リサーチの質問が保存値へ入る', () => {
   it('質問を消すと一覧・件数・保存値が揃う', async () => {
     await renderEditor('research')
     await act(async () => {
-      buttonByText('質問を追加（あと9問）').click()
+      buttonByText('質問を追加する（あと9問）').click()
       await settle()
     })
     expect(host.textContent).toContain('2 / 10 問')
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('button[aria-label="質問 2 を消す"]')!.click()
+      document.querySelector<HTMLButtonElement>('button[aria-label="質問 2 を削除する"]')!.click()
       await settle()
     })
     expect(host.textContent).toContain('1 / 10 問')

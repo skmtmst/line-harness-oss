@@ -123,7 +123,7 @@ describe('E-02 自動応答編集ダイアログのoverlay制御', () => {
     mocks.create.mockImplementationOnce(() => new Promise<void>((resolve) => { finishSave = resolve }))
     const onClose = mount()
     await flush()
-    const save = Array.from(dialog().querySelectorAll('button')).find((button) => button.textContent === '保存')
+    const save = Array.from(dialog().querySelectorAll('button')).find((button) => button.textContent === '保存する')
     if (!save) throw new Error('save button not found')
     act(() => { save.click() })
     await flush()
@@ -143,7 +143,7 @@ describe('E-02 自動応答編集ダイアログのoverlay制御', () => {
 
     act(() => { root.render(<Owner />) })
     await flush()
-    const save = Array.from(dialog().querySelectorAll('button')).find((button) => button.textContent === '保存')
+    const save = Array.from(dialog().querySelectorAll('button')).find((button) => button.textContent === '保存する')
     if (!save) throw new Error('save button not found')
     act(() => { save.click() })
     await flush()

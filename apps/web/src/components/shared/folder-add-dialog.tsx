@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
+import Button from '@/components/shared/button'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
 export const FOLDER_COLORS = [
@@ -143,16 +144,11 @@ export default function FolderAddDialog({
             onClick={onClose}
             className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
           >
-            やめる
+            キャンセル
           </button>
-          <button
-            type="button"
-            onClick={() => void add()}
-            disabled={saving || !name.trim()}
-            className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
-          >
-            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '変更を保存' : '追加する')}
-          </button>
+          <Button variant="primary" className="px-4 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void add()} disabled={saving || !name.trim()}>
+            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '保存する' : '追加する')}
+          </Button>
         </div>
       </div>
     </div>

@@ -38,6 +38,7 @@ import {
   messageKindWord,
   responseTypeWord,
 } from '@/app/auto-replies/auto-reply-words'
+import { formatNumber } from '@/lib/format'
 
 export interface AutoReplyDraft {
   id?: string
@@ -596,8 +597,7 @@ export default function EditDialog({
     <>
       {page ? (
         <>
-          <Button type="button" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '下書き保存'}
+          <Button type="button" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">下書きを保存する
           </Button>
           {step === 'basic' && <Button type="button" variant="primary" onClick={() => moveTo('trigger')}>反応条件へ</Button>}
           {step === 'trigger' && <Button type="button" variant="primary" onClick={() => moveTo('response')}>何を返すかへ</Button>}
@@ -606,8 +606,7 @@ export default function EditDialog({
       ) : (
         <>
           <Button type="button" onClick={onClose}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '保存'}
+          <Button type="button" variant="primary" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">保存する
           </Button>
         </>
       )}
@@ -903,7 +902,7 @@ export default function EditDialog({
                           setKeyword(next[0]?.keyword ?? '')
                         }}
                       >
-                        削除
+                        削除する
                       </Button>
                     )}
                   </div>
@@ -912,7 +911,7 @@ export default function EditDialog({
                   type="button"
                   onClick={() => setKeywordRules((current) => [...current, emptyKeywordRule(matchType)])}
                 >
-                  ＋ キーワードを追加
+                  ＋ キーワードを追加する
                 </Button>
               </div>
             )}
@@ -1001,11 +1000,11 @@ export default function EditDialog({
                 {WEEKDAY_LABELS.map((label, day) => {
                   const on = weekdays.length === 0 || weekdays.includes(day)
                   return (
-                    <button
-                      key={day}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => {
+                    <Button variant="secondary" className={(`rounded-control border px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'border-accent bg-accent-soft text-ink'
+                          : 'border-hairline text-ink-faint'
+                      }`) + ' h-auto whitespace-normal'} key={day} type="button" aria-pressed={on} onClick={() => {
                         // 何も選ばない＝すべての曜日。最初の1つを押したときは
                         // 「その曜日だけ」にする（全部入りから1つ外す、ではない）。
                         if (weekdays.length === 0) {
@@ -1031,15 +1030,9 @@ export default function EditDialog({
                         }
                         setWeekdays([...weekdays, day].sort((a, b) => a - b))
                         setWeekdayNotice(null)
-                      }}
-                      className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
-                        on
-                          ? 'border-accent bg-accent-soft text-ink'
-                          : 'border-hairline text-ink-faint'
-                      }`}
-                    >
+                      }}>
                       {label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -1124,13 +1117,11 @@ export default function EditDialog({
                 {MESSAGE_KIND_WORDS.map(({ key, label }) => {
                   const on = messageKinds.length === 0 || messageKinds.includes(key)
                   return (
-                    <button
-                      key={key}
-                      type="button"
-                      // R254: 選・不選を読み上げで区別できるようにする。
-                      // 曜日・一致のしかたの切り替えと同じ押した状態。
-                      aria-pressed={on}
-                      onClick={() =>
+                    <Button variant="primary" className={(`rounded-pill px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'bg-accent-deep text-on-accent'
+                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                      }`) + ' border-0 h-auto whitespace-normal'} key={key} type="button" aria-pressed={on} onClick={() =>
                         setMessageKinds((prev) => {
                           // 何も選んでいない状態は「全部」を意味する。そこから
                           // 1つ外すには、いったん全部を入れてから外す。
@@ -1139,15 +1130,9 @@ export default function EditDialog({
                             ? base.filter((k) => k !== key)
                             : [...base, key]
                         })
-                      }
-                      className={`rounded-pill px-2.5 py-1 text-xs transition-colors ${
-                        on
-                          ? 'bg-accent-deep text-on-accent'
-                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                      }`}
-                    >
+                      }>
                       {label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -1189,7 +1174,7 @@ export default function EditDialog({
                       ? <span className="text-ink-faint">受信なし</span>
                       : draft.receiveSourceCounts.map((item) => (
                         <span key={item.source} className="bg-canvas-sunken rounded-pill px-2 py-1 text-xs">
-                          {messageKindWord(item.source)} {item.count.toLocaleString()}件
+                          {messageKindWord(item.source)} {formatNumber(item.count)}件
                         </span>
                       ))}
                 </div>
@@ -1626,8 +1611,8 @@ export default function EditDialog({
             <p className="text-ink font-semibold">{step === 'trigger' ? '過去28日の受信' : '動作の確認'}</p>
             {step === 'trigger' ? (
               <>
-                <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{draft.matchedLast28Days == null ? '—' : `${draft.matchedLast28Days.toLocaleString()}件`}</p>
-                <p className="text-ink-faint mt-1 leading-relaxed">{receiveCount == null ? '受信総数は未取得です。' : `受信 ${receiveCount.toLocaleString()}件の実測集計です。`}</p>
+                <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{draft.matchedLast28Days == null ? '—' : `${formatNumber(draft.matchedLast28Days)}件`}</p>
+                <p className="text-ink-faint mt-1 leading-relaxed">{receiveCount == null ? '受信総数は未取得です。' : `受信 ${formatNumber(receiveCount)}件の実測集計です。`}</p>
                 <p className="text-ink-faint mt-3 leading-relaxed">利用できる条件：タグ・友だち情報・シナリオ・予約・流入経路・対応状況など</p>
               </>
             ) : (

@@ -111,7 +111,7 @@ describe('自動応答一覧の行操作', () => {
     expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
 
     // 削除は行に直に置かない。
-    expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」を削除"]')).toBeNull()
+    expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」を削除する"]')).toBeNull()
 
     const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]') as HTMLButtonElement
     expect(more, 'その他ボタンが見つかりません').toBeTruthy()

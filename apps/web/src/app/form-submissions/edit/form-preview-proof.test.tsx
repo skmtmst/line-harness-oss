@@ -205,7 +205,7 @@ describe('N-174 公開前プレビューと検証の実React対照', () => {
       net.layout = layout
       await renderPage()
 
-      await click('下書きを保存')
+      await click('下書きを保存する')
       expect(container.textContent).toContain(invalid.message)
       await click('この版を公開')
       expect(container.textContent).toContain(invalid.message)

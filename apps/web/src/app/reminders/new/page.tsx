@@ -354,7 +354,7 @@ export default function NewReminderPage() {
           {appliedTemplate ? appliedTemplate.step.messageContent : 'メッセージは STEP 3 で作成します。基準日を選ぶと、差し込める項目がここに出ます。'}
         </LinePreview>
         <div className={styles.previewActions}>
-          <Button disabled>テスト送信</Button>
+          <Button disabled>テストを送る</Button>
           <Button disabled>通知イメージを見る</Button>
         </div>
         <p className={styles.previewNote}>テスト送信と表示確認は、STEP 3 で通知を作ると使えます。</p>
@@ -449,13 +449,13 @@ export default function NewReminderPage() {
         </ReminderPanel>
         {/* #996 DEEP-07: 説明だけの表に「このひな形を使う」を付け、選べるようにする。 */}
         <ReminderPanel title="ひな形から作る" note="用途に合う組み合わせを選ぶと、基準日・タイミング・本文をまとめて入力します。">
-          <div className="overflow-hidden rounded-control border border-hairline"><table className="w-full text-left text-xs"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow>{/* 表の外側の余白は見出しの余白（16px）にそろえ、操作は右へ寄せる。 */}<Th className="pl-4">ひな形</Th><Th>基準日</Th><Th>通知のタイミング</Th><Th align="right" className="pr-4">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{reminderTemplates.map((template) => <tr key={template.id}><td className="py-2 pr-2 pl-4"><strong className="block text-ink">{template.title}</strong><span className="text-ink-faint">{template.note}</span></td><td>{template.baseLabel}</td><td>{template.timingLabel}</td><td className="py-2 pr-4 pl-2 text-right"><Button onClick={() => requestTemplate(template)}>{appliedTemplateId === template.id ? '選択中' : 'このひな形を使う'}</Button></td></tr>)}</tbody></table></div>
+          <div className="overflow-hidden rounded-control border border-hairline"><table className="w-full text-left text-xs"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow>{/* 表の外側の余白は見出しの余白（16px）にそろえ、操作は右へ寄せる。 */}<Th className="pl-4">ひな形</Th><Th>基準日</Th><Th>通知のタイミング</Th><Th align="right" className="pr-4">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{reminderTemplates.map((template) => <tr key={template.id}><td className="py-2 pr-2 pl-4"><strong className="block text-ink">{template.title}</strong><span className="text-ink-faint">{template.note}</span></td><td>{template.baseLabel}</td><td>{template.timingLabel}</td><td className="py-2 pr-4 pl-2 text-right"><Button onClick={() => requestTemplate(template)} busy={appliedTemplateId === template.id} busyLabel="選択中">このひな形を使う</Button></td></tr>)}</tbody></table></div>
         </ReminderPanel>
         </div>
       </ReminderWorkspace>
       <ReminderFooter status={saveStatusLabel} primary={saving ? '保存中…' : '下書きを保存して対象設定へ'} primaryDisabled={saving || candidatesPending} onPrimary={() => void save()} />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-      <ConfirmDialog open={pendingTemplate !== null} title="ひな形で入力を置き換えますか？" description={pendingTemplate ? `「${pendingTemplate.title}」を使うと、基準日・タイミング・本文の設定がひな形の内容に置き換わります。` : ''} confirmLabel="このひな形を使う" cancelLabel="やめる" onConfirm={() => { if (pendingTemplate) applyTemplate(pendingTemplate); setPendingTemplate(null) }} onCancel={() => setPendingTemplate(null)} />
+      <ConfirmDialog open={pendingTemplate !== null} title="ひな形で入力を置き換えますか？" description={pendingTemplate ? `「${pendingTemplate.title}」を使うと、基準日・タイミング・本文の設定がひな形の内容に置き換わります。` : ''} confirmLabel="このひな形を使う" cancelLabel="キャンセル" onConfirm={() => { if (pendingTemplate) applyTemplate(pendingTemplate); setPendingTemplate(null) }} onCancel={() => setPendingTemplate(null)} />
     </div>
   )
 }

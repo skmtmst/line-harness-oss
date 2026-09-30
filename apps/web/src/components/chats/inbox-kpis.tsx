@@ -1,10 +1,12 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type InboxStats } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { formatDurationMinutes } from '@/lib/format-duration'
+import { formatNumber } from '@/lib/format'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import Button from '@/components/shared/button'
 
 function formatWait(minutes: number | null): string {
   if (!minutes || minutes < 1) return '待ちはありません'
@@ -38,9 +40,14 @@ export default function InboxKpis() {
    * 読み込み中は数の場所に骨組みを出す（#673）。
    * 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す。
    */
-  const skeleton = <span className="bg-canvas-sunken inline-block h-5 w-12 animate-pulse rounded-mini align-middle" aria-hidden="true" />
-  const value = (number: number | undefined) =>
-    loading ? skeleton : number === undefined ? '—' : `${number.toLocaleString('ja-JP')}件`
+  const value = (number: number | undefined) => (
+    <DelayedSkeleton
+      loading={loading}
+      skeleton={<Skeleton className="h-5 w-12 align-middle" />}
+    >
+      {number === undefined ? '—' : `${formatNumber(number)}件`}
+    </DelayedSkeleton>
+  )
 
   return (
     <section
@@ -56,7 +63,12 @@ export default function InboxKpis() {
         <div>
           <p className="text-ink text-[17px] font-bold">要返信 {value(stats?.waiting)}</p>
           <p className="text-status-warn-deep mt-0.5 text-[11px] font-semibold">
-            {loading ? <span className="bg-canvas-sunken inline-block h-3.5 w-24 animate-pulse rounded-mini align-middle" aria-hidden="true" /> : formatWait(stats?.oldestWaitingMinutes ?? null)}
+            <DelayedSkeleton
+              loading={loading}
+              skeleton={<Skeleton className="h-3.5 w-24 align-middle" />}
+            >
+              {formatWait(stats?.oldestWaitingMinutes ?? null)}
+            </DelayedSkeleton>
           </p>
         </div>
       </div>
@@ -78,10 +90,10 @@ export default function InboxKpis() {
         ))}
       </div>
 
-      <Link href="/tags?tab=marks" className="border-hairline text-action inline-flex h-[38px] shrink-0 items-center gap-2 rounded-control border bg-canvas px-3.5 text-[13px] font-semibold hover:bg-canvas-sunken">
+      <Button variant="secondary" className="text-action h-[38px] shrink-0 items-center gap-2 px-3.5 text-[13px] whitespace-normal" href="/tags?tab=marks">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6"/></svg>
         対応ルール
-      </Link>
+      </Button>
     </section>
   )
 }

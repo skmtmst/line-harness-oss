@@ -26,6 +26,7 @@ import ConditionBuilder, {
   type SegmentRule,
 } from '@/components/shared/condition-builder'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatDateTime } from '@/lib/format'
 
 function Shell({
   title,
@@ -139,17 +140,10 @@ export function ConditionDialog({
       wide
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-          >
+          <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={async () => {
+          </Button>
+          <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
                * 欄の下で知らせて止める。保存済みの条件は維持する。
@@ -176,11 +170,9 @@ export function ConditionDialog({
               } finally {
                 setSaving(false)
               }
-            }}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-          >
+            }}>
             {saving ? '保存中…' : 'この条件を反映'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -225,7 +217,7 @@ export function ConditionDialog({
                   }}
                   className="text-danger shrink-0 text-xs"
                 >
-                  削除
+                  削除する
                 </button>
               </li>
             ))}
@@ -248,7 +240,7 @@ export function ConditionDialog({
                   }}
                   className="text-danger shrink-0 text-xs"
                 >
-                  削除
+                  削除する
                 </button>
               </li>
             ))}
@@ -460,17 +452,10 @@ export function OnCompleteDialog({
       onClose={onClose}
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-          >
-            やめる
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={async () => {
+          <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
+            キャンセル
+          </Button>
+          <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
                * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
@@ -499,11 +484,9 @@ export function OnCompleteDialog({
               } finally {
                 setSaving(false)
               }
-            }}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-          >
+            }}>
             {saving ? '保存中…' : '変更する'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -546,13 +529,9 @@ export function OnCompleteDialog({
         <p className="text-ink-secondary mt-0.5 mb-2 text-xs">
           配り終えた人に対して、タグ・友だち情報・対応マークなどを動かします。
         </p>
-        <button
-          type="button"
-          onClick={onOpenActions}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-4 text-sm"
-        >
+        <Button variant="secondary" className="text-ink-secondary h-10 px-4 whitespace-normal" type="button" onClick={onOpenActions}>
           アクション設定{actionCount > 0 ? `（${actionCount} 件）` : ''}
-        </button>
+        </Button>
       </div>
 
       {draftMode === 'move' && (
@@ -973,7 +952,7 @@ export function TestSendDialog({
                 )}
               </Notice>
             )}
-          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>完了</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()}>{sending ? '送信中…' : result ? 'もう一度送信' : 'テスト送信を開始'}</Button></>)}</div></div>
+          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
         </div>
       </div>
     )
@@ -990,21 +969,12 @@ export function TestSendDialog({
       // ここに確認中のフッターは要らない。
       footer={
         <>
-        <button
-          type="button"
-          onClick={onClose}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-        >
+        <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
           キャンセル
-        </button>
-        <button
-          type="button"
-          disabled={!selected || sending}
-          onClick={openConfirm}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
           内容を確認
-        </button>
+        </Button>
         </>
       }
     >
@@ -1023,7 +993,7 @@ export function TestSendDialog({
 
       {lastTest ? (
         <Notice tone="info" className="mb-4">
-          前回のテスト送信：{new Date(lastTest.sentAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{lastTest.messageCount}通
+          前回のテスト送信：{formatDateTime(lastTest.sentAt)}・{lastTest.messageCount}通
         </Notice>
       ) : null}
 
@@ -1345,7 +1315,7 @@ export function FriendPlanDialog({
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-ink-faint">試算した時刻</dt>
               <dd className="text-ink tabular-nums">
-                {new Date(plan.computedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                {formatDateTime(plan.computedAt)}
               </dd>
             </div>
           </dl>

@@ -37,13 +37,14 @@ import {
   deadlineSelectValue,
   parseDeadlineSelect,
 } from './event-draft-shared'
+import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
 
 type Tab = 'overview' | 'slots' | 'publish'
 
 const TABS: Array<{ key: Tab; label: string; saveLabel: string; sub: string }> = [
-  { key: 'overview', label: '1. 概要', saveLabel: '概要を保存', sub: 'イベント名・場所・詳細を入力' },
+  { key: 'overview', label: '1. 概要', saveLabel: '概要を保存する', sub: 'イベント名・場所・詳細を入力' },
   { key: 'slots', label: '2. 予約枠', saveLabel: '', sub: '友だちが選べる日時を追加' },
-  { key: 'publish', label: '3. 公開設定', saveLabel: '公開設定を保存', sub: '承認制・リマインダ・公開' },
+  { key: 'publish', label: '3. 公開設定', saveLabel: '公開設定を保存する', sub: '承認制・リマインダ・公開' },
 ]
 
 const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT
@@ -69,10 +70,7 @@ export function formatJpDateTime(iso: string): string {
     ここが端末の時間帯に依存すると、同じ開催回が一覧と編集で
     時差分ずれて見える。保存値(UTC)は変えず、表示だけ日本時間に固定する。
   */
-  return d.toLocaleString('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(d)
 }
 
 /**
@@ -84,8 +82,8 @@ export function formatJpDateTime(iso: string): string {
 export function formatJpSlotRange(startsAt: string, endsAt: string): string {
   const start = formatJpDateTime(startsAt)
   const end = formatJpDateTime(endsAt)
-  const sameDay = start.slice(0, 10) === end.slice(0, 10)
-  return `${start} 〜 ${sameDay ? end.slice(-5) : end}`
+  const sameDay = formatDay(startsAt) === formatDay(endsAt)
+  return `${start} 〜 ${sameDay ? formatTime(endsAt) : end}`
 }
 
 /**
@@ -477,7 +475,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
             status={(
               <span className="text-xs text-ink-faint">
               {tab === 'overview' && !eventId && '保存するとイベントが作成され、予約枠タブに進みます'}
-              {tab === 'overview' && eventId && '変更を「概要を保存」で確定します'}
+              {tab === 'overview' && eventId && '変更を「概要を保存する」で確定します'}
               {tab === 'publish' && '「公開する」ON で友だちに予約 URL を案内できます'}
               </span>
             )}
@@ -495,9 +493,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
               <Button
                 variant="primary"
                 onClick={() => save()}
-                disabled={saving}
-              >
-                {saving ? '保存中...' : tab === 'overview' && !eventId ? 'イベントを作成' : TABS.find((x) => x.key === tab)?.saveLabel ?? '保存'}
+                disabled={saving} busy={saving} busyLabel="保存中...">
+                {tab === 'overview' && !eventId ? 'イベントを作る' : TABS.find((x) => x.key === tab)?.saveLabel ?? '保存する'}
               </Button>
               </>
             )}
@@ -580,7 +577,7 @@ function OverviewTab({
         <label className="flex justify-between items-center text-sm font-medium text-ink-secondary mb-1.5">
           <span>イベント詳細</span>
           <span className={`text-xs ${descLen > 20000 ? 'text-danger' : 'text-ink-faint'}`}>
-            {descLen.toLocaleString()} / 20,000
+            {formatNumber(descLen)} / 20,000
           </span>
         </label>
         <textarea
@@ -848,10 +845,10 @@ function SlotsTab({
         <div className="text-sm text-ink-secondary">{slots.length} 件の予約枠</div>
         <div className="flex gap-2">
           <Button onClick={() => setShowAdd(true)}>
-            ＋ 枠を追加
+            ＋ 枠を追加する
           </Button>
           <Button onClick={() => setShowBulk(true)}>
-            一括追加
+            一括追加する
           </Button>
         </div>
       </div>
@@ -905,7 +902,7 @@ function SlotsTab({
                         title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
                         className="text-xs text-danger hover:underline disabled:opacity-30 disabled:no-underline"
                       >
-                        削除
+                        削除する
                       </button>
                     </div>
                   </ActionCell>
@@ -1100,7 +1097,7 @@ function AddSlotDialog({
             disabled={busy}
             className="px-4 py-2 text-sm bg-action text-on-accent rounded-control hover:bg-action-hover disabled:opacity-50"
           >
-            追加
+            追加する
           </button>
         </div>
       </div>
@@ -1225,8 +1222,7 @@ function EditSlotDialog({
           <Button variant="secondary" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" onClick={submit} disabled={busy}>
-            {busy ? '保存中...' : '保存'}
+          <Button variant="primary" onClick={submit} disabled={busy} busy={busy} busyLabel="保存中...">保存する
           </Button>
         </div>
       </div>
@@ -1307,19 +1303,13 @@ export function BulkSlotDialog({
             {/* R218: 色だけでなく aria-pressed で選択状態を読み上げに伝える。 */}
             <div className="flex gap-1.5" role="group" aria-label="枠を作る曜日">
               {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  aria-pressed={weekdays.includes(i)}
-                  onClick={() => toggleWeekday(i)}
-                  className={`flex-1 px-2 py-2 text-sm border rounded-control ${
+                <Button variant="secondary" className={(`flex-1 px-2 py-2 text-sm border rounded-control ${
                     weekdays.includes(i)
                       ? 'bg-action text-on-accent border-action'
                       : 'border-hairline text-ink-secondary hover:bg-surface-pearl'
-                  }`}
-                >
+                  }`) + ' h-auto whitespace-normal'} key={i} type="button" aria-pressed={weekdays.includes(i)} onClick={() => toggleWeekday(i)}>
                   {d}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -1356,7 +1346,7 @@ export function BulkSlotDialog({
               onClick={() => setPatterns((ps) => [...ps, { start: '14:00', end: '15:00' }])}
               className="text-sm text-action hover:underline"
             >
-              ＋ パターン追加
+              ＋ パターンを追加する
             </button>
           </div>
           <label className="block">

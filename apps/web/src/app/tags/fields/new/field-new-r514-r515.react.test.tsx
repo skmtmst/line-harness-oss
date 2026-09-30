@@ -36,7 +36,7 @@ vi.mock('@/lib/api', () => ({
 import NewFriendFieldPage from './page'
 
 function createButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: '項目を作成' }) as HTMLButtonElement
+  return screen.getByRole('button', { name: '項目を作る' }) as HTMLButtonElement
 }
 
 beforeEach(() => {

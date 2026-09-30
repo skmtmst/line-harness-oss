@@ -7,7 +7,9 @@ import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
+import ValidationSummary from '@/components/shared/validation-summary'
 import { describeSaveFailure } from '@/lib/api'
+import type { FormErrors } from '@/lib/use-form-errors'
 
 /*
  * D005: `ApiError.message` は安全と判定されない応答では `API error: <番号>` の
@@ -71,6 +73,12 @@ export interface CreatePageProps {
   /** 保存前の確認。文字列を返すとその内容をエラーとして出し、保存しない */
   validate?: () => string | null
   /**
+   * 欄ごとの検査（★V7 sTJsh §6）。渡すと保存時に全欄を検査し、落ちた欄は
+   * 欄の下に理由・上にまとめを出して1つ目へフォーカスを移す。
+   * 欄は離れた時点でも1回だけ検査される（`useFormErrors` 参照）。
+   */
+  fields?: FormErrors
+  /**
    * 右の列。設計では作成画面の多くが「入力の左」と「見え方・注意の右」に
    * 分かれている。入力しながら、お客様側にどう出るかを見られるようにする。
    */
@@ -96,6 +104,7 @@ export default function CreatePage({
   successHref,
   onReset,
   validate,
+  fields,
   aside,
   saveLabel,
   showHeader = true,
@@ -112,8 +121,19 @@ export default function CreatePage({
   const run = async (andAnother: boolean) => {
     if (saving) return
     const validationError = validate?.()
+    /*
+     * 欄ごとの検査がある画面では、保存時に全欄をもう一度見て、落ちた欄は
+     * 欄の下に理由・上にまとめを出す（★V7 sTJsh §6）。直し方が分かる文なので
+     * 「保存できませんでした」だけの帯にはしない。画面全体の条件
+     * （アカウント未選択など）とは両方出す。
+     */
+    const fieldProblems = fields?.submit() ?? []
     if (validationError) {
       setError(validationError)
+      return
+    }
+    if (fieldProblems.length > 0) {
+      setError('')
       return
     }
     setSaving(true)
@@ -147,27 +167,19 @@ export default function CreatePage({
           保存して続けて作る
         </Button>
       )}
-      <Button variant="primary" onClick={() => run(false)} disabled={saving}>
-        {saving ? '保存中...' : (saveLabel ?? '保存')}
+      <Button variant="primary" onClick={() => run(false)} disabled={saving} busy={saving} busyLabel="保存中...">
+        {(saveLabel ?? '保存する')}
       </Button>
     </>
   ) : (
     <>
-      <button
-        onClick={() => run(false)}
-        disabled={saving}
-        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-      >
-        {saving ? '保存中...' : (saveLabel ?? '保存')}
-      </button>
+      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving}>
+        {saving ? '保存中...' : (saveLabel ?? '保存する')}
+      </Button>
       {onReset && (
-        <button
-          onClick={() => run(true)}
-          disabled={saving}
-          className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-        >
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving}>
           保存して続けて作る
-        </button>
+        </Button>
       )}
       <Link
         href={parent[1]}
@@ -202,6 +214,10 @@ export default function CreatePage({
             v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
+          {/* 保存時に落ちた欄のまとめ（★V7 sTJsh §6）。欄の上の方に出す。 */}
+          {fields ? (
+            <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} />
+          ) : null}
           {children}
 
           {error && <p className="text-danger text-sm">{error}</p>}

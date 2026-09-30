@@ -147,7 +147,7 @@ describe('U004: 開始条件のキャンセル', () => {
     expect(addTrigger).not.toHaveBeenCalled()
 
     await act(async () => {
-      fireEvent.click(screen.getByText('開始条件を保存'))
+      fireEvent.click(screen.getByText('開始条件を保存する'))
     })
     expect(onClose).toHaveBeenCalled()
     expect(removeTrigger).toHaveBeenCalledWith('sc-1', 'trig-1')
@@ -162,7 +162,7 @@ describe('U004: 開始条件のキャンセル', () => {
 
     fireEvent.click(screen.getAllByText('外す')[0])
     await act(async () => {
-      fireEvent.click(screen.getByText('開始条件を保存'))
+      fireEvent.click(screen.getByText('開始条件を保存する'))
     })
 
     expect(screen.getByText('外せませんでした')).toBeTruthy()

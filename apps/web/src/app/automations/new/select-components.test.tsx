@@ -121,7 +121,7 @@ describe('対象の友だちの複数選択（R22）', () => {
       resolveList({ success: true, data: { items: [{ id: 'friend-1', displayName: '山田 花子' }] } })
     })
     expect(el.textContent).toContain('山田 花子')
-    const add = Array.from(el.querySelectorAll('button')).find((button) => button.textContent === '追加')
+    const add = Array.from(el.querySelectorAll('button')).find((button) => button.textContent === '追加する')
     if (!add) throw new Error('追加ボタンが見つかりません')
     await click(add)
     expect(onChange).toHaveBeenCalledWith(['friend-1'], { 'friend-1': '山田 花子' })

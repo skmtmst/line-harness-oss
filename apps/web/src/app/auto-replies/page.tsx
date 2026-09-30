@@ -18,7 +18,7 @@ import { inEvaluationOrder, movePriorityUpdates } from './auto-reply-order'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
-import { TableStateRow } from '@/components/shared/table'
+import { TableStateRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
@@ -822,21 +822,21 @@ export default function AutoRepliesPage() {
           <table className="min-w-[784px] @[880px]:min-w-[880px] w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
-                <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
-                <th title="返信と実行するアクション" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
+                <Th className="px-4 py-3 text-xs whitespace-normal">ルール名</Th>
+                <Th className="w-20 px-4 py-3 text-xs whitespace-normal">状態</Th>
+                <Th className="w-1/6 px-4 py-3 text-xs" title="動く条件（キーワード・適用アカウント）">条件</Th>
+                <Th className="w-1/6 px-4 py-3 text-xs" title="返信と実行するアクション">返すもの</Th>
                 {/* 谷間帯の列削減: 回数は補助情報なので表の幅が足りない間だけ畳む。 */}
-                <th title="今月動いた回数" className="cq-hide-below-880 w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
+                <Th className="cq-hide-below-880 w-24 px-4 py-3 text-xs whitespace-normal" title="今月動いた回数">今月の応答</Th>
                 {/*
                   #774: 右端の操作列は sticky で留める。幅は中身（編集＋
                   その他の 32px 級 2つ）に合わせた固定 144。
                 */}
-                <th title="編集・停止または再開・削除" className={`bg-canvas-sunken sticky right-0 px-4 py-3 text-right text-xs font-semibold text-ink-faint ${sortKey === 'priority' ? 'w-52' : 'w-36'}`}>操作</th>
-                <th className="hidden px-4 py-3">テンプレート</th>
-                <th className="hidden px-4 py-3">応答条件</th>
-                <th className="hidden px-4 py-3">適用アカウント</th>
-                <th className="hidden px-4 py-3">累計</th>
+                <Th title="編集・停止または再開・削除" className={`bg-canvas-sunken sticky right-0 px-4 py-3 text-right text-xs font-semibold text-ink-faint whitespace-normal ${sortKey === 'priority' ? 'w-52' : 'w-36'}`}>操作</Th>
+                <Th hidden>テンプレート</Th>
+                <Th hidden>応答条件</Th>
+                <Th hidden>適用アカウント</Th>
+                <Th hidden>累計</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-divider-soft">
@@ -1124,7 +1124,7 @@ export default function AutoRepliesPage() {
           open={pendingDelete !== null}
           title={`自動応答「${pendingDelete?.item.name || pendingDelete?.item.keyword || 'すべてのメッセージ'}」を削除しますか？`}
           description="新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。"
-          confirmLabel="自動応答を削除"
+          confirmLabel="自動応答を削除する"
           destructive
           busy={deleting}
           error={deleteError}

@@ -277,8 +277,8 @@ function FolderEditor() {
               <div className="border-hairline mt-7 border-t pt-6">
                 <p className="text-ink mb-3 text-sm font-semibold">作成する場所</p>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setScope('tag')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'tag' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>タグ</button>
-                  <button type="button" onClick={() => setScope('friend_field')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'friend_field' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>友だち情報欄</button>
+                  <Button variant="secondary" className={(`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'tag' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => setScope('tag')}>タグ</Button>
+                  <Button variant="secondary" className={(`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'friend_field' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => setScope('friend_field')}>友だち情報欄</Button>
                 </div>
               </div>
             )}
@@ -296,13 +296,13 @@ function FolderEditor() {
               className="-mx-5 -mb-4 mt-4 rounded-none border-x-0 border-b-0"
               destructive={editId ? (
                 <Button type="button" className="border-danger/30 text-danger" disabled={saving} onClick={() => setDeleteOpen(true)}>
-                  <Trash2 size={16} aria-hidden="true" /> フォルダを削除
+                  <Trash2 size={16} aria-hidden="true" /> フォルダを削除する
                 </Button>
               ) : undefined}
               actions={(
                 <>
-                  <button type="button" disabled={saving} onClick={close} className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium hover:bg-canvas-sunken disabled:opacity-40">キャンセル</button>
-                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()}>{saving ? '保存中…' : editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存</> : 'フォルダを追加'}</Button>
+                  <Button variant="secondary" className="text-ink-secondary px-4 py-2.5 font-medium h-auto whitespace-normal" type="button" disabled={saving} onClick={close}>キャンセル</Button>
+                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()} busy={saving}>{editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存する</> : 'フォルダを追加する'}</Button>
                 </>
               )}
             />
@@ -315,7 +315,7 @@ function FolderEditor() {
         open={deleteOpen}
         title={`「${name}」を削除しますか？`}
         description="フォルダだけを削除します。中にあるタグは削除されず、未分類へ戻ります。"
-        confirmLabel="このフォルダを削除"
+        confirmLabel="このフォルダを削除する"
         destructive
         busy={saving}
         onCancel={() => { if (!saving) setDeleteOpen(false) }}

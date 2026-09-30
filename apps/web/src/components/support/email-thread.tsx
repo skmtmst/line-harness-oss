@@ -10,6 +10,8 @@ import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '
 import TemplatePicker from '@/components/chats/template-picker'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import { formatDateTime } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /**
  * メールの往復。受信箱（/chats）の中央ペインで使う。
@@ -71,12 +73,7 @@ function mergeMessages(current: EmailMessage[], incoming: EmailMessage[]): Email
 }
 
 function dateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(iso)
 }
 
 export function EmailThreadBackButton({ onBack }: { onBack: () => void }) {
@@ -639,13 +636,9 @@ export default function EmailThread({
             />
           </label>
           {!customerInfoOpen && onOpenCustomerInfo && (
-            <button
-              type="button"
-              onClick={onOpenCustomerInfo}
-              className="whitespace-nowrap rounded-control border border-hairline bg-canvas px-2.5 py-1.5 text-xs font-semibold text-action hover:bg-canvas-sunken"
-            >
+            <Button variant="secondary" className="whitespace-nowrap px-2.5 py-1.5 text-xs text-action h-auto" type="button" onClick={onOpenCustomerInfo}>
               顧客情報を開く
-            </button>
+            </Button>
           )}
         </div>
       </EmailThreadHeader>
@@ -658,14 +651,9 @@ export default function EmailThread({
         */}
         {detail.hasMoreOlder ? (
           <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => void loadOlder()}
-              disabled={olderLoading}
-              className="rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-action hover:bg-canvas-sunken disabled:opacity-50"
-            >
+            <Button variant="secondary" className="rounded-pill px-3 py-1.5 text-xs text-action disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={() => void loadOlder()} disabled={olderLoading}>
               {olderLoading ? '読み込み中...' : '過去のメッセージを読み込む'}
-            </button>
+            </Button>
           </div>
         ) : null}
         {detail.messages.map((message) => (
@@ -709,28 +697,15 @@ export default function EmailThread({
         */}
         <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowTemplatePicker(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-action hover:bg-canvas-sunken"
-            >
+            <Button variant="secondary" className="shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs text-action h-auto" type="button" onClick={() => setShowTemplatePicker(true)}>
               ▧ テンプレートを選択
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowComposerOptions(v => !v)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-action hover:bg-canvas-sunken"
-            >
+            </Button>
+            <Button variant="secondary" className="shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs text-action h-auto" type="button" onClick={() => setShowComposerOptions(v => !v)}>
               ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
-            </button>
-            <button
-              type="button"
-              onClick={openMemoEditor}
-              aria-expanded={showMemoEditor}
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary hover:bg-canvas-sunken"
-            >
+            </Button>
+            <Button variant="secondary" className="shrink-0 items-center whitespace-nowrap px-3 py-2 text-xs text-ink-secondary h-auto" type="button" onClick={openMemoEditor} aria-expanded={showMemoEditor}>
               内部メモ
-            </button>
+            </Button>
           </div>
           <span className="text-ink-faint shrink-0 text-xs">
             {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
@@ -811,15 +786,10 @@ export default function EmailThread({
                 {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
               </div>
               <div className="flex justify-end gap-2 border-t border-hairline px-5 py-4">
-                <button type="button" onClick={closeMemoEditor} className="rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken">キャンセル</button>
-                <button
-                  type="button"
-                  onClick={() => void saveMemo()}
-                  disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}
-                  className="rounded-control bg-accent-deep px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {memoSaving ? '保存中...' : '保存'}
-                </button>
+                <Button variant="secondary" className="px-4 py-2 text-ink-faint h-auto whitespace-normal" type="button" onClick={closeMemoEditor}>キャンセル</Button>
+                <Button variant="primary" className="px-4 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void saveMemo()} disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}>
+                  {memoSaving ? '保存中...' : '保存する'}
+                </Button>
               </div>
             </div>
           </div>,
@@ -880,13 +850,9 @@ export default function EmailThread({
             <span className="text-ink-faint min-w-0 truncate text-xs" title="差出人 contact-shed@nen-petfood.com">
               差出人 contact-shed@nen-petfood.com
             </span>
-            <button
-              onClick={() => void sendReply()}
-              disabled={!reply.trim() || sending}
-              className="shrink-0 whitespace-nowrap rounded-control bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <Button variant="primary" className="shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto" onClick={() => void sendReply()} disabled={!reply.trim() || sending}>
               {sending ? '送信中...' : 'メールで返信'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

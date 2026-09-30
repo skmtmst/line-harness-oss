@@ -109,11 +109,11 @@ export default function IdentityDecisionDialog({
       footer={
         <div className={styles.actions}>
           <Button type="button" onClick={onCancel} disabled={busy}>
-            やめる
+            キャンセル
           </Button>
           {/* 理由が空のまま押せると、履歴に「なぜそう決めたか」が残らない。 */}
-          <Button type="button" variant="primary" onClick={submit} disabled={!ready}>
-            {busy ? '処理中…' : decisionText(decision)}
+          <Button type="button" variant="primary" onClick={submit} disabled={!ready} busy={busy} busyLabel="処理中…">
+            {decisionText(decision)}
           </Button>
         </div>
       }

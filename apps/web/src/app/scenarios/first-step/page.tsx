@@ -45,6 +45,7 @@ import {
   restoreFirstStep,
   scheduleToPayload,
 } from './first-step-form'
+import { formatNumber } from '@/lib/format'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -477,12 +478,9 @@ function FirstStepContent() {
           <span className="mx-1.5">/</span>
           <span>1通目を設定</span>
         </nav>
-        <Link
-          href="/scenarios"
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-        >
+        <Button variant="secondary" className="text-ink-secondary items-center px-3 py-2 font-medium h-auto whitespace-normal" href="/scenarios">
           ✕ キャンセル
-        </Link>
+        </Button>
       </div>
 
       {/*
@@ -836,7 +834,7 @@ function FirstStepContent() {
       */}
       {bodyOverLimit && (
         <Notice tone="danger" className="mt-4">
-          本文が {LINE_TEXT_LIMIT.toLocaleString('en-US')} 字を超えています。
+          本文が {formatNumber(LINE_TEXT_LIMIT)} 字を超えています。
           LINEが受け付けないため、この状態では保存できません。
         </Notice>
       )}
@@ -857,14 +855,9 @@ function FirstStepContent() {
             >
               1通目はあとで書く
             </button>
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={saving || bodyOverLimit || loadState !== 'ready'}
-              className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
-            >
-              {saving ? '保存中…' : '作成して編集へ →'}
-            </button>
+            <Button variant="primary" className="px-5 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void submit()} disabled={saving || bodyOverLimit || loadState !== 'ready'}>
+              {saving ? '保存中…' : '作って編集へ →'}
+            </Button>
           </>
         )}
       />

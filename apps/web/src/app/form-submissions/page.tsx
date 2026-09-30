@@ -29,6 +29,7 @@ import HelpTip from '@/components/shared/help-tip'
 import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
+import { formatDay, formatNumber } from '@/lib/format'
 
 interface UsedByAccount {
   id: string
@@ -134,7 +135,7 @@ function displayUpdatedAt(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })
+  return formatDay(date)
 }
 
 export default function FormSubmissionsPage() {
@@ -696,8 +697,7 @@ export default function FormSubmissionsPage() {
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Bar" className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" onClick={createDraft} disabled={creating}>
-            {creating ? '下書きを作成中' : '＋ フォームを作る'}
+          <Button variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">＋ フォームを作る
           </Button>
         </div>
       </div>
@@ -857,8 +857,7 @@ export default function FormSubmissionsPage() {
               title="まだフォームがありません"
               description="最初の1つを作ると、集まった回答もここから見られます。"
             action={(
-              <Button variant="primary" onClick={createDraft} disabled={creating}>
-                {creating ? '下書きを作成中' : '＋ フォームを作る'}
+              <Button variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">＋ フォームを作る
               </Button>
             )}
             />
@@ -945,7 +944,7 @@ export default function FormSubmissionsPage() {
                   <td className="px-3 py-2.5 text-right text-xs tabular-nums">
                     {/* ★V7：回答数そのものを「回答を見る」の入口にし、操作の列を細くして名前を読めるようにする。 */}
                     {reviewMode ? (
-                      <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
+                      <span className="block">{displayCount ? `${formatNumber(displayCount)}件` : '—'}</span>
                     ) : (
                       <Link
                         href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`}
@@ -953,7 +952,7 @@ export default function FormSubmissionsPage() {
                         title="集まった回答を見る"
                         className="text-action block font-medium hover:underline"
                       >
-                        {displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '0件'}
+                        {displayCount ? `${formatNumber(displayCount)}件` : '0件'}
                       </Link>
                     )}
                     {/*
@@ -965,12 +964,12 @@ export default function FormSubmissionsPage() {
                     <span className="text-ink-faint block">
                       {form.monthlySubmitCount == null
                         ? '今月 —'
-                        : `今月 ${form.monthlySubmitCount.toLocaleString('ja-JP')}件`}
+                        : `今月 ${formatNumber(form.monthlySubmitCount)}件`}
                     </span>
                     <span className="text-ink-faint block">
                       {form.monthlyCompletionRate == null
                         ? '完了率 —'
-                        : `完了率 ${form.monthlyCompletionRate.toLocaleString('ja-JP')}%`}
+                        : `完了率 ${formatNumber(form.monthlyCompletionRate)}%`}
                     </span>
                   </td>
                   <td className="cq-hide-below-800 px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
@@ -1069,22 +1068,12 @@ export default function FormSubmissionsPage() {
             </label>
             {renameError && <p className="mt-2 text-xs text-status-danger">{renameError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingForm(null)}
-                disabled={savingName}
-                className="rounded-control border border-hairline px-4 py-2 text-sm text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
-              >
+              <Button variant="secondary" className="px-4 py-2 text-ink-secondary hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={() => setEditingForm(null)} disabled={savingName}>
                 キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => void saveName()}
-                disabled={!editingName.trim() || savingName}
-                className="rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent hover:brightness-92 disabled:opacity-50"
-              >
-                {savingName ? '保存中...' : '保存'}
-              </button>
+              </Button>
+              <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void saveName()} disabled={!editingName.trim() || savingName}>
+                {savingName ? '保存中...' : '保存する'}
+              </Button>
             </div>
           </div>
         </div>
@@ -1119,7 +1108,7 @@ export default function FormSubmissionsPage() {
         description={`削除しても、中のフォームは未分類に残ります。${
           deletingFolderCount === null
             ? 'いまこのフォルダに入っている件数を確認できませんでした。'
-            : `いまこのフォルダに入っているのは${deletingFolderCount.toLocaleString('ja-JP')}件です。`
+            : `いまこのフォルダに入っているのは${formatNumber(deletingFolderCount)}件です。`
         }`}
         confirmLabel="削除する"
         destructive
@@ -1217,9 +1206,9 @@ export default function FormSubmissionsPage() {
           <div className="space-y-3 text-sm">
             <dl className="bg-canvas-sunken grid grid-cols-2 gap-2 rounded-control p-3">
               <div><dt className="text-ink-faint text-xs">公開状態</dt><dd className="text-ink mt-1 font-medium">{deleteImpact.form.isActive ? '公開中' : '受付停止中'}</dd></div>
-              <div><dt className="text-ink-faint text-xs">集まった回答</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.submissionCount.toLocaleString('ja-JP')}件</dd></div>
-              <div><dt className="text-ink-faint text-xs">利用中の場所</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.referenceCount.toLocaleString('ja-JP')}か所</dd></div>
-              <div><dt className="text-ink-faint text-xs">開かれた回数</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.openCount.toLocaleString('ja-JP')}回</dd></div>
+              <div><dt className="text-ink-faint text-xs">集まった回答</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.submissionCount)}件</dd></div>
+              <div><dt className="text-ink-faint text-xs">利用中の場所</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.referenceCount)}か所</dd></div>
+              <div><dt className="text-ink-faint text-xs">開かれた回数</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.openCount)}回</dd></div>
             </dl>
             {deleteImpact.answerUrl && (
               <div>
@@ -1243,8 +1232,7 @@ export default function FormSubmissionsPage() {
               <div className="border-hairline rounded-control border p-3">
                 <p className="text-ink text-xs font-medium">受付だけ止める（おすすめ）</p>
                 <p className="text-ink-faint mt-1 text-xs">一覧と回答を残したまま、新しい回答だけを止めます。</p>
-                <Button className="mt-3" onClick={() => void stopAccepting()} disabled={stopping || deleting}>
-                  {stopping ? '停止中' : '受付だけ止める'}
+                <Button className="mt-3" onClick={() => void stopAccepting()} disabled={stopping || deleting} busy={stopping} busyLabel="停止中">受付だけ止める
                 </Button>
               </div>
             )}
