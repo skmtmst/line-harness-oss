@@ -1122,9 +1122,10 @@ booking.post(
         return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
       }
     }
+    const customerId = crypto.randomUUID();
     try {
       const customer = await createBookingCustomer(c.env.DB, {
-        id: crypto.randomUUID(),
+        id: customerId,
         lineAccountId: accountId,
         displayName: body.display_name,
         phone: body.phone,
@@ -1142,17 +1143,65 @@ booking.post(
       }
       return c.json({ customer }, 201);
     } catch (error) {
-      // 確保だけ残すと後の再送が進行中扱いで詰まるので、作れなかった
-      // 呼び出し自身の仮応答は消す（完了行・別呼び出しの行は触らない）。
+      /*
+       * R559再残差: 顧客INSERTの成功後に完了書き込みだけ落ちると、
+       * 仮応答を消すだけでは再送が同じ顧客を作り直して2件になる。
+       * 作られた顧客を読み直し、完了行を修復してから503を返す。
+       * 再送は修復済みの作成済み顧客へ届く。作られていないときだけ
+       * 仮応答を消す（完了行・別呼び出しの行は触らない）。修復自体が
+       * 失敗したときは仮応答を残し、再送を409で止める（作り直さない）。
+       */
       if (idemKey) {
-        await c.env.DB
-          .prepare(
-            `DELETE FROM booking_idempotency_keys
-              WHERE key = ? AND line_account_id = ? AND friend_id = ?
-                AND response_status = 202`,
-          )
-          .bind(idemScope.key, idemScope.lineAccountId, idemScope.friendId)
-          .run();
+        let rescued: {
+          id: string; line_account_id: string; friend_id: string | null;
+          display_name: string; phone_last4: string; pet_name: string | null;
+          created_at: string; updated_at: string;
+        } | null = null;
+        try {
+          rescued = await c.env.DB
+            .prepare(
+              `SELECT id, line_account_id, friend_id, display_name,
+                      phone_last4, pet_name, created_at, updated_at
+                 FROM booking_customers WHERE id = ? AND line_account_id = ?`,
+            )
+            .bind(customerId, accountId)
+            .first<{
+              id: string; line_account_id: string; friend_id: string | null;
+              display_name: string; phone_last4: string; pet_name: string | null;
+              created_at: string; updated_at: string;
+            }>();
+        } catch {
+          rescued = null;
+        }
+        if (rescued) {
+          try {
+            await completeIdempotencyResponse(c.env.DB, {
+              ...idemScope,
+              status: 201,
+              body: {
+                customer: {
+                  ...rescued,
+                  is_line_linked: rescued.friend_id !== null,
+                },
+              },
+            });
+          } catch {
+            // 修復できず仮応答が残る。再送は409で止まり、作り直さない。
+          }
+        } else {
+          try {
+            await c.env.DB
+              .prepare(
+                `DELETE FROM booking_idempotency_keys
+                  WHERE key = ? AND line_account_id = ? AND friend_id = ?
+                    AND response_status = 202`,
+              )
+              .bind(idemScope.key, idemScope.lineAccountId, idemScope.friendId)
+              .run();
+          } catch {
+            // 消せなくても後の分岐で503を返す。残った仮応答はTTLで消える。
+          }
+        }
       }
       const code = error instanceof Error ? error.message : '';
       if (code.startsWith('booking_customer_') && code.endsWith('_invalid')) {

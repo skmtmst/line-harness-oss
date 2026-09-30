@@ -26,11 +26,18 @@ const access = vi.hoisted(() => ({
 }));
 vi.mock('../services/account-access.js', () => access);
 
+// R559再残差: 顧客INSERTの成功後に完了書き込みだけを1回落とす仕掛け。
+let failCompletionOnce = false;
+
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
     first: async <T>() => (sqlite.prepare(sql).get(...params) as T | undefined) ?? null,
     all: async <T>() => ({ success: true, results: sqlite.prepare(sql).all(...params) as T[], meta: {} }),
     run: async <T>() => {
+      if (failCompletionOnce && /UPDATE booking_idempotency_keys/.test(sql)) {
+        failCompletionOnce = false;
+        throw new Error('isolated completion write failure');
+      }
       const info = sqlite.prepare(sql).run(...params);
       return { success: true, results: [], meta: { changes: info.changes } } as T;
     },
@@ -94,6 +101,7 @@ let db: D1Database;
 let bookingRoute: Hono<Env>;
 
 beforeEach(async () => {
+  failCompletionOnce = false;
   sqlite = new Database(':memory:');
   sqlite.exec(readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'packages', 'db', 'bootstrap.sql'), 'utf8'));
   sqlite.pragma('foreign_keys = OFF');
@@ -177,6 +185,25 @@ describe('R559 電話客の保存の応答再送は作り直さない', () => {
     // 仮応答が残らないので、後の再送は作成済みを返す。
     const retry = await postCustomer(app, env, 'account-a', 'customer-race-1');
     expect(retry.status).toBe(201);
+    expect(customerCount('account-a')).toBe(1);
+  });
+
+  test('R559再残差: INSERT成功後の完了書き込み失敗でも再送は作り直さない', async () => {
+    const { app, env } = makeApp(db, bookingRoute);
+    failCompletionOnce = true;
+    // 初回は503だが顧客は1件作られている。
+    const first = await postCustomer(app, env, 'account-a', 'customer-rescue-1');
+    expect(first.status).toBe(503);
+    expect(customerCount('account-a')).toBe(1);
+    // 同キー再送は修復済みの初回顧客へ届き、2件目を作らない。
+    const retry = await postCustomer(app, env, 'account-a', 'customer-rescue-1');
+    expect(retry.status).toBe(201);
+    const retryBody = await retry.json() as { customer: { id: string } };
+    expect(customerCount('account-a')).toBe(1);
+    const again = await postCustomer(app, env, 'account-a', 'customer-rescue-1');
+    expect(again.status).toBe(201);
+    const againBody = await again.json() as { customer: { id: string } };
+    expect(againBody.customer.id).toBe(retryBody.customer.id);
     expect(customerCount('account-a')).toBe(1);
   });
 
