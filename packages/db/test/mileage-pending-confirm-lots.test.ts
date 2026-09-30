@@ -173,4 +173,27 @@ describe('確定待ちの確定と付与内訳の一致', () => {
     expect(summary.pending).toBe(0);
     expect(lotOf(entry.id)).toBeUndefined();
   });
+
+  it('同じ担当・同じ時刻の同時確定は1回分だけ財布と内訳を動かす', async () => {
+    const entry = await grantPending();
+    const input = {
+      entryId: entry.id,
+      lineAccountId: 'acc-a',
+      staffId: 'staff-1',
+      staffName: '担当者',
+      reason: '来店を確認した',
+      occurredAt: '2026-09-30T12:00:00.000+09:00',
+    };
+    const [first, second] = await Promise.all([
+      confirmPendingMileageEntry(db, input),
+      confirmPendingMileageEntry(db, input),
+    ]);
+
+    // 勝者だけが確定し、負けは確定済みとして何も動かさない。
+    expect([first.alreadyConfirmed, second.alreadyConfirmed].sort()).toEqual([false, true]);
+    expect(wallet()).toMatchObject({ available: 100, pending: 0 });
+    expect(lotOf(entry.id)).toMatchObject({ remaining_amount: 100, status: 'available' });
+    const summary = await getMileageSummaryForFriend(db, 'fa-1');
+    expect(summary).toMatchObject({ available: 100, pending: 0 });
+  });
 });

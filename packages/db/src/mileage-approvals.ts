@@ -95,14 +95,20 @@ export async function confirmPendingMileageEntry(
     );
   }
 
-  // 今回だけの確定印。同時操作の負け分は台帳が動かず、この印も付かないため
-  // 財布・内訳の書き込みは印に合うときだけ通る（原子性は batch が守る）。
+  // 今回だけの確定印。呼び出しごとに違う合言葉（attemptId）を台帳へ刻み、
+  // 財布・内訳の書き込みはその合言葉に合うときだけ通る（原子性は batch が守る）。
+  // 同じ担当・同じ時刻の同時確定でも合言葉が違うため、負け分の batch は
+  // 台帳の更新（0件）と財布・内訳の書き込み（合言葉不一致）を両方落とす。
+  // R359: 同じ印（担当・時刻）だけでは勝者と負け分を見分けられず、
+  // 負け分も財布を動かして残高と内訳がずれていた。
+  const attemptId = crypto.randomUUID();
   const confirmMarkerSql = `EXISTS (
     SELECT 1 FROM mileage_ledger
      WHERE id = ?
        AND status = 'available'
        AND json_extract(metadata, '$.confirmedByStaffId') = ?
        AND json_extract(metadata, '$.confirmedAt') = ?
+       AND json_extract(metadata, '$.confirmedAttemptId') = ?
   )`;
   const statements: D1PreparedStatement[] = [
     db.prepare(
@@ -112,9 +118,10 @@ export async function confirmPendingMileageEntry(
                 '$.confirmedByStaffId', ?,
                 '$.confirmedByStaffName', ?,
                 '$.confirmedReason', ?,
-                '$.confirmedAt', ?)
+                '$.confirmedAt', ?,
+                '$.confirmedAttemptId', ?)
         WHERE id = ? AND status = 'pending'`,
-    ).bind(input.staffId, input.staffName, reason, now, input.entryId),
+    ).bind(input.staffId, input.staffName, reason, now, attemptId, input.entryId),
   ];
   if (await dbTableExists(db, 'mileage_wallets')) {
     statements.push(
@@ -153,6 +160,7 @@ export async function confirmPendingMileageEntry(
         input.entryId,
         input.staffId,
         now,
+        attemptId,
       ),
     );
   }
@@ -193,6 +201,7 @@ export async function confirmPendingMileageEntry(
         input.entryId,
         input.staffId,
         now,
+        attemptId,
       ),
     );
   }
