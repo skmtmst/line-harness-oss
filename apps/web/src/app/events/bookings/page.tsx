@@ -431,6 +431,12 @@ function BookingsInner() {
   const occurrenceApplicantsRequestRef = useRef(0)
   const broadcastPreviewKeyRef = useRef<string | null>(null)
   /*
+   * 対象確定の要求番号。押すたびに上げ、古い要求の成功・失敗・
+   * 後片付けには何も書かせない。開催回を戻すと scope と開催回IDが
+   * 同値に戻るため、この番号だけが新旧を見分ける。
+   */
+  const broadcastPreviewRequestRef = useRef(0)
+  /*
    * 今選んでいる開催回。申込プレビューの遅い応答が、切り替え前の
    * 開催回のものかを見分ける。描画のたびに写す（state は非同期の
    *  closures では古いままになるため）。
@@ -950,6 +956,8 @@ function BookingsInner() {
     if (!accountId || !occurrence || !message || broadcastBusy) return
     const startedScope = scope
     const startedOccurrenceId = occurrence.id
+    const startedRequest = broadcastPreviewRequestRef.current + 1
+    broadcastPreviewRequestRef.current = startedRequest
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
@@ -961,15 +969,21 @@ function BookingsInner() {
         snapshotId: occurrenceApplicants.snapshotId,
       }, idempotencyKey)
       if (scopeRef.current !== startedScope) return
+      /* 古い要求の成功は書かせない。戻って同値でも番号で見分ける。 */
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
       /* 開催回が切り替わっていたら、前の開催回の下書きは捨てる。 */
       if (selectedOccurrenceIdRef.current !== startedOccurrenceId) return
       setBroadcastPreview({ ...result, scope: startedScope, occurrenceId: startedOccurrenceId })
     } catch {
       if (scopeRef.current !== startedScope) return
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
       if (selectedOccurrenceIdRef.current !== startedOccurrenceId) return
       setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。')
     } finally {
-      if (scopeRef.current === startedScope) setBroadcastBusy(false)
+      if (scopeRef.current !== startedScope) return
+      /* 古い要求の後片付けで、新しい要求の操作中表示を消さない。 */
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
+      setBroadcastBusy(false)
     }
   }
 
