@@ -10,6 +10,7 @@ import TemplateFolderSelect, {
   type TemplateFolderOption,
   type TemplateFolderStatus,
 } from './template-folder-select'
+import Button from '@/components/shared/button'
 
 type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -401,15 +402,9 @@ export default function TemplatePicker({
                 { key: 'reservation' as const, label: '予約' },
                 { key: 'ec' as const, label: 'EC' },
               ].map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setCategory(item.key)}
-                  aria-pressed={category === item.key}
-                  className={`rounded-mini border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas text-ink-faint hover:bg-shell'}`}
-                >
+                <Button variant="secondary" className={(`rounded-mini border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas text-ink-faint hover:bg-shell'}`) + ' h-auto whitespace-normal'} key={item.key} type="button" onClick={() => setCategory(item.key)} aria-pressed={category === item.key}>
                   {item.label}
-                </button>
+                </Button>
               ))}
               {onPickPack ? (
                 <button
@@ -488,14 +483,9 @@ export default function TemplatePicker({
             */}
             {visibleTemplatesStatus === 'ready' && category !== 'frequent' && templates.length < total ? (
               <div className="mt-2 flex justify-center">
-                <button
-                  type="button"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-action hover:bg-shell disabled:opacity-50"
-                >
+                <Button variant="secondary" className="rounded-pill px-3 py-1.5 text-xs text-action hover:bg-shell disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={loadMore} disabled={loadingMore}>
                   {loadingMore ? '読み込み中...' : `さらに表示（残り${total - templates.length}件）`}
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>
@@ -574,15 +564,10 @@ export default function TemplatePicker({
               : '入力後に文章を編集してから送信できます。'}
           </p>
           <div className="mt-3 flex flex-wrap justify-end gap-2">
-            <button
-              onClick={onClose}
-              className="min-h-11 whitespace-nowrap rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken"
-            >
+            <Button variant="secondary" className="min-h-11 whitespace-nowrap px-4 py-2 text-ink-faint h-auto" onClick={onClose}>
               キャンセル
-            </button>
-            <button
-              disabled={packMode && onPickPack ? packItems.length === 0 : !selected}
-              onClick={() => {
+            </Button>
+            <Button variant="primary" className="min-h-11 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 border-0 h-auto" disabled={packMode && onPickPack ? packItems.length === 0 : !selected} onClick={() => {
                 if (packMode && onPickPack) {
                   if (packItems.length === 0) return
                   onPickPack(packItems.map((item) => item.content))
@@ -591,11 +576,9 @@ export default function TemplatePicker({
                   onPick(selected.messageContent)
                 }
                 onClose()
-              }}
-              className="min-h-11 whitespace-nowrap rounded-control bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:opacity-40"
-            >
+              }}>
               {packMode && onPickPack ? `まとめて送る（${packItems.length}通）` : '入力欄へ挿入'}
-            </button>
+            </Button>
           </div>
         </footer>
       </div>

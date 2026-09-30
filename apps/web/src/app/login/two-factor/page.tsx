@@ -7,6 +7,7 @@ import { useBrand } from '@/lib/use-brand'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 import { twoFactorFailureMessage } from './two-factor-error'
+import Button from '@/components/shared/button'
 
 export default function TwoFactorLoginPage() {
   const [code, setCode] = useState('')
@@ -114,7 +115,8 @@ export default function TwoFactorLoginPage() {
         />
       </div>
       <p className="mt-2 text-xs text-ink-faint">◷ コードは約30秒ごとに更新されます</p>
-      <button onClick={() => void submit()} disabled={loading || missingChallenge || code.length !== 6} className="mt-6 h-12 w-full cursor-pointer rounded-control bg-accent-deep font-bold text-on-accent hover:brightness-92 disabled:cursor-not-allowed disabled:opacity-50">{loading ? '確認中…' : '確認してログイン'}</button>
+      {/* R614: 合言葉なしでは押せない（V8移行後も共通Buttonで条件を維持）。 */}
+      <Button variant="primary" className="mt-6 h-12 w-full font-bold disabled:opacity-50 border-0 whitespace-normal" onClick={() => void submit()} disabled={loading || missingChallenge || code.length !== 6}>{loading ? '確認中…' : '確認してログイン'}</Button>
       <p className="mt-5 text-center text-xs text-ink-secondary">コードを入力できない場合</p>
       {/* R507残部: メール経路と合言葉なし直リンクの戻り先はLINEに限定しない。LINE経路は既存どおり。 */}
       <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-2 block text-center text-xs font-medium text-action hover:underline">{missingChallenge || method === 'password' ? 'ログインに戻る' : '別のLINEアカウントでログイン'}</Link>
