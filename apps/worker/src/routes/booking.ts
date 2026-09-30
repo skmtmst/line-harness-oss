@@ -1157,6 +1157,12 @@ booking.post(
           display_name: string; phone_last4: string; pet_name: string | null;
           created_at: string; updated_at: string;
         } | null = null;
+        /*
+         * 救出の読み直し自体が落ちたときは「無い」と分からない。
+         * null と例外を混ぜると、作られた顧客がいるのに仮応答を消して
+         * 再送で作り直してしまう。不在が確実なときだけ消す。
+         */
+        let rescueSettled = false;
         try {
           rescued = await c.env.DB
             .prepare(
@@ -1170,8 +1176,9 @@ booking.post(
               display_name: string; phone_last4: string; pet_name: string | null;
               created_at: string; updated_at: string;
             }>();
+          rescueSettled = true;
         } catch {
-          rescued = null;
+          rescueSettled = false;
         }
         if (rescued) {
           try {
@@ -1188,7 +1195,7 @@ booking.post(
           } catch {
             // 修復できず仮応答が残る。再送は409で止まり、作り直さない。
           }
-        } else {
+        } else if (rescueSettled) {
           try {
             await c.env.DB
               .prepare(

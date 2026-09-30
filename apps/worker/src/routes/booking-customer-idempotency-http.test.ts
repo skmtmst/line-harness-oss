@@ -27,16 +27,30 @@ const access = vi.hoisted(() => ({
 vi.mock('../services/account-access.js', () => access);
 
 // R559再残差: 顧客INSERTの成功後に完了書き込みだけを1回落とす仕掛け。
+// 修復UPDATE・救出SELECTの故障も再現できる。
 let failCompletionOnce = false;
+let failRepairUpdate = false;
+let failRescueRead = false;
+let completionFailed = false;
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
-    first: async <T>() => (sqlite.prepare(sql).get(...params) as T | undefined) ?? null,
+    first: async <T>() => {
+      if (failRescueRead && completionFailed && /FROM booking_customers WHERE id/.test(sql)) {
+        failRescueRead = false;
+        throw new Error('isolated rescue read failed');
+      }
+      return (sqlite.prepare(sql).get(...params) as T | undefined) ?? null;
+    },
     all: async <T>() => ({ success: true, results: sqlite.prepare(sql).all(...params) as T[], meta: {} }),
     run: async <T>() => {
       if (failCompletionOnce && /UPDATE booking_idempotency_keys/.test(sql)) {
         failCompletionOnce = false;
+        completionFailed = true;
         throw new Error('isolated completion write failure');
+      }
+      if (failRepairUpdate && completionFailed && /UPDATE booking_idempotency_keys/.test(sql)) {
+        throw new Error('isolated repair update failed');
       }
       const info = sqlite.prepare(sql).run(...params);
       return { success: true, results: [], meta: { changes: info.changes } } as T;
@@ -102,6 +116,9 @@ let bookingRoute: Hono<Env>;
 
 beforeEach(async () => {
   failCompletionOnce = false;
+  failRepairUpdate = false;
+  failRescueRead = false;
+  completionFailed = false;
   sqlite = new Database(':memory:');
   sqlite.exec(readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'packages', 'db', 'bootstrap.sql'), 'utf8'));
   sqlite.pragma('foreign_keys = OFF');
@@ -204,6 +221,39 @@ describe('R559 電話客の保存の応答再送は作り直さない', () => {
     expect(again.status).toBe(201);
     const againBody = await again.json() as { customer: { id: string } };
     expect(againBody.customer.id).toBe(retryBody.customer.id);
+    expect(customerCount('account-a')).toBe(1);
+  });
+
+  test('R559再残差: 修復UPDATE失敗時は202を保持し再送は409で作り直さない', async () => {
+    const { app, env } = makeApp(db, bookingRoute);
+    failCompletionOnce = true;
+    failRepairUpdate = true;
+    const first = await postCustomer(app, env, 'account-a', 'customer-repair-fail');
+    expect(first.status).toBe(503);
+    expect(customerCount('account-a')).toBe(1);
+    const reserve = sqlite.prepare(
+      `SELECT response_status FROM booking_idempotency_keys`,
+    ).get() as { response_status: number };
+    expect(reserve.response_status).toBe(202);
+    failRepairUpdate = false;
+    const retry = await postCustomer(app, env, 'account-a', 'customer-repair-fail');
+    expect(retry.status).toBe(409);
+    expect(customerCount('account-a')).toBe(1);
+  });
+
+  test('R559再残差: 救出読み直しの失敗は不在とみなさず202を保持する', async () => {
+    const { app, env } = makeApp(db, bookingRoute);
+    failCompletionOnce = true;
+    failRescueRead = true;
+    const first = await postCustomer(app, env, 'account-a', 'customer-rescue-read-fail');
+    expect(first.status).toBe(503);
+    expect(customerCount('account-a')).toBe(1);
+    const reserve = sqlite.prepare(
+      `SELECT response_status FROM booking_idempotency_keys`,
+    ).get() as { response_status: number } | undefined;
+    expect(reserve?.response_status).toBe(202);
+    const retry = await postCustomer(app, env, 'account-a', 'customer-rescue-read-fail');
+    expect(retry.status).toBe(409);
     expect(customerCount('account-a')).toBe(1);
   });
 
