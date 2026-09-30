@@ -24,6 +24,7 @@ import {
 } from '../services/nen-engagement.js';
 import { syncNenPetTags } from '../services/nen-tag-sync.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import {
   buildNenColumnStorageFields,
   isNenColumnSlugConflict,
@@ -731,11 +732,43 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner
   if (!body?.accountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
+  /*
+   * M506: 複製の要求キー。二重押し・応答消失後の再送は同じ複製へ戻し、
+   * 2本目を作らない。キーは複製行の主キーになる。
+   */
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
+  if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
+    return c.json({ success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400);
+  }
+  const sourceId = c.req.param('id');
+  const findDuplicate = () => c.env.DB.prepare(
+    `SELECT id, source_column_id FROM nen_columns WHERE id = ? AND line_account_id = ?`,
+  ).bind(idempotencyKey, body.accountId).first<{ id: string; source_column_id: string | null }>();
   try {
-    const data = await duplicateNenColumn(c.env.DB, { id: c.req.param('id'), lineAccountId: body.accountId });
+    if (idempotencyKey) {
+      const existing = await findDuplicate();
+      if (existing) {
+        if (existing.source_column_id !== sourceId) {
+          return c.json({ success: false, error: '同じ操作で内容の違う複製が既にあります' }, 409);
+        }
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: { id: existing.id, sourceColumnId: sourceId }, replayed: true }, 200);
+      }
+    }
+    const data = await duplicateNenColumn(c.env.DB, {
+      id: sourceId, lineAccountId: body.accountId, newId: idempotencyKey ?? undefined,
+    });
     auditLog(c, 'nen.column.duplicate', { kind: 'nen_column', id: data.id });
     return c.json({ success: true, data }, 201);
   } catch (error) {
+    // 同時実行の競合で負けた側。勝った複製を読み直して返す。
+    if (idempotencyKey) {
+      const raced = await findDuplicate();
+      if (raced && raced.source_column_id === sourceId) {
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: { id: raced.id, sourceColumnId: sourceId }, replayed: true }, 200);
+      }
+    }
     return columnOperationError(c, error);
   }
 });

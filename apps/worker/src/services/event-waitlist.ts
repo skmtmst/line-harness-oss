@@ -1160,21 +1160,49 @@ export async function reorderEventWaitlist(
     || params.orderedIds.some((id) => !current.has(id))) {
     return { kind: 'invalid', error: 'ordered_ids_mismatch' };
   }
+  /*
+   * 版の突き合わせは読み取り時だけでなく、書き込みの条件にも入れる。
+   * 読み取り後に別の操作が版を進めると、条件のないUPDATEが完了済みの
+   * 順番を上書きし、両方が成功に見える。行の更新と枠の版上げの両方に
+   * 同じ期待版を条件付けし、枠の更新が当たらなければ競合として返す。
+   * 敗者の行更新も当たらないため、勝者の順番だけが残る。
+   */
+  const guardVersion = params.expectedVersion ?? null;
   const statements = params.orderedIds.map((id, index) =>
-    db
-      .prepare(
-        `UPDATE event_waitlist
-            SET sort_order = ?, version = version + 1, updated_at = ?
-          WHERE id = ? AND status = 'waiting'`,
-      )
-      .bind(index + 1, nowIso, id),
+    guardVersion == null
+      ? db
+        .prepare(
+          `UPDATE event_waitlist
+              SET sort_order = ?, version = version + 1, updated_at = ?
+            WHERE id = ? AND status = 'waiting'`,
+        )
+        .bind(index + 1, nowIso, id)
+      : db
+        .prepare(
+          `UPDATE event_waitlist
+              SET sort_order = ?, version = version + 1, updated_at = ?
+            WHERE id = ? AND status = 'waiting'
+              AND (SELECT version FROM event_slots WHERE id = ?) = ?`,
+        )
+        .bind(index + 1, nowIso, id, params.occurrenceId, guardVersion),
   );
   statements.push(
-    db
-      .prepare(`UPDATE event_slots SET version = version + 1, updated_at = ? WHERE id = ?`)
-      .bind(nowIso, params.occurrenceId),
+    guardVersion == null
+      ? db
+        .prepare(`UPDATE event_slots SET version = version + 1, updated_at = ? WHERE id = ?`)
+        .bind(nowIso, params.occurrenceId)
+      : db
+        .prepare(`UPDATE event_slots SET version = version + 1, updated_at = ? WHERE id = ? AND version = ?`)
+        .bind(nowIso, params.occurrenceId, guardVersion),
   );
-  await db.batch(statements);
+  const results = await db.batch(statements);
+  if (guardVersion != null) {
+    const slotChanges = results[results.length - 1]?.meta?.changes ?? 0;
+    if (slotChanges !== 1) {
+      const latest = await loadOccurrence(db, params.occurrenceId, params.lineAccountId);
+      return { kind: 'conflict', currentVersion: latest?.version ?? occurrence.version };
+    }
+  }
   const latest = await loadOccurrence(db, params.occurrenceId, params.lineAccountId);
   return {
     kind: 'reordered',

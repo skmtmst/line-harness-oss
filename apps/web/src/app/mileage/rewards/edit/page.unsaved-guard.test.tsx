@@ -126,7 +126,7 @@ describe('mileage/rewards/edit の未保存ガード', () => {
     expect((host.querySelector('input#reward-name') as HTMLInputElement).value).toBe('ドリンク無料券')
   })
 
-  it('「保存せずに移動」を押すと一覧へ進む', async () => {
+  it('「保存せずに移る」を押すと一覧へ進む', async () => {
     await render()
     await flush()
 
@@ -135,7 +135,7 @@ describe('mileage/rewards/edit の未保存ガード', () => {
     fireEvent.click(cancelLink())
     await flush()
 
-    fireEvent.click(bodyButton('保存せずに移動'))
+    fireEvent.click(bodyButton('保存せずに移る'))
     await flush()
 
     expect(fixture.push).toHaveBeenCalledWith('/mileage?tab=rewards')

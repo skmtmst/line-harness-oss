@@ -386,7 +386,7 @@ function BookingsInner() {
   /* TECH-03: 申込者CSVの書出し中。失敗は occurrenceActionError へ出す。 */
   const [csvBusy, setCsvBusy] = useState(false)
   const [broadcastMessage, setBroadcastMessage] = useState('')
-  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string } | null>(null)
+  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string; occurrenceId: string } | null>(null)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
   const [broadcastError, setBroadcastError] = useState('')
@@ -430,6 +430,21 @@ function BookingsInner() {
   const occurrenceSlotsRequestRef = useRef(0)
   const occurrenceApplicantsRequestRef = useRef(0)
   const broadcastPreviewKeyRef = useRef<string | null>(null)
+  /*
+   * 対象確定の要求番号。押すたびに上げ、古い要求の成功・失敗・
+   * 後片付けには何も書かせない。開催回を戻すと scope と開催回IDが
+   * 同値に戻るため、この番号だけが新旧を見分ける。
+   */
+  const broadcastPreviewRequestRef = useRef(0)
+  /*
+   * 今選んでいる開催回。申込プレビューの遅い応答が、切り替え前の
+   * 開催回のものかを見分ける。描画のたびに写す（state は非同期の
+   *  closures では古いままになるため）。
+   */
+  const selectedOccurrenceIdRef = useRef(selectedOccurrenceId)
+  if (selectedOccurrenceIdRef.current !== selectedOccurrenceId) {
+    selectedOccurrenceIdRef.current = selectedOccurrenceId
+  }
 
   /*
    * **アカウント・イベントを切り替えたら、進行中の記録を失効させる。**
@@ -470,6 +485,23 @@ function BookingsInner() {
     setBroadcastPreview(null)
     broadcastPreviewKeyRef.current = null
     setBroadcastMessage('')
+    setBroadcastError('')
+  }
+  /*
+   * **開催回を切り替えたら、前の開催回の下書きは捨てる。**
+   *
+   * 開催回1の対象確定を押したまま開催回2へ切り替えると、1の応答が
+   * 2の申込者の読み込みより後に返り、**2の画面に1の対象人数と確認
+   * ボタンが復活した。** そのまま進むと別日の申込者へ送りかねない。
+   * 描画のうちに捨てる（文面は残し、対象・確認・使い回し鍵だけ捨てる）。
+   */
+  const [broadcastOccurrenceScope, setBroadcastOccurrenceScope] = useState(selectedOccurrenceId)
+  if (broadcastOccurrenceScope !== selectedOccurrenceId) {
+    setBroadcastOccurrenceScope(selectedOccurrenceId)
+    setBroadcastBusy(false)
+    setBroadcastConfirmOpen(false)
+    setBroadcastPreview(null)
+    broadcastPreviewKeyRef.current = null
     setBroadcastError('')
   }
   /*
@@ -923,6 +955,9 @@ function BookingsInner() {
     const message = broadcastMessage.trim()
     if (!accountId || !occurrence || !message || broadcastBusy) return
     const startedScope = scope
+    const startedOccurrenceId = occurrence.id
+    const startedRequest = broadcastPreviewRequestRef.current + 1
+    broadcastPreviewRequestRef.current = startedRequest
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
@@ -934,17 +969,26 @@ function BookingsInner() {
         snapshotId: occurrenceApplicants.snapshotId,
       }, idempotencyKey)
       if (scopeRef.current !== startedScope) return
-      setBroadcastPreview({ ...result, scope: startedScope })
+      /* 古い要求の成功は書かせない。戻って同値でも番号で見分ける。 */
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
+      /* 開催回が切り替わっていたら、前の開催回の下書きは捨てる。 */
+      if (selectedOccurrenceIdRef.current !== startedOccurrenceId) return
+      setBroadcastPreview({ ...result, scope: startedScope, occurrenceId: startedOccurrenceId })
     } catch {
       if (scopeRef.current !== startedScope) return
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
+      if (selectedOccurrenceIdRef.current !== startedOccurrenceId) return
       setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。')
     } finally {
-      if (scopeRef.current === startedScope) setBroadcastBusy(false)
+      if (scopeRef.current !== startedScope) return
+      /* 古い要求の後片付けで、新しい要求の操作中表示を消さない。 */
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
+      setBroadcastBusy(false)
     }
   }
 
   async function sendOccurrenceBroadcast() {
-    if (!broadcastPreview || broadcastPreview.scope !== scope || broadcastBusy) return
+    if (!broadcastPreview || broadcastPreview.scope !== scope || broadcastPreview.occurrenceId !== selectedOccurrenceId || broadcastBusy) return
     const startedScope = scope
     setBroadcastBusy(true)
     setBroadcastError('')
@@ -985,7 +1029,9 @@ function BookingsInner() {
   const currentPage = Math.min(page, pageCount)
   const selectedAccountRole = accounts.find((account) => account.id === selectedAccountId)?.role
   const canManageApplicantBroadcast = selectedAccountRole === 'owner' || selectedAccountRole === 'admin'
-  const activeBroadcastPreview = broadcastPreview?.scope === scope ? broadcastPreview : null
+  const activeBroadcastPreview = broadcastPreview?.scope === scope && broadcastPreview.occurrenceId === selectedOccurrenceId
+    ? broadcastPreview
+    : null
 
   return (
     <div className="flex flex-col gap-4">
@@ -1228,7 +1274,7 @@ function BookingsInner() {
                     <th className="px-4 py-2 text-left font-medium">予約枠</th>
                     <th className="px-4 py-2 text-left font-medium">連れてくるペット</th>
                     <th className="px-4 py-2 text-left font-medium">この方について</th>
-                    <th className="px-4 py-2 text-right font-medium">状態と操作</th>
+                    <th className="px-4 py-2 font-medium text-right">状態と操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1338,36 +1384,19 @@ function BookingsInner() {
                         )}
                         {b.status === 'confirmed' && (
                           <div className="ml-2 inline-flex gap-1.5">
-                            <button
-                              data-booking-id={b.id}
-                              data-booking-action="attended"
-                              onClick={() => markStatus(b.id, 'attended')}
-                              disabled={busy || marking}
-                              className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
-                            >
+                            <Button variant="primary" className="px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50 border-0 h-auto whitespace-normal" data-booking-id={b.id} data-booking-action="attended" onClick={() => markStatus(b.id, 'attended')} disabled={busy || marking}>
                               {marking ? '記録中…' : '参加済'}
-                            </button>
-                            <button
-                              data-booking-id={b.id}
-                              data-booking-action="no_show"
-                              onClick={() => markStatus(b.id, 'no_show')}
-                              disabled={busy || marking}
-                              className="bg-danger text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
-                            >
+                            </Button>
+                            <Button variant="danger" className="px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50 border-0 h-auto whitespace-normal" data-booking-id={b.id} data-booking-action="no_show" onClick={() => markStatus(b.id, 'no_show')} disabled={busy || marking}>
                               {marking ? '記録中…' : '無断'}
-                            </button>
-                            <button
-                              data-qa-open="i5SN2j-cancel"
-                              onClick={() => {
+                            </Button>
+                            <Button variant="secondary" className="hover:bg-canvas px-3 py-1 text-xs font-medium disabled:opacity-50 h-auto whitespace-normal" data-qa-open="i5SN2j-cancel" onClick={() => {
                                 if (!selectedAccountId) return
                                 setCancelError('')
                                 setCancelTarget({ booking: b, accountId: selectedAccountId })
-                              }}
-                              disabled={busy}
-                              className="border-hairline rounded-control hover:bg-canvas border px-3 py-1 text-xs font-medium disabled:opacity-50"
-                            >
+                              }} disabled={busy}>
                               キャンセル
-                            </button>
+                            </Button>
                             {markErrors[actionKey] && (
                               <span className="text-danger block max-w-64 text-left text-xs" role="alert">
                                 {markErrors[actionKey]}

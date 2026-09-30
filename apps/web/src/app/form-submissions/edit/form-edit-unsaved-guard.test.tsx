@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 /*
- * フォーム編集の「保存せずに移動」の試験（FORM-19a / FORM-19b / #1061）。
+ * フォーム編集の「保存せずに移る」の試験（FORM-19a / FORM-19b / #1061）。
  *
  * 見る筋書き:
  *   1. 変更があるとき、一覧へのパンくず（回答フォーム）を押すと
  *      確認が出て、まだ移動しない（FORM-19a）。
- *   2. 「保存せずに移動」は移動と同時に、画面の入力を保存済みの状態へ戻す。
+ *   2. 「保存せずに移る」は移動と同時に、画面の入力を保存済みの状態へ戻す。
  *      同じページ内のクエリ遷移（タブ切替）でも同じ——コンポーネントが
  *      外れず画面が残るので、消えますと言った変更が残ってはいけない（FORM-19b）。
  *   3. 戻ったあとは未変更扱いになり、次の移動は確認なしで通る。
@@ -211,11 +211,11 @@ describe('フォーム編集の未保存ガード（FORM-19）', () => {
     expect(nameInput().value).toBe('書きかけの名前')
   })
 
-  it('「保存せずに移動」は入力を保存済みの状態へ戻してから移動する（FORM-19b）', async () => {
+  it('「保存せずに移る」は入力を保存済みの状態へ戻してから移動する（FORM-19b）', async () => {
     await show()
     await editName('書きかけの名前')
     await click(anchor('回答フォーム'))
-    await click(dialogButton('保存せずに移動'))
+    await click(dialogButton('保存せずに移る'))
     expect(navigation.push).toHaveBeenCalledWith('/form-submissions')
     // 移動が画面を外さない場合でも「消えます」と言った変更は戻っている。
     expect(nameInput().value).toBe('読み込んだフォーム名')
@@ -226,7 +226,7 @@ describe('フォーム編集の未保存ガード（FORM-19）', () => {
     await editName('書きかけの名前')
     await click(anchor('デザイン設定'))
     expect(bodyText()).toContain('保存していない変更があります')
-    await click(dialogButton('保存せずに移動'))
+    await click(dialogButton('保存せずに移る'))
     expect(navigation.push).toHaveBeenCalledWith('/form-submissions/edit?id=form-1&tab=design')
     expect(nameInput().value).toBe('読み込んだフォーム名')
   })
@@ -235,7 +235,7 @@ describe('フォーム編集の未保存ガード（FORM-19）', () => {
     await show()
     await editName('書きかけの名前')
     await click(anchor('回答フォーム'))
-    await click(dialogButton('保存せずに移動'))
+    await click(dialogButton('保存せずに移る'))
     navigation.push.mockClear()
     // 捨て終わると未変更に戻るので、次のリンク押下は番兵が止めない
     // （止めない＝defaultPrevented されない＝そのまま遷移できる）。

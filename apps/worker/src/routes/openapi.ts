@@ -932,9 +932,18 @@ const spec = {
         parameters: [
           { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu'] } },
           { name: 'filename', in: 'query', required: true, schema: { type: 'string', minLength: 1, maxLength: 200 } },
+          { name: 'width', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる幅。画像が違う寸法なら登録せず422' },
+          { name: 'height', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる高さ。画像が違う寸法なら登録せず422' },
         ],
         requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } } } },
         responses: { '201': { description: 'Immutable tenant-scoped image receipt; identical retries reuse it' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
+      },
+      delete: {
+        tags: ['HQ Templates'], summary: '採用されなかった統括ひな形の画像を回収（所有確認つき）',
+        parameters: [
+          { name: 'r2Key', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Deleted flag; missing objects are a no-op' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '404': { description: 'Outside the caller tenant ownership' }, '422': { description: 'Invalid image key' } },
       },
     },
     '/api/hq/templates/accounts': {
@@ -4559,7 +4568,7 @@ const spec = {
       post: {
         tags: ['Affiliates'],
         summary: 'アフィリエイト作成',
-        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, code: { type: 'string' }, commissionRate: { type: 'number' } }, required: ['name', 'code'] } } } },
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, code: { type: 'string' }, commissionRate: { type: 'number' }, isActive: { type: 'boolean' } }, required: ['name', 'code'] } } } },
         responses: { '201': { description: 'Created' } },
       },
     },
@@ -5024,9 +5033,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['lineAccountId'],
+                required: ['lineAccountId', 'expectedVersion'],
                 properties: {
                   lineAccountId: { type: 'string' },
+                  expectedVersion: { type: 'integer', minimum: 1 },
                   name: { type: 'string' },
                   eventType: { type: 'string' },
                   conditions: { type: 'object' },
@@ -5041,7 +5051,7 @@ const spec = {
           '400': { description: '必須項目または通知方法の指定が不正' },
           '403': { description: 'このLINEアカウントを変更する権限がない' },
           '404': { description: 'お知らせが見つからない' },
-          '409': { description: 'isActive が指定された（公開・停止は別の操作で行う）' },
+          '409': { description: 'isActive が指定された（公開・停止は別の操作で行う）、または読んだ版が古い（現在値を返して開き直しを案内する）' },
         },
       },
     },

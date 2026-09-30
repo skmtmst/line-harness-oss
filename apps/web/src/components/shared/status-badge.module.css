@@ -58,4 +58,25 @@
   outline: 2px solid var(--color-status-info);
   outline-offset: 1px;
 }
+
+/*
+ * ★V8「状態の札」（mpVfY ほか）：薄い地＋色の点＋色の文字 12/600・
+ * 余白 2/8。点は文字と同じ色（currentColor）で、色だけに頼らない
+ * 印（形）としても働く。
+ */
+[data-theme='v8'] .badge {
+  gap: 5px;
+  padding: 2px 8px;
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+[data-theme='v8'] .badge::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  content: '';
+}
 }

@@ -138,7 +138,7 @@ describe('booking/staff/new の未保存ガード', () => {
     expect((host.querySelector('input#bs-name') as HTMLInputElement).value).toBe('田中')
   })
 
-  it('「保存せずに移動」を押すと予約設定へ進む', async () => {
+  it('「保存せずに移る」を押すと予約設定へ進む', async () => {
     await render()
     await flush()
 
@@ -147,7 +147,7 @@ describe('booking/staff/new の未保存ガード', () => {
     fireEvent.click(cancelLink())
     await flush()
 
-    fireEvent.click(bodyButton('保存せずに移動'))
+    fireEvent.click(bodyButton('保存せずに移る'))
     await flush()
 
     expect(fixture.push).toHaveBeenCalledWith('/booking/menus?tab=staff')

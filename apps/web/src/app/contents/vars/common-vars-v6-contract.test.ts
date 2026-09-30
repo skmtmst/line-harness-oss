@@ -38,10 +38,14 @@ describe('V6共通情報一覧', () => {
   })
 
   it('独立した詳細・フォルダ・予約の読み込みは並列に行う', () => {
-    expect(EDIT_PAGE).toContain('const [detail, folderList, scheduleList] = await Promise.all([')
+    // R591: 並列のまま、結果は欄ごとに扱う。フォルダ・予定の失敗で
+    // 詳細の結果まで捨てない（直列の滝に戻さない）。
+    expect(EDIT_PAGE).toContain('await Promise.all([')
     expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
     expect(EDIT_PAGE).toContain("api.folders.list('common_var')")
     expect(EDIT_PAGE).toContain('api.commonVars.schedules(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain('setFoldersError(true)')
+    expect(EDIT_PAGE).toContain('setSchedulesError(true)')
   })
 
   it('一覧は種別を出さず、Qで「状態」列を足した7列を固定する', () => {
@@ -68,6 +72,16 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).not.toContain('placeholderText(item.name)')
     expect(EDIT_PAGE).toContain('placeholderText(item.varKey)')
     expect(EDIT_PAGE).not.toContain('placeholderText(item.name)')
+  })
+
+  it('操作列は「編集」「削除する」の2個分の幅を持ち、隣の列へはみ出さない', () => {
+    // #1057で「削除」→「削除する」に延び、w-36（144px）では行のボタンが
+    // 隣の「使われている場所」へ被った（1152pxで再現）。2個と間隔で約148px
+    // 要るため、列幅176px（w-44）・内余白8px（px-2）・表の最小幅696pxにする。
+    expect(PAGE).toContain('min-w-[696px]')
+    expect(PAGE).toContain('sticky right-0 w-44 px-2 py-3')
+    expect(PAGE).toContain('sticky right-0 px-2 py-3 text-right')
+    expect(PAGE).not.toContain('sticky right-0 w-36 px-4 py-3')
   })
 
   it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {

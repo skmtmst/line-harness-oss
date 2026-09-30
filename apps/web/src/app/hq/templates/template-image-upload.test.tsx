@@ -30,11 +30,33 @@ describe('HQ image authoring',()=>{
     await waitFor(()=>expect(onChange).toHaveBeenCalled());const next=onChange.mock.calls[0][0];expect(next.richMenu.pages[0].imageR2Key).toBe(media.r2Key);expect(next.richMenu.pages[1]).toEqual(value.richMenu.pages[1]);expect(value.richMenu.pages[0].imageR2Key).toBe('')
   })
   it('late upload cannot modify another screen after navigation',async()=>{
-    let finish!:(v:typeof media)=>void;vi.spyOn(hqTemplatesApi,'uploadImage').mockImplementation(()=>new Promise(resolve=>{finish=resolve}));const onChange=vi.fn(),busy=vi.fn();
+    let finish!:(v:typeof media)=>void;const upload=vi.spyOn(hqTemplatesApi,'uploadImage').mockImplementation(()=>new Promise(resolve=>{finish=resolve}));const onChange=vi.fn(),busy=vi.fn();
     const {unmount}=render(<TemplateDefinitionEditor type="rich_menu" value={freshDefinition('rich_menu')} disabled={false} onChange={onChange} onBusyChange={busy} />)
-    fireEvent.change(screen.getByLabelText('リッチメニュー画像を選ぶ'),{target:{files:[new File(['fixture'],'a.png',{type:'image/png'})]}});unmount();finish(media);await Promise.resolve();expect(onChange).not.toHaveBeenCalled();expect(busy).toHaveBeenLastCalledWith(false)
+    fireEvent.change(screen.getByLabelText('リッチメニュー画像を選ぶ'),{target:{files:[new File(['fixture'],'a.png',{type:'image/png'})]}})
+    // The local size read yields before the upload starts; wait until the in-flight upload exists, then leave.
+    await waitFor(()=>expect(upload).toHaveBeenCalled());unmount();finish(media);await Promise.resolve();expect(onChange).not.toHaveBeenCalled();expect(busy).toHaveBeenLastCalledWith(false)
   })
   it('combined image budget is enforced before changing the editor value',()=>{
     const value=freshDefinition('template') as MessageTemplateDefinition;value.media=[{...media,id:'old',sizeBytes:16*1024*1024}];expect(()=>withUploadedImage(value,media)).toThrow('16 MiB');expect(value.media).toHaveLength(1)
+  })
+  it('R568: dimension mismatch is refused before upload so R2 never sees it',async()=>{
+    vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:2500,height:843,close:vi.fn()})))
+    try {
+      const upload=vi.spyOn(hqTemplatesApi,'uploadImage').mockResolvedValue(media);const onChange=vi.fn(),onReceipt=vi.fn();
+      render(<TemplateDefinitionEditor type="rich_menu" value={freshDefinition('rich_menu')} disabled={false} onChange={onChange} onMediaUploaded={onReceipt} />)
+      fireEvent.change(screen.getByLabelText('リッチメニュー画像を選ぶ'),{target:{files:[new File(['fixture'],'compact.png',{type:'image/png'})]}})
+      await screen.findByRole('alert');expect(upload).not.toHaveBeenCalled();expect(onChange).not.toHaveBeenCalled();expect(onReceipt).not.toHaveBeenCalled()
+      expect(screen.getByRole('alert').textContent).toContain('選択中のサイズに合う画像を指定してください。')
+    } finally { vi.unstubAllGlobals() }
+  })
+  it('R568: matching dimensions upload with the adopted size declared and report the receipt',async()=>{
+    vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:2500,height:1686,close:vi.fn()})))
+    try {
+      const upload=vi.spyOn(hqTemplatesApi,'uploadImage').mockResolvedValue(media);const onReceipt=vi.fn();
+      render(<TemplateDefinitionEditor type="rich_menu" value={freshDefinition('rich_menu')} disabled={false} onChange={()=>undefined} onMediaUploaded={onReceipt} />)
+      fireEvent.change(screen.getByLabelText('リッチメニュー画像を選ぶ'),{target:{files:[new File(['fixture'],'large.png',{type:'image/png'})]}})
+      await waitFor(()=>expect(upload).toHaveBeenCalledWith(expect.any(File),'rich_menu',{width:2500,height:1686}))
+      await waitFor(()=>expect(onReceipt).toHaveBeenCalledWith(media))
+    } finally { vi.unstubAllGlobals() }
   })
 })

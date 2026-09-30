@@ -373,6 +373,62 @@
    */
   --default-transition-duration: 120ms;
   --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- ★V8 で増える語彙 -------------------------------------------------
+   * V8 移行② で足した名前。値はどのテーマでも同じ新しい語彙なので
+   * `@theme` に置く（V8 だけ値が違うものは下の `[data-theme="v8"]` へ）。
+   * 移行が終わるまで v7 の画面はこれらを読まない。
+   *
+   * 出どころ: Pencil ★V8 板（lh-work/design/v8/）と COMPONENT-MAP.md の
+   * オーナー決まり。
+   */
+
+  /*
+   * 表の区切り線。hairline（#dadde2）より薄い #eceef1。
+   * 表の行の間・数の帯の縦線など、板の中の細かい割れ目に使う。
+   */
+  --color-divider: #eceef1;
+  /* 表の見出しの行の地（★V8 表の寸法「見出し 44・地 table-head」）。 */
+  --color-table-head: #fafafb;
+  /* 受信箱で自分が送った吹き出しの地（★V8 受信箱の型）。 */
+  --color-chat-outgoing: #dff5e7;
+  /*
+   * 白い板の枠と影（★V8 外側「灰色の地に白い板1枚」）。
+   * 枠は ink の 8%、影は 4% で、hairline の実線より弱い輪郭にする。
+   */
+  --color-board-line: #1d1d1f14;
+  --shadow-board: 0 1px 2px #1d1d1f0a;
+  /* 左メニューで「いまの項目」の白い札にのせる薄い影（ink 8%）。 */
+  --shadow-nav-active: 0 1px 2px #1d1d1f14;
+  /*
+   * 灰色の地の上での「乗せたとき」の薄い白（左メニューの項目の hover）。
+   * 地より少し明るいだけなので、板の中の hover には使わない。
+   */
+  --color-nav-hover: #ffffff8c;
+  /*
+   * 印のタイル（数の帯のアイコン地）の6色。**タイルの中だけで使う**決まりで、
+   * 状態の色・アクセントとは別系統。画面のボタンや文字には使わない。
+   */
+  --color-icon-tile-green: #16a34a;
+  --color-icon-tile-orange: #f97316;
+  --color-icon-tile-blue: #3b82f6;
+  --color-icon-tile-purple: #8b5cf6;
+  --color-icon-tile-slate: #64748b;
+  --color-icon-tile-red: #ef4444;
+
+  /*
+   * 主ボタンの緑の影＋内側の白い照り（Pencil V8 ボタン/主 doYdE の
+   * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
+   * なりすぎないようにする。
+   */
+  --shadow-primary-action:
+    0 1px 2px #087a3e40,
+    inset 0 1px 0 rgb(255 255 255 / 0.15);
+  /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
+  --color-toggle-off: #c9ced6;
+  /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
+  --color-star-on: #fbbf24;
+  --color-star-on-edge: #f59e0b;
 }
 
 :root {
@@ -400,6 +456,97 @@
   --motion-pulse: 1.2s;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 テーマ（V8 移行②）
+ *
+ * `<html data-theme="v8">` のときだけ効く、V7 と値の違うトークン。
+ * ここに無いトークンは :root（＝V7）の値がそのまま効く。
+ * 既定は v7。検証環境は環境変数 NEXT_PUBLIC_ADMIN_THEME=v8、担当者は
+ * 設定画面の「画面の見た目（試作）」で切り替える（layout.tsx 参照）。
+ *
+ * 値の出どころは Pencil ★V8（~/Downloads/LINE-Harness-V8.pen）と
+ * lh-work/design/v8/COMPONENT-MAP.md。部品ごとの移行（④）で、部品が
+ * 必要とする値をここへ足していく。
+ *
+ *   control 8→10  ボタン・入力・選ぶ欄・探す欄の角丸（板「角丸 10」）
+ *   panel  12→16  白い板・ダイアログの角丸（板「角丸 16」、ダイアログ 16〜20）
+ */
+[data-theme="v8"] {
+  --radius-control: 10px;
+  --radius-panel: 16px;
+}
+
+/*
+ * ★V8 移行③: 外側（灰色の地・白い板1枚・上の帯）。
+ *
+ * 構造は v7 と同じ HTML のまま、v8 のときだけ見た目を切り替える。
+ * 画面をまたぐ規定（地の色・出し分けの印）はここへ。部品の中の値は
+ * 各部品の CSS Module が `[data-theme="v8"]` で上書きする。
+ *
+ * `.v8-only` / `.v7-only` は「そのテーマのときだけ出る要素」の印。
+ * v8 の新しい操作（検索・通知・メニュー畳み）は v7 では描かない。
+ */
+[data-theme="v8"] .v7-only {
+  display: none !important;
+}
+
+html:not([data-theme="v8"]) .v8-only {
+  display: none !important;
+}
+
+/* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
+[data-theme="v8"] body {
+  background-color: var(--color-shell);
+}
+
+/* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
+   メニューと組むので、狭い PC 幅でも帯を畳まない。 */
+@media (min-width: 1024px) {
+  [data-theme="v8"] .v8-topbar-wrap {
+    display: block;
+  }
+}
+
+/*
+ * ★V8「骨格の行」（MOTION.md）：v7 の点滅（animate-pulse）ではなく、
+ * 光が左から右へ流れる（1200ms・繰り返し）。`data-skeleton` は
+ * shared/skeleton.tsx が付ける印。Tailwind の animate-pulse（utilities
+ * 層）よりここ（層なし）が強いので、v8 ではこの動きが勝つ。
+ * 「動きを減らす」設定では末尾の規定で一瞬になる。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-skeleton] {
+    background-image: linear-gradient(
+      100deg,
+      transparent 40%,
+      rgb(255 255 255 / 0.55) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: v8-skeleton-shimmer 1200ms linear infinite;
+  }
+}
+
+@keyframes v8-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * ★V8「手順」（NUOgw）：白い板の中に枠付きカードを重ねない。
+ * 段の丸・文字・つなぎ線は変えず、囲い（枠・地・余白）だけを取る。
+ */
+[data-theme="v8"] [data-part="stepper"] {
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 /* ---------------------------------------------------------------------
@@ -574,6 +721,16 @@ aside[aria-label="フォルダ"] {
 
 aside[aria-label="フォルダ"] .shadow-lg {
   box-shadow: var(--shadow-float);
+}
+
+/*
+ * 欄の誤りは枠を赤くする（★V7 sTJsh §6）。共有入力部品は各自の CSS で
+ * 持っているが、画面に直接書いた `<input>` も同じ色になるようここで揃える。
+ */
+input[aria-invalid='true'],
+textarea[aria-invalid='true'],
+select[aria-invalid='true'] {
+  border-color: var(--color-danger);
 }
 
 /*

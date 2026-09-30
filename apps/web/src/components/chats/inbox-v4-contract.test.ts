@@ -116,7 +116,9 @@ describe('受信箱V4の画面契約', () => {
   it('見出しと会話まわりの余分な高さを詰める', () => {
     expect(PAGE).not.toContain('返信が必要な会話を見つけ、担当・期限・顧客情報を見ながら対応できます。')
     expect(FRIEND_INFO).not.toContain('対応に必要な情報をまとめて確認できます')
-    expect(FRIEND_INFO).toContain('inline-flex h-8 shrink-0 items-center justify-center')
+    // V8 移行 ①: 共通 Button は inline-flex を部品側が持つので、画面側の
+    // クラス列は寸法と揃えだけを見る。
+    expect(FRIEND_INFO).toContain('h-8 shrink-0 items-center justify-center')
     expect(PAGE).toContain("isOutgoing ? 'items-end justify-end' : 'items-start justify-start'")
     expect(PAGE).toContain('flex w-24 shrink-0 flex-col items-center')
   })

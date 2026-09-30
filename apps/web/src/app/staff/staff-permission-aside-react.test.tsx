@@ -136,12 +136,16 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
     expect(screen.getAllByText(/出さない項目はありません/).length).toBeGreaterThan(0)
   })
 
-  it('個別設定の人は保存済みの内訳が取れないので「未確認」と出す', async () => {
+  it('個別設定の人は保存済みをそのまま出し、差分も保存済みと比べる（R497）', async () => {
+    // 保存済みは受信箱だけ変えられる（member の permissionKeys）。
+    // 受付プリセットへの当てはめはせず、未確認にもしない。
     state.users[0] = accessUser({ roleBundle: 'custom' })
     await openPermissionView()
 
-    expect(screen.getByText(/内訳は取得できていません（未確認）/)).toBeTruthy()
-    expect(screen.getByText(/変わる項目の内訳は未確認です/)).toBeTruthy()
+    expect(screen.queryByText(/内訳は取得できていません/)).toBeNull()
+    expect(screen.queryByText(/変わる項目の内訳は未確認です/)).toBeNull()
+    expect(screen.getByText(/いまの設定と同じ内容です/)).toBeTruthy()
+    expect(screen.queryByText('変更後の予定')).toBeNull()
   })
 
   it('「つながる先」は実リンクで遷移先を持つ', async () => {

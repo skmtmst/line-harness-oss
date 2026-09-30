@@ -1,4 +1,5 @@
 import type { BookingAvailabilitySlot } from '@/lib/api'
+import Button from '@/components/shared/button'
 
 const WEEKDAY_JP = '日月火水木金土'
 
@@ -190,13 +191,9 @@ export default function LiffDateTimePreview({
  */
 function PreviewTimeButton({ time }: { time: string }) {
   return (
-    <button
-      type="button"
-      disabled
-      className="border-hairline rounded-mini py-2 text-sm"
-    >
+    <Button variant="secondary" className="rounded-mini px-0 py-2 border-0 h-auto whitespace-normal" type="button" disabled>
       {time}
-    </button>
+    </Button>
   )
 }
 

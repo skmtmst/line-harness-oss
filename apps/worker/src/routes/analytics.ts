@@ -58,6 +58,7 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { zonedWallTime } from '../services/zoned-time.js';
 
 /**
@@ -702,6 +703,50 @@ function expectedUpdatedAtOf(rawBody: unknown): string | null {
 const REPORT_SCHEDULE_CONFLICT =
   'この定期レポートは別の画面で先に更新されました。最新の内容を読み込み直してください';
 
+/*
+ * R526: 同じ要求キーで同じ内容なら、既にある予約を返す。
+ *
+ * 作成の直後に応答だけ失われると、画面は失敗表示のまま「つくって動かす」を
+ * もう一度押せる。要求キーなしでは2件目の有効な予約ができ、同じ内容が重複
+ * して届く。次回予定（nextRunAt）と作った人は要求のたびに変わるので比べない。
+ */
+function sameReportCreateRequest(
+  existing: {
+    name: string; sections: unknown; savedAnalysisIds: unknown; cadence: string;
+    weekday: number | null; monthDay: number | null; sendTime: string; timeZone: string;
+    periodDays: number; recipients: unknown; channels: unknown; alertRules: unknown;
+    isOneTime: boolean;
+  },
+  value: {
+    name: string; sections: unknown; savedAnalysisIds: unknown; cadence: string;
+    weekday: number | null; monthDay: number | null; sendTime: string; timeZone: string;
+    periodDays: number; recipients: unknown; channels: unknown; alertRules: unknown;
+  },
+  sendOnce: boolean,
+): boolean {
+  return existing.isOneTime === sendOnce
+    && existing.name === value.name
+    && JSON.stringify(existing.sections) === JSON.stringify(value.sections)
+    && JSON.stringify(existing.savedAnalysisIds) === JSON.stringify(value.savedAnalysisIds)
+    && existing.cadence === value.cadence
+    && existing.weekday === value.weekday
+    && existing.monthDay === value.monthDay
+    && existing.sendTime === value.sendTime
+    && existing.timeZone === value.timeZone
+    && existing.periodDays === value.periodDays
+    && JSON.stringify(existing.recipients) === JSON.stringify(value.recipients)
+    && JSON.stringify(existing.channels) === JSON.stringify(value.channels)
+    && JSON.stringify(existing.alertRules) === JSON.stringify(value.alertRules);
+}
+
+function reportScheduleIdConflict(existingId: string) {
+  return {
+    success: false,
+    error: '同じ操作で内容の違う予約が既にあります。一覧で既にある予約を確認してください',
+    data: { existingId },
+  };
+}
+
 analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'), async (c) => {
   try {
     const account = await resolveAccount(c);
@@ -716,10 +761,28 @@ analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'),
     }
     const validationError = await validateReportPayload(c, account.accountId, parsed.value);
     if (validationError) return c.json({ success: false, error: validationError }, 422);
+    // R526: 要求キー（UUID）を付けた作成は、応答消失後の再送でも
+    // 同じ予約へ戻す。キーが無い従来の呼び出しはそのまま通す。
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
+    if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400);
+    }
     const now = new Date();
     const sendOnce = Boolean(rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
       && (rawBody as Record<string, unknown>).sendOnce === true);
-    const item = await createAnalyticsReportSchedule(c.env.DB, {
+    if (idempotencyKey) {
+      const existing = await getAnalyticsReportScheduleIncludingArchived(
+        c.env.DB, idempotencyKey, account.accountId,
+      );
+      if (existing) {
+        if (!sameReportCreateRequest(existing, parsed.value, sendOnce)) {
+          return c.json(reportScheduleIdConflict(existing.id), 409);
+        }
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: existing, replayed: true }, 200);
+      }
+    }
+    const payload = {
       lineAccountId: account.accountId,
       ...parsed.value,
       nextRunAt: sendOnce ? now.toISOString() : nextReportRun({
@@ -730,8 +793,29 @@ analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'),
       createdBy: c.get('staff').id,
       now: now.toISOString(),
       isOneTime: sendOnce,
-    });
-    return c.json({ success: true, data: item }, 201);
+    };
+    try {
+      const item = await createAnalyticsReportSchedule(c.env.DB, {
+        ...payload,
+        // 要求キーをそのまま行の主キーにする。同時に届いた再送は
+        // 主キーの一意性で1本だけ通り、負けた側は下で回収する。
+        ...(idempotencyKey ? { id: idempotencyKey } : {}),
+      });
+      return c.json({ success: true, data: item }, 201);
+    } catch (createError) {
+      // 同時実行の競合で負けた側。勝った行を読み直し、同じ内容なら
+      // その予約を返す。内容が違うキー使い回しは409で止める。
+      if (!idempotencyKey) throw createError;
+      const raced = await getAnalyticsReportScheduleIncludingArchived(
+        c.env.DB, idempotencyKey, account.accountId,
+      );
+      if (!raced) throw createError;
+      if (!sameReportCreateRequest(raced, parsed.value, sendOnce)) {
+        return c.json(reportScheduleIdConflict(raced.id), 409);
+      }
+      c.header('Idempotency-Replayed', 'true');
+      return c.json({ success: true, data: raced, replayed: true }, 200);
+    }
   } catch (error) {
     console.error('POST /api/analytics/report-schedules error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);

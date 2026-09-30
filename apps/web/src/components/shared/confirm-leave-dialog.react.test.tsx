@@ -12,19 +12,19 @@ function primaryClass(button: HTMLElement): string {
 }
 
 describe('未保存の離脱確認の向き（★V7）', () => {
-  it('主の緑は「編集を続ける」、枠線は「保存せずに移動」、印は付けない', () => {
+  it('主の緑は「編集を続ける」、枠線は「保存せずに移る」、印は付けない', () => {
     render(<ConfirmDialog
       primaryAction="cancel"
       open
       title="保存していない変更があります"
       description="このまま移動すると、入力した内容は消えます。"
-      confirmLabel="保存せずに移動"
+      confirmLabel="保存せずに移る"
       cancelLabel="編集を続ける"
       onConfirm={vi.fn()}
       onCancel={vi.fn()}
     />)
     const stay = screen.getByRole('button', { name: '編集を続ける' })
-    const leave = screen.getByRole('button', { name: '保存せずに移動' })
+    const leave = screen.getByRole('button', { name: '保存せずに移る' })
     // 主の緑は残る方。離れる方は枠線（主でも危険色でもない）。
     expect(primaryClass(stay)).toMatch(/primary/)
     expect(primaryClass(leave)).not.toMatch(/primary/)
@@ -41,7 +41,7 @@ describe('未保存の離脱確認の向き（★V7）', () => {
       open
       title="保存していない変更があります"
       description="このまま移動すると、入力した内容は消えます。"
-      confirmLabel="保存せずに移動"
+      confirmLabel="保存せずに移る"
       cancelLabel="編集を続ける"
       onConfirm={onConfirm}
       onCancel={onCancel}
