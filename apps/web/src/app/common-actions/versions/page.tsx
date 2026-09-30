@@ -361,9 +361,13 @@ function CommonActionVersionsInner() {
               <tbody>
                 {detail.bindings.map((binding) => (
                   <Tr key={binding.id}>
+                    {/*
+                      S1N-layout-1 長文残差: `truncate` は inline の span では幅が定まらず
+                      省略記号が効かない。block 化して列幅の中で切る。全文は title で残す。
+                    */}
                     <NameCell
-                      name={<span className="truncate" title={binding.consumerId}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>}
-                      sub={<span className="truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
+                      name={<span className="block truncate" title={binding.consumerId}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>}
+                      sub={<span className="block truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
                     />
                     <Td>
                       <span className="text-ink-secondary">v{binding.versionNumber}</span>
