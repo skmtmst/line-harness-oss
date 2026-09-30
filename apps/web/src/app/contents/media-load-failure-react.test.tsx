@@ -15,9 +15,9 @@ import type { MediaItem } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
-  mediaBehavior: 'ok' as 'ok' | 'fail503',
+  mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse',
   foldersBehavior: 'ok' as 'ok' | 'fail503',
-  detailBehavior: 'ok' as 'ok' | 'fail503' | 'fail404' | 'fail403',
+  detailBehavior: 'ok' as 'ok' | 'fail503' | 'fail404' | 'fail403' | 'failFalse',
   detailCalls: [] as Array<{ id: string; accountId: string }>,
 }))
 
@@ -76,6 +76,9 @@ vi.mock('@/lib/api', () => {
           if (fixture.mediaBehavior === 'fail503') {
             return Promise.reject(new ApiError(503, 'Service Unavailable'))
           }
+          if (fixture.mediaBehavior === 'failFalse') {
+            return Promise.resolve({ success: false, error: 'unknown failure' })
+          }
           return Promise.resolve({
             success: true,
             data: { items: [MEDIA_A], total: 1, limit: 20, offset: 0 },
@@ -102,6 +105,9 @@ vi.mock('@/lib/api', () => {
           }
           if (fixture.detailBehavior === 'fail403') {
             return Promise.reject(new ApiError(403, 'Forbidden'))
+          }
+          if (fixture.detailBehavior === 'failFalse') {
+            return Promise.resolve({ success: false, error: 'unknown failure' })
           }
           if (id === 'media-a' && accountId === 'account-a') {
             return Promise.resolve({ success: true, data: { item: MEDIA_A, folderName: null } })
@@ -217,6 +223,25 @@ describe('R587 フォルダだけの失敗は一覧と容量を隠さない', ()
     expect(host.textContent).toContain(MEDIA_A.filename)
   })
 
+  it('一覧の失敗でも容量は未取得と偽らない（容量の取得は残る）', async () => {
+    fixture.mediaBehavior = 'fail503'
+    await renderPage()
+    await waitForText('表示できませんでした')
+    // 容量の取得自体は生きているので「—（未取得）」にしない。
+    expect(host.textContent).toContain('使っている容量')
+    expect(host.textContent).not.toContain('—（未取得）')
+  })
+
+  it('一覧が失敗を返しても全体の失敗と再試行になる', async () => {
+    fixture.mediaBehavior = 'failFalse'
+    await renderPage()
+    await waitForText('表示できませんでした')
+    const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent === 'もう一度読み込む')
+    expect(retry).toBeTruthy()
+    expect(host.textContent).toContain('商品')
+  })
+
   it('メディア自体の失敗は一覧全体の失敗と再試行になる', async () => {
     fixture.mediaBehavior = 'fail503'
     await renderPage()
@@ -250,6 +275,18 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     await act(async () => { retry!.click(); await settle() })
     await waitForText('ファイルのこと')
     expect(new URLSearchParams(window.location.search).get('id')).toBe('media-a')
+  })
+
+  it('詳細が原因不明の失敗を返しても存在しないと断定せず再試行を出す', async () => {
+    window.history.replaceState({}, '', '/contents?id=media-a')
+    fixture.detailBehavior = 'failFalse'
+    await renderPage()
+    await waitForText('表示できませんでした')
+    expect(host.textContent).toContain('通信が切れたか、サーバが応えませんでした')
+    expect(host.textContent).not.toContain('存在しないか、このLINEアカウントでは表示できません')
+    const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent === 'もう一度読み込む')
+    expect(retry).toBeTruthy()
   })
 
   it('詳細404は対象なしの案内で再試行は出さない', async () => {

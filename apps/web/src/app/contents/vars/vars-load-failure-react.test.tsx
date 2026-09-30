@@ -166,6 +166,16 @@ describe('R590 一覧の403と503を区別する', () => {
     expect(screen.queryByRole('button', { name: '＋ 共通情報を作る' })).toBeNull()
   })
 
+  it('一覧が失敗を返しても通信障害と再試行にし、0件と誤案内しない', async () => {
+    api.varsList.mockResolvedValue({ success: false, error: 'unknown failure' })
+    render(<CommonVarsPage />)
+
+    expect(await screen.findByText('共通情報を読み込めませんでした')).toBeTruthy()
+    expect(screen.getByText(/接続を確かめて/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
+    expect(screen.queryByText('0件')).toBeNull()
+  })
+
   it('一覧503は通信障害と再試行を出し、復旧できる', async () => {
     api.varsList.mockRejectedValueOnce(new ApiError(503, 'Service Unavailable'))
     render(<CommonVarsPage />)
