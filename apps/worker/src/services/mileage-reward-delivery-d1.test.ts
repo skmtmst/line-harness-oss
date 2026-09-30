@@ -6,7 +6,8 @@
  * 外部送信は数えるだけの fetch 差し替えで、本物の webhook 実行器を通す。
  */
 import type Database from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { asD1 } from '@line-crm/db/test/d1-test-helper.js';
 
 import {
   claimRedemptionStep,
@@ -1226,5 +1227,90 @@ describe('R362 返却中断後の回復(実D1)', () => {
     expect(raw.prepare(
       `SELECT status FROM mileage_reward_codes WHERE id = ?`,
     ).get(codeId)).toEqual({ status: 'available' });
+  });
+
+  it('旧処理の残りに同時修復が重なっても内訳は1回分だけ戻る', async () => {
+    // 原子な D1 口（packages/db の試験口）で当て、本物の直列化を見る。
+    // worker の試験口は入れ子の書込失敗を投げるため、同時修復の
+    // 判定には使わない（環境の失敗を製品の合格としない）。
+    const { raw } = createTestD1();
+    const db = asD1(raw);
+    seedAccount(raw);
+    const id = await seedStuckCouponRefund(db, raw, 'concurrent-legacy');
+    await refundMileageRewardRedemption(db, { redemptionId: id, reason: '最初の回復' });
+    const codeId = (raw.prepare(
+      `SELECT id FROM mileage_reward_codes WHERE status = 'available'`,
+    ).get() as { id: string }).id;
+    raw.prepare(
+      `UPDATE mileage_grant_lots SET remaining_amount = remaining_amount - 300
+        WHERE beneficiary_key = 'user:user-1' AND status != 'void'`,
+    ).run();
+    raw.prepare(
+      `UPDATE mileage_reward_codes
+          SET status = 'reserved', redemption_id = ?, reserved_at = ?
+        WHERE id = ?`,
+    ).run(id, '2026-09-30T12:00:00.000Z', codeId);
+    // 後の通常の交換で内訳に余白を作り、同時修復の直列化を見る。
+    const nextReward = await seedRefundWebhookReward(db);
+    await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: nextReward,
+      idempotencyKey: 'second-spend', requestFingerprint: 'second-spend',
+    });
+    raw.prepare('UPDATE mileage_redemptions SET updated_at = ? WHERE id = ?').run(
+      '2026-09-30T12:00:00.000Z', id,
+    );
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-30T12:00:00.000Z'));
+    try {
+      const results = await Promise.allSettled([
+        refundMileageRewardRedemption(db, { redemptionId: id, reason: 'race-a' }),
+        refundMileageRewardRedemption(db, { redemptionId: id, reason: 'race-b' }),
+      ]);
+      // 両方とも受け付けるが、台帳・残高・内訳の書き込みは合計1回分。
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(2);
+      expect(walletOf(raw)).toBe(700);
+      expect(reversalCount(raw, id)).toBe(1);
+      expect(lotsRemaining(raw)).toBe(700);
+    } finally {
+      vi.useRealTimers();
+      raw.close();
+    }
+  });
+
+  it('旧処理の残りは取り残しと要対応一覧に出て回復後は消える', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    const id = await seedStuckCouponRefund(db, raw, 'discover-legacy');
+    await refundMileageRewardRedemption(db, { redemptionId: id, reason: '最初の回復' });
+    const codeId = (raw.prepare(
+      `SELECT id FROM mileage_reward_codes WHERE status = 'available'`,
+    ).get() as { id: string }).id;
+    raw.prepare(
+      `UPDATE mileage_grant_lots SET remaining_amount = remaining_amount - 300
+        WHERE beneficiary_key = 'user:user-1' AND status != 'void'`,
+    ).run();
+    raw.prepare(
+      `UPDATE mileage_reward_codes
+          SET status = 'reserved', redemption_id = ?, reserved_at = ?
+        WHERE id = ?`,
+    ).run(id, '2026-09-30T12:00:00.000Z', codeId);
+
+    // 台帳はあるが内訳とコードが戻っていないため、未完了のまま見つかる。
+    expect(await isMileageRefundComplete(db, id)).toBe(false);
+    const recovery = await findIncompleteMileageRefunds(db, { lineAccountId: 'account-1' });
+    expect(recovery.map((item) => item.id)).toContain(id);
+    const listed = await listMileageRedemptions(db, { lineAccountId: 'account-1', limit: 50, offset: 0 });
+    expect(listed.items.map((item) => item.id)).toContain(id);
+
+    // 明示IDの修復で完了し、取り残しと一覧から消える。台帳は増えない。
+    await refundMileageRewardRedemption(db, { redemptionId: id, reason: '照合' });
+    expect(await isMileageRefundComplete(db, id)).toBe(true);
+    expect(reversalCount(raw, id)).toBe(1);
+    expect(lotsRemaining(raw)).toBe(1000);
+    const recoveryAfter = await findIncompleteMileageRefunds(db, { lineAccountId: 'account-1' });
+    expect(recoveryAfter.map((item) => item.id)).not.toContain(id);
+    const listedAfter = await listMileageRedemptions(db, { lineAccountId: 'account-1', limit: 50, offset: 0 });
+    expect(listedAfter.items.map((item) => item.id)).not.toContain(id);
+    raw.close();
   });
 });

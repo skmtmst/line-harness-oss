@@ -932,14 +932,23 @@ export async function listMileageRedemptions(
   // `delivering` のままの照合待ちを既定の一覧から消さない。
   // R362: 返却確定後に書き込みが中断した交換（台帳なしの refunded）も
   // 要対応に入れる。入れないと残高が戻らないまま誰にも見えない。
+  // 旧処理の残り「台帳あり・コード未解放」（ロット未復旧）も入れる。
+  // 返却済みの交換に結び付いたままの予約コードは解放漏れのため、
+  // 取り残しの発見（findIncompleteMileageRefunds）と同じ基準。
   const statusClause = status === 'all'
     ? ''
     : status === 'needs_attention'
       ? `AND (r.status IN ('delivery_failed', 'delivering')
-        OR (r.status = 'refunded' AND NOT EXISTS (
-          SELECT 1 FROM mileage_ledger l
-           WHERE l.program_id = r.program_id
-             AND l.idempotency_key = 'mileage-redemption-refund:' || r.id
+        OR (r.status = 'refunded' AND (
+          NOT EXISTS (
+            SELECT 1 FROM mileage_ledger l
+             WHERE l.program_id = r.program_id
+               AND l.idempotency_key = 'mileage-redemption-refund:' || r.id
+          )
+          OR EXISTS (
+            SELECT 1 FROM mileage_reward_codes c
+             WHERE c.redemption_id = r.id AND c.status = 'reserved'
+          )
         )))`
       : 'AND r.status = ?';
   const binds: unknown[] = [input.lineAccountId];
@@ -1543,9 +1552,11 @@ async function selectRefundReversal(
 /**
  * R362: 旧処理で残り得る「台帳あり・コード未解放」の照合。
  * batch は原子なので、コードが未解放ならロット復元も未実行。
- * updated_at の条件付き更新で勝者を1人に絞り、勝者だけが
- * ロット復元＋コード解放の batch を書く。コード解放の条件付き
- * 更新は何度でも安全なので、照合自体は何度呼んでも壊さない。
+ * ロットの復元は読んだ残数への条件付き更新（CAS）で行う。同時修復で
+ * 誰かが直した分は残数が変わっているため触らず、合計は1回分になる。
+ * コード解放も予約中のときだけ通る。照合自体は何度呼んでも壊さない。
+ * R362: updated_at の一致だけの柵では、同じ時刻の同時修復が両方通って
+ * 内訳を二重に戻していた（時刻が同じだと柵が開いたままになる）。
  */
 async function verifyRefundWrites(
   db: D1Database,
@@ -1557,20 +1568,32 @@ async function verifyRefundWrites(
     `SELECT status FROM mileage_reward_codes WHERE id = ? AND redemption_id = ?`,
   ).bind(current.rewardCodeId, current.id).first<{ status: string }>();
   if (!code || code.status !== 'reserved') return;
-  const now = new Date().toISOString();
-  const fenced = await db.prepare(
-    `UPDATE mileage_redemptions SET updated_at = ?
-      WHERE id = ? AND status = 'refunded' AND updated_at = ?`,
-  ).bind(now, current.id, current.updatedAt).run();
-  if ((fenced.meta?.changes ?? 0) !== 1) return;
+  const placeholders = allocations.map(() => '?').join(',');
+  const currentLots = allocations.length > 0
+    ? await db.prepare(
+      `SELECT ledger_entry_id, remaining_amount FROM mileage_grant_lots
+        WHERE ledger_entry_id IN (${placeholders}) AND beneficiary_key = ?
+          AND status IN ('available', 'exhausted')`,
+    ).bind(...allocations.map((allocation) => allocation.grant_lot_id), current.beneficiaryKey)
+      .all<{ ledger_entry_id: string; remaining_amount: number }>()
+    : { results: [] as Array<{ ledger_entry_id: string; remaining_amount: number }> };
+  const remainingByLot = new Map(
+    currentLots.results.map((row) => [row.ledger_entry_id, row.remaining_amount]),
+  );
   await db.batch([
     ...allocations.map((allocation) => db.prepare(
       `UPDATE mileage_grant_lots
           SET remaining_amount = remaining_amount + ?,
               status = 'available'
         WHERE ledger_entry_id = ? AND beneficiary_key = ?
+          AND remaining_amount = ?
           AND status IN ('available', 'exhausted')`,
-    ).bind(allocation.amount, allocation.grant_lot_id, current.beneficiaryKey)),
+    ).bind(
+      allocation.amount,
+      allocation.grant_lot_id,
+      current.beneficiaryKey,
+      remainingByLot.get(allocation.grant_lot_id) ?? -1,
+    )),
     db.prepare(
       `UPDATE mileage_reward_codes
           SET status = 'available', redemption_id = NULL, reserved_at = NULL
@@ -1602,6 +1625,9 @@ export async function isMileageRefundComplete(
  * R362: 返却確定後に書き込みが中断した交換（台帳なしの refunded）。
  * 再試行は409、cronも要対応一覧も拾わない取り残し。回復処理と
  * 要対応一覧がこの口で見つけて再開する。
+ * 旧処理の残り「台帳あり・コード未解放」（ロット未復旧）も拾う。
+ * 返却済みの交換に結び付いたままの予約コードは、解放漏れ以外に
+ * あり得ないため、完了判定（isMileageRefundComplete）と同じ基準。
  */
 export async function findIncompleteMileageRefunds(
   db: D1Database,
@@ -1616,10 +1642,16 @@ export async function findIncompleteMileageRefunds(
   const rows = await db.prepare(
     `SELECT r.* FROM mileage_redemptions r
       WHERE r.status = 'refunded'
-        AND NOT EXISTS (
-          SELECT 1 FROM mileage_ledger l
-           WHERE l.program_id = r.program_id
-             AND l.idempotency_key = 'mileage-redemption-refund:' || r.id
+        AND (
+          NOT EXISTS (
+            SELECT 1 FROM mileage_ledger l
+             WHERE l.program_id = r.program_id
+               AND l.idempotency_key = 'mileage-redemption-refund:' || r.id
+          )
+          OR EXISTS (
+            SELECT 1 FROM mileage_reward_codes c
+             WHERE c.redemption_id = r.id AND c.status = 'reserved'
+          )
         )
         ${accountClause}
       ORDER BY r.updated_at, r.created_at LIMIT ?`,
