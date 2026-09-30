@@ -35,6 +35,7 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -114,6 +115,11 @@ function isKnownUnused(item: MediaItem): boolean {
 type MediaView = 'grid' | 'list'
 type MediaManagementPermission = 'loading' | 'allowed' | 'denied' | 'error'
 type MediaDetailPhase = 'idle' | 'loading' | 'ready' | 'unavailable'
+/*
+ * R588: 詳細の取得失敗は理由で案内を分ける。404は対象なし、
+ * 403は権限案内、503などの通信失敗は同じIDの再試行。
+ */
+type MediaDetailFailure = 'missing' | 'denied' | 'retryable'
 
 function mediaDetailIdFromLocation(): string | null {
   if (typeof window === 'undefined') return null
@@ -142,6 +148,13 @@ function MediaLibraryInner() {
     総数を出すため、同じ棚（アーカイブの扱い）で数えた総数を別に持つ。
   */
   const [overallTotal, setOverallTotal] = useState<number | null>(null)
+  /*
+    m26m: 一覧の総数が「分かっている」かどうか。初期値の total=0 や
+    失敗時の残留値をそのまま出すと、実在する件を0件と誤案内する。
+    成功したときだけ真にし、フォルダ欄の「すべて」と表の下の件数は
+    真のときだけ出す（vars 側の listFailed と同じ約束）。
+  */
+  const [listKnown, setListKnown] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [quota, setQuota] = useState<MediaQuota | null>(null)
@@ -151,6 +164,12 @@ function MediaLibraryInner() {
   // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
   // kind=media は件数未対応のため来ない。来ないときは null（「—」表示）。
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
+  /*
+    R587: フォルダの取得失敗は一覧・容量と切り分ける。フォルダだけ503でも
+    取得済みのメディアと容量は見せ、フォルダ欄だけ失敗と再試行を示す。
+  */
+  const [folderFailure, setFolderFailure] = useState<unknown>(null)
+  const [folderReloading, setFolderReloading] = useState(false)
   const [folderFilter, setFolderFilter] = useState('')
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -208,6 +227,8 @@ function MediaLibraryInner() {
   const [detailsFor, setDetailsFor] = useState<MediaItem | null>(null)
   const [detailFolderName, setDetailFolderName] = useState<string | null>(null)
   const [detailPhase, setDetailPhase] = useState<MediaDetailPhase>('idle')
+  const [detailFailure, setDetailFailure] = useState<MediaDetailFailure | null>(null)
+  const [detailRetry, setDetailRetry] = useState(0)
   const detailRequestRef = useRef(0)
   const detailAccountRef = useRef<string | null | undefined>(undefined)
   const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
@@ -301,12 +322,14 @@ function MediaLibraryInner() {
     detailRequestRef.current = request
     setDetailsFor(null)
     setDetailFolderName(null)
+    setDetailFailure(null)
     if (!detailId) {
       setDetailPhase('idle')
       return
     }
     if (!selectedAccountId) {
       setDetailPhase('unavailable')
+      setDetailFailure('missing')
       return
     }
     const accountAtRequest = selectedAccountId
@@ -315,20 +338,38 @@ function MediaLibraryInner() {
       if (detailRequestRef.current !== request || latestAccountRef.current !== accountAtRequest) return
       if (!response.success) {
         setDetailPhase('unavailable')
+        // R588: 原因不明の失敗を「存在しない」と断定しない。読み直せる側に倒す。
+        setDetailFailure('retryable')
         return
       }
       setDetailsFor(response.data.item)
       setDetailFolderName(response.data.folderName)
       setDetailPhase('ready')
-    }).catch(() => {
+    }).catch((caught) => {
       if (detailRequestRef.current === request && latestAccountRef.current === accountAtRequest) {
         setDetailPhase('unavailable')
+        // R588: 404は対象なし、403は権限案内、それ以外は通信失敗として再試行させる。
+        setDetailFailure(
+          caught instanceof ApiError && caught.status === 404
+            ? 'missing'
+            : caught instanceof ApiError && caught.status === 403
+              ? 'denied'
+              : 'retryable',
+        )
       }
     })
     return () => {
       if (detailRequestRef.current === request) detailRequestRef.current += 1
     }
-  }, [accountLoading, detailId, selectedAccountId, setDetailUrl, urlReady])
+  }, [accountLoading, detailId, detailRetry, selectedAccountId, setDetailUrl, urlReady])
+
+  /** R588: 通信失敗の詳細は同じIDで読み直す。URLは変えない。 */
+  const retryDetail = useCallback(() => {
+    if (!detailId) return
+    setDetailFailure(null)
+    setDetailPhase('loading')
+    setDetailRetry((count) => count + 1)
+  }, [detailId])
 
   const canManageMedia = mediaManagementPermission === 'allowed'
   const managementPermissionReason = mediaManagementPermission === 'loading'
@@ -361,6 +402,37 @@ function MediaLibraryInner() {
     setArchiveError('')
   }, [selectedAccountId])
 
+  /*
+    R587: フォルダは一覧・容量と独立して読む。フォルダだけ503でも
+    取得済みのメディアと容量は見せたままにする。
+  */
+  const loadFolders = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setFolders([])
+      setUnfiledCount(null)
+      setFolderFailure(null)
+      return
+    }
+    setFolderReloading(true)
+    setFolderFailure(null)
+    try {
+      // #730: 選択中の1件に閉じた母集団で数える。
+      const folderResponse = await api.folders.list('media', accountAtRequest)
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (folderResponse.success) {
+        setFolders(folderResponse.data)
+        setUnfiledCount(folderResponse.unfiledCount ?? null)
+      } else {
+        setFolderFailure(new ApiError(500, folderResponse.error))
+      }
+    } catch (caught) {
+      if (accountAtRequest === latestAccountRef.current) setFolderFailure(caught)
+    } finally {
+      if (accountAtRequest === latestAccountRef.current) setFolderReloading(false)
+    }
+  }, [selectedAccountId])
+
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
@@ -374,7 +446,11 @@ function MediaLibraryInner() {
     setQuotaFailed(false)
     setError('')
     try {
-      const [res, folderResponse, quotaResponse, overallResponse] = await Promise.all([
+      /*
+        R587: 一覧の失敗で容量まで隠さない。一覧だけ捕まえてnull化し、
+        容量・総数はそれぞれの成否で決める（Promise.allの連鎖で消さない）。
+      */
+      const [res, quotaResponse, overallResponse] = await Promise.all([
         api.media.list(accountAtRequest, {
           kind: kinds.size === 1 ? [...kinds][0] : undefined,
           folderId: folderFilter || undefined,
@@ -385,9 +461,7 @@ function MediaLibraryInner() {
           sort,
           limit: pageSize,
           offset: (page - 1) * pageSize,
-        }),
-        // #730: 選択中の1件に閉じた母集団で数える。
-        api.folders.list('media', accountAtRequest),
+        }).catch(() => null),
         api.media.quota(accountAtRequest).catch(() => null),
         // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
         api.media.list(accountAtRequest, {
@@ -397,22 +471,25 @@ function MediaLibraryInner() {
         }).catch(() => null),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
-      if (res.success) {
+      if (res?.success) {
         setItems(res.data.items)
         setTotal(res.data.total)
+        setListKnown(true)
+      } else {
+        setLoadFailed(true)
+        setListKnown(false)
       }
       if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
-      if (folderResponse.success) {
-        setFolders(folderResponse.data)
-        setUnfiledCount(folderResponse.unfiledCount ?? null)
-      }
       if (quotaResponse?.success) setQuota(quotaResponse.data)
       else {
         setQuota(null)
         setQuotaFailed(true)
       }
     } catch {
-      if (accountAtRequest === latestAccountRef.current) setLoadFailed(true)
+      if (accountAtRequest === latestAccountRef.current) {
+        setLoadFailed(true)
+        setListKnown(false)
+      }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
@@ -425,11 +502,18 @@ function MediaLibraryInner() {
     setReplacementFor(null)
     setPreview(null)
     setPage(1)
+    // m26m: 別アカウントの総数を残さない。読み直すまで「すべて」は未知。
+    setListKnown(false)
+    setOverallTotal(null)
   }, [accountLoading, selectedAccountId])
 
   useEffect(() => {
-    if (!accountLoading && urlReady && !detailId) void load()
-  }, [accountLoading, detailId, load, urlReady])
+    if (!accountLoading && urlReady && !detailId) {
+      void load()
+      // R587: フォルダの成否は一覧・容量と切り分ける。
+      void loadFolders()
+    }
+  }, [accountLoading, detailId, load, loadFolders, urlReady])
 
   const rename = async () => {
     if (!renaming || !selectedAccountId || renamingBusy) return
@@ -486,6 +570,7 @@ function MediaLibraryInner() {
       setDeletingFolder(null)
       if (folderFilter === deletingFolder.id) setFolderFilter('')
       void load()
+      void loadFolders()
     } catch {
       if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
     } finally {
@@ -766,12 +851,37 @@ function MediaLibraryInner() {
   // まとめて削除の候補は未使用かつ一覧にいるものだけ。退避済みは選ばない。
   const removable = items.filter((item) => isKnownUnused(item) && !item.archivedAt)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
+  /** R587: フォルダ欄の失敗は403（権限）とそれ以外（通信）で案内を分ける。 */
+  const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
 
   if (!urlReady || (detailId && (detailPhase === 'idle' || detailPhase === 'loading'))) {
     return <ListState kind="loading" title="メディアの詳細を読み込んでいます" />
   }
 
   if (detailId && (detailPhase === 'unavailable' || !detailsFor)) {
+    // R588: 403は権限案内にする。押しても直らない再試行は出さない。
+    if (detailFailure === 'denied') {
+      return (
+        <ListState
+          kind="forbidden"
+          title="メディアの詳細を見る権限がありません"
+          description="見るには権限が要ります。オーナーか管理者に追加を依頼してください。"
+          action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
+        />
+      )
+    }
+    // R588: 503などの通信失敗は通信失敗と言い、同じIDで読み直せるようにする。
+    if (detailFailure === 'retryable') {
+      return (
+        <ListState
+          kind="error"
+          title="表示できませんでした"
+          description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+          onRetry={retryDetail}
+          action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
+        />
+      )
+    }
     return (
       <ListState
         kind="empty"
@@ -862,7 +972,9 @@ function MediaLibraryInner() {
           rows={[
             // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
             // 入れると「すべて0・未分類2」のように母集団が混ざる。
-            { id: '', label: 'すべて', count: overallTotal ?? total },
+            // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
+            // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
+            { id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
             ...folders.map((folder) => ({
               id: folder.id,
               label: folder.name,
@@ -880,6 +992,20 @@ function MediaLibraryInner() {
             { id: UNGROUPED, label: '未分類', count: unfiledCount },
           ]}
         >
+          {folderFailure ? (
+            <div role="alert" className="space-y-1.5">
+              <p className="text-ink-secondary text-xs">
+                {folderForbidden
+                  ? 'フォルダを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                  : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}
+              </p>
+              {folderForbidden ? null : (
+                <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
+                  {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
+                </Button>
+              )}
+            </div>
+          ) : null}
           {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
           {addingFolder ? (
             <div className="space-y-2">
@@ -1042,7 +1168,7 @@ function MediaLibraryInner() {
       />
 
       <div data-design-node="h8pBZr" className="flex flex-col gap-4">
-      {total > 200 ? (
+      {listKnown && !loadFailed && total > 200 ? (
         <p className="text-ink-faint text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
       ) : null}
       {loading ? (
@@ -1446,6 +1572,12 @@ function MediaLibraryInner() {
         </label>
       </Dialog>
 
+      {/*
+        m26m: 一覧が読めていない間の表の下の「0件」は偽ゼロなので出さない。
+        失敗の1枚（再試行）が件数の置き場所になる。復旧後は実件数を戻す。
+        vars 側と同じ約束。フォルダだけ503の側は listKnown が真なので残る。
+      */}
+      {listKnown && !loadFailed ? (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
@@ -1480,6 +1612,7 @@ function MediaLibraryInner() {
           )}
         </div>
       </div>
+      ) : null}
         </div>
       </div>
 

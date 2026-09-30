@@ -44,7 +44,7 @@ import {
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check'
-import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
+import { newBroadcastDraftSession, persistBroadcastDraft, type BroadcastDraftSession } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -85,6 +85,14 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 interface BroadcastFormProps {
   tags: Tag[]
+  /**
+   * R581: タグ候補の取得状態。呼び側（作成ページ）が持つ。
+   * 取得失敗と真の0件を分け、同じ画面で再試行できるようにする。
+   * 未指定は取得ずみ扱い（一覧の埋め込みフォームは従来どおり）。
+   */
+  tagsStatus?: 'loading' | 'ready' | 'error'
+  /** R581: タグ候補の再取得。入力はフォームが持つので、再試行で消えない。 */
+  onRetryTags?: () => void
   /** 作成された実物。予約だけを完了画面へ送り、下書きと取り違えない。 */
   onSuccess: (broadcast: ApiBroadcast) => void
   /**
@@ -169,6 +177,19 @@ const MESSAGE_TYPE_TABS = [
  * 書きかけの中身が移るたびに空へ戻ってしまう（切替は bubble の中身を
  * 作り直す）ので、フォーカスと選択は分ける。
  */
+/**
+ * R580: 保存の検査で止まった不備を直す欄がある段。
+ *
+ * 段の名前は `broadcast-steps.ts` の5段と同じにする。確認の段は入力を
+ * 持たないので、ここには出ない（不備は必ず基本・対象者・メッセージの
+ * どれかにある）。
+ */
+const VALIDATION_STEP_LABEL: Record<'basic' | 'audience' | 'message', string> = {
+  basic: '基本設定',
+  audience: '対象者',
+  message: 'メッセージ',
+}
+
 export function moveMessageTypeTabFocus(
   event: { key: string; currentTarget: HTMLElement; preventDefault: () => void },
   activeElement: Element | null,
@@ -578,6 +599,8 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
 
 export default function BroadcastForm({
   tags,
+  tagsStatus = 'ready',
+  onRetryTags,
   onSuccess,
   onDraftSaved,
   onCancel,
@@ -599,6 +622,17 @@ export default function BroadcastForm({
    * さらに別のレコードになる。アカウントを切り替えた場合だけ新しい下書きへ分ける。
    */
   const draftSession = useRef(newBroadcastDraftSession())
+  /*
+   * R625/R626/R627: 保存の直列化とアカウント別の世代管理。
+   * 同じアカウントの保存が重なったら後から来た方は先行を待ってから
+   * 最新の入力で送り直す（初回作成の二重POSTにしない）。
+   * 別アカウントの応答で今のアカウントの保存表示・版・下書きIDを
+   * 書き換えない。作りかけの冪等キーはアカウントごとに1つに保つ。
+   */
+  const saveInFlightRef = useRef<{ accountId: string | null; promise: Promise<ApiBroadcast | null> } | null>(null)
+  const draftSessionsByAccount = useRef(new Map<string | null, BroadcastDraftSession>())
+  const createKeyByAccount = useRef(new Map<string | null, string>())
+  const autosaveRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const appliedInitialTemplate = useRef(false)
   // 独立審査(指摘4): テンプレート読み込みの世代照合と選択中アカウントの記録。
   const templateLoadGenerationRef = useRef(createLoadGeneration())
@@ -900,6 +934,7 @@ export default function BroadcastForm({
         version: draft.version ?? 1,
         createKey: draftSession.current.createKey,
       }
+      draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
       setEditingDraft(draft)
       // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
       cleanFingerprintRef.current = null
@@ -1221,6 +1256,20 @@ export default function BroadcastForm({
     return ''
   }
   /**
+   * R580: いまの入力に対する検査結果が、どの段の不備か。
+   *
+   * `validate()` と同じ順序・同じ関数で判定する。別々に書くと、帯は
+   * 「対象者 済み」なのに保存で断られる、という一番困る形になる
+   * （段の帯と保存の検査を同じ関数に寄せる契約と同じ考え）。
+   * 送信設定の段は入力の不備を持たない（日時は保存の検査対象外）。
+   */
+  const validationStep = (): 'basic' | 'audience' | 'message' | null => {
+    if (!title.trim() || title.trim().length > TITLE_MAX) return 'basic'
+    if (audienceError(targetMode, { scenarioId, tagId, condition })) return 'audience'
+    if (bubblesError(bubbles) || messageButtonsError(messageButtons)) return 'message'
+    return null
+  }
+  /**
    * 配信前チェックへ渡す入力。
    *
    * 人数を数える口と同じ組み立てを1か所にする。この中身の指紋（JSON）を
@@ -1336,7 +1385,7 @@ export default function BroadcastForm({
     saveAsDraft = false,
     confirmedCount?: number,
   ): Promise<ApiBroadcast | null> => {
-    const accountId = selectedAccountId || null
+    const accountId = selectedAccountIdRef.current || null
     /*
      * 編集中にアカウントが切り替わったまま保存すると、下書きが別アカウントの
      * 新規配信として増える（セッションのアカウントと合わないため）。
@@ -1346,10 +1395,54 @@ export default function BroadcastForm({
       setError('別のLINEアカウントへ切り替わっています。元のアカウントへ戻してから保存してください。')
       return null
     }
+    /*
+     * R627: 同じアカウントの保存が重なったら最新の先行を待ち直す。
+     * 待たずに2つ投げると初回作成が2回・冪等キー2種になり、
+     * 下書きが2件・保持IDの競合になる。1つだけ待つと3つ目以降が
+     * 並ぶので、輪の中で読み直す。待った後は最新の入力で送り直すので、
+     * 段移動（draftStepの違い）も更新で追いつく。
+     */
+    for (;;) {
+      const latest = saveInFlightRef.current
+      if (!latest || latest.accountId !== accountId) break
+      try {
+        await latest.promise
+      } catch {
+        /* 先行の失敗はこの保存の判断に混ぜない。下で最新を送る。 */
+      }
+      if ((selectedAccountIdRef.current || null) !== accountId) return null
+    }
     const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
+    /*
+     * R627: 作りかけの冪等キーはアカウントごとに1つ。
+     * 初期セッション（accountId=null）のまま毎回新しい鍵を作ると、
+     * 並んだ2つの初回作成が別物になる。ここで束ねて同じ鍵を使い回す。
+     */
+    const sessionForAccount = (() => {
+      const stored = draftSessionsByAccount.current.get(accountId)
+      if (stored) return stored
+      if (draftSession.current.accountId === accountId) {
+        draftSessionsByAccount.current.set(accountId, draftSession.current)
+        return draftSession.current
+      }
+      const stableKey = createKeyByAccount.current.get(accountId)
+        ?? (() => {
+          const next = crypto.randomUUID()
+          createKeyByAccount.current.set(accountId, next)
+          return next
+        })()
+      const fresh = newBroadcastDraftSession(accountId, stableKey)
+      draftSessionsByAccount.current.set(accountId, fresh)
+      return fresh
+    })()
+    let settleInFlight: (value: ApiBroadcast | null) => void = () => undefined
+    const ourPromise = new Promise<ApiBroadcast | null>((resolve) => {
+      settleInFlight = resolve
+    })
+    saveInFlightRef.current = { accountId, promise: ourPromise }
     try {
       const result = await persistBroadcastDraft(
-        draftSession.current,
+        sessionForAccount,
         accountId,
         payload,
         {
@@ -1358,18 +1451,47 @@ export default function BroadcastForm({
             api.broadcasts.update(id, { ...draftPayload, expectedVersion }),
         },
       )
-      draftSession.current = result.session
-      return result.broadcast
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 409 && draftSession.current.draftId) {
-        const current = await api.broadcasts.get(draftSession.current.draftId)
-        if (current.success) {
-          draftSession.current = { ...draftSession.current, version: current.data.version ?? null }
-        }
-        setError('別の画面で更新されたため読み直しました')
+      /*
+       * R626: 待っている間にアカウントが変わっていたら、今の画面の
+       * 保存表示・版・下書きIDへ混ぜない。古い方のセッションだけ残し、
+       * 今のアカウントは未保存のままにする。
+       */
+      draftSessionsByAccount.current.set(accountId, result.session)
+      if ((selectedAccountIdRef.current || null) !== accountId) {
+        settleInFlight(null)
         return null
       }
+      draftSession.current = result.session
+      settleInFlight(result.broadcast)
+      return result.broadcast
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && sessionForAccount.draftId) {
+        /*
+         * R626: 古いアカウントの409を今の画面の文言へ混ぜない。
+         * 取得も表示も今のアカウントのときだけにする。
+         */
+        if ((selectedAccountIdRef.current || null) !== accountId) {
+          settleInFlight(null)
+          return null
+        }
+        const current = await api.broadcasts.get(sessionForAccount.draftId)
+        if (current.success && (selectedAccountIdRef.current || null) === accountId) {
+          const refreshed = { ...sessionForAccount, version: current.data.version ?? null }
+          draftSessionsByAccount.current.set(accountId, refreshed)
+          draftSession.current = refreshed
+        }
+        if ((selectedAccountIdRef.current || null) !== accountId) {
+          settleInFlight(null)
+          return null
+        }
+        setError('別の画面で更新されたため読み直しました')
+        settleInFlight(null)
+        return null
+      }
+      settleInFlight(null)
       throw e
+    } finally {
+      if (saveInFlightRef.current?.promise === ourPromise) saveInFlightRef.current = null
     }
   }
 
@@ -1387,6 +1509,8 @@ export default function BroadcastForm({
     (key, value) => (key === 'lineAccountId' ? undefined : value),
   )
   const cleanFingerprintRef = useRef<string | null>(null)
+  const formFingerprintRef = useRef(formFingerprint)
+  formFingerprintRef.current = formFingerprint
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [autosaving, setAutosaving] = useState(false)
   const autosavingRef = useRef(false)
@@ -1398,6 +1522,8 @@ export default function BroadcastForm({
   })
   const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
+  const leaveTargetRef = useRef(leaveTarget)
+  leaveTargetRef.current = leaveTarget
 
   /*
    * 入力が2秒止まったら下書きへ静かに保存する。打つたびに送ると
@@ -1407,11 +1533,17 @@ export default function BroadcastForm({
   const autosaveDraft = async () => {
     if (autosavingRef.current || saving || testSending) return
     if (!selectedAccountId || validate()) return
+    const requestAccountId = selectedAccountIdRef.current || null
     autosavingRef.current = true
     setAutosaving(true)
     const fingerprintAtSave = formFingerprint
     try {
       const saved = await persistDraft(scheduledAtIso(), true)
+      /*
+       * R626: 別アカウントへ移っていたら今の画面へ混ぜない。
+       * persistDraftがnullで返すのでここでも世代で守る。
+       */
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (saved) {
         cleanFingerprintRef.current = fingerprintAtSave
         setDraftSavedAt(Date.now())
@@ -1423,8 +1555,35 @@ export default function BroadcastForm({
     } finally {
       autosavingRef.current = false
       setAutosaving(false)
+      /*
+       * R625/R626: 保存中に追記されていたら置き去りにしない。
+       * 同じアカウントなら進んだ指紋を2秒後にもう一度静かに送る。
+       * 違うアカウントへ移っていたら、Aの応答でBを保存ずみにはしない
+       * まま、今のアカウントが未保存なら送り直す（Bの間合いが先行の
+       * 保存中に捨てられていても、autosavingの変化だけでは effect が
+       * 起きないため、ここで拾う）。
+       */
+      if (leaveTargetRef.current === null) {
+        const stillSameAccount = (selectedAccountIdRef.current || null) === requestAccountId
+        const pendingFingerprint = stillSameAccount
+          ? formFingerprintRef.current !== fingerprintAtSave
+          : cleanFingerprintRef.current !== null
+            && formFingerprintRef.current !== cleanFingerprintRef.current
+        if (pendingFingerprint) {
+          if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
+          autosaveRetryTimer.current = setTimeout(() => autosaveDraftRef.current(), 2000)
+        }
+      }
     }
   }
+
+  /*
+   * R625: 置き去りの再送は最新の入力で送る。
+   * タイマーに閉じ込めた古い autosaveDraft を呼ぶと追記前の本文で
+   * 更新してしまう。毎描画で最新の関数へ付け替えて呼ぶ。
+   */
+  const autosaveDraftRef = useRef(() => {})
+  autosaveDraftRef.current = () => void autosaveDraft()
 
   useEffect(() => {
     if (!dirty || leaveTarget !== null) return
@@ -1433,6 +1592,10 @@ export default function BroadcastForm({
     // autosaveDraft は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formFingerprint, dirty, selectedAccountId, saving, testSending, leaveTarget])
+
+  useEffect(() => () => {
+    if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
+  }, [])
 
   // 「下書き保存済み・◯秒前」の秒数だけ10秒ごとに進める。
   useEffect(() => {
@@ -1467,10 +1630,13 @@ export default function BroadcastForm({
     }
     setSaving(true)
     setError('')
+    const requestAccountId = selectedAccountIdRef.current || null
     const fingerprintAtSave = formFingerprint
     try {
       // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
       const saved = await persistDraft(scheduledAtIso(), true)
+      // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
       if (saved) {
         cleanFingerprintRef.current = fingerprintAtSave
         setDraftSavedAt(Date.now())
@@ -1486,7 +1652,9 @@ export default function BroadcastForm({
        * R234: 保存側で弾いた理由（音声URL・スタンプ番号・Flexの形など）を
        * そのまま出す。「保存できませんでした」だけだと、どこを直すか分からない。
        * 400 の本文は運用者へ出してよい安全な文だけが来る（api.ts の約束）。
+       * R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
        */
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
       setError(describeSaveFailure(error))
       return false
     } finally {
@@ -1745,6 +1913,40 @@ export default function BroadcastForm({
     : progressSteps
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
   const goToStep = (step: BroadcastStepKey) => onStepChange?.(step)
+  /*
+   * R580: 保存を押した段で理由を示し、直す欄がある段へ移動できるようにする。
+   *
+   * 以前は失敗の文がメッセージの段の中にだけあり、対象者の段で保存を
+   * 押しても理由が見えなかった（非表示の段に隠れていた）。
+   *
+   * 導線は「いまの入力に対する検査結果」と画面の文が一致するときだけ出す。
+   * サーバー側で断られた文・直した後の古い文では、指す段がずれるので出さない。
+   */
+  const liveValidationProblem = validate()
+  const validationMoveStep: 'basic' | 'audience' | 'message' | null =
+    currentStep && error && error === liveValidationProblem ? validationStep() : null
+  /*
+   * 段を移動したあと、直す欄へ焦点を移す。押した位置（下部追従バー）に
+   * 取り残されると、キーボードだけの操作では修正欄へたどり着けない。
+   */
+  const pendingValidationFocus = useRef<BroadcastStepKey | null>(null)
+  const goToValidationStep = (step: 'basic' | 'audience' | 'message') => {
+    if (!onStepChange) {
+      pendingValidationFocus.current = null
+      return
+    }
+    pendingValidationFocus.current = step
+    goToStep(step)
+  }
+  useEffect(() => {
+    if (!pendingValidationFocus.current || pendingValidationFocus.current !== currentStep) return
+    pendingValidationFocus.current = null
+    const section = document.getElementById(`broadcast-step-${currentStep}`)
+    if (typeof section?.scrollIntoView === 'function') {
+      section.scrollIntoView({ block: 'start' })
+    }
+    section?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea')?.focus()
+  }, [currentStep])
 
   const canConfirm = audienceCount !== null && audienceCount > 0
 
@@ -1771,12 +1973,15 @@ export default function BroadcastForm({
       return
     }
     setSaving(true); setError('')
+    const requestAccountId = selectedAccountIdRef.current || null
     try {
       const saved = await persistDraft(
         scheduledAtIso(),
         false,
         needsApprovalSingle ? Number(approvalCountInput) : undefined,
       )
+      // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (!saved) return
       // 承認が要るときは、保存のあと承認の依頼まで続ける。依頼までが1つの操作。
       if (needsApproval && !needsApprovalSingle) {
@@ -1791,7 +1996,11 @@ export default function BroadcastForm({
       }
       setConfirmOpen(false)
       onSuccess(saved)
-    } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
+    } catch {
+      // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
+      setError('下書きを保存できませんでした')
+    } finally { setSaving(false) }
   }
 
   /*
@@ -1843,6 +2052,24 @@ export default function BroadcastForm({
       </div>
     )}
     <BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />
+    {/*
+      R580: 保存を押した段で理由を示す。失敗の帯は1画面に1つまでなので、
+      段ごとに分かれているときはここだけに出し、メッセージの段の中の帯は
+      段分けなしの従来フォームのときだけ出す（下の `{!currentStep && ...}`）。
+    */}
+    {currentStep && error ? (
+      <Notice
+        tone="danger"
+        className="mt-3"
+        action={validationMoveStep && validationMoveStep !== currentStep ? (
+          <Button variant="secondary" size="compact" onClick={() => goToValidationStep(validationMoveStep)}>
+            {`${VALIDATION_STEP_LABEL[validationMoveStep]}へ移動`}
+          </Button>
+        ) : undefined}
+      >
+        {error}
+      </Notice>
+    ) : null}
     {editingDraft ? (
       <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
@@ -2081,8 +2308,35 @@ export default function BroadcastForm({
               value={tagId}
               onChange={setTagId}
               options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              loading={tagsStatus === 'loading'}
+              /*
+               * R581: 候補が取れていない間は開かせない。空のまま開くと
+               * 「候補はありません」と出て、通信失敗が「タグが無い」と
+               * 誤って伝わる。読み込み中も同じ。
+               */
+              disabled={tagsStatus !== 'ready'}
               className="mt-1 w-full sm:max-w-sm"
             />
+            {/*
+              R581: 通信失敗と真の0件を分ける。失敗は赤を使わず注意色で出し、
+              同じ画面で再試行できるようにする（失敗・直し方は「？」に入れない）。
+              真の0件は作り先を案内する。入力はフォームが持つので、
+              再試行で書きかけは消えない。
+            */}
+            {tagsStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">タグを読み込んでいます…</p>}
+            {tagsStatus === 'error' && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-xs text-warning">タグを読み込めませんでした。通信を確かめて、もう一度お試しください。</p>
+                {onRetryTags && <Button variant="secondary" size="compact" onClick={onRetryTags}>もう一度読み込む</Button>}
+              </div>
+            )}
+            {tagsStatus === 'ready' && tags.length === 0 && (
+              <p className="mt-1 text-xs text-ink-faint">
+                タグはまだありません。先に
+                <Link href="/tags" className="font-semibold text-action hover:underline">友だち属性 ＞ タグ</Link>
+                で作成してください。
+              </p>
+            )}
           </div>}
           {targetMode === 'advanced' && <div className="border-hairline mt-4 border-t pt-4">
             {/*
@@ -2330,7 +2584,7 @@ export default function BroadcastForm({
             いまは1通にまとめるか、配信を分けてください。
           </Notice>
         )}
-        {error && <Notice tone="danger" message={error} />}
+        {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={`${shows('schedule') ? '' : 'hidden'} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
           <h3 className="text-lg font-bold text-ink">送信設定</h3>
