@@ -66,7 +66,7 @@ describe('V8 移行④b — 一覧まわり', () => {
   })
 
   it('数の帯：4枚のカードではなく1本の帯を縦線で割る（data-kpi-strip）', () => {
-    expect(tsx('list-kpis.tsx')).toContain('data-kpi-strip')
+    expect(tsx('list-kpis.tsx')).toContain('kpiStyles.strip')
     const blocks = v8Blocks(css('kpi-card.module.css'), 'kpi-card')
     expect(blocks).toContain('border-left: 1px solid var(--color-divider)')
     expect(blocks).toContain('border-radius: 0')
