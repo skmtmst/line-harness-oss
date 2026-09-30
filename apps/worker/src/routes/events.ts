@@ -475,8 +475,9 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
          og_title, og_description, og_image_url,
          visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
          questions_json,
-         current_published_version_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         current_published_version_id,
+         lifecycle_status, lifecycle_changed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -509,6 +510,11 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       // validateEventInput で形は検証済み。id未指定の分だけここで連番を補う。
       body.questions == null ? null : JSON.stringify((normalizeEventQuestions(body.questions) as { questions: EventQuestion[] }).questions),
       publishedVersionId,
+      // m26g R576: 作成時も公開フラグと保存する状態を両書きする。
+      // 公開で作った行が下書きのままでは、顧客 GET の可視性と
+      // 管理表示がずれる（lifecycle_status が正本・移行 492 の決め）。
+      isPublished ? 'published' : 'draft',
+      new Date().toISOString(),
     );
   if (publishedVersionId) {
     await c.env.DB.batch([
@@ -892,6 +898,40 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   }
   const nextVersion = (expectedVersion as number) + 1;
   const nextPublished = (body.is_published ?? exists.is_published) === 1;
+  // m26g R576: 公開フラグと保存する状態の両書き。lifecycle 口では
+  // is_published へ両書きしているが、通常 PUT は lifecycle_status を
+  // 触らず、is_published=1・lifecycle=draft の不整合行を作っていた。
+  // その行は管理表示が「下書き」なのに顧客 GET が 200 になる。
+  // 公開フラグが実際に切り替わるときだけ、保存する状態も連動させる。
+  // 内容だけの保存（一時停止中の名前直し等）では状態を壊さない。
+  const currentLifecycle = isLifecycleStatus(exists.lifecycle_status)
+    ? exists.lifecycle_status
+    : exists.is_published === 1 ? 'published' : 'draft';
+  let nextLifecycle: string | null = null;
+  if (Object.prototype.hasOwnProperty.call(body, 'is_published')
+    && body.is_published !== exists.is_published) {
+    const target = body.is_published === 1 ? 'published' : 'draft';
+    if (target !== currentLifecycle) {
+      if (canTransitionLifecycle(currentLifecycle, target)) {
+        nextLifecycle = target;
+      } else if (currentLifecycle === 'published' && target === 'draft') {
+        // 編集画面の公開ラジオは下書きに戻す操作を許している（lifecycle 口の
+        // 遷移表は published→draft を禁じるが、あちらは状態操作の口の決め）。
+        // ここでは「公開表示なのに顧客に届かない」逆向きの不整合を消すため、
+        // 公開中→下書きの切替だけは編集の口でも受けて両書きする。
+        nextLifecycle = target;
+      } else {
+        // 終了・中止からの公開など、終端状態の復活は内容編集では受けない。
+        // 状態操作の口（lifecycle）で理由つきにやり直してもらう。
+        return bad(c, 'lifecycle_transition_invalid', 409);
+      }
+    }
+  }
+  if (nextLifecycle !== null) {
+    setClauses.push('lifecycle_status = ?');
+    setValues.push(nextLifecycle);
+    setClauses.push(`lifecycle_changed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
+  }
   const writeToken = crypto.randomUUID();
   const publishedVersionId = nextPublished ? crypto.randomUUID() : null;
   const nextEvent = { ...exists, ...body } as Record<string, unknown>;
@@ -1871,7 +1911,24 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     .bind(slot_id, event_id)
     .first<Record<string, unknown>>();
   if (!slot) return bad(c, 'not_found', 404);
-  const body = (await c.req.json().catch(() => ({}))) as SlotInput;
+  const body = (await c.req.json().catch(() => ({}))) as SlotInput & {
+    expected_version?: unknown;
+    expectedVersion?: unknown;
+  };
+  // m26g R577: 枠の並行編集・有効切替の競合検出（v6-29 §13「変更系は
+  // 期待版を必須にし、版競合は 409 で最新内容と差分を返す」）。
+  // 版なしの更新は受けず、古い版は 409 + 最新の枠を返す。画面は
+  // 読み直して差分を見せる。イベント本体 PUT と同じ決め。
+  const slotExpectedVersion = body.expected_version ?? body.expectedVersion;
+  if (!Number.isInteger(slotExpectedVersion) || (slotExpectedVersion as number) < 1) {
+    return bad(c, 'expected_version_required', 422);
+  }
+  if ((slot.version as number) !== slotExpectedVersion) {
+    // 古い画面からの操作は、枠時刻の通知作り直しなどの副作用を
+    // 走らせる前に止める。書き込み時の条件付き更新が最終の審判で、
+    // こちらは速やかな失敗のための事前確認。
+    return c.json({ error: 'version_conflict', data: { current: slot } }, 409);
+  }
   // when only one of starts_at / ends_at is provided, range check uses existing values
   const merged: SlotInput = {
     starts_at: body.starts_at ?? (slot.starts_at as string),
@@ -1984,11 +2041,21 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     }
   }
   setClauses.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
-  setValues.push(slot_id);
-  await c.env.DB
-    .prepare(`UPDATE event_slots SET ${setClauses.join(', ')} WHERE id = ?`)
+  setClauses.push(`version = version + 1`);
+  setValues.push(slot_id, slotExpectedVersion);
+  const slotUpdated = await c.env.DB
+    .prepare(`UPDATE event_slots SET ${setClauses.join(', ')} WHERE id = ? AND version = ? AND deleted_at IS NULL`)
     .bind(...setValues)
     .run();
+  if ((slotUpdated.meta?.changes ?? 0) === 0) {
+    const current = await c.env.DB.prepare(`SELECT * FROM event_slots WHERE id = ?`).bind(slot_id).first();
+    if (!current || (current as Record<string, unknown>).deleted_at != null) {
+      return bad(c, 'not_found', 404);
+    }
+    // 敗者に最新内容（差分のもと）を返す。画面は ApiError.data.current
+    // で読んで、一覧の読み直しと合わせて見せる。
+    return c.json({ error: 'version_conflict', data: { current } }, 409);
+  }
   if (slotStartsAtChanging) {
     // 旧表の作り直しは更新後の枠時刻を読むため、枠更新の後に行う。
     await rebuildRemindersForSlot(c.env.DB, slot_id);
@@ -2315,7 +2382,8 @@ events.post('/api/events/liff/bookings/:id/change', async (c) => {
                 reminder_day_before_enabled, reminder_hours_before,
                 entry_cutoff_hours_before
            FROM events
-          WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+          WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+            AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
             (target_type = 'single' AND line_account_id = ?)
             OR (target_type = 'multi-account-dedup'
                 AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -2495,7 +2563,8 @@ events.get('/api/liff/events/:id', async (c) => {
   const row = await c.env.DB
     .prepare(
       `SELECT * FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -2578,7 +2647,8 @@ events.get('/api/liff/events/:id/slots', async (c) => {
   const ev = await c.env.DB
     .prepare(
       `SELECT id FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -2819,7 +2889,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
               visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
               questions_json
          FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
