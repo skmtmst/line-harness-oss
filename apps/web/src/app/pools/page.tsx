@@ -9,6 +9,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -434,24 +435,44 @@ function CreatePoolModal({
         {error && (
           <Notice tone="danger" message={error} />
         )}
-        <input
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          placeholder="slug (例: brand-a)"
-          className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 font-mono text-sm"
-        />
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="表示名 (例: ブランドA)"
-          className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
-        />
-        <Select
-          aria-label="最初の所属アカウント"
-          value={activeAccountId}
-          onChange={(value) => setActiveAccountId(value)}
-          options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
-        />
+        {/*
+          R617: 項目名がplaceholderだけだと、入力後に何の欄か消える。
+          欄を包むlabel（常時表示）とSelectのhtmlForで結び付ける。
+          読み上げ名（placeholder・aria-label由来）は元からあるので残す。
+        */}
+        <label className="block">
+          <span className="text-ink-secondary mb-1 block text-sm font-medium">
+            slug{' '}
+            <HelpTip label="slugの説明">
+              公開URLに使う識別子です。
+            </HelpTip>
+          </span>
+          <input
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="例: brand-a"
+            className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 font-mono text-sm"
+          />
+        </label>
+        <label className="block">
+          <span className="text-ink-secondary mb-1 block text-sm font-medium">表示名</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: ブランドA"
+            className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
+          />
+        </label>
+        <div>
+          <label htmlFor="create-pool-account" className="text-ink-secondary mb-1 block text-sm font-medium">最初の所属アカウント</label>
+          <Select
+            id="create-pool-account"
+            aria-label="最初の所属アカウント"
+            value={activeAccountId}
+            onChange={(value) => setActiveAccountId(value)}
+            options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+          />
+        </div>
         <div className="border-hairline flex justify-end gap-2 border-t pt-2">
           <Button variant="secondary" onClick={onClose}>
             キャンセル
