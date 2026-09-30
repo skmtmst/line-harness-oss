@@ -378,7 +378,8 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
       </>}
     </>}
     {stage === 'edit' && <>
-      <div className={styles.grid}><div className={styles.stack}><section className={styles.panel}>
+      {/* 正規エディタ（タグ/回答フォーム）は右asideを持たないため、空の260px段を残さない。谷間帯（1280〜1400px）で入力欄が潰れるのを防ぐ。 */}
+      <div className={canonicalEditorOwnsSave ? styles.stack : styles.grid}><div className={styles.stack}><section className={styles.panel}>
         {catalogFailed ? (
           <Notice
             tone="warn"
