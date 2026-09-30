@@ -344,7 +344,7 @@ function OwnShiftEntry() {
           title="自分の勤務を読み込めませんでした"
           // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
           // それ以外は画面の文のまま。紐づけが無いとは限らないので断定しない。
-          description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の不具合などで担当者の情報を取得できませんでした。紐づけが無いとは限りません。「もう一度読み込む」を押してください。'}
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の不具合などで担当者の情報を読み込めませんでした。紐づけが無いとは限りません。「もう一度読み込む」を押してください。'}
           error={loadError ?? undefined}
           onRetry={retry}
         />
