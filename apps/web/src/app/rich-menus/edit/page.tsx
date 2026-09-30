@@ -1152,32 +1152,25 @@ function Editor({
         {pages.map((p) => {
           const active = p.id === activePageId
           return (
-            <button
-              key={p.id}
-              onClick={() => {
-                setActivePageId(p.id)
-                setSelectedAreaId(null)
-              }}
-              className={`px-3 py-1.5 rounded-control text-sm font-medium transition-colors ${
+            <Button variant="primary" className={(`px-3 py-1.5 rounded-control text-sm font-medium transition-colors ${
                 active
                   ? 'bg-accent-deep text-on-accent'
                   : 'bg-shell text-ink-secondary hover:bg-shell-gray'
-              }`}
-            >
+              }`) + ' border-0 h-auto whitespace-normal'} key={p.id} onClick={() => {
+                setActivePageId(p.id)
+                setSelectedAreaId(null)
+              }}>
               {p.name}
               {active && <span className="ml-1 text-xs opacity-80">編集中</span>}
               {p.id.startsWith('tmp-') && (
                 <span className="ml-1 text-xs opacity-70">(未保存)</span>
               )}
-            </button>
+            </Button>
           )
         })}
-        <button
-          onClick={addPage}
-          className="px-3 py-1.5 text-sm font-medium border border-hairline rounded-control hover:bg-surface-pearl transition-colors"
-        >
+        <Button variant="secondary" className="px-3 py-1.5 font-medium hover:bg-surface-pearl h-auto whitespace-normal" onClick={addPage}>
           ＋ ページを追加する
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
@@ -1344,13 +1337,9 @@ function Editor({
                   }}
                 />
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => fileInput.current?.click()}
-                    disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-hairline rounded-control hover:bg-surface-pearl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                  <Button variant="secondary" className="px-3 py-1.5 text-xs font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={() => fileInput.current?.click()} disabled={busy || activePage.id.startsWith('tmp-')}>
                     {activePage.imageR2Key ? '画像を差し替え' : '画像を選択'}
-                  </button>
+                  </Button>
                   {/*
                     隣の「画像を選択」と同じ見た目。ただし hover の色だけは
                     生の gray-50 ではなく既存トークン canvas-sunken（同じ
@@ -1359,13 +1348,9 @@ function Editor({
                     素の button に書くと direct-secondary-button の借金に
                     数えられる）。
                   */}
-                  <button
-                    onClick={() => setMediaPickerOpen(true)}
-                    disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-hairline rounded-control hover:bg-canvas-sunken disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                  <Button variant="secondary" className="px-3 py-1.5 text-xs font-medium disabled:opacity-50 h-auto whitespace-normal" onClick={() => setMediaPickerOpen(true)} disabled={busy || activePage.id.startsWith('tmp-')}>
                     登録メディアから選ぶ
-                  </button>
+                  </Button>
                 </div>
                 <p className="mt-1.5 text-[11px] text-ink-faint">
                   PNG / JPEG, {SIZE_LABEL[group.size]}, 1MB 以下
@@ -1721,13 +1706,9 @@ function Editor({
           >
             プレビュー
           </Checkbox>
-          <button
-            onClick={handleSave}
-            disabled={saving || publishing || unpublishing || busy}
-            className="rounded-control border border-hairline px-4 py-2 text-sm font-medium transition-colors hover:bg-surface-pearl disabled:opacity-50"
-          >
+          <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={handleSave} disabled={saving || publishing || unpublishing || busy}>
             {saving ? '保存中...' : '下書きを保存する'}
-          </button>
+          </Button>
           {/* #702: 共有Buttonのprimaryはaccent-deep＋白文字(5.44:1)。生のLINE緑だと2.78:1で落ちる。 */}
           <Button
             variant="primary"

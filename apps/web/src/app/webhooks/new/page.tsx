@@ -345,13 +345,9 @@ function NewWebhookForm() {
             className={`${inputClass} font-mono`}
             aria-invalid={fields.invalid('secret') || undefined}
           />
-          <button
-            type="button"
-            onClick={() => setSecret(generateSecret())}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm whitespace-nowrap"
-          >
+          <Button variant="secondary" className="text-ink-secondary px-3 py-2 whitespace-nowrap h-auto" type="button" onClick={() => setSecret(generateSecret())}>
             作り直す
-          </button>
+          </Button>
         </div>
       </Field>
 

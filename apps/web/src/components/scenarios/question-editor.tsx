@@ -16,6 +16,7 @@ import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { scenarioReferenceData } from './scenario-reference-data'
+import Button from '@/components/shared/button'
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
 
@@ -374,13 +375,9 @@ export default function QuestionEditor({
                   （SCENARIO-22）。
                 */}
                 {onOpenChoiceActions && !uriOnly && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenChoiceActions(index)}
-                    className="border-hairline text-ink-secondary rounded-control h-9 border px-3 text-xs"
-                  >
+                  <Button variant="secondary" className="text-ink-secondary h-9 px-3 text-xs whitespace-normal" type="button" onClick={() => onOpenChoiceActions(index)}>
                     アクション
-                  </button>
+                  </Button>
                 )}
                 <button
                   type="button"
@@ -680,19 +677,14 @@ export default function QuestionEditor({
           )
         })}
 
-        <button
-          type="button"
-          onClick={() =>
+        <Button variant="secondary" className="text-ink-secondary rounded-card h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
             onChange({
               ...value,
               choices: [...value.choices, { key: newChoiceKey(), label: '', behavior: 'none' }],
             })
-          }
-          disabled={value.choices.length >= 13}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-card h-10 w-full border border-dashed text-sm disabled:opacity-40"
-        >
+          } disabled={value.choices.length >= 13}>
           ＋ 選択肢を追加
-        </button>
+        </Button>
       </div>
 
       <div>
