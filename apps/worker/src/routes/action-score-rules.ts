@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import {
   ActionScoreRuleValidationError,
   getActionScoreBandOverview,
+  getActionScoreDraftReplayIfSameContent,
   getActionScoreRuleConfiguration,
   postActionScoreManualAdjustment,
   previewActionScoreBandDistribution,
@@ -80,7 +81,15 @@ actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'a
   const body = await c.req.json<Body>().catch((): Body => ({}));
   const accountId = await requireAccount(c, body.accountId);
   if (typeof accountId !== 'string') return accountId;
-  return endpoint(c, async () => {
+  /*
+   * M505: 応答消失後の再送の要求キー。版ずれの再送が自分の保存済みと
+   * 同じ内容なら、競合（409）ではなく保存済みの結果を返す。
+   */
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
+  if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
+    return c.json({ success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400);
+  }
+  try {
     const data = await saveActionScoreRuleDraft(c.env.DB, {
       lineAccountId: accountId,
       expectedDraftVersionId: typeof body.expectedDraftVersionId === 'string'
@@ -90,8 +99,28 @@ actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'a
       createdBy: c.get('staff').id,
     });
     auditLog(c, 'action_score.rules.draft.save', { kind: 'line_account', id: accountId });
-    return data;
-  });
+    return c.json({ success: true, data }, 200);
+  } catch (error) {
+    if (idempotencyKey
+      && error instanceof ActionScoreRuleValidationError
+      && error.code === 'version_conflict') {
+      const replayed = await getActionScoreDraftReplayIfSameContent(
+        c.env.DB, accountId, body.configuration,
+      );
+      if (replayed) {
+        auditLog(c, 'action_score.rules.draft.save', { kind: 'line_account', id: accountId });
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: replayed, replayed: true }, 200);
+      }
+    }
+    if (error instanceof ActionScoreRuleValidationError) return validationResponse(c, error);
+    console.error(JSON.stringify({
+      event: 'action_score_rule_api_failed',
+      path: c.req.path,
+      reason: error instanceof Error ? error.message : String(error),
+    }));
+    return c.json({ success: false, error: 'スコアのルールを処理できませんでした' }, 500);
+  }
 });
 
 actionScoreRules.post('/api/action-scores/rules/test', requireRole('owner', 'admin'), async (c) => {

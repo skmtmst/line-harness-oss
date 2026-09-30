@@ -428,6 +428,35 @@ export async function saveActionScoreRuleDraft(
   return getActionScoreRuleConfiguration(db, input.lineAccountId);
 }
 
+/**
+ * M505: 応答消失後の再送を、競合ではなく保存済みとして返すための照合。
+ *
+ * 保存は通ったのに応答だけ失われると、画面は古い版IDのまま送り直す。
+ * 最新の下書きの中身と送られた中身が同じなら、自分の保存が通ったものとして
+ * 現在の設定を返す（migrationなしで版の競合と再送を見分ける）。
+ * 中身が違う・下書きが無い・形が壊れているときは null を返し、
+ * 呼び出し側は409のままにする。
+ */
+export async function getActionScoreDraftReplayIfSameContent(
+  db: D1Database,
+  lineAccountId: string,
+  configuration: unknown,
+): Promise<ActionScoreRuleConfiguration | null> {
+  let wanted: ActionScoreRuleBundle;
+  try {
+    wanted = validateActionScoreRuleBundle(configuration);
+  } catch {
+    return null;
+  }
+  const owner = await getRuleSet(db, lineAccountId);
+  const current = await getVersion(db, owner?.current_draft_version_id ?? null);
+  if (!current) return null;
+  const same = JSON.stringify({ rules: wanted.rules, bands: wanted.bands })
+    === JSON.stringify({ rules: current.rules, bands: current.bands });
+  if (!same) return null;
+  return getActionScoreRuleConfiguration(db, lineAccountId);
+}
+
 export async function publishActionScoreRuleDraft(
   db: D1Database,
   input: { lineAccountId: string; draftVersionId: string; publishedBy?: string | null },
