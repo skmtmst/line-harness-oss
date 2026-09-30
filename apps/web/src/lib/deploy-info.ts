@@ -1,4 +1,5 @@
 import type { AdminVersionDetail } from './admin-version-cache'
+import { formatDateTime } from '@/lib/format'
 
 /**
  * メニューの下に出す版の表示（★V7 監査の直し E）の組み立て。
@@ -32,16 +33,7 @@ export function formatDeployedAt(iso: string | null | undefined): string | null 
   if (!Number.isFinite(time)) return null
   const at = new Date(time)
   if (at.getUTCFullYear() < 2024) return null
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(at)
-  const pick = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  return `${pick('month')}/${pick('day')} ${pick('hour')}:${pick('minute')}`
+  return formatDateTime(at)
 }
 
 /** 環境の呼び名。知らない値はそのまま出す（勝手に日本語を作らない）。 */

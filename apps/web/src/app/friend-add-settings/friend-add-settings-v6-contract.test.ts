@@ -171,7 +171,7 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
     expect(EDITOR).toContain('updateTimeWindow(current.timeWindows, index')
     expect(EDITOR).toContain('removeTimeWindow(current.timeWindows, index')
     expect(EDITOR).toContain('addTimeWindow(current.timeWindows)')
-    expect(EDITOR).toContain('時間帯を追加')
+    expect(EDITOR).toContain('時間帯を追加する')
     expect(EDITOR).not.toContain('timeWindows: [{ ...window')
   })
 

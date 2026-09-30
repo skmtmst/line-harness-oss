@@ -45,7 +45,7 @@ describe('V6 予約設定', () => {
     expect(CREATE).toContain('予約を受け付けたことを知らせる')
     expect(CREATE).toContain('前日・開始前に思い出してもらう')
     expect(CREATE).toContain("item.eventType === 'booking_created'")
-    expect(CREATE).toContain('マイルを ${bookingMileage.toLocaleString()} 付ける')
+    expect(CREATE).toContain('マイルを ${formatNumber(bookingMileage)} 付ける')
   })
 
   it('作成画面で価格種別と店舗共通ルールの継承を実契約へ送る', () => {

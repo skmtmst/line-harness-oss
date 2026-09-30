@@ -337,7 +337,7 @@ export default function SavedViewDialog({
                 /* 主ボタンの緑は本流が `accent-deep` へそろえた（白文字の読みやすさ）。 */
                 className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold disabled:opacity-40"
               >
-                {saving ? '保存中' : '検索条件を保存'}
+                {saving ? '保存中' : '検索条件を保存する'}
               </button>
             </>
           )}

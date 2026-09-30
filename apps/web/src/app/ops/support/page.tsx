@@ -371,8 +371,8 @@ export default function OpsSupportPage() {
             <TextArea rows={4} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} required />
           </label>
           <div className="flex items-center gap-2 md:col-span-2">
+            <Button onClick={() => setCreating(false)}>キャンセル</Button>
             <Button type="submit" variant="primary" disabled={busy}>作る</Button>
-            <Button onClick={() => setCreating(false)}>やめる</Button>
             <span className="text-micro text-ink-faint">電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</span>
           </div>
         </form>
@@ -509,7 +509,7 @@ export default function OpsSupportPage() {
                   ) : replyFromAi ? (
                     <>
                       <Button size="field" onClick={() => void generateAi()} disabled={busy || !detail?.ai.available}>作り直す</Button>
-                      <Button size="field" onClick={() => void discardAi()} disabled={busy}>下書きを消す</Button>
+                      <Button size="field" onClick={() => void discardAi()} disabled={busy}>下書きを削除する</Button>
                     </>
                   ) : (
                     <Button size="field" onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'}>
@@ -552,7 +552,7 @@ export default function OpsSupportPage() {
                     {ticket.staffEmailRegistered ? '' : '（起票者のメールが未登録のため、今回は履歴だけに載ります）'}
                   </p>
                   <span className="ml-auto flex items-center gap-2">
-                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy}>{draftSaving ? '保存中…' : '下書き保存'}</Button>
+                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
                     <Button size="field" variant="primary" onClick={() => void send()} disabled={busy || closed || aiBusy || !reply.trim()}>返信する</Button>
                   </span>
                 </div>

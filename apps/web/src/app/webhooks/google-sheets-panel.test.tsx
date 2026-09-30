@@ -371,7 +371,7 @@ describe('#838 Google Sheets 連携パネル', () => {
       setter.call(input, 'sheet-xyz')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    await act(async () => { button('保存')!.click() })
+    await act(async () => { button('保存する')!.click() })
     await settle()
 
     expect(text()).toContain('出力先を保存しましたが、最新の状態を読み込めませんでした')

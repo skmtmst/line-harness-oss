@@ -32,6 +32,7 @@ import {
   type SegmentCondition,
   type SegmentRule,
 } from '@/lib/segment-condition'
+import { formatNumber } from '@/lib/format'
 
 // これまでどおりこのファイルからも取れるようにしておく。呼び出し側が多い。
 export {
@@ -346,7 +347,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
                   ? '…'
                   : count === null
                     ? '—'
-                    : `${count.toLocaleString('ja-JP')} 人`}
+                    : `${formatNumber(count)} 人`}
           </span>
         </div>
       )}

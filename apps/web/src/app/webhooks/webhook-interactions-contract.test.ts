@@ -42,7 +42,7 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
   it('遅れと成功率に対象期間を書く(IDEA-26)', () => {
     // 「いつからの数字か」が分からないと遅い・悪いの判断が付かない。
     // 成功・返事までの時間・未取得の各補足に選択中の期間を入れる。
-    expect(PAGE).toContain('この${periodDays}日で ${successRate.toLocaleString')
+    expect(PAGE).toContain('この${periodDays}日で ${formatNumber(successRate)}')
     expect(PAGE).toContain('この${periodDays}日でいちばん遅くて')
     expect(PAGE).toContain('この${periodDays}日は未取得')
     expect(PAGE).toContain('この${periodDays}日の送受信の処理時間')

@@ -4,8 +4,8 @@ import UserRow, { type UserRowData } from './user-row'
 import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { TableStateRow } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
-const fmt = new Intl.NumberFormat('ja-JP')
 
 interface Props {
   rows: UserRowData[]
@@ -102,7 +102,7 @@ export default function UsersTable({
       <div className="flex items-center justify-between border-t border-divider-soft px-4 py-3 text-sm text-ink-secondary">
         <span>
           {countAvailable
-            ? `${fmt.format(total)}人中 ${fmt.format(start)}〜${fmt.format(end)}人`
+            ? `${formatNumber(total)}人中 ${formatNumber(start)}〜${formatNumber(end)}人`
             : '—人'}
         </span>
         <Pagination

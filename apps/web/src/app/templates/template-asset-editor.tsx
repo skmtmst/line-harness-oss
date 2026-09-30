@@ -583,7 +583,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 <div className="flex items-center justify-between">
                   <div><h2 className="font-semibold">質問（上から順に出ます）</h2><p className="text-caption mt-1 text-ink-faint">{questions.length} / {MAX_QUESTIONS} 問</p></div>
                   <Button type="button" disabled={questions.length >= MAX_QUESTIONS} title={questions.length >= MAX_QUESTIONS ? `質問は${MAX_QUESTIONS}問までです` : undefined} onClick={addQuestion}>
-                    質問を追加（あと{MAX_QUESTIONS - questions.length}問）
+                    質問を追加する（あと{MAX_QUESTIONS - questions.length}問）
                   </Button>
                 </div>
                 <div className="mt-3 grid gap-2">
@@ -594,7 +594,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                       </Button>
                       <button type="button" aria-label={`質問 ${index + 1} を上へ`} title="上へ" disabled={index === 0} onClick={() => moveQuestion(index, -1)} className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40">↑</button>
                       <button type="button" aria-label={`質問 ${index + 1} を下へ`} title="下へ" disabled={index === questions.length - 1} onClick={() => moveQuestion(index, 1)} className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40">↓</button>
-                      <button type="button" aria-label={`質問 ${index + 1} を消す`} title={questions.length <= 1 ? '質問は1つ必要です' : 'この質問を消す'} disabled={questions.length <= 1} onClick={() => removeQuestion(index)} className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs disabled:opacity-40">消す</button>
+                      <button type="button" aria-label={`質問 ${index + 1} を削除する`} title={questions.length <= 1 ? '質問は1つ必要です' : 'この質問を削除する'} disabled={questions.length <= 1} onClick={() => removeQuestion(index)} className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs disabled:opacity-40">削除する</button>
                     </div>
                   ))}
                 </div>
@@ -631,17 +631,17 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                             />
                             <button
                               type="button"
-                              aria-label={`選択肢 ${choiceIndex + 1} を消す`}
+                              aria-label={`選択肢 ${choiceIndex + 1} を削除する`}
                               disabled={previewQuestion.choices.length <= 1}
-                              title={previewQuestion.choices.length <= 1 ? '選択肢は1つ必要です' : 'この選択肢を消す'}
+                              title={previewQuestion.choices.length <= 1 ? '選択肢は1つ必要です' : 'この選択肢を削除する'}
                               onClick={() => updateQuestion(previewQuestionIndex, { choices: previewQuestion.choices.filter((_, i) => i !== choiceIndex) })}
                               className="text-danger hover:bg-danger-bg shrink-0 rounded-mini px-2 py-1 text-xs disabled:opacity-40"
-                            >消す</button>
+                            >削除する</button>
                           </div>
                         ))}
                       </div>
                       {previewQuestion.choices.length < MAX_CHOICES ? (
-                        <Button type="button" className="mt-2" onClick={() => updateQuestion(previewQuestionIndex, { choices: [...previewQuestion.choices, ''] })}>＋ 選択肢を追加</Button>
+                        <Button type="button" className="mt-2" onClick={() => updateQuestion(previewQuestionIndex, { choices: [...previewQuestion.choices, ''] })}>＋ 選択肢を追加する</Button>
                       ) : (
                         <p className="text-caption mt-2 text-ink-faint">選択肢は{MAX_CHOICES}つまでです（LINEの決まり）。</p>
                       )}
@@ -721,7 +721,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         </aside>
       </div>
 
-      <StickyBar status={saved ? '保存しました。一覧へ戻れます。' : '下書き（まだ誰にも送られません）'} actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving || saved} onClick={() => void save()}>下書きに保存</Button><Button type="button" variant="primary" disabled={saving || saved} onClick={() => void save()}>{saving ? '保存中…' : saved ? '保存しました' : 'テンプレートを保存'}</Button></>} />
+      <StickyBar status={saved ? '保存しました。一覧へ戻れます。' : '下書き（まだ誰にも送られません）'} actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving || saved} onClick={() => void save()}>下書きを保存する</Button><Button type="button" variant="primary" disabled={saving || saved} onClick={() => void save()} busy={saving} done={saved}>テンプレートを保存する</Button></>} />
 
       <ConfirmDialog
         open={pendingShape !== null}

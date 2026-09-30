@@ -1,5 +1,6 @@
 import type { FriendAddEventRoutingStatus } from '@line-crm/shared'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
+import { formatDateTime } from '@/lib/format'
 
 export const ROUTING_LABELS: Record<FriendAddEventRoutingStatus, { label: string; tone: StatusBadgeTone }> = {
   pending: { label: 'テスト待ち', tone: 'info' },
@@ -54,13 +55,5 @@ export function formatJstDateTime(value: string | null): string {
   }
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(parsed)
+  return formatDateTime(parsed)
 }

@@ -3,11 +3,11 @@ import { formatPhotoReceivedAt } from './photo-review-time'
 
 describe('写真審査の受信日時', () => {
   it('UTCの日時を日本時間で表示する', () => {
-    expect(formatPhotoReceivedAt('2026-08-22T09:22:00.000Z')).toBe('2026/08/22 18:22')
+    expect(formatPhotoReceivedAt('2026-08-22T09:22:00.000Z')).toBe('8月22日（土）18:22')
   })
 
   it('タイムゾーンオフセット付きISO日時を日本時間へ変換し日付をまたぐ', () => {
-    expect(formatPhotoReceivedAt('2026-08-22T16:30:00-07:00')).toBe('2026/08/23 08:30')
+    expect(formatPhotoReceivedAt('2026-08-22T16:30:00-07:00')).toBe('8月23日（日）8:30')
   })
 
   it('読めない日時を元文字列のまま見せない', () => {

@@ -100,8 +100,7 @@ export default function PetEditor({ accountId, pet, onClose, onSaved }: {
       error={error}
       onClose={onClose}
       footer={(
-        <Button type="button" variant="primary" disabled={saving || !name.trim()} onClick={() => void save()}>
-          {saving ? '保存しています…' : '保存する'}
+        <Button type="button" variant="primary" disabled={saving || !name.trim()} onClick={() => void save()} busy={saving} busyLabel="保存しています…">保存する
         </Button>
       )}
     >

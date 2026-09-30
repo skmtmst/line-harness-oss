@@ -197,7 +197,7 @@ describe('R263 再追加シナリオの開始位置を選び・保存・再読�
     await renderExisting({ returningMode: 'other', startPosition: 'beginning' })
     expect(select('再追加時の開始位置').value).toBe('beginning')
     await choose('再追加時の開始位置', 'resume')
-    await act(async () => { button('下書き保存').click(); await Promise.resolve() })
+    await act(async () => { button('下書きを保存する').click(); await Promise.resolve() })
     expect(api.saveDraft).toHaveBeenCalled()
     const payload = api.saveDraft.mock.calls[0][1] as { definition: { startPosition: string } }
     expect(payload.definition.startPosition).toBe('resume')
@@ -257,7 +257,7 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
       .find((item) => item.textContent?.includes('山田 太郎'))
     if (!result) throw new Error(`friend result: ${host.textContent}`)
     await act(async () => { (result as HTMLButtonElement).click() })
-    await act(async () => { button('テスト送信').click(); await Promise.resolve() })
+    await act(async () => { button('テストを送る').click(); await Promise.resolve() })
     expect(api.test).toHaveBeenCalledWith('account-a', 'rule-1', {
       routeId: 'route-1', expectedAt: '2026-09-28T10:00', friendId: 'friend-1',
     })
@@ -266,7 +266,7 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
   it('試行条件を指定しなければ「いま・どの経路でも・友だち不問」で送る', async () => {
     state.search = 'step=preview'
     await renderExisting()
-    await act(async () => { button('テスト送信').click(); await Promise.resolve() })
+    await act(async () => { button('テストを送る').click(); await Promise.resolve() })
     expect(api.test).toHaveBeenCalledWith('account-a', 'rule-1', {
       routeId: null, expectedAt: null, friendId: null,
     })

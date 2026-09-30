@@ -15,6 +15,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 入力欄の幅。
@@ -435,7 +436,7 @@ export default function NewAffiliatePage() {
               ) : (
                 <div className="mt-2 flex max-w-lg flex-wrap items-center justify-between gap-2">
                   <p className="text-ink-faint text-xs tabular-nums">
-                    {friendLoading ? '友だちを読み込んでいます' : `全${friendTotal.toLocaleString('ja-JP')}件`}
+                    {friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)}件`}
                   </p>
                   {friendPageCount > 1 ? (
                     <Select

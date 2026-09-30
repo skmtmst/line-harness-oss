@@ -6,6 +6,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TemplatePicker from '@/components/chats/template-picker'
 import ListState from '@/components/shared/list-state'
 import { describeSendFailure } from '@/app/chats/send-failure'
+import { formatDay, formatTime } from '@/lib/format'
 
 /**
  * 友だち詳細のタイムライン（設計 V2 2-2-1 の右カラム）。
@@ -49,11 +50,11 @@ function dayLabel(iso: string): string {
     d.getMonth() === today.getMonth() &&
     d.getDate() === today.getDate()
   if (same) return '今日'
-  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
+  return formatDay(d)
 }
 
 function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  return formatTime(iso)
 }
 
 /** 本文。テキスト以外は種類だけ出す。中身の描き分けは受信箱側が持っている。 */
