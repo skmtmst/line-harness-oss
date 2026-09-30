@@ -1,4 +1,9 @@
-import type { ActionDefinition } from './automation-engine.js';
+import {
+  COMMON_ACTION_MAX_BRANCH_DEPTH,
+  COMMON_ACTION_MAX_DEPTH,
+  COMMON_ACTION_MAX_STEPS,
+  type ActionDefinition,
+} from './automation-engine.js';
 
 const SUPPORTED_ACTION_TYPES = new Set([
   'add_tag',
@@ -572,14 +577,12 @@ async function pinAndValidateReferences(
 /*
  * 監査 R478: 公開前に参照先の固定版まで展開し、実行計画と同じ制限を検査する。
  * 公開だけ通って開始時に失敗する内容を、理由と対象経路を示して止める。
- * 制限値は automation-engine の buildExecutionPlan と同じにする。
+ * 制限値は automation-engine の buildExecutionPlan と同じ定数を使う。
  * - 共通アクションの呼び出し: 20段まで（利用先から1段使う前提で深さ1から数える）
  * - 条件分岐の入れ子: 3段まで
- * - 展開後の処理総数: 1000個まで（呼び出し自体も1個に数える）
+ * - 展開後の処理総数: 1000個まで（呼び出し自体も1個に数える。
+ *   利用側の呼び出し1件分を先に数え、実行時に1件足りなくなる公開を止める）
  */
-const EXPANSION_MAX_DEPTH = 20;
-const EXPANSION_MAX_BRANCH_DEPTH = 3;
-const EXPANSION_MAX_STEPS = 1000;
 
 async function resolvePublishedVersionActions(
   db: D1Database,
@@ -614,7 +617,12 @@ async function assertPublishableExpansion(
   lineAccountId: string,
   actions: ActionDefinition[],
 ): Promise<void> {
-  const state = { count: 0 };
+  /*
+   * 監査 R478: 実行時は利用側の呼び出し1件が先に1件数えられる。
+   * 公開検査でも同じ1件を先に数え、1000件ちょうどの公開が
+   * 実行時に1001件で失敗しないようにする（深さの1段予約と同じ考え）。
+   */
+  const state = { count: 1 };
   await walkExpansion(db, lineAccountId, actions, {
     depth: 1,
     branchDepth: 0,
@@ -630,27 +638,27 @@ async function walkExpansion(
   actions: ActionDefinition[],
   context: { depth: number; branchDepth: number; chain: string[]; ids: string[]; state: { count: number } },
 ): Promise<void> {
-  if (context.depth > EXPANSION_MAX_DEPTH) {
+  if (context.depth > COMMON_ACTION_MAX_DEPTH) {
     throw new CommonActionValidationError(
       'common_action_too_deep',
-      `共通アクションの呼び出しが深すぎます（${EXPANSION_MAX_DEPTH}段まで）。経路：${context.chain.join('→')}`,
+      `共通アクションの呼び出しが深すぎます（${COMMON_ACTION_MAX_DEPTH}段まで）。経路：${context.chain.join('→')}`,
       'actions',
     );
   }
   for (const action of actions) {
     context.state.count += 1;
-    if (context.state.count > EXPANSION_MAX_STEPS) {
+    if (context.state.count > COMMON_ACTION_MAX_STEPS) {
       throw new CommonActionValidationError(
         'execution_plan_too_large',
-        `実行する処理が多すぎます（${EXPANSION_MAX_STEPS}個まで）。経路：${context.chain.join('→')}`,
+        `実行する処理が多すぎます（${COMMON_ACTION_MAX_STEPS}個まで）。経路：${context.chain.join('→')}`,
         'actions',
       );
     }
     if (action.type === 'branch') {
-      if (context.branchDepth >= EXPANSION_MAX_BRANCH_DEPTH) {
+      if (context.branchDepth >= COMMON_ACTION_MAX_BRANCH_DEPTH) {
         throw new CommonActionValidationError(
           'branch_too_deep',
-          `条件分岐の入れ子は${EXPANSION_MAX_BRANCH_DEPTH}段までです。経路：${context.chain.join('→')}`,
+          `条件分岐の入れ子は${COMMON_ACTION_MAX_BRANCH_DEPTH}段までです。経路：${context.chain.join('→')}`,
           'actions',
         );
       }
@@ -1204,17 +1212,30 @@ export async function updateCommonActionDraft(
     db, input.lineAccountId, owner.id, validateActionShape(input.actions),
   );
   const now = new Date().toISOString();
+  /*
+   * 監査 R473: 2文とも改訂番号で条件付けし、競合時はどちらも
+   * 書き換えない。親行を先に触り、版行の番号上げは後に回す。
+   * 逆順にすると成功時でも親行の条件が新しい番号を見て外れる。
+   */
   const result = await db.batch([
+    db.prepare(
+      `UPDATE common_actions SET name = ?, description = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
+          AND EXISTS (
+            SELECT 1 FROM common_action_versions
+             WHERE id = ? AND common_action_id = ? AND status = 'draft'
+               AND draft_revision = ?
+          )`,
+    ).bind(
+      name, description, now, owner.id, input.lineAccountId, expected,
+      expected, owner.id, expectedRevision,
+    ),
     db.prepare(
       `UPDATE common_action_versions
           SET action_config = ?, draft_revision = draft_revision + 1
         WHERE id = ? AND common_action_id = ? AND status = 'draft'
           AND draft_revision = ?`,
     ).bind(JSON.stringify(actions), expected, owner.id, expectedRevision),
-    db.prepare(
-      `UPDATE common_actions SET name = ?, description = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
-    ).bind(name, description, now, owner.id, input.lineAccountId, expected),
   ]);
   if ((result[0].meta?.changes ?? 0) !== 1 || (result[1].meta?.changes ?? 0) !== 1) {
     throw new CommonActionValidationError(
@@ -1310,19 +1331,32 @@ export async function publishCommonActionDraft(
   // 監査 R478: 参照を展開した深さ・総数も公開前に検査する。
   await assertPublishableExpansion(db, input.lineAccountId, pinned);
   const now = new Date().toISOString();
+  /*
+   * 監査 R477: 保存と同じく2文とも改訂番号で条件付けし、競合時は
+   * 親行の版ポインタも版行の状態も変えない。親行を先に触り、
+   * 版行の公開切替は後に回す（成功時の条件外れを防ぐ）。
+   */
   const result = await db.batch([
+    db.prepare(
+      `UPDATE common_actions
+          SET status = 'published', current_draft_version_id = NULL,
+              current_published_version_id = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
+          AND EXISTS (
+            SELECT 1 FROM common_action_versions
+             WHERE id = ? AND common_action_id = ? AND status = 'draft'
+               AND draft_revision = ?
+          )`,
+    ).bind(
+      draft.id, now, owner.id, input.lineAccountId, draft.id,
+      draft.id, owner.id, expectedRevision,
+    ),
     db.prepare(
       `UPDATE common_action_versions
           SET status = 'published', action_config = ?, published_at = ?
         WHERE id = ? AND common_action_id = ? AND status = 'draft'
           AND draft_revision = ?`,
     ).bind(JSON.stringify(pinned), now, draft.id, owner.id, expectedRevision),
-    db.prepare(
-      `UPDATE common_actions
-          SET status = 'published', current_draft_version_id = NULL,
-              current_published_version_id = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
-    ).bind(draft.id, now, owner.id, input.lineAccountId, draft.id),
   ]);
   if ((result[0].meta?.changes ?? 0) !== 1 || (result[1].meta?.changes ?? 0) !== 1) {
     throw new CommonActionValidationError(
