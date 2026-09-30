@@ -15,7 +15,7 @@ import type { MediaItem } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
-  mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse' | 'empty',
+  mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse' | 'empty' | 'twoItems',
   foldersBehavior: 'ok' as 'ok' | 'fail503',
   detailBehavior: 'ok' as 'ok' | 'fail503' | 'fail404' | 'fail403' | 'failFalse',
   detailCalls: [] as Array<{ id: string; accountId: string }>,
@@ -35,6 +35,24 @@ const MEDIA_A: MediaItem = {
   url: 'https://example.test/a.png',
   uploadedBy: '管理者',
   createdAt: '2026-09-16T09:00:00+09:00',
+  usageCount: 0,
+}
+
+// m26m: 絞り込み前後の総数の描画確認用。画像とは別の種別にする。
+const MEDIA_B: MediaItem = {
+  id: 'media-b',
+  lineAccountId: 'account-a',
+  folderId: null,
+  kind: 'video',
+  filename: 'Bの動画.mp4',
+  mimeType: 'video/mp4',
+  sizeBytes: 2400,
+  width: null,
+  height: null,
+  durationMs: 5000,
+  url: 'https://example.test/b.mp4',
+  uploadedBy: '管理者',
+  createdAt: '2026-09-16T10:00:00+09:00',
   usageCount: 0,
 }
 
@@ -72,7 +90,8 @@ vi.mock('@/lib/api', () => {
         },
       },
       media: {
-        list: () => {
+        list: (accountId: string, params?: { kind?: string }) => {
+          void accountId
           if (fixture.mediaBehavior === 'fail503') {
             return Promise.reject(new ApiError(503, 'Service Unavailable'))
           }
@@ -83,6 +102,20 @@ vi.mock('@/lib/api', () => {
             return Promise.resolve({
               success: true,
               data: { items: [], total: 0, limit: 20, offset: 0 },
+            })
+          }
+          if (fixture.mediaBehavior === 'twoItems') {
+            // 種別で絞った呼び出しだけ1件にする。絞り込み前の総数取り
+            // （overallTotal 用の limit: 1 の呼び出し）は2件のまま。
+            if (params?.kind === 'image') {
+              return Promise.resolve({
+                success: true,
+                data: { items: [MEDIA_A], total: 1, limit: 20, offset: 0 },
+              })
+            }
+            return Promise.resolve({
+              success: true,
+              data: { items: [MEDIA_A, MEDIA_B], total: 2, limit: 20, offset: 0 },
             })
           }
           return Promise.resolve({
@@ -367,5 +400,23 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
     expect(folderRowButton('すべて').textContent).toBe('すべて0')
     const zeroRanges = [...host.querySelectorAll('span')].filter((element) => element.textContent === '0件')
     expect(zeroRanges.length).toBeGreaterThan(0)
+  })
+
+  it('種別で絞っても「すべて」は絞り込み前の総数のまま', async () => {
+    fixture.mediaBehavior = 'twoItems'
+    await renderPage()
+    await waitForText(MEDIA_B.filename)
+    // 絞る前は総数2。
+    expect(folderRowButton('すべて').textContent).toBe('すべて2')
+
+    const imageChips = [...host.querySelectorAll<HTMLButtonElement>('button')]
+      .filter((button) => button.textContent === '画像')
+    expect(imageChips).toHaveLength(1)
+    await act(async () => { imageChips[0].click(); await settle() })
+    await waitForText('1件中 1〜1件を表示')
+    // 「すべて」は絞り込み前の総数（overallTotal）のまま。絞り込み後の1件を入れない。
+    expect(folderRowButton('すべて').textContent).toBe('すべて2')
+    expect(host.textContent).toContain(MEDIA_A.filename)
+    expect(host.textContent).not.toContain(MEDIA_B.filename)
   })
 })
