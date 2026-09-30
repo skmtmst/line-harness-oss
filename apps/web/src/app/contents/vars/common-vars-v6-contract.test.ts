@@ -38,10 +38,14 @@ describe('V6共通情報一覧', () => {
   })
 
   it('独立した詳細・フォルダ・予約の読み込みは並列に行う', () => {
-    expect(EDIT_PAGE).toContain('const [detail, folderList, scheduleList] = await Promise.all([')
+    // R591: 並列のまま、結果は欄ごとに扱う。フォルダ・予定の失敗で
+    // 詳細の結果まで捨てない（直列の滝に戻さない）。
+    expect(EDIT_PAGE).toContain('await Promise.all([')
     expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
     expect(EDIT_PAGE).toContain("api.folders.list('common_var')")
     expect(EDIT_PAGE).toContain('api.commonVars.schedules(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain('setFoldersError(true)')
+    expect(EDIT_PAGE).toContain('setSchedulesError(true)')
   })
 
   it('一覧は種別を出さず、Qで「状態」列を足した7列を固定する', () => {
