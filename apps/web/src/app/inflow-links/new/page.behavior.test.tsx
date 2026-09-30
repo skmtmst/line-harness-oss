@@ -175,4 +175,24 @@ describe('流入リンクの新規作成(実React)', () => {
 
     expect(document.body.textContent ?? '').not.toContain('保存していない変更があります')
   })
+
+  /*
+   * R610: 不正REFで発行を押した後、有効なREFへ直したら古い検証文は消え、
+   * 未発行の見本は新しいREFのURLになる。保存は送らない。
+   */
+  it('R610: 有効なREFへ直すと古い入力エラーが消え、見本は新しいREFになる', async () => {
+    await render()
+    await setValue(byId('ir-name'), '夏の投稿')
+    await setValue(byId('ir-ref'), 'bad ref!')
+    await click(byExactText('button', '発行してURLを受け取る'))
+
+    expect(api.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('refコードは、半角英数字・_・ハイフンで1〜64文字にしてください')
+
+    await setValue(byId('ir-ref'), 'audit-sample')
+
+    expect(host.textContent).not.toContain('refコードは、半角英数字')
+    expect(host.textContent).toContain('/r/audit-sample')
+    expect(api.create).not.toHaveBeenCalled()
+  })
 })
