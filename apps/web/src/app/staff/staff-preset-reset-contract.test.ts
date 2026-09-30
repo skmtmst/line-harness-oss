@@ -31,6 +31,8 @@ describe('R67 かたまりの選び直しは個別の上書きを捨てる', () 
   it('保存は上書きがあるときだけ項目ごと送る', () => {
     // 上書きが null（かたまり通り）なら permissionScope を送らず、
     // サーバー側で選んだかたまりのまま保存する。
-    expect(staffSource).toContain('permissionScope: customLevels ?? undefined')
+    // R497: 個別設定の人が行だけ触ったときは行単位のキー送りになる。
+    expect(staffSource).toContain('permissionScope: surgical ? undefined : (customLevels ?? undefined)')
+    expect(staffSource).toContain('const surgical = isCustom && hasSaved')
   })
 })

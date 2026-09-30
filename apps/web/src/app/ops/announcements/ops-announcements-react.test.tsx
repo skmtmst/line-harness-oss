@@ -142,7 +142,9 @@ describe('画面', () => {
       setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '予約のお知らせ')
       setValue(document.querySelector<HTMLTextAreaElement>('textarea')!, '本文')
     })
-    // 公開日時の選択（★V7）で 2026-09-20 02:00 を選ぶ。値は今までどおり日本時間の文字列。
+    // 公開日時の選択（★V7）で今月の押せる日の 02:00 を選ぶ。値は今までどおり日本時間の文字列。
+    // 固定の日付で指定すると、その日が今月の格子に出ない月の切り替わりで
+    // 落ちる（月初境界で発生）。格子の中の押せる日をその都度選ぶ。
     await act(async () => {
       document.querySelector<HTMLButtonElement>('button[aria-label="公開日時（日本時間）"]')!.click()
     })
@@ -150,10 +152,16 @@ describe('画面', () => {
     await act(async () => {
       picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
     })
+    let picked = ''
     await act(async () => {
-      Array.from(document.querySelectorAll('button')).find((b) =>
-        (b.getAttribute('aria-label') ?? '').startsWith('2026年9月20日（日）'),
-      )!.click()
+      const day = Array.from(document.querySelectorAll<HTMLButtonElement>('button[aria-label]')).find((b) => {
+        const label = b.getAttribute('aria-label') ?? ''
+        return /^(\d{4})年(\d{1,2})月(\d{1,2})日（.）/.test(label) && b.getAttribute('aria-disabled') !== 'true' && !b.hasAttribute('data-outside')
+      })!
+      const match = day.getAttribute('aria-label')!.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日/)!
+      const pad2 = (n: string) => n.padStart(2, '0')
+      picked = `${match[1]}-${pad2(match[2])}-${pad2(match[3])}`
+      day.click()
     })
     await act(async () => {
       const hour = picker.querySelector<HTMLSelectElement>('select[aria-label="時"]')!
@@ -164,7 +172,7 @@ describe('画面', () => {
     await act(async () => { button('配信を予約する')!.click() })
     await flush()
     const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
-    expect(post.body).toMatchObject({ mode: 'schedule', publishAt: '2026-09-20T02:00:00+09:00' })
+    expect(post.body).toMatchObject({ mode: 'schedule', publishAt: `${picked}T02:00:00+09:00` })
   })
 
   it('契約者専用LINEが未設定なら注意を出し、LINE を含む送信は止める', async () => {
