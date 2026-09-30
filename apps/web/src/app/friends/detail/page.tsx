@@ -1518,9 +1518,7 @@ function FriendDetailInner() {
                         type="button"
                         variant="primary"
                         onClick={() => void saveSupport()}
-                        disabled={supportBusy}
-                      >
-                        {supportBusy ? '処理中…' : '保存する'}
+                        disabled={supportBusy} busy={supportBusy} busyLabel="処理中…">保存する
                       </Button>
                       <Button
                         type="button"
@@ -1894,9 +1892,7 @@ function FriendDetailInner() {
                           type="button"
                           variant="primary"
                           onClick={() => void enrollScenario()}
-                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'}
-                        >
-                          {scenarioBusy ? '登録中…' : 'このシナリオに登録する'}
+                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'} busy={scenarioBusy} busyLabel="登録中…">このシナリオに登録する
                         </Button>
                         <Button
                           type="button"
@@ -1969,9 +1965,8 @@ function FriendDetailInner() {
                         <Button
                           type="button"
                           onClick={() => void loadHistory(historyNextCursor)}
-                          disabled={historyLoadingMore}
-                        >
-                          {historyLoadingMore ? '読み込み中…' : historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
+                          disabled={historyLoadingMore} busy={historyLoadingMore} busyLabel="読み込み中…">
+                          {historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
                         </Button>
                       </div>
                     ) : null}
@@ -2260,9 +2255,7 @@ function FriendDetailInner() {
                         type="button"
                         variant="secondary"
                         disabled={submissionsLoadingMore}
-                        onClick={() => void loadSubmissions(submissionsNextCursor)}
-                      >
-                        {submissionsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                        onClick={() => void loadSubmissions(submissionsNextCursor)} busy={submissionsLoadingMore} busyLabel="読み込んでいます…">さらに読み込む
                       </Button>
                     </div>
                   ) : null}

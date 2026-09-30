@@ -493,9 +493,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
               <Button
                 variant="primary"
                 onClick={() => save()}
-                disabled={saving}
-              >
-                {saving ? '保存中...' : tab === 'overview' && !eventId ? 'イベントを作る' : TABS.find((x) => x.key === tab)?.saveLabel ?? '保存する'}
+                disabled={saving} busy={saving} busyLabel="保存中...">
+                {tab === 'overview' && !eventId ? 'イベントを作る' : TABS.find((x) => x.key === tab)?.saveLabel ?? '保存する'}
               </Button>
               </>
             )}
@@ -1223,8 +1222,7 @@ function EditSlotDialog({
           <Button variant="secondary" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" onClick={submit} disabled={busy}>
-            {busy ? '保存中...' : '保存する'}
+          <Button variant="primary" onClick={submit} disabled={busy} busy={busy} busyLabel="保存中...">保存する
           </Button>
         </div>
       </div>

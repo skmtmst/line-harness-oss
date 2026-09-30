@@ -376,10 +376,8 @@ export default function WebhookInteractions() {
         <Button
           onClick={() => void retryFailed()}
           disabled={loading || bulkRetrying || data.summary.retryable === 0}
-          title={data.summary.retryable === 0 ? '今ここから送り直せる失敗はありません' : undefined}
-        >
-          <RefreshCw size={16} aria-hidden="true" />
-          {bulkRetrying ? '失敗したものを確認中' : '失敗したものをまとめてやり直す'}
+          title={data.summary.retryable === 0 ? '今ここから送り直せる失敗はありません' : undefined} busy={bulkRetrying} busyLabel="失敗したものを確認中">
+          <RefreshCw size={16} aria-hidden="true" />失敗したものをまとめてやり直す
         </Button>
       </div> : null}
 
@@ -451,7 +449,7 @@ export default function WebhookInteractions() {
                     <Td><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
                     <Td><StatusBadge tone={item.eventType === 'incoming_webhook.test' ? 'info' : item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
                     <Td>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
-                    <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => item.failureReasonCode === 'unknown' ? setConfirmingRetry(item) : void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
+                    <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => item.failureReasonCode === 'unknown' ? setConfirmingRetry(item) : void retry(item)} disabled={retrying === item.id} busy={retrying === item.id} busyLabel="やり直し中">やり直す</Button> : null}</div></ActionCell>
                   </Tr>
                 ))}
               </tbody>

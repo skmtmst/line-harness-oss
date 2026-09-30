@@ -971,12 +971,10 @@ export default function SettingsPage() {
             variant="primary"
             onClick={() => void save()}
             disabled={loading || saving || loadFailed || !dirty}
-            title={!dirty && !loading ? '変更すると保存できます' : undefined}
-          >
+            title={!dirty && !loading ? '変更すると保存できます' : undefined} busy={saving}>
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {saving ? '保存中…' : '機能設定を保存する'}
+            </svg>機能設定を保存する
           </Button>
           {!loading && !loadFailed && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
           </>

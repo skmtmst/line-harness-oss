@@ -71,7 +71,7 @@ describe('V6 photo review contract', () => {
     expect(page).toContain("['rejected', '見送り']");
     expect(page).toContain("['pending', '審査待ち']");
     expect(page).toContain("{ label: '公式サイト掲載'");
-    expect(page).toContain("reviewing === photo.id ? '処理中...' : '採用する'");
+    expect(page).toContain('busy={reviewing === photo.id} busyLabel="処理中...">採用する');
     expect(page).toContain('response.data.awardedPoints');
     expect(page).toContain('付与するマイル');
     // #817: 合計は固定の5ptではなく、その時点で使っている報酬の決まりの版を見る。未取得は「—」。

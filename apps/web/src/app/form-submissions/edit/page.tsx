@@ -952,9 +952,7 @@ function FormEditInner() {
               <Button
                 onClick={() => void startTest()}
                 disabled={testBusy || !answerUrl}
-                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'}
-              >
-                {testBusy ? '用意しています...' : 'テスト回答を始める'}
+                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'} busy={testBusy} busyLabel="用意しています...">テスト回答を始める
               </Button>
             </div>
             {testError && <p role="alert" className="text-danger mt-2 text-xs">{testError}</p>}

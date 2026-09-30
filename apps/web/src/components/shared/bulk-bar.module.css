@@ -1,0 +1,65 @@
+@layer components {
+/*
+ * 一括バー。★V7 仕上げ §2 の決まり:
+ *   - 黒地にしない。surface-pearl の地、上に 1px の細い線、段2（浮く）の影
+ *   - 1件でも選ぶと表の下端から 8px 上がって出る（motion-base・ease-out）
+ *   - 0件で下がって消える（motion-fast）
+ *   - 件数は濃い緑の太字、操作は白地ボタン（残りは「…」のメニューへ）
+ */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-pearl);
+  box-shadow: var(--shadow-float);
+}
+
+/* 「N件を選択中」。濃い緑の太字、桁は表と同じ tabular-nums。 */
+.count {
+  color: var(--color-accent-deep);
+  font-size: var(--text-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+/* 操作は右寄せ。白地ボタンをよく使う順に2つまで、残りは「…」。 */
+.actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 下段（1件選択の個別操作など）。帯の中で横幅いっぱいに使う。 */
+.below {
+  flex-basis: 100%;
+}
+
+/* 入る: 表の下端から8px上がって出る。 */
+.enter {
+  animation: bulk-bar-in var(--motion-base) var(--motion-ease-out);
+}
+
+/* 出る: 同じ軌道を逆再生して下がって消える。 */
+.exit {
+  animation: bulk-bar-in var(--motion-fast) var(--motion-ease-out) reverse;
+}
+
+@keyframes bulk-bar-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+}

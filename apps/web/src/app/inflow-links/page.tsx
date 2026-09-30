@@ -1452,8 +1452,8 @@ function BulkRoutesDialog({
             キャンセル
           </Button>
           {action && affected.length > 0 ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }}>
-              {busy ? '実行中…' : `${formatNumber(affected.length)}件に実行する`}
+            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
+              {`${formatNumber(affected.length)}件に実行する`}
             </Button>
           ) : null}
         </div>

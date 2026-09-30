@@ -1233,9 +1233,7 @@ function VarsPageInner() {
                   type="button"
                   variant="primary"
                   onClick={() => void confirmReplacement()}
-                  disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()}
-                >
-                  {singleBusy ? '差し替え中…' : '差し替えて削除する'}
+                  disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()} busy={singleBusy} busyLabel="差し替え中…">差し替えて削除する
                 </Button>
               ) : null}
               {singleImpact && !singleImpact.canDelete ? (
@@ -1249,8 +1247,7 @@ function VarsPageInner() {
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteVar({ impact: singleImpact, typedKey, reason: singleReason, busy: singleBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()}>
-                  {singleBusy ? '処理中…' : 'このまま削除する'}
+                <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()} busy={singleBusy} busyLabel="処理中…">このまま削除する
                 </Button>
               ) : null}
             </div>

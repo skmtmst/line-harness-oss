@@ -7,6 +7,7 @@ import Disclosure from '@/components/shared/disclosure'
 import NoteBar from '@/components/shared/note-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import StatusBadge from '@/components/shared/status-badge'
 import { api, ApiError } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
@@ -285,7 +286,14 @@ export default function SearchConsolePage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="rounded-card bg-canvas-sunken h-36 animate-pulse" />)}</div>
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {metrics.map((item) => <Skeleton key={item.label} className="block h-36 w-full rounded-card" />)}
+            </div>
+          }
+        />
       ) : loadError ? (
         <ListState
           kind="error"

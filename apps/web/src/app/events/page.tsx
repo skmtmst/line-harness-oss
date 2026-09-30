@@ -381,8 +381,7 @@ export default function EventsListPage() {
                     </Td>
                     <Td align="right" className="tabular-nums">
                       {e.total_active}
-                      <span className="text-ink-faint">
-                        {' / '}
+                      <span className="text-ink-faint"> /{' '}
                         {e.total_capacity ?? '—'}
                       </span>
                     </Td>

@@ -117,9 +117,7 @@ export default function HqPage() {
           type="button"
           variant="secondary"
           disabled={checkingConnections || loading || accounts.length === 0}
-          onClick={() => { void refreshConnectionInfo() }}
-        >
-          {checkingConnections ? '接続情報を更新中' : 'LINE ID・接続状態を更新する'}
+          onClick={() => { void refreshConnectionInfo() }} busy={checkingConnections} busyLabel="接続情報を更新中">LINE ID・接続状態を更新する
         </Button>
         <Button href="/accounts/new" variant="primary" className="shrink-0">
           ＋ LINEアカウントを登録する

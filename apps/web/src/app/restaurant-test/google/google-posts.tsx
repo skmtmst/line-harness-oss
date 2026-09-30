@@ -149,7 +149,7 @@ export function PostsTab({ accountId, go }: { accountId: string; go: ProfileNav 
         <h2 className="text-lg font-bold">投稿</h2>
         <span className="text-ink-secondary text-sm">Googleに届ける最新情報・特典・イベント</span>
         <span className="grow" />
-        <Button onClick={() => void sync()} disabled={syncing}>{syncing ? '確認中…' : 'Googleの状態を確認'}</Button>
+        <Button onClick={() => void sync()} disabled={syncing} busy={syncing} busyLabel="確認中…">Googleの状態を確認</Button>
         <Button variant="primary" onClick={() => go({ tab: 'posts', view: 'new', kind: 'standard' })}>投稿を作る</Button>
       </div>
 
@@ -557,7 +557,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
       </div>
 
       {editable ? (
-        <StickyBar actions={<><Button onClick={() => void saveDraft()} disabled={busy !== null}>{busy === 'save' ? '保存中…' : '下書きを保存する'}</Button><Button variant="primary" onClick={() => void openConfirm()} disabled={busy !== null}>{busy === 'confirm' ? '確認中…' : '公開内容を確認'}</Button></>} />
+        <StickyBar actions={<><Button onClick={() => void saveDraft()} disabled={busy !== null} busy={busy === 'save'}>下書きを保存する</Button><Button variant="primary" onClick={() => void openConfirm()} disabled={busy !== null} busy={busy === 'confirm'} busyLabel="確認中…">公開内容を確認</Button></>} />
       ) : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
@@ -664,7 +664,7 @@ export function PostConfirmScreen({ accountId, id, go }: { accountId: string; id
       {done || post.status === 'cancelled' ? (
         <StickyBar actions={<Button variant="primary" onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button>} />
       ) : (
-        <StickyBar actions={<><Button onClick={() => go({ tab: 'posts', view: 'edit', id })} disabled={busy}>修正する</Button><Button variant="primary" onClick={() => void publish()} disabled={!canPress}>{busy ? '送信中…' : 'この内容で予約する'}</Button></>} />
+        <StickyBar actions={<><Button onClick={() => go({ tab: 'posts', view: 'edit', id })} disabled={busy}>修正する</Button><Button variant="primary" onClick={() => void publish()} disabled={!canPress} busy={busy} busyLabel="送信中…">この内容で予約する</Button></>} />
       )}
     </div>
   )

@@ -1416,8 +1416,7 @@ function MediaLibraryInner() {
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteMedia({ impact, busy: deleteBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()}>
-                  {deleteBusy ? '処理中…' : '削除する'}
+                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
                 </Button>
               ) : null}
             </div>
@@ -1501,9 +1500,7 @@ function MediaLibraryInner() {
               type="button"
               variant="primary"
               disabled={bulkBusy}
-              onClick={() => void runBulkDelete(bulkConfirm ?? [])}
-            >
-              {bulkBusy ? '処理中…' : '削除する'}
+              onClick={() => void runBulkDelete(bulkConfirm ?? [])} busy={bulkBusy} busyLabel="処理中…">削除する
             </Button>
           </div>
         }
@@ -1545,11 +1542,8 @@ function MediaLibraryInner() {
               type="button"
               variant="primary"
               disabled={archiveBusy || !archiveReason.trim()}
-              onClick={() => void confirmArchiveChange()}
-            >
-              {archiveBusy
-                ? '処理中…'
-                : archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
+              onClick={() => void confirmArchiveChange()} busy={archiveBusy} busyLabel="処理中…">
+              {archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
             </Button>
           </div>
         }

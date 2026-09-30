@@ -439,7 +439,7 @@ export default function AutomationRunsPage() {
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 動いた記録</p>
         {runPermissions?.canExport ? (
           <div className="text-right">
-            <Button disabled={csvBusy} onClick={downloadRunsCsv}>{csvBusy ? '書き出しています…' : 'CSVで書き出す'}</Button>
+            <Button disabled={csvBusy} onClick={downloadRunsCsv} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button>
             {data && data.pagination.total > 5000 ? (
               <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みは{formatNumber(data.pagination.total)}件あり、5,000件までしか出ません。期間や絞り込みで分けて出してください。</p>
             ) : (
@@ -509,9 +509,7 @@ export default function AutomationRunsPage() {
                   <Button
                     onClick={() => void retryRun(run)}
                     disabled={retryingId !== null}
-                    title="失敗した処理だけを再実行します"
-                  >
-                    {retryingId === run.id ? '実行中' : 'もう一度やる'}
+                    title="失敗した処理だけを再実行します" busy={retryingId === run.id} busyLabel="実行中">もう一度やる
                   </Button>
                 ) : null}
               </div>
@@ -614,16 +612,14 @@ export default function AutomationRunsPage() {
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {selectedRun.canRetry && runPermissions?.canOperate ? (
-              <Button onClick={() => void retryRun(selectedRun)} disabled={retryingId !== null}>
-                {retryingId === selectedRun.id ? '実行中' : '失敗した処理をもう一度やる'}
+              <Button onClick={() => void retryRun(selectedRun)} disabled={retryingId !== null} busy={retryingId === selectedRun.id} busyLabel="実行中">失敗した処理をもう一度やる
               </Button>
             ) : null}
             {selectedRun.canCancel && runPermissions?.canOperate ? (
               confirmCancel ? (
                 <>
                   <span className="text-xs font-semibold text-danger">「{selectedRun.accountLabel ?? '選択中のアカウント'}」の実行を取りやめますか？記録は残りますが、実行は戻せません。</span>
-                  <Button onClick={() => void cancelRun(selectedRun)} disabled={cancellingId !== null}>
-                    {cancellingId === selectedRun.id ? '取りやめ中' : '取りやめる'}
+                  <Button onClick={() => void cancelRun(selectedRun)} disabled={cancellingId !== null} busy={cancellingId === selectedRun.id} busyLabel="取りやめ中">取りやめる
                   </Button>
                   <Button onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>キャンセル</Button>
                 </>

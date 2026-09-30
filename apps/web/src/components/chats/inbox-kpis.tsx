@@ -6,6 +6,7 @@ import { api, type InboxStats } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { formatDurationMinutes } from '@/lib/format-duration'
 import { formatNumber } from '@/lib/format'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 
 function formatWait(minutes: number | null): string {
   if (!minutes || minutes < 1) return '待ちはありません'
@@ -39,9 +40,14 @@ export default function InboxKpis() {
    * 読み込み中は数の場所に骨組みを出す（#673）。
    * 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す。
    */
-  const skeleton = <span className="bg-canvas-sunken inline-block h-5 w-12 animate-pulse rounded-mini align-middle" aria-hidden="true" />
-  const value = (number: number | undefined) =>
-    loading ? skeleton : number === undefined ? '—' : `${formatNumber(number)}件`
+  const value = (number: number | undefined) => (
+    <DelayedSkeleton
+      loading={loading}
+      skeleton={<Skeleton className="h-5 w-12 align-middle" />}
+    >
+      {number === undefined ? '—' : `${formatNumber(number)}件`}
+    </DelayedSkeleton>
+  )
 
   return (
     <section
@@ -57,7 +63,12 @@ export default function InboxKpis() {
         <div>
           <p className="text-ink text-[17px] font-bold">要返信 {value(stats?.waiting)}</p>
           <p className="text-status-warn-deep mt-0.5 text-[11px] font-semibold">
-            {loading ? <span className="bg-canvas-sunken inline-block h-3.5 w-24 animate-pulse rounded-mini align-middle" aria-hidden="true" /> : formatWait(stats?.oldestWaitingMinutes ?? null)}
+            <DelayedSkeleton
+              loading={loading}
+              skeleton={<Skeleton className="h-3.5 w-24 align-middle" />}
+            >
+              {formatWait(stats?.oldestWaitingMinutes ?? null)}
+            </DelayedSkeleton>
           </p>
         </div>
       </div>

@@ -173,9 +173,8 @@ export default function GenerationPanel({
                     <Images aria-hidden="true" className="h-4 w-4" />
                     ライブラリから選ぶ
                   </Button>
-                  <Button disabled={disabled || referenceBusy} onClick={() => fileRef.current?.click()} className="w-full">
-                    <Upload aria-hidden="true" className="h-4 w-4" />
-                    {referenceBusy ? '取り込んでいます…' : 'ファイルを選ぶ'}
+                  <Button disabled={disabled || referenceBusy} onClick={() => fileRef.current?.click()} className="w-full" busy={referenceBusy} busyLabel="取り込んでいます…">
+                    <Upload aria-hidden="true" className="h-4 w-4" />ファイルを選ぶ
                   </Button>
                   <input
                     ref={fileRef}
