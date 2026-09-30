@@ -110,7 +110,6 @@ function asD1(sqlite: Database.Database): D1Database {
       }));
       return runBatch(statements) as unknown as T;
     },
-    },
   } as unknown as D1Database;
 }
 
