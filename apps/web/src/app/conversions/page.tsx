@@ -369,6 +369,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 表示を上書きしてしまう。応答が返った時点で番号が変わっていたら捨てる。
    */
   const loadSeq = useRef(0)
+  /*
+   * 今選ばれているアカウントの控え。再試行の遅れた応答が、切り替え後の
+   * アカウントの表示を上書きしないよう、応答が返った時点で照合する。
+   * effect の後より先に描画時の代入で最新化する（切り替え直後の
+   * 応答との競合を狭めるため）。
+   */
+  const accountIdRef = useRef(accountId)
+  accountIdRef.current = accountId
   /** 検索は1文字ごとに口を叩かず、少し待ってから読み直す。 */
   const [debouncedQuery, setDebouncedQuery] = useState('')
   useEffect(() => {
@@ -495,19 +503,29 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       // 失敗と再試行を出すため、由来を残す。
       setReportFailed(true)
     }
-    setLoading(false)
+    // 古い読み込みは表示の後片付けもしない。新しい読み込みの
+    // 「読み込み中」を先に消してしまうため（R596 回帰と同じ競合）。
+    if (loadSeq.current === seq) setLoading(false)
   }, [accountId, debouncedQuery, sort])
 
   /**
    * R596: 集計だけを読み直す。一覧は触らないので、再試行のあいだも
    * 行は残る。復旧したら数値カードが数値へ戻る。
+   *
+   * 再試行の応答が遅れたとき、切り替え後のアカウントの表示を上書き
+   * しない（R596 回帰）。`load` と同じ世代番号を進め、応答が返った
+   * 時点で世代とアカウントを照合する。成功・失敗どちらの応答も捨てる。
    */
   const reloadReport = useCallback(async () => {
+    const seq = ++loadSeq.current
+    const requestAccountId = accountId
     const range = definitionRange(30)
     try {
       const response = await api.conversions.definitionReport({
         ...range, lineAccountId: accountId ?? undefined,
       })
+      if (loadSeq.current !== seq) return
+      if (accountIdRef.current !== requestAccountId) return
       if (response.success && Array.isArray(response.data.byDefinition)) {
         setSummaryReport(response.data)
         setReportFailed(false)
@@ -515,6 +533,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         setReportFailed(true)
       }
     } catch {
+      if (loadSeq.current !== seq) return
+      if (accountIdRef.current !== requestAccountId) return
       setReportFailed(true)
     }
   }, [accountId])
