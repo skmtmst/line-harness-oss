@@ -1,4 +1,5 @@
 import React from 'react'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 一覧の件数表示（監査6 #667）。
@@ -38,7 +39,7 @@ export default function ListRange({
       {label ? `${label} ` : null}
       {t === 0
         ? '0件'
-        : `${t.toLocaleString('ja-JP')}件中 ${Math.max(0, first).toLocaleString('ja-JP')}〜${Math.max(0, last).toLocaleString('ja-JP')}件を表示`}
+        : `${formatNumber(t)}件中 ${formatNumber(Math.max(0, first))}〜${formatNumber(Math.max(0, last))}件を表示`}
     </span>
   )
 }

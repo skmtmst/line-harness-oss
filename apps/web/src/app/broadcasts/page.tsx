@@ -23,6 +23,7 @@ import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
+import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -60,13 +61,7 @@ const displayStatusConfig: Record<string, { label: string; className: string }> 
  */
 function formatDatetime(iso: string | null): string {
   if (!iso) return '未設定'
-  return new Date(iso).toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(iso)
 }
 
 /*
@@ -74,16 +69,7 @@ function formatDatetime(iso: string | null): string {
  * 混ざっていたので、こっちに寄せる（#490 軽7）。UTC のまま切ると、
  * 夜の配信が前日に入る。
  */
-function formatYmdJst(iso: string): string {
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date(iso))
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('year')}-${get('month')}-${get('day')}`
-}
+
 
 function BroadcastsPageContent() {
   const searchParams = useSearchParams()
@@ -455,7 +441,7 @@ function BroadcastList() {
       const iso = b.status === 'sent' ? b.sentAt : b.scheduledAt
       if (!iso) return false
       // JST の日付で比べる。UTC のまま切ると、夜の配信が前日に入る。
-      const ymd = formatYmdJst(iso)
+      const ymd = formatYmd(iso)
       if (dateFrom && ymd < dateFrom) return false
       if (dateTo && ymd > dateTo) return false
     }
@@ -610,7 +596,7 @@ function BroadcastList() {
                     ...savedViews.map((view) => ({ value: view.id, label: view.name })),
                   ]}
                 />
-                <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
+                <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存する</Button>
               </>
             }
             filters={
@@ -673,7 +659,7 @@ function BroadcastList() {
                 onChange={(event) => setSavedViewName(event.target.value)}
                 className="border-hairline rounded-control min-w-64 border px-3 py-2 text-sm"
               />
-              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()}>{savedViewBusy ? '保存中…' : '保存'}</Button>
+              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()}>{savedViewBusy ? '保存中…' : '保存する'}</Button>
               <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
             </div>
           )}
@@ -862,7 +848,7 @@ function BroadcastList() {
                           {broadcast.title}
                         </a>
                         {isDedup && (
-                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded text-[10px] font-medium bg-info-bg text-info">
+                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded-mini text-[10px] font-medium bg-info-bg text-info">
                             複数アカウント
                           </span>
                         )}
@@ -891,7 +877,7 @@ function BroadcastList() {
                         </span>
                       ) : (
                         <span className="inline-flex flex-wrap items-center gap-1">
-                          <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                          <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-pill text-xs font-medium ${statusInfo.className}`}>
                             {statusInfo.label}
                           </span>
                           <ApprovalBadge status={broadcast.approvalStatus} />
@@ -929,22 +915,22 @@ function BroadcastList() {
                       ) : (
                         <div>
                           {broadcast.totalCount > 0 && (
-                            <p className="whitespace-nowrap">{broadcast.successCount.toLocaleString('ja-JP')} / {broadcast.totalCount.toLocaleString('ja-JP')} 件</p>
+                            <p className="whitespace-nowrap">{formatNumber(broadcast.successCount)} / {formatNumber(broadcast.totalCount)} 件</p>
                           )}
                           {insight ? (
                             <div className="mt-1 space-y-0.5">
                               {insight.delivered != null && (
-                                <p className="whitespace-nowrap text-xs">配信: <span className="font-medium text-ink-secondary">{insight.delivered.toLocaleString('ja-JP')}</span></p>
+                                <p className="whitespace-nowrap text-xs">配信: <span className="font-medium text-ink-secondary">{formatNumber(insight.delivered)}</span></p>
                               )}
                               {insight.uniqueImpression != null && (
-                                <p className="text-xs">開封: <span className="whitespace-nowrap"><span className="font-medium text-info">{insight.uniqueImpression.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">開封: <span className="whitespace-nowrap"><span className="font-medium text-info">{formatNumber(insight.uniqueImpression)}</span>
                                   {insight.openRate != null && (
                                     <span className="text-ink-faint"> ({(insight.openRate * 100).toFixed(1)}%)</span>
                                   )}
                                 </span></p>
                               )}
                               {insight.uniqueClick != null && (
-                                <p className="text-xs">クリック: <span className="whitespace-nowrap"><span className="font-medium text-success">{insight.uniqueClick.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">クリック: <span className="whitespace-nowrap"><span className="font-medium text-success">{formatNumber(insight.uniqueClick)}</span>
                                   {insight.clickRate != null && (
                                     <span className="text-ink-faint"> ({(insight.clickRate * 100).toFixed(1)}%)</span>
                                   )}

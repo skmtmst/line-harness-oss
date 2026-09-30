@@ -192,7 +192,7 @@ try {
     await page.getByText('稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。', { exact: true }).waitFor()
     assert.ok(state.listCalls.length >= 3, '失敗後も一覧APIを再取得する')
 
-    await page.getByRole('button', { name: 'キャンセル' }).click()
+    await page.getByRole('button', { name: 'キャンセル', exact: true }).click()
     await page.getByRole('button', { name: '止める・動かす' }).first().click()
     await page.getByLabel('LINEアカウント').selectOption('account-b')
     await page.getByText(/押したあとにLINEアカウントが切り替わりました/).waitFor()

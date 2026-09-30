@@ -944,11 +944,11 @@ export default function PhotoReviewsPage() {
                 // 詳細で保存した向きを一覧にも出す（#931 N-309）。
                 style={Number(photo.display_rotation) ? { transform: `rotate(${Number(photo.display_rotation)}deg)` } : undefined}
               />
-              : <div className="grid h-full w-full place-items-center text-xs font-bold text-ink-faint">画像を表示できません</div>}
+              : <div className="grid h-full w-full place-items-center text-xs font-medium text-ink-faint">画像を表示できません</div>}
             <span className="absolute left-2 top-2 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><Checkbox checked={selected} onCheckedChange={() => togglePhotoSelection(photoId)} aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を選ぶ`}>選ぶ</Checkbox></span>
           </div>
           <div className="p-4">
-            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '採用' : '見送り'}</span></div>
+            <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink">{photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-pill px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '採用' : '見送り'}</span></div>
             <p className="mt-2 min-h-5 truncate text-sm text-ink-secondary" title={text(photo.caption) || 'コメントなし'}>{text(photo.caption) || 'コメントなし'}</p>
             {/*
              * 「この人の次の投稿は、必ず人が見る」を付けた方の写真。
@@ -1028,7 +1028,7 @@ export default function PhotoReviewsPage() {
       </dl>
       <p className="mt-3 text-xs text-ink-faint">写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
     </Dialog>
-    {rejectingPhoto && <Dialog open designNode="N2J629" title="この写真を見送りますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。" busy={Boolean(reviewing)} error={reasonError} confirmLabel="見送って、この文章を送る" cancelLabel="やめる" onCancel={() => { setRejectingPhotoId(null); setRejectingPhotoDetail(null); setReasonError('') }} onConfirm={() => {
+    {rejectingPhoto && <Dialog open designNode="N2J629" title="この写真を見送りますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。" busy={Boolean(reviewing)} error={reasonError} confirmLabel="見送って、この文章を送る" cancelLabel="キャンセル" onCancel={() => { setRejectingPhotoId(null); setRejectingPhotoDetail(null); setReasonError('') }} onConfirm={() => {
       if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
       void review(text(rejectingPhoto.id), 'rejected', { reasonCode, reasonNote: reasonNote.trim(), resubmitInvite, watchSubmitter })
     }}>
@@ -1036,7 +1036,7 @@ export default function PhotoReviewsPage() {
             <div className="grid grid-cols-[64px_1fr] items-center gap-3 rounded-control bg-surface-pearl px-3 py-2 text-sm text-ink-secondary">
               {rejectingPhotoSrc
                 ? <img src={rejectingPhotoSrc} alt="" loading="lazy" className="h-16 w-16 rounded-control object-cover" />
-                : <div className="grid h-16 w-16 place-items-center rounded-control bg-canvas-sunken text-xs font-bold text-ink-faint">—</div>}
+                : <div className="grid h-16 w-16 place-items-center rounded-control bg-canvas-sunken text-xs font-medium text-ink-faint">—</div>}
               <div>
               <p className="font-semibold text-ink">
                 {photoPetDisplayName(rejectingPhoto.pet_name, { callName: rejectingPhoto.pet_call_name, gender: rejectingPhoto.pet_gender })}／{text(rejectingPhoto.owner_name) || 'お名前は未取得'}

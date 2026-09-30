@@ -428,7 +428,7 @@ describe('A01-02 初期状態に戻すは確認なしに実行しない', () => 
     await act(async () => { button('初期状態に戻す').click() })
     expect(net.deletes).toBe(0)
     expect(dialog().textContent).toContain('削除して初期状態へ戻します')
-    await act(async () => { button('やめる').click() })
+    await act(async () => { button('キャンセル').click() })
     expect(net.deletes).toBe(0)
     expect(dialog().textContent).not.toContain('削除して初期状態へ戻します')
   })

@@ -33,7 +33,7 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     // 1件ずつPATCHすると途中失敗で一部だけ反映されるため、全順序を1回で送る。
     expect(PAGE).toContain('api.mileage.saveEarningRulesOrder')
     expect(PAGE).toContain('ids: ruleOrder')
-    expect(PAGE).toContain("{savingRuleOrder ? '保存しています' : '並び順を保存'}")
+    expect(PAGE).toContain("{savingRuleOrder ? '保存しています' : '並び順を保存する'}")
     expect(PAGE).not.toContain('api.mileage.saveEarningRuleDraft')
   })
 
@@ -59,7 +59,7 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     // 消せるのは公開前の下書きだけ。履歴のある運用済みは口が409で断り、
     // 画面は確認窓に理由を残す（一覧を消さない）。
     expect(PAGE).toContain('rule.publishedVersion == null')
-    expect(PAGE).toContain('この決めごとを削除')
+    expect(PAGE).toContain('この決めごとを削除する')
     expect(PAGE).toContain('api.mileage.deleteRule')
     expect(PAGE).toContain('を削除しますか？')
     expect(PAGE).toContain('取り消せません')

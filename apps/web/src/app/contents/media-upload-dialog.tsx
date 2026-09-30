@@ -14,6 +14,7 @@ import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
+import { formatNumber } from '@/lib/format'
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
@@ -207,7 +208,7 @@ export default function MediaUploadDialog({
         aria-labelledby={`${inputId}-title`}
         aria-busy={busy || undefined}
         tabIndex={-1}
-        className="border-hairline max-h-screen w-full max-w-2xl overflow-y-auto rounded-card border bg-canvas shadow-xl"
+        className="border-hairline max-h-screen w-full max-w-2xl overflow-y-auto rounded-card border bg-canvas shadow-float"
       >
         <div className="border-hairline flex items-center justify-between gap-3 border-b px-6 py-4">
           <h2 id={`${inputId}-title`} className="text-ink text-xl font-bold">ファイルを入れる</h2>
@@ -257,15 +258,15 @@ export default function MediaUploadDialog({
                 state="active"
                 title="登録しています"
                 percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
-                countText={`${doneCount.toLocaleString()} / ${entries.length.toLocaleString()} 件`}
+                countText={`${formatNumber(doneCount)} / ${formatNumber(entries.length)} 件`}
                 className="mb-3"
               />
             ) : attempted ? (
               <Progress
                 state={uploadErrorCount > 0 ? 'partial' : 'done'}
                 title={uploadErrorCount > 0
-                  ? `${doneCount.toLocaleString()}件を登録し、${uploadErrorCount.toLocaleString()}件は入りませんでした`
-                  : `${doneCount.toLocaleString()}件を登録しました`}
+                  ? `${formatNumber(doneCount)}件を登録し、${formatNumber(uploadErrorCount)}件は入りませんでした`
+                  : `${formatNumber(doneCount)}件を登録しました`}
                 percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
                 className="mb-3"
               />

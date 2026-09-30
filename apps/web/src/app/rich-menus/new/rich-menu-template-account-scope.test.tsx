@@ -138,7 +138,7 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
       clickOption('お知らせ')
     })
     await settle(50)
-    const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存')
+    const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存する')
     expect(save).toBeTruthy()
     await act(async () => {
       fireEvent.click(save!)

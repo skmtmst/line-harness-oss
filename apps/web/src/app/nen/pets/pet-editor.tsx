@@ -106,7 +106,7 @@ export default function PetEditor({ accountId, pet, onClose, onSaved }: {
       )}
     >
       <div className="grid gap-4">
-        <label className="grid gap-1 text-caption font-bold text-ink">
+        <label className="grid gap-1 text-caption font-medium text-ink">
           名前
           <TextField aria-label="ペットの名前" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
         </label>
@@ -132,7 +132,7 @@ export default function PetEditor({ accountId, pet, onClose, onSaved }: {
             { value: 'unknown', label: 'わからない' },
           ]}
         />
-        <label className="grid gap-1 text-caption font-bold text-ink">
+        <label className="grid gap-1 text-caption font-medium text-ink">
           誕生日
           <TextField
             aria-label="誕生日"
@@ -142,11 +142,11 @@ export default function PetEditor({ accountId, pet, onClose, onSaved }: {
           />
           <span className="text-micro font-normal text-ink-faint">生まれた年が分からないときは「03-15」のように月日だけを入れます。空欄は未登録です。</span>
         </label>
-        <label className="grid gap-1 text-caption font-bold text-ink">
+        <label className="grid gap-1 text-caption font-medium text-ink">
           品種（任意）
           <TextField aria-label="品種" value={breed} onChange={(event) => setBreed(event.target.value)} maxLength={80} />
         </label>
-        <label className="grid gap-1 text-caption font-bold text-ink">
+        <label className="grid gap-1 text-caption font-medium text-ink">
           体重 kg（任意）
           <TextField aria-label="体重" inputMode="decimal" value={weight} onChange={(event) => setWeight(event.target.value)} />
         </label>

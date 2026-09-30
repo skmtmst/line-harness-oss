@@ -24,6 +24,7 @@ import {
   type MileageRewardSummary,
 } from '@/lib/api'
 import type { ApiResponse } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /** ★V6 `qlVLJ` 17-1-B マイルの使い道。 */
 
@@ -111,7 +112,7 @@ function stockText(reward: MileageRewardSummary): string | null {
     ここは短く言い切り、0 と紛れないことだけ守る。
   */
   if (reward.availableCodeCount === null) return '数量に限りがあります（残りの数は取れていません）'
-  return `数量に限りがあります（残り ${reward.availableCodeCount.toLocaleString('ja-JP')}個）`
+  return `数量に限りがあります（残り ${formatNumber(reward.availableCodeCount)}個）`
 }
 
 /**
@@ -120,7 +121,7 @@ function stockText(reward: MileageRewardSummary): string | null {
  */
 function RedemptionsCount({ total, page, shown }: { total: number; page: number; shown: number }) {
   if (total <= 0 || shown <= 0) return null
-  const toJa = (value: number): string => value.toLocaleString('ja-JP')
+  const toJa = (value: number): string => formatNumber(value)
   const pageCount = Math.max(1, Math.ceil(total / REDEMPTIONS_PAGE_SIZE))
   if (pageCount === 1) {
     return (
@@ -413,10 +414,10 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月 使われたマイル</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {reason ? '—' : (summary?.redeemedMilesThisMonth ?? 0).toLocaleString('ja-JP')}
+            {reason ? '—' : formatNumber((summary?.redeemedMilesThisMonth ?? 0))}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            {reason ?? `${rewards.reduce((sum, r) => sum + r.exchangedThisMonth, 0).toLocaleString('ja-JP')}回`}
+            {reason ?? `${formatNumber(rewards.reduce((sum, r) => sum + r.exchangedThisMonth, 0))}回`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -428,7 +429,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
             {reason || summary?.neverRedeemedFriendCount == null
               ? '—'
-              : summary.neverRedeemedFriendCount.toLocaleString('ja-JP')}
+              : formatNumber(summary.neverRedeemedFriendCount)}
             {!reason && summary?.neverRedeemedFriendCount != null
               && <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>}
           </p>
@@ -454,7 +455,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
               ? notConnectedText('交換の回数')
               : summary.mostRedeemedRewardCount === 0
                 ? 'まだ交換されていません'
-                : `${summary.mostRedeemedRewardCount.toLocaleString('ja-JP')}回`)}
+                : `${formatNumber(summary.mostRedeemedRewardCount)}回`)}
           </p>
         </div>
       </div>
@@ -481,9 +482,9 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         ) : rankBenefits.map((rank) => (
           <div key={rank.rewardId} className="rounded-card border border-hairline bg-canvas p-4">
             <p className="truncate font-bold text-ink" title={rank.rewardName}>{rank.rewardName}</p>
-            <p className="mt-1 text-sm font-semibold text-ink-secondary">{rank.requiredMiles.toLocaleString('ja-JP')} マイルから</p>
-            <p className="mt-3 text-xs text-ink-secondary">今すぐ届く人 {rank.reachableFriendCount.toLocaleString('ja-JP')}人</p>
-            <p className="mt-1 text-xs text-ink-faint">交換済み {rank.redeemedFriendCount.toLocaleString('ja-JP')}人</p>
+            <p className="mt-1 text-sm font-semibold text-ink-secondary">{formatNumber(rank.requiredMiles)} マイルから</p>
+            <p className="mt-3 text-xs text-ink-secondary">今すぐ届く人 {formatNumber(rank.reachableFriendCount)}人</p>
+            <p className="mt-1 text-xs text-ink-faint">交換済み {formatNumber(rank.redeemedFriendCount)}人</p>
           </div>
         ))}
       </section>
@@ -513,11 +514,11 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                           <p className="text-ink font-semibold">{reward.name}</p>
                           {reward.description && <p className="text-ink-faint text-xs">{reward.description}</p>}
                           {stock && <p className="text-ink-faint text-xs">{stock}</p>}
-                          {reach && <p className="mt-1 text-xs text-ink-faint">今すぐ交換できる人 {reach.reachableFriendCount.toLocaleString('ja-JP')}人</p>}
+                          {reach && <p className="mt-1 text-xs text-ink-faint">今すぐ交換できる人 {formatNumber(reach.reachableFriendCount)}人</p>}
                         </Td>
                         <Td align="right" className="tabular-nums">{miles(reward.currentVersion?.requiredMiles)}</Td>
                         <Td>{reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind]}</Td>
-                        <Td align="right" className="tabular-nums">{reward.exchangedThisMonth.toLocaleString('ja-JP')}回</Td>
+                        <Td align="right" className="tabular-nums">{formatNumber(reward.exchangedThisMonth)}回</Td>
                         <Td>{STATUS_LABEL[reward.status]}</Td>
                         <Td align="right">
                           <div className="flex justify-end gap-2">
@@ -612,7 +613,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                           )}
                         </Td>
                         <Td>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</Td>
-                        <Td align="right" className="tabular-nums">{item.attemptCount.toLocaleString('ja-JP')}回</Td>
+                        <Td align="right" className="tabular-nums">{formatNumber(item.attemptCount)}回</Td>
                         <Td>{formatMileageDate(item.updatedAt)}</Td>
                         <Td align="right">
                           <Button

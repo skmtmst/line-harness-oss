@@ -7,6 +7,7 @@ import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { formatJstDateTime } from '@/lib/presentation'
 import { onlyWhenVisible } from '@/lib/visible-polling'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 共通情報の監査付きCSV出力（N-192）。
@@ -192,15 +193,15 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
             </StatusBadge>
             {running ? (
               <span className="text-ink-secondary">
-                {active.processedCount.toLocaleString('ja-JP')}
+                {formatNumber(active.processedCount)}
                 {' / '}
-                {active.totalCount == null ? '…' : active.totalCount.toLocaleString('ja-JP')}
+                {active.totalCount == null ? '…' : formatNumber(active.totalCount)}
                 件
               </span>
             ) : null}
             {active.status === 'completed' ? (
               <span className="text-ink-secondary">
-                {(active.rowCount ?? 0).toLocaleString('ja-JP')}件
+                {formatNumber((active.rowCount ?? 0))}件
                 （{formatJstDateTime(active.expiresAt)}まで）
               </span>
             ) : null}
@@ -242,7 +243,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
               <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                 <span>
                   {formatJstDateTime(job.createdAt)}・{job.createdByName}
-                  {job.rowCount != null ? `・${job.rowCount.toLocaleString('ja-JP')}件` : ''}
+                  {job.rowCount != null ? `・${formatNumber(job.rowCount)}件` : ''}
                 </span>
                 <span className="flex items-center gap-2">
                   <StatusBadge tone={statusTone(job.status)} size="compact">

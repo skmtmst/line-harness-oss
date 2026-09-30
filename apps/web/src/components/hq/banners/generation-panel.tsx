@@ -150,7 +150,7 @@ export default function GenerationPanel({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={reference.media.url} alt="" className="h-14 w-14 shrink-0 rounded-mini bg-step-idle object-cover" />
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p className="truncate text-label font-bold text-ink">{referenceTitle(reference)}</p>
+                    <p className="truncate text-label font-medium text-ink">{referenceTitle(reference)}</p>
                     <p className="truncate text-micro text-ink-faint">{tileCaption(reference, presets)}</p>
                   </div>
                   <Button disabled={disabled || referenceBusy} onClick={() => set('referenceImageId', null)}>
@@ -342,9 +342,9 @@ function Field({
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
         {htmlFor ? (
-          <label htmlFor={htmlFor} className="text-label font-bold text-ink">{label}</label>
+          <label htmlFor={htmlFor} className="text-label font-medium text-ink">{label}</label>
         ) : (
-          <span className="text-label font-bold text-ink">{label}{help ? <span className="ml-1">{help}</span> : null}</span>
+          <span className="text-label font-medium text-ink">{label}{help ? <span className="ml-1">{help}</span> : null}</span>
         )}
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </div>
@@ -425,7 +425,7 @@ function ColorPicker({
   return (
     <fieldset className="flex flex-col gap-1.5" disabled={disabled}>
       <legend className="flex w-full items-baseline justify-between gap-2">
-        <span className="text-label font-bold text-ink">{label}</span>
+        <span className="text-label font-medium text-ink">{label}</span>
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </legend>
       <div className="flex flex-wrap gap-1.5">
@@ -439,7 +439,7 @@ function ColorPicker({
               checked={checked}
               onChange={() => onChange(hex)}
               title={hex}
-              note={<span aria-hidden="true" style={{ backgroundColor: hex }} className="border-hairline inline-block h-4 w-4 rounded-full border" />}
+              note={<span aria-hidden="true" style={{ backgroundColor: hex }} className="border-hairline inline-block h-4 w-4 rounded-pill border" />}
             />
           )
         })}

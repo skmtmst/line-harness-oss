@@ -14,6 +14,7 @@ import {
   savedSearchParams,
   savedSearchSummary,
 } from '@/components/friends/saved-search-utils'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 「保存した検索」の呼び出し窓（N-039）。
@@ -211,7 +212,7 @@ function SavedSearchItem({
       ) : null}
       <div className="mt-2 flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-ink">
-          {search.match.total === null ? search.match.error ?? '人数を確認できません' : `${search.match.total.toLocaleString('ja-JP')}人`}
+          {search.match.total === null ? search.match.error ?? '人数を確認できません' : `${formatNumber(search.match.total)}人`}
         </span>
         <Button
           variant="primary"

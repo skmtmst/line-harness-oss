@@ -14,6 +14,7 @@ import { nenRanksApi, type NenMemberListData, type NenMemberRow, type NenMemberS
 import type { LoadStatus } from './page'
 import { RankChip, yen } from './rank-view'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import { formatNumber } from '@/lib/format'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -84,7 +85,7 @@ export default function MembersTab({
           detail={ready && topTwo[1] ? `${topTwo[1].name} ${kpis!.byRank[topTwo[1].key] ?? 0}人` : '—'}
           loading={!ready && settingsStatus === 'loading'}
         />
-        <KpiCard variant="v6" title="マイル残高 合計" value={ready ? kpis!.balanceTotal : null} unit="マイル" detail={ready ? `今月 使われた ${kpis!.usedThisMonth.toLocaleString('ja-JP')}マイル` : '—'} loading={!ready && settingsStatus === 'loading'} />
+        <KpiCard variant="v6" title="マイル残高 合計" value={ready ? kpis!.balanceTotal : null} unit="マイル" detail={ready ? `今月 使われた ${formatNumber(kpis!.usedThisMonth)}マイル` : '—'} loading={!ready && settingsStatus === 'loading'} />
       </KpiCollapse>
 
       <div data-design="Note" data-design-node="G9TVE">
@@ -129,7 +130,7 @@ export default function MembersTab({
           ]}
         />
         <span className="ml-auto text-caption font-semibold text-ink-faint">
-          {data ? `${data.total.toLocaleString('ja-JP')}人中 ${data.total === 0 ? 0 : (data.page - 1) * data.pageSize + 1}〜${Math.min(data.total, data.page * data.pageSize)}人` : '—'}
+          {data ? `${formatNumber(data.total)}人中 ${data.total === 0 ? 0 : (data.page - 1) * data.pageSize + 1}〜${Math.min(data.total, data.page * data.pageSize)}人` : '—'}
         </span>
       </div>
 
@@ -188,7 +189,7 @@ function MemberRow({ member, rankOrder }: { member: NenMemberRow; rankOrder: str
             // eslint-disable-next-line @next/next/no-img-element -- LINEのCDN画像
             <img src={member.pictureUrl} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
           ) : (
-            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
+            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep">{initial}</span>
           )}
           <span className="min-w-0">
             <span className="block truncate text-label font-semibold text-ink" title={member.name}>{member.name || '（名前なし）'}</span>
@@ -199,7 +200,7 @@ function MemberRow({ member, rankOrder }: { member: NenMemberRow; rankOrder: str
       <Td className="w-28"><RankChip rankKey={member.rankKey} name={member.rankName} rankOrder={rankOrder} /></Td>
       <Td align="right" className="w-32"><span className="text-label font-semibold tabular-nums text-ink">{yen(member.annualMilesYen)}</span></Td>
       <Td align="right" className="w-32"><span className="text-label tabular-nums text-ink-secondary">{yen(member.lifetimeMilesYen)}</span></Td>
-      <Td align="right" className="w-28"><span className="text-label tabular-nums text-ink">{member.mileBalance.toLocaleString('ja-JP')}</span></Td>
+      <Td align="right" className="w-28"><span className="text-label tabular-nums text-ink">{formatNumber(member.mileBalance)}</span></Td>
       <Td>
         <span className="block truncate text-label text-ink-secondary" title={member.petNames ?? ''}>
           {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : '—'}

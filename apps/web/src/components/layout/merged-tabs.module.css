@@ -28,7 +28,7 @@
 }
 
 .tab:focus-visible {
-  border-radius: 3px;
+  border-radius: var(--radius-mini);
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
@@ -38,7 +38,7 @@
 .selected {
   border-bottom-color: var(--color-accent-deep);
   color: var(--color-accent-deep);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .segmented {
@@ -71,7 +71,7 @@
 .segmentedSelected:hover {
   background: var(--color-canvas);
   color: var(--color-accent-deep); /* #976 U084: 白地で読める緑 */
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .tab:disabled {

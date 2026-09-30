@@ -48,6 +48,7 @@ import {
 } from './trigger-helpers'
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
+import { formatNumber, formatTime } from '@/lib/format'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -650,7 +651,7 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
 
 /** 保存した時刻の表示（DETAIL-15）。分まであれば「いつ保存したか」は読める。 */
 const formatClock = (time: number): string =>
-  new Date(time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  formatTime(time)
 
 /**
  * 「この内容で送る」と押したときに送る中身を、押す前に固めた控え（N-358）。
@@ -2082,7 +2083,7 @@ export default function NewAutomationPage() {
             {triggerEventGroups.map((group) =>
               group.events.length === 0 ? null : (
                 <div key={group.id} className="mb-3">
-                  <p className="mb-2 text-xs font-bold text-ink-faint">{group.label}</p>
+                  <p className="mb-2 text-xs font-medium text-ink-faint">{group.label}</p>
                   <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
                     {group.events.map((event) => (
                       <button
@@ -2190,18 +2191,18 @@ export default function NewAutomationPage() {
             {/* AUTOMATION-02: 要約と同じ条件から作った札。条件が本当に無いときだけ「条件なし」。 */}
             <div className="mt-3 flex flex-wrap gap-2">
               {usesKeyword && keyword.trim() ? (
-                <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">「{keyword.trim()}」を含む</span>
+                <span className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">「{keyword.trim()}」を含む</span>
               ) : null}
               {conditionSummaries.map((text, index) => (
                 <span
                   key={`${index}-${text}`}
-                  className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary"
+                  className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary"
                 >
                   {text}
                 </span>
               ))}
               {!((usesKeyword && keyword.trim()) || conditionSummaries.length > 0) ? (
-                <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">条件なし</span>
+                <span className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">条件なし</span>
               ) : null}
             </div>
             {conditionUnreadable ? (
@@ -2233,7 +2234,7 @@ export default function NewAutomationPage() {
                 <p className="mt-2 text-xs text-ink-faint">標準互換（15軸）。一斉配信やシナリオと同じ条件です。</p>
               </div>
             )}
-            <p className="mt-3 text-xs font-bold text-info">いまの条件に当てはまる友だち　保存後に見込み人数を確認できます。</p>
+            <p className="mt-3 text-xs font-medium text-info">いまの条件に当てはまる友だち　保存後に見込み人数を確認できます。</p>
           </Step>
 
           <Step step={3} done={actions.length > 0} title="何をするか" note="上から順に実行します。">
@@ -2250,7 +2251,7 @@ export default function NewAutomationPage() {
                         setActions((current) => current.filter((item) => item.key !== row.key))
                       }
                     >
-                      この動きを消す
+                      この動きを削除する
                     </button>
                   </div>
 
@@ -2346,7 +2347,7 @@ export default function NewAutomationPage() {
                 className={`${styles.action} ${styles.actionSecondary} ${styles.addAction}`}
                 onClick={() => setActions((current) => [...current, newActionDraft()])}
               >
-                動きを追加
+                動きを追加する
               </button>
             </div>
           </Step>
@@ -2395,7 +2396,7 @@ export default function NewAutomationPage() {
 
           <section className={styles.sideCard}>
             <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
-            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
+            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${formatNumber(previewCount)}人`}</p>
             <p className={styles.sideMissingNote}>
               {/* AUTOMATION-03: 人数の失敗は保存の失敗ではない。下書きは残っている。 */}
               {previewFailed
@@ -2427,7 +2428,7 @@ export default function NewAutomationPage() {
             </div>
             {testConfirmation ? (
               <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" role="dialog" aria-label="1人テストの確認">
-                <p className="text-xs font-bold text-ink">送る前に確認してください</p>
+                <p className="text-xs font-medium text-ink">送る前に確認してください</p>
                 <p className="text-xs leading-5 text-ink-secondary">送り先：{testConfirmation.friendId}</p>
                 <div className="text-xs leading-5 text-ink-secondary">
                   <p>送る内容：</p>
@@ -2437,7 +2438,7 @@ export default function NewAutomationPage() {
                 </div>
                 <p className="text-xs leading-5 text-ink-secondary">起きること：{testConfirmation.effects.join('、')}。取り消せません。</p>
                 {canonicalJson(draftActions()) !== testConfirmation.actionsFingerprint ? (
-                  <p className="text-xs font-bold leading-5 text-ink">画面の入力は、ここに出ている内容と違います。送られるのは、保存済みのこの内容です。</p>
+                  <p className="text-xs font-medium leading-5 text-ink">画面の入力は、ここに出ている内容と違います。送られるのは、保存済みのこの内容です。</p>
                 ) : null}
                 <div className="flex gap-2">
                   <Button
@@ -2448,7 +2449,7 @@ export default function NewAutomationPage() {
                       setTestConfirmation(null)
                     }}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                   <Button
                     variant="primary"
@@ -2466,7 +2467,7 @@ export default function NewAutomationPage() {
              */}
             {testRun ? (
               <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" aria-label="1人テストの実行">
-                <p className="text-xs font-bold text-ink">試した実行：{testRunStatusLabel(testRun.status)}</p>
+                <p className="text-xs font-medium text-ink">試した実行：{testRunStatusLabel(testRun.status)}</p>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
@@ -2490,7 +2491,7 @@ export default function NewAutomationPage() {
              */}
             {saveOutcome === 'published' && publishedRuleId ? (
               <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" aria-label="公開済みの案内">
-                <p className="text-xs font-bold text-ink">この内容はすでに公開済みです</p>
+                <p className="text-xs font-medium text-ink">この内容はすでに公開済みです</p>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
@@ -2550,7 +2551,7 @@ export default function NewAutomationPage() {
               disabled={saving || Boolean(blockedReason)}
               onClick={() => void save(false)}
             >
-              下書きに保存
+              下書きを保存する
             </button>
             <button
               type="button"
@@ -2588,26 +2589,26 @@ export default function NewAutomationPage() {
       >
         <dl className="space-y-2 text-sm">
           <div>
-            <dt className="text-xs font-bold text-ink-faint">名前</dt>
+            <dt className="text-xs font-medium text-ink-faint">名前</dt>
             <dd className="font-semibold text-ink">{name.trim()}</dd>
           </div>
           <div>
-            <dt className="text-xs font-bold text-ink-faint">きっかけ</dt>
+            <dt className="text-xs font-medium text-ink-faint">きっかけ</dt>
             <dd className="text-ink">{selectedEvent.label}（{triggerConfigSummary}）</dd>
           </div>
           <div>
-            <dt className="text-xs font-bold text-ink-faint">だれに</dt>
+            <dt className="text-xs font-medium text-ink-faint">だれに</dt>
             <dd className="text-ink">
               {targetSummary}
-              {previewCount !== null ? ` 見込み ${previewCount.toLocaleString('ja-JP')}人` : ''}
+              {previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-bold text-ink-faint">すること</dt>
+            <dt className="text-xs font-medium text-ink-faint">すること</dt>
             <dd className="text-ink">{actionSummary || '未設定'}</dd>
           </div>
           <div>
-            <dt className="text-xs font-bold text-ink-faint">最初に動くのは</dt>
+            <dt className="text-xs font-medium text-ink-faint">最初に動くのは</dt>
             <dd className="text-ink">
               {['datetime', 'daily', 'weekly'].includes(eventType)
                 ? `次の決めた時刻（${triggerConfigSummary}）`
@@ -2660,7 +2661,7 @@ function SummaryStep({ number, label, value, active = false }: { number: number;
   return (
     <div className="flex min-w-0 items-center gap-3">
       <span className={`${styles.stepBadge} ${active ? '' : styles.stepBadgeIdle}`}>{number}</span>
-      <span className="flex min-w-0 flex-col"><small className="text-xs font-bold text-ink-faint">{label}</small><strong className="truncate text-sm text-ink" title={value}>{value}</strong></span>
+      <span className="flex min-w-0 flex-col"><small className="text-xs font-medium text-ink-faint">{label}</small><strong className="truncate text-sm text-ink" title={value}>{value}</strong></span>
     </div>
   )
 }

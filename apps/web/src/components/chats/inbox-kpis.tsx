@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type InboxStats } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { formatDurationMinutes } from '@/lib/format-duration'
+import { formatNumber } from '@/lib/format'
 
 function formatWait(minutes: number | null): string {
   if (!minutes || minutes < 1) return '待ちはありません'
@@ -38,30 +39,30 @@ export default function InboxKpis() {
    * 読み込み中は数の場所に骨組みを出す（#673）。
    * 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す。
    */
-  const skeleton = <span className="bg-canvas-sunken inline-block h-5 w-12 animate-pulse rounded align-middle" aria-hidden="true" />
+  const skeleton = <span className="bg-canvas-sunken inline-block h-5 w-12 animate-pulse rounded-mini align-middle" aria-hidden="true" />
   const value = (number: number | undefined) =>
-    loading ? skeleton : number === undefined ? '—' : `${number.toLocaleString('ja-JP')}件`
+    loading ? skeleton : number === undefined ? '—' : `${formatNumber(number)}件`
 
   return (
     <section
       data-inbox-v4="summary"
-      className="border-[#E5E7EB] bg-canvas shadow-card flex min-h-[74px] flex-wrap items-center gap-x-6 gap-y-3 rounded-[10px] border px-[18px] py-3 xl:flex-nowrap"
+      className="border-hairline bg-canvas shadow-card flex min-h-[74px] flex-wrap items-center gap-x-6 gap-y-3 rounded-card border px-[18px] py-3 xl:flex-nowrap"
       aria-label="受信箱の対応状況"
       aria-busy={loading || undefined}
     >
       <div className="flex min-w-[270px] items-center gap-3">
-        <span className="bg-[#FFF1F2] text-[#E5484D] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full" aria-hidden="true">
+        <span className="bg-status-danger-soft text-status-danger flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-pill" aria-hidden="true">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 17h.01"/></svg>
         </span>
         <div>
-          <p className="text-[#1F2937] text-[17px] font-bold">要返信 {value(stats?.waiting)}</p>
-          <p className="text-[#B45309] mt-0.5 text-[11px] font-semibold">
-            {loading ? <span className="bg-canvas-sunken inline-block h-3.5 w-24 animate-pulse rounded align-middle" aria-hidden="true" /> : formatWait(stats?.oldestWaitingMinutes ?? null)}
+          <p className="text-ink text-[17px] font-bold">要返信 {value(stats?.waiting)}</p>
+          <p className="text-status-warn-deep mt-0.5 text-[11px] font-semibold">
+            {loading ? <span className="bg-canvas-sunken inline-block h-3.5 w-24 animate-pulse rounded-mini align-middle" aria-hidden="true" /> : formatWait(stats?.oldestWaitingMinutes ?? null)}
           </p>
         </div>
       </div>
 
-      <div className="bg-[#E5E7EB] hidden h-px w-[min(17vw,280px)] shrink-0 xl:block" />
+      <div className="bg-hairline hidden h-px w-[min(17vw,280px)] shrink-0 xl:block" />
 
       <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4">
         {([
@@ -72,13 +73,13 @@ export default function InboxKpis() {
           ['1時間以上待ち', value(stats?.waitingOverAnHour)],
         ] as [string, ReactNode][]).map(([label, count], index) => (
           <div key={label} className="min-w-0">
-            <p className={`whitespace-nowrap text-[11px] font-semibold ${index === 3 ? 'text-[#334155]' : 'text-[#667085]'}`}>{label}</p>
-            <p className={`mt-0.5 text-[18px] font-bold tabular-nums ${index === 3 ? 'text-[#334155]' : 'text-[#1F2937]'}`}>{count}</p>
+            <p className={`whitespace-nowrap text-[11px] font-semibold ${index === 3 ? 'text-ink-secondary' : 'text-ink-faint'}`}>{label}</p>
+            <p className={`mt-0.5 text-[18px] font-bold tabular-nums ${index === 3 ? 'text-ink-secondary' : 'text-ink'}`}>{count}</p>
           </div>
         ))}
       </div>
 
-      <Link href="/tags?tab=marks" className="border-[#E5E7EB] text-[#2563EB] inline-flex h-[38px] shrink-0 items-center gap-2 rounded-lg border bg-canvas px-3.5 text-[13px] font-semibold hover:bg-[#F7F8F6]">
+      <Link href="/tags?tab=marks" className="border-hairline text-action inline-flex h-[38px] shrink-0 items-center gap-2 rounded-control border bg-canvas px-3.5 text-[13px] font-semibold hover:bg-canvas-sunken">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6"/></svg>
         対応ルール
       </Link>

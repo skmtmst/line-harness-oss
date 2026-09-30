@@ -135,7 +135,7 @@ function Go({ busy, onClick, label = '実行' }: { busy: boolean; onClick: () =>
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+      className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
     >
       {busy ? '実行中…' : label}
     </button>

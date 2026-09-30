@@ -93,7 +93,7 @@ export default function InboxFilterPanel({
         role="dialog"
         aria-modal="true"
         aria-label="絞り込み"
-        className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-2xl sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
+        className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-overlay sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
       >
         <header className="border-hairline flex h-14 shrink-0 items-center gap-2 border-b px-5">
           <Filter aria-hidden="true" size={18} className="text-ink" />

@@ -42,7 +42,7 @@ export default function UnfamiliarLoginNotice() {
     <NoteBar
       tone="warn"
       action={
-        <Link href="/staff" className="text-action whitespace-nowrap text-xs font-bold underline underline-offset-2">
+        <Link href="/staff" className="text-action whitespace-nowrap text-xs font-medium underline underline-offset-2">
           ログイン中の端末を確認する
         </Link>
       }

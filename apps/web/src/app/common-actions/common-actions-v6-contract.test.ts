@@ -40,7 +40,7 @@ describe('V6共通アクションの画面契約', () => {
   it('作成はJSON入力ではなく、選択肢と順番で編集する', () => {
     expect(CREATE + EDIT).toContain('<CommonActionEditor')
     expect(EDITOR).toContain('失敗したとき')
-    expect(EDITOR).toContain('処理を追加')
+    expect(EDITOR).toContain('処理を追加する')
     expect(EDITOR).not.toContain('actionsJson')
     expect(CREATE).not.toContain('<main className=')
     expect(EDITOR).toContain('テンプレート「{selected.name}」')

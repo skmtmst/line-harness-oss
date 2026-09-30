@@ -784,8 +784,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
-        <div ref={rotateModalRef} className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleRotateSubmit} role="dialog" aria-modal="true" aria-labelledby="rotate-secret-title" className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
+        <div ref={rotateModalRef} className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleRotateSubmit} role="dialog" aria-modal="true" aria-labelledby="rotate-secret-title" className="bg-canvas rounded-control shadow-float max-w-lg w-full p-6">
             <div className="mb-2 flex items-start justify-between gap-3">
               <h2 id="rotate-secret-title" className="text-lg font-semibold text-ink">
                 「{rotateTarget.name}」のシークレットを{rotateTarget.activate ? '設定して有効化' : '更新'}
@@ -793,7 +793,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               <button
                 type="button"
                 aria-label="閉じる"
-                className="rounded p-1 text-ink-secondary hover:bg-canvas-sunken"
+                className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"
                 onClick={() => {
                   setRotateTarget(null)
                   setRotateSecretValue('')
@@ -812,7 +812,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               <input
                 value={rotateSecretValue}
                 onChange={(e) => setRotateSecretValue(e.target.value)}
-                className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm font-mono"
+                className="flex-1 border border-hairline rounded-control px-3 py-2 text-sm font-mono"
                 placeholder="ランダムな英数字32文字以上"
                 required
                 minLength={MIN_SECRET_LENGTH}
@@ -839,7 +839,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                 type="submit"
                 variant="primary"
               >
-                保存
+                保存する
               </Button>
             </div>
           </form>
@@ -848,8 +848,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Created-secret modal — shown ONCE after a successful create. */}
       {createdSecret && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div ref={secretModalRef} role="dialog" aria-modal="true" aria-labelledby="created-secret-title" className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
+        <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
+          <div ref={secretModalRef} role="dialog" aria-modal="true" aria-labelledby="created-secret-title" className="bg-canvas rounded-control shadow-float max-w-lg w-full p-6">
             <div className="mb-2 flex items-start justify-between gap-3">
               <h2 id="created-secret-title" className="text-lg font-semibold text-ink">
                 シークレットを保存してください
@@ -857,7 +857,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               <button
                 type="button"
                 aria-label="閉じる"
-                className="rounded p-1 text-ink-secondary hover:bg-canvas-sunken"
+                className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"
                 onClick={() => {
                   setCreatedSecret(null)
                   setSecretCopied(false)
@@ -871,7 +871,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               <strong className="text-danger">このシークレットは今後二度と表示されません。</strong>
               閉じる前に必ず安全な場所に保存してください。
             </p>
-            <div className="bg-canvas-sunken border border-hairline rounded p-3 mb-4">
+            <div className="bg-canvas-sunken border border-hairline rounded-mini p-3 mb-4">
               <code className="text-sm break-all">{createdSecret.secret}</code>
             </div>
             <div className="flex gap-2 justify-end">
@@ -885,7 +885,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                   setCreatedSecret(null)
                   setSecretCopied(false)
                 }}
-                className="px-4 py-2 text-sm rounded-lg text-white font-medium"
+                className="px-4 py-2 text-sm rounded-control text-on-accent font-medium"
                 style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存しました
@@ -930,7 +930,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
-        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6">
+        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-control border border-hairline p-6">
           <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -941,7 +941,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                   setInForm({ ...inForm, name: e.target.value })
                   if (createFieldError.name) setCreateFieldError((current) => ({ ...current, name: undefined }))
                 }}
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
                 placeholder="LINE公式アカウント"
                 required
               />
@@ -992,7 +992,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                     setInForm({ ...inForm, secret: e.target.value })
                     if (createFieldError.secret) setCreateFieldError((current) => ({ ...current, secret: undefined }))
                   }}
-                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm font-mono"
+                  className="flex-1 border border-hairline rounded-control px-3 py-2 text-sm font-mono"
                   placeholder="ランダムな英数字32文字以上"
                   required
                   minLength={MIN_SECRET_LENGTH}
@@ -1017,7 +1017,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
             variant="primary"
             className="mt-4"
           >
-            作成
+            作る
           </Button>
         </form>
       )}

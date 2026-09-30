@@ -1,3 +1,4 @@
+import { formatDateTime, formatDay } from '@/lib/format'
 /**
  * NEN配信の「今月・先月」と、日本時間の短い日付表記。★V6 37-6（`z4q1K`）。
  *
@@ -37,23 +38,21 @@ function parse(value: string | null | undefined): Date | null {
 export function jstShortDate(value: string | null | undefined): string {
   const date = parse(value)
   if (!date) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(date)
+  return formatDay(date)
 }
 
 /** 「9/20 10:00」。 */
 export function jstShortDateTime(value: string | null | undefined): string {
   const date = parse(value)
   if (!date) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }).format(date)
+  return formatDateTime(date)
 }
 
-/** 「2026/09/20（土）10:00」。予約日時の確認に使う。 */
+/** 「9月20日（日）10:00」。予約日時の確認に使う。 */
 export function jstLongDateTime(value: string | null | undefined): string {
   const date = parse(value)
   if (!date) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('year')}/${get('month')}/${get('day')}（${get('weekday')}）${get('hour')}:${get('minute')}`
+  return formatDateTime(date)
 }
 
 /** `datetime-local` の初期値。日本時間の「翌日 10:00」を `YYYY-MM-DDTHH:mm` で返す。 */

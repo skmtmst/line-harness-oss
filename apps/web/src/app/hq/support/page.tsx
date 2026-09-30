@@ -198,7 +198,7 @@ export default function HqSupportPage() {
         onCancel={() => setSent(null)}
         designNode="X6LZP"
       >
-        {sent?.ticketLabel ? <p className="text-label text-ink">受付番号：<span className="font-bold">{sent.ticketLabel}</span>　件名：{sent.subject}</p> : null}
+        {sent?.ticketLabel ? <p className="text-label text-ink">受付番号：<span className="font-semibold">{sent.ticketLabel}</span>　件名：{sent.subject}</p> : null}
       </Dialog>
 
       <div data-design-node="VKxoO" className="flex flex-col gap-4 xl:flex-row xl:items-start">
@@ -262,7 +262,7 @@ export default function HqSupportPage() {
           </Field>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-label font-bold text-ink">画面の画像（任意・{SUPPORT_ATTACHMENT_MAX}枚まで）</span>
+            <span className="text-label font-medium text-ink">画面の画像（任意・{SUPPORT_ATTACHMENT_MAX}枚まで）</span>
             {/*
               本物の file input は出さない（display:none）。
               開くのは下の「クリックして画像を選ぶ」ボタンから。
@@ -361,8 +361,8 @@ export default function HqSupportPage() {
                         <span
                           className={
                             item.status === 'open'
-                              ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                              : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                              ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                              : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                           }
                         >
                           {SUPPORT_STATUS_LABELS[item.status]}
@@ -388,7 +388,7 @@ export default function HqSupportPage() {
               <Button onClick={clear} disabled={sending}>内容をクリア</Button>
               <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)}>
                 <Send aria-hidden="true" className="h-4 w-4" />
-                {sending ? '送信中…' : '送信する'}
+                {sending ? '送信中…' : '送る'}
               </Button>
             </>
           }
@@ -402,7 +402,7 @@ function Field({ label, required, note, htmlFor, children }: { label: string; re
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <label htmlFor={htmlFor} className="text-label font-bold text-ink">{label}</label>
+        <label htmlFor={htmlFor} className="text-label font-medium text-ink">{label}</label>
         {/* #976 U086: 必須の印は共通の「必須」札 */}
         {required ? <RequiredBadge /> : null}
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}

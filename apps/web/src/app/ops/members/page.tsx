@@ -137,8 +137,8 @@ export default function OpsMembersPage() {
               required
             />
           </div>
+          <Button onClick={() => setInviting(false)}>キャンセル</Button>
           <Button type="submit" variant="primary" disabled={busy}>招待メールを送る</Button>
-          <Button onClick={() => setInviting(false)}>やめる</Button>
         </form>
       ) : null}
 
@@ -184,7 +184,7 @@ export default function OpsMembersPage() {
             <tbody>
               {members.map((m) => (
                 <Tr key={m.staffId}>
-                  <Td><span className="block truncate text-label font-bold text-ink" title={m.name}>{m.name}{m.staffId === me ? '（あなた）' : ''}</span></Td>
+                  <Td><span className="block truncate text-label font-medium text-ink" title={m.name}>{m.name}{m.staffId === me ? '（あなた）' : ''}</span></Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={m.email ?? ''}>{m.email ?? '—'}</span></Td>
                   <Td>{m.totpEnabled ? <Chip tone="ok">設定済み</Chip> : <Chip tone="danger">未設定</Chip>}</Td>
                   <Td>{memberStateChip(m)}</Td>
@@ -215,7 +215,7 @@ export default function OpsMembersPage() {
         <div className="grid gap-4">
           <NoticeLineAccountCard />
           <div className="rounded-card border border-hairline bg-canvas px-5 py-4 text-label text-ink-secondary">
-            運営メンバーは <code className="rounded bg-canvas-sunken px-1">platform_admins</code> で管理しています。
+            運営メンバーは <code className="rounded-mini bg-canvas-sunken px-1">platform_admins</code> で管理しています。
             LINE でログインする場合は、各メンバーの権限者アカウントに LINE を紐づけてください。
           </div>
         </div>

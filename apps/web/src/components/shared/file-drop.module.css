@@ -30,7 +30,7 @@
   min-height: 180px; /* height: 180 */
   padding: 16px;
   border: 1.5px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: 12px; /* cornerRadius: 12 */
+  border-radius: var(--radius-card); /* cornerRadius: 12 */
   background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
   cursor: pointer;
   transition:
@@ -59,21 +59,21 @@
   margin: 0;
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .activeTitle {
   margin: 0;
   color: var(--color-accent-deep); /* fill: $accent-deep */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .rejectTitle {
   margin: 0;
   color: var(--color-status-danger); /* fill: $status-danger */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .zoneHint {
@@ -127,7 +127,7 @@
   min-height: 56px; /* height: 56 */
   padding: 0 12px; /* padding: 0 12 */
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: 10px; /* cornerRadius: 10 */
+  border-radius: var(--radius-card); /* cornerRadius: 10 */
   background: var(--color-canvas); /* fill: $canvas */
 }
 
@@ -145,7 +145,7 @@
   height: 36px; /* height: 36 */
   overflow: hidden;
   border: 1px solid var(--color-hairline); /* stroke: $hairline（画像の薄い縁） */
-  border-radius: 6px; /* cornerRadius: 6 */
+  border-radius: var(--radius-mini); /* cornerRadius: 6 */
   background: var(--color-shell); /* fill: $shell */
 }
 
@@ -198,7 +198,7 @@
   display: block;
   height: 4px; /* height: 4 */
   overflow: hidden;
-  border-radius: 2px; /* cornerRadius: 2 */
+  border-radius: var(--radius-mini); /* cornerRadius: 2 */
   background: var(--color-shell); /* fill: $shell */
   position: relative;
 }
@@ -206,7 +206,7 @@
 .miniFill {
   position: absolute;
   inset: 0;
-  border-radius: 2px; /* cornerRadius: 2 */
+  border-radius: var(--radius-mini); /* cornerRadius: 2 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   transform: scaleX(0);
   transform-origin: left center;

@@ -21,7 +21,7 @@ describe('U034 機能設定の見出しの縦割れ', () => {
   it('見出し操作の顔ぶれは変えていない', () => {
     expect(PAGE).toContain('並びを変える')
     expect(PAGE).toContain('初期値に戻す')
-    expect(PAGE).toContain('機能設定を保存')
+    expect(PAGE).toContain('機能設定を保存する')
   })
 
   it('区分見出しの「まとめて切替」は語の途中で折れない', () => {

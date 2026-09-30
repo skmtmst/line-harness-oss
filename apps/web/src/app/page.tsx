@@ -54,6 +54,7 @@ import {
   markDashboardNotificationRead,
   type DashboardNotificationFilter,
 } from '@/components/dashboard/notification-summary'
+import { formatNumber, formatTime } from '@/lib/format'
 
 /** 共通トップバーの通知ベル。件数と一覧は選択中アカウントの通知センターから読む。 */
 function BellIcon() {
@@ -100,9 +101,7 @@ function monthKey(offset: number): string {
  * 時刻だけだと、深夜に見たとき「次回 09:00」が今日なのか明日なのか読めない。
  */
 function nextBookingLabel(iso: string, today: string): string {
-  const time = new Date(iso).toLocaleTimeString('ja-JP', {
-    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
-  })
+  const time = formatTime(iso)
   const day = jstDay(iso)
   if (day === today) return `次回 ${time}`
   if (day === jstDay(Date.now() + 86_400_000)) return `次回 明日 ${time}`
@@ -165,12 +164,12 @@ function TodayTaskCard({
           {loading ? (
             <>
               {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
-              <span className="bg-canvas-sunken inline-block h-7 w-16 animate-pulse rounded" aria-hidden="true" />
+              <span className="bg-canvas-sunken inline-block h-7 w-16 animate-pulse rounded-mini" aria-hidden="true" />
               <span className="sr-only">{STATE_TEXT.loading}</span>
             </>
           ) : (
             <>
-              {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
+              {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
             </>
           )}
         </p>
@@ -294,7 +293,7 @@ function FriendAddLinkCard({
               ]}
             />
           </label>
-          <Link href="/inflow-links" className="border-hairline text-action hover:bg-action-soft rounded-control border px-3 py-2 text-xs font-medium">経路を分けて発行</Link>
+          <Link href="/inflow-links" className="border-hairline text-action hover:bg-action-soft rounded-control border px-3 py-2 text-xs font-semibold">経路を分けて発行</Link>
         </div>
       </div>
 
@@ -306,10 +305,10 @@ function FriendAddLinkCard({
           aria-label="友だち追加リンク"
           className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2.5 font-mono text-xs"
         />
-        <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-medium">
+        <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-semibold">
           {copyState === 'copied' ? 'コピーしました ✓' : 'コピー'}
         </button>
-        <button type="button" onClick={() => writeQr(routeId || 'base')} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-medium">QRを表示</button>
+        <button type="button" onClick={() => writeQr(routeId || 'base')} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-semibold">QRを表示</button>
       </div>
       {copyState === 'failed' ? (
         <p role="alert" className="text-danger mt-2 text-xs">
@@ -374,8 +373,8 @@ function LoadingDataCard({ title, href, linkLabel }: { title: string; href: stri
         actionTone="info"
       />
       <div className="space-y-2 px-5 py-8" aria-label={`${title}を${STATE_TEXT.loading}`}>
-        <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
-        <div className="bg-canvas-sunken h-5 w-2/3 animate-pulse rounded" />
+        <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
+        <div className="bg-canvas-sunken h-5 w-2/3 animate-pulse rounded-mini" />
       </div>
     </Card>
   )
@@ -436,7 +435,7 @@ function LiveDataCard({
         {loading ? (
           <>
             {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
-            <span className="bg-canvas-sunken inline-block h-7 w-20 animate-pulse rounded" aria-hidden="true" />
+            <span className="bg-canvas-sunken inline-block h-7 w-20 animate-pulse rounded-mini" aria-hidden="true" />
             <span className="sr-only">{STATE_TEXT.loading}</span>
           </>
         ) : (
@@ -506,14 +505,14 @@ function SendQuotaCard({
         <span className="text-base leading-tight">
           {loading ? (
             <>
-              <span className="bg-canvas-sunken inline-block h-6 w-44 animate-pulse rounded" aria-hidden="true" />
+              <span className="bg-canvas-sunken inline-block h-6 w-44 animate-pulse rounded-mini" aria-hidden="true" />
               <span className="sr-only">{STATE_TEXT.loading}</span>
             </>
           ) : unlimited
-            ? `使用 ${used === null ? '—' : used.toLocaleString('ja-JP')}通（上限なし）`
+            ? `使用 ${used === null ? '—' : formatNumber(used)}通（上限なし）`
             : remaining === null || limit === null
               ? '—'
-              : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
+              : `残り ${formatNumber(remaining)} / 上限 ${formatNumber(limit)}通`}
         </span>
       </span>
     </p>
@@ -530,7 +529,7 @@ function SendQuotaCard({
           {`送信枠を${STATE_TEXT.error}。もう一度読み込む`}
         </button>
       ) : loading ? (
-        <span className="bg-canvas-sunken inline-block h-4 w-24 animate-pulse rounded" aria-hidden="true" />
+        <span className="bg-canvas-sunken inline-block h-4 w-24 animate-pulse rounded-mini" aria-hidden="true" />
       ) : unlimited ? (
         <span className="text-ink-faint">契約種別：無制限</span>
       ) : (
@@ -600,7 +599,7 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">LINE Webhook</dt><dd className={webhookLabel === '正常' ? 'text-success font-semibold' : webhookLabel === '要確認' ? 'text-danger font-semibold' : 'text-ink-faint'}>{webhookLabel}</dd></div>
       {/* 稼働チェックの取得に失敗したときは「確認中」ではなく「未取得」にする（IDEA-01）。 */}
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={healthFailed ? 'text-ink-faint' : risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{healthFailed ? '未取得' : risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
-      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-ink font-semibold tabular-nums">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-ink font-semibold tabular-nums">{activeFriends === null ? '—' : `${formatNumber(activeFriends)}人`}</dd></div>
     </dl>
   </Card>
 }
@@ -1443,7 +1442,7 @@ function DashboardPageInner() {
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-2.5">
           <DashboardFreshness freshness={data?.freshness} asOf={data?.asOf} />
-          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
+          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-pill bg-current" />{healthLabel}</span>
           <div className="flex gap-2">
             {PERIODS.map((item) => (
               <button
@@ -1470,7 +1469,7 @@ function DashboardPageInner() {
             {unreadNotificationCount > 0 ? (
               <span
                 aria-hidden="true"
-                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-full px-1 text-center text-xs leading-5 font-bold tabular-nums"
+                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-pill px-1 text-center text-xs leading-5 font-medium tabular-nums"
               >{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
             ) : null}
             <NotificationPanel

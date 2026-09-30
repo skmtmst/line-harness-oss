@@ -16,7 +16,7 @@ describe('V6 dqFft シナリオの通を削除する確認', () => {
     expect(PAGE).toContain('その配信対象・送信後アクションが削除されます')
     expect(PAGE).toContain('到達済みの履歴は監査記録として残ります')
     expect(PAGE).toContain('この操作は取り消せません')
-    expect(PAGE).toContain('confirmLabel="この通を削除"')
+    expect(PAGE).toContain('confirmLabel="この通を削除する"')
   })
 
   it('削除中の二重操作を止め、失敗しても窓を閉じず日本語で再試行を案内する', () => {

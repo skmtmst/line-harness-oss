@@ -299,7 +299,7 @@ function ScenarioModeContent() {
           <span>新規作成</span>
         </nav>
         {/* 見た目を手書きしない。共通ボタンで高さをそろえる。 */}
-        <Button href="/scenarios">✕ キャンセル</Button>
+        <Button href="/scenarios">キャンセル</Button>
       </div>
 
       <Stepper
@@ -458,7 +458,7 @@ function ScenarioModeContent() {
             disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}
             onClick={() => { if (selectedMode) void choose(selectedMode) }}
           >
-            {saving !== null ? '作成中…' : id ? 'この方式で保存' : 'この方式で作成'}
+            {saving !== null ? '作成中…' : id ? 'この方式で保存する' : 'この方式で作る'}
           </Button>
         </div>
       </div>
@@ -545,7 +545,7 @@ function ModeCard({
           <h2 className="text-ink flex flex-wrap items-center gap-2 text-lg font-bold">
             {title}
             {recommended && (
-              <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-xs font-bold">
+              <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-xs font-medium">
                 おすすめ
               </span>
             )}
@@ -575,7 +575,7 @@ function ModeCard({
             {heads.map(h => (
               <span
                 key={h}
-                className="bg-accent-deep text-on-accent rounded-control flex-1 px-2 py-1 text-center text-xs font-bold"
+                className="bg-accent-deep text-on-accent rounded-control flex-1 px-2 py-1 text-center text-xs font-medium"
               >
                 {h}
               </span>
@@ -586,7 +586,7 @@ function ModeCard({
           {rows.map(r => (
             <div key={r.who} className="flex items-center gap-2">
               <div className="w-36 shrink-0">
-                <p className="text-ink text-xs font-bold">{r.who}</p>
+                <p className="text-ink text-xs font-medium">{r.who}</p>
                 <p className="text-ink-faint text-[11px]">{r.start}</p>
               </div>
               <Slot order="1通目" at={r.first} gap={r.gaps?.[0]} />
@@ -614,7 +614,7 @@ function Slot({ order, at, gap }: { order: string; at: string; gap?: string }) {
       )}
       <div className="border-hairline rounded-control bg-canvas border px-2 py-1.5 text-center">
         <p className="text-ink-faint text-[10px]">{order}</p>
-        <p className="text-ink text-xs font-bold">{at}</p>
+        <p className="text-ink text-xs font-medium">{at}</p>
       </div>
     </div>
   )

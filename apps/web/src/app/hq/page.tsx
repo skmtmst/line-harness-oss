@@ -119,10 +119,10 @@ export default function HqPage() {
           disabled={checkingConnections || loading || accounts.length === 0}
           onClick={() => { void refreshConnectionInfo() }}
         >
-          {checkingConnections ? '接続情報を更新中' : 'LINE ID・接続状態を更新'}
+          {checkingConnections ? '接続情報を更新中' : 'LINE ID・接続状態を更新する'}
         </Button>
         <Button href="/accounts/new" variant="primary" className="shrink-0">
-          ＋ LINEアカウントを新規登録
+          ＋ LINEアカウントを登録する
         </Button>
       </div>
 
@@ -153,7 +153,7 @@ export default function HqPage() {
 
       {!loadError && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
+          <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
 
@@ -175,7 +175,7 @@ export default function HqPage() {
           data-design="Empty"
           title="まだアカウントがありません"
           description="最初のLINE公式アカウントを登録すると、ここからアカウントへログインできます。"
-          action={<Button href="/accounts/new" variant="primary">＋ LINEアカウントを新規登録</Button>}
+          action={<Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録する</Button>}
         />
       ) : null}
 
