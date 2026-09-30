@@ -119,7 +119,7 @@ describe('R145: 対象と停止条件の書きかけがある間の離脱確認'
     fireEvent.click(screen.getByRole('link', { name: '外の一覧へ' }))
     await screen.findByText('保存していない変更があります')
 
-    fireEvent.click(screen.getByRole('button', { name: '保存せずに移動' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
     await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/reminders'))
   })
 

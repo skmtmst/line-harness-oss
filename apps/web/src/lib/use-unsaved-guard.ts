@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 export type UnsavedLeaveTarget =
   | { kind: 'link'; href: string }
   | { kind: 'history-back' }
+  | { kind: 'action'; run: () => void }
 
 /**
  * 未保存の変更がある間、画面を離れる操作を止める。
@@ -14,7 +15,7 @@ export type UnsavedLeaveTarget =
  * - 左メニュー等の画面内リンク: クリックを捕まえて確認対話を出す
  * - 戻る操作: popstate で元の履歴位置へ戻してから確認対話を出す
  *
- * 保存成功や「保存せずに移動」の確認後は markClean() で dirty を外し、
+ * 保存成功や「保存せずに移る」の確認後は markClean() で dirty を外し、
  * 警告がもう出ないようにする。
  */
 export function useUnsavedGuard(options: {
@@ -27,7 +28,7 @@ export function useUnsavedGuard(options: {
    */
   samePage?: (destination: URL) => boolean
   /**
-   * 「保存せずに移動」が確定したあと・実際に移動する直前に呼ぶ。
+   * 「保存せずに移る」が確定したあと・実際に移動する直前に呼ぶ。
    * クエリだけ変わる画面内遷移（コンポーネントがアンマウントされない）でも
    * 「変更は消えます」と約束した通り、画面の入力を初期状態へ戻せるようにする。
    */
@@ -123,7 +124,7 @@ export function useUnsavedGuard(options: {
   }, [dirty, busy])
 
   /**
-   * 確認で「保存せずに移動」が選ばれたとき、予定していた移動を実行する。
+   * 確認で「保存せずに移る」が選ばれたとき、予定していた移動を実行する。
    *
    * `onDiscard` は移動の直前に呼ぶ。「変更は消えます」と約束したあと、
    * クエリだけ変わる画面内遷移（コンポーネントがアンマウントされない）でも
@@ -138,10 +139,32 @@ export function useUnsavedGuard(options: {
       window.history.back()
       return
     }
+    if (leaveTarget.kind === 'action') {
+      /*
+       * 保留していた操作（一覧へ戻るボタン等の router.push）を再実行する。
+       * 実行前に腕を下ろしておかないと、操作の中の遷移が再度止まる。
+       */
+      disarmedRef.current = true
+      leaveTarget.run()
+      return
+    }
     router.push(leaveTarget.href)
   }, [leaveTarget, busy, router])
 
   const cancelLeave = useCallback(() => setLeaveTarget(null), [])
+
+  /*
+   * リンクではない離れる操作（`<button onClick>` からの router.push や、
+   * 画面内で閉じる操作）にも同じ確認を挟む入口。dirty でなければ操作を
+   * そのまま実行し、dirty なら操作を保留して確認対話を出す。
+   */
+  const guarded = useCallback((action: () => void) => {
+    if (disarmedRef.current || !dirtyRef.current) {
+      action()
+      return
+    }
+    if (!busy) setLeaveTarget({ kind: 'action', run: action })
+  }, [busy])
 
   /*
    * 公開成功のあとの画面遷移のように「未保存でも警告せず離れてよい」と
@@ -153,5 +176,5 @@ export function useUnsavedGuard(options: {
     setLeaveTarget(null)
   }, [])
 
-  return { leaveTarget, confirmLeave, cancelLeave, disarm }
+  return { leaveTarget, confirmLeave, cancelLeave, disarm, guarded }
 }
