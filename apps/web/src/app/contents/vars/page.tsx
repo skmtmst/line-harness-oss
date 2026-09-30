@@ -996,7 +996,7 @@ function VarsPageInner() {
             ) : (
             <div className="overflow-x-auto @container">
               {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「更新・次の変更」を畳む。 */}
-              <table className="w-full min-w-[664px] table-fixed @[870px]:min-w-[820px]">
+              <table className="w-full min-w-[696px] table-fixed @[870px]:min-w-[820px]">
                 <thead>
                   <TableHeadRow className="bg-canvas-sunken border-hairline border-b">
                     <Th className="w-10 px-3 py-3">
@@ -1034,8 +1034,13 @@ function VarsPageInner() {
                     <Th className="cq-hide-below-870 px-4 py-3" style={{ width: '19%' }} title="最終更新日・次の変更予定">
                       更新・次の変更
                     </Th>
-                    {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                    <Th align="right" className="bg-canvas-sunken sticky right-0 w-36 px-4 py-3" title="編集・削除">操作</Th>
+                    {/*
+                      #768: 表が横に流れる帯でも操作列は右端に留める。
+                      #1057で「削除」→「削除する」に延び、w-36では行のボタンが
+                      隣列へ被った（1152px）。2個と間隔で約148px要るため、
+                      列幅176px（w-44）・内余白8px（px-2）にする。
+                    */}
+                    <Th align="right" className="bg-canvas-sunken sticky right-0 w-44 px-2 py-3" title="編集・削除">操作</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-divider-soft">
@@ -1137,7 +1142,7 @@ function VarsPageInner() {
                               </>
                             )}
                           </td>
-                          <td className="bg-canvas group-hover:bg-canvas-sunken whitespace-nowrap sticky right-0 px-4 py-3 text-right" title="編集・削除">
+                          <td className="bg-canvas group-hover:bg-canvas-sunken whitespace-nowrap sticky right-0 px-2 py-3 text-right" title="編集・削除">
                             {/*
                               行の操作は同じ高さ（32）にそろえる。削除は撮影入口
                              （data-qa-open="yPkWe"）のため行に残す。
