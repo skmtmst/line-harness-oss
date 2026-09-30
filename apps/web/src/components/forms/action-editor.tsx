@@ -12,6 +12,7 @@
 import type { FormAction } from '@line-crm/shared'
 import Select from '@/components/shared/select'
 import { cellInput, miniButton, type FormRefs } from './form-refs'
+import Button from '@/components/shared/button'
 
 const ACTION_LABELS: { kind: FormAction['kind']; label: string }[] = [
   { kind: 'send_text', label: 'テキストを送る' },
@@ -199,12 +200,9 @@ export default function ActionEditor({
         </div>
       ))}
 
-      <button
-        onClick={() => onChange([...value, emptyAction('tag')])}
-        className={`${miniButton} border-hairline rounded-control border border-dashed px-3 py-1.5`}
-      >
+      <Button variant="secondary" className={(`${miniButton} border-hairline rounded-control border border-dashed px-3 py-1.5`) + ' h-auto whitespace-normal'} onClick={() => onChange([...value, emptyAction('tag')])}>
         ＋ 動作を追加する
-      </button>
+      </Button>
     </div>
   )
 }

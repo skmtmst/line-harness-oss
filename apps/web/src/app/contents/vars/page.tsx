@@ -658,22 +658,15 @@ function VarsPageInner() {
         className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
       />
       <div className="flex justify-end gap-2">
-        <button
-          onClick={() => {
+        <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" onClick={() => {
             setAddingFolder(false)
             setFolderName('')
-          }}
-          className="border-hairline text-ink-secondary rounded-control border px-3 py-1 text-xs"
-        >
+          }}>
           キャンセル
-        </button>
-        <button
-          onClick={() => void addFolder()}
-          disabled={!folderName.trim() || savingFolder}
-          className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
-        >
+        </Button>
+        <Button variant="primary" className="px-3 py-1 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => void addFolder()} disabled={!folderName.trim() || savingFolder}>
           決定
-        </button>
+        </Button>
       </div>
     </div>
   )

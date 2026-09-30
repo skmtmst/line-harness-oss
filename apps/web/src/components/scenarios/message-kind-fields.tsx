@@ -14,6 +14,7 @@
 
 import { useState } from 'react'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Button from '@/components/shared/button'
 
 export type MessageKind = 'location' | 'video' | 'audio' | 'sticker'
 
@@ -455,18 +456,11 @@ export default function MessageKindFields({ kind, value, onChange }: MessageKind
           {BASIC_STICKERS.map((s) => {
             const on = s.packageId === v.packageId && s.stickerId === v.stickerId
             return (
-              <button
-                key={`${s.packageId}-${s.stickerId}`}
-                type="button"
-                onClick={() => set({ packageId: s.packageId, stickerId: s.stickerId })}
-                title={s.label}
-                aria-pressed={on}
-                className={`rounded-card border p-1.5 transition-colors ${
+              <Button variant="secondary" className={(`rounded-card border p-1.5 transition-colors ${
                   on ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
-                }`}
-              >
+                }`) + ' h-auto whitespace-normal'} key={`${s.packageId}-${s.stickerId}`} type="button" onClick={() => set({ packageId: s.packageId, stickerId: s.stickerId })} title={s.label} aria-pressed={on}>
                 <StickerThumb stickerId={s.stickerId} label={s.label} />
-              </button>
+              </Button>
             )
           })}
         </div>

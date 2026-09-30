@@ -293,7 +293,7 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded-mini bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><Button variant="primary" className="mt-2 w-full rounded-mini px-0 py-1 text-[10px] border-0 h-auto whitespace-normal">{String(card.actionLabel ?? '詳しく見る')}</Button></div>)}</div>
   }
   return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
@@ -1837,9 +1837,9 @@ export default function BroadcastForm({
             送る相手・送る内容・送る時間を決めます。配信する前に、右側のチェックがすべて緑になっているか確認してください。
           </p>
         </div>
-        <button onClick={() => guarded(onCancel)} className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm">
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" onClick={() => guarded(onCancel)}>
           一覧に戻る
-        </button>
+        </Button>
       </div>
     )}
     <BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />
@@ -2040,12 +2040,9 @@ export default function BroadcastForm({
             {/* ブロック中の人は countRules の is_following=true で外れている。
                 外していることを書かないと、人数が合わないように見える。 */}
             <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
-            <Link
-              href="/friends"
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1 text-xs"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" href="/friends">
               対象を一覧で見る
-            </Link>
+            </Button>
             <SegmentPresetControls
               accountId={selectedAccountId}
               value={targetMode === 'advanced' ? condition : null}
@@ -2339,26 +2336,16 @@ export default function BroadcastForm({
           <h3 className="text-lg font-bold text-ink">送信設定</h3>
           <p className="mb-4 mt-1 text-sm text-ink-faint">配信する日時と、LINEの集計方法を設定します。</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => setSendMode('now')}
-              aria-pressed={sendMode === 'now'}
-              className={`rounded-card border p-3 text-left text-sm ${
+            <Button variant="secondary" className={(`rounded-card border p-3 text-left text-sm ${
                 sendMode === 'now' ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`}
-            >
+              }`) + ' h-auto whitespace-normal'} type="button" onClick={() => setSendMode('now')} aria-pressed={sendMode === 'now'}>
               今すぐ配信
-            </button>
-            <button
-              type="button"
-              onClick={() => setSendMode('scheduled')}
-              aria-pressed={sendMode === 'scheduled'}
-              className={`rounded-card border p-3 text-left text-sm ${
+            </Button>
+            <Button variant="secondary" className={(`rounded-card border p-3 text-left text-sm ${
                 sendMode === 'scheduled' ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`}
-            >
+              }`) + ' h-auto whitespace-normal'} type="button" onClick={() => setSendMode('scheduled')} aria-pressed={sendMode === 'scheduled'}>
               日時を指定して予約
-            </button>
+            </Button>
             {/* 「友だちごとの最適な時間」は開封の時間帯を持っていないので押し口を出さない。 */}
           </div>
 
@@ -2724,9 +2711,9 @@ export default function BroadcastForm({
         </>
       ) : (
         <>
-          <button onClick={() => guarded(onCancel)} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">キャンセル</button>
-          {(shows('message') || shows('confirm')) && <button disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50">{testSending ? '送信中…' : 'テストを送る'}</button>}
-          <button disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</button>
+          <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
+          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>
