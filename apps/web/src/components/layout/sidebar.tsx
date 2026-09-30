@@ -140,18 +140,14 @@ export default function Sidebar({
         return next
       })
     }
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
-        if (document.documentElement.dataset.theme !== 'v8') return
-        e.preventDefault()
-        toggle()
-      }
-    }
+    /*
+     * ⌘\ / Ctrl+\ の受け口は TopBar の keydown が投げる
+     * SIDEBAR_TOGGLE_EVENT に一本化する。ここでも keydown を受けると
+     * 同じ押下で2回畳みが走り、開閉が元に戻る(V8-1085-KEYBOARD-01)。
+     */
     window.addEventListener(SIDEBAR_TOGGLE_EVENT, toggle)
-    window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, toggle)
-      window.removeEventListener('keydown', onKey)
     }
   }, [])
 
