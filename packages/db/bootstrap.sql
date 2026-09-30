@@ -988,6 +988,19 @@ CREATE TABLE auto_reply_action_runs (
   UNIQUE (evaluation_id, action_stable_id)
 );
 
+CREATE TABLE auto_reply_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT REFERENCES line_accounts(id),
+  operation         TEXT NOT NULL,
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  auto_reply_id     TEXT NOT NULL REFERENCES auto_replies(id) ON DELETE CASCADE,
+  version_id        TEXT REFERENCES auto_reply_versions(id) ON DELETE SET NULL,
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(idempotency_key)
+);
+
 CREATE TABLE auto_reply_evaluation_details (
   id                 TEXT PRIMARY KEY,
   evaluation_id      TEXT NOT NULL,
@@ -7513,6 +7526,9 @@ CREATE INDEX idx_auto_replies_template_id ON auto_replies(template_id);
 
 CREATE INDEX idx_auto_reply_action_runs_evaluation
   ON auto_reply_action_runs (evaluation_id, status);
+
+CREATE INDEX idx_auto_reply_create_requests_rule
+  ON auto_reply_create_requests(auto_reply_id, created_at DESC);
 
 CREATE INDEX idx_auto_reply_evaluation_details_evaluation
   ON auto_reply_evaluation_details (evaluation_id, evaluation_order);
