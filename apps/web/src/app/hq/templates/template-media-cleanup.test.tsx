@@ -21,8 +21,8 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 async function startCreate(label: 'リッチメニュー画像を選ぶ' | 'メッセージ画像を選ぶ') {
   render(<TemplateConsole type={label === 'メッセージ画像を選ぶ' ? 'template' : 'rich_menu'} />)
-  await screen.findByRole('button', { name: '＋ひな形を作成' })
-  fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+  await screen.findByRole('button', { name: '＋ひな形を作る' })
+  fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
   await screen.findByLabelText(label)
 }
 
@@ -54,7 +54,7 @@ describe('R568 cancelled or replaced uploads are reclaimed', () => {
     fireEvent.change(input, { target: { files: [new File(['b'], 'b.png', { type: 'image/png' })] } })
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalledTimes(2))
     fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '案内' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalled())
     await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_A))
     expect(calls.deleteImage).not.toHaveBeenCalledWith(KEY_B)
