@@ -70,8 +70,8 @@ export default function MergedProfileDialog({
       footer={(
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={onSave} disabled={busy || selectedCount === 0}>
-            {busy ? '保存中…' : `選んだ${selectedCount}項目を保存`}
+          <Button type="button" variant="primary" onClick={onSave} disabled={busy || selectedCount === 0} busy={busy}>
+            {`選んだ${selectedCount}項目を保存`}
           </Button>
         </div>
       )}

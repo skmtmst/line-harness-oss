@@ -38,7 +38,7 @@ describe('V6 送信後アクションの契約', () => {
   })
 
   it('動作の札は設計の寸法（h58・r8・12/700・アイコン18）で並べる', () => {
-    expect(CSS).toMatch(/\.kindButton \{[^}]*height: 58px;[^}]*border-radius: 8px;/)
+    expect(CSS).toMatch(/\.kindButton \{[^}]*height: 58px;[^}]*border-radius: var\(--radius-control\);/)
     expect(EDITOR).toContain('styles.kindButton')
     expect(EDITOR).toContain('text-caption font-medium')
     expect(EDITOR).toContain('size={18}')

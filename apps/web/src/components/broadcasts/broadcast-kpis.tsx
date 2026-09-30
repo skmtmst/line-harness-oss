@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { api, type BroadcastListKpis, type BroadcastStats } from '@/lib/api'
 import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'
 import MetricValue from '@/components/ui/metric-value'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 
 /** 帯の副題に出す数。中身は `broadcast-kpi-values.ts`。 */
 export { countText }
@@ -66,17 +67,18 @@ export default function BroadcastKpis({
         <div key={card.title} className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-secondary text-xs font-medium">{card.title}</p>
           <p className="mt-1 flex items-baseline gap-1">
-            {loading ? (
-              <span className="bg-canvas-sunken inline-block h-7 w-14 animate-pulse rounded" />
-            ) : (
-              // 監査6 #674: 数が無いときは「—」だけで単位を出さない（`—件` は数に見える）
+            <DelayedSkeleton
+              loading={loading}
+              skeleton={<Skeleton className="h-7 w-14" />}
+            >
+              {/* 監査6 #674: 数が無いときは「—」だけで単位を出さない（`—件` は数に見える） */}
               <span className="text-ink text-2xl font-bold">
                 <MetricValue
                   value={typeof card.value === 'number' && Number.isFinite(card.value) ? card.value : null}
                   unit={card.unit}
                 />
               </span>
-            )}
+            </DelayedSkeleton>
           </p>
           <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
             {/*

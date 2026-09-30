@@ -307,7 +307,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     await flush()
 
     /* 固定バーの「下書き保存」は通知の保存を呼ぶ。成功で未保存の印が降りる。 */
-    await act(async () => { buttonByText('下書き保存').click() })
+    await act(async () => { buttonByText('下書きを保存する').click() })
     await flush()
     expect(host.textContent).not.toContain('保存していない変更があります')
 
@@ -410,7 +410,7 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     /* 固定バーの「下書き保存」は飾りではない。押せて、実際に保存する。 */
-    expect(buttonByText('下書き保存').disabled).toBe(false)
+    expect(buttonByText('下書きを保存する').disabled).toBe(false)
 
     await act(async () => { buttonContaining('動画へ').click() })
     await flush()
@@ -449,7 +449,7 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     await act(async () => { fireEvent.change(titleInput(), { target: { value: '下書きで保存する題名' } }) })
-    await act(async () => { buttonByText('下書き保存').click() })
+    await act(async () => { buttonByText('下書きを保存する').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
@@ -503,10 +503,12 @@ describe('DETAIL-05 無反応のボタンを残さない', () => {
     await render()
     await flush()
 
-    await act(async () => { buttonByText('テスト送信').click() })
+    await act(async () => { buttonByText('テストを送る').click() })
     await flush()
     /* 送信前に相手と文面を確認する。押した瞬間に送らない。 */
-    await act(async () => { buttonByText('テスト送信する').click() })
+    const confirm = Array.from(host.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'テストを送る') as HTMLButtonElement | undefined
+    expect(confirm).toBeDefined()
+    await act(async () => { confirm!.click() })
     await flush()
 
     expect(net.calls.some((call) => call.method === 'POST' && call.path.endsWith('/notifications/test'))).toBe(true)

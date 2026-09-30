@@ -89,12 +89,12 @@ describe('bV5Vs シナリオ編集', () => {
     expect(header).not.toContain('シナリオ編集')
     expect(header).not.toContain('配信のタイミングと内容を並べます。')
     /*
-     * 操作は残す。配信結果・一括プレビュー・一括テスト送信・保存の
+     * 操作は残す。配信結果・一括プレビュー・一括でテストを送る・保存の
      * 各ボタンは Header の action に渡し続ける。
      */
     expect(header).toContain('action=')
     expect(detail).toContain('配信結果を見る')
-    expect(detail).toContain('一括テスト送信')
+    expect(detail).toContain('一括でテストを送る')
   })
 
   it('「作成しただけでは配信されません」を見出しの説明から外し、帯へ移す', () => {
@@ -343,7 +343,7 @@ describe('EvVO5 開始条件', () => {
   })
 })
 
-describe('g2UNV 一括テスト送信', () => {
+describe('g2UNV 一括でテストを送る', () => {
   it('本番へ何が起きないのかを断る', () => {
     expect(testSendBody).toContain('本番の登録は増えません。配信予定も作りません。')
   })
@@ -368,7 +368,7 @@ describe('g2UNV 一括テスト送信', () => {
     expect(testSendBody).toContain('const [confirming, setConfirming] = useState(false)')
     expect(testSendBody).toContain('内容を確認')
     expect(testSendBody).toContain('selectedFriend?.displayName')
-    expect(testSendBody).toContain('テスト送信を開始')
+    expect(testSendBody).toContain('テストを送る')
   })
 
   it('詳細画面から、送る通を渡す', () => {

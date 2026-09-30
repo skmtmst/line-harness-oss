@@ -1,5 +1,6 @@
 import type { MediaDeleteImpact, MediaDeleteImpactReference } from '@line-crm/shared'
 import { mediaUsageKindText } from './media-usage-display'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
  * メディアを消したときの影響（設計 `YfTfJ` 15-1-C／契約 #610）。
@@ -58,10 +59,10 @@ export function usageText(impact: MediaDeleteImpact): string {
   if (impact.verified === false) {
     return impact.usageCount === 0
       ? '使われている場所を確かめられませんでした。'
-      : `いま ${impact.usageCount.toLocaleString('ja-JP')}か所で使われています（ほかに確認できていない場所があります）。`
+      : `いま ${formatNumber(impact.usageCount)}か所で使われています（ほかに確認できていない場所があります）。`
   }
   if (impact.usageCount === 0) return 'どこでも使っていません。'
-  return `いま ${impact.usageCount.toLocaleString('ja-JP')}か所で使われています。`
+  return `いま ${formatNumber(impact.usageCount)}か所で使われています。`
 }
 
 /** 消せない理由。設計の「そこから外すか、別の画像に差し替えてください」。 */
@@ -77,10 +78,7 @@ export function blockedReason(impact: MediaDeleteImpact): string | null {
 export function checkedAtText(checkedAt: string): string {
   const date = new Date(checkedAt)
   if (Number.isNaN(date.getTime())) return NOT_AVAILABLE
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return formatDateTime(date)
 }
 
 /**

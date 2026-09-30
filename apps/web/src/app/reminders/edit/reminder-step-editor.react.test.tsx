@@ -156,14 +156,14 @@ describe('通知ステップの複数通編集', () => {
     render(<Issue469ReminderStepEditor reminderId="r-1" />)
     await screen.findByRole('button', { name: /1通目のお知らせ/ })
 
-    fireEvent.click(screen.getByRole('button', { name: '通知を追加' }))
+    fireEvent.click(screen.getByRole('button', { name: '通知を追加する' }))
     await screen.findByRole('button', { name: /3通目のお知らせ/ })
 
     // 新しい通が選ばれて本文は空。空のままでは保存ボタンを押せない。
     const saveButton = screen.getByRole('button', { name: '送信設定へ' }) as HTMLButtonElement
     expect(saveButton.disabled).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: 'この通知を削除' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この通知を削除する' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: /3通目のお知らせ/ })).toBeNull())
   })
 
@@ -173,7 +173,7 @@ describe('通知ステップの複数通編集', () => {
     }))
     render(<Issue469ReminderStepEditor reminderId="r-1" />)
     await screen.findByRole('button', { name: /1通目のお知らせ/ })
-    expect((screen.getByRole('button', { name: 'この通知を削除' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'この通知を削除する' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('前へ移動で順番を入れ替えられる', async () => {
@@ -242,7 +242,7 @@ describe('通知ステップの複数通編集', () => {
     const { container } = render(<Issue469ReminderStepEditor reminderId="r-1" />)
     await waitFor(() => expect(bodyTextarea(container).value).toBe('前日のお知らせ本文'))
 
-    fireEvent.change(bodyTextarea(container), { target: { value: '古い画面からの保存' } })
+    fireEvent.change(bodyTextarea(container), { target: { value: '古い画面からの保存する' } })
     fireEvent.click(screen.getByRole('button', { name: '送信設定へ' }))
 
     await screen.findByText(/別の画面で先に更新されました/)

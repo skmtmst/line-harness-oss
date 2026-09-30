@@ -35,6 +35,7 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import Pagination from '@/components/shared/pagination'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
+import { formatDay, formatNumber } from '@/lib/format'
 
 interface MessageTemplate {
   id: string
@@ -675,13 +676,8 @@ function InflowLinksPageInner({
   }, [page, pageCount])
   const genreOptions = availableGenres.map((genre) => genre.name)
 
-  const formatDate = (iso: string | null) => {
-    if (!iso) return '—'
-    // ★V7：他の一覧と同じ「8月25日」。今年でないときだけ年を付ける。
-    const date = new Date(iso)
-    const sameYear = date.getFullYear() === new Date().getFullYear()
-    return date.toLocaleDateString('ja-JP', sameYear ? { month: 'long', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' })
-  }
+  // ★V7：他の一覧と同じ「8月25日（月）」。今年でないときだけ年を付ける。
+  const formatDate = (iso: string | null) => formatDay(iso)
 
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
   // R273: 「受付中」は isActive が真の登録済み行だけを数える。orphan（外部が
@@ -775,7 +771,7 @@ function InflowLinksPageInner({
           unit="人"
           detail={
             summaryAvailable && summary
-              ? `累計。そのうち経路が分かる人 ${summary.friendsWithRef.toLocaleString('ja-JP')}人`
+              ? `累計。そのうち経路が分かる人 ${formatNumber(summary.friendsWithRef)}人`
               : loading
                 ? '読み込んでいます'
                 : '取得できません'
@@ -808,7 +804,7 @@ function InflowLinksPageInner({
           <p>        集計は累計（全期間）です。購入・返金は、LINEの友だちと結びついた注文だけを、
         その人がはじめて来た経路に数えます（同じ人・同じ注文は二重に数えません）。
         {summary?.orders
-          ? `いまの範囲では注文${summary.orders.total.toLocaleString('ja-JP')}件のうち、経路が分かるのは${summary.orders.attributed.toLocaleString('ja-JP')}件、経路が分からないのは${(summary.orders.total - summary.orders.attributed).toLocaleString('ja-JP')}件（うち友だち未連携${(summary.orders.total - summary.orders.linked).toLocaleString('ja-JP')}件）です。`
+          ? `いまの範囲では注文${formatNumber(summary.orders.total)}件のうち、経路が分かるのは${formatNumber(summary.orders.attributed)}件、経路が分からないのは${formatNumber((summary.orders.total - summary.orders.attributed))}件（うち友だち未連携${formatNumber((summary.orders.total - summary.orders.linked))}件）です。`
           : '注文の集計を取得できたら、経路が分かる件数と分からない件数をここに出します。'}
       </p>
         </div>
@@ -835,7 +831,7 @@ function InflowLinksPageInner({
         />
 
         <section className="flex min-w-0 flex-col gap-4">
-          <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-card lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
               <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'フォルダを選んでください'}</h2>
@@ -941,7 +937,7 @@ function InflowLinksPageInner({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
+        <div className="overflow-hidden rounded-control border border-hairline bg-canvas">
           <table className="w-full table-fixed text-xs">
             <colgroup>
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
@@ -1063,7 +1059,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
+                            className="shrink-0 rounded-mini border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
                             title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
@@ -1073,7 +1069,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
+                            className="shrink-0 rounded-mini border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
                             title="外部で発行されたREFです。流入実績だけを集計しています。"
                           >
                             未登録
@@ -1109,7 +1105,7 @@ function InflowLinksPageInner({
                     <td className="px-2 py-3 text-ink-secondary">
                       {tag ? (
                         <span
-                          className="block truncate whitespace-nowrap rounded-full px-2 py-0.5 text-center text-[11px] font-medium"
+                          className="block truncate whitespace-nowrap rounded-pill px-2 py-0.5 text-center text-[11px] font-medium"
                           style={{
                             backgroundColor: `${tag.color}22`,
                             color: tagTextColor(tag.color),
@@ -1135,10 +1131,10 @@ function InflowLinksPageInner({
                           : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-ink">
-                      {summaryAvailable ? (r.stats?.friendCount ?? 0).toLocaleString('ja-JP') : '—'}
+                      {summaryAvailable ? formatNumber((r.stats?.friendCount ?? 0)) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right text-ink-secondary">
-                      {summaryAvailable ? (r.stats?.clickCount ?? 0).toLocaleString('ja-JP') : '—'}
+                      {summaryAvailable ? formatNumber((r.stats?.clickCount ?? 0)) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
                       {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}
@@ -1197,7 +1193,7 @@ function InflowLinksPageInner({
                           onClick={() => setEditing({ register: r.refCode })}
                           title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
                         >
-                          登録
+                          登録する
                         </Button>
                       )}
                     </td>
@@ -1331,18 +1327,14 @@ function FragmentRow({
                     <Link
                       key={f.id}
                       href={`/chats?friend=${f.id}`}
-                      className="flex items-center justify-between bg-canvas rounded-lg px-3 py-2 border border-hairline hover:border-action"
+                      className="flex items-center justify-between bg-canvas rounded-control px-3 py-2 border border-hairline hover:border-action"
                     >
                       <span className="text-sm text-ink font-medium truncate">
                         {f.displayName}
                       </span>
                       <span className="text-xs text-ink-faint ml-2 shrink-0">
                         {f.trackedAt
-                          ? new Date(f.trackedAt).toLocaleDateString('ja-JP', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                            })
+                          ? formatDay(f.trackedAt)
                           : '—'}
                       </span>
                     </Link>
@@ -1359,9 +1351,9 @@ function FragmentRow({
             <div className="mt-4 border-t border-hairline pt-3" onClick={(e) => e.stopPropagation()}>
               {orderStats?.orderCount !== undefined ? (
                 <p className="mb-2 text-xs text-ink-faint">
-                  集計では、この経路からの購入は {orderStats.orderCount.toLocaleString('ja-JP')}件
-                  （返金 {(orderStats.refundedOrderCount ?? 0).toLocaleString('ja-JP')}件・
-                  取消 {(orderStats.cancelledOrderCount ?? 0).toLocaleString('ja-JP')}件）です。
+                  集計では、この経路からの購入は {formatNumber(orderStats.orderCount)}件
+                  （返金 {formatNumber((orderStats.refundedOrderCount ?? 0))}件・
+                  取消 {formatNumber((orderStats.cancelledOrderCount ?? 0))}件）です。
                 </p>
               ) : null}
               <RefOrdersPanel refCode={refCode} accountId={accountId} pageSize={10} />
@@ -1460,8 +1452,8 @@ function BulkRoutesDialog({
             キャンセル
           </Button>
           {action && affected.length > 0 ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }}>
-              {busy ? '実行中…' : `${affected.length.toLocaleString('ja-JP')}件に実行する`}
+            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
+              {`${formatNumber(affected.length)}件に実行する`}
             </Button>
           ) : null}
         </div>
@@ -1470,12 +1462,12 @@ function BulkRoutesDialog({
       {result ? (
         <div className="space-y-3">
           <p className="text-ink text-sm">
-            {result.succeeded.length.toLocaleString('ja-JP')}件に反映しました。
+            {formatNumber(result.succeeded.length)}件に反映しました。
           </p>
           {result.failed.length > 0 ? (
             <div className="space-y-2">
               <p className="text-danger text-sm font-semibold">
-                {result.failed.length.toLocaleString('ja-JP')}件は実行できませんでした。
+                {formatNumber(result.failed.length)}件は実行できませんでした。
               </p>
               <ul className="divide-hairline divide-y rounded-control border border-hairline text-sm">
                 {result.failed.map(({ route, error }) => (
@@ -1506,11 +1498,11 @@ function BulkRoutesDialog({
         <div className="space-y-4">
           <div>
             <p className="text-ink text-sm font-semibold">
-              対象 {remaining.length.toLocaleString('ja-JP')}件
+              対象 {formatNumber(remaining.length)}件
             </p>
             <p className="text-ink-faint mt-1 text-xs leading-5">
               {remaining.slice(0, 8).map((route) => route.name).join('、')}
-              {remaining.length > 8 ? ` ほか${(remaining.length - 8).toLocaleString('ja-JP')}件` : ''}
+              {remaining.length > 8 ? ` ほか${formatNumber((remaining.length - 8))}件` : ''}
             </p>
           </div>
           <RadioCardGroup legend="どの操作をしますか？">
@@ -1518,19 +1510,19 @@ function BulkRoutesDialog({
               {
                 value: 'pause' as const,
                 label: 'まとめて停止する',
-                note: `選んだ中の受付中 ${pauseTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                note: `選んだ中の受付中 ${formatNumber(pauseTargets.length)}件が対象です。`,
                 count: pauseTargets.length,
               },
               {
                 value: 'resume' as const,
                 label: 'まとめて再開する',
-                note: `選んだ中の停止中 ${resumeTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                note: `選んだ中の停止中 ${formatNumber(resumeTargets.length)}件が対象です。`,
                 count: resumeTargets.length,
               },
               {
                 value: 'move' as const,
                 label: 'フォルダをまとめて移動する',
-                note: `選んだ中の ${moveTargets.length.toLocaleString('ja-JP')}件が変わります。`,
+                note: `選んだ中の ${formatNumber(moveTargets.length)}件が変わります。`,
                 count: -1,
               },
             ]).map((option) => {

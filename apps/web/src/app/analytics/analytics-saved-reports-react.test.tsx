@@ -277,8 +277,8 @@ describe('監査 R226 保存済み分析の絞り込み', () => {
     expect(host.textContent).not.toContain('流入別の成果 ／ 定期レポート')
     expect(host.textContent).toContain('一覧から分析を選んでください')
 
-    // 「検索をやめる」で元の一覧へ戻り、先頭が選び直されて履歴も戻る
-    await act(async () => { button('検索をやめる').click() })
+    // 「キャンセル」で元の一覧へ戻り、先頭が選び直されて履歴も戻る
+    await act(async () => { button('キャンセル').click() })
     expect(host.textContent).toContain('流入別の成果 ／ 定期レポート')
     expect(host.textContent).toContain('曜日別の推移')
   })

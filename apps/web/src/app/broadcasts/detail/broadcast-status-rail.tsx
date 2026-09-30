@@ -17,6 +17,7 @@ export function isApprovalInvolved(
 }
 import Chip from '@/components/shared/chip'
 import HelpTip from '@/components/shared/help-tip'
+import { formatNumber } from '@/lib/format'
 
 export type StatusRailStatus = BroadcastDisplayStatus
 
@@ -106,7 +107,7 @@ export default function BroadcastStatusRail({
               <span className="flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
-                  className={`flex h-5 w-5 items-center justify-center rounded-full border text-micro ${done ? 'border-accent-deep bg-accent-soft text-accent-deep' : current ? 'border-accent-deep text-accent-deep' : 'border-hairline text-ink-faint'}`}
+                  className={`flex h-5 w-5 items-center justify-center rounded-pill border text-micro ${done ? 'border-accent-deep bg-accent-soft text-accent-deep' : current ? 'border-accent-deep text-accent-deep' : 'border-hairline text-ink-faint'}`}
                 >
                   {done ? <Check size={12} strokeWidth={3} /> : null}
                 </span>
@@ -152,7 +153,7 @@ function bandText(
   formatDateTime: (value: string | null | undefined) => string,
 ): string {
   const sent = ledger?.sent ?? 0
-  const totalText = total.toLocaleString('ja-JP')
+  const totalText = formatNumber(total)
   switch (displayStatus) {
     case 'draft':
       return 'まだ送っていません'
@@ -164,18 +165,18 @@ function bandText(
       return '送信の準備をしています'
     case 'sending': {
       const remaining = Math.max(0, total - sent)
-      return `送信中 ${sent.toLocaleString('ja-JP')} / ${totalText}人に送りました。止めると、まだの${remaining.toLocaleString('ja-JP')}人には送りません。`
+      return `送信中 ${formatNumber(sent)} / ${totalText}人に送りました。止めると、まだの${formatNumber(remaining)}人には送りません。`
     }
     case 'sent':
-      return `${sent.toLocaleString('ja-JP')} / ${totalText}人に届きました`
+      return `${formatNumber(sent)} / ${totalText}人に届きました`
     case 'partial_failed': {
       const retryable = ledger?.retryableCount ?? 0
-      return `${sent.toLocaleString('ja-JP')} / ${totalText}人に届きました。${retryable.toLocaleString('ja-JP')}人は送り直せます。`
+      return `${formatNumber(sent)} / ${totalText}人に届きました。${formatNumber(retryable)}人は送り直せます。`
     }
     case 'failed': {
       const retryable = ledger?.retryableCount ?? 0
       return retryable > 0
-        ? `届けられませんでした。一時的な失敗 ${retryable.toLocaleString('ja-JP')}人は送り直せます。`
+        ? `届けられませんでした。一時的な失敗 ${formatNumber(retryable)}人は送り直せます。`
         : '届けられませんでした。送り直せる相手はいません。'
     }
     case 'stopped':

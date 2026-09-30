@@ -43,7 +43,7 @@ describe('V6 オートメーション一覧の状態', () => {
   })
 
   it('各行の実行回数・失敗回数と詳細導線を表示する', () => {
-    expect(PAGE).toContain("automation.executionCount30d.toLocaleString('ja-JP')")
+    expect(PAGE).toContain("formatNumber(automation.executionCount30d)")
     expect(PAGE).toContain('automation.failureCount30d > 0')
     // #942 N-352: 編集は公開版を写した下書きを作ってから開く。実行記録への
     // 導線は行の名前を検索語に載せる。

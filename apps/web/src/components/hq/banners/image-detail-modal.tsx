@@ -239,10 +239,9 @@ export default function ImageDetailModal({
           <Button
             variant="primary"
             disabled={busy || selected.length === 0 || deliverable.length === 0}
-            onClick={() => void onDeliver(selected).then(() => setSelected([]))}
-          >
+            onClick={() => void onDeliver(selected).then(() => setSelected([]))} busy={busy} busyLabel="渡しています…">
             <Store aria-hidden="true" className="h-4 w-4" />
-            {busy ? '渡しています…' : `${selected.length}アカウントへ渡す`}
+            {`${selected.length}アカウントへ渡す`}
           </Button>
         </div>
       </div>

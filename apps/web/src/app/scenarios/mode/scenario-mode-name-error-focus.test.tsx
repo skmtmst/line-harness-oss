@@ -70,7 +70,7 @@ function nameInput(): HTMLInputElement {
   return input
 }
 
-describe('R172 名前空欄の下書き保存', () => {
+describe('R172 名前空欄の下書き保存する', () => {
   it('入力欄の下に案内を出し、欄へフォーカスとスクロールを移す', async () => {
     await mount()
     const draft = [...host.querySelectorAll('button')].find((el) =>

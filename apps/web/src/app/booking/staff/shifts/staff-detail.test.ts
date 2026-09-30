@@ -137,7 +137,7 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     expect(DETAIL).toContain('(weekdayOf(previewDates[0]) + 6) % 7')
     expect(DETAIL).toContain('aria-hidden="true"')
     // 月またぎの位置が分かるよう、月の初めと先頭は「月/日」で出す。
-    expect(DETAIL).toContain('weekdayLabel(item.date)')
+    expect(DETAIL).toContain('formatDay(item.date)')
   })
 
   it('日別シフトがある日は優先、ない日はいつもの時間、外の予定は枠を閉じる', () => {

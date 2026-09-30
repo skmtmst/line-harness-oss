@@ -173,7 +173,7 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
               >
                 <span
                   className={`border-hairline inline-block h-3 w-3 border ${
-                    block.type === 'radio' ? 'rounded-pill' : 'rounded-[3px]'
+                    block.type === 'radio' ? 'rounded-pill' : 'rounded-mini'
                   } ${selected ? '' : 'bg-canvas'}`}
                   style={selected ? { backgroundColor: theme.main, borderColor: theme.main } : undefined}
                 />

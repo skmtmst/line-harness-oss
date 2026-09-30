@@ -105,7 +105,7 @@ describe('ウェビナー作成の保存失敗文（D002）', () => {
     await render()
     await typeTitle('残したい名前')
 
-    await act(async () => { buttonByText('下書き保存').click() })
+    await act(async () => { buttonByText('下書きを保存する').click() })
     await flush()
 
     expect(fixture.push).not.toHaveBeenCalled()
@@ -126,9 +126,9 @@ describe('ウェビナー作成のフォルダ取得失敗（D003）', () => {
     expect(host.querySelector('#webinar-folder')).not.toBeNull()
 
     // 読み込めていない間は保存先を確定させない。保存ボタンは押せない。
-    expect(buttonByText('下書き保存').disabled).toBe(true)
+    expect(buttonByText('下書きを保存する').disabled).toBe(true)
     expect(buttonByText('動画設定へ').disabled).toBe(true)
-    await act(async () => { buttonByText('下書き保存').click() })
+    await act(async () => { buttonByText('下書きを保存する').click() })
     await flush()
     expect(fixture.create).not.toHaveBeenCalled()
   })
@@ -147,10 +147,10 @@ describe('ウェビナー作成のフォルダ取得失敗（D003）', () => {
     await flush()
 
     expect(host.textContent).not.toContain('フォルダを読み込めませんでした')
-    expect(buttonByText('下書き保存').disabled).toBe(false)
+    expect(buttonByText('下書きを保存する').disabled).toBe(false)
 
     await typeTitle('直ったので保存')
-    await act(async () => { buttonByText('下書き保存').click() })
+    await act(async () => { buttonByText('下書きを保存する').click() })
     await flush()
     expect(fixture.create).toHaveBeenCalledTimes(1)
     expect(fixture.push).toHaveBeenCalledWith('/webinars')
@@ -162,11 +162,11 @@ describe('ウェビナー作成の権限表示（D001）', () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
     await render()
 
-    expect(buttonByText('下書き保存').disabled).toBe(true)
+    expect(buttonByText('下書きを保存する').disabled).toBe(true)
     expect(buttonByText('動画設定へ').disabled).toBe(true)
     expect(host.textContent).toContain('オーナーか管理者')
 
-    await act(async () => { buttonByText('下書き保存').click() })
+    await act(async () => { buttonByText('下書きを保存する').click() })
     await flush()
     expect(fixture.create).not.toHaveBeenCalled()
   })

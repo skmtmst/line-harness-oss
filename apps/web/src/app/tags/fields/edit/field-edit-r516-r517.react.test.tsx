@@ -69,7 +69,7 @@ const FIELD = {
 }
 
 function saveButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: '変更を保存' }) as HTMLButtonElement
+  return screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
 }
 
 function nameBox(): HTMLInputElement {

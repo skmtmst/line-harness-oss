@@ -83,7 +83,7 @@ export function UpdateBanner() {
 
   if (status.kind === 'latest') {
     return (
-      <div className="text-xs text-gray-500 px-4 py-2 border-b bg-gray-50">
+      <div className="text-xs text-ink-faint px-4 py-2 border-b bg-surface-pearl">
         v{status.version} (最新)
       </div>
     )
@@ -94,7 +94,7 @@ export function UpdateBanner() {
     // ここで伝えるべきは「自動更新の対象外」という事実だけ (詳細 reason は title に)。
     return (
       <div
-        className="bg-amber-50 text-amber-900 px-4 py-2 border-b text-sm"
+        className="bg-status-warn-soft text-status-warn-deep px-4 py-2 border-b text-sm"
         title={status.reason}
       >
         カスタマイズ版で動作中です（v{status.version}）。そのままお使いいただけます。
@@ -113,7 +113,7 @@ export function UpdateBanner() {
   }
 
   return (
-    <div className="bg-blue-50 text-blue-900 px-4 py-2 border-b flex items-center gap-3 text-sm">
+    <div className="bg-status-info-soft text-status-info px-4 py-2 border-b flex items-center gap-3 text-sm">
       <div>
         <strong>v{status.target.version}</strong> が利用可能（現 v
         {status.current}）

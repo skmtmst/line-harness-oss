@@ -22,6 +22,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { LinePreview, Pill, ReminderFooter, ReminderPanel, ReminderWizard, ReminderWorkspace, SummaryCard } from './reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 export type ReminderPublishStage = 'target' | 'preview' | 'test' | 'confirm' | 'done'
 
@@ -35,22 +36,10 @@ export function reminderAudienceCounts(validation: ReminderValidationResult | nu
   }
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date)
-}
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
-}
 
 function countLabel(value: number | null, unit: string): string {
-  return value == null ? `—${unit}` : `${value.toLocaleString('ja-JP')}${unit}`
+  return value == null ? `—${unit}` : `${formatNumber(value)}${unit}`
 }
 
 export default function ReminderPublishFlow({ reminderId, stage }: { reminderId: string; stage: ReminderPublishStage }) {
@@ -333,7 +322,7 @@ export function TargetStage({ reminderId, settings, validation, validationFailed
         showCount={false}
         onChange={(next) => onChange({ ...settings, targetCondition: next })}
       />
-      <div className="mt-3 rounded-lg border border-hairline p-3 text-xs">
+      <div className="mt-3 rounded-control border border-hairline p-3 text-xs">
         <p className="flex items-center gap-1 font-bold">対象者の人数
           <HelpTip label="対象者の人数の説明">当てはまる人はこの店舗の友だち全員の中での一致数、送る予定はそのうちフォローを続けている人数です。</HelpTip>
         </p>
@@ -385,8 +374,8 @@ export function PreviewStage({ settings, preview, previewFailed = false, onRetry
   const nextItem = items.find((item) => item.state === 'scheduled') ?? null
   const firstDuplicate = items.find((item) => (duplicateGroups.get(item.scheduledAt) ?? 0) > 1) ?? null
   return <div data-design-node="JCz6J"><ReminderWorkspace aside={<><SummaryCard title="予定数" rows={[["対象者", preview ? countLabel(preview.summary.audience,'人') : '—人'], ['今後7日', preview ? countLabel(preview.summary.next7Days,'通') : '—通'], ['今後30日', preview ? countLabel(preview.summary.next30Days,'通') : '—通'], ['重複調整', preview ? countLabel(preview.summary.duplicateCount,'通') : '—通']]} /><LinePreview caption={previewFailed ? '配信予定を確認できませんでした' : nextItem ? `次は ${formatDateTime(nextItem.scheduledAt)} に届きます` : '送信予定はまだありません'} empty={!nextItem}>{nextItem ? firstReminderStepMessage(settings, nextItem.stableStepId) : previewFailed ? '再読み込みすると予定を確認できます。' : '未来の送信予定ができると、ここに最初の通の本文を表示します。'}</LinePreview></>}>
-    <ReminderPanel title="配信予定プレビュー" note={preview ? `基準日を ${formatDate(preview.targetDate)} とした場合の送信予定です。` : previewFailed ? '配信予定を確認できませんでした。' : '配信予定を確認しています。'}><div className="mb-3 flex gap-2"><Button variant={range === '7d' ? 'primary' : 'secondary'} onClick={() => setRange('7d')}>今後7日</Button><Button variant={range === '30d' ? 'primary' : 'secondary'} onClick={() => setRange('30d')}>今後30日</Button><Button variant={range === 'conflict' ? 'primary' : 'secondary'} onClick={() => setRange('conflict')}>競合のみ</Button></div>{settings.steps.length === 0 ? <ListState kind="empty" title="送る通知がまだありません" description="通知ステップで本文を作成してから、配信予定を確認してください。" action={editHref ? <Button href={editHref}>通知ステップへ</Button> : undefined} /> : !preview ? (previewFailed ? <ListState kind="error" title="配信予定を確認できませんでした" description="通信または権限を確認して、もう一度お試しください。" onRetry={onRetryPreview} /> : <ListState kind="loading" title="配信予定を確認しています" />) : rows.length === 0 ? <ListState kind="empty" title="条件に合う送信予定はありません" /> : <div className="overflow-hidden rounded-lg border border-hairline"><table className="w-full text-left text-xs"><thead className="bg-canvas-sunken"><TableHeadRow><Th>送信日時</Th><Th>通知</Th><Th>対象</Th><Th>状態</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{rows.map((item) => <tr key={item.stableStepId}><td className="p-2">{formatDateTime(item.scheduledAt)}</td><td><b>{item.label}</b><small className="block text-ink-faint">{settings.name} ／ {item.stepNumber}通目</small></td><td>{countLabel(preview.summary.audience, '人')}</td><td>{item.state === 'duplicate' ? <Pill tone="warning">{`同時刻に${duplicateGroups.get(item.scheduledAt) ?? 0}件`}</Pill> : item.state === 'past' ? <Pill tone="warning">過去の日時</Pill> : <Pill tone="success">予定どおり</Pill>}</td></tr>)}</tbody></table></div>}</ReminderPanel>
-    <ReminderPanel title="重複・時間帯の確認" note="送信前に問題になりそうな予定を自動検知します。">{!preview ? (previewFailed ? <ListState kind="error" title="重複を確認できませんでした" onRetry={onRetryPreview} /> : <ListState kind="loading" title="重複を確認しています" />) : preview.summary.duplicateCount > 0 && firstDuplicate ? <Notice tone="warn"><b>{`${formatDateTime(firstDuplicate.scheduledAt)}に${duplicateGroups.get(firstDuplicate.scheduledAt) ?? 0}件の通知が重複`}</b><p>同じ友だちへの同時刻通知を1通にまとめます。</p></Notice> : <p className="text-ink-faint text-xs">重複している送信予定はありません。</p>}<dl className="mt-3 grid grid-cols-3 gap-2 text-xs"><Metric label="基準日" value={preview ? formatDate(preview.targetDate) : previewFailed ? '未取得' : '確認中'} /><Metric label="重複予定" value={preview ? `${preview.summary.duplicateCount.toLocaleString('ja-JP')}件` : previewFailed ? '未取得' : '確認中'} /><Metric label="通知ステップ" value={`${settings.steps.length}件`} /></dl></ReminderPanel>
+    <ReminderPanel title="配信予定プレビュー" note={preview ? `基準日を ${formatDay(preview.targetDate)} とした場合の送信予定です。` : previewFailed ? '配信予定を確認できませんでした。' : '配信予定を確認しています。'}><div className="mb-3 flex gap-2"><Button variant={range === '7d' ? 'primary' : 'secondary'} onClick={() => setRange('7d')}>今後7日</Button><Button variant={range === '30d' ? 'primary' : 'secondary'} onClick={() => setRange('30d')}>今後30日</Button><Button variant={range === 'conflict' ? 'primary' : 'secondary'} onClick={() => setRange('conflict')}>競合のみ</Button></div>{settings.steps.length === 0 ? <ListState kind="empty" title="送る通知がまだありません" description="通知ステップで本文を作成してから、配信予定を確認してください。" action={editHref ? <Button href={editHref}>通知ステップへ</Button> : undefined} /> : !preview ? (previewFailed ? <ListState kind="error" title="配信予定を確認できませんでした" description="通信または権限を確認して、もう一度お試しください。" onRetry={onRetryPreview} /> : <ListState kind="loading" title="配信予定を確認しています" />) : rows.length === 0 ? <ListState kind="empty" title="条件に合う送信予定はありません" /> : <div className="overflow-hidden rounded-control border border-hairline"><table className="w-full text-left text-xs"><thead className="bg-canvas-sunken"><TableHeadRow><Th>送信日時</Th><Th>通知</Th><Th>対象</Th><Th>状態</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{rows.map((item) => <tr key={item.stableStepId}><td className="p-2">{formatDateTime(item.scheduledAt)}</td><td><b>{item.label}</b><small className="block text-ink-faint">{settings.name} ／ {item.stepNumber}通目</small></td><td>{countLabel(preview.summary.audience, '人')}</td><td>{item.state === 'duplicate' ? <Pill tone="warning">{`同時刻に${duplicateGroups.get(item.scheduledAt) ?? 0}件`}</Pill> : item.state === 'past' ? <Pill tone="warning">過去の日時</Pill> : <Pill tone="success">予定どおり</Pill>}</td></tr>)}</tbody></table></div>}</ReminderPanel>
+    <ReminderPanel title="重複・時間帯の確認" note="送信前に問題になりそうな予定を自動検知します。">{!preview ? (previewFailed ? <ListState kind="error" title="重複を確認できませんでした" onRetry={onRetryPreview} /> : <ListState kind="loading" title="重複を確認しています" />) : preview.summary.duplicateCount > 0 && firstDuplicate ? <Notice tone="warn"><b>{`${formatDateTime(firstDuplicate.scheduledAt)}に${duplicateGroups.get(firstDuplicate.scheduledAt) ?? 0}件の通知が重複`}</b><p>同じ友だちへの同時刻通知を1通にまとめます。</p></Notice> : <p className="text-ink-faint text-xs">重複している送信予定はありません。</p>}<dl className="mt-3 grid grid-cols-3 gap-2 text-xs"><Metric label="基準日" value={preview ? formatDay(preview.targetDate) : previewFailed ? '未取得' : '確認中'} /><Metric label="重複予定" value={preview ? `${formatNumber(preview.summary.duplicateCount)}件` : previewFailed ? '未取得' : '確認中'} /><Metric label="通知ステップ" value={`${settings.steps.length}件`} /></dl></ReminderPanel>
     {/* REMINDER-08/09: 取得失敗は再試行を出し、通知0件ではテスト送信へ進ませない。 */}
     <ReminderFooter secondary={settings.steps.length === 0 && editHref ? { label: '通知ステップへ戻る', href: editHref } : undefined} primary="テスト送信へ" primaryDisabled={settings.steps.length === 0} onPrimary={onNext} />
   </ReminderWorkspace></div>
@@ -417,8 +406,8 @@ export function ConfirmStage({ draft, settings, validation, validationFailed = f
 export function DoneStage({ draft, published, preview, validation }: { draft: ReminderDraftVersion; published: ReminderPublishResult | null; preview: ReminderPreviewResult | null; validation: ReminderValidationResult | null }) {
   const nextScheduledAt = published?.nextScheduledAt ?? preview?.items.find((item) => item.state === 'scheduled')?.scheduledAt ?? null
   return <div data-design-node="PSmHo"><ReminderWorkspace fill aside={<><ReminderPanel title="次にできること" note="稼働中でも安全に管理できます。"><ul className="space-y-2 text-xs"><li>リマインダを一時停止</li><li>内容を編集する</li><li>対象者を確認する</li><li>リマインダを複製して作成</li></ul></ReminderPanel><ReminderPanel title="実行状況の確認" note="詳細画面でいつでも確認できます。"><ul className="space-y-2 text-xs"><li>● 送信の成功・失敗</li><li>● 次回の送信予定</li><li>● 停止した配信</li></ul></ReminderPanel><LinePreview caption={nextScheduledAt ? `最初の通知は ${formatDateTime(nextScheduledAt)}` : '次の送信予定はまだありません'} empty={!nextScheduledAt}>{nextScheduledAt ? firstReminderStepMessage(draft.settings) : '基準日が登録されると、ここに最初の通の本文を表示します。'}</LinePreview></>}>
-    <section className="bg-canvas rounded-card border-hairline border p-6 shadow-sm">
-      <div className="text-center"><span className="bg-success-bg text-success mx-auto grid h-10 w-10 place-items-center rounded-full text-xl">✓</span><h2 className="text-ink mt-3 text-base font-bold">リマインダを有効化しました</h2><p className="text-ink-faint mt-1 text-xs">基準日の登録・変更に合わせて、対象者ごとの通知予定を自動作成します。</p></div>
+    <section className="bg-canvas rounded-card border-hairline border p-6 shadow-card">
+      <div className="text-center"><span className="bg-success-bg text-success mx-auto grid h-10 w-10 place-items-center rounded-pill text-xl">✓</span><h2 className="text-ink mt-3 text-base font-bold">リマインダを有効化しました</h2><p className="text-ink-faint mt-1 text-xs">基準日の登録・変更に合わせて、対象者ごとの通知予定を自動作成します。</p></div>
       <dl className="mx-auto mt-5 max-w-xl divide-y divide-hairline text-xs"><Metric label="管理名" value={draft.settings.name} /><Metric label="対象" value={countLabel(published?.audience ?? validation?.audience.matched ?? null,'人')} /><Metric label="通知ステップ" value={reminderStepTimings(draft.settings)} /><Metric label="次回送信" value={nextScheduledAt ? formatDateTime(nextScheduledAt) : '予定なし'} /><Metric label="状態" value="稼働中" /></dl>
       <Notice tone="info" className="mx-auto mt-4 max-w-xl">送信の状況と今後の予定は詳細画面でいつでも確認できます。</Notice><div className="mt-5 flex justify-center gap-2"><Button href="/reminders">一覧へ戻る</Button><Button variant="primary" href={`/reminders/detail?id=${draft.reminderId}`}>通知予定を確認</Button></div>
     </section>

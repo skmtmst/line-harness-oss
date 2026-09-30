@@ -11,6 +11,7 @@ import { TableStateRow } from '@/components/shared/table'
 import { api } from '@/lib/api'
 import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 interface PerAccountStat {
   accountId: string
@@ -53,7 +54,6 @@ function formatRelative(iso: string): string {
   return `${hr}時間前`
 }
 
-const fmt = new Intl.NumberFormat('ja-JP')
 
 const CANDIDATE_PAGE_SIZE = 50
 
@@ -239,8 +239,8 @@ export default function DuplicatesPage() {
               全件を数えた statusCounts / lowConfidenceCount で出す。
               （読み込み50件で頭打ちにならない。）
             */}
-            <KpiCard title="重複候補" value={null} unit="" valueText={`${fmt.format(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`} detail={`${fmt.format(statusCounts.pending ?? 0)}組を確認待ち`} />
-            <KpiCard title="確認済み" value={null} unit="" valueText={`${fmt.format(statusCounts.linked ?? 0)}組`} detail="" help="統合ユーザーに紐付け済みの組数です" />
+            <KpiCard title="重複候補" value={null} unit="" valueText={`${formatNumber(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`} detail={`${formatNumber(statusCounts.pending ?? 0)}組を確認待ち`} />
+            <KpiCard title="確認済み" value={null} unit="" valueText={`${formatNumber(statusCounts.linked ?? 0)}組`} detail="" help="統合ユーザーに紐付け済みの組数です" />
             {/*
               friendDups は「重複した登録の行数」。送った通数ではない。
               以前はこれを「余分な配信回数」「1配信あたり浪費 ¥X」と言い切り、
@@ -259,14 +259,14 @@ export default function DuplicatesPage() {
               title="1配信あたりの無駄"
               value={null}
               unit=""
-              valueText={`¥${fmt.format(data.wastedPerBroadcastYen)}`}
-              detail={`¥${fmt.format(data.msgUnitYen)}/通の見積り`}
+              valueText={`¥${formatNumber(data.wastedPerBroadcastYen)}`}
+              detail={`¥${formatNumber(data.msgUnitYen)}/通の見積り`}
               description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
             />
-            <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(lowConfidenceCount)}組`} detail="" help="名前・画像だけの候補です" />
+            <KpiCard title="根拠不足" value={null} unit="" valueText={`${formatNumber(lowConfidenceCount)}組`} detail="" help="名前・画像だけの候補です" />
           </section>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#565F59]">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-ink-secondary">
             <div className="flex flex-1 flex-wrap items-center gap-2">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・電話で検索" aria-label="名前・メール・電話で検索" className="h-10 min-w-60 rounded-control border border-hairline bg-canvas px-3 text-sm" />
               <Select
@@ -293,7 +293,7 @@ export default function DuplicatesPage() {
                 type="button"
                 onClick={() => void detect()}
                 disabled={refreshing}
-                className="h-9 rounded-[9px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#565F59] hover:bg-[#F6F6F8] disabled:opacity-50"
+                className="h-9 rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
               >
                 {refreshing ? '再検出中…' : '重複を再検出'}
               </button>
@@ -327,7 +327,7 @@ export default function DuplicatesPage() {
                     <td className="px-3 py-3 text-ink-secondary">{candidate.confidence.label === 'very_high' ? '最高' : candidate.confidence.label === 'high' ? '高' : candidate.confidence.label === 'medium' ? '中' : '低'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary" title={candidate.evidenceSummary.join('・')}>{candidate.evidenceSummary.join('・') || '根拠を確認'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
-                    <td className="px-3 py-3 text-ink-secondary">{new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="px-3 py-3 text-ink-secondary">{formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
                     <td className="whitespace-nowrap py-2 pr-5 pl-3 text-right"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
                   </tr>
@@ -362,7 +362,7 @@ export default function DuplicatesPage() {
                 </span>
               ) : candidateTotal > 0 ? (
                 <span>
-                  {fmt.format(candidateTotal)}組中 {fmt.format(rangeStart)}〜{fmt.format(rangeEnd)}組
+                  {formatNumber(candidateTotal)}組中 {formatNumber(rangeStart)}〜{formatNumber(rangeEnd)}組
                 </span>
               ) : null}
               {/* FRIEND-11: 51件目以降へ進めるページ送り。 */}
@@ -377,12 +377,12 @@ export default function DuplicatesPage() {
           </section>
 
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-            <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント別ブレイクダウン</h2>
+            <h2 className="text-sm font-bold text-ink">アカウント別ブレイクダウン</h2>
             <p className="mt-1 text-xs text-ink-faint">どのアカウントに重複が偏っているかを見ます。</p>
             {data.perAccount.length === 0 ? (
               <p className="mt-3 text-sm text-ink-faint">アカウントが登録されていません。</p>
             ) : (
-              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
+              <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
@@ -393,12 +393,12 @@ export default function DuplicatesPage() {
                       <Th align="right" className="pr-5">重複率</Th>
                     </TableHeadRow>
                   </thead>
-                  <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
+                  <tbody className="divide-y divide-divider-soft bg-canvas text-ink-secondary">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td className="py-4 pr-4 pl-5 font-semibold text-[#1D1D1F]" title={row.accountName}><span className="block truncate">{row.accountName}</span></td>
-                        <td className="px-4 py-4 text-right tabular-nums"><span>{fmt.format(row.friends)}</span></td>
-                        <td className="px-4 py-4 text-right tabular-nums"><span>{fmt.format(row.dups)}</span></td>
+                        <td className="py-4 pr-4 pl-5 font-semibold text-ink" title={row.accountName}><span className="block truncate">{row.accountName}</span></td>
+                        <td className="px-4 py-4 text-right tabular-nums"><span>{formatNumber(row.friends)}</span></td>
+                        <td className="px-4 py-4 text-right tabular-nums"><span>{formatNumber(row.dups)}</span></td>
                         <td className="py-4 pr-5 pl-4 text-right tabular-nums">
                           <span>{(row.dupRate * 100).toFixed(0)}%</span>
                         </td>
@@ -416,7 +416,7 @@ export default function DuplicatesPage() {
             const pairwise = data.pairwiseOverlap
             return (
             <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-              <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント間 重複マトリックス</h2>
+              <h2 className="text-sm font-bold text-ink">アカウント間 重複マトリックス</h2>
               <p className="mt-1 text-xs text-ink-faint">
                 行アカウントの友だちのうち、列アカウントにも居る人数 （行のアカウントに対する割合）。
               </p>
@@ -425,7 +425,7 @@ export default function DuplicatesPage() {
                 （16px。先頭列の pl-4 とそろえる）。
               */}
               <style>{`[data-duplicates-matrix] tr > :last-child { padding-right: 16px; }`}</style>
-              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
+              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
@@ -443,10 +443,10 @@ export default function DuplicatesPage() {
                       ))}
                     </TableHeadRow>
                   </thead>
-                  <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
+                  <tbody className="divide-y divide-divider-soft bg-canvas text-ink-secondary">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td title={row.accountName} className="py-4 pr-2 pl-4 font-semibold text-[#1D1D1F]">
+                        <td title={row.accountName} className="py-4 pr-2 pl-4 font-semibold text-ink">
                           <span className="block truncate">{row.accountName}</span>
                         </td>
                         {data.perAccount.map((col) => {
@@ -454,7 +454,7 @@ export default function DuplicatesPage() {
                             return (
                               <td
                                 key={col.accountId}
-                                className="px-2 py-4 text-right text-[#B8BCC2]"
+                                className="px-2 py-4 text-right text-ink-disabled"
                               >
                                 <span>—</span>
                               </td>
@@ -472,7 +472,7 @@ export default function DuplicatesPage() {
                               key={col.accountId}
                               className="px-2 py-4 text-right tabular-nums"
                             >
-                              {fmt.format(overlap)}{' '}
+                              {formatNumber(overlap)}{' '}
                               <span className="text-xs text-ink-faint">
                                 ({(rate * 100).toFixed(0)}%)
                               </span>
