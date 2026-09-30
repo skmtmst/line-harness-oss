@@ -556,8 +556,11 @@ export function OutgoingOverview({
                                 disabled={!item.isActive && !canActivate}
                                 aria-busy={toggling || undefined}
                                 data-webhook-toggle-pending={toggling ? `outgoing:${item.id}` : undefined}
-                                title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined} busy={toggling} busyLabel={(item.isActive ? '止めています…' : '動かしています…')}>
-                                {(item.isActive ? '止める' : '動かす')}
+                                title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
+                              >
+                                {toggling
+                                  ? (item.isActive ? '止めています…' : '動かしています…')
+                                  : (item.isActive ? '止める' : '動かす')}
                               </Button>
                               {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
                               <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
@@ -968,8 +971,11 @@ export function IncomingOverview({
                     onClick={() => onToggle(selected.id, selected.isActive)}
                     disabled={!selected.hasSecret && !selected.isActive}
                     aria-busy={togglingIds.includes(selected.id) || undefined}
-                    data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined} busy={togglingIds.includes(selected.id)} busyLabel={(selected.isActive ? '止めています…' : '動かしています…')}>
-                    {(selected.isActive ? '止める' : '動かす')}
+                    data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined}
+                  >
+                    {togglingIds.includes(selected.id)
+                      ? (selected.isActive ? '止めています…' : '動かしています…')
+                      : (selected.isActive ? '止める' : '動かす')}
                   </Button>
                   <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新する</Button>
                 </>
