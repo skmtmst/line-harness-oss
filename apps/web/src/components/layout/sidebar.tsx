@@ -630,10 +630,10 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
           ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>{brand.name?.slice(0, 1) ?? 'm'}</div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-ink">{brand.name ?? '然-NEN- LINE管理システム'}</p>
+            <p className="truncate text-sm font-bold text-ink">{brand.name ?? 'musubo LINE管理システム'}</p>
             <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
           </div>
         </div>
@@ -652,9 +652,10 @@ export default function Sidebar({
         <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">サ</div>
             <div className="ml-3 min-w-0 flex-1">
-              <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
+              {/* デザイン確認用の見本。特定の利用者の名前は書かない。 */}
+              <p className="truncate text-[14px] font-semibold text-ink">サンプルアカウント</p>
               <p className="mt-0.5 truncate text-micro text-ink-faint">コミュニケーション</p>
             </div>
           </div>
@@ -843,7 +844,7 @@ export default function Sidebar({
             1280px 未満では PC のトップバー（画面の唯一の <h1>）を畳むので、
             現在地を h1 で持つのはここ（#734: 390px で全画面 h1 が消えていた）。 */}
         <h1 className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
-          {mobileTitle || brand.name || '然-NEN- LINE管理システム'}
+          {mobileTitle || brand.name || 'musubo LINE管理システム'}
         </h1>
         {/* 公式アカウントの印。名前は画面名が持つので、ここはアイコンだけ。 */}
         <div className={styles.mobileBrand}>
@@ -851,7 +852,7 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>{brand.name?.slice(0, 1) ?? 'm'}</div>
           )}
         </div>
       </div>

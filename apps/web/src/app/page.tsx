@@ -321,7 +321,7 @@ function FriendAddLinkCard({
       <QrDialog
         open={showQr}
         onClose={() => writeQr(null)}
-        accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
+        accountName={selectedAccount?.displayName ?? 'LINE公式アカウント'}
         officialProfileUrl={visualQa?.officialProfileUrl ?? officialProfileUrl}
         accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}
