@@ -4,7 +4,7 @@
  *
  * 複数パネルを組み立てた状態で「キャンセル」を押しても、以前は確認なしで
  * 一覧へ遷移し、途中の作業が警告なく消えた。いまは共通の番兵
- * `useUnsavedGuard`＋確認窓で止め、「保存せずに移動」を選んだときだけ進む。
+ * `useUnsavedGuard`＋確認窓で止め、「保存せずに移る」を選んだときだけ進む。
  *
  * 差し替えるのは通信と遷移と文脈だけ。画面の判断は差し替えない。
  */
@@ -163,17 +163,17 @@ describe('D009: 未保存のままキャンセルすると確認が出る', () =
     // 確認なしの遷移はしない。
     expect(routing.pushed).toEqual([])
     expect(dialogByText('h2', '保存していない変更があります')).not.toBeNull()
-    expect(dialogByText('button', '保存せずに移動')).not.toBeNull()
+    expect(dialogByText('button', '保存せずに移る')).not.toBeNull()
   })
 
-  it('「保存せずに移動」を選んだときだけ一覧へ進む', async () => {
+  it('「保存せずに移る」を選んだときだけ一覧へ進む', async () => {
     await mountAt('')
     await act(async () => { typeInto(nameInput()!, '夏の新作セット') })
     await settle()
     await act(async () => { click(cancelLink()!) })
     await settle()
 
-    await act(async () => { click(dialogByText('button', '保存せずに移動')!) })
+    await act(async () => { click(dialogByText('button', '保存せずに移る')!) })
     await settle()
 
     expect(routing.pushed).toEqual(['/templates'])
@@ -201,7 +201,7 @@ describe('D009: 未保存のままキャンセルすると確認が出る', () =
 
     // 番兵は止めない。進む役は Link 本体なので、行き先が残っていることだけ見る。
     expect(dialogByText('h2', '保存していない変更があります')).toBeNull()
-    expect(dialogByText('button', '保存せずに移動')).toBeNull()
+    expect(dialogByText('button', '保存せずに移る')).toBeNull()
     expect(cancelLink()!.getAttribute('href')).toBe('/templates')
     expect(routing.pushed).toEqual([])
   })

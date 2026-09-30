@@ -131,14 +131,14 @@ describe('#948 N-322: 取り込みを止めるは保存必須であることを�
     await act(async () => { link.click() })
 
     expect(await screen.findByText('保存していない変更があります')).toBeTruthy()
-    expect(screen.getByText(/このまま移動すると、取り込みは止まりません/)).toBeTruthy()
+    expect(screen.getByText(/このまま移ると、取り込みは止まりません/)).toBeTruthy()
     expect(routerPush).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '設定に戻る' }))
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
 
     await act(async () => { link.click() })
-    fireEvent.click(await screen.findByRole('button', { name: '保存せずに移動' }))
+    fireEvent.click(await screen.findByRole('button', { name: '保存せずに移る' }))
     expect(routerPush).toHaveBeenCalledWith('/ec-commerce')
   })
 })
