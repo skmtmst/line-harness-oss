@@ -72,6 +72,12 @@ vi.mock('@/lib/api', () => {
   return {
     ApiError,
     fetchApi: vi.fn(),
+    // R497-SAVE-WORDING: page が保存catchで使う。本物（api.ts）の
+    // 非ApiError分岐と同一。この画面が流す入力は全てこの分岐に落ちる。
+    describeSaveFailure: (err: unknown) => {
+      if (err instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(err.message)) return err.message
+      return '保存できませんでした。通信が切れている可能性があります。接続を確かめて、もう一度お試しください。'
+    },
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
