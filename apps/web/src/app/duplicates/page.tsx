@@ -114,7 +114,7 @@ export default function DuplicatesPage() {
         setError('')
       } else {
         // success:false には状態が付かないので汎用（再試行あり）扱いにする。
-        setStatsFailure(new Error('集計の取得に失敗しました'))
+        setStatsFailure(new Error('集計を読み込めませんでした'))
         setError('読み込めませんでした')
       }
     } catch (err) {
@@ -157,7 +157,7 @@ export default function DuplicatesPage() {
         setCandidates([])
         setCandidateTotal(0)
         setCandidateError('候補一覧を読み込めませんでした')
-        setCandidateFailure(new Error('候補一覧の取得に失敗しました'))
+        setCandidateFailure(new Error('候補一覧を読み込めませんでした'))
       }
     } catch (err) {
       if (req !== candidatesReqRef.current || candidatesKeyRef.current !== key) return
