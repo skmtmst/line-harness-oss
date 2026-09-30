@@ -732,6 +732,57 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledWith('account-b', 'slot-1', 4, 'Bの空きを案内します')
   })
 
+  it('開催回を切り替えた後に古いpreviewが返っても、新しい開催回の確認・送信に使えない', async () => {
+    apiMocks.listOccurrenceSelector.mockResolvedValue({
+      items: [
+        { id: 'slot-1', starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z', is_active: 1 },
+        { id: 'slot-2', starts_at: '2099-06-08T01:00:00.000Z', ends_at: '2099-06-08T02:00:00.000Z', is_active: 1 },
+      ],
+    })
+    apiMocks.getOccurrenceApplicants.mockImplementation(async (_accountId: string, occurrenceId: string) => ({
+      occurrence: { id: occurrenceId, eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      snapshotId: `snapshot-${occurrenceId}`, snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [],
+    }))
+    const oldPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    apiMocks.previewOccurrenceBroadcast.mockReturnValueOnce(oldPreview.promise)
+    const view = await mount(<EventBookingsPage />)
+    const message = elements(view.container).find((element) => (
+      element.tagName === 'TEXTAREA' && propsOf(element)['aria-label'] === '申込者へ送るメッセージ'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: '開催回のご案内です' } })
+    })
+    await flush()
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    expect(apiMocks.previewOccurrenceBroadcast).toHaveBeenCalledWith(
+      'account-a', 'slot-1', expect.objectContaining({ snapshotId: 'snapshot-slot-1' }), expect.any(String),
+    )
+
+    // 開催回2へ切り替え、申込者の表示が切り替わるのを待つ。
+    const selector = elements(view.container).find((element) => (
+      element.tagName === 'SELECT' && propsOf(element)['aria-label'] === '開催回を選ぶ'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(selector).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: 'slot-2' } })
+    })
+    await flush()
+    expect(apiMocks.getOccurrenceApplicants).toHaveBeenLastCalledWith('account-a', 'slot-2')
+
+    // 切り替え前の古いpreview応答が今返る。
+    oldPreview.resolve({ broadcastId: 'slot-1-draft', recipientCount: 97 })
+    await flush()
+
+    expect(view.container.textContent).not.toContain('送信対象 97人')
+    expect(elements(view.container).some((element) => (
+      element.tagName === 'BUTTON' && element.textContent === '送信前の最終確認へ'
+    ))).toBe(false)
+    expect(apiMocks.sendOccurrenceBroadcast).not.toHaveBeenCalled()
+  })
+
   it('同じ行を連打しても更新は1回だけ送る', async () => {
     const pending = deferred<{ ok: true }>()
     apiMocks.listBookings.mockResolvedValue({ items: [booking('booking-a', '青木さん')], total: 1 })
