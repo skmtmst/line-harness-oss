@@ -334,8 +334,7 @@ function QuestionTemplatePageInner() {
             <Button type="button" variant="secondary" disabled={saving} onClick={() => void save('draft')}>
               下書きを保存する
             </Button>
-            <Button type="button" variant="primary" disabled={saving} onClick={() => void save('published')}>
-              {saving ? '保存中…' : 'テンプレートを保存する'}
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save('published')} busy={saving}>テンプレートを保存する
             </Button>
           </>
         )}

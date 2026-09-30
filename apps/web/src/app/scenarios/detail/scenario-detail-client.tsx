@@ -11,6 +11,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TargetMissing from '@/components/shared/target-missing'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -1769,10 +1770,18 @@ export default function ScenarioDetailClient({
     return (
       <div>
 
-        <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
-          <div className="bg-canvas-sunken h-6 w-1/3 rounded-mini" />
-          <div className="h-4 bg-canvas-sunken rounded-mini w-2/3" />
-          <div className="h-4 bg-canvas-sunken rounded-mini w-1/2" />
+        {/* ★V7 仕上げ §3: 枠は最初から本物で出し、中身の場所だけ骨組み。 */}
+        <div className="bg-canvas rounded-card border border-hairline p-8 space-y-4">
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div className="space-y-4">
+                <Skeleton className="block h-6 w-1/3" />
+                <Skeleton className="block h-4 w-2/3" />
+                <Skeleton className="block h-4 w-1/2" />
+              </div>
+            }
+          />
         </div>
       </div>
     )
@@ -1846,8 +1855,7 @@ export default function ScenarioDetailClient({
         {editingStepId ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={closeStepForm}>編集を閉じる</Button>
-            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving}>
-              {stepSaving ? '保存中…' : '保存する'}
+            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving} busy={stepSaving}>保存する
             </Button>
           </div>
         ) : null}

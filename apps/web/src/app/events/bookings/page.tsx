@@ -198,9 +198,7 @@ function OccurrenceApplicantsPanel({
           <Button
             onClick={onPromote}
             disabled={promoting || waitingCount === 0}
-            data-occurrence-action="promote-waitlist"
-          >
-            {promoting ? '案内を送信中…' : '次の方へ案内'}
+            data-occurrence-action="promote-waitlist" busy={promoting} busyLabel="案内を送信中…">次の方へ案内
           </Button>
         </div>
       </div>
@@ -1154,8 +1152,7 @@ function BookingsInner() {
                     className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm"
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''}>
-                      {broadcastBusy ? '対象を確定中…' : '対象と内容を確認'}
+                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="対象を確定中…">対象と内容を確認
                     </Button>
                     {activeBroadcastPreview && <span className="text-ink-secondary text-sm">送信対象 {activeBroadcastPreview.recipientCount}人</span>}
                     {activeBroadcastPreview && <Button onClick={() => setBroadcastConfirmOpen(true)} disabled={broadcastBusy}>送信前の最終確認へ</Button>}

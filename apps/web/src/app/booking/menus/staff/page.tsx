@@ -295,9 +295,7 @@ function MenuStaffMatrixContent() {
             <Button
               variant="primary"
               onClick={saveAll}
-              disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty}
-            >
-              {saving ? '保存中…' : '保存する'}
+              disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty} busy={saving}>保存する
             </Button>
           ) : (
             <StatusBadge tone="neutral" size="compact">変更なし</StatusBadge>

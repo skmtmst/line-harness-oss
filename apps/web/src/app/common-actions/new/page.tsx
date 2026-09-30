@@ -228,8 +228,7 @@ export default function NewCommonActionPage() {
         actions={(
           <>
             <Button href="/common-actions">キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={saving || resourcesLoading}>
-              {saving ? '保存中' : '下書きを保存する'}
+            <Button variant="primary" onClick={() => void save()} disabled={saving || resourcesLoading} busy={saving} busyLabel="保存中">下書きを保存する
             </Button>
           </>
         )}

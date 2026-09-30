@@ -332,7 +332,7 @@ export default function NewLineAccountPage() {
                 </ol>
                 {stopped && <Notice tone="warn" message={stopped.message} />}
                 {connectionPassed && <Notice tone="success" message="5段すべて通りました。保存できます。" />}
-                <Button type="button" variant="primary" disabled={Boolean(busyAction)} onClick={() => void checkConnection()}>{busyAction === 'check' ? '接続して設定しています…' : '接続して設定する'}</Button>
+                <Button type="button" variant="primary" disabled={Boolean(busyAction)} onClick={() => void checkConnection()} busy={busyAction === 'check'} busyLabel="接続して設定しています…">接続して設定する</Button>
               </SetupSection>
             </div>
             <aside className="space-y-4" aria-label="設定時の補足">
@@ -383,7 +383,7 @@ export default function NewLineAccountPage() {
             </> : <>
               <Button href="/accounts">キャンセル</Button>
               {currentStep > 1 && <Button type="button" disabled={Boolean(busyAction)} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}>戻る</Button>}
-              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)}>{currentStep === 4 ? busyAction === 'save' ? '接続して保存しています…' : '接続して保存する' : '次へ'}</Button>
+              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)} busy={currentStep === 4 && busyAction === 'save'} busyLabel="接続して保存しています…">{currentStep === 4 ? '接続して保存する' : '次へ'}</Button>
             </>}
           />
         </div>

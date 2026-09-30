@@ -321,7 +321,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
             <>
               <div><StatusBadge tone="neutral">{data.googleUpdates ? '確認が必要な変更はありません' : '未確認'}</StatusBadge></div>
               <p className="text-ink-secondary text-sm leading-relaxed">{data.googleUpdates ? 'Google側からの営業時間やプロフィールの変更提案は、いまはありません。' : 'Google側の変更提案を取得できませんでした。同期すると再確認します。'}</p>
-              <div><Button onClick={() => void load(true)} disabled={syncing}>{syncing ? '取得中…' : '同期する'}</Button></div>
+              <div><Button onClick={() => void load(true)} disabled={syncing} busy={syncing} busyLabel="取得中…">同期する</Button></div>
             </>
           )}
           <div className="border-hairline border-t pt-3">
@@ -725,7 +725,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
           {side}
         </div>
       ) : main}
-      <StickyBar actions={<><Button onClick={clear} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={!canSubmit}>{busy ? '確認中…' : '変更案を確認'}</Button></>} />
+      <StickyBar actions={<><Button onClick={clear} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={!canSubmit} busy={busy} busyLabel="確認中…">変更案を確認</Button></>} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した営業時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
@@ -924,7 +924,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
         <StickyBar actions={<>{ids.length > 1 && index < ids.length - 1 ? <Button variant="primary" onClick={() => setIndex(index + 1)}>次の変更へ</Button> : null}<Button variant={ids.length > 1 && index < ids.length - 1 ? 'secondary' : 'primary'} onClick={() => go({ tab: 'profile' })}>プロフィールへ戻る</Button><Button onClick={() => go({ tab: 'profile', view: 'history' })}>変更履歴を見る</Button></>} />
       ) : (
         <StickyBar
-          actions={<><Button onClick={backTo} disabled={busy}>修正する</Button>{change.status === 'failed' || change.status === 'conflict' ? <Button onClick={() => void cancel()} disabled={busy}>キャンセル</Button> : null}<Button variant="primary" onClick={() => void send()} disabled={!canPress}>{busy ? '送信中…' : 'Googleに変更を送信'}</Button></>}
+          actions={<><Button onClick={backTo} disabled={busy}>修正する</Button>{change.status === 'failed' || change.status === 'conflict' ? <Button onClick={() => void cancel()} disabled={busy}>キャンセル</Button> : null}<Button variant="primary" onClick={() => void send()} disabled={!canPress} busy={busy} busyLabel="送信中…">Googleに変更を送信</Button></>}
         />
       )}
     </div>
@@ -1002,7 +1002,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
         <h2 className="text-heading font-bold">変更履歴</h2>
         <span className="text-ink-faint text-label">このLINEアカウントの店舗に対して、Googleへ送った変更の記録です。Google側で直接行われた変更は含みません。</span>
         <span className="grow" />
-        <Button onClick={() => void exportCsv()} disabled={exporting || !data || data.total === 0}><Download size={16} />{exporting ? '書き出し中…' : 'CSVで書き出す'}</Button>
+        <Button onClick={() => void exportCsv()} disabled={exporting || !data || data.total === 0} busy={exporting} busyLabel="書き出し中…"><Download size={16} />CSVで書き出す</Button>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <PillTabs label="変更の種類" items={HISTORY_KINDS.map((k) => ({ key: k.key, label: `${k.label}${data ? ` ${data.counts[k.key]}` : ''}`, current: kind === k.key, onClick: () => { setKind(k.key); setPage(1) } }))} />
@@ -1229,7 +1229,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Pr
         </div>
       </div>
 
-      <StickyBar actions={<><Button onClick={() => { setForm(formFrom(data)); setAdds([]); setDeletes([]); setActionError('') }} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={busy || !dirty || data.closed || form.description.length > 750}>{busy ? '確認中…' : '変更内容を確認'}</Button></>} />
+      <StickyBar actions={<><Button onClick={() => { setForm(formFrom(data)); setAdds([]); setDeletes([]); setActionError('') }} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={busy || !dirty || data.closed || form.description.length > 750} busy={busy} busyLabel="確認中…">変更内容を確認</Button></>} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="プロフィールの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )

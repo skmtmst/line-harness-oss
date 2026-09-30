@@ -239,8 +239,7 @@ export default function EcIdentityCandidatesPage() {
 
           {review.hasMore ? (
             <div className="flex justify-center">
-              <Button type="button" onClick={review.loadMore} disabled={review.loadingMore}>
-                {review.loadingMore ? '読み込み中…' : '続きを読み込む'}
+              <Button type="button" onClick={review.loadMore} disabled={review.loadingMore} busy={review.loadingMore} busyLabel="読み込み中…">続きを読み込む
               </Button>
             </div>
           ) : null}

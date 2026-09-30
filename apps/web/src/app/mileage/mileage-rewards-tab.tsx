@@ -526,11 +526,8 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                             {reward.status === 'published' || reward.status === 'draft' || reward.status === 'stopped' ? (
                               <Button
                                 disabled={busyRewardId === reward.id}
-                                onClick={() => void changePublishedState(reward)}
-                              >
-                                {busyRewardId === reward.id
-                                  ? '反映しています'
-                                  : reward.status === 'published'
+                                onClick={() => void changePublishedState(reward)} busy={busyRewardId === reward.id} busyLabel="反映しています">
+                                {reward.status === 'published'
                                     ? '止める'
                                     : reward.status === 'stopped'
                                       ? 'また出す'
@@ -618,9 +615,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                         <Td align="right">
                           <Button
                             disabled={retryingId !== null}
-                            onClick={() => void retryRedemption(item)}
-                          >
-                            {retryingId === item.id ? 'やり直しています' : 'もう一度届ける'}
+                            onClick={() => void retryRedemption(item)} busy={retryingId === item.id} busyLabel="やり直しています">もう一度届ける
                           </Button>
                         </Td>
                       </Tr>

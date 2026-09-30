@@ -552,7 +552,7 @@ export default function OpsSupportPage() {
                     {ticket.staffEmailRegistered ? '' : '（起票者のメールが未登録のため、今回は履歴だけに載ります）'}
                   </p>
                   <span className="ml-auto flex items-center gap-2">
-                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy}>{draftSaving ? '保存中…' : '下書きを保存する'}</Button>
+                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
                     <Button size="field" variant="primary" onClick={() => void send()} disabled={busy || closed || aiBusy || !reply.trim()}>返信する</Button>
                   </span>
                 </div>
