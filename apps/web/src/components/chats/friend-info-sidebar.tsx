@@ -482,18 +482,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-ink">顧客情報</h3>
           </div>
-          <button
-            type="button"
-            ref={settingsButtonRef}
-            onClick={() => {
+          <Button variant="secondary" className="mr-14 h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-[11px] text-ink-faint" type="button" ref={settingsButtonRef} onClick={() => {
               if (!showSettings) updateSettingsPanelPos()
               setShowSettings(!showSettings)
-            }}
-            aria-expanded={showSettings}
-            className="mr-14 inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-[11px] font-semibold text-ink-faint hover:bg-canvas-sunken"
-          >
+            }} aria-expanded={showSettings}>
             表示項目
-          </button>
+          </Button>
         </div>
         {showSettings && typeof document !== 'undefined' ? createPortal(
           <div
@@ -611,13 +605,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           /* INBOX-08: 失敗は文字だけにせず、その場で再試行できるようにする。 */
           <div className="space-y-2 p-4">
             <p className="text-xs text-danger">{error}</p>
-            <button
-              type="button"
-              onClick={() => setFriendRetry((key) => key + 1)}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-1.5 text-xs font-semibold"
-            >
+            <Button variant="secondary" className="text-ink-secondary items-center px-3 py-1.5 text-xs h-auto whitespace-normal" type="button" onClick={() => setFriendRetry((key) => key + 1)}>
               再試行する
-            </button>
+            </Button>
           </div>
         ) : friend ? (
           <div className="flex flex-col divide-y divide-hairline">
@@ -650,12 +640,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   ブロック済
                 </span>
               )}
-              <a
-                href={`/friends/detail?id=${friend.id}`}
-                className="border-hairline text-action mt-3 inline-flex items-center rounded-control border px-3 py-2 text-xs font-semibold hover:bg-canvas-sunken"
-              >
+              <Button variant="secondary" className="text-action mt-3 items-center px-3 py-2 text-xs h-auto whitespace-normal" href={`/friends/detail?id=${friend.id}`}>
                 友だち詳細
-              </a>
+              </Button>
             </div>
 
             {/*

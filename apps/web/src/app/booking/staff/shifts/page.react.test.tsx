@@ -662,7 +662,7 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     await screen.findByLabelText('休業日の理由')
     fireEvent.click(screen.getByRole('link', { name: /予約管理/ }))
     await screen.findByText('保存していない変更があります')
-    expect(screen.getByRole('button', { name: '保存せずに移動' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存せずに移る' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '編集を続ける' })).toBeTruthy()
   })
 })

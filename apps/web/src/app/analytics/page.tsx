@@ -141,15 +141,9 @@ function RangePicker({ days, onChange }: { days: number; onChange: (days: number
     // aria-pressedで、読み上げにも同じ選択状態を伝える。
     <div className="flex gap-1" role="group" aria-label="集計期間">
       {RANGES.map((range) => (
-        <button
-          type="button"
-          key={range}
-          onClick={() => onChange(range)}
-          aria-pressed={days === range}
-          className={`rounded-control px-3 py-2 text-xs font-medium ${days === range ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary'}`}
-        >
+        <Button variant="primary" className={(`rounded-control px-3 py-2 text-xs font-medium ${days === range ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary'}`) + ' border-0 h-auto whitespace-normal'} type="button" key={range} onClick={() => onChange(range)} aria-pressed={days === range}>
           {range}日
-        </button>
+        </Button>
       ))}
     </div>
   )
@@ -930,15 +924,15 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             <table className="w-full table-fixed">
               <thead>
                 <tr className="bg-canvas-sunken border-hairline border-b">
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                  <Th className="px-4 py-3 text-xs whitespace-normal">
                     {rowLabel} ＼ {fieldName}
-                  </th>
+                  </Th>
                   {cols.map((col) => (
-                    <th key={col.key} className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">
+                    <Th align="right" className="px-4 py-3 text-xs whitespace-normal" key={col.key}>
                       {col.label}
-                    </th>
+                    </Th>
                   ))}
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">合計</th>
+                  <Th align="right" className="px-4 py-3 text-xs whitespace-normal">合計</Th>
                 </tr>
               </thead>
               <tbody className="divide-hairline divide-y">
@@ -1485,12 +1479,9 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   {`この${funnelDays}日を再集計`}
                 </Button>
                 {canManage && (
-                  <button
-                    onClick={() => setCreating(true)}
-                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
-                  >
+                  <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs font-medium h-auto whitespace-normal" onClick={() => setCreating(true)}>
                     ＋ 段を足す
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -2156,12 +2147,9 @@ function FunnelForm({
           </div>
         ))}
         {steps.length < 10 && (
-          <button
-            onClick={() => setSteps((prev) => [...prev, { label: '', kind: 'tag', value: '' }])}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-sm"
-          >
+          <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 h-auto whitespace-normal" onClick={() => setSteps((prev) => [...prev, { label: '', kind: 'tag', value: '' }])}>
             ＋ 段を足す
-          </button>
+          </Button>
         )}
       </div>
 

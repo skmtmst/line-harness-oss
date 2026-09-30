@@ -79,7 +79,9 @@ import {
   SingleOperatorFields,
 } from '@/components/broadcasts/broadcast-approval'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
-import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
+import { formatDateTime, formatDay, formatNumber, formatRelative, formatTime } from '@/lib/format'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -291,7 +293,7 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded-mini bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><Button variant="primary" className="mt-2 w-full rounded-mini px-0 py-1 text-[10px] border-0 h-auto whitespace-normal">{String(card.actionLabel ?? '詳しく見る')}</Button></div>)}</div>
   }
   return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
@@ -899,6 +901,8 @@ export default function BroadcastForm({
         createKey: draftSession.current.createKey,
       }
       setEditingDraft(draft)
+      // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
+      cleanFingerprintRef.current = null
     }).catch(() => {
       setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
     })
@@ -1369,7 +1373,88 @@ export default function BroadcastForm({
     }
   }
 
-  const saveDraftNow = async () => {
+  /*
+   * ★V7 sTJsh §5: 書きかけを守る。
+   * 保存に送るのと同じ組み立て（draftPayload）を指紋にして、
+   * 「最後に保存した形」と違う間だけ未保存とする。開いた直後や
+   * 下書き読み込み直後は指紋が基準になるので、何もしていないのに
+   * 確認が出ることはない。lineAccountId は共通バーの選択が遅れて
+   * 届くと誤って未保存に見えるので指紋から外す（別アカウントへの
+   * 誤保存は persistDraft が別の口で止めている）。
+   */
+  const formFingerprint = JSON.stringify(
+    draftPayload(scheduledAtIso()),
+    (key, value) => (key === 'lineAccountId' ? undefined : value),
+  )
+  const cleanFingerprintRef = useRef<string | null>(null)
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
+  const [autosaving, setAutosaving] = useState(false)
+  const autosavingRef = useRef(false)
+  const [clockTick, setClockTick] = useState(() => Date.now())
+
+  // 最初の描画と、下書き適用で内容が入れ替わった直後に「保存ずみの形」を採る。
+  useEffect(() => {
+    if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
+  })
+  const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
+
+  /*
+   * 入力が2秒止まったら下書きへ静かに保存する。打つたびに送ると
+   * 通信だらけになるので指紋の変化から数える。通せない形（未入力など）、
+   * アカウントが決まっていない間、離脱の確認中は送らない。
+   */
+  const autosaveDraft = async () => {
+    if (autosavingRef.current || saving || testSending) return
+    if (!selectedAccountId || validate()) return
+    autosavingRef.current = true
+    setAutosaving(true)
+    const fingerprintAtSave = formFingerprint
+    try {
+      const saved = await persistDraft(scheduledAtIso(), true)
+      if (saved) {
+        cleanFingerprintRef.current = fingerprintAtSave
+        setDraftSavedAt(Date.now())
+        // BROADCAST-16: 自動でも下書きが増えるので、一覧側へは同じ口で知らせる。
+        onDraftSaved?.(saved)
+      }
+    } catch {
+      /* 静かに未保存のまま。次の変更・手動保存・「保存して移る」でやり直せる。 */
+    } finally {
+      autosavingRef.current = false
+      setAutosaving(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!dirty || leaveTarget !== null) return
+    const timer = setTimeout(() => void autosaveDraft(), 2000)
+    return () => clearTimeout(timer)
+    // autosaveDraft は毎回作り直されるので依存に入れない。見たいのは中身の変化。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formFingerprint, dirty, selectedAccountId, saving, testSending, leaveTarget])
+
+  // 「下書き保存済み・◯秒前」の秒数だけ10秒ごとに進める。
+  useEffect(() => {
+    if (draftSavedAt === null) return
+    const timer = setInterval(() => setClockTick(Date.now()), 10_000)
+    return () => clearInterval(timer)
+  }, [draftSavedAt])
+
+  const draftSavedAgo = draftSavedAt === null
+    ? null
+    : Math.floor((clockTick - draftSavedAt) / 1000) < 60
+      ? `${Math.max(0, Math.floor((clockTick - draftSavedAt) / 1000))}秒前`
+      : formatRelative(draftSavedAt, clockTick)
+  const draftStatusLabel = autosaving
+    ? '下書きを保存しています…'
+    : dirty
+      ? '下書きはまだ保存していません'
+      : draftSavedAgo
+        ? `下書き保存済み・${draftSavedAgo}`
+        : null
+
+  const saveDraftNow = async (): Promise<boolean> => {
     /*
      * 監査 R206: 下書き保存も確認・テスト送信と同じ検査を通す。
      * 通さないと、ボタンの不備が Worker で断られて「保存できませんでした」
@@ -1378,19 +1463,24 @@ export default function BroadcastForm({
     const validationError = validate()
     if (validationError) {
       setError(validationError)
-      return
+      return false
     }
     setSaving(true)
     setError('')
+    const fingerprintAtSave = formFingerprint
     try {
       // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
       const saved = await persistDraft(scheduledAtIso(), true)
       if (saved) {
+        cleanFingerprintRef.current = fingerprintAtSave
+        setDraftSavedAt(Date.now())
         notifyToast('下書きを保存しました。')
         // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
         // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
         onDraftSaved?.(saved)
+        return true
       }
+      return false
     } catch (error) {
       /*
        * R234: 保存側で弾いた理由（音声URL・スタンプ番号・Flexの形など）を
@@ -1398,6 +1488,7 @@ export default function BroadcastForm({
        * 400 の本文は運用者へ出してよい安全な文だけが来る（api.ts の約束）。
        */
       setError(describeSaveFailure(error))
+      return false
     } finally {
       setSaving(false)
     }
@@ -1746,9 +1837,9 @@ export default function BroadcastForm({
             送る相手・送る内容・送る時間を決めます。配信する前に、右側のチェックがすべて緑になっているか確認してください。
           </p>
         </div>
-        <button onClick={onCancel} className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm">
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" onClick={() => guarded(onCancel)}>
           一覧に戻る
-        </button>
+        </Button>
       </div>
     )}
     <BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />
@@ -1756,6 +1847,10 @@ export default function BroadcastForm({
       <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
+    ) : null}
+    {/* ★V7 sTJsh §5: 下書きの状態を薄い字で常に示す（未保存→保存中→保存済み）。 */}
+    {draftStatusLabel ? (
+      <p className="text-ink-faint mt-1.5 text-xs" aria-live="polite">{draftStatusLabel}</p>
     ) : null}
     <div className="mt-2.5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
       <div className={`min-w-0 space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
@@ -1945,12 +2040,9 @@ export default function BroadcastForm({
             {/* ブロック中の人は countRules の is_following=true で外れている。
                 外していることを書かないと、人数が合わないように見える。 */}
             <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
-            <Link
-              href="/friends"
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1 text-xs"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" href="/friends">
               対象を一覧で見る
-            </Link>
+            </Button>
             <SegmentPresetControls
               accountId={selectedAccountId}
               value={targetMode === 'advanced' ? condition : null}
@@ -2244,26 +2336,16 @@ export default function BroadcastForm({
           <h3 className="text-lg font-bold text-ink">送信設定</h3>
           <p className="mb-4 mt-1 text-sm text-ink-faint">配信する日時と、LINEの集計方法を設定します。</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => setSendMode('now')}
-              aria-pressed={sendMode === 'now'}
-              className={`rounded-card border p-3 text-left text-sm ${
+            <Button variant="secondary" className={(`rounded-card border p-3 text-left text-sm ${
                 sendMode === 'now' ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`}
-            >
+              }`) + ' h-auto whitespace-normal'} type="button" onClick={() => setSendMode('now')} aria-pressed={sendMode === 'now'}>
               今すぐ配信
-            </button>
-            <button
-              type="button"
-              onClick={() => setSendMode('scheduled')}
-              aria-pressed={sendMode === 'scheduled'}
-              className={`rounded-card border p-3 text-left text-sm ${
+            </Button>
+            <Button variant="secondary" className={(`rounded-card border p-3 text-left text-sm ${
                 sendMode === 'scheduled' ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`}
-            >
+              }`) + ' h-auto whitespace-normal'} type="button" onClick={() => setSendMode('scheduled')} aria-pressed={sendMode === 'scheduled'}>
               日時を指定して予約
-            </button>
+            </Button>
             {/* 「友だちごとの最適な時間」は開封の時間帯を持っていないので押し口を出さない。 */}
           </div>
 
@@ -2629,13 +2711,27 @@ export default function BroadcastForm({
         </>
       ) : (
         <>
-          <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">キャンセル</button>
-          {(shows('message') || shows('confirm')) && <button disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50">{testSending ? '送信中…' : 'テストを送る'}</button>}
-          <button disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</button>
+          <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
+          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>
     )} />
+
+    {/*
+      書きかけのまま離れようとしたときの確認（★V7 sTJsh §5）。
+      「保存して移る」は下書きへ保存できたらそのまま移動し、
+      保存できないときはこの画面へ戻って直す。
+    */}
+    <UnsavedLeaveDialog
+      open={leaveTarget !== null}
+      subject="配信の変更"
+      busy={saving}
+      onSave={saveDraftNow}
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
 
     {/*
       最終確認（設計 `FpgxH` 6-1-H）。
