@@ -102,6 +102,12 @@ function FriendsPageInner({
   const scoredOnly = searchParams.get('scoredOnly') === '1'
   const audienceId = searchParams.get('audienceId')?.trim() || ''
   const directSavedSearchId = searchParams.get('savedSearch')
+  /*
+   * ★V8：上の帯の探す欄からの受け口（`/friends?q=…`）。URL に語が
+   * あれば最初からその言葉で絞る。保存してある一覧の状態では
+   * 上書きしない（明示の指示を優先）。
+   */
+  const directQuery = (searchParams.get('q') ?? '').trim()
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -114,8 +120,8 @@ function FriendsPageInner({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(20)
   const [selectedTagId, setSelectedTagId] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [searchSubmitted, setSearchSubmitted] = useState('')
+  const [searchInput, setSearchInput] = useState(directQuery)
+  const [searchSubmitted, setSearchSubmitted] = useState(directQuery)
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [responseFilter, setResponseFilter] = useState<ResponseFilter>('all')
   const [operatorId, setOperatorId] = useState('')
@@ -151,7 +157,7 @@ function FriendsPageInner({
    */
   const restoredRef = useRef(false)
   const [restored, setRestored] = useState(false)
-  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId)
+  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directQuery !== ''
   useEffect(() => {
     if (restoredRef.current || accountLoading) return
     restoredRef.current = true

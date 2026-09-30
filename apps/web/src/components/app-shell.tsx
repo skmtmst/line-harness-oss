@@ -84,8 +84,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <SessionLostNotice />
               {/* Phase 6: banner above sidebar+header so it pins to the top of the
                   admin shell. Renders nothing while loading; one of latest/fork/
-                  upgrade once /admin/version + manifest resolve. */}
-              <UpdateBanner />
+                  upgrade once /admin/version + manifest resolve.
+                  ★V8 では帯を出さない（移行③「黄色の版の帯を消す」）。版は
+                  メニューの一番下の「Ver.」が持つ。 */}
+              <div className="v7-only"><UpdateBanner /></div>
               {/* 代理ログイン中の赤い帯（★V6 37-5）。運営マスター以外には出ない。 */}
               <ImpersonationNotice />
               {/* V-2: いつもと違う端末・場所からのログイン帯。そのログイン中だけ出る。 */}
