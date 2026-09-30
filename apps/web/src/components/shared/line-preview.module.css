@@ -1,0 +1,23 @@
+@layer components {
+/*
+ * LINE プレビューの枠（Pencil ★V8 `cfVyj`）。
+ *
+ * V7 はトーク背景色のパネルだけ。V8 は白い板の中に置かれるので、
+ * 板の決まり（細い枠・radius-panel・board の薄い影）にそろえる。
+ * 吹き出し・カードなど中身の改修は各画面側で別途行う。
+ */
+
+.frame {
+  display: block;
+}
+}
+
+/*
+ * TSX 側の Tailwind クラス（rounded-card）が utilities 層にいるので、
+ * V8 の上書きは層なしに置いて勝たせる（globals の骨格と同じやり方）。
+ */
+[data-theme='v8'] .frame {
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-board);
+}

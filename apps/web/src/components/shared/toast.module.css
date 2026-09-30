@@ -111,4 +111,25 @@
 .close:focus-visible {
   outline: revert;
 }
+
+/*
+ * ★V8 の動き（MOTION.md「知らせ」）：下から 8px 浮き出しながら入る
+ * （200ms ease-out）。出る側は今の仕組みが即時に外すため入りだけ。
+ * 「動きを減らす」設定では globals の規定で一瞬になる。
+ */
+[data-theme='v8'] .toast {
+  animation: toast-v8-enter var(--motion-base) var(--motion-ease-out);
+}
+
+@keyframes toast-v8-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 }

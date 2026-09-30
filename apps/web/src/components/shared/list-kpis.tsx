@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api, type ListStats } from '@/lib/api'
 import KpiCard, { type KpiCardProps } from './kpi-card'
+import kpiStyles from './kpi-card.module.css'
 
 /**
  * 一覧画面の上部に出す数値カード4枚。
@@ -86,7 +87,7 @@ export default function ListKpis({
       }))
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <div className={`mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4 ${kpiStyles.strip}`} data-kpi-strip>
       {cards.map((card, i) => (
         // key は props に混ぜない。混ぜて spread すると React が
         // 「key を spread で渡すな」と毎回警告を出す。

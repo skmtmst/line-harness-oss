@@ -107,4 +107,29 @@
     padding-bottom: 0;
   }
 }
+
+/*
+ * ★V8「タブ」（clV5c）：選んだタブは緑ではなく墨の下線＋墨の600。
+ * 選んでないタブは ink-secondary の 500。下線と文字色は速い動きで
+ * 移る（★V8 動き「切り替え・タブは滑る 120ms」）。
+ */
+[data-theme='v8'] .items {
+  gap: 24px;
+}
+
+[data-theme='v8'] .tab {
+  transition:
+    color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .current {
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+[data-theme='v8'] .current .count {
+  color: var(--color-ink-faint);
+}
 }
