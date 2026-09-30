@@ -21,6 +21,9 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_login_failed',
 ])
 
+/** 空パスワードで送信したときだけ出す入力前の案内。入力が始まったら消す。 */
+const EMPTY_PASSWORD_MESSAGE = 'パスワードを入力してください'
+
 /**
  * ログイン。★V6 0-1（`UufG8`、カード `m3tWJ`）。
  *
@@ -35,6 +38,13 @@ export default function LoginPage() {
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
+
+  // R613: 空パスワードの案内は入力が始まったら消す。
+  // 認証失敗・通信失敗・権限エラーなど別の原因の表示は次の送信まで残す。
+  const handlePasswordChange = (value: string) => {
+    setPassword(value)
+    if (value && error === EMPTY_PASSWORD_MESSAGE) setError('')
+  }
 
   useEffect(() => {
     const errorCode = new URLSearchParams(window.location.search).get('error')
@@ -53,7 +63,7 @@ export default function LoginPage() {
     setEmailMessage(emailProblem)
     if (emailProblem) return
     if (!password) {
-      setError('パスワードを入力してください')
+      setError(EMPTY_PASSWORD_MESSAGE)
       return
     }
     setBusy('password')
@@ -119,7 +129,7 @@ export default function LoginPage() {
           />
         </AuthField>
         <AuthField label="パスワード" htmlFor="login-password">
-          <PasswordField id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
+          <PasswordField id="login-password" value={password} onChange={handlePasswordChange} autoComplete="current-password" />
         </AuthField>
         <Checkbox
           checked={remember}

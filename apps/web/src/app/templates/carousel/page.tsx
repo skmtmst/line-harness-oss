@@ -928,7 +928,7 @@ function CarouselEditorInner() {
             <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
               <li>・パネルは{MAX_COLUMNS}枚まで。多いと最後まで見てもらえません</li>
               <li>・ボタンは1パネルにつき{MAX_ACTIONS}つまでです（LINEの仕様）</li>
-              <li>・パネル本文は{TEXT_MAX_WITH_IMAGE}文字まで。超えると途中で切れて表示されます</li>
+              <li>・パネル本文はタイトルか画像があると{TEXT_MAX_WITH_IMAGE}文字まで、両方なければ{TEXT_MAX_WITHOUT_IMAGE}文字までです。超えると途中で切れて表示されます</li>
               <li>
                 ・画像は横1024 × 縦678pxを推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
               </li>
