@@ -1,0 +1,118 @@
+@layer components {
+/*
+ * 削除ボタン（Pencil ★V8 `prbOC`／`zopvP`）。
+ *
+ *   閉じたとき  48×36 のタイル（白地・細い枠・角丸 control）
+ *   開いたとき  右へ確認の帯が開く（✓ 赤 / ×）。開閉は 200ms
+ *   Esc・× はどちらも「やめる」
+ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+}
+
+.tile,
+.confirm {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+.tile {
+  width: 48px;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tile:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-status-danger);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* 確認の帯。閉じている間は畳んで隠す。 */
+.confirm {
+  position: absolute;
+  left: 0;
+  gap: 2px;
+  overflow: hidden;
+  padding: 0 4px;
+  opacity: 0;
+  transform: scaleX(0.6);
+  transform-origin: left center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.confirm button {
+  display: inline-flex;
+  width: 32px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  cursor: pointer;
+}
+
+.yes {
+  color: var(--color-status-danger);
+}
+
+.yes:hover {
+  background: var(--color-status-danger-soft);
+}
+
+.no {
+  color: var(--color-ink-secondary);
+}
+
+.no:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.confirm button:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: -2px;
+}
+
+/*
+ * 開く：タイルが消え、確認の帯が左端から伸びる（200ms ease-out）。
+ * 「動きを減らす」設定では globals の規定で一瞬になる。
+ */
+.root[data-open] .tile {
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
+}
+
+.root[data-open] .confirm {
+  opacity: 1;
+  transform: scaleX(1);
+  pointer-events: auto;
+}
+
+.tile,
+.confirm {
+  transition:
+    opacity var(--motion-base) var(--motion-ease-out),
+    transform var(--motion-base) var(--motion-ease-out);
+}
+}
