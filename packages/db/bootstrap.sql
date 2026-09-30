@@ -6615,6 +6615,18 @@ CREATE TABLE support_mark_create_requests (
   UNIQUE(line_account_id, idempotency_key)
 );
 
+CREATE TABLE support_mark_rule_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  mark_id           TEXT NOT NULL REFERENCES support_marks(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  rule_id           TEXT NOT NULL REFERENCES automation_definitions(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
 CREATE TABLE support_mark_scopes (
   mark_id         TEXT PRIMARY KEY REFERENCES support_marks(id),
   tenant_id       TEXT NOT NULL REFERENCES tenants(id),
@@ -9034,6 +9046,9 @@ CREATE INDEX idx_support_mark_archive_requests_mark
 
 CREATE INDEX idx_support_mark_create_requests_mark
   ON support_mark_create_requests(line_account_id, mark_id, created_at DESC);
+
+CREATE INDEX idx_support_mark_rule_create_requests_rule
+  ON support_mark_rule_create_requests(line_account_id, rule_id, created_at DESC);
 
 CREATE INDEX idx_support_mark_scopes_account
   ON support_mark_scopes(tenant_id, line_account_id);
