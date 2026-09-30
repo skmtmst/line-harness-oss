@@ -210,11 +210,11 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
                         同時受付数
                         <input aria-label={`${day.label} ${index + 1}件目の同時受付数`} type="number" min={1} max={1000} value={interval.capacity ?? 1} onChange={(event) => updateInterval(day.weekday, index, { capacity: Number(event.target.value) })} className="border-hairline rounded-control mt-1 block w-24 border bg-canvas px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
                       </label>
-                      <button type="button" className="text-danger mb-1.5 px-2 py-1 text-xs underline" onClick={() => updateDay(day.weekday, (current) => current.filter((_, currentIndex) => currentIndex !== index))}>この時間を削除</button>
+                      <button type="button" className="text-danger mb-1.5 px-2 py-1 text-xs underline" onClick={() => updateDay(day.weekday, (current) => current.filter((_, currentIndex) => currentIndex !== index))}>この時間を削除する</button>
                     </div>
                   ))}
                   {intervals.length < 8 ? (
-                    <button type="button" className="text-action text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加</button>
+                    <button type="button" className="text-action text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加する</button>
                   ) : null}
                 </div>
               )}
@@ -235,7 +235,7 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
         ) : null}
         {canEdit ? (
           <div className="mt-3 flex justify-end">
-            <Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? '保存中…' : '営業時間を保存'}</Button>
+            <Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? '保存中…' : '営業時間を保存する'}</Button>
           </div>
         ) : <p className="text-ink-faint mt-3 text-xs">閲覧のみです。変更には予約設定の権限が必要です。</p>}
       </div>
@@ -455,12 +455,12 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       {canManage ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => void update()} disabled={saving || deleting}>{saving ? '保存中…' : '設備を保存'}</Button>
+          <Button variant="primary" onClick={() => void update()} disabled={saving || deleting}>{saving ? '保存中…' : '設備を保存する'}</Button>
           <Button onClick={() => {
             if (resourceDirty) { setError(null); setConfirmStop(true); return }
             void setActive(!resource.isActive)
           }} disabled={saving || deleting}>{saving ? '保存中…' : resource.isActive ? '受付を停止' : '受付を再開'}</Button>
-          {!resource.usage?.referenced ? <Button onClick={() => { setError(null); setConfirmDelete(true) }} disabled={saving || deleting}>設備を削除</Button> : null}
+          {!resource.usage?.referenced ? <Button onClick={() => { setError(null); setConfirmDelete(true) }} disabled={saving || deleting}>設備を削除する</Button> : null}
         </div>
       ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
       <ConfirmDialog
@@ -485,7 +485,7 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
         title={`「${resource.name}」を削除しますか？`}
         description="削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。"
         confirmLabel="削除する"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         destructive
         busy={deleting}
         onCancel={() => { if (!deleting) setConfirmDelete(false) }}
@@ -554,7 +554,7 @@ function NewResourceEditor({ accountId, onCreated }: {
         </label>
       </div>
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
-      <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving}>{saving ? '追加中…' : '設備を追加'}</Button>
+      <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving}>{saving ? '追加中…' : '設備を追加する'}</Button>
       {/* R161 監査：追加欄の書きかけがある間の離脱確認。 */}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した設備" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
@@ -1015,7 +1015,7 @@ function StoreShiftsView() {
                     <input aria-label="休業の理由" value={closedReason} onChange={(event) => setClosedReason(event.target.value)} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
                   </label>
                   {saveError ? <p className="text-danger text-xs sm:col-span-2">{saveError}</p> : <span className="sm:col-span-2" />}
-                  <Button variant="primary" onClick={() => void saveClosedDay()} disabled={savingClosed}>{savingClosed ? '保存中…' : '休業日を保存'}</Button>
+                  <Button variant="primary" onClick={() => void saveClosedDay()} disabled={savingClosed}>{savingClosed ? '保存中…' : '休業日を保存する'}</Button>
                 </div>
               ) : null}
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -1042,8 +1042,8 @@ function StoreShiftsView() {
                           </label>
                           {exceptionError ? <p className="text-danger text-xs" role="alert">{exceptionError}</p> : null}
                           <div className="flex flex-wrap gap-2">
-                            <Button variant="primary" onClick={() => void saveExceptionEdit(item)} disabled={exceptionBusy}>{exceptionBusy ? '保存中…' : '休業日を保存'}</Button>
-                            <Button onClick={() => { setEditingExceptionId(null); setExceptionError(null) }} disabled={exceptionBusy}>やめる</Button>
+                            <Button variant="primary" onClick={() => void saveExceptionEdit(item)} disabled={exceptionBusy}>{exceptionBusy ? '保存中…' : '休業日を保存する'}</Button>
+                            <Button onClick={() => { setEditingExceptionId(null); setExceptionError(null) }} disabled={exceptionBusy}>キャンセル</Button>
                           </div>
                         </div>
                       ) : (
@@ -1153,7 +1153,7 @@ function StoreShiftsView() {
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
         description="消すと、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
-        confirmLabel="休業日を消す"
+        confirmLabel="休業日を削除する"
         destructive
         busy={exceptionBusy}
         error={exceptionError ?? undefined}

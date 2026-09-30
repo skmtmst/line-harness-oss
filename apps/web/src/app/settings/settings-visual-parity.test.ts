@@ -10,7 +10,7 @@ describe('機能設定の添付デザイン', () => {
     expect(source).not.toContain('適用先：この契約全体')
     expect(source).toContain('並びを変える')
     expect(source).toContain('初期値に戻す')
-    expect(source).toContain('機能設定を保存')
+    expect(source).toContain('機能設定を保存する')
     expect(source).toContain('まとめて切替')
     expect(source).toContain('上へ移動')
     expect(source).toContain('下へ移動')

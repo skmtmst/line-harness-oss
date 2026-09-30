@@ -423,13 +423,13 @@ describe('写真の向きの保存(#931 N-309)', () => {
     await act(async () => { await Promise.resolve() })
 
     const rotate = buttonByText('回す')
-    const save = buttonByText('向きを保存')
+    const save = buttonByText('向きを保存する')
     expect(rotate).toBeTruthy()
     expect(save).toBeTruthy()
     // 回す前は保存できない（向きに変更が無い）。
     expect(save!.disabled).toBe(true)
     await act(async () => { rotate!.click() })
-    const saveReady = buttonByText('向きを保存')!
+    const saveReady = buttonByText('向きを保存する')!
     expect(saveReady.disabled).toBe(false)
     await act(async () => { saveReady.click() })
     await act(async () => { await Promise.resolve() })
@@ -456,7 +456,7 @@ describe('戻る・再読込での復元(#931 N-314)', () => {
     await renderAt('/nen-members?tab=photos&status=pending&view=detail&photo=p-1')
     await act(async () => { await Promise.resolve() })
     // 詳細が開いている（一覧のカードではなく詳細の操作が出る）。
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
     expect(document.body.textContent).toContain('送ってくれた人')
   })
 
@@ -465,19 +465,19 @@ describe('戻る・再読込での復元(#931 N-314)', () => {
     await renderAt('/nen-members?tab=photos')
     await act(async () => { buttonByText('⛶ 1枚ずつ大きく見る', host)!.click() })
     await act(async () => { await Promise.resolve() })
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
     // ブラウザの戻る: URLが一覧へ変わったあと popstate が来る。
     window.history.pushState(null, '', '/nen-members?tab=photos&status=pending')
     await act(async () => { window.dispatchEvent(new Event('popstate')) })
     await act(async () => { await Promise.resolve() })
-    expect(buttonByText('向きを保存')).toBeUndefined()
+    expect(buttonByText('向きを保存する')).toBeUndefined()
     expect(host.textContent).toContain('ハナ')
     // 進む: 詳細のURLへ戻ると、同じ写真の詳細を取り直して開く。
     window.history.pushState(null, '', '/nen-members?tab=photos&status=pending&view=detail&photo=p-1')
     await act(async () => { window.dispatchEvent(new Event('popstate')) })
     await act(async () => { await Promise.resolve() })
     expect(net.calls.some((path) => path.startsWith('/api/nen-members/photos/p-1?'))).toBe(true)
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
   })
 
   it('再読込のあとも、選んでいた写真がsessionStorageから戻る', async () => {

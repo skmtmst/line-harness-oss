@@ -382,7 +382,7 @@ function NewNenColumnInner() {
               onMouseDown={() => setTouched(true)}
               onClick={() => void save()}
             >
-              {busy ? '保存中…' : '下書きに保存'}
+              {busy ? '保存中…' : '下書きを保存する'}
             </Button>
           </>
         )}

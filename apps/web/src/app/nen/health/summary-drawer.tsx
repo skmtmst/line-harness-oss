@@ -49,7 +49,7 @@ export default function SummaryDrawer({
       title="30日のまとめ"
       description={summary ? `${summary.pet.callName || summary.pet.name}（${petAnimalTypeLabel(summary.pet.animalType)}${summary.pet.breed ? `・${summary.pet.breed}` : ''}・${summary.pet.ageLabel}）／飼い主 ${summary.owner.name}` : undefined}
       onClose={onClose}
-      footer={ready ? <Button type="button" variant="primary" onClick={onPrint}>印刷・PDFに保存</Button> : undefined}
+      footer={ready ? <Button type="button" variant="primary" onClick={onPrint}>印刷・PDFに保存する</Button> : undefined}
     >
       {status === 'loading' ? (
         <ListState kind="loading" title="まとめを作っています" />

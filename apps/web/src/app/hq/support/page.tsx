@@ -388,7 +388,7 @@ export default function HqSupportPage() {
               <Button onClick={clear} disabled={sending}>内容をクリア</Button>
               <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)}>
                 <Send aria-hidden="true" className="h-4 w-4" />
-                {sending ? '送信中…' : '送信する'}
+                {sending ? '送信中…' : '送る'}
               </Button>
             </>
           }

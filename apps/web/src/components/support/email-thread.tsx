@@ -814,7 +814,7 @@ export default function EmailThread({
                   disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}
                   className="rounded-control bg-accent-deep px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {memoSaving ? '保存中...' : '保存'}
+                  {memoSaving ? '保存中...' : '保存する'}
                 </button>
               </div>
             </div>

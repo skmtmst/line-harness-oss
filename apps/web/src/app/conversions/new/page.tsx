@@ -365,7 +365,7 @@ export default function NewConversionPointPage() {
       showHeader={false}
       parent={['コンバージョン', '/conversions?tab=points']}
       successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}
-      saveLabel={saveAsDraft ? '下書きとして保存する' : 'つくって数えはじめる'}
+      saveLabel={saveAsDraft ? '下書きを保存する' : 'つくって数えはじめる'}
       designNode="GtylA"
       variant="v6"
       validate={() => {

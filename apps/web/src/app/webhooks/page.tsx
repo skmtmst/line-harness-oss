@@ -839,7 +839,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                 type="submit"
                 variant="primary"
               >
-                保存
+                保存する
               </Button>
             </div>
           </form>
@@ -1017,7 +1017,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
             variant="primary"
             className="mt-4"
           >
-            作成
+            作る
           </Button>
         </form>
       )}

@@ -111,7 +111,7 @@ async function fillMinimum() {
 
 function saveButton(): HTMLButtonElement | undefined {
   const buttons = Array.from(container.querySelectorAll('button')).filter(
-    (button) => button.textContent === '下書き保存' && !button.disabled,
+    (button) => button.textContent === '下書きを保存する' && !button.disabled,
   )
   return buttons[buttons.length - 1]
 }

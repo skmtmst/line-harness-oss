@@ -462,7 +462,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                   type="button"
                   onClick={() => setConfirmingReset(false)}
                   className="font-medium underline"
-                >やめる</button>
+                >キャンセル</button>
               </div>
             </div>
           ) : null}

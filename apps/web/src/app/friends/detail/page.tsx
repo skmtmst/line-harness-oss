@@ -1120,7 +1120,7 @@ function FriendDetailInner() {
     ...(canManageFieldDefs
       ? [{
           id: 'scenario-enroll',
-          label: 'シナリオに登録',
+          label: 'シナリオに登録する',
           icon: <ListPlus size={16} />,
           onSelect: () => void openScenarioPicker(),
         }]
@@ -1160,7 +1160,7 @@ function FriendDetailInner() {
       <>
         {canManageFieldDefs ? (
           <Button type="button" variant="primary" onClick={() => void openScenarioPicker()}>
-            この友だちをシナリオに登録
+            この友だちをシナリオに登録する
           </Button>
         ) : null}
         <Button href="/scenarios">シナリオ一覧を見る</Button>
@@ -1458,7 +1458,7 @@ function FriendDetailInner() {
                       aria-expanded={supportEditing}
                       className="text-action shrink-0 text-xs hover:underline"
                     >
-                      {supportEditing ? 'やめる' : '編集'}
+                      {supportEditing ? 'キャンセル' : '編集'}
                     </button>
                   ) : (
                     <Link href={inboxHrefForFriend(friendId)} className="text-action shrink-0 text-xs hover:underline">
@@ -1832,7 +1832,7 @@ function FriendDetailInner() {
                 </section>
                 {/*
                   NEXT-09: 対象者を引き継ぐ操作と、汎用一覧への移動を分ける。
-                  「シナリオに登録」はこの友だちを対象に選んで実行できる。
+                  「シナリオに登録する」はこの友だちを対象に選んで実行できる。
                   一覧へ行くだけのものは名前を「一覧を見る」に変えて混同させない。
                 */}
                 <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
@@ -1847,7 +1847,7 @@ function FriendDetailInner() {
                         }
                         aria-expanded={scenarioPickerOpen}
                       >
-                        シナリオに登録
+                        シナリオに登録する
                       </Button>
                     ) : null}
                     {/* ★V7：この友だちに関係の無い「〜一覧を見る」は外した（左のメニューから行ける）。 */}
@@ -1903,7 +1903,7 @@ function FriendDetailInner() {
                           onClick={() => setScenarioPickerOpen(false)}
                           disabled={scenarioBusy}
                         >
-                          やめる
+                          キャンセル
                         </Button>
                       </div>
                     </div>
@@ -2157,7 +2157,7 @@ function FriendDetailInner() {
                           disabled={saving}
                           className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
                         >
-                          {saving ? '保存中...' : '保存'}
+                          {saving ? '保存中...' : '保存する'}
                         </button>
                         {canManageFieldDefs && (
                           <Link

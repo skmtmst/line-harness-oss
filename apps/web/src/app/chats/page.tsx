@@ -2503,7 +2503,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   setSavedViewSuccess(false)
                   setSaveDialogOpen(true)
                 }}>
-                  現在の条件を保存
+                  現在の条件を保存する
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
@@ -3548,7 +3548,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         onClick={() => void handleSaveMemo()}
                         disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
                       >
-                        {memoSaving ? '保存中...' : 'メモを保存'}
+                        {memoSaving ? '保存中...' : 'メモを保存する'}
                       </Button>
                     </div>
                   </div>

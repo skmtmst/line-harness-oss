@@ -510,7 +510,7 @@ function TemplateDetailInner() {
                   title={usageCount > 0 ? '使用先を差し替えると削除できます' : undefined}
                   className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {usageCount > 0 ? '使用中のため削除できません' : 'テンプレートを削除'}
+                  {usageCount > 0 ? '使用中のため削除できません' : 'テンプレートを削除する'}
                 </button>
               </section>
             )}

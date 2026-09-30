@@ -137,7 +137,7 @@ describe('R252 曜日の解除はその曜日だけ・最後の1つは外さな�
     await flush()
     await click(weekdayButton('金'))
     const save = Array.from(host.querySelectorAll('button')).find(
-      (el) => el.textContent?.trim() === '保存',
+      (el) => el.textContent?.trim() === '保存する',
     )!
     await click(save)
     await flush()

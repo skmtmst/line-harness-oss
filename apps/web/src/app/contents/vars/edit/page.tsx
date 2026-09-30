@@ -781,7 +781,7 @@ function EditCommonVarInner() {
                         {statusBusy ? '変更中…' : statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
                       </Button>
                       <Button type="button" disabled={statusBusy} onClick={() => setStatusAction(null)}>
-                        やめる
+                        キャンセル
                       </Button>
                     </div>
                   </div>
@@ -969,7 +969,7 @@ function EditCommonVarInner() {
                     <span className="text-ink-secondary">
                       {formatStamp(schedule.effectiveFrom)} に「{schedule.value || '（空）'}」へ変更
                     </span>
-                    <Button type="button" onClick={() => void removeSchedule(schedule.id)}>予定を削除</Button>
+                    <Button type="button" onClick={() => void removeSchedule(schedule.id)}>予定を削除する</Button>
                   </div>
                 ))}
                 {/*
@@ -1164,7 +1164,7 @@ function EditCommonVarInner() {
                 onClick={() => void openDelete()}
                 className="rounded-control bg-danger text-on-accent px-4 py-2 text-sm font-bold"
               >
-                この共通情報を削除
+                この共通情報を削除する
               </button>
             )}
             actions={(
@@ -1196,7 +1196,7 @@ function EditCommonVarInner() {
                     void save()
                   }}
                 >
-                  {saving ? '保存中…' : '共通情報を保存'}
+                  {saving ? '保存中…' : '共通情報を保存する'}
                 </Button>
               </>
             )}
@@ -1276,7 +1276,7 @@ function EditCommonVarInner() {
                 onClick={() => void addSchedule()}
                 className="bg-accent-deep text-on-accent rounded-control px-6 py-2 text-sm font-medium"
               >
-                登録
+                登録する
               </button>
             </div>
           </div>
@@ -1378,7 +1378,7 @@ function EditCommonVarInner() {
         open={clearSchedulesOpen}
         title="更新の予定をすべて消しますか？"
         description="予定の時刻に値が変わる設定をすべて取り消します。いま入力中の内容はそのまま残ります。"
-        confirmLabel="すべて消す"
+        confirmLabel="すべて削除する"
         destructive
         busy={clearSchedulesBusy}
         error={clearSchedulesError || undefined}

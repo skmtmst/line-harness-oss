@@ -1054,7 +1054,7 @@ function BookingDetailInner() {
                     onClick={() => { setEditing(false); setError('') }}
                     disabled={saving}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                 </div>
               </section>

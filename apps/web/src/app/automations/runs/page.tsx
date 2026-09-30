@@ -625,7 +625,7 @@ export default function AutomationRunsPage() {
                   <Button onClick={() => void cancelRun(selectedRun)} disabled={cancellingId !== null}>
                     {cancellingId === selectedRun.id ? '取りやめ中' : '取りやめる'}
                   </Button>
-                  <Button onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>やめる</Button>
+                  <Button onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>キャンセル</Button>
                 </>
               ) : (
                 <Button onClick={() => setConfirmCancel(true)} disabled={cancellingId !== null}>この実行を取りやめる</Button>

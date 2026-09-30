@@ -958,7 +958,7 @@ export default function SettingsPage() {
             disabled={loading || saving || loadFailed || !dirty}
             title={!dirty && !loading ? '変更すると取り消せます' : undefined}
           >
-            変更を取り消す
+            キャンセル
           </Button>
           <Button
             variant="secondary"
@@ -976,7 +976,7 @@ export default function SettingsPage() {
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {saving ? '保存中…' : '機能設定を保存'}
+            {saving ? '保存中…' : '機能設定を保存する'}
           </Button>
           {!loading && !loadFailed && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
           </>
@@ -1138,7 +1138,7 @@ export default function SettingsPage() {
         open={impactOpen}
         title="オフにする前に確認"
         description="止まる仕事があります。オフにしてもデータは削除されず、再度オンにすると再開できます。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。"
-        confirmLabel="確認して保存"
+        confirmLabel="確認して保存する"
         destructive
         busy={impactBusy || saving}
         error={impactError || undefined}

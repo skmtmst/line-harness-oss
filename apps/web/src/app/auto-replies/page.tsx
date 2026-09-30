@@ -1124,7 +1124,7 @@ export default function AutoRepliesPage() {
           open={pendingDelete !== null}
           title={`自動応答「${pendingDelete?.item.name || pendingDelete?.item.keyword || 'すべてのメッセージ'}」を削除しますか？`}
           description="新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。"
-          confirmLabel="自動応答を削除"
+          confirmLabel="自動応答を削除する"
           destructive
           busy={deleting}
           error={deleteError}

@@ -148,7 +148,7 @@ export default function CreatePage({
         </Button>
       )}
       <Button variant="primary" onClick={() => run(false)} disabled={saving}>
-        {saving ? '保存中...' : (saveLabel ?? '保存')}
+        {saving ? '保存中...' : (saveLabel ?? '保存する')}
       </Button>
     </>
   ) : (
@@ -158,7 +158,7 @@ export default function CreatePage({
         disabled={saving}
         className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
       >
-        {saving ? '保存中...' : (saveLabel ?? '保存')}
+        {saving ? '保存中...' : (saveLabel ?? '保存する')}
       </button>
       {onReset && (
         <button

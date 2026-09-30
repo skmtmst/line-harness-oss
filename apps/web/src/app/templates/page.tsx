@@ -597,7 +597,7 @@ export default function TemplatesPage() {
           ? { id: 'usage', label: '使用先を見る', onSelect: () => handleDelete(template) }
           : {
               id: 'delete',
-              label: 'テンプレートを削除',
+              label: 'テンプレートを削除する',
               tone: 'danger',
               dividerBefore: true,
               onSelect: () => handleDelete(template),
@@ -954,7 +954,7 @@ export default function TemplatesPage() {
                 disabled={saving}
                 variant="primary"
               >
-                {saving ? '作成中...' : '作成'}
+                {saving ? '作成中...' : '作る'}
               </Button>
               <Button
                 onClick={() => { setShowCreate(false); setFormError('') }}
@@ -1379,7 +1379,7 @@ export default function TemplatesPage() {
                       disabled={savingEdit}
                       className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                     >
-                      {savingEdit ? '保存中...' : '保存'}
+                      {savingEdit ? '保存中...' : '保存する'}
                     </button>
                     <button
                       onClick={() => { setEditContent(null); setEditName(null) }}

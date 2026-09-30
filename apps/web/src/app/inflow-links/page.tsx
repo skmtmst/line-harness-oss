@@ -1193,7 +1193,7 @@ function InflowLinksPageInner({
                           onClick={() => setEditing({ register: r.refCode })}
                           title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
                         >
-                          登録
+                          登録する
                         </Button>
                       )}
                     </td>

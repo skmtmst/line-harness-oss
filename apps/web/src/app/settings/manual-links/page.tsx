@@ -276,8 +276,8 @@ export default function ManualLinksPage() {
                 <Td align="right">
                   {editing ? (
                     <>
-                      <Button disabled={saving} onClick={() => void saveEdit()}>保存</Button>
-                      <Button disabled={saving} onClick={() => setEditingKey(null)}>やめる</Button>
+                      <Button disabled={saving} onClick={() => setEditingKey(null)}>キャンセル</Button>
+                      <Button disabled={saving} onClick={() => void saveEdit()}>保存する</Button>
                     </>
                   ) : (
                     <Button onClick={() => startEdit(key)}>直す</Button>

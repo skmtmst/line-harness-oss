@@ -88,7 +88,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   it('保存・キャンセルは下部追従バーにしか置かない', () => {
     expect(PAGE).toContain("import StickyBar from '@/components/shared/sticky-bar'")
     const bar = PAGE.slice(PAGE.indexOf('<StickyBar'))
-    for (const label of ['キャンセル', '下書きに保存', 'つくって動かす']) {
+    for (const label of ['キャンセル', '下書きを保存する', 'つくって動かす']) {
       expect(bar, `${label} が追従バーの外にあります`).toContain(label)
     }
     // 追従バーより前に保存の押し口を置かない。
@@ -199,8 +199,8 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   })
 
   it('すること（動き）を複数持てる', () => {
-    expect(PAGE).toContain('動きを追加')
-    expect(PAGE).toContain('この動きを消す')
+    expect(PAGE).toContain('動きを追加する')
+    expect(PAGE).toContain('この動きを削除する')
     // 送る形は `draftActions()` にまとめた（確認画面とのずれ検出でも同じ形を使う）。
     // 名前が変わっても「入力の並びをそのまま送る」ことは崩さない。
     expect(PAGE).toContain('const draftActions = (): AutomationDraftAction[] => actions.map(')

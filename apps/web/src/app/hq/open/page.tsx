@@ -111,7 +111,7 @@ export default function HqOpenPage() {
           data-design="Empty"
           title="まだアカウントがありません"
           description="最初のLINE公式アカウントを登録してください。"
-          action={<Button href="/accounts/new" variant="primary">＋LINEアカウントを新規登録</Button>}
+          action={<Button href="/accounts/new" variant="primary">＋LINEアカウントを登録する</Button>}
         />
       ) : null}
       {!failure && !loading && accounts.length > 0 ? (

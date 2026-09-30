@@ -270,7 +270,7 @@ function MenuStaffMatrixContent() {
               href="/booking/staff/new"
               className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
             >
-              スタッフを追加
+              スタッフを追加する
             </Link>
           ) : (
             <span
@@ -278,7 +278,7 @@ function MenuStaffMatrixContent() {
               title="予約設定の変更権限がありません"
               className="border-hairline text-ink-faint rounded-control cursor-not-allowed border px-3 py-2 text-sm opacity-50"
             >
-              スタッフを追加
+              スタッフを追加する
             </span>
           )}
           {/*
@@ -297,7 +297,7 @@ function MenuStaffMatrixContent() {
               onClick={saveAll}
               disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty}
             >
-              {saving ? '保存中…' : '変更を保存'}
+              {saving ? '保存中…' : '保存する'}
             </Button>
           ) : (
             <StatusBadge tone="neutral" size="compact">変更なし</StatusBadge>

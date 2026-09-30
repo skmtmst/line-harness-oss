@@ -185,7 +185,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   /*
    * 「表示項目」パネルは、押したボタンの下へ開く(#982 LAY-03)。
    * 以前は `top:430px` 固定で、高さ700pxの画面では「初期状態に戻す」
-   * 「完了」が画面外へ出て届かなかった。
+   * 「閉じる」が画面外へ出て届かなかった。
    * 下に十分な空きがなければボタンの上へ開き、どちらにしても
    * 最大高さは 100dvh-32px（上下16px余白）までに収める。
    */
@@ -570,7 +570,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             {/*
               **全部隠すと右パネルが空になり、何を隠したのかも画面から読めない。**
               戻す道をここに置く。スクロール領域の外に固定して、低い画面でも
-              「初期状態に戻す」「完了」へ届くようにする(#982 LAY-03)。
+              「初期状態に戻す」「閉じる」へ届くようにする(#982 LAY-03)。
             */}
             <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-hairline px-4 py-3">
               {/* 設計 `Xi4x9` の2つは h36。共通ボタンと同値なので部品を使う。 */}
@@ -583,7 +583,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 初期状態に戻す
               </Button>
               <Button variant="primary" onClick={() => setShowSettings(false)}>
-                完了
+                閉じる
               </Button>
             </div>
           </div>

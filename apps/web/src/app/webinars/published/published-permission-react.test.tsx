@@ -94,7 +94,7 @@ async function render() {
   await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
 }
 
-const MUTATING_LABELS = ['公開を一時停止', '通知をテスト', 'ウェビナーを複製して作成']
+const MUTATING_LABELS = ['公開を一時停止', '通知をテスト', 'ウェビナーを複製して作る']
 
 describe('公開完了画面の権限表示（D001）', () => {
   it('閲覧だけの担当者には変更系ボタンを出さず、理由を添える', async () => {

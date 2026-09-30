@@ -800,7 +800,7 @@ export default function AdvancedSearchDialog({
             </button>
             {savedNotice ? <span className="text-xs font-semibold text-accent-deep">{savedNotice}</span> : null}
             {savedSearchEnabled ? (
-              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
+              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存する</Button>
             ) : null}
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
@@ -916,7 +916,7 @@ function OrAxisPicker({
           }}
           className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
         >
-          ＋ 追加
+          ＋ 追加する
         </button>
       </div>
       {waitingForOptions ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}

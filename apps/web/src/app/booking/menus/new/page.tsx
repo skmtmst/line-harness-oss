@@ -285,7 +285,7 @@ export default function NewBookingMenuPage() {
           ? '担当の設定をやり直す'
           : isActive
             ? 'つくって出す'
-            : '下書きに保存'
+            : '下書きを保存する'
       }
       showHeader={false}
       variant="v6"

@@ -239,7 +239,7 @@ export default function NewWebinarPage() {
           </LinePreview>
           </div>
           <div className="flex gap-2">
-            <Button disabled title="下書き保存後に使えます">テスト送信</Button>
+            <Button disabled title="下書き保存後に使えます">テストを送る</Button>
             <Button disabled title="公開後に使えます">公開ページを見る</Button>
           </div>
         </aside>
@@ -263,7 +263,7 @@ export default function NewWebinarPage() {
               }
               onClick={() => void save('list')}
             >
-              {saving ? '保存中…' : '下書き保存'}
+              {saving ? '保存中…' : '下書きを保存する'}
             </Button>
             <Button
               variant="primary"

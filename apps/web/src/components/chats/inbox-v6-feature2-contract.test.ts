@@ -154,7 +154,7 @@ describe('B7CER8 内部メモ', () => {
     expect(popover).toContain('対応方針や引き継ぎ内容を入力してください。顧客には表示・送信されません。')
     expect(popover).toContain('例：次回返信時に配送先住所を確認する')
     expect(popover).toContain('この内容は社内メンバーだけが確認できます')
-    expect(popover).toContain('メモを保存')
+    expect(popover).toContain('メモを保存する')
   })
 
   it('保存の口へつなぎ、書き換えていないうちは押せない', () => {
@@ -195,7 +195,7 @@ describe('Xi4x9 右パネルの表示項目', () => {
     expect(panel).toContain('初期状態に戻す')
     expect(panel).toContain('setSectionOrder(DEFAULT_SECTION_ORDER)')
     expect(panel).toContain('setHiddenSections([])')
-    expect(panel).toContain('完了')
+    expect(panel).toContain('閉じる')
   })
 })
 
@@ -271,10 +271,10 @@ describe('LAY-03 右パネルの表示項目パネル', () => {
     expect(SIDEBAR).toContain('window.innerHeight - margin * 2')
     expect(panel).toContain('min-h-0 flex-1')
     expect(panel).toContain('overflow-y-auto')
-    // 見出しと「初期状態に戻す」「完了」はスクロール領域の外に固定する。
+    // 見出しと「初期状態に戻す」「閉じる」はスクロール領域の外に固定する。
     expect(panel.indexOf('overflow-y-auto')).toBeGreaterThan(panel.indexOf('右パネルの表示項目'))
     expect(panel.indexOf('初期状態に戻す')).toBeGreaterThan(panel.indexOf('overflow-y-auto'))
-    expect(panel.indexOf('完了')).toBeGreaterThan(panel.indexOf('overflow-y-auto'))
+    expect(panel.lastIndexOf('閉じる')).toBeGreaterThan(panel.indexOf('overflow-y-auto'))
   })
 
   it('開いているあいだは Escape と画面の変化に追従する', () => {
