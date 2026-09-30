@@ -11,6 +11,7 @@ import Select from '@/components/shared/select'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useFormErrors } from '@/lib/use-form-errors'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CONVERSION_APPROVAL_EDIT_KEY, normalizeStaffPermissionKeys, toggleStaffPermissionKey } from '../permission-labels'
 
@@ -54,7 +55,30 @@ export default function NewStaffPage() {
   const [assignedLineAccountId, setAssignedLineAccountId] = useState('')
   const [inheritAccounts, setInheritAccounts] = useState(false)
   const [notifications, setNotifications] = useState<Record<string, Channel>>({ ...INITIAL_NOTIFICATIONS })
-  const togglePermission = (key: string) => setPermissionKeys((current) => toggleStaffPermissionKey(current, key))
+  /*
+   * 欄の検査（★V7 sTJsh §6）。欄から離れた時点で1回だけ理由を出し、
+   * 直すとその場で消える。送信時は全欄を見て上にまとめを出す。
+   */
+  const fields = useFormErrors()
+  fields.define('name', '名前', () => (name.trim() ? null : '名前を入力してください'))
+  fields.define('email', 'メールアドレス', () => {
+    if (!email.trim()) return 'メールアドレスを入力してください'
+    // #581: サーバー・編集窓と同じ1行正規表現で先に形式を見る。
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return '正しいメールアドレスを入力してください'
+    if (email.trim().length > 254) return 'メールアドレスは254文字以内で入力してください'
+    return null
+  })
+  fields.define('account', '最初に表示するLINEアカウント', () =>
+    assignedLineAccountId ? null : '最初に表示するLINEアカウントを選択してください')
+  fields.define('permissions', 'スタッフに表示する機能', () =>
+    role === 'staff' && permissionKeys.length === 0
+      ? 'スタッフに表示する機能を1つ以上選択してください'
+      : null)
+
+  const togglePermission = (key: string) => {
+    fields.touch('permissions')
+    setPermissionKeys((current) => toggleStaffPermissionKey(current, key))
+  }
   const toggleChannel = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
   useEffect(() => {
     void api.lineAccounts.list().then((response) => {
@@ -81,7 +105,7 @@ export default function NewStaffPage() {
     saveLabel="招待メールを送る"
     showHeader={false}
     variant="v6"
-    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? '正しいメールアドレスを入力してください' : email.trim().length > 254 ? 'メールアドレスは254文字以内で入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
+    fields={fields}
     onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: inheritAccounts, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
       <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-ink">1.</b> 招待メールでアドレスを確認</li><li><b className="text-ink">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-ink">3.</b> 連携完了後はLINE認証でログイン</li></ol></AsideCard>
@@ -91,8 +115,8 @@ export default function NewStaffPage() {
     <Notice tone="info">{selectedAccount?.name ? `${selectedAccount.name}の担当として追加されます。` : 'この店舗の担当として追加されます。'}</Notice>
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="名前" htmlFor="staff-name" required><TextInput id="staff-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><TextInput id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} /></Field>
+        <Field label="名前" htmlFor="staff-name" required error={fields.error('name')}><TextInput {...fields.bind('name')} id="staff-name" value={name} onChange={(e) => setName(e.target.value)} invalid={fields.invalid('name')} /></Field>
+        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。" error={fields.error('email')}><TextInput {...fields.bind('email')} id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} invalid={fields.invalid('email')} /></Field>
       </div>
     </FormSection>
 
@@ -107,7 +131,8 @@ export default function NewStaffPage() {
           aria-label="最初に表示するアカウント"
           size="full"
           value={assignedLineAccountId}
-          onChange={setAssignedLineAccountId}
+          error={fields.error('account') ?? undefined}
+          onChange={(value) => { fields.touch('account'); setAssignedLineAccountId(value) }}
           options={[
             { value: '', label: '選択してください' },
             ...accounts.map((account) => ({ value: account.id, label: account.name })),
@@ -121,6 +146,7 @@ export default function NewStaffPage() {
     </FormSection>
 
     {role === 'staff' && <FormSection step={4} label="スタッフに表示する機能" note="選択した機能だけが左のメニューに表示され、操作できます。">
+      {fields.error('permissions') ? <p className="text-danger text-xs" role="alert">{fields.error('permissions')}</p> : null}
       <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <Checkbox key={key} checked={permissionKeys.includes(key)} onCheckedChange={() => togglePermission(key)}>{label}</Checkbox>)}</div></div>)}</div>
     </FormSection>}
 
