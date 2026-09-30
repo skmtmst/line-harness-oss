@@ -9,6 +9,7 @@ import { usePageChrome } from './page-chrome'
 import { MENU_SECTIONS } from '@/lib/menu'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
+import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -51,6 +52,35 @@ export default function AppTopBar() {
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
   const [staffRole, setStaffRole] = useState('')
+  /*
+   * ★V8 外側：ベルの未読の数。取るのは v8 のときだけ（v7 では描かない
+   * ので余計な要求を出さない）。取れなくても帯は壊さない。
+   * 設定画面でその場で v8 へ切り替えたときにも取れるよう、テーマ
+   * 変更の合図を受ける。
+   */
+  const [notificationUnread, setNotificationUnread] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!selectedAccountId) return
+      if (document.documentElement.dataset.theme !== 'v8') return
+      try {
+        const { api } = await import('@/lib/api')
+        const response = await api.notifications.center.list(selectedAccountId, { limit: 1 })
+        if (cancelled) return
+        if (response.success) setNotificationUnread(response.data?.unreadCount ?? 0)
+      } catch {
+        // 数が取れなくてもベル自体は通知一覧への入口として動く
+      }
+    }
+    void load()
+    const onThemeChanged = () => { void load() }
+    window.addEventListener(ADMIN_THEME_CHANGED_EVENT, onThemeChanged)
+    return () => {
+      cancelled = true
+      window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, onThemeChanged)
+    }
+  }, [selectedAccountId])
 
   // AuthGuard が保存した値を読む。ここでは取りに行かない（二重に叩かない）。
   useEffect(() => {
@@ -93,6 +123,15 @@ export default function AppTopBar() {
   const logout = () => logoutAndGoToLogin()
 
   /*
+   * ★V8：帯の探す欄の行き先。全体検索の部品はまだ無いので、
+   * いちばん使う「友だちを名前・メモで絞る」へ着ける（友だち一覧は
+   * `?q=` で開いた語を最初から引く）。
+   */
+  const globalSearch = (query: string) => {
+    router.push(`/friends?q=${encodeURIComponent(query)}`)
+  }
+
+  /*
    * 一覧の取得に失敗したとき、札がただ空になるだけだと「アカウントが
    * 1件も無い」ように見える（Issue #978）。失敗と再読み込みをバーの
    * 直下へ出す。統括の画面（/hq）は画面本体が同じ失敗を出すので畳む。
@@ -109,7 +148,11 @@ export default function AppTopBar() {
       アカウント一覧の失敗帯はこの下に別で出すので、モバイルでも
       失敗だけは見える。
     */}
-    <div className="hidden xl:block">
+    {/*
+      v8 では帯を 1024px から出す（畳んだ左メニューと組むため）。
+      v7 はこれまでどおり 1280px から。
+    */}
+    <div className="hidden xl:block v8-topbar-wrap">
     <TopBar
       title={shownTitle}
       manualHref={manualHref}
@@ -121,6 +164,9 @@ export default function AppTopBar() {
       onRoleClick={canReturnToHq ? returnToHq : undefined}
       userName={staffName}
       onLogout={logout}
+      notificationUnreadCount={notificationUnread}
+      onGlobalSearch={globalSearch}
+      v8Chrome
     />
     </div>
     {accountsLoadFailed ? (

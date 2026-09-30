@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem } from '@/lib/menu'
@@ -21,6 +21,10 @@ import {
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
+
+/* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
+   反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 /** 配布の受け口が無いあいだ、統括サイドバーから外す4画面。 */
 const HQ_UNAVAILABLE_DISTRIBUTION_HREFS = new Set([
@@ -98,6 +102,59 @@ export default function Sidebar({
   const { title: chromeTitle } = usePageChrome()
   const mobileTitle = chromeTitle ?? defaultTitleForPath(pathname ?? '')
   const [isOpen, setIsOpen] = useState(false)
+
+  /*
+   * ★V8 外側：左メニューの畳み（幅 64・アイコンだけ）。
+   * 上の帯のボタンと ⌘\ が SIDEBAR_TOGGLE_EVENT を投げ、ここで受ける。
+   * 状態はブラウザに覚える（lh-sidebar-collapsed）。保存がなければ
+   * 1280px 未満では畳んだ形で開く。v7 では見た目を変えないので、
+   * data-collapsed が立っていても v7 の見た目は動かない。
+   */
+  const [collapsed, setCollapsed] = useState(false)
+  const collapsedInitRef = useRef(false)
+  useIsoLayoutEffect(() => {
+    if (collapsedInitRef.current) return
+    collapsedInitRef.current = true
+    try {
+      const saved = window.localStorage.getItem('lh-sidebar-collapsed')
+      if (saved !== null) {
+        setCollapsed(saved === '1')
+      } else {
+        setCollapsed(window.innerWidth < 1280)
+      }
+    } catch {
+      // localStorage が使えないときは展開のまま
+    }
+  }, [])
+  useEffect(() => {
+    const toggle = () => {
+      /* v7 では畳み機能を出さない。テーマが v7 のときは無視する。 */
+      if (document.documentElement.dataset.theme !== 'v8') return
+      setCollapsed((current) => {
+        const next = !current
+        try {
+          window.localStorage.setItem('lh-sidebar-collapsed', next ? '1' : '0')
+        } catch {
+          // 覚えられなくても畳み自体は動かす
+        }
+        return next
+      })
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        if (document.documentElement.dataset.theme !== 'v8') return
+        e.preventDefault()
+        toggle()
+      }
+    }
+    window.addEventListener(SIDEBAR_TOGGLE_EVENT, toggle)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener(SIDEBAR_TOGGLE_EVENT, toggle)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [])
+
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
@@ -526,14 +583,14 @@ export default function Sidebar({
       )}
 
       {isHq ? (
-        <div className="px-3 pb-3 pt-4">
+        <div className={`px-3 pb-3 pt-4 ${styles.collapseHide}`}>
           <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
             <p className="text-xs font-semibold text-accent-deep">musubo</p>
             <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
           </div>
         </div>
       ) : preview ? (
-        <div className="px-[13px] pb-[9px] pt-[18px]">
+        <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
@@ -609,7 +666,7 @@ export default function Sidebar({
                   }`}
                 >
                   <span className="shrink-0"><NavIcon d={item.icon} /></span>
-                  <span className="min-w-0 flex-1 truncate">{visibleLabel}</span>
+                  <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
                   {badgeCount(item) > 0 && (
                     <>
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
@@ -633,8 +690,9 @@ export default function Sidebar({
         メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
         commit・配備日時と環境。取れないときは「版の情報なし」。
         移行中の見た目承認（preview）は版の取得をしない。
+        V8 でメニューを畳んだときは枠ごと隠す（`styles.collapseHide`）。
       */}
-      {preview ? null : <SidebarVersion />}
+      {preview ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
@@ -645,7 +703,7 @@ export default function Sidebar({
         押すとメンバー管理・お問い合わせ・ログアウトのメニューが上に開く。
         正本は ★V6 36-1 `qAvlC`。中身は `components/hq/account-menu.tsx` が持つ。
       */}
-      {isHq ? <HqAccountMenu /> : <div className={styles.footer} />}
+      {isHq ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}
     </>
   )
 
@@ -727,7 +785,7 @@ export default function Sidebar({
 
         中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside className={styles.desktop} data-design-node="J33xq">
+      <aside className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
         {sidebarContent(false)}
       </aside>
     </>

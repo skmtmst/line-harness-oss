@@ -42,6 +42,9 @@
     { "pencil": "hNXm7", "name": "空の表示", "code": "shared/list-state.tsx" },
     { "pencil": "jr5Nl", "name": "骨格の行", "code": "shared/skeleton.tsx" },
     { "pencil": "cfVyj", "name": "LINE の見え方", "code": "shared/line-preview.tsx" },
-    { "pencil": "zUg8S・Yw24X", "name": "外側（V8）", "code": ["app-shell.tsx", "app-shell.module.css", "layout/sidebar.tsx", "layout/sidebar.module.css", "shell/app-top-bar.tsx", "shell/page-chrome.tsx"] }
+    { "pencil": "RfHCo・cMbie", "name": "OTP入力", "code": null, "planned": "shared/otp-input.tsx" },
+    { "pencil": "prbOC・zopvP", "name": "削除ボタン", "code": null, "planned": "shared/delete-button.tsx" },
+    { "pencil": "KVkPg・mpJVS", "name": "色を選ぶ", "code": null, "planned": "shared/color-well.tsx" },
+    { "pencil": "zUg8S・Yw24X", "name": "外側（V8）", "code": ["app-shell.tsx", "app-shell.module.css", "layout/sidebar.tsx", "layout/sidebar.module.css", "layout/sidebar-identity.tsx", "layout/sidebar-identity.module.css", "shell/app-top-bar.tsx", "shell/page-chrome.tsx", "shared/top-bar.tsx", "shared/top-bar.module.css"] }
   ]
 }
