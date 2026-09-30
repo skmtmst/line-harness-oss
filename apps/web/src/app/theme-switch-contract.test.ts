@@ -52,7 +52,8 @@ describe('テーマの切り替え（V8 移行②）', () => {
     expect(settings).toContain('ThemePreviewSwitch')
   })
 
-  it('台帳が部品ごと・画面ごとの状態を数える', () => {
+  // 画面列挙でリポジトリを走査するため CI の遅い環境でも間に合う余裕を持つ。
+  it('台帳が部品ごと・画面ごとの状態を数える', { timeout: 60_000 }, () => {
     const report = collectReport()
     expect(report.parts.length).toBeGreaterThan(30)
     expect(report.screens.length).toBeGreaterThan(100)
