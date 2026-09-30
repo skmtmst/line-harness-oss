@@ -19,8 +19,17 @@ async function request(path: string, method = 'GET', body?: unknown) {
   const res = await app.request(`https://worker.test/api/hq/templates${path}`, {method, headers:{'Content-Type':'application/json'}, body:body === undefined ? undefined:JSON.stringify(body)}, {DB:sql.db,IMAGES:bucket,WORKER_URL:workerUrl} as Env['Bindings']);
   return {status:res.status,body:await res.json() as any};
 }
-async function upload(purpose = 'message', bytes = png(), filename = 'test.png') {
-  const res = await app.request(`https://worker.test/api/hq/templates/media?purpose=${purpose}&filename=${encodeURIComponent(filename)}`, {method:'POST',headers:{'Content-Type':'image/png'},body:bytes}, {DB:sql.db,IMAGES:bucket,WORKER_URL:workerUrl} as Env['Bindings']);
+async function upload(purpose = 'message', bytes = png(), filename = 'test.png', expected?: { width: number; height: number }) {
+  const size = expected ? `&width=${expected.width}&height=${expected.height}` : '';
+  const res = await app.request(`https://worker.test/api/hq/templates/media?purpose=${purpose}&filename=${encodeURIComponent(filename)}${size}`, {method:'POST',headers:{'Content-Type':'image/png'},body:bytes}, {DB:sql.db,IMAGES:bucket,WORKER_URL:workerUrl} as Env['Bindings']);
+  return {status:res.status,body:await res.json() as any};
+}
+async function uploadRawWidth(filename: string, width: string, height: string) {
+  const res = await app.request(`https://worker.test/api/hq/templates/media?purpose=rich_menu&filename=${encodeURIComponent(filename)}&width=${width}&height=${height}`, {method:'POST',headers:{'Content-Type':'image/png'},body:png(2500,1686)}, {DB:sql.db,IMAGES:bucket,WORKER_URL:workerUrl} as Env['Bindings']);
+  return {status:res.status,body:await res.json() as any};
+}
+async function removeMedia(r2Key: string) {
+  const res = await app.request(`https://worker.test/api/hq/templates/media?r2Key=${encodeURIComponent(r2Key)}`, {method:'DELETE'}, {DB:sql.db,IMAGES:bucket,WORKER_URL:workerUrl} as Env['Bindings']);
   return {status:res.status,body:await res.json() as any};
 }
 async function save(type: string, definition: unknown) {
@@ -139,6 +148,50 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     if(mode==='accountScoped')sql.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='owner'");
     if(mode==='foreignTenant')staff.tenantId='other';if(mode==='missing')staff=undefined;
     expect((await upload()).status).toBe(403);expect(bucket.put).not.toHaveBeenCalled();
+  });
+  test('R568: size-mismatched rich menu image is rejected before R2',async()=>{
+    bucket.put.mockClear();
+    const compactForLarge=await upload('rich_menu',png(2500,843),'compact.png',{width:2500,height:1686});
+    expect(compactForLarge.status,JSON.stringify(compactForLarge.body)).toBe(422);expect(bucket.put).not.toHaveBeenCalled();expect(objects.size).toBe(0);
+  });
+  test('R568: matching expected dimensions still register, malformed ones are rejected',async()=>{
+    const matched=await upload('rich_menu',png(2500,1686),'large.png',{width:2500,height:1686});
+    expect(matched.status,JSON.stringify(matched.body)).toBe(201);expect(objects.size).toBe(1);
+    bucket.put.mockClear();
+    expect((await uploadRawWidth('large.png','2500','tall')).status).toBe(422);
+    expect((await uploadRawWidth('large.png','0','1686')).status).toBe(422);
+    expect((await uploadRawWidth('large.png','2500','')).status).toBe(422);
+    expect(bucket.put).not.toHaveBeenCalled();
+  });
+  test('R568: cancelled upload is reclaimed after the ownership check',async()=>{
+    const uploaded=await upload();expect(uploaded.status).toBe(201);const r2Key=uploaded.body.data.r2Key as string;
+    const removed=await removeMedia(r2Key);
+    expect(removed.status,JSON.stringify(removed.body)).toBe(200);expect(removed.body.data).toEqual({deleted:true});expect(objects.size).toBe(0);
+    const repeated=await removeMedia(r2Key);
+    expect(repeated.status).toBe(200);expect(repeated.body.data).toEqual({deleted:false});
+  });
+  test('R568: delete refuses another tenant key and malformed keys without touching R2',async()=>{
+    const uploaded=await upload();expect(uploaded.status).toBe(201);
+    bucket.delete.mockClear();
+    const foreign=await removeMedia('hq-templates/other/uploads/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png');
+    expect(foreign.status).toBe(422);expect(foreign.body.code).toBe('INVALID_IMAGE');expect(objects.size).toBe(1);expect(bucket.delete).not.toHaveBeenCalled();
+    for(const bad of ['../secret.png','hq-templates/tenant/uploads/','', 'hq-templates/tenant/uploads/a/b.png']) {
+      const res=await removeMedia(bad);expect(res.status, bad).toBe(422);
+    }
+    expect(objects.size).toBe(1);expect(bucket.delete).not.toHaveBeenCalled();
+  });
+  test('R568: delete reports tampered ownership as not found',async()=>{
+    const uploaded=await upload();expect(uploaded.status).toBe(201);
+    objects.get(uploaded.body.data.r2Key).customMetadata.hqTenant='other';
+    bucket.delete.mockClear();
+    const res=await removeMedia(uploaded.body.data.r2Key);
+    expect(res.status).toBe(404);expect(res.body.code).toBe('NOT_FOUND');expect(objects.size).toBe(1);expect(bucket.delete).not.toHaveBeenCalled();
+  });
+  test('R568: delete rejects missing authority before R2',async()=>{
+    const uploaded=await upload();expect(uploaded.status).toBe(201);
+    staff=undefined;bucket.head.mockClear();bucket.delete.mockClear();
+    expect((await removeMedia(uploaded.body.data.r2Key)).status).toBe(403);
+    expect(bucket.head).not.toHaveBeenCalled();expect(bucket.delete).not.toHaveBeenCalled();
   });
   test('rejects oversize/malformed image, traversal filename, and wrong rich dimensions',async()=>{
     expect((await upload('message',new Uint8Array(8*1024*1024+1))).status).toBe(422);
