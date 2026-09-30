@@ -41,6 +41,7 @@ import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { formatDay, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
@@ -1123,12 +1124,10 @@ function MileagePageInner() {
         </label>
       </Dialog>
 
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、たまる決めごとの並び順への変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="たまる決めごとの並び順への変更"
+        busy={savingRuleOrder}
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
