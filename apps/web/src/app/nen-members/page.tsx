@@ -18,6 +18,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import BulkBar from '@/components/shared/bulk-bar'
 import ListState from '@/components/shared/list-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
 import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -932,7 +933,11 @@ export default function PhotoReviewsPage() {
 
       <div className={styles.body}>
       <div className="flex min-w-0 flex-col gap-4">
-      {!selectedAccountId ? <div className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /></div> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadForbidden ? <ListState kind="forbidden" title="写真を見る権限がありません" description="管理者へ写真審査の閲覧権限を確認してください。" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <div className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /></div> : <section className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4">
+      {/*
+        前の一覧を残したまま読み直す（★V7 sTJsh §2）。写真が出ている
+        あいだは消さず、薄め＋上の線で伝える。
+      */}
+      {!selectedAccountId ? <div className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /></div> : loading && visiblePhotos.length === 0 ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadForbidden ? <ListState kind="forbidden" title="写真を見る権限がありません" description="管理者へ写真審査の閲覧権限を確認してください。" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <div className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /></div> : <RefreshCover refreshing={loading}><section className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4">
         {visiblePhotos.map((photo) => {
           const photoId = text(photo.id)
           const selected = selectedPhotoIds.includes(photoId)
@@ -971,7 +976,7 @@ export default function PhotoReviewsPage() {
             {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を採用する`} disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')} busy={reviewing === photo.id} busyLabel="処理中...">採用する</Button><Button data-qa-open={photoId === text(visiblePhotos[0]?.id) && status === 'pending' ? 'N2J629' : undefined} variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を見送る`} disabled={reviewing === photo.id} onClick={() => void openRejectDialog(photoId)}>見送る</Button></div>}
           </div>
         </article>})}
-      </section>}
+      </section></RefreshCover>}
       {!loading && !loadError && hasMorePhotos && <div className="flex flex-col items-center gap-1 pt-2">
         <Button variant="secondary" disabled={loadingMore} onClick={() => void loadMore()} busy={loadingMore} busyLabel="読み込み中...">
           {`さらに読み込む（いま${photos.length}枚）`}

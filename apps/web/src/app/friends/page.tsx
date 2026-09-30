@@ -122,6 +122,12 @@ function FriendsPageInner({
   const [scenarioId, setScenarioId] = useState('')
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  /*
+   * 読み直し中（★V7 sTJsh §2）。行が出ているあとの再取得では
+   * 一覧を消さず、表を薄めて上に線の帯を出す。
+   */
+  const [refreshing, setRefreshing] = useState(false)
+  const hasRowsRef = useRef(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])
@@ -134,6 +140,7 @@ function FriendsPageInner({
    */
   const loadContextRef = useRef({ accountId: selectedAccountId, page, pageSize })
   loadContextRef.current = { accountId: selectedAccountId, page, pageSize }
+  hasRowsRef.current = friends.length > 0
 
   /*
    * IDEA-03「3ページ以上の移動と戻る操作で条件・位置を保持」。
@@ -295,9 +302,19 @@ function FriendsPageInner({
     const requestedAccountId = selectedAccountId
     const requestedPage = page
     const requestedPageSize = pageSize
-    setLoadStatus('loading')
-    setFriends([])
-    setTotal(0)
+    /*
+     * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。すでに行が出て
+     * いるときは消さず薄めるだけにし、件数・ページ番号も新しい答えが
+     * 来るまで前のままにする。行が無いとき（初回・失敗あと）は
+     * 従来どおり読み込みの1枚を出す。
+     */
+    if (hasRowsRef.current) {
+      setRefreshing(true)
+    } else {
+      setLoadStatus('loading')
+      setFriends([])
+      setTotal(0)
+    }
     setBulkOpen(false)
     setSelectedIds(new Set())
     try {
@@ -329,10 +346,12 @@ function FriendsPageInner({
         setTotal(response.data.total)
         setSelectedIds(new Set())
         setLoadStatus('ready')
+        setRefreshing(false)
       } else {
         setFriends([])
         setTotal(0)
         setLoadStatus('error')
+        setRefreshing(false)
       }
     } catch {
       if (requestId !== loadRequestRef.current) return
@@ -343,6 +362,7 @@ function FriendsPageInner({
       setFriends([])
       setTotal(0)
       setLoadStatus('error')
+      setRefreshing(false)
     }
   }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
@@ -651,6 +671,7 @@ function FriendsPageInner({
       <FriendListTable
           friends={friends}
           status={loadStatus}
+          refreshing={refreshing}
           emptyTitle={emptyMessage.title}
           emptyDescription={emptyMessage.description}
           onRetry={() => void loadFriends()}

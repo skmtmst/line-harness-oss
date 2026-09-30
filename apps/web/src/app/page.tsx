@@ -40,6 +40,7 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import {
   hasInboundSupportMark,
@@ -161,17 +162,18 @@ function TodayTaskCard({
       </div>
       <div className="mt-2 flex min-w-0 items-baseline gap-2">
         <p className="text-ink text-[28px] leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
-          {loading ? (
-            <>
-              {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
-              <span className="bg-canvas-sunken inline-block h-7 w-16 animate-pulse rounded-mini" aria-hidden="true" />
-              <span className="sr-only">{STATE_TEXT.loading}</span>
-            </>
-          ) : (
-            <>
-              {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
-            </>
-          )}
+          {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
+          <DelayedSkeleton
+            loading={loading}
+            skeleton={
+              <>
+                <Skeleton className="h-7 w-16" />
+                <span className="sr-only">{STATE_TEXT.loading}</span>
+              </>
+            }
+          >
+            {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
+          </DelayedSkeleton>
         </p>
         <span className={`${statusTone === 'muted' ? 'text-ink-faint' : statusTone === 'danger' ? 'text-danger' : 'text-success'} shrink-0 whitespace-nowrap text-xs font-semibold`}>{status}</span>
       </div>
@@ -373,8 +375,15 @@ function LoadingDataCard({ title, href, linkLabel }: { title: string; href: stri
         actionTone="info"
       />
       <div className="space-y-2 px-5 py-8" aria-label={`${title}を${STATE_TEXT.loading}`}>
-        <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
-        <div className="bg-canvas-sunken h-5 w-2/3 animate-pulse rounded-mini" />
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div className="space-y-2">
+              <Skeleton className="block h-5 w-full" />
+              <Skeleton className="block h-5 w-2/3" />
+            </div>
+          }
+        />
       </div>
     </Card>
   )
@@ -432,17 +441,19 @@ function LiveDataCard({
         <Link href={href} className="text-status-info shrink-0 text-label font-semibold hover:underline">{linkLabel} →</Link>
       </div>
       <p className="text-ink mt-4 text-2xl font-bold tabular-nums" aria-busy={loading || undefined}>
-        {loading ? (
-          <>
-            {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
-            <span className="bg-canvas-sunken inline-block h-7 w-20 animate-pulse rounded-mini" aria-hidden="true" />
-            <span className="sr-only">{STATE_TEXT.loading}</span>
-          </>
-        ) : (
-          // 監査6 #674: 数字の見せ方は MetricValue に寄せる。
-          // 値が無いときは「—」だけで単位を付けない（「—件」は数に見える）。
+        {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={
+            <>
+              <Skeleton className="h-7 w-20" />
+              <span className="sr-only">{STATE_TEXT.loading}</span>
+            </>
+          }
+        >
+          {/* 監査6 #674: 数字の見せ方は MetricValue に寄せる。値が無いときは「—」だけで単位を付けない。 */}
           <MetricValue value={value} unit={unit} />
-        )}
+        </DelayedSkeleton>
       </p>
       <div className="mt-2 flex items-end justify-between gap-3">
         <p className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</p>
@@ -503,16 +514,21 @@ function SendQuotaCard({
           この値は `limit - used` なので残り。言葉を付けて向きを固定する。
         */}
         <span className="text-base leading-tight">
-          {loading ? (
-            <>
-              <span className="bg-canvas-sunken inline-block h-6 w-44 animate-pulse rounded-mini" aria-hidden="true" />
-              <span className="sr-only">{STATE_TEXT.loading}</span>
-            </>
-          ) : unlimited
-            ? `使用 ${used === null ? '—' : formatNumber(used)}通（上限なし）`
-            : remaining === null || limit === null
-              ? '—'
-              : `残り ${formatNumber(remaining)} / 上限 ${formatNumber(limit)}通`}
+          <DelayedSkeleton
+            loading={loading}
+            skeleton={
+              <>
+                <Skeleton className="h-6 w-44" />
+                <span className="sr-only">{STATE_TEXT.loading}</span>
+              </>
+            }
+          >
+            {unlimited
+              ? `使用 ${used === null ? '—' : formatNumber(used)}通（上限なし）`
+              : remaining === null || limit === null
+                ? '—'
+                : `残り ${formatNumber(remaining)} / 上限 ${formatNumber(limit)}通`}
+          </DelayedSkeleton>
         </span>
       </span>
     </p>
@@ -528,14 +544,19 @@ function SendQuotaCard({
         <button type="button" onClick={onRetry} className="text-danger font-medium hover:underline">
           {`送信枠を${STATE_TEXT.error}。もう一度読み込む`}
         </button>
-      ) : loading ? (
-        <span className="bg-canvas-sunken inline-block h-4 w-24 animate-pulse rounded-mini" aria-hidden="true" />
-      ) : unlimited ? (
-        <span className="text-ink-faint">契約種別：無制限</span>
       ) : (
-        <span className={low ? 'text-danger' : 'text-success'}>
-          {remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}
-        </span>
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={<Skeleton className="h-4 w-24" />}
+        >
+          {unlimited ? (
+            <span className="text-ink-faint">契約種別：無制限</span>
+          ) : (
+            <span className={low ? 'text-danger' : 'text-success'}>
+              {remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}
+            </span>
+          )}
+        </DelayedSkeleton>
       )}
     </div>
   </SideCard>
@@ -1428,7 +1449,11 @@ function DashboardPageInner() {
   const healthClass = displayedHealthRisk === 'danger' ? 'text-danger' : displayedHealthRisk === 'warning' ? 'text-warning' : displayedHealthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
   return (
-    <div className="flex flex-col gap-4">
+    /*
+     * ★V7 仕上げ `z97zZN` §1: 最初に開いたときだけ、段ごとに下から8px・
+     * 200ms・40ms ずつずらして出す。`.v7-stagger` は globals.css の共通規定。
+     */
+    <div className="v7-stagger flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
       {/*
@@ -1523,12 +1548,14 @@ function DashboardPageInner() {
       {visibleToday.length > 0 ? <section data-design="TodayTasks">
         {/* 見出しは置かない（オーナー指示）。4枚の小カードだけ出す。 */}
         {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-        <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* 同じ段の数のカードは 1 つずつ 40ms ずらして出す（★V7 `z97zZN` §1）。 */}
+        <KpiCollapse gridClassName="v7-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
         </KpiCollapse>
       </section> : null}
 
-      <div data-design="Middle" className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
+      {/* 主なカードと右の列も同じ段として順に出す（★V7 `z97zZN` §1）。 */}
+      <div data-design="Middle" className="v7-stagger grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
         <div data-design="Body" className="flex min-w-0 flex-col gap-4">
           {/*
             出荷予定を含め、メインのカードは編集パネルで決めた順番どおりに出す
