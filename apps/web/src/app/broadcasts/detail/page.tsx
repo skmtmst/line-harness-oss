@@ -649,12 +649,9 @@ function BroadcastDetailInner() {
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-semibold">この配信の設定</p>
-              <Link
-                href={`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`}
-                className="border-hairline text-action rounded-control border px-3 py-1 text-xs hover:underline"
-              >
+              <Button variant="secondary" className="text-action px-3 py-1 text-xs hover:underline h-auto whitespace-normal" href={`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`}>
                 同じ設定で作り直す
-              </Link>
+              </Button>
             </div>
             <p className="text-ink-faint mt-2 text-xs leading-relaxed">
               複製して作る操作です。題名と本文を引き継いで新規作成を開きます。宛先・予約日時は引き継がないので、送る前に確かめてください。

@@ -1,12 +1,12 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type InboxStats } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { formatDurationMinutes } from '@/lib/format-duration'
 import { formatNumber } from '@/lib/format'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import Button from '@/components/shared/button'
 
 function formatWait(minutes: number | null): string {
   if (!minutes || minutes < 1) return '待ちはありません'
@@ -90,10 +90,10 @@ export default function InboxKpis() {
         ))}
       </div>
 
-      <Link href="/tags?tab=marks" className="border-hairline text-action inline-flex h-[38px] shrink-0 items-center gap-2 rounded-control border bg-canvas px-3.5 text-[13px] font-semibold hover:bg-canvas-sunken">
+      <Button variant="secondary" className="text-action h-[38px] shrink-0 items-center gap-2 px-3.5 text-[13px] whitespace-normal" href="/tags?tab=marks">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6"/></svg>
         対応ルール
-      </Link>
+      </Button>
     </section>
   )
 }

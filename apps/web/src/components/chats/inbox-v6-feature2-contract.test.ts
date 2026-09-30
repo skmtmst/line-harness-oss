@@ -110,7 +110,8 @@ describe('H3lAOB / xGLVe トーク見出しの操作', () => {
     // U008/U010(#969): 390px では2行目へ落として右に切らないため、
     // 折り返しは sm 未満だけ。sm 以上では従来どおり1行を保つ。
     expect(header).toContain('sm:flex-nowrap')
-    expect(header).toContain('className="inline-flex h-10 shrink-0')
+    // V8 移行 ①: 共通 Button の inline-flex は部品側が持つので高さだけを見る。
+    expect(header).toContain('className="h-10 shrink-0')
     expect(header).toContain('compact={showFriendInfo}')
     expect(INBOX_DROPDOWN).toContain('whitespace-nowrap border px-2.5 text-xs')
   })

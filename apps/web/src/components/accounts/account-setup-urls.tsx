@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Button from '@/components/shared/button'
 
 interface Props {
   liffId: string | null
@@ -84,14 +85,9 @@ function UrlRow({ label, hint, url }: { label: string; hint: string; url: string
           onFocus={(e) => e.currentTarget.select()}
           className="min-w-0 flex-1 truncate rounded-mini border border-hairline bg-surface-pearl px-2 py-1.5 font-mono text-xs text-ink-secondary"
         />
-        <button
-          type="button"
-          onClick={onCopy}
-          disabled={!url}
-          className="shrink-0 rounded-mini border border-hairline px-2 text-xs font-medium hover:bg-surface-pearl disabled:cursor-not-allowed disabled:opacity-40"
-        >
+        <Button variant="secondary" className="shrink-0 rounded-mini px-2 text-xs font-medium hover:bg-surface-pearl h-auto whitespace-normal" type="button" onClick={onCopy} disabled={!url}>
           {copied ? '✓' : 'コピー'}
-        </button>
+        </Button>
       </div>
     </div>
   )
