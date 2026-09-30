@@ -10769,16 +10769,16 @@ export const api = {
           `/api/line-notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       get: (id: string, lineAccountId: string) =>
-        fetchApi<ApiResponse<NotificationRule>>(
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>(
           `/api/line-notifications/operator-rules/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       create: (data: { lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
-        fetchApi<ApiResponse<NotificationRule>>('/api/line-notifications/operator-rules', {
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>('/api/line-notifications/operator-rules', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      updateDraft: (id: string, lineAccountId: string, data: { name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
-        fetchApi<ApiResponse<NotificationRule>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
+      updateDraft: (id: string, lineAccountId: string, data: { expectedVersion: number; name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
           method: 'PATCH',
           body: JSON.stringify({ ...data, lineAccountId }),
         }),
