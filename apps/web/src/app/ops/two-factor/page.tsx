@@ -125,8 +125,7 @@ export default function OpsTwoFactorPage() {
               <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
             </AuthField>
           </div>
-          <Button type="submit" variant="primary" disabled={busy || !uri} className="w-full">
-            {busy ? '確認しています…' : '確認して登録を完了する'}
+          <Button type="submit" variant="primary" disabled={busy || !uri} className="w-full" busy={busy} busyLabel="確認しています…">確認して登録を完了する
           </Button>
           <p className="text-center text-caption text-ink-faint">
             確認が通ると、安全のため一度ログアウトします。メールとパスワード、次に6桁の数字でログインし直してください

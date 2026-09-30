@@ -777,8 +777,8 @@ function EditCommonVarInner() {
                     />
                     {statusError ? <p className="text-danger text-xs">{statusError}</p> : null}
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="primary" disabled={statusBusy} onClick={() => void applyStatus()}>
-                        {statusBusy ? '変更中…' : statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
+                      <Button type="button" variant="primary" disabled={statusBusy} onClick={() => void applyStatus()} busy={statusBusy} busyLabel="変更中…">
+                        {statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
                       </Button>
                       <Button type="button" disabled={statusBusy} onClick={() => setStatusAction(null)}>
                         キャンセル
@@ -1194,9 +1194,7 @@ function EditCommonVarInner() {
                       return
                     }
                     void save()
-                  }}
-                >
-                  {saving ? '保存中…' : '共通情報を保存する'}
+                  }} busy={saving}>共通情報を保存する
                 </Button>
               </>
             )}

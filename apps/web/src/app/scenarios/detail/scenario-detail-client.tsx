@@ -1846,8 +1846,7 @@ export default function ScenarioDetailClient({
         {editingStepId ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={closeStepForm}>編集を閉じる</Button>
-            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving}>
-              {stepSaving ? '保存中…' : '保存する'}
+            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving} busy={stepSaving}>保存する
             </Button>
           </div>
         ) : null}

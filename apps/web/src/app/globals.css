@@ -495,7 +495,7 @@ aside[aria-label="フォルダ"] .shadow-lg {
 
   @media (prefers-reduced-motion: no-preference) {
     :is(button, [role='button']):not(:disabled, [aria-disabled='true'], .w-full, [role='tab'], [role='option'], [role='menuitem'], [role='switch'], [role='gridcell'] *):active {
-      scale: 0.96;
+      scale: 0.98;
     }
   }
 }
@@ -582,9 +582,9 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   }
 
   /*
-   * #673 押した感触。ボタンは160msかけて少し沈み（scale 0.97）、離すと
-   * 戻る。押した瞬間の反応は `--motion-instant` 系ではなく、指に追従
-   * して見える 160ms にする（#673 の指定値）。
+   * #673 押した感触。★V7 仕上げ §2「押した」にそろえて、沈む動きは
+   * 上の `scale` 規定（0.98倍・motion-instant）に一本化した。
+   * ここに残すのは色と影のなめらか化だけ。
    *
    * 部品が持っている transition（共通 Button の CSS Module、
    * `transition-colors` などのユーティリティ）は base 層より強いので
@@ -594,17 +594,11 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
     transition:
-      transform 160ms var(--motion-ease-out),
       background-color var(--motion-fast) ease-out,
       border-color var(--motion-fast) ease-out,
       color var(--motion-fast) ease-out,
       box-shadow var(--motion-fast) ease-out,
       opacity var(--motion-fast) ease-out;
-  }
-
-  button:not(:disabled):active,
-  [role="button"]:not([aria-disabled="true"]):active {
-    transform: scale(0.97);
   }
 
   /*

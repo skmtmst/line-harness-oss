@@ -749,8 +749,7 @@ export default function ActionEditor({
                 >
                   戻る
                 </button>
-                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving}>
-                  {conditionSaving ? '保存中…' : '条件を保存する'}
+                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving} busy={conditionSaving}>条件を保存する
                 </Button>
               </div>
             </div>
@@ -914,7 +913,7 @@ export default function ActionEditor({
           </div>
         )}
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
-        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling}>{cancelling ? '戻しています…' : 'キャンセル'}</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
       </div>
     </div>
   )

@@ -872,9 +872,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           <Button
             onClick={() => void submit()}
             disabled={saving}
-            variant="primary"
-          >
-            {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作る' : '保存する'}
+            variant="primary" busy={saving}>
+            {initial.version === 0 ? '基本ルールを作る' : '保存する'}
           </Button>
         </div>
       ) : (
@@ -1205,9 +1204,7 @@ function EditMenuModal({
               variant="primary"
               onClick={() => void submit()}
               disabled={saving || !canEdit}
-              title={canEdit ? undefined : '予約メニューの変更権限がありません'}
-            >
-              {saving ? '保存中…' : '保存する'}
+              title={canEdit ? undefined : '予約メニューの変更権限がありません'} busy={saving}>保存する
             </Button>
           </div>
         }

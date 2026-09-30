@@ -210,7 +210,7 @@ function SessionsCard() {
         {sessions.map((session) => <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
           <div className="min-w-0"><p className="truncate text-sm font-medium text-ink" title={session.userAgent ?? undefined}>{deviceLabel(session.userAgent)}{session.current && <span className="ml-2 rounded-pill bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-deep">この端末</span>}</p>
             <p className="mt-0.5 text-xs text-ink-faint">ログイン：{formatStaffDate(session.createdAt)}{session.ipPrefix ? `　・　接続元：${session.ipPrefix}` : ''}</p></div>
-          <Button variant="secondary" disabled={revokingId === session.id} onClick={() => (session.current ? setConfirmCurrent(true) : void revoke(session.id, false))}>{revokingId === session.id ? '終了中…' : 'ログインを終了'}</Button>
+          <Button variant="secondary" disabled={revokingId === session.id} onClick={() => (session.current ? setConfirmCurrent(true) : void revoke(session.id, false))} busy={revokingId === session.id} busyLabel="終了中…">ログインを終了</Button>
         </li>)}
       </ul>
     )}
@@ -454,7 +454,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       狭い幅では説明は本文（いまの権限カード）へ移し、下部は操作だけに絞る。
       高さは固定せず、長いエラー文は折り返してボタンを隠さない。
     */}
-    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{targetIsAdministrator ? '管理者の権限は確認だけできます。この画面からは変更できません。' : `${user.name}さんはいま「${ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。`}</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>{targetIsAdministrator ? '一覧へ戻る' : '×　キャンセル'}</Button>{!targetIsAdministrator && <Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存する'}</Button>}</div></div>
+    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{targetIsAdministrator ? '管理者の権限は確認だけできます。この画面からは変更できません。' : `${user.name}さんはいま「${ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。`}</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>{targetIsAdministrator ? '一覧へ戻る' : '×　キャンセル'}</Button>{!targetIsAdministrator && <Button disabled={saving} onClick={requestSave} busy={saving}>✓　{'見せる範囲を保存する'}</Button>}</div></div>
     <ConfirmDialog
       open={saveConfirmOpen}
       title={`${user.name}さんの見せる範囲を保存しますか？`}

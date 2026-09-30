@@ -286,8 +286,8 @@ function FriendAddRunDetailInner() {
 
       {notice && <p role="status" className="text-sm font-bold">{notice}</p>}
       {failed.length > 0 && (
-        <Button variant="primary" disabled={retrying} onClick={() => void retry()}>
-          {retrying ? '再試行中…' : `失敗した${failed.length}件だけ再試行`}
+        <Button variant="primary" disabled={retrying} onClick={() => void retry()} busy={retrying} busyLabel="再試行中…">
+          {`失敗した${failed.length}件だけ再試行`}
         </Button>
       )}
     </div>

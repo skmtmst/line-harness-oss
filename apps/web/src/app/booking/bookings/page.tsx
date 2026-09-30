@@ -1055,8 +1055,7 @@ export default function BookingsPage() {
             trailing={
               /* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */
               selectedAccountId ? (
-                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
-                  {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す
                 </Button>
               ) : null
             }

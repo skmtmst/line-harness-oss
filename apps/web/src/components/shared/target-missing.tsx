@@ -92,9 +92,8 @@ export default function TargetMissing({
     )
   } else if (showRetry) {
     action = (
-      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying}>
-        <RotateCw aria-hidden="true" size={16} />
-        {retrying ? '読み込んでいます' : 'もう一度読み込む'}
+      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
+        <RotateCw aria-hidden="true" size={16} />もう一度読み込む
       </Button>
     )
   }

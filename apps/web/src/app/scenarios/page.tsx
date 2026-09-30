@@ -314,7 +314,7 @@ function StartScenarioDialog({
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'}>{busy ? '開始中…' : '配信を開始'}</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'} busy={busy} busyLabel="開始中…">配信を開始</Button>
         </div>
       </div>
     </div>

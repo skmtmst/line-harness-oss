@@ -20,6 +20,7 @@ import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
+import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
@@ -637,34 +638,6 @@ function FriendsPageInner({
         ) : null}
       </section>
 
-      {selectedIds.size > 0 ? (
-        <section className={`rounded-card border border-accent-border bg-accent-soft p-3 shadow-card`} data-design="V4BulkBar">
-          <div className="flex flex-wrap items-center gap-2">
-            <strong className="text-sm text-ink">{selectedIds.size}人を選択中</strong>
-            <span className="text-xs text-ink-secondary">対象を確認してから操作を選んでください</span>
-            {selectedIds.size > 1 && canRunBulk(staffRole) ? (
-              <Button
-                variant="primary"
-                className="ml-auto"
-                data-qa-open="IAf7j"
-                onClick={() => setBulkOpen(true)}
-              >
-                操作を選ぶ
-              </Button>
-            ) : null}
-            {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
-              /* 権限が無いときは押し口を出さない。理由だけ書く。 */
-              <span className="text-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
-            ) : null}
-          </div>
-          {selectedIds.size === 1 ? (
-            <div className="mt-2">
-              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
       <BulkRunDialog
         open={bulkOpen}
         friendIds={selectedFriendIds}
@@ -693,6 +666,37 @@ function FriendsPageInner({
           onPageSizeChange={(size) => resetPageWith(() => setPageSize(size as (typeof PAGE_SIZE_OPTIONS)[number]))}
           onToggleAttention={toggleAttention}
       />
+
+      {/*
+        ★V7 仕上げ §2: 一括バーは表のすぐ下に置き、1件でも選ぶと
+        下端から8px上がって出る。0件で下がって消える。
+      */}
+      <span data-design="V4BulkBar" className="block">
+        <BulkBar
+          count={selectedIds.size}
+          unit="人"
+          hint="対象を確認してから操作を選んでください"
+          below={selectedIds.size === 1 ? (
+            <div className="mt-2">
+              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
+            </div>
+          ) : undefined}
+        >
+          {selectedIds.size > 1 && canRunBulk(staffRole) ? (
+            <Button
+              variant="secondary"
+              data-qa-open="IAf7j"
+              onClick={() => setBulkOpen(true)}
+            >
+              操作を選ぶ
+            </Button>
+          ) : null}
+          {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
+            /* 権限が無いときは押し口を出さない。理由だけ書く。 */
+            <span className="text-ink-faint text-xs">一括操作ができるのはオーナーと管理者だけです</span>
+          ) : null}
+        </BulkBar>
+      </span>
 
       {advancedOpen ? (
         <style>{`

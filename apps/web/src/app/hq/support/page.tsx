@@ -386,9 +386,8 @@ export default function HqSupportPage() {
           actions={
             <>
               <Button onClick={clear} disabled={sending}>内容をクリア</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)}>
-                <Send aria-hidden="true" className="h-4 w-4" />
-                {sending ? '送信中…' : '送る'}
+              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)} busy={sending} busyLabel="送信中…">
+                <Send aria-hidden="true" className="h-4 w-4" />送る
               </Button>
             </>
           }

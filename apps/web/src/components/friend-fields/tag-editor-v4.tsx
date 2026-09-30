@@ -661,7 +661,7 @@ export default function TagEditorV4({
             <Button onClick={onCancel}>キャンセル</Button>
             {mode === 'edit' && !embedded ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して作る</Button> : null}
             {mode === 'create' ? <Button disabled={saving} onClick={() => requestSave(true)}>保存して続けて作る</Button> : null}
-            <Button variant="primary" disabled={saving} onClick={() => requestSave(false)}>{saving ? '保存中…' : mode === 'create' ? 'タグを作る' : 'タグを保存する'}</Button>
+            <Button variant="primary" disabled={saving} onClick={() => requestSave(false)} busy={saving}>{mode === 'create' ? 'タグを作る' : 'タグを保存する'}</Button>
           </>
         )}
       />

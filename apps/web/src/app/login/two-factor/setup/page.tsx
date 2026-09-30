@@ -151,8 +151,7 @@ export default function TwoFactorSetupPage() {
               <OtpInput id="totp-setup-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
             </div>
           </div>
-          <Button type="submit" variant="primary" disabled={busy} className="w-full">
-            {busy ? '確認しています…' : '確認して登録を完了する'}
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="確認しています…">確認して登録を完了する
           </Button>
         </form>
       ) : null}

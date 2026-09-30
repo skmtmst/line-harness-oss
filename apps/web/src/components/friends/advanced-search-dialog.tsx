@@ -812,9 +812,8 @@ export default function AdvancedSearchDialog({
               type="button"
               variant="primary"
               className="px-5"
-              onClick={() => onApply({ params, summary, editorState })}
-            >
-              {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${formatNumber(count)}人を表示`}
+              onClick={() => onApply({ params, summary, editorState })} busy={counting} busyLabel="再計算中…">
+              {count === null ? 'この条件で表示' : `${formatNumber(count)}人を表示`}
             </Button>
           </div>
         </div>
@@ -845,7 +844,7 @@ export default function AdvancedSearchDialog({
             {saveError ? <p className="mt-3 text-sm text-danger">{saveError}</p> : null}
             <div className="mt-5 flex justify-end gap-2">
               <Button type="button" onClick={() => setSaveOpen(false)}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>
+              <Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving}>保存する</Button>
             </div>
           </section>
         </div>

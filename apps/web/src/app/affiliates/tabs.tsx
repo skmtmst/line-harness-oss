@@ -1433,9 +1433,7 @@ export function CreateAffiliateModal({
           <Button
             variant="primary"
             onClick={() => { void handleSubmit() }}
-            disabled={submitting || !selected}
-          >
-            {submitting ? '作成中...' : '作る'}
+            disabled={submitting || !selected} busy={submitting} busyLabel="作成中...">作る
           </Button>
         </div>
       )}

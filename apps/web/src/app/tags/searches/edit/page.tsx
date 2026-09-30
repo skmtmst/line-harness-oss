@@ -966,7 +966,7 @@ function SavedSearchEditInner() {
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
             <Button type="button" disabled={saving} onClick={() => void duplicate()}>複製して保存する</Button>
-            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>
+            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}>保存する</Button>
           </>
         )}
       />
