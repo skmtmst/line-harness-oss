@@ -42,6 +42,14 @@ const OPTIONS = {
 
 /* 送った作成の記録。account_id と Idempotency-Key を控える。 */
 const posted = vi.hoisted(() => [] as Array<{ accountId: string; key: string | null }>)
+/* POST作成の振る舞い。'fail'は応答消失（通信エラー）、'manual'は止めておいて試験から解決する。 */
+const postMode = vi.hoisted(() => ({ current: 'fail' as 'fail' | 'manual' }))
+const pendingPosts = vi.hoisted(() => [] as Array<{
+  accountId: string
+  key: string | null
+  resolve: (value: Response) => void
+  reject: (reason?: unknown) => void
+}>)
 
 function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: { method?: string; headers?: Record<string, string> }) => {
@@ -54,10 +62,16 @@ function installFetch() {
       return new Response(JSON.stringify({ success: true, data: { items: [], options: OPTIONS } }), { status: 200 })
     }
     if (url.pathname === '/api/analytics/report-schedules' && init?.method === 'POST') {
-      posted.push({
+      const entry = {
         accountId: url.searchParams.get('account_id') ?? '',
         key: init?.headers?.['Idempotency-Key'] ?? null,
-      })
+      }
+      if (postMode.current === 'manual') {
+        return new Promise<Response>((resolve, reject) => {
+          pendingPosts.push({ ...entry, resolve, reject })
+        })
+      }
+      posted.push(entry)
       throw new Error('network down')
     }
     return new Response(JSON.stringify({ success: false, error: '未設定' }), { status: 500 })
@@ -119,6 +133,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   pushed.length = 0
   posted.length = 0
+  pendingPosts.length = 0
+  postMode.current = 'fail'
   account.id = 'account-a'
   installFetch()
 })
@@ -159,6 +175,78 @@ describe('定期レポート作成の要求キー（R526）', () => {
     expect(posted[1].accountId).toBe('account-b')
     expect(posted[1].key).toBeTruthy()
     expect(posted[1].key).not.toBe(keyA)
+  })
+
+  it('Aで応答を失いBで作ってAへ戻っても、Aの押し直しはAのキーで送る（R526）', async () => {
+    await mount()
+    await settle()
+    expect(hasText('山田')).toBe(true)
+
+    await checkRecipient('山田')
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    const keyA = posted[0].key
+    expect(keyA).toBeTruthy()
+
+    account.id = 'account-b'
+    await rerender()
+    await settle()
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    const keyB = posted[1].key
+    expect(keyB).toBeTruthy()
+    expect(keyB).not.toBe(keyA)
+
+    // Aへ戻って押し直す。Bの試行で上書きされていたら別物になり、Aに二重予約ができる。
+    account.id = 'account-a'
+    await rerender()
+    await settle()
+    await click(buttonByText('つくって動かす'))
+    await settle()
+
+    expect(posted).toHaveLength(3)
+    expect(posted[2].accountId).toBe('account-a')
+    expect(posted[2].key).toBe(keyA)
+  })
+
+  it('Aの作成が終わらないうちにBへ移ってもBは止まらない。遅れたAの成功はBを上書きしない（R526）', async () => {
+    postMode.current = 'manual'
+    await mount()
+    await settle()
+    expect(hasText('山田')).toBe(true)
+
+    await checkRecipient('山田')
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(1)
+    const keyA = pendingPosts[0].key
+    expect(keyA).toBeTruthy()
+
+    // Bへ移る。Aの進行表示に引きずられず、Bはすぐ作れる。
+    account.id = 'account-b'
+    await rerender()
+    await settle()
+    expect(buttonByText('つくって動かす').disabled).toBe(false)
+
+    // 遅れてAの成功が戻っても、Bの画面はそのまま（結果へ飛ばない・文も変わらない）。
+    await act(async () => {
+      pendingPosts[0].resolve(new Response(
+        JSON.stringify({ success: true, data: { id: 'sched-a' } }), { status: 201 },
+      ))
+    })
+    await settle()
+    expect(pushed).toHaveLength(0)
+    expect(hasText('山田')).toBe(true)
+    expect(buttonByText('つくって動かす').disabled).toBe(false)
+
+    // Bの作成はAと別のキーで送る。
+    await click(buttonByText('つくって動かす'))
+    await settle()
+    expect(pendingPosts).toHaveLength(2)
+    expect(pendingPosts[1].accountId).toBe('account-b')
+    expect(pendingPosts[1].key).toBeTruthy()
+    expect(pendingPosts[1].key).not.toBe(keyA)
+    expect(pushed).toHaveLength(0)
   })
 
   it('同じアカウントの押し直しは同じキーで送る（二重予約にしない）', async () => {

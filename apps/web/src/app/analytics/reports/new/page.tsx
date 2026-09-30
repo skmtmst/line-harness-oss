@@ -361,14 +361,32 @@ function AnalyticsReportFormPage() {
   const editIdRef = useRef(editId)
   editIdRef.current = editId
   /*
-   * R526: この作成試行の要求キー。応答消失後の押し直しは同じキーで送り、
-   * サーバは既にある予約を返す。成功するまで持ち回り、成功・作り直しで捨てる。
-   * キーは選んでいるアカウントに結びつける。裏側はキーをそのまま行の
-   * 主キーにする（全アカウントで1つ）。Aで応答を失ったキーをBで使い回すと、
-   * Bには同キーが見つからずINSERTで主キーが衝突して500になる。
-   * アカウントが違えば新しい試行にし、同じアカウントへ戻れば再送が効く。
+   * R526: 別アカウント・別編集対象へ移ったら、前の保存の進行表示を
+   * 残さない。終わらない作成をAに残したままBへ移ると、Bの保存ボタンが
+   * 「作っています」のまま押せなくなる（finally の setSaving(false) は
+   * sameTarget の内側なので、移った後の決着では戻らない）。
+   * 遅れて戻るAの応答は R455 の sameTarget が捨てるので、ここで戻しても
+   * Aの結果がBの画面を上書きしない。読み直し（reloadSeq）では戻さない。
+   * 読み直しは同じ対象の再取得であり、進行中の保存と競わせないため。
    */
-  const createKeyRef = useRef<{ key: string; accountId: string } | null>(null)
+  const saveTargetRef = useRef<{ accountId: string | null; editId: string | null } | null>(null)
+  useEffect(() => {
+    const prev = saveTargetRef.current
+    saveTargetRef.current = { accountId: selectedAccountId, editId }
+    if (prev && (prev.accountId !== selectedAccountId || prev.editId !== editId)) {
+      setSaving(false)
+    }
+  }, [selectedAccountId, editId])
+  /*
+   * R526: アカウントごとの作成試行の要求キー。応答消失後の押し直しは
+   * 同じアカウントの同じキーで送り、サーバは既にある予約を返す。
+   * 成功・作り直しではそのアカウントの分だけ捨てる（別アカウントの
+   * 試行は残す）。1枠だと、Aで応答を失いBで作るとBがAを上書きし、
+   * Aへ戻った押し直しが別物として二重予約になる。
+   * 裏側はキーをそのまま行の主キーにする（全アカウントで1つ）ため、
+   * アカウントが違えば新しい試行にする。
+   */
+  const createKeysRef = useRef<Record<string, string>>({})
   /*
    * R526: 同じキーで内容の違う予約が既にあるときの、その予約の番号。
    * 2件目を黙って作らず、既にある予約への案内を出す。
@@ -464,13 +482,12 @@ function AnalyticsReportFormPage() {
           ? '定期レポートを更新しました。止まっている間は届きません。再開すると次の予定から届きます。'
           : `定期レポートを更新しました。次は${nextLabel}に届きます。`)
       } else {
-        // R526: 作成試行の要求キー。応答消失後の押し直しは同じキーで送り、
-        // 既にある予約へ戻す（2件目を作らない）。別アカウントの試行では
-        // 新しいキーにする（使い回すと裏側の主キーが衝突して500になる）。
-        if (!createKeyRef.current || createKeyRef.current.accountId !== selectedAccountId) {
-          createKeyRef.current = { key: crypto.randomUUID(), accountId: selectedAccountId }
-        }
-        const requestKey = createKeyRef.current.key
+        // R526: 作成試行の要求キー。応答消失後の押し直しは同じアカウントの
+        // 同じキーで送り、既にある予約へ戻す（2件目を作らない）。
+        // 別アカウントの試行は別のキーにする（使い回すと裏側の主キーが
+        // 衝突して500になる）。Aへ戻ればAのキーが残っているので再送が効く。
+        const requestKey = createKeysRef.current[selectedAccountId]
+          ?? (createKeysRef.current[selectedAccountId] = crypto.randomUUID())
         let response
         try {
           response = await api.analytics.reportSchedules.create(selectedAccountId, {
@@ -491,7 +508,8 @@ function AnalyticsReportFormPage() {
         }
         if (!sameTarget()) return
         if (!response.success) throw new Error(response.error)
-        createKeyRef.current = null
+        // R526: 解決したのはこの保存の試行だけ。別アカウントの試行は残す。
+        delete createKeysRef.current[wantAccount]
         setConflictId(null)
         /*
           R76。作ったあとも新規のまま残すと、時刻を直してもう一度押したときに
@@ -588,7 +606,7 @@ function AnalyticsReportFormPage() {
           action={(
             <>
               <Button variant="secondary" href={`/analytics/reports/new?id=${encodeURIComponent(conflictId)}`}>既にある予約を確認</Button>
-              <Button variant="secondary" onClick={() => { createKeyRef.current = null; setConflictId(null) }}>内容を変えた新しい予約として作り直す</Button>
+              <Button variant="secondary" onClick={() => { delete createKeysRef.current[selectedAccountId]; setConflictId(null) }}>内容を変えた新しい予約として作り直す</Button>
             </>
           )}
         >
