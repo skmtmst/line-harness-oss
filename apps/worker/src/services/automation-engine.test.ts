@@ -406,6 +406,54 @@ describe('V6オートメーション実行エンジン', () => {
     ]);
   });
 
+  it('共通アクションの呼び出し1件分を含めて1000件まで実行し1001件で止まる（監査 R478）', async () => {
+    const setupSized = (waits: number, suffix: string) => {
+      const commonId = `common-limit-${suffix}`;
+      const versionId = `common-limit-${suffix}-v1`;
+      testDb.raw.prepare(
+        `INSERT INTO common_actions (id, line_account_id, name, status)
+         VALUES (?, 'account-1', ?, 'published')`,
+      ).run(commonId, commonId);
+      testDb.raw.prepare(
+        `INSERT INTO common_action_versions
+           (id, common_action_id, version_number, status, action_config, published_at)
+         VALUES (?, ?, 1, 'published', ?, ?)`,
+      ).run(
+        versionId, commonId,
+        JSON.stringify(Array.from({ length: waits }, (_, index) => action(`w${index}`))),
+        T0,
+      );
+      const setup = addPublishedAutomation(testDb.raw, {
+        automationId: `auto-limit-${suffix}`,
+        lineAccountId: 'account-1',
+        actions: [action('shared', 'common_action', { commonActionId: commonId })],
+      });
+      testDb.raw.prepare(
+        `INSERT INTO common_action_bindings
+           (id, line_account_id, common_action_id, common_action_version_id,
+            consumer_type, consumer_id, consumer_path)
+         VALUES (?, 'account-1', ?, ?, 'automation', ?, 'shared')`,
+      ).run(`binding-limit-${suffix}`, commonId, versionId, setup.automationId);
+      return setup;
+    };
+
+    // 呼び出し1件 + 中999件 = 1000件は実行できる（境界）。
+    const ok = await start(testDb.db, setupSized(999, 'ok'), {
+      sourceEventId: 'event-limit-ok', idempotencyKey: 'event-limit-ok',
+    });
+    expect(ok.status).toBe('queued');
+
+    // 中1000件になると呼び出しと合わせて1001件で実行開始時に止まる。
+    const over = await start(testDb.db, setupSized(1000, 'over'), {
+      sourceEventId: 'event-limit-over', idempotencyKey: 'event-limit-over',
+    });
+    expect(over.status).toBe('failed');
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps
+        WHERE automation_run_id = ? AND step_key = '__configuration__'`,
+    ).get(over.runId)).toEqual({ error_code: 'execution_plan_too_large' });
+  });
+
   it('共通アクション内の待機後も固定した計画の続きから再開する', async () => {
     const setup = addPublishedAutomation(testDb.raw, {
       actions: [action('shared', 'common_action', { commonActionId: 'common-wait' })],
