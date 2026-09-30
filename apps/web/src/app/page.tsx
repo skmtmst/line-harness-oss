@@ -295,7 +295,7 @@ function FriendAddLinkCard({
               ]}
             />
           </label>
-          <Link href="/inflow-links" className="border-hairline text-action hover:bg-action-soft rounded-control border px-3 py-2 text-xs font-semibold">経路を分けて発行</Link>
+          <Button variant="secondary" className="text-action hover:bg-action-soft px-3 py-2 text-xs h-auto whitespace-normal" href="/inflow-links">経路を分けて発行</Button>
         </div>
       </div>
 
@@ -307,10 +307,10 @@ function FriendAddLinkCard({
           aria-label="友だち追加リンク"
           className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2.5 font-mono text-xs"
         />
-        <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-semibold">
+        <Button variant="primary" className="shrink-0 px-5 py-2.5 text-xs border-0 h-auto whitespace-normal" type="button" onClick={onCopy}>
           {copyState === 'copied' ? 'コピーしました ✓' : 'コピー'}
-        </button>
-        <button type="button" onClick={() => writeQr(routeId || 'base')} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-semibold">QRを表示</button>
+        </Button>
+        <Button variant="secondary" className="text-ink-secondary shrink-0 px-5 py-2.5 text-xs h-auto whitespace-normal" type="button" onClick={() => writeQr(routeId || 'base')}>QRを表示</Button>
       </div>
       {copyState === 'failed' ? (
         <p role="alert" className="text-danger mt-2 text-xs">
@@ -1470,13 +1470,7 @@ function DashboardPageInner() {
           <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-pill bg-current" />{healthLabel}</span>
           <div className="flex gap-2">
             {PERIODS.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => selectPeriod(item.key)}
-                aria-pressed={period === item.key}
-                className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
-              >{item.label}</button>
+              <Button variant="primary" className={(`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={item.key} type="button" onClick={() => selectPeriod(item.key)} aria-pressed={period === item.key}>{item.label}</Button>
             ))}
           </div>
           {/* 選択中のLINEアカウントの通知だけを表示し、未取得を0件に見せない。 */}

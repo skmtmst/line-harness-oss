@@ -1159,13 +1159,9 @@ function EditCommonVarInner() {
           */}
           <StickyBar
             destructive={(
-              <button
-                type="button"
-                onClick={() => void openDelete()}
-                className="rounded-control bg-danger text-on-accent px-4 py-2 text-sm font-bold"
-              >
+              <Button variant="danger" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" type="button" onClick={() => void openDelete()}>
                 この共通情報を削除する
-              </button>
+              </Button>
             )}
             actions={(
               <>
@@ -1264,18 +1260,12 @@ function EditCommonVarInner() {
               {scheduleFieldError ? <p className="text-danger mt-1 text-xs">{scheduleFieldError}</p> : null}
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setDraft(null)}
-                className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm"
-              >
+              <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" onClick={() => setDraft(null)}>
                 キャンセル
-              </button>
-              <button
-                onClick={() => void addSchedule()}
-                className="bg-accent-deep text-on-accent rounded-control px-6 py-2 text-sm font-medium"
-              >
+              </Button>
+              <Button variant="primary" className="px-6 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void addSchedule()}>
                 登録する
-              </button>
+              </Button>
             </div>
           </div>
         </div>

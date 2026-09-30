@@ -934,8 +934,8 @@ export default function RichMenusListPage() {
                           <div className="flex items-center gap-2">
                             {reordering ? (
                               <div className="flex shrink-0 gap-1">
-                                <button type="button" onClick={() => void moveGroup(g, -1)} disabled={reorderBusy} aria-label={`${g.name}を上へ`} className="border-hairline rounded-control border px-1.5 py-1 text-xs disabled:opacity-40">↑</button>
-                                <button type="button" onClick={() => void moveGroup(g, 1)} disabled={reorderBusy} aria-label={`${g.name}を下へ`} className="border-hairline rounded-control border px-1.5 py-1 text-xs disabled:opacity-40">↓</button>
+                                <Button variant="secondary" className="px-1.5 py-1 text-xs h-auto whitespace-normal" type="button" onClick={() => void moveGroup(g, -1)} disabled={reorderBusy} aria-label={`${g.name}を上へ`}>↑</Button>
+                                <Button variant="secondary" className="px-1.5 py-1 text-xs h-auto whitespace-normal" type="button" onClick={() => void moveGroup(g, 1)} disabled={reorderBusy} aria-label={`${g.name}を下へ`}>↓</Button>
                               </div>
                             ) : null}
                             <div className="min-w-0">
