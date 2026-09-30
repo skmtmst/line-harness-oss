@@ -373,6 +373,41 @@
    */
   --default-transition-duration: 120ms;
   --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- ★V8 で増える語彙 -------------------------------------------------
+   * V8 移行② で足した名前。値はどのテーマでも同じ新しい語彙なので
+   * `@theme` に置く（V8 だけ値が違うものは下の `[data-theme="v8"]` へ）。
+   * 移行が終わるまで v7 の画面はこれらを読まない。
+   *
+   * 出どころ: Pencil ★V8 板（lh-work/design/v8/）と COMPONENT-MAP.md の
+   * オーナー決まり。
+   */
+
+  /*
+   * 表の区切り線。hairline（#dadde2）より薄い #eceef1。
+   * 表の行の間・数の帯の縦線など、板の中の細かい割れ目に使う。
+   */
+  --color-divider: #eceef1;
+  /* 表の見出しの行の地（★V8 表の寸法「見出し 44・地 table-head」）。 */
+  --color-table-head: #fafafb;
+  /* 受信箱で自分が送った吹き出しの地（★V8 受信箱の型）。 */
+  --color-chat-outgoing: #dff5e7;
+  /*
+   * 白い板の枠と影（★V8 外側「灰色の地に白い板1枚」）。
+   * 枠は ink の 8%、影は 4% で、hairline の実線より弱い輪郭にする。
+   */
+  --color-board-line: #1d1d1f14;
+  --shadow-board: 0 1px 2px #1d1d1f0a;
+  /*
+   * 印のタイル（数の帯のアイコン地）の6色。**タイルの中だけで使う**決まりで、
+   * 状態の色・アクセントとは別系統。画面のボタンや文字には使わない。
+   */
+  --color-icon-tile-green: #16a34a;
+  --color-icon-tile-orange: #f97316;
+  --color-icon-tile-blue: #3b82f6;
+  --color-icon-tile-purple: #8b5cf6;
+  --color-icon-tile-slate: #64748b;
+  --color-icon-tile-red: #ef4444;
 }
 
 :root {
@@ -400,6 +435,26 @@
   --motion-pulse: 1.2s;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 テーマ（V8 移行②）
+ *
+ * `<html data-theme="v8">` のときだけ効く、V7 と値の違うトークン。
+ * ここに無いトークンは :root（＝V7）の値がそのまま効く。
+ * 既定は v7。検証環境は環境変数 NEXT_PUBLIC_ADMIN_THEME=v8、担当者は
+ * 設定画面の「画面の見た目（試作）」で切り替える（layout.tsx 参照）。
+ *
+ * 値の出どころは Pencil ★V8（~/Downloads/LINE-Harness-V8.pen）と
+ * lh-work/design/v8/COMPONENT-MAP.md。部品ごとの移行（④）で、部品が
+ * 必要とする値をここへ足していく。
+ *
+ *   control 8→10  ボタン・入力・選ぶ欄・探す欄の角丸（板「角丸 10」）
+ *   panel  12→16  白い板・ダイアログの角丸（板「角丸 16」、ダイアログ 16〜20）
+ */
+[data-theme="v8"] {
+  --radius-control: 10px;
+  --radius-panel: 16px;
 }
 
 /* ---------------------------------------------------------------------
