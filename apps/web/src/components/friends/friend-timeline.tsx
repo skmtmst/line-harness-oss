@@ -7,6 +7,7 @@ import TemplatePicker from '@/components/chats/template-picker'
 import ListState from '@/components/shared/list-state'
 import { describeSendFailure } from '@/app/chats/send-failure'
 import { formatDay, formatTime } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /**
  * 友だち詳細のタイムライン（設計 V2 2-2-1 の右カラム）。
@@ -264,14 +265,9 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
         {error && <p className="text-danger mt-1 text-xs">{error}</p>}
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="text-ink-faint text-xs">画像は JPEG / PNG、1枚 10MB まで</span>
-          <button
-            type="button"
-            onClick={() => void send()}
-            disabled={sending || !text.trim()}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium disabled:opacity-40"
-          >
+          <Button variant="primary" className="px-5 py-2 font-medium border-0 h-auto whitespace-normal" type="button" onClick={() => void send()} disabled={sending || !text.trim()}>
             {sending ? '送信中...' : '送信'}
-          </button>
+          </Button>
         </div>
       </div>
 

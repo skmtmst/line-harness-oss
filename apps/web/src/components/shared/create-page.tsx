@@ -173,21 +173,13 @@ export default function CreatePage({
     </>
   ) : (
     <>
-      <button
-        onClick={() => run(false)}
-        disabled={saving}
-        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-      >
+      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving}>
         {saving ? '保存中...' : (saveLabel ?? '保存する')}
-      </button>
+      </Button>
       {onReset && (
-        <button
-          onClick={() => run(true)}
-          disabled={saving}
-          className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-        >
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving}>
           保存して続けて作る
-        </button>
+        </Button>
       )}
       <Link
         href={parent[1]}
