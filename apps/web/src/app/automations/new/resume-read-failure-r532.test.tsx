@@ -140,7 +140,7 @@ async function mountPage(): Promise<HTMLDivElement> {
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きに保存')
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存する')
   if (!button) throw new Error('保存ボタンが見つかりません')
   return button as HTMLButtonElement
 }
