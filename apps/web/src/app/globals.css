@@ -577,6 +577,16 @@ aside[aria-label="フォルダ"] .shadow-lg {
 }
 
 /*
+ * 欄の誤りは枠を赤くする（★V7 sTJsh §6）。共有入力部品は各自の CSS で
+ * 持っているが、画面に直接書いた `<input>` も同じ色になるようここで揃える。
+ */
+input[aria-invalid='true'],
+textarea[aria-invalid='true'],
+select[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+/*
  * タッチ端末の入力欄は 16px 以上（★V7 修正方針 §3）。
  * 共通部品（TextField・Select ほか）は各自で 16px にしているが、画面に直接書いた
  * 入力欄は 12〜14px のままで、iPhone で押すと画面が拡大されていた（2026-09-24 の点検で
