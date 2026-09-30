@@ -1277,6 +1277,74 @@ describe('R362 返却中断後の回復(実D1)', () => {
     }
   });
 
+  it('内訳の読み直しが遅れた修復が重なっても内訳は1回分だけ戻る', async () => {
+    // Bがコードを読んだ後、内訳の読み直しで待たせ、その間にAを
+    // 完了させる。Bが新しい内訳値で条件を作り直しても、書き込み時の
+    // コード所有の条件で止まり、合計は1回分になる。
+    const { raw } = createTestD1();
+    const db = asD1(raw);
+    seedAccount(raw);
+    const id = await seedStuckCouponRefund(db, raw, 'staggered-legacy');
+    await refundMileageRewardRedemption(db, { redemptionId: id, reason: '最初の回復' });
+    const codeId = (raw.prepare(
+      `SELECT id FROM mileage_reward_codes WHERE status = 'available'`,
+    ).get() as { id: string }).id;
+    raw.prepare(
+      `UPDATE mileage_grant_lots SET remaining_amount = remaining_amount - 300
+        WHERE beneficiary_key = 'user:user-1' AND status != 'void'`,
+    ).run();
+    raw.prepare(
+      `UPDATE mileage_reward_codes
+          SET status = 'reserved', redemption_id = ?, reserved_at = ?
+        WHERE id = ?`,
+    ).run(id, '2026-09-30T12:00:00.000Z', codeId);
+    const nextReward = await seedRefundWebhookReward(db);
+    await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: nextReward,
+      idempotencyKey: 'staggered-spend', requestFingerprint: 'staggered-spend',
+    });
+    let release!: () => void;
+    let hit!: () => void;
+    const pause = new Promise<void>((resolve) => { release = resolve; });
+    const reached = new Promise<void>((resolve) => { hit = resolve; });
+    let paused = false;
+    const lagDb = {
+      ...db,
+      prepare(sql: string) {
+        const stmt = db.prepare(sql);
+        if (!sql.includes('SELECT ledger_entry_id, remaining_amount FROM mileage_grant_lots')) {
+          return stmt;
+        }
+        const wrap = (st: any): any => ({
+          ...st,
+          bind: (...args: unknown[]) => wrap(st.bind(...args)),
+          all: async () => {
+            if (!paused) {
+              paused = true;
+              hit();
+              await pause;
+            }
+            return st.all();
+          },
+        });
+        return wrap(stmt);
+      },
+    } as D1Database;
+    try {
+      const delayed = refundMileageRewardRedemption(lagDb, { redemptionId: id, reason: 'delayed' });
+      await reached;
+      await refundMileageRewardRedemption(db, { redemptionId: id, reason: 'first' });
+      release();
+      await delayed;
+      expect(walletOf(raw)).toBe(700);
+      expect(reversalCount(raw, id)).toBe(1);
+      expect(lotsRemaining(raw)).toBe(700);
+    } finally {
+      release();
+      raw.close();
+    }
+  });
+
   it('旧処理の残りは取り残しと要対応一覧に出て回復後は消える', async () => {
     const { db, raw } = createTestD1();
     seedAccount(raw);

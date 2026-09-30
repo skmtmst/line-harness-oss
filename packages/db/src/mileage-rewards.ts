@@ -1554,7 +1554,10 @@ async function selectRefundReversal(
  * batch は原子なので、コードが未解放ならロット復元も未実行。
  * ロットの復元は読んだ残数への条件付き更新（CAS）で行う。同時修復で
  * 誰かが直した分は残数が変わっているため触らず、合計は1回分になる。
- * コード解放も予約中のときだけ通る。照合自体は何度呼んでも壊さない。
+ * さらに内訳の更新は1件ごとに「いまもこの交換に予約中」の条件を付ける。
+ * 読み直しが遅れて新しい残数で条件を作り直しても、先に終わった修復が
+ * コードを解放していれば1件も通らず、二重に戻らない。コード解放も
+ * 予約中のときだけ通る。照合自体は何度呼んでも壊さない。
  * R362: updated_at の一致だけの柵では、同じ時刻の同時修復が両方通って
  * 内訳を二重に戻していた（時刻が同じだと柵が開いたままになる）。
  */
@@ -1587,12 +1590,18 @@ async function verifyRefundWrites(
               status = 'available'
         WHERE ledger_entry_id = ? AND beneficiary_key = ?
           AND remaining_amount = ?
-          AND status IN ('available', 'exhausted')`,
+          AND status IN ('available', 'exhausted')
+          AND EXISTS (
+            SELECT 1 FROM mileage_reward_codes
+             WHERE id = ? AND redemption_id = ? AND status = 'reserved'
+          )`,
     ).bind(
       allocation.amount,
       allocation.grant_lot_id,
       current.beneficiaryKey,
       remainingByLot.get(allocation.grant_lot_id) ?? -1,
+      current.rewardCodeId,
+      current.id,
     )),
     db.prepare(
       `UPDATE mileage_reward_codes
