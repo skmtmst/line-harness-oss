@@ -113,6 +113,12 @@ export interface CreateAffiliateInput {
    * duplicate affiliate.
    */
   operationId?: string | null;
+  /**
+   * R525: 作った直後の稼働状態。「すぐに計測を始める」をオフで登録したら
+   * 最初のINSERTから停止(0)で作る。オンのまま2段階目が失敗しても稼働で
+   * 残る——という取り違えを、作り口で断つ。省略時は稼働(1)のまま。
+   */
+  isActive?: boolean;
 }
 
 /** Look up a prior create by its client-supplied operation UUID (idempotent replay, #686). */
@@ -152,7 +158,7 @@ export async function createAffiliate(
       .prepare(
         `INSERT INTO affiliates
            (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -161,6 +167,8 @@ export async function createAffiliate(
         input.name,
         input.code,
         input.commissionRate ?? 0,
+        // R525: 計測オフの登録は最初から停止で作る（省略時は稼働）。
+        input.isActive === false ? 0 : 1,
         now,
         input.friendId ?? null,
         input.operationId ?? null,
@@ -187,6 +195,8 @@ export interface CreateAffiliateWithRandomCodeInput {
   friendId?: string | null;
   /** See CreateAffiliateInput.operationId (#686). */
   operationId?: string | null;
+  /** See CreateAffiliateInput.isActive (R525). */
+  isActive?: boolean;
 }
 
 /**
@@ -226,7 +236,7 @@ export async function createAffiliateWithRandomCode(
         .prepare(
           `INSERT INTO affiliates
              (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -235,6 +245,8 @@ export async function createAffiliateWithRandomCode(
           input.name,
           code,
           input.commissionRate ?? 0,
+          // R525: 計測オフの登録は最初から停止で作る（省略時は稼働）。
+          input.isActive === false ? 0 : 1,
           now,
           input.friendId ?? null,
           input.operationId ?? null,

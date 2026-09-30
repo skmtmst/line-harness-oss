@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React from 'react'
+import React, { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -69,12 +69,31 @@ function previewButton(): HTMLButtonElement {
   return screen.getAllByRole('button', { name: '項目を作って事前確認' })[0] as HTMLButtonElement
 }
 
+async function waitForReady() {
+  await waitFor(() => expect(previewButton().disabled).toBe(false))
+  /*
+    R519-flake: ボタンが見えても、初期取得で入った名前・差し込み名に
+    反応する受動effect（要求キーの作り直し）がまだ流れる前がある。
+    押す前に流して、1回目と2回目の押下を同じ世代のキーにする。
+    CI run36668283000 はここを待たずに押し、2回目だけ新しいキーになった。
+  */
+  await act(async () => {})
+}
+
 beforeEach(() => {
   fixture.fieldsList.mockResolvedValue({ success: true, data: [SOURCE] })
   fixture.fieldsCreate.mockResolvedValue({ success: true, data: CREATED })
   fixture.migrationPreview.mockResolvedValue({
     success: true,
-    data: { summary: { total: 0, migratable: 0, skipped: 0 }, usages: [], previewToken: 'tok' },
+    data: {
+      source: SOURCE,
+      summary: { total: 0, convertible: 0, review: 0, invalid: 0 },
+      rows: [],
+      usageTargets: [],
+      runId: null,
+      previewToken: 'tok',
+      previewExpiresAt: null,
+    },
   })
 })
 
@@ -90,7 +109,7 @@ afterEach(() => {
 describe('R519 移行先の作成応答を失っても復帰する', () => {
   it('入力を変えない再試行は同じ要求キーで送り、事前確認へ進める', async () => {
     render(<MigrateFriendFieldPage />)
-    await waitFor(() => expect(previewButton().disabled).toBe(false))
+    await waitForReady()
 
     fixture.fieldsCreate.mockRejectedValueOnce(new Error('response lost'))
     fireEvent.click(previewButton())
@@ -107,11 +126,13 @@ describe('R519 移行先の作成応答を失っても復帰する', () => {
     expect(fixture.migrationPreview).toHaveBeenCalledWith(
       'source-1', 'account-1', { targetFieldId: 'ff-new' },
     )
+    // 事前確認の描画まで進む。不完全な応答のままでは画面が落ち、ここで赤になる。
+    await screen.findByText('確認が必要な値はありません。')
   })
 
   it('差し込み名の重複では同一内容の作成済みを取り直して続ける', async () => {
     render(<MigrateFriendFieldPage />)
-    await waitFor(() => expect(previewButton().disabled).toBe(false))
+    await waitForReady()
 
     // 要求キーが変わった後の再送で一意制約に当たった想定。
     fixture.fieldsCreate.mockRejectedValueOnce({ status: 409 })
@@ -125,7 +146,7 @@ describe('R519 移行先の作成応答を失っても復帰する', () => {
 
   it('異なる内容の重複名は衝突として説明し、事前確認へ進めない', async () => {
     render(<MigrateFriendFieldPage />)
-    await waitFor(() => expect(previewButton().disabled).toBe(false))
+    await waitForReady()
 
     fixture.fieldsCreate.mockRejectedValueOnce({ status: 409 })
     fixture.fieldsList.mockResolvedValueOnce({
