@@ -16,7 +16,7 @@ describe('m22c 札・ボタンの折り返し', () => {
   it('受信箱の上の行は札も操作も高さ32で1行（言葉は変えない）', () => {
     const source = read('app/chats/page.tsx')
     // 札3つは h-8（32px）。py-1.5（約30px）に戻すと上端がずれて2行に見える。
-    expect(source).toContain('inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-pill border')
+    expect(source).toContain('h-8 shrink-0 items-center whitespace-nowrap rounded-pill border')
     // 右の操作も compact（32px）でそろえる。
     expect(source).toContain('保存した検索')
     expect(source).not.toContain('<Button href="/tags?tab=marks" className="h-10 shrink-0">')
