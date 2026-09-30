@@ -15,6 +15,7 @@ import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
 import {
   describeApiFailure,
+  isForbidden,
   isForbiddenOrRateLimited,
   loadFailureNotice,
 } from '@/components/shared/api-error-message'
@@ -214,7 +215,14 @@ function NewOperatorNotificationInner() {
       return null
     }
     if (recipientIds.length === 0) {
-      setError('受け取るスタッフを1人以上選んでください。')
+      /*
+       * M032残差: 受取人の取得に失敗したまま保存すると、選択要求の文が
+       * 取得失敗の文を置き換えていた。保存自体は止めたまま、取り直しへ
+       * 案内する文にする。
+       */
+      setError(recipientsError !== null
+        ? '受け取る人を読み込めませんでした。上の「もう一度読み込む」で取り直してから保存してください。'
+        : '受け取るスタッフを1人以上選んでください。')
       return null
     }
     setSaving(true)
@@ -346,7 +354,9 @@ function NewOperatorNotificationInner() {
                           ? loadFailureNotice(recipientsError, '受け取る人')
                           : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}
                       </p>
-                      <Button variant="secondary" size="compact" onClick={() => loadRecipients()}>もう一度読み込む</Button>
+                      {isForbidden(recipientsError) ? null : (
+                        <Button variant="secondary" size="compact" onClick={() => loadRecipients()}>もう一度読み込む</Button>
+                      )}
                     </div>
                     )
                   : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}

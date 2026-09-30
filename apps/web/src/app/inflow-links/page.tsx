@@ -945,15 +945,28 @@ function InflowLinksPageInner({
           onRetry={loadFailure?.retryable ? () => void load() : undefined}
         />
       ) : sortedRows.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
-          description={
-            selectedGenre
-              ? '上の「＋ 流入リンクを作る」から作ると、ここに出ます。'
-              : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
-          }
-        />
+        /*
+         * R173: 絞り込み・検索で0件のときは「まだ無い」と言わない。
+         * 登録があるのに未登録向けの案内（最初のフォルダ作り）を出すと、
+         * あるはずの経路が消えたように見える。条件を変える案内にする。
+         */
+        accountFilteredRows.length > 0 && (normalizedSearch !== '' || filter !== 'all' || selectedGenre !== '') ? (
+          <ListState
+            kind="empty"
+            title="条件に合う流入経路がありません"
+            description="検索や絞り込みの条件を変えてください。"
+          />
+        ) : (
+          <ListState
+            kind="empty"
+            title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
+            description={
+              selectedGenre
+                ? '上の「＋ 流入リンクを作る」から作ると、ここに出ます。'
+                : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
+            }
+          />
+        )
       ) : (
         <div className="overflow-hidden rounded-control border border-hairline bg-canvas">
           <table className="w-full table-fixed text-xs">

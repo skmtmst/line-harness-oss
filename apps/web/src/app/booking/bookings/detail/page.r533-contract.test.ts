@@ -14,4 +14,9 @@ describe('R533 booking detail 取得失敗', () => {
     // 読み直しは同じ予約を取り直す
     expect(page).toContain('void load()')
   })
+
+  it('403は通信切断の文にしない（共通の権限案内へ切り替える）', () => {
+    expect(page).toContain('loadFailureCopy(loadError')
+    expect(page).toContain('detailFailure')
+  })
 })

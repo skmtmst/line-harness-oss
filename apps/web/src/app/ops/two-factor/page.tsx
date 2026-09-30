@@ -54,9 +54,24 @@ export default function OpsTwoFactorPage() {
       // 運営メンバー（登録済み）か、2要素認証待ちの人だけ
       if (!body.data.platformAdmin && body.data.platformAdminState !== 'awaiting_totp') { setState('denied'); return }
       setSession(body.data)
-      const setup = await api.staff.beginTwoFactorSetup(body.data.id)
+      /*
+       * R615: QR準備の失敗はログイン切れではない。fetchApi は 4xx/5xx を
+       * 例外で投げるので、そのままでは下の catch でログインへ送られ、
+       * 失敗の案内も再試行も出ない。準備だけを別に捕まえ、ログイン中の
+       * まま理由と取り直しを出す。
+       */
+      let setup: Awaited<ReturnType<typeof api.staff.beginTwoFactorSetup>> | null = null
+      try {
+        setup = await api.staff.beginTwoFactorSetup(body.data.id)
+      } catch {
+        setup = null
+      }
       if (cancelledRef.current) return
-      if (!setup.success) { setError(setup.error || 'QRコードを用意できませんでした'); setState('ready'); return }
+      if (!setup || !setup.success) {
+        setError(!setup || typeof setup.error !== 'string' || !setup.error ? 'QRコードを用意できませんでした' : setup.error)
+        setState('ready')
+        return
+      }
       setUri(setup.data.provisioningUri)
       setManualKey(setup.data.manualKey)
       setState('ready')

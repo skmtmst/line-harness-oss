@@ -16,4 +16,9 @@ describe('R528 auto-replies/edit 下書き取得失敗', () => {
     // 同じidを取り直す（別idや一覧の取り直しでは直らない）
     expect(page).toContain('getDraft(id)')
   })
+
+  it('403は通信切断の文にしない（共通の権限案内へ切り替える）', () => {
+    expect(page).toContain('loadFailureCopy(loadError')
+    expect(page).toContain('draftFailure')
+  })
 })

@@ -142,7 +142,14 @@ export default function RestaurantConsole({ view }: { view: string }) {
       setSelectedStoreId((current) => res.data.stores.some((item) => item.id === current)
         ? current
         : res.data.stores[0]?.id || '')
-    } catch (caught) { setLoadError(caught); setNotice({ tone: 'error', text: '飲食店向けテストデータを読み込めませんでした。' }) }
+    } catch (caught) {
+      /*
+       * R619: 読み込み失敗は下の ListState の1枚に集める。ここで帯にも
+       * 出すと「読めません」と「店舗未登録」が同時に並ぶ。操作の成否の
+       * 帯（mutate 側）は残す。
+       */
+      setLoadError(caught)
+    }
     finally { setLoading(false) }
   }, [selectedAccountId, effectiveQuery])
   useEffect(() => { void load() }, [load])

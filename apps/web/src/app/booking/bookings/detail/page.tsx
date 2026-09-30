@@ -26,6 +26,7 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
+import { loadFailureCopy } from '@/components/shared/api-error-message'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
@@ -861,12 +862,17 @@ function BookingDetailInner() {
     )
   }
 
+  /*
+   * R533: 403は通信切断ではない。共通文で権限の案内にし、押しても
+   * 直らない再試行は TargetMissing 側で隠れる（`loadFailureCopy`）。
+   */
+  const detailFailure = loadError ? loadFailureCopy(loadError, '予約') : null
   if (!loading && error && !detail) {
     return (
       <TargetMissing
         kind="error"
-        title="予約を読み込めませんでした"
-        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        title={detailFailure?.title ?? '予約を読み込めませんでした'}
+        description={detailFailure?.description ?? '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
         error={loadError ?? undefined}
         onRetry={() => void load()}
       />

@@ -6,7 +6,8 @@
  * - 一覧の 403 は汎用文＋再試行にしない。権限の案内のみ（再試行なし）。
  * - 一覧の 429 は待ち案内＋再試行を出す。
  * - 失敗を「通知はまだありません」（空）と混ぜない。
- * - 既読付けの失敗は「もう一度」の言葉を添える（再試行の余地を言う）。
+ * - 既読付けは楽観更新（★V7 sTJsh §1）。裏の保存が失敗したら未読へ
+ *   戻し、知らせに「もう一度」を出す（再試行の余地を言う）。
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,6 +47,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { ApiError } from '@/lib/api'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import NotificationsPage from './page'
 
 const EMPTY_DATA = {
@@ -98,16 +100,18 @@ describe('M037 一覧の403は汎用文＋再試行にしない', () => {
   })
 })
 
-describe('M037 既読付けの失敗はもう一度の言葉を添える', () => {
-  it('既読にできないときはもう一度試せる言葉で出す', async () => {
+describe('M037 既読付けの失敗は元に戻してやり直せる知らせを出す', () => {
+  it('既読にできないときは未読へ戻し、知らせに「もう一度」を出す', async () => {
+    clearToastsForTest()
     fixture.list.mockResolvedValueOnce({ success: true, data: ONE_UNREAD })
     fixture.markRead.mockRejectedValueOnce(new Error('down'))
+    render(<ToastHost />)
     render(<NotificationsPage />)
 
     const list = await screen.findByRole('list')
     fireEvent.click(within(list).getByRole('button', { name: /大事なお知らせ/ }))
-    // 既読付けの失敗文そのものに「もう一度」の言葉があること。
-    // 一覧の再読み込みボタンとは別の文言を見る。
-    await waitFor(() => expect(screen.getByText(/既読.*もう一度/)).toBeTruthy())
+    // 裏の保存が失敗したら知らせが出て、やり直せる口が付く。
+    await waitFor(() => expect(screen.getByText('通知を既読にできませんでした。')).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'もう一度' })).toBeTruthy()
   })
 })

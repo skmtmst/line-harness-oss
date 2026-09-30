@@ -29,6 +29,7 @@ let host: HTMLDivElement
 let root: Root
 let entryRoutesStatus: number
 let entryRoutesHeaders: Record<string, string>
+let entryRoutesSuccessData: Array<Record<string, unknown>> | null
 
 function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async (input: unknown) => {
@@ -42,6 +43,12 @@ function stubFetch() {
       )
     }
     if (path.startsWith('/api/entry-routes')) {
+      if (entryRoutesSuccessData !== null) {
+        return new Response(
+          JSON.stringify({ success: true, data: entryRoutesSuccessData }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
       return new Response(
         JSON.stringify({ success: false, error: 'forbidden' }),
         { status: entryRoutesStatus, headers: { 'Content-Type': 'application/json', ...entryRoutesHeaders } },
@@ -74,6 +81,7 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
   beforeEach(() => {
     entryRoutesStatus = 500
     entryRoutesHeaders = {}
+    entryRoutesSuccessData = null
     stubFetch()
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -129,5 +137,58 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
     expect(card).not.toBeNull()
     expect(card!.textContent).toContain('表示できませんでした')
     expect(card!.querySelector('button')).not.toBeNull()
+  })
+})
+
+describe('R173 検索・絞り込みの0件は未登録と混ぜない', () => {
+  beforeEach(() => {
+    entryRoutesStatus = 200
+    entryRoutesHeaders = {}
+    entryRoutesSuccessData = [{
+      id: 'er-1',
+      refCode: 'spring',
+      name: '春キャンペーン',
+      genre: null,
+      poolId: null,
+      tagId: null,
+      scenarioId: null,
+      runAccountFriendAddScenarios: false,
+      isActive: true,
+    }]
+    stubFetch()
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(() => {
+    act(() => {
+      root.unmount()
+    })
+    host.remove()
+    vi.unstubAllGlobals()
+  })
+
+  it('存在しない検索語では「条件に合う」案内になり、フォルダ作りを出さない', async () => {
+    await act(async () => {
+      root.render(<InflowLinksPage />)
+    })
+    await settle()
+
+    // まず登録済みの行が見えること（絞り込みの土台がある）。
+    expect(host.textContent).toContain('春キャンペーン')
+
+    const input = host.querySelector('input[placeholder="流入元の名前・REFで検索"]') as HTMLInputElement
+    expect(input).not.toBeNull()
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, 'そんざいしないさーち')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await settle()
+
+    expect(host.textContent).toContain('条件に合う流入経路がありません')
+    expect(host.textContent).not.toContain('最初のフォルダ')
+    expect(host.textContent).not.toContain('まだ流入経路がありません')
   })
 })

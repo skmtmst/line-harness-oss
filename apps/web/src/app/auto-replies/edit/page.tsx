@@ -9,7 +9,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
-import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited, loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 import './issue481-height.css'
 
@@ -129,6 +129,8 @@ function AutoReplyEditInner() {
     }
   }, [load])
 
+  // R528: 403は通信切断ではない。共通文で権限の案内にする（再試行は隠れる）。
+  const draftFailure = loadError ? loadFailureCopy(loadError, '下書き') : null
   return (
     <div data-issue481-height>
       <nav className="text-ink-faint mb-4 text-xs">
@@ -159,8 +161,8 @@ function AutoReplyEditInner() {
         canManage ? (
           <TargetMissing
             kind="error"
-            title="下書きを読み込めませんでした"
-            description={error || '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+            title={draftFailure?.title ?? '下書きを読み込めませんでした'}
+            description={draftFailure?.description ?? error ?? '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
             error={loadError ?? undefined}
             onRetry={() => void load()}
           />
