@@ -181,6 +181,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'DELETE /api/broadcast-message-assets/:id',
     'DELETE /api/hq/banners/images/:id',
     'DELETE /api/hq/templates/:id',
+    'DELETE /api/hq/templates/media',
     'DELETE /api/images/:key',
     'DELETE /api/integrations/google-calendar/:id',
     'DELETE /api/line-accounts/:id',

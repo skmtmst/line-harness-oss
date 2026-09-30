@@ -2047,6 +2047,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/hq/banners/images') {
     return { success: true, data: HQ_BANNER_IMAGES, nextBefore: null }
   }
+  if (method === 'DELETE' && pathname === '/api/hq/templates/media') {
+    return { success: true, data: { deleted: true } }
+  }
   if (pathname === '/api/operations/health') {
     return { success: true, data: OPERATION_HEALTH }
   }
