@@ -30,6 +30,7 @@ const dbMocks = {
   decideConversionApproval: vi.fn(),
   getApprovalNotificationState: vi.fn(),
   markApprovalNotified: vi.fn(),
+  releaseApprovalNotification: vi.fn(),
   getConversionApprovalNotifyInfo: vi.fn(),
   // N-212 の案件動作はここでは対象外 — 案件なしとして通す。
   getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
@@ -318,6 +319,68 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       'ev-dup',
       '2026-09-01T00:00:00.000+09:00',
     );
+  });
+
+  it('sends only once when the same decision arrives concurrently (R354)', async () => {
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
+    dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue({
+      affiliateId: 'aff-1',
+      offerName: '案件X',
+      rewardAmount: 5000,
+      notifyOnConversion: true,
+    });
+    // 両方の要求が send=true を見る（読み直しの前に両方が到達）。
+    // CAS は勝った1件だけ通す — 実DBの markApprovalNotified と同じ契約。
+    dbMocks.markApprovalNotified.mockResolvedValue(false);
+    dbMocks.markApprovalNotified.mockResolvedValueOnce(true);
+
+    const [first, second] = await Promise.all([
+      req('PATCH', '/api/conversions/events/ev-1/approval', { status: 'approved', expectedStatus: 'pending' }),
+      req('PATCH', '/api/conversions/events/ev-1/approval', { status: 'approved', expectedStatus: 'pending' }),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    // 同じ承認判断の通知は1件だけ。送信権の確保が送信より先。
+    expect(notifyAffiliateApproval).toHaveBeenCalledTimes(1);
+    expect(dbMocks.markApprovalNotified.mock.invocationCallOrder[0]).toBeLessThan(
+      notifyAffiliateApproval.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('releases the claim on send failure so a retry resends without loss (R354)', async () => {
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
+    dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue({
+      affiliateId: 'aff-1',
+      offerName: '案件X',
+      rewardAmount: 5000,
+      notifyOnConversion: true,
+    });
+    // 実送信の代わりに1回だけ落とす。本物の送信部は投げない契約だが、
+    // 途中で落ちた場合の欠落防止を隔離して確かめる。
+    // 注記: この「欠落なし」は通知口の投げに限る。実際の配信側の失敗
+    // （503など）は呑み込む best-effort のままで、再送の回復は未検証。
+    // R354の守りは承認の決定・台帳と送信権（CAS）の1回限り。
+    notifyAffiliateApproval.mockRejectedValueOnce(new Error('push down'));
+
+    const failed = await req('PATCH', '/api/conversions/events/ev-1/approval', {
+      status: 'approved',
+      expectedStatus: 'pending',
+    });
+    // 通知の失敗は承認を巻き添えにしない。
+    expect(failed.status).toBe(200);
+    expect(dbMocks.releaseApprovalNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      'ev-1',
+      '2026-09-01T00:00:00.000+09:00',
+    );
+
+    // 再試行では送り直す（欠落なし）。試行は失敗1＋成功1の2回。
+    const retried = await req('PATCH', '/api/conversions/events/ev-1/approval', {
+      status: 'approved',
+      expectedStatus: 'pending',
+    });
+    expect(retried.status).toBe(200);
+    expect(notifyAffiliateApproval).toHaveBeenCalledTimes(2);
   });
 
   it('returns 500 when the mileage projection fails so a retry can repair it', async () => {
