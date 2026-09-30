@@ -122,7 +122,7 @@ describe('line-notifications/operator/new の未保存ガード', () => {
     expect((host.querySelector('input#operator-name') as HTMLInputElement).value).toBe('在庫が切れました')
   })
 
-  it('「保存せずに移動」を押すと一覧へ進む', async () => {
+  it('「保存せずに移る」を押すと一覧へ進む', async () => {
     await render()
     await flush()
 
@@ -131,7 +131,7 @@ describe('line-notifications/operator/new の未保存ガード', () => {
     fireEvent.click(quitLink())
     await flush()
 
-    fireEvent.click(bodyButton('保存せずに移動'))
+    fireEvent.click(bodyButton('保存せずに移る'))
     await flush()
 
     expect(fixture.push).toHaveBeenCalledWith('/line-notifications?tab=operator')
