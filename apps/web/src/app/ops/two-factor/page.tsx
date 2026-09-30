@@ -12,6 +12,7 @@ import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
 import OtpInput from '@/components/shared/otp-input'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 
 /**
  * 運営コンソールの 2要素認証の設定（★V6 37-10-B `NAJKx`）。
@@ -113,7 +114,7 @@ export default function OpsTwoFactorPage() {
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
             <img src={qr} alt="認証アプリ登録用のQRコード" className="h-52 w-52 rounded-control border border-hairline" />
           ) : (
-            <div className="h-52 w-52 animate-pulse rounded-control bg-canvas-sunken" aria-hidden="true" />
+            <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
           )}
           <div className="text-center">
             <p className="text-caption text-ink-faint">読み取れないときは、このキーを手で入力</p>

@@ -135,9 +135,13 @@ describe('#673 指標カードのスケルトン', () => {
 
     const section = host.querySelector('section[aria-label="受信箱の対応状況"]')
     expect(section?.getAttribute('aria-busy')).toBe('true')
-    // 「要返信」＋4指標＋待ち時間の骨組み。実数の「—」は出さない。
-    expect(host.querySelectorAll('.animate-pulse').length).toBeGreaterThanOrEqual(5)
-    expect(section?.textContent).not.toContain('—')
+    /*
+     * ★V7 仕上げ §3: 骨組みは 0.3 秒待ってから出す（速い応答では出さない）。
+     * 出る前は本物の場所を不可視で取るので、実数の「—」は見えない。
+     * 「要返信」＋4指標＋待ち時間の骨組み。
+     */
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    expect(host.querySelectorAll('[data-skeleton]').length).toBeGreaterThanOrEqual(5)
 
     const stats = {
       waiting: 3,
@@ -151,7 +155,9 @@ describe('#673 指標カードのスケルトン', () => {
       resolveStats?.({ success: true, data: stats })
     })
     expect(section?.getAttribute('aria-busy')).toBeNull()
-    expect(host.querySelectorAll('.animate-pulse').length).toBe(0)
+    // ★V7 §3: 出した骨組みは最低 0.4 秒残る。待ってから実数を確かめる。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)) })
+    expect(host.querySelectorAll('[data-skeleton]').length).toBe(0)
     expect(section?.textContent).toContain('要返信 3件')
     expect(section?.textContent).toContain('5件')
   })
@@ -162,6 +168,8 @@ describe('#673 指標カードのスケルトン', () => {
     // 読込中は「—」ではなく animate-pulse の骨組みを出す。
     expect(page).toMatch(/function LiveDataCard[\s\S]*?loading = false/)
     expect(page).toMatch(/aria-busy=\{loading \|\| undefined\}/)
-    expect(page).toContain('animate-pulse')
+    // ★V7 仕上げ §3: 骨組みは共有の Skeleton/DelayedSkeleton（0.3秒遅延・0.4秒最低表示）。
+    expect(page).toContain('DelayedSkeleton')
+    expect(page).toContain('Skeleton')
   })
 })

@@ -8,6 +8,7 @@ import { useBrand } from '@/lib/use-brand'
 import { qrToDataURL } from '@/lib/qr-image'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '../two-factor-error'
 
 type SetupData = { provisioningUri: string; manualKey: string }
@@ -138,7 +139,7 @@ export default function TwoFactorSetupPage() {
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
             <img src={qr} alt="認証アプリ登録用のQRコード" className="h-52 w-52 rounded-control border border-hairline" />
           ) : (
-            <div className="h-52 w-52 animate-pulse rounded-control bg-canvas-sunken" aria-hidden="true" />
+            <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
           )}
           <div className="text-center">
             <p className="text-xs text-ink-faint">読み取れないときは、このキーを手で入力</p>
