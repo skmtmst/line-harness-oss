@@ -28,15 +28,16 @@ const MANIFEST = join(WEB, 'design', 'v8-parts.json')
 
 const V8_SELECTOR = /\[data-theme=["']?v8["']?\]/
 
-/** 部品を構成する実ファイル（コード + 同名の CSS Module）を返す。 */
+/** 部品を構成する実ファイル（コード + 同名の CSS Module／素の .css）を返す。 */
 function partFiles(codePaths) {
   const files = []
   for (const rel of codePaths) {
     const full = join(COMPONENTS, rel)
     if (!existsSync(full)) continue
     files.push(full)
-    const css = full.replace(/\.tsx?$/, '.module.css')
-    if (existsSync(css)) files.push(css)
+    for (const css of [full.replace(/\.tsx?$/, '.module.css'), full.replace(/\.tsx?$/, '.css')]) {
+      if (existsSync(css)) files.push(css)
+    }
   }
   return files
 }
@@ -52,7 +53,15 @@ export function collectReport() {
       pencil: part.pencil,
       files,
       v8Files,
-      status: codePaths.length === 0 ? '未作成' : files.length === 0 ? 'コード不明' : v8Files.length > 0 ? 'v8対応済み' : 'v7 のまま',
+      // `v8Same: true` は「V8 と値が同じで上書きが要らない」部品（例: 入力欄）。
+      status:
+        codePaths.length === 0
+          ? '未作成'
+          : files.length === 0
+            ? 'コード不明'
+            : v8Files.length > 0 || part.v8Same === true
+              ? 'v8対応済み'
+              : 'v7 のまま',
     }
   })
 

@@ -415,6 +415,20 @@
   --color-icon-tile-purple: #8b5cf6;
   --color-icon-tile-slate: #64748b;
   --color-icon-tile-red: #ef4444;
+
+  /*
+   * 主ボタンの緑の影＋内側の白い照り（Pencil V8 ボタン/主 doYdE の
+   * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
+   * なりすぎないようにする。
+   */
+  --shadow-primary-action:
+    0 1px 2px #087a3e40,
+    inset 0 1px 0 rgb(255 255 255 / 0.15);
+  /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
+  --color-toggle-off: #c9ced6;
+  /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
+  --color-star-on: #fbbf24;
+  --color-star-on-edge: #f59e0b;
 }
 
 :root {

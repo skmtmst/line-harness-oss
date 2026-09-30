@@ -2,6 +2,7 @@
   "$description": [
     "V8 移行の台帳の対象表。正本は lh-work/design/v8/COMPONENT-MAP.md（Pencil ↔ コードの対応表）。",
     "code は src/components/ からの相対パス。Pencil にあってコードに無い部品は null（④で作る）。",
+    "v8Same: true は「V8 と値が同じで上書きが要らない」部品の印（v8対応済みとして数える）。",
     "scripts/theme-migration-report.mjs がこの表の順に「v7 のまま／v8 対応済み」を数える。",
     "部品を足したり名前を変えたりしたときは COMPONENT-MAP.md と一緒にここも更新する。"
   ],
@@ -9,7 +10,7 @@
     { "pencil": "doYdE・u101P・LrB2L・wDPmk", "name": "ボタン", "code": "shared/button.tsx" },
     { "pencil": "KspUx", "name": "アイコンボタン", "code": "shared/icon-button.tsx" },
     { "pencil": "g5Db8", "name": "リンク（→つき）", "code": null, "planned": "shared/text-link.tsx" },
-    { "pencil": "Ume2U", "name": "入力欄", "code": "shared/text-field.tsx" },
+    { "pencil": "Ume2U", "name": "入力欄", "code": "shared/text-field.tsx", "v8Same": true },
     { "pencil": "wMMk6", "name": "選ぶ欄", "code": "shared/select.tsx" },
     { "pencil": "TkVyB", "name": "検索", "code": "shared/search-field.tsx" },
     { "pencil": "dQCCN・S9U7v", "name": "チェック", "code": "shared/checkbox.tsx" },
