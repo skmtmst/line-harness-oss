@@ -342,7 +342,7 @@ describe('案件登録の実操作（#686）', () => {
     await type(byId<HTMLInputElement>('of-name'), '秋の紹介キャンペーン')
     await type(byId<HTMLInputElement>('of-amount'), '100')
     await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('下書きを保存する'))
 
     /*
      * 「公開で作ってから止める」2段階は途中失敗で公開中の案件が残る。
@@ -367,13 +367,13 @@ describe('案件登録の実操作（#686）', () => {
     await type(byId<HTMLInputElement>('of-name'), '最初の案件名')
     await type(byId<HTMLInputElement>('of-amount'), '100')
     await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('下書きを保存する'))
 
     expect(offersCreate).toHaveBeenCalledTimes(1)
     expect(hasText('一時的に応答を読めません')).toBe(true)
     expect(pushed).toHaveLength(0)
 
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('下書きを保存する'))
     expect(offersCreate).toHaveBeenCalledTimes(2)
     // 同じ操作UUIDで再送するので、サーバ側は先に作った行を回収できる。
     expect(offersCreate.mock.calls[1][0].operationId)
@@ -390,7 +390,7 @@ describe('案件登録の実操作（#686）', () => {
     await type(byId<HTMLInputElement>('of-name'), '秋の紹介キャンペーン')
     await type(byId<HTMLInputElement>('of-amount'), '100')
     await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('下書きを保存する'))
 
     expect(offersCreate).toHaveBeenCalledTimes(1)
     // 回収した行は公開中のまま返るため、画面の「下書きに保存」へ合わせる。
@@ -414,7 +414,7 @@ describe('案件登録の実操作（#686）', () => {
     await type(byId<HTMLInputElement>('of-name'), 'A店の案件')
     await type(byId<HTMLInputElement>('of-amount'), '100')
     await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('下書きを保存する'))
     // 状態を直すPUTが落ちたエラーが出て、作成済みの身元(createdId)は残る。
     expect(hasText('一時的に保存できません')).toBe(true)
     const operationA = offersCreate.mock.calls[0][0].operationId
@@ -429,7 +429,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), 'B店の案件')
     await type(byId<HTMLInputElement>('of-amount'), '200')
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('下書きを保存する'))
 
     // 切替のあと、A店の案件(offer-1)へ PUT していない。
     expect(offersUpdate.mock.calls.slice(offerUpdatesBeforeSwitch).map((call) => call[0]))

@@ -18,6 +18,7 @@ import {
 } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { formatDateTime } from '@/lib/format'
 
 type TestApplyState = {
   linked: boolean
@@ -177,7 +178,7 @@ export function TestApplySection({ groupId }: { groupId: string }) {
           </div>
           {state.recent.length > 0 ? (
             <p className="text-ink-faint text-micro">
-              最近の適用: {state.recent.length}件（直近 {new Date(state.recent[0].createdAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}）
+              最近の適用: {state.recent.length}件（直近 {formatDateTime(state.recent[0].createdAt)}）
             </p>
           ) : null}
         </div>

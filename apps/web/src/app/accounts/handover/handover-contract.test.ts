@@ -52,7 +52,7 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
     expect(PAGE).toContain('api.accountHandovers.listForAccount(id)')
     expect(PAGE).toContain('api.accountHandovers.get(current.id)')
     expect(PAGE).toContain('totalsMatch(handover.counts, handover.counts.sourceTotal)')
-    expect(PAGE).toContain("countsAreComplete ? `${handover.counts?.[bucket.key].toLocaleString('ja-JP')}人` : '—'")
+    expect(PAGE).toContain("countsAreComplete ? `${formatNumber(handover.counts?.[bucket.key])}人` : '—'")
   })
 
   it('事前確認では元のアカウントが変わらないと書く', () => {

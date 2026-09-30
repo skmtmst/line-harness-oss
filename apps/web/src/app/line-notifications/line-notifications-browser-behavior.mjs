@@ -268,7 +268,7 @@ async function openEditor(page) {
   const editRow = page.getByRole('button', { name: '内容を編集' })
   await editRow.first().waitFor({ timeout: 15_000 })
   await editRow.first().click()
-  await page.getByRole('button', { name: '下書きを保存' }).waitFor({ timeout: 15_000 })
+  await page.getByRole('button', { name: '下書きを保存する', exact: true }).waitFor({ timeout: 15_000 })
 }
 
 const introBox = (page) => page.locator('label', { hasText: 'ご案内文' }).locator('textarea')
@@ -344,7 +344,7 @@ try {
 
     let releaseSave = () => {}
     state.holdSave = new Promise((resolve) => { releaseSave = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // 保存の応答を止めたまま書き足す。
@@ -388,7 +388,7 @@ try {
 
     let releaseSave = () => {}
     state.holdSave = new Promise((resolve) => { releaseSave = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // 編集画面は開いたまま、見ているアカウントだけが替わる。
@@ -451,7 +451,7 @@ try {
 
     let releaseA = () => {}
     state.holdSave = new Promise((resolve) => { releaseA = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // Bの一覧読み込みを足止めする。切り替えても、Bの中身はまだ何も出ない。

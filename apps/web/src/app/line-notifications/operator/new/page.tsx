@@ -305,7 +305,7 @@ function NewOperatorNotificationInner() {
     <div data-design-node="N2gAza" data-selects-wide className="space-y-4 pb-24">
       <div className="flex items-center justify-between gap-3"><nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/line-notifications" className="text-action hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-action hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
-      </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテスト送信</Button></div>
+      </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテストを送る</Button></div>
 
       <div className="mb-4"><NoteBar>宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは別の画面で作ります。</NoteBar></div>
 
@@ -412,8 +412,8 @@ function NewOperatorNotificationInner() {
       <StickyBar
         status={ruleLoading ? '保存ずみのお知らせを読み込んでいます…' : savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
         actions={<>
-          <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
-          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きに保存'}</Button>
+          <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
+          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きを保存する'}</Button>
           <Button onClick={() => void publish()} disabled={saving || ruleLoading} variant="primary">運用者へのお知らせを公開</Button>
         </>}
       />

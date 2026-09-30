@@ -3,8 +3,8 @@
  * #704 デザイントークン収束（サイズ系のみ。色は #669 の範囲なので触らない）。
  *
  * 正規の段は globals.css の @theme に定義する:
- *   文字 6段 nano10/caption12/body14/lead16/title20/hero24
- *   角丸 4段 mini6/control8/card10/pill9999
+ *   文字 6段 micro11/caption12/body14/lead16/title20/hero28（★V7 で hero は28）
+ *   角丸 4段 mini6/control8/card12/pill9999（★V7 でカード・窓は12に一本化）
  *   余白 5段 4/8/12/16/24（gap-1/2/3/4/6。Tailwind 既定の4px基準を使う）
  *
  * 既存の半端値（text-[11px] 201か所など）は使う画面と設計固定テストが
@@ -64,19 +64,21 @@ function increased(counts: Map<string, number>, baseline: Record<string, number>
 }
 
 describe('#704 正規のサイズトークンがある', () => {
-  it('文字は正規6段（10/12/14/16/20/24）', () => {
+  it('文字は正規6段（10/12/14/16/20/28）', () => {
     expect(token('text-nano')).toBe('10px')
     expect(token('text-caption')).toBe('12px')
     expect(token('text-body')).toBe('14px')
     expect(token('text-lead')).toBe('16px')
     expect(token('text-title')).toBe('20px')
-    expect(token('text-hero')).toBe('24px')
+    // ★V7「見た目の物差し」§1: 大きな数は 28/700/1.3（#704 の 24px から改定）
+    expect(token('text-hero')).toBe('28px')
   })
 
-  it('角丸は正規4段（6/8/10/full）', () => {
+  it('角丸は正規4段（6/8/12/full）', () => {
     expect(token('radius-mini')).toBe('6px')
     expect(token('radius-control')).toBe('8px')
-    expect(token('radius-card')).toBe('10px')
+    // ★V7「見た目の物差し」§1: カード・ダイアログ・知らせは 12px
+    expect(token('radius-card')).toBe('12px')
     expect(token('radius-pill')).toBe('9999px')
   })
 
@@ -124,19 +126,7 @@ describe('#704 半端値を新規で使わない（ラチェット）', () => {
   it('角丸の任意値 rounded-[Npx] を増やさない', () => {
     const counts = countUsages(/rounded(?:-(?:t|b|l|r|tl|tr|bl|br))?-\[\d+px\]/g)
     expect(
-      increased(counts, {
-        'rounded-[9px]': 7,
-        'rounded-[14px]': 6,
-        'rounded-[12px]': 5,
-        'rounded-[10px]': 4,
-        'rounded-tl-[4px]': 1,
-        'rounded-[8px]': 1,
-        'rounded-[3px]': 1,
-        'rounded-[28px]': 1,
-        'rounded-[24px]': 1,
-        'rounded-[22px]': 1,
-        'rounded-[18px]': 1,
-      }),
+      increased(counts, {}),
     ).toEqual([])
   })
 
@@ -173,7 +163,8 @@ function TokenProbe() {
   return (
     <div className="flex gap-2 rounded-card bg-canvas p-4">
       <p className="text-body text-ink">本文</p>
-      <p className="text-hero font-bold text-ink">大きな数値</p>
+      {/* ★V7: 700 は大きな数だけ。text-hero が自分で 700 を持つので font-bold は付けない */}
+      <p className="text-hero text-ink">大きな数値</p>
     </div>
   )
 }
@@ -190,7 +181,7 @@ describe('#704 正規トークンを実Reactで読む', () => {
     expect(card?.className).toContain('gap-2')
     // 描画した綴りが、定義されたトークンを指している。
     expect(token('text-body')).toBe('14px')
-    expect(token('text-hero')).toBe('24px')
-    expect(token('radius-card')).toBe('10px')
+    expect(token('text-hero')).toBe('28px')
+    expect(token('radius-card')).toBe('12px')
   })
 })

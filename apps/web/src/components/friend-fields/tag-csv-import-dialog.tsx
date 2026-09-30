@@ -22,6 +22,7 @@ import {
   TagCsvParseError,
 } from './tag-csv-import'
 import styles from './tag-csv-import-dialog.module.css'
+import { formatYmd } from '@/lib/format'
 
 type Phase = 'select' | 'preview' | 'saving' | 'success' | 'partial'
 type PreviewFilter = 'all' | 'ready' | 'skipped' | 'invalid'
@@ -44,7 +45,7 @@ function downloadCsv(content: string, name: string) {
 }
 
 function todayInJapan() {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date())
+  return formatYmd(new Date())
 }
 
 /** 選んだCSVの大きさを行に出すだけの短い表記。 */
@@ -307,7 +308,7 @@ export default function TagCsvImportDialog({
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
           <div className={styles.footerRow}>
             <div className={styles.actions}>
-              <Button type="button" disabled={busy} onClick={resetSelection}>やめる</Button>
+              <Button type="button" disabled={busy} onClick={resetSelection}>キャンセル</Button>
               <Button type="button" variant="primary" disabled={busy || !preview || preview.summary.ready === 0} onClick={() => void saveRows()}>
                 {busy ? '登録中…' : `${preview?.summary.ready ?? 0}件を登録する`}
               </Button>

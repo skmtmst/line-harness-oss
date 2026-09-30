@@ -13,6 +13,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { parseJstDateTime, shortDateTime } from '@/lib/hq-banners'
 import { ChevronDown } from 'lucide-react'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 interface LineAccount {
   id: string
@@ -308,8 +309,8 @@ export default function HealthPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${config.bgColor} ${config.textColor}`}>
-                          <span className={`w-2 h-2 rounded-full ${config.color} ${risk === 'danger' ? 'animate-pulse' : ''}`} />
+                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-pill ${config.bgColor} ${config.textColor}`}>
+                          <span className={`w-2 h-2 rounded-pill ${config.color} ${risk === 'danger' ? 'animate-pulse' : ''}`} />
                           {config.label}
                         </span>
                         <ChevronDown aria-hidden="true" className={`size-4 text-ink-faint transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -353,7 +354,7 @@ export default function HealthPage() {
                                 setMigrateFrom(account.id)
                                 setMigrateToId('')
                               }}
-                              className="px-3 py-1.5 rounded-control text-white text-xs font-medium bg-danger hover:brightness-92 transition-colors"
+                              className="px-3 py-1.5 rounded-control text-on-accent text-xs font-medium bg-danger hover:brightness-92 transition-colors"
                             >
                               友だちを移行する
                             </button>
@@ -385,13 +386,13 @@ export default function HealthPage() {
                                     <Td className="text-ink-secondary">{log.errorCount}</Td>
                                     <Td className="text-ink-secondary">{log.checkPeriod}</Td>
                                     <Td>
-                                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${logConfig.bgColor} ${logConfig.textColor}`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${logConfig.color} ${log.riskLevel === 'danger' ? 'animate-pulse' : ''}`} />
+                                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-pill ${logConfig.bgColor} ${logConfig.textColor}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-pill ${logConfig.color} ${log.riskLevel === 'danger' ? 'animate-pulse' : ''}`} />
                                         {logConfig.label}
                                       </span>
                                     </Td>
                                     <Td className="text-ink-faint text-xs">
-                                      {new Date(log.createdAt).toLocaleString('ja-JP')}
+                                      {formatDateTime(log.createdAt)}
                                     </Td>
                                   </Tr>
                                 )
@@ -490,7 +491,7 @@ export default function HealthPage() {
                     <tbody>
                       {migrations.map((migration) => {
                         const status = statusConfig[migration.status]
-                        const countText = `${migration.migratedCount.toLocaleString('ja-JP')} / ${migration.totalCount.toLocaleString('ja-JP')} 人`
+                        const countText = `${formatNumber(migration.migratedCount)} / ${formatNumber(migration.totalCount)} 人`
                         const percent = migration.totalCount > 0
                           ? (migration.migratedCount / migration.totalCount) * 100
                           : 0
@@ -503,7 +504,7 @@ export default function HealthPage() {
                               {getAccountName(migration.toAccountId)}
                             </Td>
                             <Td>
-                              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full ${status.bgColor} ${status.textColor}`}>
+                              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-pill ${status.bgColor} ${status.textColor}`}>
                                 {status.label}
                               </span>
                             </Td>
@@ -529,11 +530,11 @@ export default function HealthPage() {
                               )}
                             </Td>
                             <Td className="text-ink-faint text-xs">
-                              {new Date(migration.createdAt).toLocaleString('ja-JP')}
+                              {formatDateTime(migration.createdAt)}
                             </Td>
                             <Td className="text-ink-faint text-xs">
                               {migration.completedAt
-                                ? new Date(migration.completedAt).toLocaleString('ja-JP')
+                                ? formatDateTime(migration.completedAt)
                                 : '-'}
                             </Td>
                           </Tr>

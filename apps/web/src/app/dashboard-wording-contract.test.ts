@@ -26,7 +26,7 @@ const CODE = code(PAGE)
 describe('ダッシュボードの言葉を設計にそろえる', () => {
   it('送信枠は、使用数か残りかが分かる形で書く', () => {
     expect(CODE, '数字だけで向きが分からない').not.toMatch(/\$\{remaining\.toLocaleString\('ja-JP'\)\} \/ \$\{limit/)
-    expect(CODE).toContain('残り ${remaining.toLocaleString(\'ja-JP\')} / 上限 ${limit.toLocaleString(\'ja-JP\')}通')
+    expect(CODE).toContain('残り ${formatNumber(remaining)} / 上限 ${formatNumber(limit)}通')
   })
 
   it('残りは limit - used から出す（向きを取り違えない）', () => {
@@ -34,7 +34,7 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
   })
 
   it('待ち時間は読める単位で言う', () => {
-    expect(CODE, '分のまま出している').not.toContain("`${oldestWaitMinutes.toLocaleString('ja-JP')}分前`")
+    expect(CODE, '分のまま出している').not.toContain("`${formatNumber(oldestWaitMinutes)}分前`")
     expect(CODE).toContain('formatWaitRough(oldestWaitMinutes)')
   })
 

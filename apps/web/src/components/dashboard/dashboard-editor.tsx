@@ -208,8 +208,8 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
   const style = { transform: CSS.Transform.toString(transform), transition }
 
   return (
-    <div ref={setNodeRef} style={style} className={`border-hairline flex h-[54px] items-center gap-2.5 border-b px-3 last:border-b-0 ${isDragging ? 'bg-action-soft relative z-10 shadow-md' : 'bg-canvas'}`}>
-      <button type="button" aria-label={`${definition.label}をドラッグして並べ替え`} className="text-ink-faint hover:text-ink touch-none cursor-grab rounded p-0.5 active:cursor-grabbing" {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className={`border-hairline flex h-[54px] items-center gap-2.5 border-b px-3 last:border-b-0 ${isDragging ? 'bg-action-soft relative z-10 shadow-card' : 'bg-canvas'}`}>
+      <button type="button" aria-label={`${definition.label}をドラッグして並べ替え`} className="text-ink-faint hover:text-ink touch-none cursor-grab rounded-mini p-0.5 active:cursor-grabbing" {...attributes} {...listeners}>
         <GripIcon />
       </button>
       <div className="min-w-0 flex-1">
@@ -226,7 +226,7 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
           aria-label={`${definition.label}を1つ上へ移動`}
           disabled={!canMoveUp}
           onClick={() => onMove('up')}
-          className="text-ink-faint hover:text-ink rounded p-1 disabled:opacity-30"
+          className="text-ink-faint hover:text-ink rounded-mini p-1 disabled:opacity-30"
         >
           <ChevronUp aria-hidden="true" className="h-4 w-4" />
         </button>
@@ -235,7 +235,7 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
           aria-label={`${definition.label}を1つ下へ移動`}
           disabled={!canMoveDown}
           onClick={() => onMove('down')}
-          className="text-ink-faint hover:text-ink rounded p-1 disabled:opacity-30"
+          className="text-ink-faint hover:text-ink rounded-mini p-1 disabled:opacity-30"
         >
           <ChevronDown aria-hidden="true" className="h-4 w-4" />
         </button>
@@ -251,7 +251,7 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
 }
 
 function PreviewCard({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
-  return <div className={`rounded-lg border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
+  return <div className={`rounded-control border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
 }
 
 /*
@@ -462,7 +462,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                   type="button"
                   onClick={() => setConfirmingReset(false)}
                   className="font-medium underline"
-                >やめる</button>
+                >キャンセル</button>
               </div>
             </div>
           ) : null}
@@ -481,7 +481,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
         */}
         {saveError ? (
           <div role="alert" className="bg-danger-bg text-danger mx-[22px] mt-3 rounded-control px-3 py-2.5 text-xs leading-relaxed">
-            <p className="font-medium">{saveError}</p>
+            <p className="font-semibold">{saveError}</p>
             <div className="mt-1.5 flex flex-wrap gap-3">
               <button
                 type="button"
@@ -525,7 +525,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                     onDragEnd={(event) => handleDragEnd(group, event)}
                   >
                     <SortableContext items={draft[group].map((item) => item.id)} strategy={verticalListSortingStrategy}>
-                      <div className="border-hairline overflow-hidden rounded-[9px] border">
+                      <div className="border-hairline overflow-hidden rounded-control border">
                         {draft[group].map((item, index) => {
                           const definition = CARD_DEFINITION_MAP.get(item.id)
                           if (!definition) return null

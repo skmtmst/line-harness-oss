@@ -1,4 +1,5 @@
 'use client'
+import { formatDateTime, formatDay } from '@/lib/format'
 
 /**
  * EC連携3画面の日付表示（#517 軽）。
@@ -16,23 +17,19 @@ function formatInvalidAsDash(date: Date, format: (date: Date) => string): string
 export function formatEcDateTime(value: string | null): string {
   if (!value) return '—'
   return formatInvalidAsDash(new Date(value), (date) =>
-    new Intl.DateTimeFormat('ja-JP', {
-      month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    }).format(date))
+    formatDateTime(date))
 }
 
 /** 年あり日時（例: 2026/8/25 14:30）。つなぎ先の記録向き。 */
 export function formatEcDateTimeWithYear(value: string | null): string {
   if (!value) return '—'
   return formatInvalidAsDash(new Date(value), (date) =>
-    new Intl.DateTimeFormat('ja-JP', {
-      year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    }).format(date))
+    formatDateTime(date))
 }
 
 /** 月日のみ（例: 8/25）。定期便の次回発送向き。 */
 export function formatEcShortDate(value: string | null): string {
   if (!value) return '—'
   return formatInvalidAsDash(new Date(value), (date) =>
-    new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date))
+    formatDay(date))
 }

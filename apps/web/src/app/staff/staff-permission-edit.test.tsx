@@ -103,7 +103,7 @@ async function openEdit(expectOp = true) {
     fireEvent.click(screen.getByRole('button', { name: '変更する' }))
   })
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: /変更を保存/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '✓ 保存する' })).toBeTruthy()
   })
   if (expectOp) {
     await waitFor(() => {
@@ -118,7 +118,7 @@ async function saveEdit() {
 
 async function saveEditFull() {
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: /変更を保存/ }))
+    fireEvent.click(screen.getByRole('button', { name: '✓ 保存する' }))
   })
   await waitFor(() => {
     expect(fixture.updated).toHaveLength(1)

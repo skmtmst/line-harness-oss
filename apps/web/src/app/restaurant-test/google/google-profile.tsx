@@ -212,7 +212,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
         <div className="flex flex-wrap items-center gap-4">
           <Clock3 size={24} className="text-accent-deep shrink-0" aria-hidden="true" />
           <div className="flex min-w-0 grow flex-col gap-1">
-            <h3 id="gb-today-title" className="text-lead font-bold">本日の営業時間{today.holidayName ? <span className="text-ink-secondary ml-2 text-label font-normal">{formatYmdShort(today.date)}・{today.holidayName}</span> : <span className="text-ink-secondary ml-2 text-label font-normal">{formatYmdShort(today.date)}</span>}</h3>
+            <h3 id="gb-today-title" className="text-lead font-semibold">本日の営業時間{today.holidayName ? <span className="text-ink-secondary ml-2 text-label font-normal">{formatYmdShort(today.date)}・{today.holidayName}</span> : <span className="text-ink-secondary ml-2 text-label font-normal">{formatYmdShort(today.date)}</span>}</h3>
             <p className="text-title font-semibold">{todayText}{today.special ? <span className="text-ink-secondary ml-2 text-label font-normal">特別営業時間</span> : null}</p>
           </div>
           <Button variant="primary" onClick={() => go({ tab: 'profile', view: 'hours', mode: 'text' })} disabled={!canChange}><Pencil size={16} />営業時間を変更</Button>
@@ -229,7 +229,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
             <Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} />
             <span className="text-ink-secondary text-caption">現在 {formatPeriods(today.periods)}</span>
             <span className="grow" />
-            <Button size="field" onClick={() => setEarlyClose(null)} disabled={busy}>やめる</Button>
+            <Button size="field" onClick={() => setEarlyClose(null)} disabled={busy}>キャンセル</Button>
             <Button size="field" variant="primary" onClick={() => void quick({ source: 'shortcut', shortcut: 'early_close_today', closeTime: earlyClose })} disabled={busy}>変更案を確認</Button>
           </div>
         ) : null}
@@ -580,7 +580,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                       aria-pressed={selected}
                       aria-label={`${formatYmdJa(date, true)}${mark ? ` ${mark}` : ''}${isToday ? ' 今日' : ''}`}
                       onClick={() => setSelectedDate(date)}
-                      className={`flex flex-col items-start gap-1 rounded-control border px-2 py-1.5 text-left text-label disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'text-on-accent border-transparent font-bold' : s || changed ? 'bg-status-warn-soft text-ink' : 'bg-canvas text-ink hover:bg-canvas-sunken'}`}
+                      className={`flex flex-col items-start gap-1 rounded-control border px-2 py-1.5 text-left text-label disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'text-on-accent border-transparent font-medium' : s || changed ? 'bg-status-warn-soft text-ink' : 'bg-canvas text-ink hover:bg-canvas-sunken'}`}
                       style={{ height: 56, backgroundColor: selected ? 'var(--color-accent-deep)' : undefined, borderColor: selected ? 'transparent' : isToday ? 'var(--color-accent)' : 'var(--color-hairline)', borderWidth: isToday && !selected ? 2 : 1 }}
                     >
                       <span className={`${past ? 'text-ink-faint' : ''} leading-tight`}>{Number.parseInt(date.slice(8, 10), 10)}</span>
@@ -683,7 +683,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
               // R109: 狭い画面では曜日ごとの縦カードにし、開始・終了を選ぶ欄を全幅で並べる。
               <div key={d} role="row" className={`border-hairline flex flex-col items-stretch gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:gap-3 sm:py-2 ${changed ? 'bg-accent-soft' : 'bg-canvas'}`} style={{ minHeight: 54 }}>
                 <div role="presentation" className="flex items-center justify-between gap-3 sm:contents">
-                  <span role="rowheader" className={`flex shrink-0 items-center gap-1 text-sm font-bold ${d === 'SATURDAY' ? 'text-status-info' : d === 'SUNDAY' ? 'text-status-danger' : ''}`} style={{ width: 72 }}>{WEEKDAY_JA[d]}曜{changed ? <span className="text-accent-deep text-nano font-semibold">変更</span> : null}</span>
+                  <span role="rowheader" className={`flex shrink-0 items-center gap-1 text-sm font-medium ${d === 'SATURDAY' ? 'text-status-info' : d === 'SUNDAY' ? 'text-status-danger' : ''}`} style={{ width: 72 }}>{WEEKDAY_JA[d]}曜{changed ? <span className="text-accent-deep text-nano font-semibold">変更</span> : null}</span>
                   <span role="cell" className="flex shrink-0 items-center gap-2 sm:w-16"><span className="text-ink-secondary text-xs sm:hidden">定休日</span><Toggle checked={closed} label={`${WEEKDAY_JA[d]}曜を定休日にする`} onChange={(next) => setDayPeriods(d, next ? [] : (profile.regularHours[d]?.length ? profile.regularHours[d] : [{ open: '11:00', close: '22:00' }]))} /></span>
                 </div>
                 <span role="cell" className="flex min-w-0 grow flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
@@ -695,7 +695,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                       {periods.length > 1 && i === periods.length - 1 ? <button type="button" aria-label={`${WEEKDAY_JA[d]}曜 枠${i + 1}を削除`} onClick={() => setDayPeriods(d, periods.filter((_, j) => j !== i))} className="text-ink-faint flex h-7 w-7 shrink-0 items-center justify-center rounded-control hover:bg-canvas-sunken"><X size={16} /></button> : null}
                     </span>
                   ))}
-                  {!closed && periods.length < 3 ? <Button size="field" onClick={() => setDayPeriods(d, [...periods, { open: periods[periods.length - 1]?.close ?? '17:00', close: '22:00' }])}><Plus size={14} />枠を追加</Button> : null}
+                  {!closed && periods.length < 3 ? <Button size="field" onClick={() => setDayPeriods(d, [...periods, { open: periods[periods.length - 1]?.close ?? '17:00', close: '22:00' }])}><Plus size={14} />枠を追加する</Button> : null}
                 </span>
               </div>
             )
@@ -898,7 +898,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
           <ArrowRight size={24} className="text-ink-faint hidden shrink-0 justify-self-center lg:block" aria-hidden="true" />
           <div className="bg-accent-soft border-accent flex flex-col gap-3 rounded-card border p-5">
             <p className="text-accent-deep text-label font-semibold">変更後</p>
-            <div className={`leading-relaxed font-bold ${isHours ? 'text-hero' : 'text-lead'}`}>{afterNode}</div>
+            <div className={`leading-relaxed ${isHours ? 'text-hero font-semibold' : 'text-lead font-bold'}`}>{afterNode}</div>
             <p className="text-ink-secondary text-label">{afterNote}</p>
           </div>
         </div>
@@ -924,7 +924,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
         <StickyBar actions={<>{ids.length > 1 && index < ids.length - 1 ? <Button variant="primary" onClick={() => setIndex(index + 1)}>次の変更へ</Button> : null}<Button variant={ids.length > 1 && index < ids.length - 1 ? 'secondary' : 'primary'} onClick={() => go({ tab: 'profile' })}>プロフィールへ戻る</Button><Button onClick={() => go({ tab: 'profile', view: 'history' })}>変更履歴を見る</Button></>} />
       ) : (
         <StickyBar
-          actions={<><Button onClick={backTo} disabled={busy}>修正する</Button>{change.status === 'failed' || change.status === 'conflict' ? <Button onClick={() => void cancel()} disabled={busy}>この変更を取り消す</Button> : null}<Button variant="primary" onClick={() => void send()} disabled={!canPress}>{busy ? '送信中…' : 'Googleに変更を送信'}</Button></>}
+          actions={<><Button onClick={backTo} disabled={busy}>修正する</Button>{change.status === 'failed' || change.status === 'conflict' ? <Button onClick={() => void cancel()} disabled={busy}>キャンセル</Button> : null}<Button variant="primary" onClick={() => void send()} disabled={!canPress}>{busy ? '送信中…' : 'Googleに変更を送信'}</Button></>}
         />
       )}
     </div>
@@ -1190,24 +1190,24 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Pr
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-label font-semibold">写真（{photos === null ? '—' : `${photoTotal}枚`}）</span>
               <span className="grow" />
-              <Button onClick={() => void openPicker()} disabled={picker.loading || data.closed}>登録メディアから追加</Button>
+              <Button onClick={() => void openPicker()} disabled={picker.loading || data.closed}>登録メディアから追加する</Button>
             </div>
             {photosError ? <p className="text-ink-faint text-caption">{photosError}</p> : null}
             <div className="flex flex-wrap gap-2">
               {visiblePhotos.map((p) => (
-                <figure key={p.name} className="border-hairline bg-surface-chrome relative overflow-hidden rounded-control border" style={{ width: 100, height: 100 }}>
+                <figure key={p.name} className="border-hairline bg-shell-gray relative overflow-hidden rounded-control border" style={{ width: 100, height: 100 }}>
                   {p.thumbnailUrl || p.googleUrl ? <img src={p.thumbnailUrl ?? p.googleUrl ?? ''} alt="" className="h-full w-full object-cover" /> : null}
-                  <button type="button" onClick={() => setDeletes([...deletes, p.name])} className="bg-canvas text-danger absolute right-1.5 bottom-1.5 rounded-mini px-1.5 text-micro font-semibold" aria-label="この写真を削除">削除</button>
+                  <button type="button" onClick={() => setDeletes([...deletes, p.name])} className="bg-canvas text-danger absolute right-1.5 bottom-1.5 rounded-mini px-1.5 text-micro font-semibold" aria-label="この写真を削除">削除する</button>
                 </figure>
               ))}
               {adds.map((m) => (
-                <figure key={m.id} className="border-accent bg-surface-chrome relative overflow-hidden rounded-control border" style={{ width: 100, height: 100 }} title={m.filename}>
+                <figure key={m.id} className="border-accent bg-shell-gray relative overflow-hidden rounded-control border" style={{ width: 100, height: 100 }} title={m.filename}>
                   <img src={m.url} alt={m.filename} className="h-full w-full object-cover" />
                   <span className="bg-accent-deep text-on-accent absolute top-1.5 left-1.5 rounded-mini px-1.5 text-micro font-semibold">追加</span>
-                  <button type="button" onClick={() => setAdds(adds.filter((x) => x.id !== m.id))} className="bg-canvas text-ink absolute right-1.5 bottom-1.5 rounded-mini px-1.5 text-micro font-semibold" aria-label="追加をやめる">やめる</button>
+                  <button type="button" onClick={() => setAdds(adds.filter((x) => x.id !== m.id))} className="bg-canvas text-ink absolute right-1.5 bottom-1.5 rounded-mini px-1.5 text-micro font-semibold" aria-label="追加をやめる">キャンセル</button>
                 </figure>
               ))}
-              {deletes.length ? <p className="text-status-warn-deep w-full text-caption">{deletes.length}枚を削除します。<button type="button" className="ml-2 font-semibold underline" onClick={() => setDeletes([])}>削除をやめる</button></p> : null}
+              {deletes.length ? <p className="text-status-warn-deep w-full text-caption">{deletes.length}枚を削除します。<button type="button" className="ml-2 font-semibold underline" onClick={() => setDeletes([])}>キャンセル</button></p> : null}
             </div>
             {picker.open ? (
               <div className="border-hairline bg-canvas flex flex-col gap-3 rounded-control border p-3" role="group" aria-label="登録メディアから写真を選ぶ">

@@ -15,6 +15,7 @@ import { ApiError } from '@/lib/api'
 import {
   headCountLabel, nenPetsApi, petAnimalTypeLabel, type NenHealthChangeFilter, type NenHealthKpis, type NenHealthLastFilter, type NenHealthListData, type NenHealthRow, type NenHealthSort,
 } from '@/lib/nen-pets-api'
+import { formatNumber } from '@/lib/format'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -68,7 +69,7 @@ export default function HealthTab({
     <>
       <KpiCollapse data-design="KPIs" data-design-node="health-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard variant="v6" title="今週の記録" value={ready ? kpis!.recordsThisWeek : null} unit="件" detail="" help="直近7日にお客様が付けた記録です" loading={!ready && status === 'loading'} />
-        <KpiCard variant="v6" title="記録しているペット" value={ready ? kpis!.petsWithRecords : null} unit="頭" detail={ready ? `登録 ${kpis!.petsTotal.toLocaleString('ja-JP')}頭のうち` : '—'} loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="記録しているペット" value={ready ? kpis!.petsWithRecords : null} unit="頭" detail={ready ? `登録 ${formatNumber(kpis!.petsTotal)}頭のうち` : '—'} loading={!ready && status === 'loading'} />
         <KpiCard variant="v6" title="気になる変化" value={ready ? kpis!.concerning : null} unit="頭" detail="" help="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットです" loading={!ready && status === 'loading'} />
         <KpiCard variant="v6" title="30日以上 記録なし" value={ready ? kpis!.silent30 : null} unit="頭" detail="続けるきっかけを配信できる" loading={!ready && status === 'loading'} />
       </KpiCollapse>
@@ -236,7 +237,7 @@ function HealthRow({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary: (
             // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
             <img src={row.pet.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
           ) : (
-            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
+            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep">{initial}</span>
           )}
           <span className="min-w-0">
             <span className="block truncate text-label font-semibold text-ink" title={row.pet.callName}>{row.pet.callName || row.pet.name || '（名前なし）'}</span>

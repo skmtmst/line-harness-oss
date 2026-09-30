@@ -526,12 +526,12 @@ function FriendsPageInner({
               保存した検索
             </button>
           ) : null}
-          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-control bg-accent-deep text-label font-bold text-on-accent hover:brightness-92">検索</button>
+          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-control bg-accent-deep text-label font-medium text-on-accent hover:brightness-92">検索</button>
         </form>
 
         {advanced?.summary.length ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-accent-soft px-3 py-2">
-            <span className="text-xs font-bold text-accent-deep">絞り込み中</span>
+            <span className="text-xs font-medium text-accent-deep">絞り込み中</span>
             {/* 保存条件の札は共通 Chip（設計の印：高さ17 / 文字10・700 / 丸）。 */}
             {advanced.summary.map((summary) => <Chip key={summary} tone="neutral">{summary}</Chip>)}
             <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-action hover:underline">条件を外す</button>
@@ -621,7 +621,7 @@ function FriendsPageInner({
             <Link
               href={broadcastHandoffHref}
               data-broadcast-handoff
-              className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-accent-border bg-accent-soft px-3 text-xs font-bold text-accent-deep hover:brightness-95"
+              className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-accent-border bg-accent-soft px-3 text-xs font-medium text-accent-deep hover:brightness-95"
               title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。"
             >
               <Megaphone aria-hidden="true" className="h-3.5 w-3.5" />
@@ -697,7 +697,7 @@ function FriendsPageInner({
       {advancedOpen ? (
         <style>{`
           [data-friends-advanced-search] > div {
-            background-color: rgb(16 24 40 / 33%) !important;
+            background-color: var(--color-scrim) !important;
           }
           [data-friends-advanced-search] > div > div {
             max-height: min(944px, calc(100vh - 32px)) !important;

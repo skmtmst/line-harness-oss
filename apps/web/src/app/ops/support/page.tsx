@@ -371,8 +371,8 @@ export default function OpsSupportPage() {
             <TextArea rows={4} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} required />
           </label>
           <div className="flex items-center gap-2 md:col-span-2">
+            <Button onClick={() => setCreating(false)}>キャンセル</Button>
             <Button type="submit" variant="primary" disabled={busy}>作る</Button>
-            <Button onClick={() => setCreating(false)}>やめる</Button>
             <span className="text-micro text-ink-faint">電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</span>
           </div>
         </form>
@@ -389,7 +389,7 @@ export default function OpsSupportPage() {
         {/* 左：チケット一覧 */}
         <section aria-label={listTitle} className={knowledgeStyles.supportList}>
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
-            <h2 className="text-label font-bold text-ink">{listTitle}</h2>
+            <h2 className="text-label font-semibold text-ink">{listTitle}</h2>
             <ListRange total={total} first={tickets.length === 0 ? 0 : 1} last={tickets.length} />
           </header>
           {loading && tickets.length === 0 ? (
@@ -422,7 +422,7 @@ export default function OpsSupportPage() {
                         <span className="truncate">{t.staffName || '—'}</span>
                         <span className="ml-auto shrink-0 text-ink-faint">{elapsedLabel(t.lastMessageAt)}</span>
                       </span>
-                      <span className="mt-1 block truncate text-label font-bold text-ink">{t.subject}</span>
+                      <span className="mt-1 block truncate text-label font-medium text-ink">{t.subject}</span>
                       <span className="mt-1.5 flex items-center gap-1.5">
                         {stageChip(t.stage, t.stageLabel)}
                         {priorityChip(t.priority, t.priorityLabel)}
@@ -452,7 +452,7 @@ export default function OpsSupportPage() {
             <div className="grid gap-3">
               {/* 見出し行 */}
               <div className={knowledgeStyles.supportSubject}>
-                <span className="text-label font-bold text-ink-secondary">{ticket.ticketLabel}</span>
+                <span className="text-label font-medium text-ink-secondary">{ticket.ticketLabel}</span>
                 <h2 className="text-body font-bold text-ink">{ticket.subject}</h2>
                 {ticket.subjectAuto ? <Chip tone="neutral">自動で付けた件名</Chip> : null}
                 {priorityChip(ticket.priority, ticket.priorityLabel)}
@@ -503,13 +503,13 @@ export default function OpsSupportPage() {
               {/* 返信 */}
               <div className={knowledgeStyles.supportReply} data-design-node={aiBusy ? 'XlTAd' : replyFromAi ? references.length > 0 ? 'RPjQ6' : 'b2uv3' : undefined}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-label font-bold text-ink">返信</h3>
+                  <h3 className="text-label font-semibold text-ink">返信</h3>
                   {aiBusy ? (
                     <Chip tone="info">作成中…</Chip>
                   ) : replyFromAi ? (
                     <>
                       <Button size="field" onClick={() => void generateAi()} disabled={busy || !detail?.ai.available}>作り直す</Button>
-                      <Button size="field" onClick={() => void discardAi()} disabled={busy}>下書きを消す</Button>
+                      <Button size="field" onClick={() => void discardAi()} disabled={busy}>下書きを削除する</Button>
                     </>
                   ) : (
                     <Button size="field" onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'}>
@@ -552,7 +552,7 @@ export default function OpsSupportPage() {
                     {ticket.staffEmailRegistered ? '' : '（起票者のメールが未登録のため、今回は履歴だけに載ります）'}
                   </p>
                   <span className="ml-auto flex items-center gap-2">
-                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy}>{draftSaving ? '保存中…' : '下書き保存'}</Button>
+                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy}>{draftSaving ? '保存中…' : '下書きを保存する'}</Button>
                     <Button size="field" variant="primary" onClick={() => void send()} disabled={busy || closed || aiBusy || !reply.trim()}>返信する</Button>
                   </span>
                 </div>

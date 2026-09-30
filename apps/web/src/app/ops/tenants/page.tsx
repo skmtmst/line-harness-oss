@@ -179,8 +179,8 @@ export default function OpsTenantsPage() {
             />
             <span className="text-caption text-ink-secondary">飲食店機能</span>
           </label>
-          <Button type="submit" variant="primary">作成する</Button>
-          <Button onClick={() => setCreating(false)}>やめる</Button>
+          <Button onClick={() => setCreating(false)}>キャンセル</Button>
+          <Button type="submit" variant="primary">作る</Button>
         </form>
       ) : null}
 
@@ -220,7 +220,7 @@ export default function OpsTenantsPage() {
             {visible.map((row) => (
               <Tr key={row.id}>
                 <Td>
-                  <Link href={tenantDetailHref(row.id)} className="block truncate text-label font-bold text-ink hover:underline" title={row.name}>{row.name}</Link>
+                  <Link href={tenantDetailHref(row.id)} className="block truncate text-label font-medium text-ink hover:underline" title={row.name}>{row.name}</Link>
                   <span className="mt-1 block truncate text-caption text-ink-faint">{row.featurePacks.length ? row.featurePacks.join('・') : ' '}</span>
                 </Td>
                 <Td><span className="text-label text-ink-secondary">{planLabel(row.plan_key)}</span></Td>
@@ -228,7 +228,7 @@ export default function OpsTenantsPage() {
                 <Td><span className="text-caption text-ink-secondary">{formatDate(row.created_at)}</span></Td>
                 <Td>
                   {row.trial_ends_at
-                    ? <span className="text-caption font-bold text-status-warn-deep">{formatDate(row.trial_ends_at)}</span>
+                    ? <span className="text-caption font-medium text-status-warn-deep">{formatDate(row.trial_ends_at)}</span>
                     : <span className="text-caption text-ink-faint">—</span>}
                 </Td>
                 <Td align="right"><span className="text-label text-ink">{row.account_count}</span></Td>

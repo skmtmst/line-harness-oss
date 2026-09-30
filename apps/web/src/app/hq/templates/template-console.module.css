@@ -1,6 +1,6 @@
 .console { color: var(--color-ink); min-width: 0; font-size: 13px; }
 .header { display: flex; justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 20px; }
-.header h1 { font-size: 24px; font-weight: 700; margin: 0 0 6px; }
+.header h1 { font-size: 24px; font-weight: 600; margin: 0 0 6px; }
 .console p { line-height: 1.6; }
 .muted { color: var(--color-ink-secondary); font-size: 12px; }
 .tabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; background: var(--color-canvas-sunken); padding: 4px; border-radius: var(--radius-control); margin-bottom: 20px; }

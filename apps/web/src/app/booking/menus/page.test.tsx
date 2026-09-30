@@ -220,7 +220,7 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
     await screen.findByText('席A')
     fireEvent.click(screen.getByRole('checkbox', { name: /席A/ }))
     fireEvent.change(screen.getByRole('spinbutton', { name: '個室Aの必要数' }), { target: { value: '2' } })
-    const saveButton = screen.getByRole('button', { name: '設備の割当を保存' })
+    const saveButton = screen.getByRole('button', { name: '設備の割当を保存する' })
     // 同じ描画中に2イベントを届け、disabledへの再描画ではなくuseRefの
     // single-flight guardそのものが二重要求を止めることを確かめる。
     act(() => {
@@ -244,7 +244,7 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
     await openEditor()
     const quantity = await screen.findByRole('spinbutton', { name: '個室Aの必要数' })
     fireEvent.change(quantity, { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
     await waitFor(() => expect(screen.getByRole('status').textContent).toContain('最新の内容を読み直して'))
     expect((quantity as HTMLInputElement).value).toBe('2')
   })
@@ -253,7 +253,7 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
     let resolveSave!: (value: unknown) => void
     fixture.saveMenuResources = vi.fn(() => new Promise((resolve) => { resolveSave = resolve }))
     await openEditor()
-    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
     switchAccount('account-b')
     await act(async () => {
       resolveSave({ success: true, data: { id: 'menu-1', version: 2, resources: [] } })
@@ -267,7 +267,7 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
     await openEditor()
     expect(await screen.findByText('設備の割当は閲覧のみです。変更は管理者へ依頼してください。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '設備の割当を保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '設備の割当を保存する' })).toBeNull()
     expect((screen.getByRole('checkbox', { name: /個室A/ }) as HTMLInputElement).disabled).toBe(true)
   })
 })
@@ -351,7 +351,7 @@ describe('R305 編集窓は共通Dialog（フォーカス・Esc・破棄確認�
     await openEditor()
     const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
     const closeButton = within(dialog).getByRole('button', { name: '閉じる' })
-    const saveButton = within(dialog).getByRole('button', { name: '保存' })
+    const saveButton = within(dialog).getByRole('button', { name: '保存する' })
 
     // 最後にいる状態でTabを押すと先頭（×）へ戻り、背後へ抜けない。
     saveButton.focus()
@@ -457,7 +457,7 @@ describe('既存メニューの編集窓: 予約申込時に自動付与する�
     fireEvent.change(autoTagSelect(), { target: { value: 'tag-active-2' } })
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
 
     await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
@@ -498,7 +498,7 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
     // 空欄を維持し、0へ自動で変わらない。
     expect(cutoff.value).toBe('')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
 
     expect((await screen.findByRole('alert')).textContent).toContain('空欄のまま保存できません')
@@ -511,7 +511,7 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
     fireEvent.change(cutoff, { target: { value: '0' } })
     expect(cutoff.value).toBe('0')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
 
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
@@ -527,7 +527,7 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
     expect(cancel.value).toBe('')
     fireEvent.change(cancel, { target: { value: '60' } })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
 
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
@@ -549,7 +549,7 @@ describe('店舗共通の予約ルール', () => {
       target: { value: 'manual' },
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作成' }))
+      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作る' }))
     })
 
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
@@ -570,9 +570,9 @@ describe('店舗共通の予約ルール', () => {
     })
     render(<><MenusPage /><ToastHost /></>)
 
-    await screen.findByRole('button', { name: '変更を保存' })
+    await screen.findByRole('button', { name: '保存する' })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
 
     expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先に保存しました。')
@@ -591,7 +591,7 @@ describe('店舗共通の予約ルール', () => {
     const holdMinutes = await screen.findByRole('spinbutton', { name: '仮押さえの保持時間' })
     fireEvent.change(holdMinutes, { target: { value: '30' } })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
 
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
@@ -639,9 +639,9 @@ describe('店舗共通の予約ルール', () => {
     fixture.saveSettings = vi.fn(() => new Promise((resolve) => { resolveOldSave = resolve }))
     render(<><MenusPage /><ToastHost /></>)
 
-    await screen.findByRole('button', { name: '基本ルールを作成' })
+    await screen.findByRole('button', { name: '基本ルールを作る' })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作成' }))
+      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作る' }))
     })
     switchAccount('account-b')
 
@@ -677,7 +677,7 @@ describe('店舗共通の予約ルール', () => {
     expect(calendar.checked).toBe(true)
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作成' }))
+      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作る' }))
     })
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
     expect(fixture.saveSettings).toHaveBeenCalledWith('account-a', expect.objectContaining({
@@ -746,7 +746,7 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
   test('保存は読み込んだ version を expectedVersion として送る', async () => {
     await openEditor()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
     await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
     expect(fixture.updateMenu).toHaveBeenCalledWith(
@@ -761,7 +761,7 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
     await openEditor({ version: undefined })
     const callsBefore = (fixture.listMenus as ReturnType<typeof vi.fn>).mock.calls.length
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
     expect(fixture.updateMenu).not.toHaveBeenCalled()
     expect((await screen.findByRole('alert')).textContent).toContain('最新の内容を読み直して')
@@ -772,7 +772,7 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
     fixture.updateMenu = vi.fn(async () => { throw new ApiError(409, 'version_conflict', 'version_conflict') })
     await openEditor()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
 
     // 競合を出しても窓は開いたまま。文言で次の手順を案内する。
@@ -794,7 +794,7 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
     expect(screen.queryByRole('spinbutton', { name: '料金（円）' })).toBeNull()
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
     await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
     expect(fixture.updateMenu).toHaveBeenCalledWith(

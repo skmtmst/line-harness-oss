@@ -103,7 +103,7 @@ export default function OpsTwoFactorPage() {
       title="2要素認証を設定"
       description={
         <>
-          <span className="mb-1 block text-caption font-bold text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
           運営コンソールは2要素認証が必須です。認証アプリ（Google Authenticator など）でQRコードを読み取り、表示された6桁の数字を入れてください。確認が通ると登録が完了します。
         </>
       }
@@ -141,7 +141,7 @@ export default function OpsTwoFactorPage() {
           )}
           <div className="text-center">
             <p className="text-caption text-ink-faint">読み取れないときは、このキーを手で入力</p>
-            <p className="mt-1 break-all font-mono text-label font-bold tracking-wider text-ink">{manualKey || '—'}</p>
+            <p className="mt-1 break-all font-mono text-label font-medium tracking-wider text-ink">{manualKey || '—'}</p>
           </div>
           <div className="w-full">
             <AuthField label="認証アプリの6桁の数字" htmlFor="ops-totp-code">

@@ -78,7 +78,7 @@ export default function EventQuestionsEditor({
               size="field"
               onClick={() => onChange(questions.filter((_, i) => i !== index))}
             >
-              削除
+              削除する
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -139,7 +139,7 @@ export default function EventQuestionsEditor({
                 onClick={() => setAt(index, { options: [...(q.options ?? []), ''] })}
                 className="text-action text-xs font-medium hover:underline"
               >
-                選択肢を追加
+                選択肢を追加する
               </button>
             </div>
           )}
@@ -156,7 +156,7 @@ export default function EventQuestionsEditor({
             ])
           }
         >
-          質問を追加
+          質問を追加する
         </Button>
       )}
     </div>

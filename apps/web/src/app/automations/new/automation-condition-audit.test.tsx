@@ -213,7 +213,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
     expect(el.textContent).toContain('名前に「田中」を含む人')
     expect(el.textContent).not.toContain('条件なし')
 
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
 
     // A04: 計算側（buildSegmentWhere）が読める { text, targets } の形で送る。
@@ -257,7 +257,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
 
     // 読めない条件は黙って消さない。理由を出して、保存を止める。
     expect(el.textContent).toContain('保存されていた条件は読めませんでした')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
     expect(el.textContent).toContain('条件を付け直してください')
     expect(mockUpdate).not.toHaveBeenCalled()
@@ -266,7 +266,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
     await clickButton(el, '以前の条件を外して付け直す')
     expect(el.textContent).not.toContain('保存されていた条件は読めませんでした')
 
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
     // 条件を外す判断をしたあとなので、空の条件として保存できる。
     expect(mockUpdate).toHaveBeenCalledWith(
@@ -281,7 +281,7 @@ describe('AUTOMATION-03: 人数の確認は保存とは別の成否', () => {
     mockPreview.mockRejectedValue(new Error('server error'))
     const el = await mountPage()
     await fillMinimum(el)
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
 
     // 保存は済んでいる。失敗しているのは人数の確認だけ。

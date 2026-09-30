@@ -216,7 +216,7 @@ export function TemplateInsertControls({
 export function TemplatePreviewMessage({ preview }: { preview: TemplatePreviewResult }) {
   return (
     <>
-      <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{preview.content || '（本文がまだありません）'}</p>
+      <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{preview.content || '（本文がまだありません）'}</p>
       {preview.unresolved.length > 0 && (
         <div role="alert" className="mt-2 rounded-control bg-canvas px-3 py-2 text-xs text-danger">
           <p className="font-semibold">値を確認できない差し込みがあります</p>

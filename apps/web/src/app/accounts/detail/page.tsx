@@ -27,6 +27,7 @@ import {
   parentLabel,
   toTab,
 } from './account-detail-view'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 type AccountDetailView = LineAccount & {
   timezone?: string
@@ -312,7 +313,7 @@ function AccountDetail() {
                       <button
                         type="button"
                         onClick={() => void loadAll()}
-                        className="text-action ml-2 text-xs font-bold underline"
+                        className="text-action ml-2 text-xs font-medium underline"
                       >
                         もう一度読み込む
                       </button>
@@ -322,7 +323,7 @@ function AccountDetail() {
                 <InlineRow
                   label="友だち数"
                   value={account.stats
-                    ? `${account.stats.friendCount.toLocaleString('ja-JP')}人（${capacityLabel(account)}）`
+                    ? `${formatNumber(account.stats.friendCount)}人（${capacityLabel(account)}）`
                     : `—（${capacityLabel(account)}）`}
                 />
                 <InlineRow label="状態" value={connection.label} tone={account.isActive ? 'success' : 'muted'} />
@@ -367,7 +368,7 @@ function AccountDetail() {
                 />
               </dl>
               <div className="bg-canvas-sunken rounded-control mt-3 px-3 py-2">
-                <p className="text-ink text-xs font-bold">値そのものは、ここにも出しません</p>
+                <p className="text-ink text-xs font-medium">値そのものは、ここにも出しません</p>
                 <p className="text-ink-secondary mt-1 text-xs">差し替えるときは、新しい値を入れて保存し直します。今の値を見たり直したりはできません。</p>
               </div>
             </Card>
@@ -472,7 +473,7 @@ function AccountDetail() {
                 <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link><p className="mt-1">友だち追加URLとQRはここに出ます。</p></li>
                 <li><Link className="text-action hover:underline" href="/staff">ログインユーザー</Link><p className="mt-1">人ごとの既定のアカウントはここで決めます。</p></li>
                 <li><Link className="text-action hover:underline" href="/emergency">運用状態</Link><p className="mt-1">接続の異常や停止は、ここで見張ります。</p></li>
-                <li><Link className="text-action hover:underline" href="/friends">友だち</Link><p className="mt-1">このアカウントの友だち{account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : 'は未取得'}はここに並びます。</p></li>
+                <li><Link className="text-action hover:underline" href="/friends">友だち</Link><p className="mt-1">このアカウントの友だち{account.stats ? `${formatNumber(account.stats.friendCount)}人` : 'は未取得'}はここに並びます。</p></li>
               </ul>
             </Card>
 
@@ -683,15 +684,11 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function formatMonthDay(value: string): string {
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo',
-  }).format(new Date(value))
+  return formatDay(new Date(value))
 }
 
 function formatMonthDayTime(value: string): string {
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
-  }).format(new Date(value))
+  return formatDateTime(new Date(value))
 }
 
 function InlineRow({

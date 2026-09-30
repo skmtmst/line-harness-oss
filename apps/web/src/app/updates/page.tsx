@@ -7,6 +7,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatDateTime } from '@/lib/format'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 // self-update を構成した環境 (create-line-harness セットアップ) でのみ設定される。
@@ -102,13 +103,7 @@ export default function UpdatesPage() {
               {rows.map((r) => (
                 <Tr key={r.id}>
                   <Td className="text-ink-secondary whitespace-nowrap tabular-nums">
-                    {new Date(r.started_at).toLocaleString('ja-JP', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatDateTime(r.started_at)}
                   </Td>
                   <Td className="font-mono text-xs">
                     <span className="block truncate" title={`${r.from_version} → ${r.to_version}`}>

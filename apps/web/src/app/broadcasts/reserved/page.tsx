@@ -16,6 +16,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api, type ApiBroadcast } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { audienceSummary } from '@/lib/broadcast-summary'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -34,30 +35,14 @@ function formatJst(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function formatJstSentence(value: string | null): string {
   if (!value) return '日時未設定'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時未設定'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | null): boolean {
@@ -248,7 +233,7 @@ function ReservedBroadcastContent() {
         (scenarioId) => audienceNames.scenarios.find((s) => s.id === scenarioId)?.name ?? null,
       )
     : TARGET_LABELS[broadcast.targetType]
-  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${audienceCount.toLocaleString('ja-JP')}人`}`
+  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)}人`}`
   const scheduledLabel = formatJst(broadcast.scheduledAt)
   const scheduledSentenceLabel = formatJstSentence(broadcast.scheduledAt)
 
@@ -316,15 +301,15 @@ function ReservedBroadcastContent() {
         固定の右列で本文が潰れるので、1列に畳んで下へ並べる。
       */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-sm">
-          <span className="bg-accent-soft text-accent-deep mx-auto flex h-14 w-14 items-center justify-center rounded-full">
+        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-card">
+          <span className="bg-accent-soft text-accent-deep mx-auto flex h-14 w-14 items-center justify-center rounded-pill">
             <CalendarCheck2 size={28} aria-hidden="true" />
           </span>
           <h2 className="text-ink mt-5 text-xl font-bold">一斉配信を予約しました</h2>
           <p className="text-ink-secondary mt-3 text-sm font-semibold">
             {audienceCount === null
               ? `${scheduledSentenceLabel}に配信します。対象人数は現在確認できません。`
-              : `${scheduledSentenceLabel}に、${audienceCount.toLocaleString('ja-JP')}人へ配信します。`}
+              : `${scheduledSentenceLabel}に、${formatNumber(audienceCount)}人へ配信します。`}
           </p>
 
           <dl className="bg-canvas-sunken border-hairline mx-auto mt-5 max-w-3xl rounded-card border px-5 text-sm">
@@ -353,7 +338,7 @@ function ReservedBroadcastContent() {
           </div>
         </section>
 
-        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-sm lg:w-97.5">
+        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-card lg:w-97.5">
           <h2 className="text-ink text-base font-bold">次にできること</h2>
           <p className="text-ink-faint mt-1 text-xs">予約後も開始前まで確認・取消できます。</p>
           <div className="mt-4 grid gap-2">
@@ -361,7 +346,7 @@ function ReservedBroadcastContent() {
               <Eye size={16} aria-hidden="true" />予約の内容を見る
             </Button>
             <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full">
-              <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テスト送信する'}
+              <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テストを送る'}
             </Button>
             <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full">
               <Copy size={16} aria-hidden="true" />{actionBusy === 'duplicate' ? '複製中…' : '複製して別配信を作る'}
@@ -373,7 +358,7 @@ function ReservedBroadcastContent() {
             )}
           </div>
           <p className="text-ink-faint mt-4 text-xs">配信内容: {bubbleCount}通</p>
-          {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {estimate.hiddenExcluded.toLocaleString('ja-JP')}人</p> : null}
+          {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {formatNumber(estimate.hiddenExcluded)}人</p> : null}
           {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} className="mt-3" /> : null}
         </aside>
       </div>

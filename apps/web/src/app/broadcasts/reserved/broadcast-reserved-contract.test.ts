@@ -44,7 +44,7 @@ describe('V6 一斉配信の予約完了', () => {
       `—` にし、理由を副文で言う。0人（本当に誰にも届かない）とは別物。
     */
     expect(PAGE).toContain('対象人数は現在確認できません。')
-    expect(PAGE).toContain('estimate.hiddenExcluded.toLocaleString')
+    expect(PAGE).toContain('formatNumber(estimate.hiddenExcluded')
   })
 
   it('選択中アカウントと所属先が違う配信を表示しない', () => {

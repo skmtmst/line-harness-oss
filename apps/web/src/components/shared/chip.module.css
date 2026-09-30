@@ -16,7 +16,7 @@
   border: 1px solid;
   border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
   font-size: var(--text-nano); /* fontSize: $size-nano */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 500; /* fontWeight: 500 */
   white-space: nowrap;
 }
 

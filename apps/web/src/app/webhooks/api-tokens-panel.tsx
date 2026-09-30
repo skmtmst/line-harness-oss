@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { formatDateTime } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -33,12 +34,6 @@ function scopeLabel(scope: string): string {
   return SCOPE_LABELS[scope] ?? scope
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
-}
 
 export default function ApiTokensPanel() {
   const { selectedAccountId } = useAccount()
@@ -311,7 +306,7 @@ export default function ApiTokensPanel() {
             <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="接続の作成">
               <h2 className="text-ink mb-4 text-lg font-bold">新しい接続</h2>
               <div className="mb-4">
-                <label htmlFor="api-token-name" className="text-ink mb-1 block text-sm font-bold">
+                <label htmlFor="api-token-name" className="text-ink mb-1 block text-sm font-medium">
                   接続の名前
                 </label>
                 <input
@@ -326,7 +321,7 @@ export default function ApiTokensPanel() {
                 {nameError ? <p className="text-danger mt-1 text-xs">{nameError}</p> : null}
               </div>
               <fieldset className="mb-4">
-                <legend className="text-ink mb-1 text-sm font-bold">
+                <legend className="text-ink mb-1 text-sm font-medium">
                   できること
                   <HelpTip label="できることの説明">
                     鍵に持たせる権限です。見るだけの鍵と、タグを付けられる鍵を分けられます。
@@ -356,7 +351,7 @@ export default function ApiTokensPanel() {
                     setNameError('')
                   }}
                 >
-                  やめる
+                  キャンセル
                 </Button>
               </div>
             </section>

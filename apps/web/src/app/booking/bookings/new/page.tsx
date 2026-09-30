@@ -26,6 +26,7 @@ import {
 } from '@/lib/api'
 import { canOperateBookings } from '../../lib/booking-permissions'
 import { describeApiFailure, isForbidden, loadFailureNotice } from '@/components/shared/api-error-message'
+import { formatDateTime, formatDay, formatTime } from '@/lib/format'
 
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
@@ -108,10 +109,7 @@ function slotInstant(slot?: { startUtc?: string | null } | null): string | null 
 
 function dateLabel(startUtc: string, timeZone = 'Asia/Tokyo'): string {
   if (!startUtc) return '—'
-  return new Date(startUtc).toLocaleString('ja-JP', {
-    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
-    hour: '2-digit', minute: '2-digit', timeZone,
-  })
+  return formatDateTime(startUtc, '—', undefined, timeZone)
 }
 
 function timeRangeLabel(
@@ -120,9 +118,7 @@ function timeRangeLabel(
   if (!startUtc) return '—'
   const startsAt = new Date(startUtc)
   const endsAt = endUtc ? new Date(endUtc) : new Date(startsAt.getTime() + minutes * 60_000)
-  return `${dateLabel(startUtc, timeZone)} 〜 ${endsAt.toLocaleTimeString('ja-JP', {
-    hour: '2-digit', minute: '2-digit', timeZone,
-  })}`
+  return `${dateLabel(startUtc, timeZone)} 〜 ${formatTime(endsAt, '—', timeZone)}`
 }
 
 // サーバ側 packages/db/src/booking-customers.ts の normalizeBookingCustomerPhone と
@@ -134,10 +130,7 @@ function phoneDigitsError(phone: string): string | null {
 }
 
 function scheduleLabel(value: string, timeZone = 'Asia/Tokyo'): string {
-  return new Date(value).toLocaleString('ja-JP', {
-    month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit',
-    timeZone,
-  })
+  return formatDateTime(value, '—', undefined, timeZone)
 }
 
 function operationStatusLabel(status: string): string {
@@ -838,7 +831,7 @@ export default function NewProxyBookingPage() {
                     onClose={() => setFriendSuggestOpen(false)}
                   >
                     <div
-                      className="border-hairline bg-canvas max-h-64 divide-y overflow-y-auto rounded-control border shadow-lg"
+                      className="border-hairline bg-canvas max-h-64 divide-y overflow-y-auto rounded-control border shadow-float"
                       // 最上層では absolute 指定を無効にする（位置は器が決める）。
                       style={{ position: 'static', width: '100%' }}
                     >
@@ -1055,7 +1048,7 @@ export default function NewProxyBookingPage() {
               <Card title="だれの予約か"><Summary label="お客様" value={customerLabel} /><Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} /></Card>
               <Card title="いつ・何を" note="時間が重なっています。右の空いている時間から選べます。">
                 <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
-                <Summary label="日付" value={dateLabel(slotStartIso, slotTimeZone).split(' ')[0]} />
+                <Summary label="日付" value={formatDay(slotStartIso, '—', undefined, slotTimeZone)} />
                 <Summary label="時刻" value={time} />
                 <Summary label="担当" value={selectedStaff.display_name} />
                 <p className="text-danger mt-3 text-xs">選んだ時間は、ほかの予約で埋まりました。</p>

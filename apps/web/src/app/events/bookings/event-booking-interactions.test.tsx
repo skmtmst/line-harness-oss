@@ -430,7 +430,7 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).toContain('案内中')
     expect(view.container.textContent).not.toContain('キャンセル待ち 1番')
     expect(view.container.textContent).toContain('待機 花子')
-    expect(view.container.textContent).toContain('2099/05/04')
+    expect(view.container.textContent).toContain('2099年5月4日')
     const talk = elements(view.container).find((element) => element.tagName === 'A' && element.textContent === '個別トーク')
     expect(talk && propsOf(talk).href).toBe('/chats?friend=friend-waiting')
 

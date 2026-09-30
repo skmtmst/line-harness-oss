@@ -33,7 +33,7 @@ export function WeekdaySelect({
   }
   return (
     <div>
-      <p id="au-weekdays-label" className="text-xs font-bold text-ink">
+      <p id="au-weekdays-label" className="text-xs font-medium text-ink">
         動かす曜日<RequiredBadge />
       </p>
       <div role="group" aria-labelledby="au-weekdays-label" className="mt-2 flex flex-wrap gap-2">

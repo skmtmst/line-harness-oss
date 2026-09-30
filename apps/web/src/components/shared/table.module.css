@@ -67,7 +67,7 @@
 .stateTitle {
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .stateDescription {
@@ -81,7 +81,7 @@
   border-radius: var(--radius-control);
   color: var(--color-accent-deep);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: underline;
 }
 

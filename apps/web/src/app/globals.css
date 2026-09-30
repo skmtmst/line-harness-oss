@@ -29,8 +29,14 @@
    * `.friend-attributes-v2-shell`、検証用にSF系を固定する例外）と
    * 書き方が違うので「どれが正本か」が分かりにくかった。
    * 正本をここへ移し、body は `font-sans` で読む。
+   *
+   * ★V7「見た目の物差し」§3: 並びは「Inter, Noto Sans JP」。英字と数字は
+   * Inter、かなと漢字は Noto Sans JP に見える（Inter に日本語グリフが
+   * 無いので、かな・漢字は自動で次の書体に落ちる）。2つの変数は
+   * layout.tsx で next/font が html へ出す `--font-inter` /
+   * `--font-noto-sans-jp` で、ビルド時に同梱される。
    */
-  --font-sans: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-sans: var(--font-inter), var(--font-noto-sans-jp), "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
 
   /* --- 色 ---------------------------------------------------------------
    * アクセントはLINEブランドの緑1色。状態色（成功・注意・危険）とは
@@ -126,7 +132,8 @@
   --color-status-danger: #e5484d;
   --color-status-danger-soft: #fef0f0;
   --color-step-idle: #eef0f3;
-  --color-surface-chrome: #ebedf1;
+  /* ★V7 の灰色語彙 `shell-gray`（hairline と shell の間）。旧名は surface-chrome。 */
+  --color-shell-gray: #ebedf1;
 
   /*
    * ★V6 で実測した色は、**別系統として持たない。**
@@ -144,8 +151,11 @@
   --color-divider-soft: #eaebed;
   --color-status-danger-selected: #ffe4e7;
   --color-status-danger-border: #f3b8bb;
-  /* 暗幕。Pencil `$scrim`（#11182755）。モーダルの下敷き（`docs/v6-common-rules.md` §1-7）。 */
-  --color-scrim: #11182755;
+  /*
+   * 暗幕。ダイアログ・引き出し（影の段3）の後ろを 40% で沈める
+   * （★V7「見た目の物差し」§1。Pencil `$scrim` の #111827 に 40% を掛ける）。
+   */
+  --color-scrim: #11182766;
   /*
    * 2つ目以降のタグの札。1つ目は `accent` 系で、それと分けるための色。
    *
@@ -194,25 +204,27 @@
    * 大きさで役割を分ける。カードは card、押せるものは control、
    * 丸いものは pill。すべて rounded-lg で済ませない。
    *
-   * #704 の正規4段（新規はここから選ぶ）: mini 6 / control 8 /
-   * card 10 / pill 9999。icon 3・panel 12・large 18 は使う画面が
+   * ★V7 の正規4段（新規はここから選ぶ）: mini 6 / control 8 /
+   * panel 12 / pill 9999。icon 3・large 18 は使う画面が
    * あるので残す。置き換えは画面ごとに検証して段階的に行う。 */
   /*
-   * **カードは10px（Pencil `$radius-md`）。** 以前は 0.75rem(12px) で、
-   * 設計のモーダル枠（`$radius-panel` 12）と同じ値だった。1つの
-   * トークンがカードと窓の両方を指していたので、用途で分けた。
-   * 窓は `--radius-panel`(12) を使う。
+   * **カードは12px。** ★V7「見た目の物差し」§1 で丸みは 6 / 8 / 12 / 999
+   * の4段だけになり、カード・ダイアログ・知らせはすべて 12px。
+   * V6 では 10px（`$radius-md`）と窓の 12px を分けていたが、V7 では
+   * 同じ段に畳まれた。`--radius-card` は `--radius-panel` と同値で残し、
+   * 画面側の `rounded-card` はそのまま読み替わる。
    *
-   * 測ったNode: `pRHvc` 検索と絞り込み(h=132) / `k4Hz0X` 友だち一覧カード
-   * / `eHPwj` 一括操作バー(h=56) — いずれも `$radius-md`。
+   * V6で測ったNode: `pRHvc` 検索と絞り込み(h=132) / `k4Hz0X` 友だち一覧カード
+   * / `eHPwj` 一括操作バー(h=56) — いずれも旧 `$radius-md`。
    */
-  --radius-card: 10px;
+  --radius-card: 12px;
   /*
    * 8px。**`0.5rem` ではなく `8px` と書く。** 単位が混ざると、同じ値の
    * トークンが2つあることを機械で見つけられない（`radius-v6-control` が
    * 8px で別名のまま残っていたのがそれ）。
    */
   --radius-control: 8px;
+  /* ★V7 の 12px 段（カード・ダイアログ・知らせ）。card と同値なのは意図。 */
   --radius-panel: 12px;
   --radius-icon: 3px;
   /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
@@ -242,27 +254,54 @@
    * V5/V6の共通部品が使う意味名。既存のTailwind組み込みサイズは残し、
    * 画面移行時にこの語彙へ寄せる。
    *
-   * #704 の正規6段（新規はここから選ぶ）:
-   *   nano 10（最小ラベル）/ caption 12（補助）/ body 14（本文）/
-   *   lead 16（強調）/ title 20（ページタイトル）/ hero 24（大きな数値）
-   * micro 11・label 13・heading 18・metric 22・display 30 は使う画面が
-   * あるので残す。置き換えは画面ごとに検証して段階的に行う。 */
+   * ★V7「見た目の物差し」§1 の正規6段（新規はここから選ぶ）:
+   *   micro 11/500/1.5（組の名前だけ）/ caption 12/400/1.6（補足・表の見出し）/
+   *   body 14/400/1.7（本文・表・入力欄）/ lead 16/600/1.4（カードの題）/
+   *   title 20/600/1.4（トップバーの画面名・ダイアログの題）/
+   *   hero 28/700/1.3（大きな数）
+   * nano 10・label 13・heading 18・metric 22・display 30 は使う画面が
+   * あるので残す。置き換えは画面ごとに検証して段階的に行う。
+   *
+   * 行の高さは Tailwind v4 の `--text-*--line-height` 同伴変数で持つ。
+   * `text-body` などを書くだけで物差しの行の高さが付く。 */
   --text-caption: 12px;
+  --text-caption--line-height: 1.6;
   --text-label: 13px;
   --text-body: 14px;
+  --text-body--line-height: 1.7;
   --text-lead: 16px;
+  --text-lead--line-height: 1.4;
   /*
    * Pencil `$size-title`(20)/`$size-heading`(18)。
    * 2026-08-26 に足した。共通トップバーの画面名が `var(--text-title)` を
    * 読んでいたが未定義で、16px に落ちていた（4-1 の画像比較で発覚）。
    */
   --text-heading: 18px;
+  --text-heading--line-height: 1.4;
   --text-title: 20px;
-  /* 24px。#704 の正規6段の「大きな数値」（大きな指標の数値など）。 */
-  --text-hero: 24px;
+  --text-title--line-height: 1.4;
+  /*
+   * 28px。★V7 の「大きな数」（数のカードの値）。旧 #704 の 24px から
+   * 物差し改定で 28px へ。太字 700 を許すのはこの段だけ（§2）なので、
+   * 700 はここに付けてしまう（`text-hero` と書くだけで太字になる）。
+   */
+  --text-hero: 28px;
+  --text-hero--line-height: 1.3;
+  --text-hero--font-weight: 700;
+
+  /*
+   * ★V7「見た目の物差し」§2: 太字は3段だけ。
+   *   600（題・表の見出し・ボタン）/ 500（ラベル・タブ）/ 400（本文・補足）
+   * 700・800 を許すのは大きな数（28px = text-hero）だけ。`font-bold` と
+   * `font-extrabold` はここで 600 に畳む（書き換える側は font-semibold
+   * と同じ意味になる）。
+   */
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
   --text-display: 30px;
   --text-metric: 22px;
   --text-micro: 11px;
+  --text-micro--line-height: 1.5;
   --text-nano: 10px;
 
   /* --- 余白 -------------------------------------------------------------
@@ -309,14 +348,22 @@
    * #673 で「Beautiful shadows」の sm へ差し替えた。近距離の薄い影・
    * 下端の光・輪郭の1pxリングの3層で、1px罫線だけの硬さを残さない。
    * 指標カード・フォルダパネル・右レール・各種カードはすべてここを読む。
+   *
+   * ★V7「仕上げ」§5: 影の色は黒ではなく ink（#1d1d1f）の透明にする。
    */
-  --shadow-card: 0px 2px 3px -1px rgba(0, 0, 0, 0.1), 0px 1px 0px 0px rgba(25, 28, 33, 0.02), 0px 0px 0px 1px rgba(25, 28, 33, 0.08);
+  --shadow-card: 0px 2px 3px -1px rgba(29, 29, 31, 0.08), 0px 1px 0px 0px rgba(29, 29, 31, 0.02), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
   /*
-   * 浮いて見える面（メニュー・ドロップダウン・モーダル・引き出し）の影。
-   * Beautiful shadows の md。カードより一段強い層状影で、下の内容から
-   * 浮き上がる。表コンテナなど、カードより大きい面にもこちらを当てる。
+   * 浮いて見える面（メニュー・ドロップダウン・知らせ・ふきだし）の影。
+   * ★V7 の段2。カードより一段強い層状影で、下の内容から浮き上がる。
+   * 表コンテナなど、カードより大きい面にもこちらを当てる。
    */
-  --shadow-float: 0px 4px 8px -2px rgba(0, 0, 0, 0.08), 0px 12px 24px -4px rgba(25, 28, 33, 0.14), 0px 0px 0px 1px rgba(25, 28, 33, 0.08);
+  --shadow-float: 0px 4px 8px -2px rgba(29, 29, 31, 0.08), 0px 12px 24px -4px rgba(29, 29, 31, 0.14), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
+  /*
+   * 最前面（ダイアログ・引き出し）の影。★V7 の段3。
+   * メニューより遠くに影を投げて、後ろの 40% 暗幕（--color-scrim）と
+   * 一緒にいちばん上にあることを示す。
+   */
+  --shadow-overlay: 0px 8px 16px -4px rgba(29, 29, 31, 0.10), 0px 24px 48px -8px rgba(29, 29, 31, 0.18), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
 
   /*
    * Tailwind の transition-colors などの既定の速さ（★V7 修正方針 §4）。
@@ -397,13 +444,13 @@ aside[aria-label="フォルダ"] .shadow-lg {
   transform-origin: top right;
 }
 
-/* モーダルは中央から。カードより一段強い影（Beautiful md）で浮かせる。 */
+/* モーダルは中央から。最前面の影（★V7 段3）で浮かせる。 */
 [data-design-part="dialog"] {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
 }
 
 [data-design-part="dialog"][data-design-node] {
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--shadow-overlay);
 }
 
 /*
@@ -501,6 +548,29 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
  * 画面側のクラスが指定したときはそちらが勝つ。
  */
 @layer base {
+  /*
+   * 数字は桁でそろえる（★V7「見た目の物差し」§3）。
+   * 以前は数が出る画面ごとに `tabular-nums` を付けていて、付け忘れた
+   * 場所で桁が揺れていた。全体の既定にして、個別に付けなくて済む
+   * ようにする。等幅でない数字にしたい場所だけ `proportional-nums` で
+   * 戻せる。かな・漢字・英字には効かない。
+   */
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * ★V7「見た目の物差し」§2: 太字は 600 / 500 / 400 の3段だけで、
+   * 700 は `text-hero`（28px の大きな数）だけ。ブラウザが勝手に
+   * 700 にする `<strong>`・`<b>`・`<th>` を 600 に畳む。
+   * 本文中の強調（strong/b）は 600 でも前後の 400 と分かれる。
+   */
+  strong,
+  b,
+  th {
+    font-weight: 600;
+  }
+
   :lang(ja) {
     word-break: auto-phrase;
   }

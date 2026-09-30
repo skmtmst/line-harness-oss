@@ -328,7 +328,7 @@ function NewFriendFieldForm() {
 
       {/* #976 U084/U085: 追従バーの操作は共通Button。左キャンセル→右確定の並びはStickyBarが持つ。 */}
       {/* R514: 重複を確認できるまで保存は押させず、理由を状態文に出す。 */}
-      <StickyBar status={saving ? '項目を保存しています' : listBlocked ? '既存の項目を読み直すと保存できます' : '未保存'} actions={<><Button href={back ?? '/tags?tab=fields'}>キャンセル</Button><Button type="button" variant="primary" disabled={saving || listBlocked} onClick={() => void save()}>{saving ? '作成中…' : '項目を作成'}</Button></>} />
+      <StickyBar status={saving ? '項目を保存しています' : listBlocked ? '既存の項目を読み直すと保存できます' : '未保存'} actions={<><Button href={back ?? '/tags?tab=fields'}>キャンセル</Button><Button type="button" variant="primary" disabled={saving || listBlocked} onClick={() => void save()}>{saving ? '作成中…' : '項目を作る'}</Button></>} />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )

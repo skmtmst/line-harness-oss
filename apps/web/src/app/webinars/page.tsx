@@ -36,6 +36,7 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import KpiCard from '@/components/shared/kpi-card'
 import { overviewCards } from './overview-view'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
@@ -76,7 +77,7 @@ function scheduleSummary(w: Webinar): string {
   }
   otherRules.forEach((rule) => {
     if (rule.type === 'weekly') parts.push(`毎週${(rule.days ?? []).map((day) => DAYS[day]).join('・')} ${rule.time}`)
-    if (rule.type === 'once') parts.push(rule.at ? new Date(rule.at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '単発・日時未設定')
+    if (rule.type === 'once') parts.push(rule.at ? formatDateTime(rule.at) : '単発・日時未設定')
   })
   return parts.join(' / ')
 }
@@ -142,7 +143,7 @@ function WebinarFolderDialog({
 
 function measuredCount(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')}人`
+    ? `${formatNumber(value)}人`
     : '—'
 }
 
@@ -280,7 +281,7 @@ function WebinarArchiveConfirm({
       onConfirm={copy.stopFirst ? undefined : onConfirm}
     >
       {copy.stopFirst ? (
-        <div className="rounded-control border border-amber-200 bg-amber-50 p-3 text-xs text-ink">
+        <div className="rounded-control border border-status-warn bg-status-warn-soft p-3 text-xs text-ink">
           <p>{copy.stopFirst}</p>
           <div className="mt-3">
             <Button href={`/webinars/edit?id=${target.id}`}>編集画面で公開を停止する</Button>
@@ -918,13 +919,13 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
   return (
     <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-10 overflow-y-auto px-4 py-5 sm:px-10 xl:left-64 xl:top-14" data-design-node="LKuAQ">
       <div className="mx-auto flex max-w-screen-2xl flex-col gap-4">
-        <p className="text-ink-faint text-xs font-bold">← ウェビナー一覧</p>
+        <p className="text-ink-faint text-xs font-medium">← ウェビナー一覧</p>
         <div className="grid gap-4 xl:grid-cols-4">
           <div className="space-y-4 xl:col-span-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h2 className="text-base font-bold text-ink">アーカイブする対象</h2>
               <p className="mt-1 text-xs text-ink-secondary">アーカイブするウェビナーを確認します。</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold text-ink-faint">ウェビナー</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{target.title}</p></div><div><p className="text-xs font-bold text-ink-faint">申込者</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{measuredCount(target.registrationCount)}</p></div></div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-medium text-ink-faint">ウェビナー</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{target.title}</p></div><div><p className="text-xs font-medium text-ink-faint">申込者</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{measuredCount(target.registrationCount)}</p></div></div>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h2 className="text-base font-bold text-ink">アーカイブしたあと</h2>
@@ -933,7 +934,7 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
             </section>
           </div>
           <aside className="space-y-4">
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-semibold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
             <div className="min-h-96"><LinePreview><div className="rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></LinePreview></div>
           </aside>
         </div>

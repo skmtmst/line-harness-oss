@@ -36,6 +36,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import { formatDateTime } from '@/lib/format'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -445,7 +446,7 @@ function ConditionEditor({
         <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className="min-w-44 flex-1" />
       )}
 
-      <Button type="button" onClick={onDelete}>削除</Button>
+      <Button type="button" onClick={onDelete}>削除する</Button>
     </div>
   )
 }
@@ -501,7 +502,7 @@ function ConditionGroup({
           />
         ))}
       </div>
-      <Button type="button" onClick={() => onChange([...items, defaultCondition(tags)])} className="mt-3">＋ {operator}条件を追加</Button>
+      <Button type="button" onClick={() => onChange([...items, defaultCondition(tags)])} className="mt-3">＋ {operator}条件を追加する</Button>
     </section>
   )
 }
@@ -902,7 +903,7 @@ function SavedSearchEditInner() {
               {previewError || preview?.error
                 ? '未計算'
                 : preview?.calculatedAt
-                  ? `${new Date(preview.calculatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}に計算`
+                  ? `${formatDateTime(preview.calculatedAt)}に計算`
                   : '未計算'}
             </p>
             {previewError ? (
@@ -960,12 +961,12 @@ function SavedSearchEditInner() {
       </div>
 
       <StickyBar
-        destructive={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-control bg-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
+        destructive={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-control bg-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除する</button>}
         actions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
-            <Button type="button" disabled={saving} onClick={() => void duplicate()}>複製して保存</Button>
-            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()}>{saving ? '保存中…' : '変更を保存'}</Button>
+            <Button type="button" disabled={saving} onClick={() => void duplicate()}>複製して保存する</Button>
+            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>
           </>
         )}
       />

@@ -32,14 +32,14 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
 
   it('作成は実在するスタッフを選び、下書き後に公開・本人テストできる', () => {
     expect(create).toContain("lifecycle: 'draft'")
-    expect(create).toContain('下書きに保存')
+    expect(create).toContain('下書きを保存する')
     expect(create).toContain('operatorRules.previewRecipients')
     expect(create).toContain('operatorRules.publish')
     expect(create).toContain('operatorRules.test')
     // 要件 §12-2: Pencil の仮ラベル「出す」は実装で「運用者へのお知らせを公開」へ変える。
     expect(create).toContain('>運用者へのお知らせを公開</Button>')
     expect(create).not.toContain('>出す</Button>')
-    expect(create).toContain('自分にテスト送信')
+    expect(create).toContain('自分にテストを送る')
     expect(create).toContain('LINEログイン済みの人にだけ届きます')
     expect(create).toContain('だれも受け取れないときはメールでも送る')
   })

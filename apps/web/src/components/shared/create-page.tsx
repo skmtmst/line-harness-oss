@@ -156,7 +156,7 @@ export default function CreatePage({
         </Button>
       )}
       <Button variant="primary" onClick={() => run(false)} disabled={saving}>
-        {saving ? '保存中...' : (saveLabel ?? '保存')}
+        {saving ? '保存中...' : (saveLabel ?? '保存する')}
       </Button>
     </>
   ) : (
@@ -166,7 +166,7 @@ export default function CreatePage({
         disabled={saving}
         className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
       >
-        {saving ? '保存中...' : (saveLabel ?? '保存')}
+        {saving ? '保存中...' : (saveLabel ?? '保存する')}
       </button>
       {onReset && (
         <button
@@ -275,7 +275,7 @@ export function FormSection({
     >
       <div className="mb-3 flex items-start gap-2">
         <span
-          className={`bg-accent text-on-accent mt-0.5 flex shrink-0 items-center justify-center rounded-full font-semibold ${
+          className={`bg-accent text-on-accent mt-0.5 flex shrink-0 items-center justify-center rounded-pill font-semibold ${
             v6 ? 'h-6 w-6 text-[13px]' : 'h-5 w-5 text-xs'
           }`}
         >
