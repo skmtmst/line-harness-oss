@@ -153,6 +153,58 @@ describe('課金プラン（36-2）', () => {
   })
 })
 
+/** R607: Stripe取得済み価格と代替価格の案内を分ける。金額とプラン内容の確定度も分ける。 */
+describe('Stripe価格の出所と仮表示の区別（R607）', () => {
+  const plansWith = (flags: { month: boolean; year: boolean }) =>
+    plans.map((p) => ({ ...p, priceFromStripe: flags.month, yearlyPriceFromStripe: flags.year }))
+  const summaryWith = (list: BillingPlanView[]) => ({ ...summary, plans: list })
+
+  it('月3プランともStripe取得済みなら「料金と内容は仮置き」と一律に出さない', async () => {
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: true, year: true })) })
+    await openPage()
+    expect(screen.queryByText(/料金と内容は仮置きです/)).toBeNull()
+    expect(screen.getByText(/料金は Stripe の価格です/)).toBeTruthy()
+    expect(screen.getByText(/プランの内容は仮置きです/)).toBeTruthy()
+    expect(screen.queryByText('仮の料金です')).toBeNull()
+  })
+
+  it('代替価格だけに「仮の料金です」と出し、注記も仮置きにする', async () => {
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: false, year: false })) })
+    await openPage()
+    expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
+    expect(screen.getByText(/料金と内容は仮置きです/)).toBeTruthy()
+  })
+
+  it('プランごとに出所が違う場合は一律注記にせず、代替の分だけ仮表示する', async () => {
+    const mixed = plansWith({ month: true, year: true })
+    mixed[1] = { ...mixed[1], priceFromStripe: false }
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(mixed) })
+    await openPage()
+    expect(screen.getAllByText('仮の料金です')).toHaveLength(1)
+    expect(screen.queryByText(/料金と内容は仮置きです/)).toBeNull()
+    expect(screen.getByText(/取得できなかった料金/)).toBeTruthy()
+  })
+
+  it('注記は選んだ周期に追随する（月はStripe取得・年は代替）', async () => {
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: true, year: false })) })
+    const toggle = await openPage()
+    expect(screen.queryByText('仮の料金です')).toBeNull()
+    expect(screen.getByText(/料金は Stripe の価格です/)).toBeTruthy()
+    fireEvent.click(toggle)
+    expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
+    expect(screen.getByText(/料金と内容は仮置きです/)).toBeTruthy()
+  })
+
+  it('注記は選んだ周期に追随する（月は代替・年はStripe取得）', async () => {
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: false, year: true })) })
+    const toggle = await openPage()
+    expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
+    fireEvent.click(toggle)
+    expect(screen.queryByText('仮の料金です')).toBeNull()
+    expect(screen.getByText(/料金は Stripe の価格です/)).toBeTruthy()
+  })
+})
+
 /** R118: 履歴だけの取得失敗は「まだ支払いはありません」に置き換えない。 */
 describe('請求履歴の取得失敗（R118）', () => {
   it('履歴の通信失敗でも概要は出し、履歴欄だけ失敗表示にする', async () => {
