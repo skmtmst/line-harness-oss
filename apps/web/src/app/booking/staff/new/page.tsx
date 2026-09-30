@@ -362,7 +362,7 @@ export default function NewBookingStaffPage() {
             title="メニューを読み込めませんでした"
             // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
             // それ以外は画面の文のまま。入力は残っているので再取得だけ案内する。
-            description={isForbiddenOrRateLimited(menusError) ? undefined : '通信の不具合などでメニュー一覧を取得できませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
+            description={isForbiddenOrRateLimited(menusError) ? undefined : '通信の不具合などでメニュー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
             error={menusError}
             onRetry={() => setMenusReloadKey((value) => value + 1)}
           />
@@ -429,7 +429,7 @@ export default function NewBookingStaffPage() {
               title="ログインユーザーを読み込めませんでした"
               // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
               // それ以外は画面の文のまま。入力は残っているので再取得だけ案内する。
-              description={isForbiddenOrRateLimited(membersError) ? undefined : '通信の不具合などでログインユーザー一覧を取得できませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
+              description={isForbiddenOrRateLimited(membersError) ? undefined : '通信の不具合などでログインユーザー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
               error={membersError}
               onRetry={() => setMembersReloadKey((value) => value + 1)}
             />
