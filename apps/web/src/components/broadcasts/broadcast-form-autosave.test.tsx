@@ -349,6 +349,74 @@ describe('自動保存の競合（R625/R626/R627）', () => {
     expect(updateApi).not.toHaveBeenCalledWith('a-for-acc1', expect.anything(), expect.anything())
   })
 
+  it('R626: 別アカウントの失敗も今の画面へ混ぜない', async () => {
+    await renderWithDraftSaved()
+    const req = deferred<{ success: boolean; error: string }>()
+    createApi.mockReturnValueOnce(req.promise)
+    createApi.mockResolvedValue({ success: true, data: { id: 'b-for-acc2', version: 1 } })
+    await validInput()
+    await tick(2000)
+    expect(createApi).toHaveBeenCalledTimes(1)
+
+    testAccount.id = 'acc-2'
+    await rerenderWithDraftSaved()
+    await act(async () => {
+      req.resolve({ success: false, error: 'old account failure' })
+    })
+    await flushFake()
+    await tick(1000)
+    // 古い失敗で今の文言・守り・通知を変えない。
+    expect(container.textContent).toContain('下書きはまだ保存していません')
+    expect(container.textContent).not.toContain('下書き保存済み')
+    expect(container.textContent).not.toContain('old account failure')
+    expect(container.textContent).not.toContain('下書きを保存しています')
+    expect(onDraftSavedSpy).not.toHaveBeenCalled()
+    const unload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(unload)
+    expect(unload.defaultPrevented).toBe(true)
+
+    // 今のアカウントの分は新しく作り直せる。
+    await tick(2500)
+    expect(createApi).toHaveBeenCalledTimes(2)
+    expect(createApi.mock.calls[1][0].lineAccountId).toBe('acc-2')
+    expect(onDraftSavedSpy).toHaveBeenCalledTimes(1)
+    expect((onDraftSavedSpy.mock.calls[0][0] as { id: string }).id).toBe('b-for-acc2')
+    expect(container.textContent).toContain('下書き保存済み')
+  })
+
+  it('R627: 複数の待ちが最新の先行へ付け替わり作成は1回', async () => {
+    await renderWithDraftSaved()
+    const req = deferred<{ success: boolean; data: { id: string; version: number } }>()
+    createApi.mockReturnValueOnce(req.promise)
+    createApi.mockResolvedValue({ success: true, data: { id: 'unexpected-second-create', version: 1 } })
+    updateApi.mockResolvedValue({ success: true, data: { id: 'first', version: 3 } })
+    await validInput()
+    await tick(2000)
+    expect(createApi).toHaveBeenCalledTimes(1)
+
+    // 手動は先行を待ち、その間に追記が入る。
+    await click('下書きを保存する')
+    expect(createApi).toHaveBeenCalledTimes(1)
+    await enter(messageInput(), 'body C newest')
+
+    await act(async () => {
+      req.resolve({ success: true, data: { id: 'first', version: 1 } })
+    })
+    await flushFake()
+    await tick(3000)
+    await tick(3000)
+    // 作成は1回。待ちは最新の入力で更新へ回り、追記を捨てない。
+    expect(createApi).toHaveBeenCalledTimes(1)
+    expect(updateApi.mock.calls.length).toBeGreaterThanOrEqual(1)
+    const lastUpdate = updateApi.mock.calls[updateApi.mock.calls.length - 1]
+    expect(lastUpdate[0]).toBe('first')
+    expect(lastUpdate[1].messageContent).toBe('body C newest')
+    expect(messageInput().value).toBe('body C newest')
+    expect(container.textContent).toContain('下書き保存済み')
+    const savedIds = onDraftSavedSpy.mock.calls.map((call) => (call[0] as { id: string }).id)
+    expect(new Set(savedIds)).toEqual(new Set(['first']))
+  })
+
   it('R627: 初回自動作成の保留中に手動保存しても作成は1回', async () => {
     await renderWithDraftSaved()
     const req = deferred<{ success: boolean; data: { id: string; version: number } }>()

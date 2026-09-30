@@ -1396,15 +1396,17 @@ export default function BroadcastForm({
       return null
     }
     /*
-     * R627: 同じアカウントの保存が重なったら先行を待つ。
+     * R627: 同じアカウントの保存が重なったら最新の先行を待ち直す。
      * 待たずに2つ投げると初回作成が2回・冪等キー2種になり、
-     * 下書きが2件・保持IDの競合になる。待った後は最新の入力で
-     * 送り直すので、段移動（draftStepの違い）も更新で追いつく。
+     * 下書きが2件・保持IDの競合になる。1つだけ待つと3つ目以降が
+     * 並ぶので、輪の中で読み直す。待った後は最新の入力で送り直すので、
+     * 段移動（draftStepの違い）も更新で追いつく。
      */
-    const inFlight = saveInFlightRef.current
-    if (inFlight && inFlight.accountId === accountId) {
+    for (;;) {
+      const latest = saveInFlightRef.current
+      if (!latest || latest.accountId !== accountId) break
       try {
-        await inFlight.promise
+        await latest.promise
       } catch {
         /* 先行の失敗はこの保存の判断に混ぜない。下で最新を送る。 */
       }
@@ -1464,11 +1466,23 @@ export default function BroadcastForm({
       return result.broadcast
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && sessionForAccount.draftId) {
+        /*
+         * R626: 古いアカウントの409を今の画面の文言へ混ぜない。
+         * 取得も表示も今のアカウントのときだけにする。
+         */
+        if ((selectedAccountIdRef.current || null) !== accountId) {
+          settleInFlight(null)
+          return null
+        }
         const current = await api.broadcasts.get(sessionForAccount.draftId)
         if (current.success && (selectedAccountIdRef.current || null) === accountId) {
           const refreshed = { ...sessionForAccount, version: current.data.version ?? null }
           draftSessionsByAccount.current.set(accountId, refreshed)
           draftSession.current = refreshed
+        }
+        if ((selectedAccountIdRef.current || null) !== accountId) {
+          settleInFlight(null)
+          return null
         }
         setError('別の画面で更新されたため読み直しました')
         settleInFlight(null)
@@ -1632,7 +1646,9 @@ export default function BroadcastForm({
        * R234: 保存側で弾いた理由（音声URL・スタンプ番号・Flexの形など）を
        * そのまま出す。「保存できませんでした」だけだと、どこを直すか分からない。
        * 400 の本文は運用者へ出してよい安全な文だけが来る（api.ts の約束）。
+       * R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
        */
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
       setError(describeSaveFailure(error))
       return false
     } finally {
@@ -1951,12 +1967,15 @@ export default function BroadcastForm({
       return
     }
     setSaving(true); setError('')
+    const requestAccountId = selectedAccountIdRef.current || null
     try {
       const saved = await persistDraft(
         scheduledAtIso(),
         false,
         needsApprovalSingle ? Number(approvalCountInput) : undefined,
       )
+      // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (!saved) return
       // 承認が要るときは、保存のあと承認の依頼まで続ける。依頼までが1つの操作。
       if (needsApproval && !needsApprovalSingle) {
@@ -1971,7 +1990,11 @@ export default function BroadcastForm({
       }
       setConfirmOpen(false)
       onSuccess(saved)
-    } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
+    } catch {
+      // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
+      setError('下書きを保存できませんでした')
+    } finally { setSaving(false) }
   }
 
   /*
