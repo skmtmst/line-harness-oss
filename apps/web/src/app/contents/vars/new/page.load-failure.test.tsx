@@ -83,8 +83,9 @@ function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
   return el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
-/** 「登録」の完全一致だけを拾う。部分一致だと秘密値警告側の
- *  「内容を確認して登録する」まで一緒に拾ってしまう。 */
+/** 「登録する」の完全一致だけを拾う。部分一致だと秘密値警告側の
+ *  「内容を確認して登録する」まで一緒に拾ってしまう。
+ *  本線7b9d6c8のボタン文言統一（「登録」→「登録する」）に合わせる。 */
 function byExactText(tag: string, text: string): HTMLElement {
   const found = Array.from(document.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
   if (!found) throw new Error(`見つかりません: <${tag}> "${text}"`)
@@ -139,7 +140,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '受付中')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
     await settle()
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ folderId: null }))
@@ -173,7 +174,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '受付中')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
     await settle()
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'f-1' }))
@@ -187,7 +188,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await click(document.querySelector('input[name="cv-type"][value="boolean"]') as HTMLInputElement)
 
     // 空欄のまま登録すると入力エラーが欄直下と画面下部の両方に出る。
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
     await settle()
     expect(api.create).not.toHaveBeenCalled()
     const fieldError = document.querySelector('#cv-value')?.parentElement?.textContent ?? ''
@@ -203,7 +204,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     expect(document.querySelectorAll('[role="alert"]').length).toBe(0)
 
     // そのまま登録できる。
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
     await settle()
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'boolean', value: 'true' }))
   })
