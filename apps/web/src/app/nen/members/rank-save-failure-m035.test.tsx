@@ -52,7 +52,7 @@ describe('M035 ランク設定・ライフタイムの保存失敗', () => {
     render(<RankSettingsTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />)
     await flush()
     fireEvent.change(screen.getByLabelText('ランク名 2'), { target: { value: 'プラチナ' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存してECへ同期' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存してECへ同期する' }))
     await flush()
 
     const alert = screen.getByRole('alert')
@@ -65,7 +65,7 @@ describe('M035 ランク設定・ライフタイムの保存失敗', () => {
     render(<LifetimeTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />)
     await flush()
     fireEvent.change(screen.getByLabelText('称号 1'), { target: { value: '大常連' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存してECへ同期' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存してECへ同期する' }))
     await flush()
 
     const alert = screen.getByRole('alert')

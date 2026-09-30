@@ -110,7 +110,7 @@ describe('M032 公開・テスト送信の失敗は生文を出さない', () =>
     render(<NewOperatorNotificationPage />)
     await waitFor(() => expect(screen.getByText('花子')).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: '自分にテスト送信' }))
+    fireEvent.click(screen.getByRole('button', { name: '自分にテストを送る' }))
     await waitFor(() => expect(screen.getByText(/権限がありません/)).toBeTruthy())
     expect(screen.queryByText(/API error/)).toBeNull()
   })
