@@ -28,7 +28,7 @@ import CopyTextButton from '@/components/ui/copy-text-button'
 import HelpTip from '@/components/shared/help-tip'
 import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
-import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import './form-submissions.css'
 import { formatDay, formatNumber } from '@/lib/format'
 
@@ -857,9 +857,8 @@ export default function FormSubmissionsPage() {
         ) : loadError ? (
           <ListState
             kind="error"
-            // R602: 403は共通の権限案内（見出し・管理者への依頼・再試行なし）へ
+            // R602/m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ
             // 切り替える。503などは従来どおり再試行を残す（scenarios と同じ形）。
-            title={isForbidden(loadFailure) ? undefined : '表示できませんでした'}
             description={isForbiddenOrRateLimited(loadFailure) ? undefined : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
             error={loadFailure ?? undefined}
             onRetry={() => void loadForms()}

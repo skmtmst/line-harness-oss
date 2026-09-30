@@ -133,6 +133,16 @@ describe('R602: フォーム取得の失敗は403と503で言い分ける', () =
     expect(host.textContent).not.toContain('箱フォーム')
   })
 
+  it('429は混み合いの案内と再試行を出す', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/forms?')) throw new ApiError(429, 'Too Many Requests')
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    await mount()
+    expect(host.textContent).toContain('混み合っています')
+    expect(retryButtons()).toHaveLength(1)
+  })
+
   it('503は表示できない旨と再試行を出す', async () => {
     fetchApi.mockImplementation(async (url: string) => {
       if (url.startsWith('/api/forms?')) throw new ApiError(503, 'Service Unavailable')
