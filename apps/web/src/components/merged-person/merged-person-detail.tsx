@@ -317,9 +317,8 @@ export default function MergedPersonDetailView({
         designNode="w8W4Eh"
         footer={(
           <div className={styles.actions}>
-            <Button type="button" onClick={() => setUnlinkTarget(null)} disabled={unlinking}>やめる</Button>
-            <Button type="button" variant="primary" className="!bg-danger !text-on-accent" onClick={unlink} disabled={unlinking || !unlinkReason.trim()}>
-              {unlinking ? '解除中…' : '結び付けを解除'}
+            <Button type="button" onClick={() => setUnlinkTarget(null)} disabled={unlinking}>キャンセル</Button>
+            <Button type="button" variant="primary" className="!bg-danger !text-on-accent" onClick={unlink} disabled={unlinking || !unlinkReason.trim()} busy={unlinking} busyLabel="解除中…">結び付けを解除
             </Button>
           </div>
         )}

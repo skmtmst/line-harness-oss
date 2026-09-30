@@ -107,7 +107,7 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
   const canConfirm = !loading && !saving && Boolean(impact?.canArchive) && (!needsReplacement || Boolean(replacementMarkId))
   return (
     <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/45 p-4">
-      <section data-design-node="zGZMA" data-design-part="archive-position" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[680px] flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
+      <section data-design-node="zGZMA" data-design-part="archive-position" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[680px] flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="flex items-start justify-between gap-3 p-4 pb-0">
           <div>
             <h2 id={titleId} className="text-lg font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
@@ -136,7 +136,7 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
           {blockReason ? <p className="mt-4 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">{blockReason}</p> : null}
           {error ? <Notice tone="danger" className="mt-4">{error}</Notice> : null}
         </div>
-        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>やめる</Button><button type="button" onClick={onConfirm} disabled={!canConfirm} className="h-9 rounded-control bg-danger px-4 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : needsReplacement ? '置き換えて保管する' : '保管する'}</button></div>
+        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>キャンセル</Button><button type="button" onClick={onConfirm} disabled={!canConfirm} className="h-9 rounded-control bg-danger px-4 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : needsReplacement ? '置き換えて保管する' : '保管する'}</button></div>
       </section>
     </div>
   )
@@ -432,7 +432,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
         </Notice>
       ) : null}
 
-      <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+      <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
         <div>
           {/* 960px以上は表。それ未満は縦に重ねたカード（#1014 ATTR-14）。 */}
           <table className="hidden w-full table-fixed text-sm md:table">
@@ -555,7 +555,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
         </div>
       </div>
 
-      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card">
         <h2 className="text-sm font-bold text-ink">受信時自動変更・保管・初期値の安全確認</h2>
         <p className="mt-1 text-xs leading-relaxed text-ink-faint">「受信時に変更」の設定は追加・編集画面で確認できます。保管時は影響人数と置き換え先を表示し、初期値は保管できません。</p>
       </section>

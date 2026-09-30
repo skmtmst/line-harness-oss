@@ -121,8 +121,8 @@ function openSelect(el: HTMLDivElement, buttonId: string): HTMLLIElement[] {
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存')
-  if (!button) throw new Error('「下書きを保存」ボタンが見つかりません')
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存する')
+  if (!button) throw new Error('「下書きを保存する」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
 

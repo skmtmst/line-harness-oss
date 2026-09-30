@@ -20,16 +20,10 @@
   max-width: calc(100vw - 48px);
   padding: 16px;
   border: 1px solid var(--color-hairline);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   /* beautiful-shadows md（date-field と同じ影） */
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 6%),
-    0 1px 1px -0.5px rgb(0 0 0 / 6%),
-    0 3px 3px -1.5px rgb(0 0 0 / 6%),
-    0 6px 6px -3px rgb(0 0 0 / 6%),
-    0 12px 12px -6px rgb(0 0 0 / 6%),
-    0 24px 24px -12px rgb(0 0 0 / 6%);
+  box-shadow: var(--shadow-card);
   transform-origin: top left;
   animation: date-time-field-in var(--motion-fast) var(--motion-ease-out);
 }

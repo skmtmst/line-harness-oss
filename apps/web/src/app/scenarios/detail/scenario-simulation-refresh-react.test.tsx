@@ -114,7 +114,7 @@ vi.mock('@/components/scenarios/question-editor', () => ({
   deadAnswerSettings: () => [],
 }))
 vi.mock('@/components/scenarios/scenario-dialogs', () => ({
-  /* 「対象を保存」を押すと条件を保存して閉じる、だけの窓。 */
+  /* 「対象を保存する」を押すと条件を保存して閉じる、だけの窓。 */
   ConditionDialog: ({
     onSave,
     onClose,
@@ -130,7 +130,7 @@ vi.mock('@/components/scenarios/scenario-dialogs', () => ({
         )
       }}
     >
-      対象を保存
+      対象を保存する
     </button>
   ),
   MoveReferrersNotice: () => null,
@@ -285,7 +285,7 @@ describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => 
     network.plannedNow = 42
     // 「対象の絞り込み」の窓を開いて保存する。
     await clickText('対象：全員')
-    await clickText('対象を保存')
+    await clickText('対象を保存する')
     await flush()
 
     expect(network.updateBodies.length).toBe(1)

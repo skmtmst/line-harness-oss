@@ -112,7 +112,7 @@ export function RichMenuTemplatePreview({ template }: { template: RichMenuTempla
    * （200px超）書くと、計算上の大きな文字として読まれる。
    */
   return (
-    <svg viewBox={`0 0 ${dims.width} ${dims.height}`} className="border-hairline bg-canvas-sunken w-full rounded border" role="img" aria-label={`${template.label} の面の分けかた`}>
+    <svg viewBox={`0 0 ${dims.width} ${dims.height}`} className="border-hairline bg-canvas-sunken w-full rounded-mini border" role="img" aria-label={`${template.label} の面の分けかた`}>
       {template.areas.length === 0 ? (
         <text x={dims.width / 2} y={dims.height / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(10px, 0.85vw, 16px)', fill: 'var(--color-ink-faint)' }}>自由に配置</text>
       ) : template.areas.map((area, index) => (
@@ -243,7 +243,7 @@ export default function RichMenuCreateForm({
       <Stepper label="リッチメニュー作成の進み方" steps={[{ label: '形とボタン', state: 'current' }, { label: '誰に出すか', state: 'todo' }, { label: '公開のしかた', state: 'todo' }]} />
       {compatibilityError || validationError ? <Notice tone="danger" className="mt-4">{compatibilityError ?? validationError}</Notice> : null}
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-4">
-        <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">
+        <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-card lg:col-span-3">
           {/*
             m18s: 3欄は均等（2/2/2）に割る。フォルダの選択欄は決まった幅
             （176px）を持つため、1/6幅では隣の入力欄へはみ出して枠線が隠れる。
@@ -385,7 +385,7 @@ export default function RichMenuCreateForm({
 
           <section className="border-hairline bg-canvas-sunken rounded-card border p-4">
             <h2 className="text-ink mb-3 text-sm font-bold">押した面ごとの動き</h2>
-            <div className="space-y-2">{currentAreas.map((area, index) => <div key={area.id}><div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs"><strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong><span className="text-ink-secondary">{isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}</span>{isAreaActionConfigured(area) ? null : <Chip tone="neutral">未設定</Chip>}<button type="button" disabled={locked} onClick={() => openAreaEditor(index)} className="ml-auto font-semibold text-action">{isAreaActionConfigured(area) ? '設定を変更する' : '設定する'}</button></div>{editingAreaIndex === index && editingArea ? <div className="border-hairline bg-canvas mt-2 rounded-control border p-4"><AreaProperties area={editingArea} pages={createPages} tags={tags} templates={templates} forms={forms} trackedLinks={trackedLinks} taps={null} showManagementDetails={false} allowedIntents={allowedIntents} onUpdate={(areaPatch) => setEditingArea((current) => current ? { ...current, ...areaPatch } : current)} /><div className="mt-4 flex justify-end gap-2"><Button type="button" onClick={() => { setEditingAreaIndex(null); setEditingArea(null) }}>キャンセル</Button><Button type="button" variant="primary" onClick={saveEditingArea}>この面の設定を保存</Button></div></div> : null}</div>)}</div>
+            <div className="space-y-2">{currentAreas.map((area, index) => <div key={area.id}><div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs"><strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong><span className="text-ink-secondary">{isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}</span>{isAreaActionConfigured(area) ? null : <Chip tone="neutral">未設定</Chip>}<button type="button" disabled={locked} onClick={() => openAreaEditor(index)} className="ml-auto font-semibold text-action">{isAreaActionConfigured(area) ? '設定を変更する' : '設定する'}</button></div>{editingAreaIndex === index && editingArea ? <div className="border-hairline bg-canvas mt-2 rounded-control border p-4"><AreaProperties area={editingArea} pages={createPages} tags={tags} templates={templates} forms={forms} trackedLinks={trackedLinks} taps={null} showManagementDetails={false} allowedIntents={allowedIntents} onUpdate={(areaPatch) => setEditingArea((current) => current ? { ...current, ...areaPatch } : current)} /><div className="mt-4 flex justify-end gap-2"><Button type="button" onClick={() => { setEditingAreaIndex(null); setEditingArea(null) }}>キャンセル</Button><Button type="button" variant="primary" onClick={saveEditingArea}>この面の設定を保存する</Button></div></div> : null}</div>)}</div>
             <p className={`mt-3 text-xs font-semibold ${unsetLabels.length > 0 ? 'text-warning' : 'text-success'}`}>{currentAreas.length === 0 ? '面を追加し、公開前にそれぞれのアクションを設定してください。' : unsetLabels.length > 0 ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。` : 'すべての面にアクションが設定されています。'}</p>
           </section>
         </div>

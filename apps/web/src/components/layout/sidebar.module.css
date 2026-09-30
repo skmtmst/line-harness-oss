@@ -115,7 +115,7 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgb(17 24 39 / 33%);
+  background: var(--color-scrim);
 }
 
 .drawer {
@@ -128,7 +128,7 @@
   flex-direction: column;
   border-right: 1px solid var(--color-hairline);
   background: var(--color-canvas);
-  box-shadow: 0 20px 25px -5px rgb(17 24 39 / 10%);
+  box-shadow: var(--shadow-card);
   transition: transform var(--motion-slow) var(--motion-ease-out);
 }
 

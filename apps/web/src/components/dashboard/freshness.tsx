@@ -1,4 +1,5 @@
 import type { DashboardOverview } from '@/lib/api'
+import { formatDay, formatTime } from '@/lib/format'
 
 type Freshness = NonNullable<DashboardOverview['freshness']>
 type Reason = NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]['reason']
@@ -14,12 +15,7 @@ function dashboardFreshnessReasonText(reason: Reason): string | null {
 
 /** JSTで「その日」を比べるためのキー。閲覧端末のタイムゾーンに左右されない。 */
 function jstDayKey(date: Date): string {
-  return date.toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDay(date)
 }
 
 export function formatDashboardAsOf(asOf: string | null | undefined, now: Date = new Date()): string | null {
@@ -31,21 +27,13 @@ export function formatDashboardAsOf(asOf: string | null | undefined, now: Date =
     : asOf
   const date = new Date(normalized)
   if (Number.isNaN(date.getTime())) return null
-  const time = date.toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  const time = formatTime(date)
   /*
    * 日付が今日と違うときは日付を添える（DASH-16）。
    * 時刻だけだと、前日・数日前に取れた値を「今日の更新」と読み違える。
    */
   if (jstDayKey(date) !== jstDayKey(now)) {
-    const day = date.toLocaleDateString('ja-JP', {
-      month: 'numeric',
-      day: 'numeric',
-      timeZone: 'Asia/Tokyo',
-    })
+    const day = formatDay(date)
     return `${day} ${time}`
   }
   return time
@@ -94,7 +82,7 @@ export function dashboardPeriodLabel(
  */
 export function dashboardLocalUpdatedAt(at: Date | null | undefined): string | null {
   if (!at || Number.isNaN(at.getTime())) return null
-  return `更新 ${at.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}`
+  return `更新 ${formatTime(at)}`
 }
 
 export default function DashboardFreshness({

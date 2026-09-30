@@ -189,7 +189,7 @@ async function pickTime(trigger: Element, value: string) {
 
 /** 窓の中の「保存」。ページ側の「保存して次へ」と取り違えないよう窓の中だけ探す。 */
 function dialogSaveButton(): HTMLButtonElement {
-  const found = [...(dialog()?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '保存')
+  const found = [...(dialog()?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '保存する')
   expect(found, '窓の「保存」がある').toBeTruthy()
   return found!
 }

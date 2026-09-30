@@ -22,15 +22,16 @@ import type {
   BroadcastApprovalCandidate,
   BroadcastApprovalState,
 } from '@/lib/api'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 export type ApprovalStatus = NonNullable<ApiBroadcast['approvalStatus']>
 
 function formatCount(n: number): string {
-  return `${n.toLocaleString('ja-JP')}人`
+  return `${formatNumber(n)}人`
 }
 
 function formatThreshold(n: number): string {
-  return `${n.toLocaleString('ja-JP')}通`
+  return `${formatNumber(n)}通`
 }
 
 /**
@@ -41,17 +42,7 @@ export function formatApprovalDateTime(value: string | null | undefined): string
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}月${get('day')}日（${get('weekday')}）${get('hour')}:${get('minute')}`
+  return formatDateTime(date)
 }
 
 /** A-2 一覧の札。承認待ちと期限切れだけ出す。 */
@@ -350,7 +341,7 @@ export function ApproverSection({
       <dl className="bg-canvas-sunken rounded-control mt-3 space-y-1 p-3 text-xs leading-5">
         <div className="flex gap-2">
           <dt className="text-ink-faint w-20 shrink-0">送る相手</dt>
-          <dd className="text-ink font-semibold tabular-nums">{recipientCount.toLocaleString('ja-JP')}人</dd>
+          <dd className="text-ink font-semibold tabular-nums">{formatNumber(recipientCount)}人</dd>
         </div>
         <div className="flex gap-2">
           <dt className="text-ink-faint w-20 shrink-0">送る日時</dt>

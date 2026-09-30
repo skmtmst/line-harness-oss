@@ -36,6 +36,7 @@ import { EC_TABS } from './ec-tabs'
 import { FAILURE_KIND_TEXT } from './ec-failure'
 import { formatEcDateTime as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
+import { formatNumber } from '@/lib/format'
 
 const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: string }> = {
   pending: { label: '処理中', tone: styles.statusWarn },
@@ -343,7 +344,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     <>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse gridClassName={styles.kpis}>
-        <KpiCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${item.count.toLocaleString('ja-JP')}`).join('・') ?? '内訳は未取得'} />
+        <KpiCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${formatNumber(item.count)}`).join('・') ?? '内訳は未取得'} />
         <KpiCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" badgeTone="neutral" />
         <KpiCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="neutral" />
         <div className="min-w-0 rounded-card border border-hairline bg-canvas p-4">
@@ -351,7 +352,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           <p className="mt-1 text-2xl font-bold text-ink tabular-nums">{dateTime(overview?.lastReceivedAt ?? null)}</p>
           <p className="mt-1 text-xs text-ink-faint">{overview?.averageDeliverySeconds == null
             ? '到着時間は測定できません'
-            : `直近24時間の平均 ${overview.averageDeliverySeconds.toLocaleString('ja-JP')}秒（${overview.latencySampleCount.toLocaleString('ja-JP')}件）`}</p>
+            : `直近24時間の平均 ${formatNumber(overview.averageDeliverySeconds)}秒（${formatNumber(overview.latencySampleCount)}件）`}</p>
         </div>
       </KpiCollapse>
       {/*
@@ -436,10 +437,10 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
               ? order.orderLines.map((line) => `${line.productName} × ${line.quantity}`).join('・')
               : '商品明細は未取得'
             const amount = order?.status === 'refunded' && order.refundedAmount !== null
-              ? `−¥${order.refundedAmount.toLocaleString('ja-JP')}`
+              ? `−¥${formatNumber(order.refundedAmount)}`
               : order?.totalAmount === null || order?.totalAmount === undefined
                 ? null
-                : `¥${order.totalAmount.toLocaleString('ja-JP')}`
+                : `¥${formatNumber(order.totalAmount)}`
             const statusInfo = ACTION_STATUS[action.status]
             return <Tr key={action.id}>
               <Td><span className={styles.cellStack}><span className={styles.cellMain}>{dateTime(action.receivedAt)} ／ {action.eventLabel || ecEventLabel(action.eventType, action.eventType)}</span><span className={styles.cellSub}>{action.orderNumber ? `注文 ${action.orderNumber}${amount ? ` ／ ${amount}` : ''}` : '注文番号 —'}</span></span></Td>
@@ -546,7 +547,7 @@ function EcCommercePageInner() {
         actions={tab === 'events'
           ? <Button href="/ec-commerce?tab=connector" variant="secondary">つなぎ先の設定</Button>
           : tab === 'subscriptions'
-            ? <Button href="/broadcasts/new" variant="primary">対象を選んで配信</Button>
+            ? <Button href="/broadcasts/new" variant="primary">対象を選んで送る</Button>
             : undefined}
       />
       <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />

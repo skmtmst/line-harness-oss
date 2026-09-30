@@ -148,11 +148,11 @@ describe('R538 閲覧のみでは変更・保存の入口に進めない', () =>
     const duration = screen.getByLabelText('稼働さん の カット の所要時間') as HTMLInputElement
     expect(duration.disabled).toBe(true)
     // 保存の押し口は出ず、理由が読める。
-    expect(screen.queryByRole('button', { name: '変更を保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
     expect(screen.getByText(/担当割当の変更権限がありません/)).toBeTruthy()
     // スタッフ追加の行き先も押せない姿になる。
-    expect(screen.queryByRole('link', { name: 'スタッフを追加' })).toBeNull()
-    expect(screen.getByText('スタッフを追加')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'スタッフを追加する' })).toBeNull()
+    expect(screen.getByText('スタッフを追加する')).toBeTruthy()
   })
 
   test('編集権限があれば変えられる', async () => {
@@ -161,11 +161,11 @@ describe('R538 閲覧のみでは変更・保存の入口に進めない', () =>
 
     const boxes = screen.getAllByRole('checkbox')
     for (const box of boxes) expect((box as HTMLInputElement).disabled).toBe(false)
-    expect(screen.getByRole('link', { name: 'スタッフを追加' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'スタッフを追加する' })).toBeTruthy()
     expect(screen.queryByText(/担当割当の変更権限がありません/)).toBeNull()
 
     // 変えると保存の押し口が出る。
     fireEvent.click(boxes[0])
-    expect(screen.getByRole('button', { name: '変更を保存' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
   })
 })

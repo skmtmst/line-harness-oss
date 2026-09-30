@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  background: #11182755;
+  background: var(--color-scrim);
   padding: 16px;
 }
 
@@ -18,9 +18,9 @@
   gap: 18px;
   overflow: hidden;
   border: 1px solid var(--color-hairline);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: 0 18px 50px rgb(15 23 42 / 18%);
+  box-shadow: var(--shadow-overlay);
   padding: 28px;
   color: var(--color-ink);
 }
@@ -305,7 +305,7 @@
   display: inline-flex;
   min-height: 24px;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 9px;
   font-size: 11px;
   font-weight: 500;

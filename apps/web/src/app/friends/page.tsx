@@ -20,6 +20,7 @@ import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
+import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
@@ -121,6 +122,12 @@ function FriendsPageInner({
   const [scenarioId, setScenarioId] = useState('')
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  /*
+   * 読み直し中（★V7 sTJsh §2）。行が出ているあとの再取得では
+   * 一覧を消さず、表を薄めて上に線の帯を出す。
+   */
+  const [refreshing, setRefreshing] = useState(false)
+  const hasRowsRef = useRef(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])
@@ -133,6 +140,7 @@ function FriendsPageInner({
    */
   const loadContextRef = useRef({ accountId: selectedAccountId, page, pageSize })
   loadContextRef.current = { accountId: selectedAccountId, page, pageSize }
+  hasRowsRef.current = friends.length > 0
 
   /*
    * IDEA-03「3ページ以上の移動と戻る操作で条件・位置を保持」。
@@ -294,9 +302,19 @@ function FriendsPageInner({
     const requestedAccountId = selectedAccountId
     const requestedPage = page
     const requestedPageSize = pageSize
-    setLoadStatus('loading')
-    setFriends([])
-    setTotal(0)
+    /*
+     * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。すでに行が出て
+     * いるときは消さず薄めるだけにし、件数・ページ番号も新しい答えが
+     * 来るまで前のままにする。行が無いとき（初回・失敗あと）は
+     * 従来どおり読み込みの1枚を出す。
+     */
+    if (hasRowsRef.current) {
+      setRefreshing(true)
+    } else {
+      setLoadStatus('loading')
+      setFriends([])
+      setTotal(0)
+    }
     setBulkOpen(false)
     setSelectedIds(new Set())
     try {
@@ -328,10 +346,12 @@ function FriendsPageInner({
         setTotal(response.data.total)
         setSelectedIds(new Set())
         setLoadStatus('ready')
+        setRefreshing(false)
       } else {
         setFriends([])
         setTotal(0)
         setLoadStatus('error')
+        setRefreshing(false)
       }
     } catch {
       if (requestId !== loadRequestRef.current) return
@@ -342,6 +362,7 @@ function FriendsPageInner({
       setFriends([])
       setTotal(0)
       setLoadStatus('error')
+      setRefreshing(false)
     }
   }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
@@ -637,34 +658,6 @@ function FriendsPageInner({
         ) : null}
       </section>
 
-      {selectedIds.size > 0 ? (
-        <section className={`rounded-card border border-accent-border bg-accent-soft p-3 shadow-card`} data-design="V4BulkBar">
-          <div className="flex flex-wrap items-center gap-2">
-            <strong className="text-sm text-ink">{selectedIds.size}人を選択中</strong>
-            <span className="text-xs text-ink-secondary">対象を確認してから操作を選んでください</span>
-            {selectedIds.size > 1 && canRunBulk(staffRole) ? (
-              <Button
-                variant="primary"
-                className="ml-auto"
-                data-qa-open="IAf7j"
-                onClick={() => setBulkOpen(true)}
-              >
-                操作を選ぶ
-              </Button>
-            ) : null}
-            {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
-              /* 権限が無いときは押し口を出さない。理由だけ書く。 */
-              <span className="text-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
-            ) : null}
-          </div>
-          {selectedIds.size === 1 ? (
-            <div className="mt-2">
-              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
       <BulkRunDialog
         open={bulkOpen}
         friendIds={selectedFriendIds}
@@ -678,6 +671,7 @@ function FriendsPageInner({
       <FriendListTable
           friends={friends}
           status={loadStatus}
+          refreshing={refreshing}
           emptyTitle={emptyMessage.title}
           emptyDescription={emptyMessage.description}
           onRetry={() => void loadFriends()}
@@ -694,10 +688,41 @@ function FriendsPageInner({
           onToggleAttention={toggleAttention}
       />
 
+      {/*
+        ★V7 仕上げ §2: 一括バーは表のすぐ下に置き、1件でも選ぶと
+        下端から8px上がって出る。0件で下がって消える。
+      */}
+      <span data-design="V4BulkBar" className="block">
+        <BulkBar
+          count={selectedIds.size}
+          unit="人"
+          hint="対象を確認してから操作を選んでください"
+          below={selectedIds.size === 1 ? (
+            <div className="mt-2">
+              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
+            </div>
+          ) : undefined}
+        >
+          {selectedIds.size > 1 && canRunBulk(staffRole) ? (
+            <Button
+              variant="secondary"
+              data-qa-open="IAf7j"
+              onClick={() => setBulkOpen(true)}
+            >
+              操作を選ぶ
+            </Button>
+          ) : null}
+          {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
+            /* 権限が無いときは押し口を出さない。理由だけ書く。 */
+            <span className="text-ink-faint text-xs">一括操作ができるのはオーナーと管理者だけです</span>
+          ) : null}
+        </BulkBar>
+      </span>
+
       {advancedOpen ? (
         <style>{`
           [data-friends-advanced-search] > div {
-            background-color: rgb(16 24 40 / 33%) !important;
+            background-color: var(--color-scrim) !important;
           }
           [data-friends-advanced-search] > div > div {
             max-height: min(944px, calc(100vh - 32px)) !important;

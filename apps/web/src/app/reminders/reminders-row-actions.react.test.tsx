@@ -98,7 +98,7 @@ describe('リマインダ一覧の行操作', () => {
       .find((el) => el.getAttribute('href') === '/reminders/detail?id=r-1' && el.textContent?.includes('詳細'))
     expect(detail, '枠つき「詳細」ボタンが見つかりません').toBeTruthy()
 
-    expect(host.querySelector('button[aria-label="予約前のお知らせを削除"]')).toBeNull()
+    expect(host.querySelector('button[aria-label="予約前のお知らせを削除する"]')).toBeNull()
 
     const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
     expect(more, 'その他ボタンが見つかりません').toBeTruthy()

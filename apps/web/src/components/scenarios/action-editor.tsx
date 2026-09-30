@@ -715,7 +715,7 @@ export default function ActionEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-editor-title" data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-lg`}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-editor-title" data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-float`}>
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
           <div className="min-w-0">
@@ -749,8 +749,7 @@ export default function ActionEditor({
                 >
                   戻る
                 </button>
-                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving}>
-                  {conditionSaving ? '保存中…' : '条件を保存'}
+                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving} busy={conditionSaving}>条件を保存する
                 </Button>
               </div>
             </div>
@@ -895,7 +894,7 @@ export default function ActionEditor({
                           <div className="border-hairline border-t p-4">
                             <ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={(config) => save(action, { config })} />
                             <Checkbox className="mt-3" checked={action.repeatOnRefire} onCheckedChange={(checked) => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox>
-                            <div className="mt-3 flex gap-2"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => remove(action)} className="text-danger">削除</button></div>
+                            <div className="mt-3 flex gap-2"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => remove(action)} className="text-danger">削除する</button></div>
                           </div>
                         )}
                       </div>
@@ -914,7 +913,7 @@ export default function ActionEditor({
           </div>
         )}
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
-        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling}>{cancelling ? '戻しています…' : 'キャンセル'}</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
       </div>
     </div>
   )

@@ -88,7 +88,7 @@ function PetsInner() {
         breadcrumb={[{ label: '専用機能' }, { label: 'マイペット' }]}
         title="マイペット"
         description=""
-        actions={tab === 'pets' ? <Button type="button" onClick={() => void exportCsv()} disabled={exporting || !selectedAccountId}>{exporting ? '書き出しています…' : 'CSVを書き出す'}</Button> : undefined}
+        actions={tab === 'pets' ? <Button type="button" onClick={() => void exportCsv()} disabled={exporting || !selectedAccountId} busy={exporting} busyLabel="書き出しています…">CSVを書き出す</Button> : undefined}
       />
       <div data-design="Tabs" data-design-node="pets-tabs">
         <Tabs

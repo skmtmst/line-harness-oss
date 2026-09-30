@@ -28,7 +28,7 @@ export default function OperatorHistory() {
   if (rows.length === 0) return null
 
   return (
-    <section className="mt-6 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-sm" aria-labelledby="operator-history-title">
+    <section className="mt-6 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card" aria-labelledby="operator-history-title">
       <h2 id="operator-history-title" className="text-base font-bold text-ink">運営による操作</h2>
       <p className="mt-1 text-sm text-ink-secondary">musubo の運営が、この統括のデータを変更した記録です。閲覧だけの確認は含みません。</p>
       <ul className="mt-3 divide-y divide-hairline">

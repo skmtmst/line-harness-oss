@@ -18,7 +18,7 @@ import Notice from '@/components/shared/notice'
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 const inputClass =
-  'w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
+  'w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
 const labelClass = 'block text-sm font-medium text-ink-secondary mb-1.5'
 
 function timeToMinutes(value: string): number {
@@ -295,7 +295,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
       {/* ★V7: 基本の段も共通の枠の幅で「本体＋右の案内」の2列にする。右の文は画面内の既存の文だけを使う。 */}
       <div className="grid items-start gap-4 xl:grid-cols-3">
         <div className="min-w-0 space-y-5 xl:col-span-2">
-      <section className="space-y-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm sm:p-6">
+      <section className="space-y-4 rounded-card border border-hairline bg-canvas p-5 shadow-card sm:p-6">
         <div><h2 className="font-bold text-ink">基本情報</h2><p className="mt-1 text-xs text-ink-faint">普段変更する項目だけを表示しています</p></div>
         <div>
           <label className={labelClass}>
@@ -332,7 +332,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             className={`${inputClass} w-32`}
           />
         </div>
-        <details className="group rounded-xl border border-hairline bg-canvas-sunken/60">
+        <details className="group rounded-card border border-hairline bg-canvas-sunken/60">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-ink-secondary">
             URL・動画ファイルの詳細設定
             <span className="text-xs text-ink-faint group-open:rotate-180">▾</span>
@@ -379,11 +379,11 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
         </details>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
+      <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div><h2 className="font-bold text-ink">配信スケジュール</h2><p className="mt-1 text-xs text-ink-faint">日本時間。参加画面には直近の候補だけが表示されます。</p></div>
-            <span className="w-fit rounded-full bg-info-bg px-3 py-1 text-xs font-semibold text-info">{rules.length}枠</span>
+            <span className="w-fit rounded-pill bg-info-bg px-3 py-1 text-xs font-semibold text-info">{rules.length}枠</span>
           </div>
           {rules.length === 0 && (
             /* 枠が無いと、公開しても友だちの画面に「次の回」が出ない。
@@ -393,12 +393,12 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             </Notice>
           )}
           {dailyRules.length > 0 ? (
-            <div className="mt-4 flex flex-col gap-1 rounded-xl border border-info/25 bg-info-bg p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 flex flex-col gap-1 rounded-card border border-info/25 bg-info-bg p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm font-bold text-ink">毎日 {dailyOverview.start}〜{dailyOverview.end}</div>
               <div className="text-xs font-medium text-ink-secondary">{dailyOverview.interval}分間隔 · {dailyRules.length}枠{nonDailyCount > 0 ? ` ＋ 個別${nonDailyCount}枠` : ''}</div>
             </div>
           ) : (
-            <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-700">毎日の配信枠は未設定です</div>
+            <div className="mt-4 rounded-card bg-status-warn-soft p-4 text-sm text-warning">毎日の配信枠は未設定です</div>
           )}
         </div>
 
@@ -408,19 +408,19 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             <span className="text-xs text-ink-faint group-open:rotate-180">▾</span>
           </summary>
           <div className="space-y-4 border-t border-hairline bg-canvas-sunken/50 p-4 sm:p-6">
-            <div className="rounded-xl border border-hairline bg-canvas p-4">
+            <div className="rounded-card border border-hairline bg-canvas p-4">
               <div className="mb-3 text-xs font-medium text-ink-secondary">毎日の枠をまとめて作成</div>
               <div className="flex flex-wrap items-end gap-3">
                 <span className="text-xs text-ink-faint">開始<TimeField value={bulkStart} onChange={setBulkStart} aria-label="まとめて作る枠の開始" className="mt-1" /></span>
                 <span className="text-xs text-ink-faint">終了<TimeField value={bulkEnd} onChange={setBulkEnd} aria-label="まとめて作る枠の終了" className="mt-1" /></span>
                 <label className="text-xs text-ink-faint">間隔<Select aria-label="間隔" value={String(bulkInterval)} onChange={(value) => setBulkInterval(Number(value))} options={[{ value: '30', label: '30分' }, { value: '60', label: '60分' }, { value: '120', label: '120分' }]} /></label>
-                <button type="button" onClick={applyDailySchedule} className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white hover:brightness-92">毎日の枠を置き換える</button>
+                <button type="button" onClick={applyDailySchedule} className="rounded-control bg-ink px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-92">毎日の枠を置き換える</button>
               </div>
               <p className="mt-2 text-[11px] text-ink-faint">下の保存ボタンを押すまでは本番へ反映されません。</p>
             </div>
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
         {rules.map((r, i) => (
-          <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline p-2 text-sm">
+          <div key={i} className="flex flex-wrap items-center gap-2 rounded-control border border-hairline p-2 text-sm">
             <Select
               aria-label="繰り返しパターン"
               value={r.type}
@@ -470,16 +470,16 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
               onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}
               className="ml-auto text-danger hover:underline"
             >
-              削除
+              削除する
             </button>
           </div>
         ))}
             </div>
         <button
           onClick={() => setRules((prev) => [...prev, { type: 'daily', time: '20:00' }])}
-          className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-canvas-sunken"
+          className="rounded-control border px-3 py-1.5 text-sm font-medium hover:bg-canvas-sunken"
         >
-          ＋ ルール追加
+          ＋ ルールを追加する
         </button>
           </div>
         </details>
@@ -500,7 +500,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
       {hideBar ? null : (
       <StickyBar
         status="変更内容を確認して本番へ反映します"
-        actions={<button onClick={() => void requestSave()} disabled={saving} className="rounded-xl bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-sm disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
+        actions={<button onClick={() => void requestSave()} disabled={saving} className="rounded-card bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-card disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '保存する'}</button>}
       />
       )}
 

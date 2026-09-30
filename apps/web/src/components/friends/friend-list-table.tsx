@@ -7,15 +7,23 @@ import MenuPortal from '@/components/shared/menu-portal'
 import Pagination from '@/components/shared/pagination'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FriendListRow, { FriendListCard } from './friend-list-row'
+import { formatNumber } from '@/lib/format'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
 interface Props {
   friends: FriendListItem[]
   status?: 'loading' | 'ready' | 'error'
+  /*
+   * 読み直し中（★V7 sTJsh §2）。行が残っている再取得では一覧を
+   * 消さず、表を 0.55 に薄めて上に 2px の線の帯を出す。
+   */
+  refreshing?: boolean
   emptyTitle?: string
   emptyDescription?: string
   onRetry?: () => void
@@ -46,6 +54,7 @@ const COLUMN_LABELS: Array<{ key: FriendListColumn; label: string }> = [
 export default function FriendListTable({
   friends,
   status = 'ready',
+  refreshing = false,
   emptyTitle = '条件に合う友だちが見つかりません',
   emptyDescription = '検索条件を外すか、別のキーワードでお試しください。',
   onRetry,
@@ -107,7 +116,7 @@ export default function FriendListTable({
   const rangeEnd = Math.min(page * pageSize, total)
 
   return (
-    <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
+    <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X" aria-busy={status === 'loading' || undefined}>
       {/*
         FRIEND-17: 狭い幅ではツールバーの右側（件数・表示項目）を折り返して
         隠さない。h-14 の固定高は lg 以上にだけ掛ける。
@@ -118,7 +127,7 @@ export default function FriendListTable({
             未取得の件数は0件に見せない（絞り込みの行の件数を消した後は、
             この見出しがその役目を持つ）。取れるまでは「—」。
           */}
-          友だち一覧 <span className="ml-1 text-xs font-medium text-ink-faint">{status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
+          友だち一覧 <span className="ml-1 text-xs font-medium text-ink-faint">{status === 'ready' ? `${formatNumber(total)}件` : '—'}</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
@@ -194,11 +203,30 @@ export default function FriendListTable({
         {visible.has('last') ? <div className="truncate text-center">最終接触</div> : null}
       </div>
 
+      <RefreshCover refreshing={refreshing}>
       <div>
         {status === 'loading' ? (
-          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
-            <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
-          </div>
+          /*
+           * ★V7 仕上げ §3: 表は中身の代わりに同じ形の骨組みを出す。
+           * 列の見出しは上にそのまま出ているので、ここは行だけ。
+           * 0.3 秒より早く来たら出さない（DelayedSkeleton）。
+           */
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div aria-hidden="true">
+                {[0, 1, 2, 3, 4, 5].map((row) => (
+                  <div key={row} className="flex items-center gap-3 border-b border-hairline px-3 py-3">
+                    <Skeleton className="h-5 w-5 shrink-0" />
+                    <Skeleton circle className="h-9 w-9 shrink-0" />
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                ))}
+              </div>
+            }
+          />
         ) : status === 'error' ? (
           <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
             <ListState
@@ -245,6 +273,7 @@ export default function FriendListTable({
         <ListRange total={total} first={rangeStart} last={rangeEnd} />
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
       </div>
+      </RefreshCover>
     </section>
   )
 }

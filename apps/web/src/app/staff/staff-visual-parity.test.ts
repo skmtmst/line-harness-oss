@@ -28,7 +28,7 @@ describe('V6 30 ログインユーザーの画面契約', () => {
 
   it('集計カードをPenの105px高と文字階層に固定する', () => {
     expect(staffSource).toContain('h-[105px]')
-    expect(staffSource).toContain('rounded-[18px]')
+    expect(staffSource).toContain('rounded-card')
     expect(staffSource).toContain('p-[15px]')
     expect(staffSource).toContain('gap-[5px]')
     expect(staffSource).toContain('text-xl font-semibold leading-[1.45]')
@@ -102,7 +102,7 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).toContain('かたまりから選ぶ')
     expect(staffSource).toContain('項目ごとに決める')
     expect(staffSource).toContain('この決め方で、この人にはこう見えます')
-    expect(staffSource).toContain('見せる範囲を保存')
+    expect(staffSource).toContain('見せる範囲を保存する')
     expect(staffSource).not.toContain('function RolePermissionMatrix')
   })
 })

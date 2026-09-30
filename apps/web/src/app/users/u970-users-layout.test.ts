@@ -19,7 +19,7 @@ describe('U018 統合ユーザーの検索・絞り込みを縦へ逃がす', ()
   })
 
   it('作成・CSV・再計算の操作は残す', () => {
-    expect(PAGE).toContain('＋ 統合ユーザーを作成')
+    expect(PAGE).toContain('＋ 統合ユーザーを作る')
     expect(PAGE).toContain('CSVで書き出す')
     expect(PAGE).toContain('再計算')
     expect(PAGE).toContain('UsersFilters')

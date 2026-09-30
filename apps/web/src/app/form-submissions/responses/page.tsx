@@ -27,6 +27,7 @@ import {
   type FormSubmissionSummary,
   type SubmissionPostActions,
 } from './response-summary'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type Submission = {
   id: string
@@ -80,7 +81,7 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
     lines.push([
       row.id,
       row.friendName ?? '不明',
-      new Date(row.createdAt).toLocaleString('ja-JP'),
+      formatDateTime(row.createdAt),
       ...fieldKeys.map((key) => data[key]),
     ].map(csvCell).join(','))
   }
@@ -245,7 +246,7 @@ function FormResponsesInner() {
   const exportAll = async () => {
     if (!selectedAccountId || !form || exporting) return
     if (total !== null && total > MAX_EXPORT_ROWS) {
-      setExportError(`回答が${total.toLocaleString('ja-JP')}件あり、一度に書き出せる上限（${MAX_EXPORT_ROWS.toLocaleString('ja-JP')}件）を超えています。`)
+      setExportError(`回答が${formatNumber(total)}件あり、一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`)
       return
     }
     setExporting(true)
@@ -266,7 +267,7 @@ function FormResponsesInner() {
         expected = result.data.total
         if (expected > MAX_EXPORT_ROWS) throw new Error('export_too_many')
         all.push(...result.data.items.map(normalizedSubmission))
-        setExportProgress(`${Math.min(all.length, expected).toLocaleString('ja-JP')} / ${expected.toLocaleString('ja-JP')}件を取得中`)
+        setExportProgress(`${formatNumber(Math.min(all.length, expected))} / ${formatNumber(expected)}件を取得中`)
         currentPage += 1
       } while (all.length < expected && currentPage <= 1001)
       if (all.length < expected) throw new Error('export_incomplete')
@@ -275,7 +276,7 @@ function FormResponsesInner() {
     } catch (error) {
       setExportError(
         error instanceof Error && error.message === 'export_too_many'
-          ? `回答が一度に書き出せる上限（${MAX_EXPORT_ROWS.toLocaleString('ja-JP')}件）を超えています。`
+          ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`
           : 'CSVを書き出せませんでした。もう一度お試しください。',
       )
     } finally {
@@ -383,33 +384,32 @@ function FormResponsesInner() {
         </nav>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => document.getElementById('form-response-filter')?.focus()}>絞り込む</Button>
-          <Button onClick={() => void exportAll()} disabled={exporting || total === 0}>
-            {exporting ? (exportProgress || 'CSVを準備しています') : 'CSVで書き出す'}
+          <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={(exportProgress || 'CSVを準備しています')}>CSVで書き出す
           </Button>
           <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} variant="primary">フォームを編集</Button>
         </div>
       </div>
 
       <div className="border-hairline flex items-center gap-6 border-b">
-        <button type="button" onClick={() => setView('rows')} className={`border-b-2 px-1 py-3 text-sm font-semibold ${view === 'rows' ? 'border-accent-deep text-accent-deep' : 'border-transparent text-ink-faint'}`}>1件ずつ見る　{total === null ? '—' : `${total.toLocaleString('ja-JP')}件`}</button>
+        <button type="button" onClick={() => setView('rows')} className={`border-b-2 px-1 py-3 text-sm font-semibold ${view === 'rows' ? 'border-accent-deep text-accent-deep' : 'border-transparent text-ink-faint'}`}>1件ずつ見る　{total === null ? '—' : `${formatNumber(total)}件`}</button>
         <button type="button" onClick={() => setView('summary')} className={`border-b-2 px-1 py-3 text-sm font-semibold ${view === 'summary' ? 'border-accent-deep text-accent-deep' : 'border-transparent text-ink-faint'}`}>まとめて見る</button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="回答" value={total === null ? '—' : `${total.toLocaleString('ja-JP')}件`} note="現在保存されている回答" />
+        <Kpi label="回答" value={total === null ? '—' : `${formatNumber(total)}件`} note="現在保存されている回答" />
         <Kpi
           label="開いた人のうち答えた割合"
-          value={summary?.completionRate == null ? '—' : `${summary.completionRate.toLocaleString('ja-JP')}%`}
-          note={summary ? `${summary.startedUnique.toLocaleString('ja-JP')}人が開いて、${summary.submitted.toLocaleString('ja-JP')}人が答えた` : '開始数の集計を取得できませんでした'}
+          value={summary?.completionRate == null ? '—' : `${formatNumber(summary.completionRate)}%`}
+          note={summary ? `${formatNumber(summary.startedUnique)}人が開いて、${formatNumber(summary.submitted)}人が答えた` : '開始数の集計を取得できませんでした'}
         />
         <Kpi
           label="友だち情報欄への書き込み"
-          value={destinationWriteCount == null ? '—' : `${destinationWriteCount.toLocaleString('ja-JP')}件`}
-          note={failedDestinationWrites == null ? '書き込み結果を取得できませんでした' : failedDestinationWrites > 0 ? `${failedDestinationWrites.toLocaleString('ja-JP')}件は欄が消えていて書けていません` : 'すべて書き込み済みです'}
+          value={destinationWriteCount == null ? '—' : `${formatNumber(destinationWriteCount)}件`}
+          note={failedDestinationWrites == null ? '書き込み結果を取得できませんでした' : failedDestinationWrites > 0 ? `${formatNumber(failedDestinationWrites)}件は欄が消えていて書けていません` : 'すべて書き込み済みです'}
         />
         <Kpi
           label="次回の予定が入った人"
-          value={nextVisitCount == null ? '—' : `${nextVisitCount.toLocaleString('ja-JP')}人`}
+          value={nextVisitCount == null ? '—' : `${formatNumber(nextVisitCount)}人`}
           note={nextVisitSummary ? `${nextVisitSummary.label}を全回答から集計` : summary ? '日付の回答を全回答から集計' : '日付項目の集計を取得できませんでした'}
         />
       </div>
@@ -448,7 +448,7 @@ function FormResponsesInner() {
                 {shown.map((item) => (
                   <tr key={item.id} className="hover:bg-canvas-sunken cursor-pointer" onClick={() => setSelected(item)}>
                     <td className="px-3 py-3"><p className="text-ink truncate text-sm font-semibold" title={item.friendName ?? '不明'}>{item.friendName ?? '不明'}</p><p className="text-ink-faint mt-1 truncate text-xs" title={valueText(Object.values(item.data as Record<string, unknown>)[0])}>{valueText(Object.values(item.data as Record<string, unknown>)[0])}</p>{postActionsNeedRetry(item.postActions) && <p className="text-danger mt-1 text-xs">後処理に未完があります</p>}</td>
-                    <td className="text-ink-secondary px-3 py-3 text-xs whitespace-nowrap">{new Date(item.createdAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="text-ink-secondary px-3 py-3 text-xs whitespace-nowrap">{formatDateTime(item.createdAt)}</td>
                     {fieldKeys.slice(0, 3).map((key) => <td key={key} className="text-ink-secondary truncate px-3 py-3 text-sm" title={valueText((item.data as Record<string, unknown>)[key])}>{valueText((item.data as Record<string, unknown>)[key])}</td>)}
                     <td className="text-ink-faint px-3 py-3 text-center">•••</td>
                   </tr>
@@ -517,11 +517,11 @@ function ResponseDetail({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" className="bg-ink/30 absolute inset-0" onClick={onClose} aria-label="回答詳細を閉じる" />
-      <aside ref={panelRef} role="dialog" aria-modal="true" aria-label="回答詳細" className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-xl">
+      <aside ref={panelRef} role="dialog" aria-modal="true" aria-label="回答詳細" className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-float">
         <div className="border-hairline flex items-center justify-between border-b pb-4"><h2 className="text-ink text-base font-bold">回答詳細</h2><button type="button" onClick={onClose} className="text-ink-faint text-xl" aria-label="閉じる">×</button></div>
         <dl className="mt-5 space-y-4">
           <Detail label="答えた人" value={item.friendName ?? '不明'} />
-          <Detail label="答えた日時" value={new Date(item.createdAt).toLocaleString('ja-JP')} />
+          <Detail label="答えた日時" value={formatDateTime(item.createdAt)} />
           <Detail label="フォームの版" value="—（回答単位の版は未取得）" />
           {fieldKeys.map((key) => <Detail key={key} label={labels[key] ?? key} value={valueText((item.data as Record<string, unknown>)[key])} />)}
           <Detail label="友だち情報欄への書き込み" value={destinationWriteText(item.destinationWrite)} />
@@ -530,8 +530,7 @@ function ResponseDetail({
             <dd className="text-ink mt-1 break-words text-sm whitespace-pre-wrap">{postActionsText(item.postActions)}</dd>
             {postActionsNeedRetry(item.postActions) && (
               <div className="mt-2">
-                <Button onClick={onRetryPostActions} disabled={retrying}>
-                  {retrying ? '再実行しています' : '未完の工程だけ再実行する'}
+                <Button onClick={onRetryPostActions} disabled={retrying} busy={retrying} busyLabel="再実行しています">未完の工程だけ再実行する
                 </Button>
                 {retryError && <p className="text-danger mt-2 text-xs">{retryError}</p>}
               </div>

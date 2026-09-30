@@ -132,7 +132,7 @@ it('EVENT-01: ①で枠の定員を保存→②へ進むと一覧・残席が新
 it('EVENT-02: 公開OFFでは主ボタンが「下書きとして保存」になる', async () => {
   st.getEvent.mockResolvedValue({ ...ev, is_published: 0 })
   await render(3, 'event-1')
-  expect(buttonLabels()).toContain('下書きとして保存')
+  expect(buttonLabels()).toContain('下書きを保存する')
   expect(buttonLabels()).not.toContain('保存して公開')
 })
 
@@ -140,7 +140,7 @@ it('EVENT-02: 公開ONでは主ボタンが「保存して公開」になる', a
   st.getEvent.mockResolvedValue({ ...ev, is_published: 1 })
   await render(3, 'event-1')
   expect(buttonLabels()).toContain('保存して公開')
-  expect(buttonLabels()).not.toContain('下書きとして保存')
+  expect(buttonLabels()).not.toContain('下書きを保存する')
 })
 
 it('EVENT-03: 取消期限の null は作成画面でも「不可」と表示し、開始直前までの選択肢がある', async () => {

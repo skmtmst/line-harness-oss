@@ -126,19 +126,7 @@ describe('#704 半端値を新規で使わない（ラチェット）', () => {
   it('角丸の任意値 rounded-[Npx] を増やさない', () => {
     const counts = countUsages(/rounded(?:-(?:t|b|l|r|tl|tr|bl|br))?-\[\d+px\]/g)
     expect(
-      increased(counts, {
-        'rounded-[9px]': 7,
-        'rounded-[14px]': 6,
-        'rounded-[12px]': 5,
-        'rounded-[10px]': 4,
-        'rounded-tl-[4px]': 1,
-        'rounded-[8px]': 1,
-        'rounded-[3px]': 1,
-        'rounded-[28px]': 1,
-        'rounded-[24px]': 1,
-        'rounded-[22px]': 1,
-        'rounded-[18px]': 1,
-      }),
+      increased(counts, {}),
     ).toEqual([])
   })
 

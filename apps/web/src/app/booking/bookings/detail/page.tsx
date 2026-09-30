@@ -27,6 +27,7 @@ import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
 
@@ -157,34 +158,15 @@ function decideDescription(
 }
 
 function jpDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function jpTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatTime(iso)
 }
 
 function jpStamp(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function jstDate(iso: string): string {
@@ -925,7 +907,7 @@ function BookingDetailInner() {
               <Row label="担当">{detail.staffName}</Row>
               <Row label="料金">
                 <span className="tabular-nums">
-                  ¥{detail.price.toLocaleString()}（税込）
+                  ¥{formatNumber(detail.price)}（税込）
                 </span>
               </Row>
               <Row label="申込日時">{jpStamp(detail.requestedAt)}</Row>
@@ -978,7 +960,7 @@ function BookingDetailInner() {
                         ? '無料'
                         : snapshot.priceMode === 'inquiry'
                           ? 'お問い合わせ'
-                          : `¥${snapshot.basePrice.toLocaleString()}（税込）`}
+                          : `¥${formatNumber(snapshot.basePrice)}（税込）`}
                     </span>
                   </Row>
                 </section>
@@ -1063,16 +1045,14 @@ function BookingDetailInner() {
                     variant="primary"
                     type="button"
                     onClick={() => void saveEdit()}
-                    disabled={saving}
-                  >
-                    {saving ? '保存しています' : 'この内容で変更する'}
+                    disabled={saving} busy={saving} busyLabel="保存しています">この内容で変更する
                   </Button>
                   <Button
                     type="button"
                     onClick={() => { setEditing(false); setError('') }}
                     disabled={saving}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                 </div>
               </section>
@@ -1143,7 +1123,7 @@ function BookingDetailInner() {
               {detail.customer.mileageBalance !== null
               && detail.customer.mileageBalance !== undefined ? (
                 <Row label="マイル">
-                  <span className="tabular-nums">{detail.customer.mileageBalance.toLocaleString()}</span>
+                  <span className="tabular-nums">{formatNumber(detail.customer.mileageBalance)}</span>
                 </Row>
               ) : null}
               {detail.previousHandover?.trim() ? (
@@ -1383,7 +1363,7 @@ function BookingDetailInner() {
                 <p className="text-ink-faint mb-3 text-xs">お客様に届く内容</p>
                 <div className="bg-canvas-sunken rounded-card p-3">
                   <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-                  <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                  <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                     {approvedText({ menu_name: detail.menuName, staff_name: detail.staffName, starts_at: detail.startsAt })}
                   </p>
                 </div>

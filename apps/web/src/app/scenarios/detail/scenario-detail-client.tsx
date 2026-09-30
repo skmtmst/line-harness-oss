@@ -11,6 +11,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TargetMissing from '@/components/shared/target-missing'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -79,6 +80,7 @@ import {
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -107,8 +109,8 @@ const messageTypeOptions: { value: MessageType; label: string }[] = [
 
 const modeBadgeStyle: Record<DeliveryMode, { bg: string; text: string; label: string }> = {
   relative: { bg: 'bg-canvas-sunken', text: 'text-ink-secondary', label: 'Legacy' },
-  elapsed: { bg: 'bg-blue-50', text: 'text-blue-700', label: '経過時間' },
-  absolute_time: { bg: 'bg-amber-50', text: 'text-amber-700', label: '時刻指定' },
+  elapsed: { bg: 'bg-status-info-soft', text: 'text-action', label: '経過時間' },
+  absolute_time: { bg: 'bg-status-warn-soft', text: 'text-warning', label: '時刻指定' },
 }
 
 function formatDelay(minutes: number): string {
@@ -262,7 +264,7 @@ function ImagePreview({ content }: { content: string }) {
     const url = parsed.previewImageUrl || parsed.originalContentUrl
     return (
       <div>
-        <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded mb-2 inline-block">画像</span>
+        <span className="text-xs font-medium text-chip-alt bg-chip-alt-soft px-2 py-0.5 rounded-mini mb-2 inline-block">画像</span>
         {url ? (
           <img src={url} alt="preview" className="border-hairline rounded-card mt-1 max-w-[200px] border" />
         ) : (
@@ -271,7 +273,7 @@ function ImagePreview({ content }: { content: string }) {
       </div>
     )
   } catch {
-    return <p className="text-xs text-red-500">画像 JSON パースエラー</p>
+    return <p className="text-xs text-status-danger">画像 JSON パースエラー</p>
   }
 }
 
@@ -504,14 +506,7 @@ export default function ScenarioDetailClient({
   const deliveryMode: DeliveryMode = (scenario?.deliveryMode ?? 'relative') as DeliveryMode
   const latestStartedAt = runs?.subscriptions[0]?.startedAt ?? null
   const latestStartedLabel = latestStartedAt
-    ? new Intl.DateTimeFormat('ja-JP', {
-        timeZone: 'Asia/Tokyo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(latestStartedAt))
+    ? formatDateTime(new Date(latestStartedAt))
     : null
 
   const loadScenario = useCallback(async (fresh = false) => {
@@ -1689,7 +1684,7 @@ export default function ScenarioDetailClient({
             disabled={stepSaving}
  className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
           >
-            {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加'}
+            {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加する'}
           </button>
           <button
             onClick={closeStepForm}
@@ -1775,10 +1770,18 @@ export default function ScenarioDetailClient({
     return (
       <div>
 
-        <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
-          <div className="bg-canvas-sunken h-6 w-1/3 rounded" />
-          <div className="h-4 bg-canvas-sunken rounded w-2/3" />
-          <div className="h-4 bg-canvas-sunken rounded w-1/2" />
+        {/* ★V7 仕上げ §3: 枠は最初から本物で出し、中身の場所だけ骨組み。 */}
+        <div className="bg-canvas rounded-card border border-hairline p-8 space-y-4">
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div className="space-y-4">
+                <Skeleton className="block h-6 w-1/3" />
+                <Skeleton className="block h-4 w-2/3" />
+                <Skeleton className="block h-4 w-1/2" />
+              </div>
+            }
+          />
         </div>
       </div>
     )
@@ -1852,8 +1855,7 @@ export default function ScenarioDetailClient({
         {editingStepId ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={closeStepForm}>編集を閉じる</Button>
-            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving}>
-              {stepSaving ? '保存中…' : '変更を保存'}
+            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving} busy={stepSaving}>保存する
             </Button>
           </div>
         ) : null}
@@ -1887,7 +1889,7 @@ export default function ScenarioDetailClient({
                 title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
                 className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
               >
-                一括テスト送信
+                一括でテストを送る
               </button>
               {/* 保存するものは、いま開いている編集の内容。カードの「編集」
                   「変更」を押していないときは、保存するものが無い。 */}
@@ -1897,7 +1899,7 @@ export default function ScenarioDetailClient({
                 title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}
                 className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40"
               >
-                {saving ? '保存中…' : '保存'}
+                {saving ? '保存中…' : '保存する'}
               </button>
               </div>
             }
@@ -1922,7 +1924,7 @@ export default function ScenarioDetailClient({
             {simulationRefreshing
               ? '予約中の人数を計算しています…'
               : simulation
-                ? `予約中${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人へ、条件を満たした時点から順に配信します。`
+                ? `予約中${formatNumber(simulation.audience.newStartPlanned)}人へ、条件を満たした時点から順に配信します。`
                 : '条件を満たした友だちから順に配信します。'}
           </p>
           <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
@@ -2047,7 +2049,7 @@ export default function ScenarioDetailClient({
                 disabled={saving}
  className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
               >
-                {saving ? '保存中...' : '保存'}
+                {saving ? '保存中...' : '保存する'}
               </button>
               <button
                 onClick={() => {
@@ -2157,7 +2159,7 @@ export default function ScenarioDetailClient({
                     {simulationRefreshing
                       ? '予約中の人数を計算しています…'
                       : simulation
-                        ? `予約中 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人`
+                        ? `予約中 ${formatNumber(simulation.audience.newStartPlanned)}人`
                         : triggerCount === 0
                           ? 'アクションなどから開始できます'
                           : '押すと足せます'}
@@ -2218,14 +2220,14 @@ export default function ScenarioDetailClient({
           <div>
             <p className="text-ink-faint text-xs">購読中</p>
             <p className="text-ink text-xl font-bold tabular-nums">
-              {stats.activeNow.toLocaleString('ja-JP')}
+              {formatNumber(stats.activeNow)}
               <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
             </p>
           </div>
           <div className="border-hairline border-l pl-8">
             <p className="text-ink-faint text-xs">読了済</p>
             <p className="text-ink text-xl font-bold tabular-nums">
-              {stats.completed.toLocaleString('ja-JP')}
+              {formatNumber(stats.completed)}
               <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
             </p>
           </div>
@@ -2241,7 +2243,7 @@ export default function ScenarioDetailClient({
           </div>
           {biggestDrop && (
             <p className="text-warning ml-auto text-xs">
-              ↘ {biggestDrop.fromOrder}通目で {biggestDrop.lost.toLocaleString('ja-JP')}人（
+              ↘ {biggestDrop.fromOrder}通目で {formatNumber(biggestDrop.lost)}人（
               {Math.round(biggestDrop.rate * 100)}%）が離脱しています
             </p>
           )}
@@ -2258,7 +2260,7 @@ export default function ScenarioDetailClient({
               onClick={openAddStep}
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
-              ＋ メッセージを追加
+              ＋ メッセージを追加する
             </button>
             {/* テンプレートは受け口がある（scenario_steps.template_id）。
                 最初からテンプレートを選ぶ状態でフォームを開く。 */}
@@ -2266,7 +2268,7 @@ export default function ScenarioDetailClient({
               onClick={openAddTemplateStep}
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
-              テンプレートを追加
+              テンプレートを追加する
             </button>
             {/* 質問メッセージ。選択肢ごとにタグ・友だち情報・シナリオを動かせる。
                 押されたことは postback で戻ってくる（sq:<stepId>:<index>）。 */}
@@ -2275,7 +2277,7 @@ export default function ScenarioDetailClient({
               title="質問メッセージを足します。選択肢ごとにタグ・友だち情報・シナリオを動かせます"
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
-              分岐を追加
+              分岐を追加する
             </button>
           </div>
         </div>
@@ -2440,9 +2442,9 @@ export default function ScenarioDetailClient({
                           {stat ? (
                             <span className="inline-flex items-center gap-2">
                               {reachBarWidth === null ? null : (
-                                <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                                <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-pill">
                                   <span
-                                    className="bg-ink-faint block h-full rounded-full"
+                                    className="bg-ink-faint block h-full rounded-pill"
                                     style={{ width: reachBarWidth }}
                                   />
                                 </span>
@@ -2506,7 +2508,7 @@ export default function ScenarioDetailClient({
                                 /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
                                 { id: 'action', label: `アクション${actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}`, onSelect: () => setActionTarget({ hook: 'step_sent', stepId: step.id, choiceIndex: null, title: `${step.stepOrder}通目を送ったあと` }) },
                                 { id: 'duplicate', label: duplicatingStepId === step.id ? '複製中…' : '複製', disabled: duplicatingStepId === step.id, disabledReason: 'この通を複製しています', onSelect: () => { void handleDuplicateStep(step) } },
-                                { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteStepError(''); setDeleteStepTarget(step) } },
+                                { id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteStepError(''); setDeleteStepTarget(step) } },
                               ]}
                             />
                           </span>
@@ -2582,7 +2584,7 @@ export default function ScenarioDetailClient({
               }}
               className="text-danger font-medium hover:underline"
             >
-              作りかけのコピーを削除
+              作りかけのコピーを削除する
             </button>
           </div>
         </div>
@@ -2631,7 +2633,7 @@ export default function ScenarioDetailClient({
           }}
           className="text-danger hover:underline text-sm font-medium"
         >
-          このシナリオを削除
+          このシナリオを削除する
         </button>
       </div>
       </>
@@ -2649,7 +2651,7 @@ export default function ScenarioDetailClient({
         description={deleteStepTarget
           ? `${deleteStepTarget.stepOrder}通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
           : ''}
-        confirmLabel="この通を削除"
+        confirmLabel="この通を削除する"
         destructive
         busy={deletingStepId !== null}
         error={deleteStepError}
@@ -2669,12 +2671,12 @@ export default function ScenarioDetailClient({
             ? '購読中の人数は確認できません。'
             : stats.activeNow === 0
               ? '現在購読中の友だちは0人です。'
-              : `現在${stats.activeNow.toLocaleString('ja-JP')}人が購読中です。途中の人は続きを受け取れません。`,
+              : `現在${formatNumber(stats.activeNow)}人が購読中です。途中の人は続きを受け取れません。`,
           'シナリオの設定と今後の配信が削除されます。',
           'これまでの配信履歴は監査記録として残ります。',
           'この操作は取り消せません。',
         ].join(' ')}
-        confirmLabel="このシナリオを削除"
+        confirmLabel="このシナリオを削除する"
         destructive
         busy={deletingScenario}
         error={deleteScenarioError}
@@ -2696,7 +2698,7 @@ export default function ScenarioDetailClient({
         open={discardDuplicateOpen && duplicateRemainder !== null}
         title={duplicateRemainder ? `作りかけのコピー「${duplicateRemainder.copyName}」を削除しますか？` : ''}
         description={`複製が「${duplicateRemainder?.stage ?? ''}」の途中で止まったため、内容が欠けた状態で残っています。削除しても元のシナリオは変わりません。この操作は取り消せません。`}
-        confirmLabel="作りかけのコピーを削除"
+        confirmLabel="作りかけのコピーを削除する"
         destructive
         busy={discardingDuplicate}
         error={discardDuplicateError}

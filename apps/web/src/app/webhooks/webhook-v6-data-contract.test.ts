@@ -18,7 +18,7 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
   })
 
   it('送信回数・失敗・再送可否を画面へ反映する', () => {
-    expect(OVERVIEWS).toContain('item.deliverySummary.total.toLocaleString')
+    expect(OVERVIEWS).toContain('formatNumber(item.deliverySummary.total)')
     expect(OVERVIEWS).toContain('item.deliverySummary.failed > 0')
     expect(OVERVIEWS).toContain('item.deliverySummary.canRetry')
     expect(OVERVIEWS).toContain("item.deliverySummary.lastResult?.status === 'pending'")

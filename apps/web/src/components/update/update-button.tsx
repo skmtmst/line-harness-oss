@@ -37,7 +37,7 @@ export function UpdateButton({ targetVersion }: { targetVersion: string }) {
         type="button"
         onClick={() => { setError(''); void onClick() }}
         disabled={loading}
-        className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+        className="text-sm px-3 py-1 rounded-mini bg-action text-on-accent hover:bg-action-hover disabled:opacity-50"
       >
         {loading ? '開始中...' : `v${targetVersion} にアップデート`}
       </button>

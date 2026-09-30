@@ -16,18 +16,19 @@ import {
   type AffiliateArchiveImpact,
   type AffiliateSettlementPreview,
 } from '@/lib/api'
+import { formatDay, formatNumber } from '@/lib/format'
 
 type LoadPhase = 'loading' | 'ready' | 'empty' | 'error'
 
 function yen(value: number): string {
-  return `¥${Math.round(value).toLocaleString('ja-JP')}`
+  return `¥${formatNumber(Math.round(value))}`
 }
 
 function dateLabel(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })
+  return formatDay(date)
 }
 
 export function AffiliateArchiveDialog({
@@ -113,9 +114,8 @@ export function AffiliateArchiveDialog({
               type="button"
               variant="primary"
               disabled={busy || phase !== 'ready' || archiveDisabled}
-              onClick={() => { void apply() }}
-            >
-              {busy ? '処理中…' : choice === 'pause' ? '紹介を止める' : 'アーカイブする'}
+              onClick={() => { void apply() }} busy={busy} busyLabel="処理中…">
+              {choice === 'pause' ? '紹介を止める' : 'アーカイブする'}
             </Button>
           )}
         </div>
@@ -140,9 +140,9 @@ export function AffiliateArchiveDialog({
               紹介者で絞ったもの、リンクはこの紹介者の内訳（リンク一覧）を開く。
             */}
             <dl className="mt-2 divide-y divide-danger/20 text-sm">
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{impact.activeLinks.toLocaleString('ja-JP')}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=affiliates&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.activeLinks)}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=affiliates&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
               <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-semibold">{yen(impact.unsettledReward)}</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions?tab=payment">ここを開く</a></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{impact.pendingConversions.toLocaleString('ja-JP')}件</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.pendingConversions)}件</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
             </dl>
             <p className="text-danger mt-2 text-xs leading-5">
               紹介リンクは開けなくなります。過去の成果・報酬・支払いの記録は消えません。
@@ -292,10 +292,10 @@ export function AffiliatePaymentConfirmDialog({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="GqFTV">
-      <section ref={panelRef} className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 800 }} role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
+      <section ref={panelRef} className="flex w-full flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay" style={{ maxWidth: 800 }} role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
         <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true"><Landmark size={20} /></span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-warning-bg text-warning" aria-hidden="true"><Landmark size={20} /></span>
             <div>
               <h2 id="affiliate-payment-title" className="text-lead font-bold text-ink">{title}</h2>
               <p className="mt-0.5 text-xs text-ink-faint">確定すると金額が固定され、振込用のデータに入ります。</p>
@@ -325,7 +325,7 @@ export function AffiliatePaymentConfirmDialog({
         <div className="space-y-3">
           <dl className="grid grid-cols-2 gap-3 rounded-control bg-canvas-sunken p-4 sm:grid-cols-4">
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">確定する額</dt><dd className="text-ink mt-1 text-lg font-medium">{yen(preview.amount)}</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果の件数</dt><dd className="text-ink mt-1 text-lg font-medium">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果の件数</dt><dd className="text-ink mt-1 text-lg font-medium">{formatNumber(preview.conversionCount)}件</dd></div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 text-lg font-medium">{dateLabel(periodTo ?? preview.closeDate)}</dd></div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">支払日</dt><dd className="mt-1 text-lg font-medium text-success">{dateLabel(preview.paymentDate)}</dd></div>
           </dl>
@@ -335,7 +335,7 @@ export function AffiliatePaymentConfirmDialog({
               <thead><TableHeadRow><Th>案件</Th><Th align="right">認めた</Th><Th align="right">1件の報酬</Th><Th align="right">小計</Th></TableHeadRow></thead>
               <tbody className="divide-hairline divide-y">
                 {preview.breakdown.map((line) => (
-                  <tr key={line.offerName}><td className="text-ink px-3 py-2 font-medium">{line.offerName}</td><td className="text-ink-secondary px-3 py-2 text-right">{line.conversions.toLocaleString('ja-JP')}件</td><td className="text-ink-secondary px-3 py-2 text-right">{line.unitReward == null ? '—' : yen(line.unitReward)}</td><td className="text-ink px-3 py-2 text-right font-semibold">{yen(line.subtotal)}</td></tr>
+                  <tr key={line.offerName}><td className="text-ink px-3 py-2 font-medium">{line.offerName}</td><td className="text-ink-secondary px-3 py-2 text-right">{formatNumber(line.conversions)}件</td><td className="text-ink-secondary px-3 py-2 text-right">{line.unitReward == null ? '—' : yen(line.unitReward)}</td><td className="text-ink px-3 py-2 text-right font-semibold">{yen(line.subtotal)}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -402,10 +402,10 @@ export function AffiliatePaymentConfirmDialog({
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
           <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
           <div className="flex shrink-0 items-center gap-2">
-            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />やめる</Button>
+            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />キャンセル</Button>
             {phase === 'ready' && preview ? (
-              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5">
-                <Check size={15} />{busy ? '処理中…' : `${yen(preview.amount)} で確定する`}
+              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
+                <Check size={15} />{`${yen(preview.amount)} で確定する`}
               </Button>
             ) : null}
           </div>

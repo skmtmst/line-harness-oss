@@ -14,7 +14,7 @@ const noop = () => {}
 
 function StateCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-hairline bg-canvas p-5" style={{ width: 420 }}>
+    <div className="rounded-card border border-hairline bg-canvas p-5" style={{ width: 420 }}>
       {children}
     </div>
   )

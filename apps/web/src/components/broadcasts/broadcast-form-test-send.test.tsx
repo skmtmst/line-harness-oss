@@ -126,7 +126,7 @@ function dialog(): HTMLElement {
 async function openTestDialog() {
   await renderForm()
   await fillMinimum()
-  const button = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テスト送信')
+  const button = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テストを送る')
   expect(button).toBeDefined()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -135,7 +135,7 @@ async function openTestDialog() {
 }
 
 async function confirmTestSend() {
-  const button = [...dialog().querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テスト送信する')
+  const button = [...dialog().querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テストを送る')
   expect(button).toBeDefined()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))

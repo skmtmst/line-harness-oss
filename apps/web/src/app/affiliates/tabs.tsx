@@ -71,6 +71,7 @@ import {
   type OfferFilter,
   type OfferSort,
 } from './offer-list-view'
+import { formatDay, formatNumber } from '@/lib/format'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -158,7 +159,7 @@ interface ReportV2 {
 
   **`as unknown as ReportV2` は嘘をつく。** 集計は期間で絞れるので、
   その期間に成果が1件も無い紹介者は**行そのものが返らない**。
-  一覧には載っているので押せてしまい、`report.clicks.toLocaleString()` で
+  一覧には載っているので押せてしまい、`formatNumber(report.clicks)` で
   **内訳の面ごと落ちていた。**（`Cannot read properties of undefined`）
 
   0件と「この期間に記録が無い」を混ぜないため、読めないときは `null` にして
@@ -197,11 +198,11 @@ function formatDate(iso: string | null): string {
   if (!iso) return '—'
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  return formatDay(date)
 }
 
 function formatYen(n: number): string {
-  return `¥${Math.round(n).toLocaleString('ja-JP')}`
+  return `¥${formatNumber(Math.round(n))}`
 }
 
 /*
@@ -754,7 +755,7 @@ export function AffiliatorsTab({
             <div key={label} className="bg-canvas-sunken rounded-control px-3 py-2">
               <p className="text-ink-faint text-xs">{label}</p>
               <p className="text-ink mt-1 text-lg font-semibold tabular-nums">
-                {value === null ? '—' : `${value.toLocaleString('ja-JP')}件`}
+                {value === null ? '—' : `${formatNumber(value)}件`}
               </p>
             </div>
           ))}
@@ -908,13 +909,13 @@ export function AffiliatorsTab({
                         <span className="mt-1 block"><Chip tone={row.isActive ? 'ok' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</Chip></span>
                       </td>
                       <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                        {row.linkCount.toLocaleString()}本
+                        {formatNumber(row.linkCount)}本
                       </td>
                       <td className="text-action px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                        {row.friendAdds.toLocaleString()}人
+                        {formatNumber(row.friendAdds)}人
                       </td>
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                        {row.totalConversions.toLocaleString()}件
+                        {formatNumber(row.totalConversions)}件
                       </td>
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {formatYen(row.rewardAmount)}
@@ -984,7 +985,7 @@ export function AffiliatorsTab({
                                 ) : settlement ? (
                                   <dl className="mt-4 grid gap-3 sm:grid-cols-4">
                                     <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">今回の金額</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatYen(settlement.amount)}</dd></div>
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 font-medium tabular-nums">{settlement.conversionCount.toLocaleString('ja-JP')}件</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(settlement.conversionCount)}件</dd></div>
                                     <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 font-medium">{formatDate(accountSettlement?.periodTo ?? null)}</dd></div>
                                     <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">振込先</dt><dd className={`mt-1 font-medium ${settlement.bankProfileRegistered ? 'text-success' : 'text-warning'}`}>{settlement.bankProfileRegistered ? '登録済み' : '未登録'}</dd><p className="text-ink-faint mt-1 text-xs">口座番号は本人だけに表示</p></div>
                                   </dl>
@@ -1016,23 +1017,23 @@ export function AffiliatorsTab({
                               {/* v2 summary cards */}
                               {report && (
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">{CLICK_SUMMARY_LABEL}</p>
-                                    <p className="text-2xl font-bold text-ink mt-1">{report.clicks.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-ink mt-1">{formatNumber(report.clicks)}</p>
                                   </div>
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">友だち追加</p>
-                                    <p className="text-2xl font-bold text-status-info mt-1">{report.friendAdds.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-status-info mt-1">{formatNumber(report.friendAdds)}</p>
                                   </div>
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">CV 件数（却下除く）</p>
-                                    <p className="text-2xl font-bold text-ink mt-1">{report.conversions.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-ink mt-1">{formatNumber(report.conversions)}</p>
                                   </div>
-                                  <div className="bg-success-bg rounded-lg p-4 border border-hairline">
+                                  <div className="bg-success-bg rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">確定報酬</p>
                                     <p className="text-2xl font-bold text-success mt-1">{formatYen(report.confirmedReward)}</p>
                                     <p className="text-[11px] text-ink-secondary mt-1">
-                                      承認済み {report.conversionsApproved.toLocaleString()}件 / 審査中 {report.conversionsPending.toLocaleString()}件 / 却下 {report.conversionsRejected.toLocaleString()}件
+                                      承認済み {formatNumber(report.conversionsApproved)}件 / 審査中 {formatNumber(report.conversionsPending)}件 / 却下 {formatNumber(report.conversionsRejected)}件
                                     </p>
                                   </div>
                                 </div>
@@ -1058,8 +1059,8 @@ export function AffiliatorsTab({
                                           <tr key={o.offerId}>
                                             <td className="py-1 pr-4 text-ink">{o.offerName}</td>
                                             <td className="py-1 pr-4 text-right text-ink-secondary">{formatYen(o.rewardAmount)}</td>
-                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{o.conversionsApproved.toLocaleString()}</td>
-                                            <td className="py-1 pr-4 text-right text-ink-secondary">{o.conversionsPending.toLocaleString()}</td>
+                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{formatNumber(o.conversionsApproved)}</td>
+                                            <td className="py-1 pr-4 text-right text-ink-secondary">{formatNumber(o.conversionsPending)}</td>
                                             <td className="py-1 text-right font-semibold text-success">{formatYen(o.confirmedReward)}</td>
                                           </tr>
                                         ))}
@@ -1072,14 +1073,14 @@ export function AffiliatorsTab({
                               {/* Duplicate flags */}
                               {report && report.duplicateFlags.length > 0 && (
                                 <div>
-                                  <p className="text-xs font-semibold text-amber-700 uppercase mb-2">
+                                  <p className="text-xs font-semibold text-warning uppercase mb-2">
                                     {duplicateFlagHeading(report.duplicateFlags.length)}
                                   </p>
                                   <div className="flex flex-wrap gap-2">
                                     {report.duplicateFlags.map((f) => (
                                       <span
                                         key={f.friendId}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800"
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-status-warn-soft border border-status-warn rounded-mini text-xs text-status-warn-deep"
                                       >
                                         ⚠ {duplicateFriendNameText(f.friendId, journeys)}
                                       </span>
@@ -1162,12 +1163,12 @@ export function AffiliatorsTab({
                                             <td className="py-1 pr-4 text-ink-secondary">{link.label ?? '—'}</td>
                                             <td className="py-1 pr-4">
                                               {link.offer_name ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-status-info-soft text-status-info">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium bg-status-info-soft text-status-info">
                                                   {link.offer_name}
                                                 </span>
                                               ) : <span className="text-ink-faint">—</span>}
                                             </td>
-                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{link.click_count.toLocaleString()}</td>
+                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{formatNumber(link.click_count)}</td>
                                             <td className="py-1">
                                               {link.is_active
                                                 /* #670 22: green-600 は白地で 3.3:1 しかなく AA 未満。共通トークンの濃い緑へ。 */
@@ -1219,7 +1220,7 @@ export function AffiliatorsTab({
                                           {journeys.map((j) => {
                                             const isDup = report?.duplicateFlags.some((f) => f.friendId === j.friendId)
                                             return (
-                                              <tr key={j.friendId} className={isDup ? 'bg-amber-50' : ''}>
+                                              <tr key={j.friendId} className={isDup ? 'bg-status-warn-soft' : ''}>
                                                 <td className={`py-1 pr-4 ${j.displayName ? 'text-ink' : 'text-ink-faint italic'}`}>
                                                   {isDup && <span className="mr-1">⚠</span>}
                                                   {personNameText(j.displayName)}
@@ -1243,7 +1244,7 @@ export function AffiliatorsTab({
                                       <button
                                         onClick={() => { void loadMoreJourneys(row.id, detailGenRef.current) }}
                                         disabled={journeyLoadingMore}
-                                        className="mt-3 px-4 py-2 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50 rounded-md border border-blue-200"
+                                        className="mt-3 px-4 py-2 text-sm text-action hover:bg-status-info-soft disabled:opacity-50 rounded-mini border border-status-info-soft"
                                       >
                                         {journeyLoadingMore ? '読み込み中...' : 'さらに読み込む'}
                                       </button>
@@ -1432,9 +1433,7 @@ export function CreateAffiliateModal({
           <Button
             variant="primary"
             onClick={() => { void handleSubmit() }}
-            disabled={submitting || !selected}
-          >
-            {submitting ? '作成中...' : '作成'}
+            disabled={submitting || !selected} busy={submitting} busyLabel="作成中...">作る
           </Button>
         </div>
       )}
@@ -1491,7 +1490,7 @@ export function CreateAffiliateModal({
                     onClose={() => setSuggestDismissed(true)}
                   >
                     <div
-                      className="max-h-56 overflow-y-auto rounded-control border border-hairline bg-canvas shadow-lg"
+                      className="max-h-56 overflow-y-auto rounded-control border border-hairline bg-canvas shadow-float"
                       // 最上層では absolute 指定を無効にする（位置は器が決める）。
                       style={{ position: 'static', width: '100%' }}
                     >
@@ -1568,18 +1567,12 @@ export function CreateAffiliateModal({
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDay(iso)
 }
 
 function formatYenNullable(n: number | null): string {
   if (n === null) return '—'
-  return `¥${Math.round(n).toLocaleString('ja-JP')}`
+  return `¥${formatNumber(Math.round(n))}`
 }
 
 // ── Offer form modal ─────────────────────────────────────────────────────────
@@ -2569,7 +2562,7 @@ export function ApprovalQueue({
                 <div className="flex gap-2">
                   <dt className="text-ink-faint shrink-0">確定した報酬</dt>
                   <dd className="text-ink-secondary">
-                    {detailItem.rewardAmount != null ? `¥${Math.round(detailItem.rewardAmount).toLocaleString('ja-JP')}` : '未確定'}
+                    {detailItem.rewardAmount != null ? `¥${formatNumber(Math.round(detailItem.rewardAmount))}` : '未確定'}
                   </dd>
                 </div>
                 <div className="flex gap-2">
@@ -2767,7 +2760,7 @@ function OffersList({
               </td>
               <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                 {formatYenNullable(offer.rewardAmount)}
-                {offer.rewardMiles > 0 && <span className="text-ink-faint block text-xs">＋{offer.rewardMiles.toLocaleString()}マイル</span>}
+                {offer.rewardMiles > 0 && <span className="text-ink-faint block text-xs">＋{formatNumber(offer.rewardMiles)}マイル</span>}
               </td>
               <td className="text-ink-secondary px-4 py-3 text-sm">
                 {offer.tagId ? (
@@ -2775,16 +2768,16 @@ function OffersList({
                 ) : offer.scenarioId ? (
                   <>シナリオ「{scenarioMap.get(offer.scenarioId) ?? '名前を確認できません'}」を始める</>
                 ) : offer.rewardMiles > 0 ? (
-                  <>{offer.rewardMiles.toLocaleString()}マイルを付ける</>
+                  <>{formatNumber(offer.rewardMiles)}マイルを付ける</>
                 ) : (
                   <span className="text-warning">何も設定されていません</span>
                 )}
               </td>
               <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
-                {(offerStats.get(offer.id)?.introducers ?? 0).toLocaleString()}人
+                {formatNumber((offerStats.get(offer.id)?.introducers ?? 0))}人
               </td>
               <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                {(offerStats.get(offer.id)?.conversions ?? 0).toLocaleString()}件
+                {formatNumber((offerStats.get(offer.id)?.conversions ?? 0))}件
                 <span className="text-ink-faint block text-xs">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
               </td>
               <td className="px-4 py-3 text-right whitespace-nowrap">
@@ -3154,13 +3147,13 @@ function SettlementEditor({
   }
 
   return (
-    <div className="rounded-lg border border-gray-100 bg-white p-4">
-      <p className="mb-3 text-xs font-semibold uppercase text-gray-500">支払いの取り決め</p>
+    <div className="rounded-control border border-divider-soft bg-canvas p-4">
+      <p className="mb-3 text-xs font-semibold uppercase text-ink-faint">支払いの取り決め</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
           <label
             htmlFor={`aff-email-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             連絡先
           </label>
@@ -3173,13 +3166,13 @@ function SettlementEditor({
               setSaved(false)
             }}
             placeholder="partner@example.com"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
           />
         </div>
         <div>
           <label
             htmlFor={`aff-hold-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             確定までの保留
           </label>
@@ -3195,15 +3188,15 @@ function SettlementEditor({
                 setSaved(false)
               }}
               placeholder="なし"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-action"
             />
-            <span className="whitespace-nowrap text-xs text-gray-400">日</span>
+            <span className="whitespace-nowrap text-xs text-ink-faint">日</span>
           </div>
         </div>
         <div>
           <label
             htmlFor={`aff-cycle-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             支払いサイクル
           </label>
@@ -3217,7 +3210,7 @@ function SettlementEditor({
             }}
             placeholder="例: 月末締め翌月末払い"
             maxLength={100}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
           />
         </div>
       </div>
@@ -3229,17 +3222,17 @@ function SettlementEditor({
         }}
         className="mt-3"
       >成果が出たときに本人へ知らせる</Checkbox>
-      <p className="mt-2 text-[11px] text-gray-400">
+      <p className="mt-2 text-[11px] text-ink-faint">
         保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。
       </p>
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex items-center gap-2">
         <button
           onClick={save}
           disabled={saving}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          className="rounded-mini border border-hairline px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-surface-pearl disabled:opacity-40"
         >
-          {saving ? '保存中...' : '取り決めを保存'}
+          {saving ? '保存中...' : '取り決めを保存する'}
         </button>
         {/* #670 22: emerald-600 は白地で 3.8:1 しかなく AA 未満。共通トークンの濃い緑へ。 */}
         {saved && <span className="text-xs font-semibold text-success">保存しました</span>}

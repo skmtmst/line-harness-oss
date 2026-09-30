@@ -106,7 +106,7 @@ export default function FolderPanel({
   total,
   heading = 'フォルダ',
   onAddFolder,
-  addFolderLabel = 'フォルダを追加',
+  addFolderLabel = 'フォルダを追加する',
   addFolderDisabled = false,
   addFolderTitle,
   addFolderNote,
