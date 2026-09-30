@@ -478,12 +478,9 @@ function FirstStepContent() {
           <span className="mx-1.5">/</span>
           <span>1通目を設定</span>
         </nav>
-        <Link
-          href="/scenarios"
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-        >
+        <Button variant="secondary" className="text-ink-secondary items-center px-3 py-2 font-medium h-auto whitespace-normal" href="/scenarios">
           ✕ キャンセル
-        </Link>
+        </Button>
       </div>
 
       {/*
@@ -858,14 +855,9 @@ function FirstStepContent() {
             >
               1通目はあとで書く
             </button>
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={saving || bodyOverLimit || loadState !== 'ready'}
-              className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
-            >
+            <Button variant="primary" className="px-5 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void submit()} disabled={saving || bodyOverLimit || loadState !== 'ready'}>
               {saving ? '保存中…' : '作って編集へ →'}
-            </button>
+            </Button>
           </>
         )}
       />
