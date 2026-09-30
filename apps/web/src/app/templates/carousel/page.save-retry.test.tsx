@@ -153,7 +153,7 @@ function byText(tag: string, text: string): HTMLElement | null {
   return all(tag).find((element) => element.textContent?.trim() === text) ?? null
 }
 
-const saveButton = () => byText('button', '保存')
+const saveButton = () => byText('button', '保存する')
 const retryButton = () => byText('button', 'もう一度保存する')
 const nameInput = () => document.getElementById('cr-name') as HTMLInputElement | null
 const screenText = () => container.textContent ?? ''

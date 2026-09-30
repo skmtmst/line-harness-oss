@@ -16,8 +16,9 @@ import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { mileStatusLabel, text } from './photo-text'
+import { formatNumber } from '@/lib/format'
 
-const views = (value: unknown) => value == null ? '—（未取得）' : `${Number(value).toLocaleString('ja-JP')}回`
+const views = (value: unknown) => value == null ? '—（未取得）' : `${formatNumber(Number(value))}回`
 const PLACEMENT_CHOICES = [
   { type: 'rich_menu', label: 'リッチメニュー' },
   { type: 'column', label: 'NENコラム' },
@@ -262,8 +263,8 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
     open
     title={`${text(editing.pet_name) || 'この写真'}を使う場所`}
     description="選んだ場所へ公開用画像を出します。原本は公開しません。"
-    confirmLabel="使う場所を保存"
-    cancelLabel="戻る"
+    confirmLabel="使う場所を保存する"
+    cancelLabel="キャンセル"
     busy={busyId === editing.id}
     onCancel={() => setEditing(null)}
     onConfirm={() => void savePlacements()}

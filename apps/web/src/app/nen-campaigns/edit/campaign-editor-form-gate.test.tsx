@@ -107,7 +107,7 @@ async function mount() {
 
 function saveButton(): HTMLButtonElement {
   const found = Array.from(container.querySelectorAll('button')).find(
-    (element) => element.textContent === '配信内容を保存',
+    (element) => element.textContent === '配信内容を保存する',
   )
   if (!found) throw new Error('保存ボタンが見つかりません')
   return found as HTMLButtonElement

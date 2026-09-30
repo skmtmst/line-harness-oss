@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type InboxStats } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { formatDurationMinutes } from '@/lib/format-duration'
+import { formatNumber } from '@/lib/format'
 
 function formatWait(minutes: number | null): string {
   if (!minutes || minutes < 1) return '待ちはありません'
@@ -40,7 +41,7 @@ export default function InboxKpis() {
    */
   const skeleton = <span className="bg-canvas-sunken inline-block h-5 w-12 animate-pulse rounded-mini align-middle" aria-hidden="true" />
   const value = (number: number | undefined) =>
-    loading ? skeleton : number === undefined ? '—' : `${number.toLocaleString('ja-JP')}件`
+    loading ? skeleton : number === undefined ? '—' : `${formatNumber(number)}件`
 
   return (
     <section

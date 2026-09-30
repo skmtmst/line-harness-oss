@@ -39,6 +39,7 @@ import {
   normalizeFeatureSettings,
   splitFeatureGroups,
 } from './feature-settings-view'
+import { formatDay, formatNumber } from '@/lib/format'
 
 function LockIcon() {
   return (
@@ -155,16 +156,16 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
   return (
     <span
       className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
-      title={`${category.label}：作成 ${created.toLocaleString('ja-JP')}、利用中 ${inUse.toLocaleString('ja-JP')}`}
+      title={`${category.label}：作成 ${formatNumber(created)}、利用中 ${formatNumber(inUse)}`}
     >
-      利用中 {inUse.toLocaleString('ja-JP')} / 作成 {created.toLocaleString('ja-JP')}
+      利用中 {formatNumber(inUse)} / 作成 {formatNumber(created)}
     </span>
   )
 }
 
 /** 最終利用の日付だけを短く出す。時刻はバッジに入らないのでタイトルへ残す。 */
 function shortUsageDate(value: string): string {
-  return value.slice(0, 10).replaceAll('-', '/')
+  return formatDay(value)
 }
 
 /**
@@ -222,7 +223,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
       </>
     )
   }
-  const count = activity.value.toLocaleString('ja-JP')
+  const count = formatNumber(activity.value)
   if (activityBasis === 'current') {
     return (
       <span
@@ -925,7 +926,7 @@ export default function SettingsPage() {
   }
 
   const impactSummary = (group: FeatureImpactGroup) => group.items
-    .map((item) => `${item.targetType} ${item.count.toLocaleString('ja-JP')}件`)
+    .map((item) => `${item.targetType} ${formatNumber(item.count)}件`)
     .join('、')
 
   return (
@@ -957,7 +958,7 @@ export default function SettingsPage() {
             disabled={loading || saving || loadFailed || !dirty}
             title={!dirty && !loading ? '変更すると取り消せます' : undefined}
           >
-            変更を取り消す
+            キャンセル
           </Button>
           <Button
             variant="secondary"
@@ -975,7 +976,7 @@ export default function SettingsPage() {
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {saving ? '保存中…' : '機能設定を保存'}
+            {saving ? '保存中…' : '機能設定を保存する'}
           </Button>
           {!loading && !loadFailed && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
           </>
@@ -1137,7 +1138,7 @@ export default function SettingsPage() {
         open={impactOpen}
         title="オフにする前に確認"
         description="止まる仕事があります。オフにしてもデータは削除されず、再度オンにすると再開できます。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。"
-        confirmLabel="確認して保存"
+        confirmLabel="確認して保存する"
         destructive
         busy={impactBusy || saving}
         error={impactError || undefined}

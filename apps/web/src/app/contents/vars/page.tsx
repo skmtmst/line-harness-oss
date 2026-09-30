@@ -45,6 +45,7 @@ import {
   type CommonVarOrder,
 } from './list-model'
 import VarsExportPanel from './export-panel'
+import { formatDay, formatNumber } from '@/lib/format'
 
 /**
  * 共通情報の一覧。
@@ -77,11 +78,7 @@ function formatListDate(value: string): string {
    */
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
+  return formatDay(date)
 }
 
 /*
@@ -732,7 +729,7 @@ function VarsPageInner() {
 
       {emptyInUseCount > 0 ? (
         <div className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm font-semibold" role="status">
-          中身が空のまま使われているものが {emptyInUseCount.toLocaleString('ja-JP')}件あります。差し込んだところが空欄のまま送られます。
+          中身が空のまま使われているものが {formatNumber(emptyInUseCount)}件あります。差し込んだところが空欄のまま送られます。
         </div>
       ) : null}
 
@@ -757,7 +754,7 @@ function VarsPageInner() {
           {addingFolder ? (
             folderForm
           ) : (
-            <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
+            <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加する</Button>
           )}
           {/*
             R37: 狭い幅では縦パネルが出ないため、選んでいるフォルダの
@@ -769,7 +766,7 @@ function VarsPageInner() {
                 フォルダ名を変える
               </Button>
               <Button type="button" onClick={() => { setFolderError(''); setDeletingFolder(selectedUserFolder) }}>
-                フォルダを削除
+                フォルダを削除する
               </Button>
             </div>
           ) : null}
@@ -1027,13 +1024,13 @@ function VarsPageInner() {
                               ? '使われている場所（未取得）'
                               : item.usageCount === 0
                                 ? '使われていません'
-                                : `${item.usageCount.toLocaleString('ja-JP')}か所で使われています`}
+                                : `${formatNumber(item.usageCount)}か所で使われています`}
                           >
                             {item.usageCount === undefined
                               ? '—（未取得）'
                               : item.usageCount === 0
                                 ? '使われていません'
-                                : `${item.usageCount.toLocaleString('ja-JP')}か所`}
+                                : `${formatNumber(item.usageCount)}か所`}
                           </td>
                           {/* 更新日と次の変更が長いと切れるため、セル全体に
                               全文が読める title を付ける（第5パス D-3）。 */}
@@ -1077,7 +1074,7 @@ function VarsPageInner() {
                                 data-qa-open="yPkWe"
                                 aria-label={`${item.name}を削除`}
                               >
-                                削除
+                                削除する
                               </Button>
                             </span>
                           </td>
@@ -1143,7 +1140,7 @@ function VarsPageInner() {
                   onClick={() => void confirmReplacement()}
                   disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()}
                 >
-                  {singleBusy ? '差し替え中…' : '差し替えて削除'}
+                  {singleBusy ? '差し替え中…' : '差し替えて削除する'}
                 </Button>
               ) : null}
               {singleImpact && !singleImpact.canDelete ? (
@@ -1152,7 +1149,7 @@ function VarsPageInner() {
                   disabled
                   title="使用中の共通情報は削除できません"
                 >
-                  このまま削除
+                  このまま削除する
                 </Button>
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
@@ -1187,7 +1184,7 @@ function VarsPageInner() {
                   <div className="border-accent bg-accent-soft rounded-control border p-3">
                     <p className="text-ink text-sm font-bold">別の共通情報に差し替えてから削除する（おすすめ）</p>
                     <p className="text-ink-secondary mt-1 text-xs leading-5">
-                      {singleImpact.blockingTotal.toLocaleString('ja-JP')}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
+                      {formatNumber(singleImpact.blockingTotal)}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                     </p>
                     <label className="text-ink-secondary mt-2 block text-xs font-semibold">
                       差し替え先
@@ -1212,8 +1209,8 @@ function VarsPageInner() {
                     ) : replacementImpact ? (
                       <p className={replacementImpact.canReplace ? 'text-success mt-2 text-xs font-semibold' : 'text-danger mt-2 text-xs font-semibold'}>
                         {replacementImpact.canReplace
-                          ? `${replacementImpact.replaceableTotal.toLocaleString('ja-JP')}か所を差し替え、元の共通情報を保管できます。`
-                          : `${replacementImpact.blockedTotal.toLocaleString('ja-JP')}か所は自動で差し替えられません。先に個別に確認してください。`}
+                          ? `${formatNumber(replacementImpact.replaceableTotal)}か所を差し替え、元の共通情報を保管できます。`
+                          : `${formatNumber(replacementImpact.blockedTotal)}か所は自動で差し替えられません。先に個別に確認してください。`}
                       </p>
                     ) : null}
                   </div>
@@ -1222,7 +1219,7 @@ function VarsPageInner() {
                     <p className="text-ink-secondary mt-1 text-xs leading-5">
                       {singleImpact.canDelete
                         ? '使われている場所が無いことを確認してから削除します。'
-                        : `${singleImpact.blockingTotal.toLocaleString('ja-JP')}か所が空欄になるため、先に使用先を直してください。`}
+                        : `${formatNumber(singleImpact.blockingTotal)}か所が空欄になるため、先に使用先を直してください。`}
                     </p>
                   </div>
                 </div>

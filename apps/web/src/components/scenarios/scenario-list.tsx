@@ -13,6 +13,7 @@ import ListState from '@/components/shared/list-state'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { formatNumber } from '@/lib/format'
 
 type ScenarioRow = Scenario & {
   stepCount?: number
@@ -324,7 +325,7 @@ export default function ScenarioList({
           {/* R250: 終了後の移動先にされていると、削除で参照元の設定が変わる。件数が取れたときだけ出す。 */}
           <MoveReferrersNotice scenarioId={deleteTarget.id} />
           <p>
-            購読中 {(deleteTarget.subscriberCount ?? 0).toLocaleString('ja-JP')}人 ／ 通数{' '}
+            購読中 {formatNumber((deleteTarget.subscriberCount ?? 0))}人 ／ 通数{' '}
             {deleteTarget.stepCount === undefined
               ? '— 読み込めませんでした'
               : `${deleteTarget.stepCount}通`}
@@ -612,14 +613,14 @@ export default function ScenarioList({
                 */}
                 <td
                   className="px-4 py-3 whitespace-nowrap"
-                  title={`購読 ${s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}人 ／ 読了 ${(s.completedCount ?? 0).toLocaleString('ja-JP')}人`}
+                  title={`購読 ${s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)}人 ／ 読了 ${formatNumber((s.completedCount ?? 0))}人`}
                 >
                   <div className="text-ink text-sm tabular-nums">
-                    {s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}
+                    {s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)}
                     <span className="text-ink-faint ml-0.5 text-xs">人</span>
                   </div>
                   <div className="text-ink-faint text-xs tabular-nums">
-                    読了 {(s.completedCount ?? 0).toLocaleString('ja-JP')}人
+                    読了 {formatNumber((s.completedCount ?? 0))}人
                   </div>
                   {/*
                     0人のとき、作っただけでは配信されないことに気づけない。

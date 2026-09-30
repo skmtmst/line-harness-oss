@@ -695,7 +695,7 @@ function TemplateEditInner() {
             <>
               <Button href="/templates">キャンセル</Button>
               <Button type="button" variant="primary" onClick={save} disabled={saving || loadFailed || saveGuard !== null} title={saveGuard ?? undefined}>
-                {saving ? '保存中...' : '保存'}
+                {saving ? '保存中...' : '保存する'}
               </Button>
             </>
           )}

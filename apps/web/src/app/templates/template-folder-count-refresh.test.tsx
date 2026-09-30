@@ -124,7 +124,7 @@ describe('R195 フォルダ件数の読み直し', () => {
     // 行の「…」→「テンプレートを削除」→確認窓で「削除する」
     // （表とモバイルカードの両方にメニューがあるので先頭を押す）
     fireEvent.click(screen.getAllByRole('button', { name: '来店お礼のその他操作' })[0])
-    fireEvent.click((await screen.findAllByRole('menuitem', { name: 'テンプレートを削除' }))[0])
+    fireEvent.click((await screen.findAllByRole('menuitem', { name: 'テンプレートを削除する' }))[0])
     fireEvent.click(await screen.findByRole('button', { name: '削除する' }))
 
     await vi.waitFor(() => {

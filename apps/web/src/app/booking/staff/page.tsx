@@ -440,7 +440,7 @@ function Modal({
             disabled={saving}
             className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
           >
-            {saving ? '保存中…' : '保存'}
+            {saving ? '保存中…' : '保存する'}
           </button>
         </div>
       </div>

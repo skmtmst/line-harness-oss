@@ -54,6 +54,7 @@ import {
   markDashboardNotificationRead,
   type DashboardNotificationFilter,
 } from '@/components/dashboard/notification-summary'
+import { formatNumber, formatTime } from '@/lib/format'
 
 /** 共通トップバーの通知ベル。件数と一覧は選択中アカウントの通知センターから読む。 */
 function BellIcon() {
@@ -100,9 +101,7 @@ function monthKey(offset: number): string {
  * 時刻だけだと、深夜に見たとき「次回 09:00」が今日なのか明日なのか読めない。
  */
 function nextBookingLabel(iso: string, today: string): string {
-  const time = new Date(iso).toLocaleTimeString('ja-JP', {
-    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
-  })
+  const time = formatTime(iso)
   const day = jstDay(iso)
   if (day === today) return `次回 ${time}`
   if (day === jstDay(Date.now() + 86_400_000)) return `次回 明日 ${time}`
@@ -170,7 +169,7 @@ function TodayTaskCard({
             </>
           ) : (
             <>
-              {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
+              {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
             </>
           )}
         </p>
@@ -510,10 +509,10 @@ function SendQuotaCard({
               <span className="sr-only">{STATE_TEXT.loading}</span>
             </>
           ) : unlimited
-            ? `使用 ${used === null ? '—' : used.toLocaleString('ja-JP')}通（上限なし）`
+            ? `使用 ${used === null ? '—' : formatNumber(used)}通（上限なし）`
             : remaining === null || limit === null
               ? '—'
-              : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
+              : `残り ${formatNumber(remaining)} / 上限 ${formatNumber(limit)}通`}
         </span>
       </span>
     </p>
@@ -600,7 +599,7 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">LINE Webhook</dt><dd className={webhookLabel === '正常' ? 'text-success font-semibold' : webhookLabel === '要確認' ? 'text-danger font-semibold' : 'text-ink-faint'}>{webhookLabel}</dd></div>
       {/* 稼働チェックの取得に失敗したときは「確認中」ではなく「未取得」にする（IDEA-01）。 */}
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={healthFailed ? 'text-ink-faint' : risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{healthFailed ? '未取得' : risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
-      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-ink font-semibold tabular-nums">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-ink font-semibold tabular-nums">{activeFriends === null ? '—' : `${formatNumber(activeFriends)}人`}</dd></div>
     </dl>
   </Card>
 }

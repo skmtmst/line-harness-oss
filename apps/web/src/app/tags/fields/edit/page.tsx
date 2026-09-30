@@ -492,7 +492,7 @@ function EditFriendFieldForm() {
 
       <StickyBar
         status={locked ? '共通項目は編集できません' : saving ? '保存しています' : '変更内容を確認して保存してください'}
-        actions={<><Button href="/tags?tab=fields">キャンセル</Button><Button type="button" variant="primary" disabled={saving || locked} onClick={() => void save()}>{saving ? '保存中…' : '変更を保存'}</Button></>}
+        actions={<><Button href="/tags?tab=fields">キャンセル</Button><Button type="button" variant="primary" disabled={saving || locked} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button></>}
       />
       {/* R176 監査：名称・既定値などの書きかけがある間の離脱確認。 */}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="項目への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />

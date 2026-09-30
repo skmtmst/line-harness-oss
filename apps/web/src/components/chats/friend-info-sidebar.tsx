@@ -9,6 +9,7 @@ import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { GripVertical, X } from 'lucide-react'
+import { formatNumber } from '@/lib/format'
 
 interface FriendDetail {
   id: string
@@ -184,7 +185,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   /*
    * 「表示項目」パネルは、押したボタンの下へ開く(#982 LAY-03)。
    * 以前は `top:430px` 固定で、高さ700pxの画面では「初期状態に戻す」
-   * 「完了」が画面外へ出て届かなかった。
+   * 「閉じる」が画面外へ出て届かなかった。
    * 下に十分な空きがなければボタンの上へ開き、どちらにしても
    * 最大高さは 100dvh-32px（上下16px余白）までに収める。
    */
@@ -569,7 +570,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             {/*
               **全部隠すと右パネルが空になり、何を隠したのかも画面から読めない。**
               戻す道をここに置く。スクロール領域の外に固定して、低い画面でも
-              「初期状態に戻す」「完了」へ届くようにする(#982 LAY-03)。
+              「初期状態に戻す」「閉じる」へ届くようにする(#982 LAY-03)。
             */}
             <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-hairline px-4 py-3">
               {/* 設計 `Xi4x9` の2つは h36。共通ボタンと同値なので部品を使う。 */}
@@ -582,7 +583,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 初期状態に戻す
               </Button>
               <Button variant="primary" onClick={() => setShowSettings(false)}>
-                完了
+                閉じる
               </Button>
             </div>
           </div>
@@ -695,14 +696,14 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                     <div>
                       <p className="text-ink-faint text-[10px] font-semibold">{mileage.summary.programName}</p>
                       <p className="text-ink mt-0.5 text-xl font-bold tabular-nums">
-                        {mileage.summary.available.toLocaleString('ja-JP')}
+                        {formatNumber(mileage.summary.available)}
                         <span className="text-ink-faint ml-1 text-[11px] font-semibold">mile</span>
                       </p>
                       <p className="text-ink-faint text-[10px]">利用可能</p>
                     </div>
                     {mileage.summary.pending > 0 && (
                       <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-1 text-[10px] font-medium">
-                        確定待ち {mileage.summary.pending.toLocaleString('ja-JP')}
+                        確定待ち {formatNumber(mileage.summary.pending)}
                       </span>
                     )}
                   </div>
@@ -713,7 +714,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                         <div key={item.id} className="flex items-center justify-between gap-2 text-[10px]">
                           <span className="text-ink-faint min-w-0 truncate">{item.reason}</span>
                           <span className={`shrink-0 font-semibold tabular-nums ${item.amount > 0 ? 'text-success' : 'text-ink-secondary'}`}>
-                            {item.amount > 0 ? '+' : ''}{item.amount.toLocaleString('ja-JP')}
+                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
                           </span>
                         </div>
                       ))}
@@ -989,7 +990,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 */}
                 {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && (
                   <span className="text-[10px] text-ink-faint">
-                    {friend.formSubmissionTotal.toLocaleString('ja-JP')}件中 1〜{friend.formSubmissions.length.toLocaleString('ja-JP')}件を表示
+                    {formatNumber(friend.formSubmissionTotal)}件中 1〜{formatNumber(friend.formSubmissions.length)}件を表示
                   </span>
                 )}
               </div>

@@ -390,7 +390,7 @@ export default function QuestionEditor({
                   disabled={value.choices.length <= 1}
                   className="text-ink-faint hover:text-danger text-xs disabled:opacity-40"
                 >
-                  削除
+                  削除する
                 </button>
               </div>
             </div>

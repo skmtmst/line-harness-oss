@@ -150,7 +150,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(ADJUSTMENT).toContain('reasonCategory')
     expect(ADJUSTMENT).toContain('sourceReferenceId')
     expect(ADJUSTMENT).toContain('setAdjustmentPolicy')
-    expect(ADJUSTMENT).toContain('承認境界を保存')
+    expect(ADJUSTMENT).toContain('承認境界を保存する')
     expect(API).toContain("'Idempotency-Key': idempotencyKey")
     expect(API).toContain("'X-Confirm-Irreversible': 'mileage-adjustment'")
   })
@@ -241,7 +241,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
       （§7 #48 の表記ゆれ）。CSVの見出しと表の見出しも同じ言葉にする。
     */
     expect(ACTION_SCORE).not.toContain('層')
-    for (const word of ['この帯の人を見る', 'この帯に配信する', '帯または検索条件']) {
+    for (const word of ['この帯の人を見る', 'この帯に送る', '帯または検索条件']) {
       expect(ACTION_SCORE).toContain(word)
     }
   })

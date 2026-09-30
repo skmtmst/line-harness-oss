@@ -384,7 +384,7 @@ export default function SupportMarkRulesPanel({
               onClick={() => void save()}
               disabled={saving || errors.length > 0}
             >
-              {saving ? '保存中…' : '保存'}
+              {saving ? '保存中…' : '保存する'}
             </Button>
           </div>
         </div>

@@ -22,6 +22,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatNumber } from '@/lib/format'
 
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -482,7 +483,7 @@ export default function AdvancedSearchDialog({
               <div>
                 <p className="text-micro font-medium text-ink-faint">現在の条件に一致</p>
                 <p className="mt-0.5 text-xl font-bold tabular-nums text-ink">
-                  {counting ? '…' : count === null ? '—' : `${count.toLocaleString('ja-JP')}人`}
+                  {counting ? '…' : count === null ? '—' : `${formatNumber(count)}人`}
                 </p>
               </div>
               {countFailed ? (
@@ -799,7 +800,7 @@ export default function AdvancedSearchDialog({
             </button>
             {savedNotice ? <span className="text-xs font-semibold text-accent-deep">{savedNotice}</span> : null}
             {savedSearchEnabled ? (
-              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
+              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存する</Button>
             ) : null}
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
@@ -813,7 +814,7 @@ export default function AdvancedSearchDialog({
               className="px-5"
               onClick={() => onApply({ params, summary, editorState })}
             >
-              {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
+              {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${formatNumber(count)}人を表示`}
             </Button>
           </div>
         </div>
@@ -915,7 +916,7 @@ function OrAxisPicker({
           }}
           className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
         >
-          ＋ 追加
+          ＋ 追加する
         </button>
       </div>
       {waitingForOptions ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}

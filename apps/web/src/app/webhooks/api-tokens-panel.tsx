@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { formatDateTime } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -33,12 +34,6 @@ function scopeLabel(scope: string): string {
   return SCOPE_LABELS[scope] ?? scope
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
-}
 
 export default function ApiTokensPanel() {
   const { selectedAccountId } = useAccount()
@@ -356,7 +351,7 @@ export default function ApiTokensPanel() {
                     setNameError('')
                   }}
                 >
-                  やめる
+                  キャンセル
                 </Button>
               </div>
             </section>

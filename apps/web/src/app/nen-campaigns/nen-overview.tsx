@@ -36,6 +36,7 @@ import { campaignTriggerLabel, formatCampaignAudience, formatCampaignTiming, for
 import { isPastScheduledAt, publishedAtIso } from './columns/new/column-form'
 import { CampaignLinePreview, COLUMN_PET_NAME_FALLBACK, ColumnLinePreview } from './line-preview'
 import { jstLongDateTime, jstShortDate, jstShortDateTime } from './nen-period'
+import { formatNumber } from '@/lib/format'
 
 /*
  * NEN配信の一覧。★V6 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム。
@@ -149,7 +150,7 @@ function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined
 }
 
 function num(value: number | null | undefined): string {
-  return value == null ? '—' : value.toLocaleString('ja-JP')
+  return value == null ? '—' : formatNumber(value)
 }
 
 /** 自動配信の行に付ける印。実キーごと（★V6 37-6 の1列目）。 */
@@ -181,7 +182,7 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: {
     return (
       <span className="flex items-center gap-2 text-caption text-ink-secondary">
         テスト送信先が未登録です
-        {accountId ? <Button href={`/accounts/detail?id=${encodeURIComponent(accountId)}`} size="field">テスト送信先を登録</Button> : null}
+        {accountId ? <Button href={`/accounts/detail?id=${encodeURIComponent(accountId)}`} size="field">テスト送信先を登録する</Button> : null}
       </span>
     )
   }
@@ -403,7 +404,7 @@ export function NenOverview({
         footer={previewSetting ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
-            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)}>{testing === previewSetting.campaignKey ? '送信中…' : '自分にテスト送信'}</Button>
+            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)}>{testing === previewSetting.campaignKey ? '送信中…' : '自分にテストを送る'}</Button>
           </div>
         ) : undefined}
       >
@@ -643,7 +644,7 @@ function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
       description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
       busy={saving}
       onClose={onClose}
-      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave}>{saving ? '保存中…' : '設定を保存'}</Button>}
+      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave}>{saving ? '保存中…' : '設定を保存する'}</Button>}
     >
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-caption font-medium text-ink">
@@ -923,7 +924,7 @@ function ColumnsPanel({
                 </label>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-micro text-ink-faint">{introDraft.length}／1500文字</span>
-                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)}>{savingColumnId === selected.id ? '保存中…' : '紹介文を保存'}</Button>
+                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)}>{savingColumnId === selected.id ? '保存中…' : '紹介文を保存する'}</Button>
                 </div>
               </>
             ) : (
@@ -990,7 +991,7 @@ function ColumnsPanel({
         actions={(
           <>
             <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
-            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)}>{selected && testing === selected.id ? '送信中…' : '自分にテスト送信'}</Button>
+            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)}>{selected && testing === selected.id ? '送信中…' : '自分にテストを送る'}</Button>
             <Button type="button" variant="primary" disabled={!selected || !columnEnabled || scheduleInvalid} onClick={() => selected && setConfirmDeliver({ column: selected, scheduledAt: scheduledIso ?? undefined })}>
               {plan.when === 'now' ? 'この内容で送る' : 'この内容で予約する'}
             </Button>

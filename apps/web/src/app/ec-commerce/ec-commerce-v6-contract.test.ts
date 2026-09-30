@@ -58,7 +58,7 @@ describe('V6 EC integration screens', () => {
       expect(identity).toContain(wording)
     }
     expect(page).toContain('order.orderLines.map')
-    expect(page).toContain('order.totalAmount.toLocaleString')
+    expect(page).toContain('formatNumber(order.totalAmount')
     expect(identity).toContain('operations?.summary.linked')
     expect(identity).toContain('operations?.summary.potentialRevenue')
     expect(identity).toContain('過去のLINE送信は再送しません')

@@ -63,7 +63,7 @@ describe('R84 一括追加の窓は増えても操作できる', () => {
   it('時刻パターンを12件に増やしても操作ボタンが残り、Escape で閉じる', async () => {
     const { onClose } = await renderDialog()
     for (let i = 0; i < 11; i += 1) {
-      await act(async () => { button('＋ パターン追加').click() })
+      await act(async () => { button('＋ パターンを追加する').click() })
     }
     expect(document.querySelectorAll('[aria-label$="件目の開始"]')).toHaveLength(12)
     // 増えても操作は文書に残る（以前は画面外へ出た）。

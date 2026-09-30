@@ -20,6 +20,7 @@ import { notifyToast } from '@/components/shared/toast'
 import StickyBar from '@/components/shared/sticky-bar'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
+import { formatNumber } from '@/lib/format'
 
 export type LinkedAction = {
   id: string
@@ -200,14 +201,14 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
       onClose={onClose}
       footer={(
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-control border border-hairline px-5 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
+          <button type="button" onClick={onClose} className="rounded-control border border-hairline px-5 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button>
           <button
             type="button"
             disabled={unavailable || (needsResource && !resourceId) || ((selected[0] === 'テキスト送信' || selected[0] === '担当者通知') && !message.trim())}
             onClick={add}
             className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-bold text-on-accent hover:brightness-92"
           >
-            このアクションを追加
+            このアクションを追加する
           </button>
         </div>
       )}
@@ -335,9 +336,9 @@ function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, 
         <p className="mt-2 text-sm leading-6 text-ink-secondary">「{values.name || 'このタグ'}」の変更を、いまこのタグが付いている人にも適用します。人数はサーバーで再計算した値です。</p>
         <div className="mt-4 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">
-            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {selfTargets}人{preview && preview.selfExcluded > 0 ? `（付与済み${preview.selfExcluded}人を除く）` : ''}</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人{preview && preview.referralExcluded > 0 ? `（付与済み${preview.referralExcluded}人を除く）` : ''}</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] bg-success-bg/40 px-4 py-2.5 font-medium"><dt>合計</dt><dd>{selfTargets + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {selfTargets}人{preview && preview.selfExcluded > 0 ? `（付与済み${preview.selfExcluded}人を除く）` : ''}</dd><dd className="text-right font-semibold text-success">+{formatNumber(rewardTotal)} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人{preview && preview.referralExcluded > 0 ? `（付与済み${preview.referralExcluded}人を除く）` : ''}</dd><dd className="text-right font-semibold text-success">+{formatNumber(referralTotal)} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] bg-success-bg/40 px-4 py-2.5 font-medium"><dt>合計</dt><dd>{selfTargets + referralTargets}人が対象</dd><dd className="text-right text-success">+{formatNumber((rewardTotal + referralTotal))} mile</dd></div>
             <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>倍率 {values.multiplierBps ? `${values.multiplierBps / 10000}倍` : 'なし'}</dt><dd>さかのぼりません</dd><dd className="text-right">次回付与から</dd></div>
             <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
           </dl>
@@ -354,8 +355,8 @@ function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, 
         )}
         <Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存</button>
-          <button type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{loading ? '対象を計算中…' : 'さかのぼって反映して保存'}</button>
+          <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存する</button>
+          <button type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</button>
         </div>
         <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>
       </section>
@@ -598,7 +599,7 @@ export default function TagEditorV4({
                   <RadioCard name="reapplyMode" value="every" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} title="付け直すたびに積む" note="購入回数など、同じタグを繰り返し使う運用向けです。" />
                 </RadioCardGroup>
                 <div className="border-t border-hairline pt-3">
-                  <div className="mb-2 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで動かすか、↑↓ボタンで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-semibold text-action">＋ アクションを追加</button></div>
+                  <div className="mb-2 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで動かすか、↑↓ボタンで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-semibold text-action">＋ アクションを追加する</button></div>
                   {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <div className="overflow-x-auto pb-1"><ol className="space-y-2">{actions.map((action, index) => <li key={action.id} draggable onDragStart={() => setDragActionId(action.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => { const fromId = dragActionId; setDragActionId(null); if (!fromId || fromId === action.id) return; setActions((current) => { const from = current.findIndex((item) => item.id === fromId); if (from < 0) return current; const reordered = current.filter((item) => item.id !== fromId); reordered.splice(Math.min(index, reordered.length), 0, current[from]); return reordered }) }} onDragEnd={() => setDragActionId(null)} className={`grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2 text-sm ${dragActionId === action.id ? 'opacity-50' : ''}`}><span className="cursor-grab text-ink-faint" title="ドラッグで順番を変更">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-pill bg-canvas-sunken text-xs font-medium">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => moveAction(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目のアクションを上へ`} title="上へ"><ArrowUp size={15} aria-hidden /></IconButton><IconButton onClick={() => moveAction(index, 1)} disabled={index === actions.length - 1} aria-label={`${index + 1}番目のアクションを下へ`} title="下へ"><ArrowDown size={15} aria-hidden /></IconButton><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol></div>}
                 </div>
               </div>
@@ -653,14 +654,14 @@ export default function TagEditorV4({
       <StickyBar
         className="sticky bottom-0 z-30"
         status={mode === 'edit' && onDelete ? (
-          <button type="button" onClick={onDelete} className="rounded-control border border-danger/25 px-3 py-2 text-sm font-medium text-danger hover:bg-danger-bg">タグを削除</button>
+          <button type="button" onClick={onDelete} className="rounded-control border border-danger/25 px-3 py-2 text-sm font-medium text-danger hover:bg-danger-bg">タグを削除する</button>
         ) : 'まだ保存していません'}
         actions={(
           <>
             <Button onClick={onCancel}>キャンセル</Button>
-            {mode === 'edit' && !embedded ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して新規作成</Button> : null}
+            {mode === 'edit' && !embedded ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して作る</Button> : null}
             {mode === 'create' ? <Button disabled={saving} onClick={() => requestSave(true)}>保存して続けて作る</Button> : null}
-            <Button variant="primary" disabled={saving} onClick={() => requestSave(false)}>{saving ? '保存中…' : mode === 'create' ? 'タグを作る' : 'タグを保存'}</Button>
+            <Button variant="primary" disabled={saving} onClick={() => requestSave(false)}>{saving ? '保存中…' : mode === 'create' ? 'タグを作る' : 'タグを保存する'}</Button>
           </>
         )}
       />

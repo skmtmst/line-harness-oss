@@ -112,7 +112,7 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
   it('完全削除は現在の経路名が正確に一致するまで実行できない', async () => {
     const { dialog } = await mountAndOpen()
     fireEvent.click(within(dialog).getByRole('button', { name: /このまま削除する/ }))
-    const confirm = within(dialog).getByRole('button', { name: 'この経路を削除' }) as HTMLButtonElement
+    const confirm = within(dialog).getByRole('button', { name: 'この経路を削除する' }) as HTMLButtonElement
     const input = within(dialog).getByLabelText('完全削除するには「店頭QR」と入力')
 
     expect(confirm.disabled).toBe(true)
@@ -143,7 +143,7 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
       target: { value: '店頭QR' },
     })
     await act(async () => {
-      fireEvent.click(within(dialog).getByRole('button', { name: 'この経路を削除' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: 'この経路を削除する' }))
     })
 
     expect(await within(dialog).findByText(/利用履歴がある経路は完全削除できません/)).toBeTruthy()

@@ -194,7 +194,7 @@ export function AreaProperties({
         <h3 className="text-ink-secondary font-semibold">選択中のボタン</h3>
         {showManagementDetails && onDelete ? (
           <button type="button" onClick={onDelete} className="text-xs text-danger hover:underline">
-            削除
+            削除する
           </button>
         ) : null}
       </div>

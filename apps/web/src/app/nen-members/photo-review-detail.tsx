@@ -16,8 +16,9 @@ import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
 import { photoReviewReasonLabel, mileStatusLabel, text } from './photo-text'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
+import { formatDay, formatNumber } from '@/lib/format'
 
-const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
+const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : '—'
 
 export function PhotoReviewDetail({
   photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
@@ -108,7 +109,7 @@ export function PhotoReviewDetail({
   const duplicateDate = (() => {
     const date = new Date(String(duplicate?.createdAt ?? duplicate?.created_at ?? ''))
     if (Number.isNaN(date.getTime())) return '—'
-    return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
+    return formatDay(date)
   })()
   const duplicateImageUrl = safePhotoSrc(duplicate ? text(duplicate.imageUrl ?? duplicate.image_url) : '')
   return <div data-photo-view="detail">
@@ -193,10 +194,10 @@ export function PhotoReviewDetail({
             disabled={rotation === savedRotation || rotationSaving}
             onClick={() => onSaveRotation(rotation)}
             title={rotation === savedRotation ? '回したあとに保存できます' : '回した向きをこの写真へ保存します'}
-          >{rotationSaving ? '保存中...' : '向きを保存'}</Button>
+          >{rotationSaving ? '保存中...' : '向きを保存する'}</Button>
           <Button disabled title="切り取りは派生画像の生成口を接続後に使えます">切り取る</Button>
           <Button disabled={assetProcessing} onClick={onProcessReviewAsset}>{assetProcessing ? '作成中...' : '審査用画像を作り直す'}</Button>
-          <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存</Button>
+          <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存する</Button>
         </div>
         <p className="px-4 pb-4 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}　派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
         {assetsFailed ? <div className="flex items-center gap-2 px-4 pb-4"><p className="text-xs text-ink-faint">審査用画像の状態を読み込めませんでした。</p><Button onClick={onReloadAssets}>状態を読み直す</Button></div> : null}
@@ -330,8 +331,8 @@ export function PhotoReviewDetail({
         : `原本には個人情報が含まれる場合があります。${stepUpMethod === 'password' ? 'パスワード' : '6桁の再認証コード'}を入力すると、一度だけ保存できます。`}
       busy={downloadBusy}
       error={downloadError}
-      confirmLabel="再認証して保存"
-      cancelLabel="やめる"
+      confirmLabel="再認証して保存する"
+      cancelLabel="キャンセル"
       onCancel={() => { setDownloadOpen(false); setDownloadError('') }}
       onConfirm={stepUpMethod === 'none' ? undefined : () => {
         if (!downloadReady) { setDownloadError(stepUpMethod === 'password' ? 'パスワードを入力してください。' : '6桁の再認証コードを入力してください。'); return }

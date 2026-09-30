@@ -40,6 +40,7 @@ import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { formatDay, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
 const TABS = [
@@ -116,7 +117,7 @@ type EarningRuleSummary = {
 function expiringLabel(member: MileageFriendV6): string {
   if (member.expiringMiles30d == null) return 'なし'
   if (member.expiringMiles30d === 0 && member.nextExpiringAt) {
-    const date = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(new Date(member.nextExpiringAt))
+    const date = formatDay(new Date(member.nextExpiringAt))
     return `30日以内はなし（次は ${date}）`
   }
   return `${formatMileageNumber(member.expiringMiles30d)} マイル`
@@ -585,7 +586,7 @@ function MileagePageInner() {
   const summary = overview?.summary
   /* R383: 期限つきマイルが30日より先だけにあるときに添える次の失効日。 */
   const nextExpiringLabel = summary?.nextExpiringAt
-    ? new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(new Date(summary.nextExpiringAt))
+    ? formatDay(new Date(summary.nextExpiringAt))
     : null
   const members = overview?.items ?? []
   const activeRules = rules.filter((rule) => rule.published.status === 'published')
@@ -694,7 +695,7 @@ function MileagePageInner() {
                   <p className="text-sm font-semibold text-ink">
                     {request.friend_display_name ?? request.friend_id} に
                     {request.direction === 'increase' ? ' +' : ' −'}
-                    {request.amount.toLocaleString('ja-JP')} マイル
+                    {formatNumber(request.amount)} マイル
                   </p>
                   <p className="mt-0.5 truncate text-xs text-ink-secondary" title={request.reason}>
                     {request.reason}
@@ -739,8 +740,8 @@ function MileagePageInner() {
         </section>
       ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
-        <KpiCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
+        <KpiCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${formatNumber(summary.totalMembers)}人のうち` : '選択中のLINEアカウント'} />
+        <KpiCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${formatNumber(summary?.pending) ?? '—'} マイル`} />
         <KpiCard variant="v6" title="今月の増減" value={summary?.monthChange ?? null} unit=" マイル" detail="" help="選択中の友だち全体の増減です" />
         <KpiCard
           variant="v6"
@@ -859,7 +860,7 @@ function MileagePageInner() {
             onClick={() => void saveRuleOrder()}
             disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'}
           >
-            {savingRuleOrder ? '保存しています' : '並び順を保存'}
+            {savingRuleOrder ? '保存しています' : '並び順を保存する'}
           </Button>
           <Button onClick={exportRulesCsv} disabled={shownRules.length === 0} className="ml-auto">
             CSVで書き出す
@@ -1029,7 +1030,7 @@ function MileagePageInner() {
                           */
                           ...(rule.publishedVersion == null ? [{
                             id: 'delete',
-                            label: 'この決めごとを削除',
+                            label: 'この決めごとを削除する',
                             tone: 'danger' as const,
                             dividerBefore: true,
                             disabled: savingRuleId !== null,
@@ -1119,7 +1120,7 @@ function MileagePageInner() {
         description={rejectTarget ? `${rejectTarget.friend_display_name ?? rejectTarget.friend_id} への変更は行われず、台帳は変わりません。` : undefined}
         tone="destructive"
         confirmLabel="差し戻す"
-        cancelLabel="戻る"
+        cancelLabel="キャンセル"
         busy={approvalBusyId !== null}
         error={approvalError || undefined}
         onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}

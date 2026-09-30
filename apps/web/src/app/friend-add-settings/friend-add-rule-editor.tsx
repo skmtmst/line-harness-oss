@@ -452,7 +452,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         <Summary step={step} rule={rule} definition={definition} options={options} matchedLast28Days={matchedLast28Days} pendingAction={actionDialogOpen && Boolean(actionTarget)} />
       </div>
 
-      <StickyBar className="friend-add-editor-sticky" status={notice || undefined} actions={<><Button href="/friend-add-settings">キャンセル</Button><Button type="button" onClick={() => void save()} disabled={saving}>下書き保存</Button>{step === 'preview' ? <Button type="button" variant="primary" onClick={() => void runTest()} disabled={saving}>{saving ? 'テスト中…' : 'テスト送信'}</Button> : <Button type="button" variant="primary" onClick={() => moveToStep(STEPS[Math.min(currentIndex + 1, 4)].key)} disabled={saving}>{STEPS[Math.min(currentIndex + 1, 4)].label}へ</Button>}</>} />
+      <StickyBar className="friend-add-editor-sticky" status={notice || undefined} actions={<><Button href="/friend-add-settings">キャンセル</Button><Button type="button" onClick={() => void save()} disabled={saving}>下書きを保存する</Button>{step === 'preview' ? <Button type="button" variant="primary" onClick={() => void runTest()} disabled={saving}>{saving ? 'テスト中…' : 'テストを送る'}</Button> : <Button type="button" variant="primary" onClick={() => moveToStep(STEPS[Math.min(currentIndex + 1, 4)].key)} disabled={saving}>{STEPS[Math.min(currentIndex + 1, 4)].label}へ</Button>}</>} />
 
       {actionDialogOpen && (
         <div data-design-node="txMO9">
@@ -462,7 +462,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
             description={`選択した${definition.actions.length + 1}件のアクションを配信フローへ追加します。`}
             titleIcon={<Check size={18} />}
             cancelLabel="初回案内へ戻る"
-            confirmLabel="アクションを追加"
+            confirmLabel="アクションを追加する"
             confirmIcon={<Plus size={16} />}
             designNode="txMO9"
             onCancel={() => router.replace(hrefFor('actions'))}
@@ -556,7 +556,7 @@ function RoutesStep({ rule, definition, options, toggleRoute, setDefinition, rou
             </div>
           ))}
         </div>
-        <div><Button type="button" onClick={() => setDefinition((current) => ({ ...current, timeWindows: addTimeWindow(current.timeWindows) }))}><Plus size={16} />時間帯を追加</Button></div>
+        <div><Button type="button" onClick={() => setDefinition((current) => ({ ...current, timeWindows: addTimeWindow(current.timeWindows) }))}><Plus size={16} />時間帯を追加する</Button></div>
       </div>
       <div className={'friend-add-editor-twoCols'}>
         <Field label="有効期間の開始"><DateTimeField aria-label="有効期間の開始" value={definition.activeFrom ?? ''} onChange={(v) => setDefinition((current) => ({ ...current, activeFrom: v || null }))} /></Field>
@@ -634,7 +634,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, openAct
         <div className={'friend-add-editor-info'}>
           基本設定で「何も配信しない」を選んでいるため、初回メッセージ・送信時刻・配信シナリオは使いません。実行されるのは案内後のアクションだけです。
         </div>
-        <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
+        <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加する</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
       </Section>
     )
   }
@@ -662,7 +662,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, openAct
         <small>初回案内のあとに登録するシナリオです。このアカウントのシナリオだけ選べます。</small>
         {scenarioError && <small className={'friend-add-editor-fieldError'} role="alert">{scenarioError}</small>}
       </Field>
-      <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
+      <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加する</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
       <Field label="流入経路が不明な場合">
         <small>共通案内を送るか、何もしないか選べます。</small>
         <RadioCardGroup legend="流入経路が不明な場合">
@@ -675,7 +675,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, openAct
 }
 
 function ActionsStep({ definition, setDefinition, options, actionType, actionTarget, setActionType, setActionTarget, openDialog }: { definition: FriendAddRuleDefinition; setDefinition: React.Dispatch<React.SetStateAction<FriendAddRuleDefinition>>; options: FriendAddRuleOptions; actionType: FriendAddRuleAction['type']; actionTarget: string; setActionType: (value: FriendAddRuleAction['type']) => void; setActionTarget: (value: string) => void; openDialog: () => void }) {
-  return <Section title="アクションの種類" description="友だち追加後に自動実行する内容を選びます。"><div className={'friend-add-editor-twoCols'}><Field label="アクション"><Select aria-label="アクション" value={actionType} onChange={(value) => { setActionType(value as FriendAddRuleAction['type']); setActionTarget('') }} options={[{ value: 'add_tag', label: 'タグを付与' }, { value: 'remove_tag', label: 'タグを解除' }, { value: 'start_scenario', label: 'シナリオを開始' }]} /></Field><Field label="実行タイミング"><TextField value="登録直後" disabled /></Field></div><Field label="設定内容"><Select aria-label="設定内容" value={actionTarget} onChange={(value) => setActionTarget(value)} options={[{ value: '', label: '選んでください' }, ...(actionType === 'start_scenario' ? options.scenarios : options.tags).map((item) => ({ value: item.id, label: item.name }))]} /></Field><div className={'friend-add-editor-actionList'}>{definition.actions.length === 0 ? <p>追加のアクションはありません。</p> : definition.actions.map((action, index) => <div key={`${action.type}-${index}`}><span>{index + 1}</span><strong>{action.label}</strong><IconButton aria-label={`${action.label}を外す`} onClick={() => setDefinition((current) => ({ ...current, actions: current.actions.filter((_, itemIndex) => itemIndex !== index) }))}><X size={16} /></IconButton></div>)}</div><Button type="button" variant="primary" onClick={openDialog} disabled={!actionTarget}><Plus size={16} />アクションを追加</Button></Section>
+  return <Section title="アクションの種類" description="友だち追加後に自動実行する内容を選びます。"><div className={'friend-add-editor-twoCols'}><Field label="アクション"><Select aria-label="アクション" value={actionType} onChange={(value) => { setActionType(value as FriendAddRuleAction['type']); setActionTarget('') }} options={[{ value: 'add_tag', label: 'タグを付与' }, { value: 'remove_tag', label: 'タグを解除' }, { value: 'start_scenario', label: 'シナリオを開始' }]} /></Field><Field label="実行タイミング"><TextField value="登録直後" disabled /></Field></div><Field label="設定内容"><Select aria-label="設定内容" value={actionTarget} onChange={(value) => setActionTarget(value)} options={[{ value: '', label: '選んでください' }, ...(actionType === 'start_scenario' ? options.scenarios : options.tags).map((item) => ({ value: item.id, label: item.name }))]} /></Field><div className={'friend-add-editor-actionList'}>{definition.actions.length === 0 ? <p>追加のアクションはありません。</p> : definition.actions.map((action, index) => <div key={`${action.type}-${index}`}><span>{index + 1}</span><strong>{action.label}</strong><IconButton aria-label={`${action.label}を外す`} onClick={() => setDefinition((current) => ({ ...current, actions: current.actions.filter((_, itemIndex) => itemIndex !== index) }))}><X size={16} /></IconButton></div>)}</div><Button type="button" variant="primary" onClick={openDialog} disabled={!actionTarget}><Plus size={16} />アクションを追加する</Button></Section>
 }
 
 function PreviewStep({ rule, definition, options, result, resultStale, testInput, setTestInput, accountId }: { rule: EditorRule; definition: FriendAddRuleDefinition; options: FriendAddRuleOptions; result: { matched: boolean; reasons: string[]; stateChanged: false } | null; resultStale: boolean; testInput: TestInput; setTestInput: React.Dispatch<React.SetStateAction<TestInput>>; accountId: string | null }) {

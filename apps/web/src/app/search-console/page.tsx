@@ -18,6 +18,7 @@ import type {
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ANALYTICS_TABS } from './analytics-tabs'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
  * Google検索の分析画面。要件 v6-20 §2: Search Console を「Google Analytics」と呼ばない。
@@ -29,8 +30,6 @@ import { ANALYTICS_TABS } from './analytics-tabs'
 const ranges = [7, 28, 90] as const
 type RangeDays = typeof ranges[number]
 
-const number = new Intl.NumberFormat('ja-JP')
-const oneDecimal = new Intl.NumberFormat('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 /** プロパティのURLから、見出しに出すホスト名だけを取り出す。 */
 function siteLabel(siteUrl: string): string {
@@ -72,7 +71,7 @@ function MetricCard({
       </div>
       <p className="text-ink mt-3 whitespace-nowrap text-3xl font-bold tabular-nums tracking-[-0.02em]">{value}</p>
       <p className={`mt-2 whitespace-nowrap text-xs font-semibold ${delta === null ? 'text-ink-faint' : positive ? 'text-success' : 'text-danger'}`}>
-        {delta === null ? '前期間との比較なし' : `${positive ? '↑' : '↓'} ${oneDecimal.format(Math.abs(delta))}% 前期間比`}
+        {delta === null ? '前期間との比較なし' : `${positive ? '↑' : '↓'} ${formatNumber(Math.abs(delta), { digits: 1 })}% 前期間比`}
       </p>
     </div>
   )
@@ -146,10 +145,10 @@ function RankingTable({ title, rows, kind }: { title: string; rows: SearchConsol
             {rows.map((row) => (
               <Tr key={row.key} interactive>
                 <Td><span className="text-ink block truncate whitespace-nowrap font-medium" title={row.key}>{displayKey(row.key)}</span></Td>
-                <Td align="right" className="text-ink-secondary whitespace-nowrap">{number.format(row.impressions)}</Td>
-                <Td align="right" className="text-ink whitespace-nowrap font-semibold">{number.format(row.clicks)}</Td>
-                <Td align="right" className="text-ink-secondary whitespace-nowrap">{oneDecimal.format(row.ctr * 100)}%</Td>
-                <Td align="right" className="text-ink-secondary whitespace-nowrap">{oneDecimal.format(row.position)}</Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{formatNumber(row.impressions)}</Td>
+                <Td align="right" className="text-ink whitespace-nowrap font-semibold">{formatNumber(row.clicks)}</Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{formatNumber(row.ctr * 100, { digits: 1 })}%</Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{formatNumber(row.position, { digits: 1 })}</Td>
               </Tr>
             ))}
           </tbody>
@@ -231,10 +230,10 @@ export default function SearchConsolePage() {
   }, [days, attempt])
 
   const metrics: Array<{ label: string; value: string; key: keyof SearchConsoleMetric; color: string; lower?: boolean }> = [
-    { label: '合計クリック数', value: number.format(data?.summary.clicks ?? 0), key: 'clicks', color: 'var(--color-action)' },
-    { label: '合計表示回数', value: number.format(data?.summary.impressions ?? 0), key: 'impressions', color: 'var(--color-info)' },
-    { label: '平均CTR', value: `${oneDecimal.format((data?.summary.ctr ?? 0) * 100)}%`, key: 'ctr', color: 'var(--color-success)' },
-    { label: '平均掲載順位', value: oneDecimal.format(data?.summary.position ?? 0), key: 'position', color: 'var(--color-status-warn-deep)', lower: true },
+    { label: '合計クリック数', value: formatNumber(data?.summary.clicks ?? 0), key: 'clicks', color: 'var(--color-action)' },
+    { label: '合計表示回数', value: formatNumber(data?.summary.impressions ?? 0), key: 'impressions', color: 'var(--color-info)' },
+    { label: '平均CTR', value: `${formatNumber((data?.summary.ctr ?? 0) * 100, { digits: 1 })}%`, key: 'ctr', color: 'var(--color-success)' },
+    { label: '平均掲載順位', value: formatNumber(data?.summary.position ?? 0, { digits: 1 }), key: 'position', color: 'var(--color-status-warn-deep)', lower: true },
   ]
 
   /*
@@ -246,11 +245,11 @@ export default function SearchConsolePage() {
     if (!data) return
     const lines: string[][] = [
       ['区分', '項目', '表示回数', 'クリック数', 'CTR(%)', '掲載順位'],
-      ['集計', `合計（${data.startDate}〜${data.endDate}）`, String(data.summary.impressions), String(data.summary.clicks), oneDecimal.format(data.summary.ctr * 100), oneDecimal.format(data.summary.position)],
+      ['集計', `合計（${data.startDate}〜${data.endDate}）`, String(data.summary.impressions), String(data.summary.clicks), formatNumber(data.summary.ctr * 100, { digits: 1 }), formatNumber(data.summary.position, { digits: 1 })],
       ...data.daily.map((row) => ['日別', row.key, '', String(row.clicks), '', '']),
       ...data.devices.map((device) => ['デバイス', { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key, '', String(device.clicks), '', '']),
-      ...data.queries.map((row) => ['キーワード', row.key || '（検索語句なし）', String(row.impressions), String(row.clicks), oneDecimal.format(row.ctr * 100), oneDecimal.format(row.position)]),
-      ...data.pages.map((row) => ['ページ', row.key, String(row.impressions), String(row.clicks), oneDecimal.format(row.ctr * 100), oneDecimal.format(row.position)]),
+      ...data.queries.map((row) => ['キーワード', row.key || '（検索語句なし）', String(row.impressions), String(row.clicks), formatNumber(row.ctr * 100, { digits: 1 }), formatNumber(row.position, { digits: 1 })]),
+      ...data.pages.map((row) => ['ページ', row.key, String(row.impressions), String(row.clicks), formatNumber(row.ctr * 100, { digits: 1 }), formatNumber(row.position, { digits: 1 })]),
     ]
     const csv = lines.map((row) => row.map((value) => csvCell(value)).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
@@ -324,7 +323,7 @@ export default function SearchConsolePage() {
                 今の横棒の並びのまま、目盛りの字（text-micro）・等幅数字・1色の棒にそろえる。
                 3項目に3色は付けない（h99Gb の決まり「色は2つまで」）。
               */}
-              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap tabular-nums">{number.format(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-pill"><div className="bg-action h-full rounded-pill" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint text-micro mt-1 text-right tabular-nums">{oneDecimal.format(ratio)}%</p></div> })}</div>
+              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap tabular-nums">{formatNumber(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-pill"><div className="bg-action h-full rounded-pill" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint text-micro mt-1 text-right tabular-nums">{formatNumber(ratio, { digits: 1 })}%</p></div> })}</div>
             </section>
           </div>
           <div className="grid gap-5 xl:grid-cols-2">
@@ -338,7 +337,7 @@ export default function SearchConsolePage() {
               <li>・「検索から友だち追加」は、サイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません</li>
             </ul>
           </Disclosure>
-          <p className="text-ink-faint text-micro text-right">Search Console APIから読み取り専用で取得・最終更新 {new Date(data.fetchedAt).toLocaleString('ja-JP')}</p>
+          <p className="text-ink-faint text-micro text-right">Search Console APIから読み取り専用で取得・最終更新 {formatDateTime(data.fetchedAt)}</p>
         </div>
       )}
     </div>

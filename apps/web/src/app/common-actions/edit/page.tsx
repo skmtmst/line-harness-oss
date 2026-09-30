@@ -262,8 +262,8 @@ function EditCommonActionInner() {
         status={saving ? '下書きを保存しています' : '公開済みの版には影響しません'}
         actions={(
           <>
-            <Button href={`/common-actions/versions?id=${encodeURIComponent(id)}`}>編集をやめる</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={saving}>下書きを保存</Button>
+            <Button href={`/common-actions/versions?id=${encodeURIComponent(id)}`}>キャンセル</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={saving}>下書きを保存する</Button>
           </>
         )}
       />

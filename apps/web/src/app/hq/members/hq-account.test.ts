@@ -73,7 +73,7 @@ describe('メンバー管理（36-5）', () => {
 
   it('保存は下部追従バーにしか置かない', () => {
     expect(members).toContain('<StickyBar')
-    expect(members).toContain('統括名を保存')
+    expect(members).toContain('統括名を保存する')
   })
 })
 

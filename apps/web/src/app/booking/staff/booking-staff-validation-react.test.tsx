@@ -149,7 +149,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
   ])('%sは理由を表示し、APIを呼ばない', async (_label, arrange, message) => {
     await openCreateModal()
     await arrange()
-    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     expect(await screen.findByText(message)).toBeTruthy()
     expect(fixture.createStaff).not.toHaveBeenCalled()
   })
@@ -162,7 +162,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
     fireEvent.change(screen.getByLabelText('プロフィール画像URL'), {
       target: { value: '  https://example.test/staff.png  ' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
 
     await waitFor(() => expect(fixture.createStaff).toHaveBeenCalledWith('account-a', expect.objectContaining({
       name: '田中 美咲', display_name: 'みさき', role: '店長',
@@ -196,7 +196,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
   test('専用の新規登録画面も空白名を同じ理由で止める', async () => {
     render(<NewBookingStaffPage />)
     fireEvent.change(screen.getByLabelText(/スタッフ名/), { target: { value: '   ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
     expect(await screen.findByText('スタッフ名を入力してください')).toBeTruthy()
     expect(fixture.createStaff).not.toHaveBeenCalled()
   })
@@ -217,7 +217,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
     fireEvent.change(screen.getByLabelText(/顔写真/), { target: { value: '  https://example.test/tanaka.png  ' } })
     fireEvent.change(screen.getByLabelText(/紹介文/), { target: { value: '  丁寧に対応します。  ' } })
     fireEvent.click(await screen.findByRole('checkbox', { name: /カット/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
 
     await waitFor(() => expect(fixture.createStaff).toHaveBeenCalledWith('account-a', expect.objectContaining({
       name: '田中', display_name: 'たなか', role: '店長',
@@ -251,7 +251,7 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     const create = screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement
     expect(create.disabled).toBe(true)
     expect(screen.queryByText('編集')).toBeNull()
-    expect(screen.queryByText('削除')).toBeNull()
+    expect(screen.queryByText('削除する')).toBeNull()
     // シフトへの導線は残す（閲覧権限があれば本人・他人どちらも開ける）
     expect(screen.getByText('シフト')).toBeTruthy()
   })
@@ -293,7 +293,7 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'ログインユーザーとの紐づけ' }))
     const option = await screen.findByRole('option', { name: '山田（yamada@example.com）' })
     fireEvent.click(within(option).getByRole('button'))
-    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledWith(
       'account-a', 'staff-1', expect.objectContaining({ staff_member_id: 'member-1' }),
     ))

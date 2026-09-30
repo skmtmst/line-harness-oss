@@ -137,8 +137,8 @@ export default function OpsMembersPage() {
               required
             />
           </div>
+          <Button onClick={() => setInviting(false)}>キャンセル</Button>
           <Button type="submit" variant="primary" disabled={busy}>招待メールを送る</Button>
-          <Button onClick={() => setInviting(false)}>やめる</Button>
         </form>
       ) : null}
 

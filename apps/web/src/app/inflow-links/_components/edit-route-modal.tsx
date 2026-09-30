@@ -173,7 +173,7 @@ export default function EditRouteModal({
             onClick={onSubmit}
             disabled={saveDisabled}
           >
-            {submitting ? '保存中…' : isNew ? '作成' : '保存'}
+            {submitting ? '保存中…' : isNew ? '作る' : '保存する'}
           </Button>
         </div>
       }
@@ -310,7 +310,7 @@ export default function EditRouteModal({
                 onClick={doSave}
                 disabled={submitting}
               >
-                それでも保存
+                それでも保存する
               </Button>
             )}
           />

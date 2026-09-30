@@ -39,6 +39,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
 import OtpInput from '@/components/shared/otp-input'
+import { formatDateTime } from '@/lib/format'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -100,14 +101,14 @@ function auditActionLabel(action: string): string {
   if (normalized.includes('update') || normalized.includes('change')) return '設定変更'
   return '操作記録'
 }
-function formatStaffDate(value: string | undefined): string { if (!value) return 'まだ入っていません'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '日時を取得できませんでした' : date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+function formatStaffDate(value: string | undefined): string { if (!value) return 'まだ入っていません'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '日時を取得できませんでした' : formatDateTime(date) }
 /* 一覧の StaffMember には招待期限が載っていない。再送口の返事を読むための形。 */
 type StaffMemberWithInvite = StaffMember & { inviteExpiresAt?: string | null }
 function formatInviteExpiry(value: string | null | undefined): string {
   if (!value) return '期限を取得できませんでした'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '期限を取得できませんでした'
-  const text = date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const text = formatDateTime(date)
   return date.getTime() < Date.now() ? `期限切れ（${text}まででした）` : `${text}まで`
 }
 function permissionSummary(member: StaffMember): string { if (member.role === 'owner' || member.role === 'admin') return 'すべての画面'; if (member.permissionKeys.length === 0) return member.role === 'viewer' ? '閲覧できる画面は未設定' : '表示する機能は未設定'; const labels = member.permissionKeys.map((key) => permissionLabel(key)).filter(Boolean); return labels.length > 0 ? labels.join('・') : `${member.permissionKeys.length}機能` }
@@ -453,7 +454,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       狭い幅では説明は本文（いまの権限カード）へ移し、下部は操作だけに絞る。
       高さは固定せず、長いエラー文は折り返してボタンを隠さない。
     */}
-    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{targetIsAdministrator ? '管理者の権限は確認だけできます。この画面からは変更できません。' : `${user.name}さんはいま「${ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。`}</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>{targetIsAdministrator ? '一覧へ戻る' : '×　キャンセル'}</Button>{!targetIsAdministrator && <Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存'}</Button>}</div></div>
+    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{targetIsAdministrator ? '管理者の権限は確認だけできます。この画面からは変更できません。' : `${user.name}さんはいま「${ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。`}</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>{targetIsAdministrator ? '一覧へ戻る' : '×　キャンセル'}</Button>{!targetIsAdministrator && <Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存する'}</Button>}</div></div>
     <ConfirmDialog
       open={saveConfirmOpen}
       title={`${user.name}さんの見せる範囲を保存しますか？`}
@@ -522,7 +523,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <Checkbox key={key} checked={permissions.includes(key)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</Checkbox>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><Checkbox checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</Checkbox></div></div>}
     <div className="mt-5"><p className="text-sm font-semibold text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-semibold ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <button onClick={() => { setUnlinkError(''); setUnlinkOpen(true) }} className="cursor-pointer rounded-control border border-hairline bg-canvas px-3 py-1.5 text-xs">連携解除</button>}</div></div>
     <div className="mt-5"><p className="text-sm font-semibold text-ink">通知設定</p><div className="mt-2 divide-y divide-hairline overflow-hidden rounded-card border border-hairline">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 p-3"><div><p className="text-sm text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs">メール<NotificationSwitch checked={notifications[key].email} onChange={() => toggleNotification(key, 'email')} label={`${label}メール`} /></div><div className="flex items-center gap-2 text-xs">LINE<NotificationSwitch checked={notifications[key].line} onChange={() => toggleNotification(key, 'line')} label={`${label}LINE`} /></div></div>)}</div></div>
-    <div className="mt-6 flex justify-end gap-2"><button onClick={onClose} className="cursor-pointer rounded-control border border-hairline px-4 py-2 text-sm">キャンセル</button><button onClick={() => void save()} disabled={saving} className="cursor-pointer rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50">✓ {saving ? '保存中…' : '変更を保存'}</button></div>
+    <div className="mt-6 flex justify-end gap-2"><button onClick={onClose} className="cursor-pointer rounded-control border border-hairline px-4 py-2 text-sm">キャンセル</button><button onClick={() => void save()} disabled={saving} className="cursor-pointer rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50">✓ {saving ? '保存中…' : '保存する'}</button></div>
     {/* 連携はあとから張り直せる。赤は本当に戻せない操作に取っておく。 */}
     <ConfirmDialog
       open={unlinkOpen}

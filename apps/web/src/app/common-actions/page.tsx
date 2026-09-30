@@ -338,7 +338,7 @@ export default function CommonActionsPage() {
             onClick={() => void load()}
           >
             <RefreshCw size={16} aria-hidden />
-            一覧を更新
+            一覧を更新する
           </Button>
         }
       />

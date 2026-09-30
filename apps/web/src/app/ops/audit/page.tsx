@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
 /** 監査ログ。★V6 37-8 `oEzZz`。 */
 
@@ -90,7 +91,7 @@ export default function OpsAuditPage() {
     a.click()
     URL.revokeObjectURL(url)
     setExportNote(truncated
-      ? `いまの条件の ${collected.length} 件を書き出しました（${expected} 件中・上限 ${CSV_MAX.toLocaleString()} 件まで。全部を残すには期間で絞ってください）`
+      ? `いまの条件の ${collected.length} 件を書き出しました（${expected} 件中・上限 ${formatNumber(CSV_MAX)} 件まで。全部を残すには期間で絞ってください）`
       : `いまの条件の ${collected.length} 件を書き出しました`)
     setExporting(false)
   }

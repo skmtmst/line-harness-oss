@@ -104,7 +104,7 @@ describe('R179 保存直後の人数プレビュー', () => {
   test('説明だけの保存後に新しい版で数え直し、人数と時刻を正常表示する', async () => {
     const { default: SavedSearchEditPage } = await import('./page')
     render(<SavedSearchEditPage />)
-    const saveButton = await screen.findByRole('button', { name: '変更を保存' })
+    const saveButton = await screen.findByRole('button', { name: '保存する' })
 
     // 説明だけ変える（条件は触らない）。
     const description = screen.getByLabelText('説明')

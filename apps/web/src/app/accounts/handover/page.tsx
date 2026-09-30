@@ -29,6 +29,7 @@ import {
   MATCH_BUCKETS,
   totalsMatch,
 } from './handover-view'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -54,9 +55,7 @@ const statusStep: Record<AccountHandover['status'], number> = {
 
 function formatMonthDayTime(value: string | null): string {
   if (!value) return '未取得'
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
-  }).format(new Date(value))
+  return formatDateTime(new Date(value))
 }
 
 /**
@@ -270,7 +269,7 @@ function Handover() {
       setRollbackOpen(false)
       const detail = await api.accountHandovers.get(handover.id)
       if (detail.success) setHandover(detail.data as HandoverView)
-      notifyToast(`切り戻しました。${res.data.restoredCount.toLocaleString('ja-JP')}人を元のアカウントへ戻しました。`)
+      notifyToast(`切り戻しました。${formatNumber(res.data.restoredCount)}人を元のアカウントへ戻しました。`)
     } catch (caught) {
       setRollbackError(
         caught instanceof ApiError && caught.message && !/^API error: /.test(caught.message)
@@ -328,7 +327,7 @@ function Handover() {
       const moved = result.data.movedCount ?? result.data.plannedCount ?? 0
       notifyToast(
         result.data.failureReason
-          ?? `本実行が終わりました。${moved.toLocaleString('ja-JP')}人を移しました。`,
+          ?? `本実行が終わりました。${formatNumber(moved)}人を移しました。`,
       )
     } catch {
       setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。')
@@ -517,7 +516,7 @@ function Handover() {
                 <div key={bucket.key} className="border-hairline rounded-card border p-4">
                   <p className="text-ink-faint text-xs">{bucket.label}</p>
                   <p className="text-ink mt-1 text-2xl font-semibold">
-                    {countsAreComplete ? `${handover.counts?.[bucket.key].toLocaleString('ja-JP')}人` : '—'}
+                    {countsAreComplete ? `${formatNumber(handover.counts?.[bucket.key])}人` : '—'}
                   </p>
                   <p className="text-ink-faint mt-1 text-xs">{bucket.note}</p>
                 </div>
@@ -644,7 +643,7 @@ function Handover() {
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              <Button href={`/accounts/detail?id=${account.id}`}>やめる</Button>
+              <Button href={`/accounts/detail?id=${account.id}`}>キャンセル</Button>
               {/* 取り消しは進行中だけ。終わった引き継ぎは切り戻しで戻す。変更なので見るだけには出さない。 */}
               {canManage && handover.status !== 'completed' && handover.status !== 'failed' && (
                 <Button type="button" variant="danger"

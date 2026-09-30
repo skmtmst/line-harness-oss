@@ -139,8 +139,8 @@ describe('V6 顧客へのお知らせの寸法', () => {
   })
 
   it('#988 NEXT-05: テスト送信は「テスト受信者に送信」と名付け、宛先を見せる確認を挟む', () => {
-    expect(CODE).toContain('テスト受信者に送信')
-    expect(CODE).not.toContain('自分にテスト送信')
+    expect(CODE).toContain('テスト受信者に送る')
+    expect(CODE).not.toContain('自分にテストを送る')
     // 宛先は登録済みのテスト受信者。開いただけでは送らず、0人・失敗では送信不可。
     expect(CODE).toContain('api.accountSettings.getTestRecipients(accountId)')
     expect(CODE).toContain("onConfirm={testRecipients.state === 'ready' && testRecipients.items.length > 0 ? confirmTestSend : undefined}")

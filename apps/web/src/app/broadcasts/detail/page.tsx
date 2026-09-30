@@ -30,6 +30,7 @@ import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components
 import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
 import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { formatNumber } from '@/lib/format'
 
 function BroadcastDetailInner() {
   const params = useSearchParams()
@@ -493,7 +494,7 @@ function BroadcastDetailInner() {
             <section aria-label="承認の依頼" className="bg-canvas rounded-card border-hairline border p-5">
               <p className="text-ink text-sm font-semibold">承認を依頼する</p>
               <p className="text-ink-secondary mt-1 text-xs leading-5">
-                {approvalState.gate.recipientCount.toLocaleString('ja-JP')}人への配信です。
+                {formatNumber(approvalState.gate.recipientCount)}人への配信です。
                 承認されるまで送られません。
               </p>
               <div className="mt-3">
@@ -539,7 +540,7 @@ function BroadcastDetailInner() {
                   state="active"
                   title="送信中"
                   percent={total > 0 ? (success / total) * 100 : 0}
-                  countText={`${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件`}
+                  countText={`${formatNumber(success)} / ${formatNumber(total)} 件`}
                   className="mt-3"
                 />
                 {/*
@@ -595,7 +596,7 @@ function BroadcastDetailInner() {
               unit="件"
               detail={
                 broadcast.status === 'sent'
-                  ? `${pct(success, total)} ・ 失敗 ${failed.toLocaleString('ja-JP')}件`
+                  ? `${pct(success, total)} ・ 失敗 ${formatNumber(failed)}件`
                   : broadcast.status === 'sending'
                     ? '送信中のため、失敗の数は終わってから確定します'
                     : '送信前のため、到達はまだありません'
@@ -664,7 +665,7 @@ function BroadcastDetailInner() {
               <Row label="宛先の条件" value={audienceLabel} />
               <Row
                 label="対象人数"
-                value={`${total.toLocaleString('ja-JP')}人（ブロック中を自動で除外）`}
+                value={`${formatNumber(total)}人（ブロック中を自動で除外）`}
               />
               <Row label="メッセージ" value={`1通（${messageTypeLabel(broadcast.messageType)}）`} />
               <Row
@@ -826,13 +827,13 @@ function SentResult({
               <div className="border-hairline rounded-control border p-3">
                 <p className="text-ink-faint text-xs font-semibold">送信成功</p>
                 <p className="text-ink mt-2 text-sm font-bold">{broadcast.totalCount > 0 ? rateText(delivered / broadcast.totalCount) : '—'}</p>
-                <p className="text-ink mt-1 text-lg font-bold">{delivered.toLocaleString('ja-JP')}人</p>
+                <p className="text-ink mt-1 text-lg font-bold">{formatNumber(delivered)}人</p>
                 <p className="text-ink-faint text-xs">届いた人</p>
               </div>
               <div className="border-hairline rounded-control border p-3">
                 <p className="text-ink-faint text-xs font-semibold">開封</p>
                 <p className="text-ink mt-2 text-sm font-bold">{insightState === 'loading' ? '読込中' : rateText(openRate)}</p>
-                <p className="text-ink mt-1 text-lg font-bold">{opened == null ? '—' : `${opened.toLocaleString('ja-JP')}人`}</p>
+                <p className="text-ink mt-1 text-lg font-bold">{opened == null ? '—' : `${formatNumber(opened)}人`}</p>
                 <p className="text-ink-faint text-xs">開いた人</p>
               </div>
             </div>
@@ -846,7 +847,7 @@ function SentResult({
                 {insight.links.map((link) => (
                   <div key={link.id} className="bg-canvas-sunken rounded-control flex items-center justify-between gap-4 p-3">
                     <div className="min-w-0"><p className="text-ink truncate text-sm font-semibold" title={link.label}>{link.label}</p><p className="text-ink-faint truncate text-xs" title={link.url}>{link.url}</p></div>
-                    <p className="text-ink-secondary shrink-0 text-xs">クリック {link.uniqueClickCount.toLocaleString('ja-JP')}人（{rateText(link.clickRate)}）</p>
+                    <p className="text-ink-secondary shrink-0 text-xs">クリック {formatNumber(link.uniqueClickCount)}人（{rateText(link.clickRate)}）</p>
                   </div>
                 ))}
               </div>
@@ -877,7 +878,7 @@ function SentResult({
             ) : null}
             <div className="bg-canvas-sunken mt-3 rounded-control p-3">
               <p className="text-ink text-sm font-bold">エラー</p>
-              <p className="text-ink-faint mt-1 text-xs">送信失敗 {failed.toLocaleString('ja-JP')}人</p>
+              <p className="text-ink-faint mt-1 text-xs">送信失敗 {formatNumber(failed)}人</p>
             </div>
           </section>
         </div>
@@ -887,7 +888,7 @@ function SentResult({
             <h2 className="text-ink text-base font-bold">配信した設定</h2>
             <p className="text-ink-faint mt-1 text-xs">この配信で使った対象と送信方法です。</p>
             <dl className="mt-4 space-y-3 text-sm">
-              <Row label="配信済み" value={`${delivered.toLocaleString('ja-JP')}人`} />
+              <Row label="配信済み" value={`${formatNumber(delivered)}人`} />
               <Row label="開封率" value={rateText(openRate)} />
               <Row label="クリック率" value={rateText(insight?.clickRate)} />
             </dl>
@@ -989,7 +990,7 @@ function Stat({
     <div className="bg-canvas rounded-card border-hairline border p-4">
       <p className="text-ink-faint text-xs">{label}</p>
       <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-        {value == null ? '—' : value.toLocaleString('ja-JP')}
+        {value == null ? '—' : formatNumber(value)}
         <span className="text-ink-faint ml-0.5 text-xs font-normal">{unit}</span>
       </p>
       <p className="text-ink-faint mt-0.5 text-xs">{detail}</p>
