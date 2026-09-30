@@ -1,0 +1,175 @@
+@layer components {
+/*
+ * 色を選ぶ（Pencil ★V8 `KVkPg`／`mpJVS`。macOS カラーウェル）。
+ *
+ *   閉じたとき  高さ36：色の見本（左・角丸）＋区切り線＋下向きの矢印
+ *   開いたとき  下にポップ（8×3 の色の格子・スポイト・十六進の欄）
+ *   動き        ポップは 8px 上から落ちながら開く（120ms）
+ */
+
+.root {
+  position: relative;
+  display: inline-block;
+}
+
+.well {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 4px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.well:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.well:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.well:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.swatch {
+  width: 28px;
+  height: 26px;
+  border-radius: var(--radius-mini);
+  box-shadow: inset 0 0 0 1px var(--color-board-line);
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-hairline);
+}
+
+.caret {
+  flex: none;
+}
+
+.pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  width: 236px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-float);
+  animation: color-well-pop var(--motion-fast) var(--motion-ease-out);
+}
+
+@keyframes color-well-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 0;
+  border-radius: var(--radius-mini);
+  box-shadow: inset 0 0 0 1px var(--color-board-line);
+  cursor: pointer;
+}
+
+.cell:hover {
+  transform: scale(1.12);
+}
+
+.cell:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.cell[aria-selected='true'] {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 1px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropper {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.dropper:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.hexField {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.hexField:focus-within {
+  outline: 2px solid var(--color-action);
+  outline-offset: -1px;
+}
+
+.hexMark {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.hexInput {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+}
