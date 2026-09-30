@@ -20,6 +20,7 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
 import DateField from '@/components/shared/date-field'
 import MenuPortal from '@/components/shared/menu-portal'
+import Button from '@/components/shared/button'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
@@ -112,19 +113,13 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   }
 
   const menuButton = (key: string, label: string, token?: string) => (
-    <button
-      type="button"
-      ref={(element) => {
-        buttonRefs.current[key] = element
-      }}
-      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
-      aria-expanded={open === key}
-      className={`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
+    <Button variant="secondary" className={(`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
         open === key ? 'bg-accent-soft text-accent-deep border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
-      }`}
-    >
+      }`) + ' whitespace-normal'} type="button" ref={(element) => {
+        buttonRefs.current[key] = element
+      }} onClick={() => token ? insert(token) : setOpen(open === key ? null : key)} aria-expanded={open === key}>
       {label}
-    </button>
+    </Button>
   )
 
   const list = (menuKey: string, items: Option[], empty: string) => (
@@ -162,13 +157,9 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     <div className="relative flex flex-wrap items-center gap-1.5">
       <span className="text-ink-faint text-xs">差し込み</span>
 
-      <button
-        type="button"
-        onClick={() => insert('{{name}}')}
-        className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-8 border px-2.5 text-xs"
-      >
+      <Button variant="secondary" className="text-ink-secondary h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
         名前
-      </button>
+      </Button>
 
       {fieldsEnabled && (
         <div className="relative">
@@ -219,27 +210,17 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
                 aria-label="目標日"
                 className="min-w-0 flex-1"
               />
-              <button
-                type="button"
-                disabled={!targetDate}
-                onClick={() => insert(`{{days_until:${targetDate}}}`)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-8 shrink-0 border px-3 text-xs disabled:opacity-40"
-              >
+              <Button variant="secondary" className="text-ink-secondary h-8 shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
                 入れる
-              </button>
+              </Button>
             </div>
 
             <p className="text-ink text-xs font-medium mt-3">配信日から何日後かの日付</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {[1, 3, 7, 14, 30].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => insert(`{{date+${n}}}`)}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-8 border px-2.5 text-xs"
-                >
+                <Button variant="secondary" className="text-ink-secondary h-8 px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
                   {n}日後
-                </button>
+                </Button>
               ))}
             </div>
           </div>

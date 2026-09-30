@@ -1571,12 +1571,9 @@ function FriendDetailInner() {
                   ) : (
                     <span className="text-ink-faint text-xs">タグはありません</span>
                   )}
-                  <Link
-                    href={inboxHrefForFriend(friendId)}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-2 py-0.5 text-[11px]"
-                  >
+                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
                     ＋ 追加
-                  </Link>
+                  </Button>
                 </div>
               </div>
 
@@ -2028,19 +2025,14 @@ function FriendDetailInner() {
                           chip.id === BASIC_GROUP ? '' : `&group=${encodeURIComponent(chip.id)}`
                         }`
                         return (
-                          <Link
-                            key={chip.id}
-                            href={href}
-                            aria-current={active ? 'true' : undefined}
-                            className={`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          <Button variant="secondary" className={(`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
                               active
                                 ? 'border-accent bg-accent-soft text-accent-deep'
                                 : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-                            }`}
-                          >
+                            }`) + ' h-auto whitespace-normal'} key={chip.id} href={href} aria-current={active ? 'true' : undefined}>
                             {chip.label}
                             <span className="ml-1 text-ink-faint">{chip.count}</span>
-                          </Link>
+                          </Button>
                         )
                       })}
                     </div>
@@ -2149,20 +2141,13 @@ function FriendDetailInner() {
                     */}
                     {canSaveFields ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={save}
-                          disabled={saving}
-                          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-                        >
+                        <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={save} disabled={saving}>
                           {saving ? '保存中...' : '保存する'}
-                        </button>
+                        </Button>
                         {canManageFieldDefs && (
-                          <Link
-                            href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-                          >
+                          <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>
                             項目を作る
-                          </Link>
+                          </Button>
                         )}
                       </div>
                     ) : (
