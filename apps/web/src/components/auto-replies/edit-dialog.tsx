@@ -597,8 +597,7 @@ export default function EditDialog({
     <>
       {page ? (
         <>
-          <Button type="button" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '下書きを保存する'}
+          <Button type="button" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">下書きを保存する
           </Button>
           {step === 'basic' && <Button type="button" variant="primary" onClick={() => moveTo('trigger')}>反応条件へ</Button>}
           {step === 'trigger' && <Button type="button" variant="primary" onClick={() => moveTo('response')}>何を返すかへ</Button>}
@@ -607,8 +606,7 @@ export default function EditDialog({
       ) : (
         <>
           <Button type="button" onClick={onClose}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '保存する'}
+          <Button type="button" variant="primary" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">保存する
           </Button>
         </>
       )}

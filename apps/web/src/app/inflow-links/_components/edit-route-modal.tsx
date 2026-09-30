@@ -171,9 +171,8 @@ export default function EditRouteModal({
           <Button
             variant="primary"
             onClick={onSubmit}
-            disabled={saveDisabled}
-          >
-            {submitting ? '保存中…' : isNew ? '作る' : '保存する'}
+            disabled={saveDisabled} busy={submitting}>
+            {isNew ? '作る' : '保存する'}
           </Button>
         </div>
       }

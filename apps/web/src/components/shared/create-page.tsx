@@ -147,8 +147,8 @@ export default function CreatePage({
           保存して続けて作る
         </Button>
       )}
-      <Button variant="primary" onClick={() => run(false)} disabled={saving}>
-        {saving ? '保存中...' : (saveLabel ?? '保存する')}
+      <Button variant="primary" onClick={() => run(false)} disabled={saving} busy={saving} busyLabel="保存中...">
+        {(saveLabel ?? '保存する')}
       </Button>
     </>
   ) : (

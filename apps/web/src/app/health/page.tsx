@@ -434,8 +434,7 @@ export default function HealthPage() {
                   />
                 </div>
                 <div className="flex items-center gap-3">
-                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId}>
-                    {migrating ? '移行中...' : '移行を開始'}
+                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId} busy={migrating} busyLabel="移行中...">移行を開始
                   </Button>
                   <Button
                     type="button"

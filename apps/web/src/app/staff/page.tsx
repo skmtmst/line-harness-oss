@@ -10,6 +10,7 @@ import Checkbox from '@/components/shared/checkbox'
 import { RowActions } from '@/components/shared/row-actions'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import SearchField from '@/components/shared/search-field'
 import { Tabs } from '@/components/shared/tabs'
 import { ActionCell, DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
@@ -210,7 +211,7 @@ function SessionsCard() {
         {sessions.map((session) => <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
           <div className="min-w-0"><p className="truncate text-sm font-medium text-ink" title={session.userAgent ?? undefined}>{deviceLabel(session.userAgent)}{session.current && <span className="ml-2 rounded-pill bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-deep">この端末</span>}</p>
             <p className="mt-0.5 text-xs text-ink-faint">ログイン：{formatStaffDate(session.createdAt)}{session.ipPrefix ? `　・　接続元：${session.ipPrefix}` : ''}</p></div>
-          <Button variant="secondary" disabled={revokingId === session.id} onClick={() => (session.current ? setConfirmCurrent(true) : void revoke(session.id, false))}>{revokingId === session.id ? '終了中…' : 'ログインを終了'}</Button>
+          <Button variant="secondary" disabled={revokingId === session.id} onClick={() => (session.current ? setConfirmCurrent(true) : void revoke(session.id, false))} busy={revokingId === session.id} busyLabel="終了中…">ログインを終了</Button>
         </li>)}
       </ul>
     )}
@@ -454,7 +455,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       狭い幅では説明は本文（いまの権限カード）へ移し、下部は操作だけに絞る。
       高さは固定せず、長いエラー文は折り返してボタンを隠さない。
     */}
-    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{targetIsAdministrator ? '管理者の権限は確認だけできます。この画面からは変更できません。' : `${user.name}さんはいま「${ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。`}</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>{targetIsAdministrator ? '一覧へ戻る' : '×　キャンセル'}</Button>{!targetIsAdministrator && <Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存する'}</Button>}</div></div>
+    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{targetIsAdministrator ? '管理者の権限は確認だけできます。この画面からは変更できません。' : `${user.name}さんはいま「${ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。`}</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>{targetIsAdministrator ? '一覧へ戻る' : '×　キャンセル'}</Button>{!targetIsAdministrator && <Button disabled={saving} onClick={requestSave} busy={saving}>✓　{'見せる範囲を保存する'}</Button>}</div></div>
     <ConfirmDialog
       open={saveConfirmOpen}
       title={`${user.name}さんの見せる範囲を保存しますか？`}
@@ -548,7 +549,7 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
   const save = async () => { if (!/^\d{6}$/.test(code)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { await api.staff.confirmTwoFactorSetup(member.id, code); await onSaved(); onClose() } catch (caught) { setError(messageOf(caught)) } finally { setSaving(false) } }
   return <Modal onClose={onClose} wide><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">二段階認証を設定</h2><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
     <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-    <div className="mt-5 grid gap-5 sm:grid-cols-[220px_1fr]">{qr ? <img src={qr} alt="Authenticator登録用QRコード" className="h-[220px] w-[220px] rounded-control border border-hairline" /> : <div className="h-[220px] animate-pulse rounded-control bg-canvas-sunken" />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || '—'}</p></div></div></div>
+    <div className="mt-5 grid gap-5 sm:grid-cols-[220px_1fr]">{qr ? <img src={qr} alt="Authenticator登録用QRコード" className="h-[220px] w-[220px] rounded-control border border-hairline" /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || '—'}</p></div></div></div>
     <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* ★V7 共通 認証コード入力（xHzFK）。 */}<OtpInput value={code} onChange={setCode} labelledBy="staff-totp-label" invalid={Boolean(error)} disabled={saving} /></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
     <div className="mt-6 flex justify-end gap-2"><button onClick={onClose} className="cursor-pointer rounded-control border border-hairline px-4 py-2 text-sm">キャンセル</button><button onClick={() => void save()} disabled={saving || !uri} className="cursor-pointer rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50">✓ {saving ? '確認中…' : '設定を完了'}</button></div></Modal>
 }

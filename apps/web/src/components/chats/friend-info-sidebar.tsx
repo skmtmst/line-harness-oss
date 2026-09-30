@@ -8,6 +8,7 @@ import { tagTextColor } from '@/lib/presentation'
 import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { GripVertical, X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 
@@ -592,15 +593,20 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4 space-y-3 animate-pulse">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-pill bg-shell-gray" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-shell-gray rounded-mini w-32" />
-                <div className="h-2 bg-shell rounded-mini w-20" />
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div className="p-4 space-y-3 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-pill bg-shell-gray" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-shell-gray rounded-mini w-32" />
+                    <div className="h-2 bg-shell rounded-mini w-20" />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            }
+          />
         ) : error ? (
           /* INBOX-08: 失敗は文字だけにせず、その場で再試行できるようにする。 */
           <div className="space-y-2 p-4">
@@ -677,7 +683,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">マイル</h4>
               {mileage.kind === 'loading' ? (
-                <div className="h-24 animate-pulse rounded-card bg-shell" />
+                <DelayedSkeleton loading skeleton={<div className="h-24 animate-pulse rounded-card bg-shell" />} />
               ) : mileage.kind === 'error' ? (
                 /* INBOX-08: 失敗と未登録を分け、その場で再試行できる。 */
                 <div className="space-y-1.5">
@@ -863,7 +869,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 </a>
               </div>
               {friendFields.kind === 'loading' ? (
-                <div className="h-10 animate-pulse rounded-control bg-canvas-sunken" />
+                <DelayedSkeleton loading skeleton={<Skeleton className="block h-10 w-full rounded-control" />} />
               ) : friendFields.kind === 'error' ? (
                 <div className="space-y-1.5">
                   <p className="text-[11px] text-danger">項目を読み込めませんでした</p>

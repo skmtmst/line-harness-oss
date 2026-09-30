@@ -192,8 +192,7 @@ export default function ImpactReview({
         actions={(
           <>
             <Button type="button" onClick={onBack}>編集に戻る</Button>
-            <Button type="button" variant="primary" disabled={busy || !impact.canSave} onClick={onSave}>
-              {busy ? '保存中…' : 'このまま保存する'}
+            <Button type="button" variant="primary" disabled={busy || !impact.canSave} onClick={onSave} busy={busy}>このまま保存する
             </Button>
           </>
         )}

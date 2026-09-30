@@ -524,8 +524,7 @@ export default function ActionScoreRulesPage() {
                 <Field label="点の上限" htmlFor="score-max"><TextInput id="score-max" type="number" value={bundle.bands.max} disabled={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></Field>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button onClick={() => void previewBands()} disabled={!canEdit || bandPreviewBusy}>
-                  {bandPreviewBusy ? '数えています' : 'この分けかただと何人入るか見る'}
+                <Button onClick={() => void previewBands()} disabled={!canEdit || bandPreviewBusy} busy={bandPreviewBusy} busyLabel="数えています">この分けかただと何人入るか見る
                 </Button>
                 {bandPreview ? (
                   <p className="text-xs text-ink-secondary" role="status">

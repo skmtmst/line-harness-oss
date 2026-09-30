@@ -974,7 +974,7 @@ export function TestSendDialog({
                 )}
               </Notice>
             )}
-          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()}>{sending ? '送信中…' : result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
+          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
         </div>
       </div>
     )

@@ -148,8 +148,7 @@ export default function OpsLoginPage() {
             パスワードを忘れた方はこちら
           </Link>
         </div>
-        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full">
-          {busy === 'password' ? 'ログインしています…' : 'ログイン'}
+        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
         </Button>
       </form>
 
@@ -159,9 +158,8 @@ export default function OpsLoginPage() {
         <span className="h-px flex-1 bg-hairline" />
       </div>
 
-      <Button onClick={lineLogin} disabled={busy !== null} className="w-full">
-        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />
-        {busy === 'line' ? 'LINEへ移動中…' : 'LINE でログイン'}
+      <Button onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
+        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン
       </Button>
 
       <p className="text-center text-caption text-ink-faint">

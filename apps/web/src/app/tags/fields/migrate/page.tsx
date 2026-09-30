@@ -434,8 +434,8 @@ function MigrateFriendField() {
       <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-base font-bold text-ink">値を変換できるか事前確認</h2><p className="mt-1 text-sm text-ink-secondary">登録済みの値を読み取り、移行できる数だけを確認します。</p></div>
-          <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (!target && targetMode === 'existing' && !existingTargetId)}>
-            {checking ? '確認しています…' : targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
+          <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
+            {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
           </Button>
         </div>
         {preview ? (
@@ -504,13 +504,12 @@ function MigrateFriendField() {
             <Button type="button" onClick={() => void runPreview()} disabled={checking || running}>確認をやり直す</Button>
           ) : null}
           {confirmed && !run ? (
-            <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running}>
-              {running ? '実行中…' : '移行を実行する'}
+            <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running} busy={running} busyLabel="実行中…">移行を実行する
             </Button>
           ) : null}
           {!confirmed ? (
-            <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)}>
-              {checking ? '確認しています…' : targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
+            <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
+              {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
             </Button>
           ) : null}
         </>}

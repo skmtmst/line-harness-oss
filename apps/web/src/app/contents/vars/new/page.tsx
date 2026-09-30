@@ -656,8 +656,7 @@ function NewCommonVarInner() {
             <Button type="button" disabled={saving} onClick={() => void save(false, true)}>
               下書きを保存する
             </Button>
-            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
-              {saving ? '登録中…' : '登録する'}
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving} busyLabel="登録中…">登録する
             </Button>
           </>
         )}

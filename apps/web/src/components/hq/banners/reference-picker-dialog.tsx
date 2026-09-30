@@ -185,8 +185,7 @@ export default function ReferencePickerDialog({
         )}
         {nextBefore ? (
           <div className="flex justify-center">
-            <Button onClick={() => void loadMore()} disabled={loading}>
-              {loading ? '読み込んでいます…' : '続きを読み込む'}
+            <Button onClick={() => void loadMore()} disabled={loading} busy={loading} busyLabel="読み込んでいます…">続きを読み込む
             </Button>
           </div>
         ) : null}

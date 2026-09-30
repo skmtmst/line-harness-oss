@@ -98,8 +98,7 @@ export default function SessionCapacityCell({
           className="border-hairline text-ink w-20 rounded-control border px-2 py-1 text-xs"
         />
       </label>
-      <Button onClick={() => void save()} disabled={busy}>
-        {busy ? '保存中…' : '保存する'}
+      <Button onClick={() => void save()} disabled={busy} busy={busy}>保存する
       </Button>
       <button type="button" onClick={() => setEditing(false)} className="text-xs underline">
         キャンセル
