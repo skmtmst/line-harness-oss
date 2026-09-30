@@ -29,6 +29,7 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import { formatDay, formatRange } from '@/lib/format'
 
@@ -281,24 +282,43 @@ function StaffShiftsPageContent() {
 // 自分に紐づく予約スタッフを /staff/me で解決し、自分の勤務画面へ送る。
 // 紐づけが無い場合: 店舗の受付枠を見られる権限があれば従来どおり店舗ビュー、
 // なければ「紐づけ待ち」の案内を出す（真っ白な403画面にしない）。
+// R579: 2経路とも通信失敗したら「紐づけ無し」と断定しない。同画面での
+// 再試行の口を出し、復旧後は本人勤務へ進める。
 function OwnShiftEntry() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
-  const [resolved, setResolved] = useState<'loading' | 'store' | 'missing'>('loading')
+  const [resolved, setResolved] = useState<'loading' | 'store' | 'missing' | 'error'>('loading')
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       // 選択中アカウント優先。見つからなければ紐づく全件の先頭を使う。
+      // どちらか一方が成功すれば「取得できた」扱い。両方失敗のときだけ
+      // 通信失敗として、空（紐づけ無し）とは別の案内にする。
+      let firstError: unknown = null
       const scoped = selectedAccountId
-        ? await bookingApi.listMyStaff(selectedAccountId).catch(() => null)
+        ? await bookingApi.listMyStaff(selectedAccountId).catch((error: unknown) => {
+          firstError = error
+          return null
+        })
         : null
       const rows = scoped?.staff?.length
         ? scoped.staff
-        : (await bookingApi.listMyStaff().catch(() => null))?.staff ?? []
+        : await bookingApi.listMyStaff().catch((error: unknown) => {
+          // 選択中の取得が成功済み（空）なら、全体の失敗は通信失敗にしない。
+          if (!scoped) firstError = error
+          return null
+        }).then((res) => res?.staff ?? [])
       if (cancelled) return
       if (rows.length > 0) {
         router.replace(`/booking/staff/shifts?staff_id=${rows[0].id}`)
+        return
+      }
+      if (firstError !== null) {
+        setLoadError(firstError)
+        setResolved('error')
         return
       }
       const canSeeStore = canViewFeature('/booking/bookings')
@@ -307,9 +327,30 @@ function OwnShiftEntry() {
       setResolved(canSeeStore ? 'store' : 'missing')
     })()
     return () => { cancelled = true }
-  }, [router, selectedAccountId])
+  }, [router, selectedAccountId, attempt])
+
+  function retry() {
+    setLoadError(null)
+    setResolved('loading')
+    setAttempt((value) => value + 1)
+  }
 
   if (resolved === 'store') return <StoreShiftsView />
+  if (resolved === 'error') {
+    return (
+      <div className="space-y-4 pb-8">
+        <ListState
+          kind="error"
+          title="自分の勤務を読み込めませんでした"
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は画面の文のまま。紐づけが無いとは限らないので断定しない。
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の不具合などで担当者の情報を取得できませんでした。紐づけが無いとは限りません。「もう一度読み込む」を押してください。'}
+          error={loadError ?? undefined}
+          onRetry={retry}
+        />
+      </div>
+    )
+  }
   if (resolved === 'missing') {
     return (
       <div className="space-y-4 pb-8">
