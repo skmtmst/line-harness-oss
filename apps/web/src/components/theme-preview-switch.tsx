@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Toggle from '@/components/shared/toggle'
+import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 
 /*
  * ★V8 移行②: 担当者が新しい見た目（V8・試作）を試すための切り替え。
@@ -31,6 +32,8 @@ export default function ThemePreviewSwitch() {
       // プライベートモード等で保存できなくても、この画面だけの切り替えは効かせる
     }
     setTheme(next)
+    // v8 で初めて現れる部品（帯のベルなど）が、その場で値を取りに行けるようにする
+    window.dispatchEvent(new Event(ADMIN_THEME_CHANGED_EVENT))
   }
 
   if (theme === null) return null

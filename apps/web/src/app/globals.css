@@ -398,6 +398,13 @@
    */
   --color-board-line: #1d1d1f14;
   --shadow-board: 0 1px 2px #1d1d1f0a;
+  /* 左メニューで「いまの項目」の白い札にのせる薄い影（ink 8%）。 */
+  --shadow-nav-active: 0 1px 2px #1d1d1f14;
+  /*
+   * 灰色の地の上での「乗せたとき」の薄い白（左メニューの項目の hover）。
+   * 地より少し明るいだけなので、板の中の hover には使わない。
+   */
+  --color-nav-hover: #ffffff8c;
   /*
    * 印のタイル（数の帯のアイコン地）の6色。**タイルの中だけで使う**決まりで、
    * 状態の色・アクセントとは別系統。画面のボタンや文字には使わない。
@@ -455,6 +462,37 @@
 [data-theme="v8"] {
   --radius-control: 10px;
   --radius-panel: 16px;
+}
+
+/*
+ * ★V8 移行③: 外側（灰色の地・白い板1枚・上の帯）。
+ *
+ * 構造は v7 と同じ HTML のまま、v8 のときだけ見た目を切り替える。
+ * 画面をまたぐ規定（地の色・出し分けの印）はここへ。部品の中の値は
+ * 各部品の CSS Module が `[data-theme="v8"]` で上書きする。
+ *
+ * `.v8-only` / `.v7-only` は「そのテーマのときだけ出る要素」の印。
+ * v8 の新しい操作（検索・通知・メニュー畳み）は v7 では描かない。
+ */
+[data-theme="v8"] .v7-only {
+  display: none !important;
+}
+
+html:not([data-theme="v8"]) .v8-only {
+  display: none !important;
+}
+
+/* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
+[data-theme="v8"] body {
+  background-color: var(--color-shell);
+}
+
+/* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
+   メニューと組むので、狭い PC 幅でも帯を畳まない。 */
+@media (min-width: 1024px) {
+  [data-theme="v8"] .v8-topbar-wrap {
+    display: block;
+  }
 }
 
 /* ---------------------------------------------------------------------

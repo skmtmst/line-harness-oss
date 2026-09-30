@@ -260,4 +260,183 @@
     max-width: 120px;
   }
 }
+
+/* ---------------------------------------------------------------------
+ * ★V8 外側（移行③・Pencil `y3gx8R` / lh-pro-ui §1）
+ *
+ * 帯は高さ 60・地の上に直接置く（枠も地色も付けない）。左は畳むボタンと
+ * パンくず（アカウント › 画面名・13px）、右は 探す欄（幅260・高さ36・
+ * ⌘K の札）・アカウント切替・通知（36 角丸10の枠ボタン）・自分・
+ * ログアウト。区切り線は出さない。
+ * ------------------------------------------------------------------- */
+[data-theme="v8"] .root {
+  height: 60px;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.v8Left {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
+
+.crumbs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-label);
+}
+
+.crumbFrom {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumbSep {
+  color: var(--color-ink-faint);
+}
+
+.crumbCurrent {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 36px・角丸10・枠つきの絵ボタン（畳むボタンと通知で同じ形） */
+.iconButton {
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--color-surface-pearl);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+/* 探す欄。幅260・高さ36・左に絵・右に ⌘K の札 */
+.search {
+  position: relative;
+  display: flex;
+  width: 260px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.searchInput {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  padding: 0 42px 0 34px;
+}
+
+.searchInput::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.searchInput:focus-visible {
+  border-color: var(--color-status-info);
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 0;
+}
+
+/* ブラウザが付ける × は ⌘K の札と重なるので消す */
+.searchInput::-webkit-search-cancel-button {
+  display: none;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-ink-faint);
+  pointer-events: none;
+}
+
+.searchKbd {
+  position: absolute;
+  right: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  background: var(--color-shell);
+  color: var(--color-ink-faint);
+  font-family: var(--font-sans);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  padding: 2px 6px;
+  pointer-events: none;
+}
+
+/* 未読の数。ベルの右上へ赤い丸（白い数字）。 */
+.bellBadge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: inline-flex;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-shell);
+  border-radius: var(--radius-pill);
+  background: var(--color-danger);
+  color: var(--color-canvas);
+  font-size: var(--text-nano);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 0 3px;
+}
+
+/* 自分。名まえの頭1文字を36pxの丸で出す。 */
+.avatar {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+[data-theme="v8"] .separator {
+  display: none;
+}
+
+[data-theme="v8"] .actions {
+  gap: 8px;
+}
 }
