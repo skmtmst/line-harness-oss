@@ -138,6 +138,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/friends/{id}/tags/{tagId}',
   'DELETE /api/file-scans/{id}',
   'DELETE /api/hq/banners/images/{id}',
+  'DELETE /api/hq/templates/media',
   'DELETE /api/hq/templates/{id}',
   'DELETE /api/line-accounts/{id}',
   'DELETE /api/mileage/rules/{id}',
