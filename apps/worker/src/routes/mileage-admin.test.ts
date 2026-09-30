@@ -50,6 +50,8 @@ const dbMocks = {
   getMileageReward: vi.fn(),
   getMileageRewardAdminOverview: vi.fn(),
   getMileageRedemption: vi.fn(),
+  isMileageRefundComplete: vi.fn(),
+  refundMileageRewardRedemption: vi.fn(),
   listMileageRedemptions: vi.fn(),
   importMileageRewardCodes: vi.fn(),
   publishMileageReward: vi.fn(),
@@ -372,7 +374,7 @@ describe('mileage admin API', () => {
   });
 
   it('refuses to retry a redemption that is not failing', async () => {
-    for (const status of ['reserved', 'succeeded', 'refunded']) {
+    for (const status of ['reserved', 'succeeded']) {
       dbMocks.getMileageRedemption.mockResolvedValueOnce({
         id: `redemption-${status}`, lineAccountId: 'account-1', status,
       });
@@ -382,7 +384,46 @@ describe('mileage admin API', () => {
       expect(response.status).toBe(409);
       expect(await response.json()).toMatchObject({ code: 'redemption_not_retryable' });
     }
+    // R362: 書き込み済みの返却のやり直しも従来どおり409（二重返却なし）。
+    dbMocks.getMileageRedemption.mockResolvedValueOnce({
+      id: 'redemption-refunded', lineAccountId: 'account-1', status: 'refunded',
+    });
+    dbMocks.isMileageRefundComplete.mockResolvedValueOnce(true);
+    const completed = await call('/api/mileage/redemptions/redemption-refunded/retry-fulfillment', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(completed.status).toBe(409);
+    expect(await completed.json()).toMatchObject({ code: 'redemption_not_retryable' });
     expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
+    expect(dbMocks.refundMileageRewardRedemption).not.toHaveBeenCalled();
+  });
+
+  /*
+   * R362: 返却確定後に書き込みが中断した交換のやり直しは、
+   * 欠けた書き込みを足して202で返す（直す前は一律409で残高が戻らない＝赤）。
+   */
+  it('resumes a refunded redemption whose writes were interrupted', async () => {
+    const stuck = { id: 'redemption-stuck', lineAccountId: 'account-1', status: 'refunded' };
+    dbMocks.getMileageRedemption.mockResolvedValue(stuck);
+    dbMocks.isMileageRefundComplete.mockResolvedValue(false);
+    dbMocks.refundMileageRewardRedemption.mockResolvedValue({ ...stuck });
+    deliveryMocks.deliverMileageReward.mockResolvedValueOnce({
+      status: 'delivery_failed', rewardName: '交換品', customerMessage: '', rewardCode: null,
+      retryAt: null, failurePolicy: 'refund', message: '交換したマイルは戻されています。',
+    });
+    const response = await call('/api/mileage/redemptions/redemption-stuck/retry-fulfillment', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(response.status).toBe(202);
+    expect(dbMocks.refundMileageRewardRedemption).toHaveBeenCalledWith(
+      expect.anything(), { redemptionId: 'redemption-stuck', reason: '中断した返却の再開' },
+    );
+    expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledWith(
+      expect.anything(), 'redemption-stuck', expect.objectContaining({}),
+    );
+    const body = await response.json() as { success: boolean; data: { redemption: { id: string } } };
+    expect(body.success).toBe(false);
+    expect(body.data.redemption).toMatchObject({ id: 'redemption-stuck' });
   });
 
   it('maps insufficient mileage and out-of-stock exchange failures without a 500', async () => {
