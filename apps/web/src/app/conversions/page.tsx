@@ -18,7 +18,7 @@ import type { ConversionPoint } from '@line-crm/shared'
 import { deduplicationLabel } from './dedup'
 import { originInfoOf } from './origin-labels'
 import { readExclusionCondition, readExclusionMemo, readExclusionView, type ExclusionCondition } from './conversion-exclusion'
-import { pruneCondition } from '@/components/shared/condition-builder'
+import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import KpiCard from '@/components/shared/kpi-card'
 
@@ -558,6 +558,16 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       setEditError('数えない条件のメモは500文字以内で入力してください')
       return
     }
+    /*
+     * S4-OR: 空の「いずれか」のかたまり・未完成の行は、黙って
+     * 「除外なし」に落とさない。足すつもりの条件が無いまま数えると
+     * 広く数えすぎるので、版上げを止めて直し方を案内する。
+     */
+    const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
+    if (exclusionIssue) {
+      setEditError(exclusionIssue)
+      return
+    }
     setEditSaving(true)
     setEditError('')
     try {
@@ -566,7 +576,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         expectedVersion: editTarget.version,
         name,
         sourceType: editForm.sourceType,
-        // R40: 数えない条件とメモも次の版に入れる。書きかけの行は落とす。
+        // R40: 数えない条件とメモも次の版に入れる。書きかけの行・空のかたまりは上で止める。
         sourceConfig: {
           ...editTarget.sourceConfig,
           exclusion: pruneCondition(editForm.exclusion),

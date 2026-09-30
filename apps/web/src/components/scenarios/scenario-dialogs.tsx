@@ -18,6 +18,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
+  findConditionDraftIssue,
   findInvalidRangeIssue,
   isEmptyCondition,
   isRuleComplete,
@@ -131,6 +132,8 @@ export function ConditionDialog({
   const [error, setError] = useState('')
   /* R247: 入力済みの不正範囲は欄の下で知らせて止める。保存済みは維持する。 */
   const [rangeError, setRangeError] = useState('')
+  /* S4-OR: 空のかたまり・未完成の行は黙って落とさず、直し方を案内して止める。 */
+  const [draftError, setDraftError] = useState('')
 
   return (
     <Shell
@@ -154,6 +157,16 @@ export function ConditionDialog({
                 return
               }
               setRangeError('')
+              /*
+               * S4-OR: 空の「いずれか」のかたまり・未完成の行は、そのまま
+               * 反映すると広い相手へ送られる。落とさず、直し方を案内する。
+               */
+              const draftIssue = findConditionDraftIssue(draft)
+              if (draftIssue) {
+                setDraftError(draftIssue)
+                return
+              }
+              setDraftError('')
               setSaving(true)
               setError('')
               try {
@@ -181,6 +194,9 @@ export function ConditionDialog({
       )}
       {rangeError && (
         <Notice tone="validation" className="mb-4" message={rangeError} />
+      )}
+      {draftError && (
+        <Notice tone="validation" className="mb-4" message={draftError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
