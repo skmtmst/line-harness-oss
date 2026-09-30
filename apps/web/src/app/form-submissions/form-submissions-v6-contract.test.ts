@@ -316,9 +316,10 @@ describe('V6回答フォームの中項目(#503 M3・M9)', () => {
 
   it('保存前に選択肢・URL・期限の形を見て、未保存のままの移動は確認する', () => {
     expect(EDIT_PAGE).toContain('validateLayoutForSave(layout)')
-    // 未保存の離脱確認は共通フックに一本化（DETAIL-04系の画面ごとの差を無くす）。
+    // 未保存の離脱確認は共通フック＋共通の確認窓に一本化（DETAIL-04系の
+    // 画面ごとの差を無くす。文言・向きは UnsavedLeaveDialog 側の契約で固定）。
     expect(EDIT_PAGE).toContain('useUnsavedGuard')
-    expect(EDIT_PAGE).toContain('保存していない変更があります')
+    expect(EDIT_PAGE).toContain('UnsavedLeaveDialog')
     expect(EDIT_PAGE).toContain('savedSnapshot.current = currentSnapshot')
   })
 })

@@ -33,6 +33,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
@@ -971,12 +972,10 @@ function SavedSearchEditInner() {
         )}
       />
       <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、検索条件への変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="検索条件への変更"
+        busy={saving}
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
