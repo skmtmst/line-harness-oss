@@ -232,6 +232,22 @@ describe('R261 再追加「何も配信しない」は配信欄を適用外に�
     expect(host.querySelector('[data-caption="再追加では配信しません"]')).not.toBeNull()
   })
 
+  it('R261残部: 確認段の右側プレビューにも保存済み本文を出さない', async () => {
+    // 保存済みの本文は設定データとして残るが、届くかのようには見せない。
+    state.search = 'step=preview'
+    await renderExisting({ returningMode: 'none', messageText: 'おかえりなさい' })
+    expect(host.querySelector('[data-caption="再追加では配信しません"]')).not.toBeNull()
+    expect(host.textContent).toContain('メッセージは届きません')
+    expect(host.textContent).not.toContain('おかえりなさい')
+  })
+
+  it('確認段では「別のシナリオ」の保存済み本文はそのまま出す', async () => {
+    state.search = 'step=preview'
+    await renderExisting({ returningMode: 'other', messageText: 'おかえりなさい' })
+    expect(host.querySelector('[data-caption="再追加では配信しません"]')).toBeNull()
+    expect(host.textContent).toContain('おかえりなさい')
+  })
+
   it('「別のシナリオ」では通常どおり本文・シナリオ欄を出す', async () => {
     state.search = 'step=message'
     await renderExisting({ returningMode: 'other' })
