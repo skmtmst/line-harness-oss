@@ -44,7 +44,7 @@ import {
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check'
-import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
+import { newBroadcastDraftSession, persistBroadcastDraft, type BroadcastDraftSession } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -622,6 +622,17 @@ export default function BroadcastForm({
    * さらに別のレコードになる。アカウントを切り替えた場合だけ新しい下書きへ分ける。
    */
   const draftSession = useRef(newBroadcastDraftSession())
+  /*
+   * R625/R626/R627: 保存の直列化とアカウント別の世代管理。
+   * 同じアカウントの保存が重なったら後から来た方は先行を待ってから
+   * 最新の入力で送り直す（初回作成の二重POSTにしない）。
+   * 別アカウントの応答で今のアカウントの保存表示・版・下書きIDを
+   * 書き換えない。作りかけの冪等キーはアカウントごとに1つに保つ。
+   */
+  const saveInFlightRef = useRef<{ accountId: string | null; promise: Promise<ApiBroadcast | null> } | null>(null)
+  const draftSessionsByAccount = useRef(new Map<string | null, BroadcastDraftSession>())
+  const createKeyByAccount = useRef(new Map<string | null, string>())
+  const autosaveRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const appliedInitialTemplate = useRef(false)
   // 独立審査(指摘4): テンプレート読み込みの世代照合と選択中アカウントの記録。
   const templateLoadGenerationRef = useRef(createLoadGeneration())
@@ -923,6 +934,7 @@ export default function BroadcastForm({
         version: draft.version ?? 1,
         createKey: draftSession.current.createKey,
       }
+      draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
       setEditingDraft(draft)
       // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
       cleanFingerprintRef.current = null
@@ -1373,7 +1385,7 @@ export default function BroadcastForm({
     saveAsDraft = false,
     confirmedCount?: number,
   ): Promise<ApiBroadcast | null> => {
-    const accountId = selectedAccountId || null
+    const accountId = selectedAccountIdRef.current || null
     /*
      * 編集中にアカウントが切り替わったまま保存すると、下書きが別アカウントの
      * 新規配信として増える（セッションのアカウントと合わないため）。
@@ -1383,10 +1395,52 @@ export default function BroadcastForm({
       setError('別のLINEアカウントへ切り替わっています。元のアカウントへ戻してから保存してください。')
       return null
     }
+    /*
+     * R627: 同じアカウントの保存が重なったら先行を待つ。
+     * 待たずに2つ投げると初回作成が2回・冪等キー2種になり、
+     * 下書きが2件・保持IDの競合になる。待った後は最新の入力で
+     * 送り直すので、段移動（draftStepの違い）も更新で追いつく。
+     */
+    const inFlight = saveInFlightRef.current
+    if (inFlight && inFlight.accountId === accountId) {
+      try {
+        await inFlight.promise
+      } catch {
+        /* 先行の失敗はこの保存の判断に混ぜない。下で最新を送る。 */
+      }
+      if ((selectedAccountIdRef.current || null) !== accountId) return null
+    }
     const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
+    /*
+     * R627: 作りかけの冪等キーはアカウントごとに1つ。
+     * 初期セッション（accountId=null）のまま毎回新しい鍵を作ると、
+     * 並んだ2つの初回作成が別物になる。ここで束ねて同じ鍵を使い回す。
+     */
+    const sessionForAccount = (() => {
+      const stored = draftSessionsByAccount.current.get(accountId)
+      if (stored) return stored
+      if (draftSession.current.accountId === accountId) {
+        draftSessionsByAccount.current.set(accountId, draftSession.current)
+        return draftSession.current
+      }
+      const stableKey = createKeyByAccount.current.get(accountId)
+        ?? (() => {
+          const next = crypto.randomUUID()
+          createKeyByAccount.current.set(accountId, next)
+          return next
+        })()
+      const fresh = newBroadcastDraftSession(accountId, stableKey)
+      draftSessionsByAccount.current.set(accountId, fresh)
+      return fresh
+    })()
+    let settleInFlight: (value: ApiBroadcast | null) => void = () => undefined
+    const ourPromise = new Promise<ApiBroadcast | null>((resolve) => {
+      settleInFlight = resolve
+    })
+    saveInFlightRef.current = { accountId, promise: ourPromise }
     try {
       const result = await persistBroadcastDraft(
-        draftSession.current,
+        sessionForAccount,
         accountId,
         payload,
         {
@@ -1395,18 +1449,35 @@ export default function BroadcastForm({
             api.broadcasts.update(id, { ...draftPayload, expectedVersion }),
         },
       )
-      draftSession.current = result.session
-      return result.broadcast
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 409 && draftSession.current.draftId) {
-        const current = await api.broadcasts.get(draftSession.current.draftId)
-        if (current.success) {
-          draftSession.current = { ...draftSession.current, version: current.data.version ?? null }
-        }
-        setError('別の画面で更新されたため読み直しました')
+      /*
+       * R626: 待っている間にアカウントが変わっていたら、今の画面の
+       * 保存表示・版・下書きIDへ混ぜない。古い方のセッションだけ残し、
+       * 今のアカウントは未保存のままにする。
+       */
+      draftSessionsByAccount.current.set(accountId, result.session)
+      if ((selectedAccountIdRef.current || null) !== accountId) {
+        settleInFlight(null)
         return null
       }
+      draftSession.current = result.session
+      settleInFlight(result.broadcast)
+      return result.broadcast
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && sessionForAccount.draftId) {
+        const current = await api.broadcasts.get(sessionForAccount.draftId)
+        if (current.success && (selectedAccountIdRef.current || null) === accountId) {
+          const refreshed = { ...sessionForAccount, version: current.data.version ?? null }
+          draftSessionsByAccount.current.set(accountId, refreshed)
+          draftSession.current = refreshed
+        }
+        setError('別の画面で更新されたため読み直しました')
+        settleInFlight(null)
+        return null
+      }
+      settleInFlight(null)
       throw e
+    } finally {
+      if (saveInFlightRef.current?.promise === ourPromise) saveInFlightRef.current = null
     }
   }
 
@@ -1424,6 +1495,8 @@ export default function BroadcastForm({
     (key, value) => (key === 'lineAccountId' ? undefined : value),
   )
   const cleanFingerprintRef = useRef<string | null>(null)
+  const formFingerprintRef = useRef(formFingerprint)
+  formFingerprintRef.current = formFingerprint
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [autosaving, setAutosaving] = useState(false)
   const autosavingRef = useRef(false)
@@ -1435,6 +1508,8 @@ export default function BroadcastForm({
   })
   const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
+  const leaveTargetRef = useRef(leaveTarget)
+  leaveTargetRef.current = leaveTarget
 
   /*
    * 入力が2秒止まったら下書きへ静かに保存する。打つたびに送ると
@@ -1444,11 +1519,17 @@ export default function BroadcastForm({
   const autosaveDraft = async () => {
     if (autosavingRef.current || saving || testSending) return
     if (!selectedAccountId || validate()) return
+    const requestAccountId = selectedAccountIdRef.current || null
     autosavingRef.current = true
     setAutosaving(true)
     const fingerprintAtSave = formFingerprint
     try {
       const saved = await persistDraft(scheduledAtIso(), true)
+      /*
+       * R626: 別アカウントへ移っていたら今の画面へ混ぜない。
+       * persistDraftがnullで返すのでここでも世代で守る。
+       */
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (saved) {
         cleanFingerprintRef.current = fingerprintAtSave
         setDraftSavedAt(Date.now())
@@ -1460,8 +1541,29 @@ export default function BroadcastForm({
     } finally {
       autosavingRef.current = false
       setAutosaving(false)
+      /*
+       * R625: 保存中に追記されていたら置き去りにしない。
+       * 指紋が進んでいたら2秒後にもう一度静かに送る。
+       * アカウントが変わっていたら今のアカウントの入力は触らない。
+       */
+      if (
+        (selectedAccountIdRef.current || null) === requestAccountId
+        && formFingerprintRef.current !== fingerprintAtSave
+        && leaveTargetRef.current === null
+      ) {
+        if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
+        autosaveRetryTimer.current = setTimeout(() => autosaveDraftRef.current(), 2000)
+      }
     }
   }
+
+  /*
+   * R625: 置き去りの再送は最新の入力で送る。
+   * タイマーに閉じ込めた古い autosaveDraft を呼ぶと追記前の本文で
+   * 更新してしまう。毎描画で最新の関数へ付け替えて呼ぶ。
+   */
+  const autosaveDraftRef = useRef(() => {})
+  autosaveDraftRef.current = () => void autosaveDraft()
 
   useEffect(() => {
     if (!dirty || leaveTarget !== null) return
@@ -1470,6 +1572,10 @@ export default function BroadcastForm({
     // autosaveDraft は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formFingerprint, dirty, selectedAccountId, saving, testSending, leaveTarget])
+
+  useEffect(() => () => {
+    if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
+  }, [])
 
   // 「下書き保存済み・◯秒前」の秒数だけ10秒ごとに進める。
   useEffect(() => {
@@ -1504,10 +1610,13 @@ export default function BroadcastForm({
     }
     setSaving(true)
     setError('')
+    const requestAccountId = selectedAccountIdRef.current || null
     const fingerprintAtSave = formFingerprint
     try {
       // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
       const saved = await persistDraft(scheduledAtIso(), true)
+      // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
       if (saved) {
         cleanFingerprintRef.current = fingerprintAtSave
         setDraftSavedAt(Date.now())
