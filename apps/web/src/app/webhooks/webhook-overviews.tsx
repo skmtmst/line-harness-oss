@@ -565,7 +565,7 @@ export function OutgoingOverview({
                               {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
                               <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
                               <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
-                              <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除</Button>
+                              <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除する</Button>
                             </>
                           ) : null}
                           {/*
@@ -621,7 +621,7 @@ export function OutgoingOverview({
             : ''
         }
         confirmLabel="この送り先へ送る"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         busy={testingId !== null}
         onConfirm={() => {
           if (testTarget) void runTest(testTarget)
@@ -979,7 +979,7 @@ export function IncomingOverview({
                       ? (selected.isActive ? '止めています…' : '動かしています…')
                       : (selected.isActive ? '止める' : '動かす')}
                   </Button>
-                  <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
+                  <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新する</Button>
                 </>
               ) : null}
               <Button
@@ -996,7 +996,7 @@ export function IncomingOverview({
                 届いたつもりで試す
               </Button>
               {canManage ? (
-                <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
+                <Button variant="secondary" onClick={() => onDelete(selected)}>削除する</Button>
               ) : null}
             </div>
             {canManage ? null : (

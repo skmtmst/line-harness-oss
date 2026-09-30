@@ -498,7 +498,7 @@ function MileageRewardEditorInner() {
               {testing ? '交換テスト中' : '自分で交換をテスト'}
             </Button>
             <Button onClick={() => void save(false)} disabled={saving || testing}>
-              {saving ? '保存中' : '下書きを保存'}
+              {saving ? '保存中' : '下書きを保存する'}
             </Button>
             <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
               保存して出す

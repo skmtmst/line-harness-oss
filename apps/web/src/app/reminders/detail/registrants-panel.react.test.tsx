@@ -156,7 +156,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     await render()
     expect(host.textContent).toContain('田中 花子')
     await pickTargetDate('田中 花子の基準日', '2026-10-08T09:00')
-    await click('基準日を保存')
+    await click('基準日を保存する')
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', expect.stringMatching(/^2026-10-08T/), 4)
     expect(host.textContent).toContain('未送信分だけ新しい日程で組み直します。')
   })
@@ -205,7 +205,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     const trigger = document.querySelector('button[aria-label="田中 花子の基準日"]')
     // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（日本語の見せ方）。
     expect(trigger?.textContent).toContain('2026年9月16日（水）10:00')
-    await click('基準日を保存')
+    await click('基準日を保存する')
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', '2026-09-16T01:00:00.000Z', 4)
   })
 })

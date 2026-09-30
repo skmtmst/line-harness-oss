@@ -463,7 +463,7 @@ function FriendMileageInner() {
         busy={pendingBusy}
         error={pendingError}
         confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         onConfirm={() => void runPendingAction()}
         onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
       >

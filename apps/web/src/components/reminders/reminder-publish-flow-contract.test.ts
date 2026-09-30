@@ -57,10 +57,10 @@ describe('V6 リマインダの公開フロー', () => {
      * 「隠すのではなく、そもそも描かない」を完了条件にしている。
      * 動くまで描かず、押せるのに何も起きない状態を作らない。
      */
-    for (const label of ['条件を編集', '＋ アクションを追加']) {
+    for (const label of ['条件を編集', '＋ アクションを追加する']) {
       expect(FLOW, `${label} が公開フローに描かれています`).not.toContain(`>${label}<`)
     }
-    for (const label of ['＋ フォルダを追加', 'ひな形を管理', 'このひな形を使う']) {
+    for (const label of ['＋ フォルダを追加する', 'ひな形を管理', 'このひな形を使う']) {
       expect(NEW_PAGE, `${label} が新規作成に描かれています`).not.toContain(`>${label}<`)
     }
     /*
@@ -68,7 +68,7 @@ describe('V6 リマインダの公開フロー', () => {
      * 動作は reminder-step-editor.react.test.tsx が保証する。
      * まだ動かない「複製」「通知イメージを見る」は描かないままにする。
      */
-    for (const label of ['この通知を複製', '通知イメージを見る', '＋ アクションを追加']) {
+    for (const label of ['この通知を複製', '通知イメージを見る', '＋ アクションを追加する']) {
       expect(STEP_EDITOR, `${label} が通知編集に描かれています`).not.toContain(`>${label}<`)
     }
   })

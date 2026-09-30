@@ -126,7 +126,7 @@ function titleInput(): HTMLInputElement | null {
 
 function saveButton(): HTMLButtonElement | undefined {
   return Array.from(container.querySelectorAll('button')).find(
-    (button) => button.textContent === '下書き保存' && !button.disabled,
+    (button) => button.textContent === '下書きを保存する' && !button.disabled,
   )
 }
 

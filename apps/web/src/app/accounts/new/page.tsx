@@ -381,9 +381,9 @@ export default function NewLineAccountPage() {
             actions={createdId ? <>
               {importingIds ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></> : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}
             </> : <>
-              <Button href="/accounts">やめる</Button>
+              <Button href="/accounts">キャンセル</Button>
               {currentStep > 1 && <Button type="button" disabled={Boolean(busyAction)} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}>戻る</Button>}
-              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)}>{currentStep === 4 ? busyAction === 'save' ? '接続して保存しています…' : '接続して保存' : '次へ'}</Button>
+              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)}>{currentStep === 4 ? busyAction === 'save' ? '接続して保存しています…' : '接続して保存する' : '次へ'}</Button>
             </>}
           />
         </div>

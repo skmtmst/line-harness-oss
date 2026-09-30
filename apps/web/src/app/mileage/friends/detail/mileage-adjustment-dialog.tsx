@@ -358,7 +358,7 @@ export default function MileageAdjustmentDialog({
                     <Field label="別のオーナー承認が必要になるマイル数" htmlFor="mileage-adjustment-threshold" required>
                       <TextInput id="mileage-adjustment-threshold" inputMode="numeric" value={policyThresholdText} onChange={(event) => setPolicyThresholdText(event.target.value.replace(/[^0-9]/g, ''))} />
                     </Field>
-                    <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存</Button>
+                    <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存する</Button>
                   </div>
                 </section>
               ) : null}

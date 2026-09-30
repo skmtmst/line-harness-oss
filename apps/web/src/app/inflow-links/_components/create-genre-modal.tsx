@@ -85,7 +85,7 @@ export default function GenreModal({
             disabled={!name.trim() || submitting}
             className="rounded-control bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90 disabled:opacity-40"
           >
-            {submitting ? '保存中…' : genre ? '変更を保存' : 'ジャンルを作成'}
+            {submitting ? '保存中…' : genre ? '保存する' : 'ジャンルを作る'}
           </button>
         </div>
       </div>

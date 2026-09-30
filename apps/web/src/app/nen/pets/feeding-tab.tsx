@@ -192,7 +192,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
             kind="staple"
             title="主食（お客様が選ぶ、ふだんのごはん）"
             description="一般的な種類だけ登録します。マイページの「いつもの主食」で選ばれ、1日の目安（g）はこの kcal で割ります。"
-            defaultLabel="既定の主食" defaultChip="既定" makeDefault="既定にする" addLabel="＋ 主食を追加" namePlaceholder="例：ドライフード（成犬・成猫用／総合栄養食）" kcalPlaceholder="360"
+            defaultLabel="既定の主食" defaultChip="既定" makeDefault="既定にする" addLabel="＋ 主食を追加する" namePlaceholder="例：ドライフード（成犬・成猫用／総合栄養食）" kcalPlaceholder="360"
             emptyTitle="まだ主食が登録されていません" emptyDescription="お客様が選ぶ一般的なフードの種類と、100g あたりのカロリーを登録してください。"
             drafts={drafts} onUpdate={update} onDefault={setDefault} onRemove={remove} onAdd={() => add('staple')} disabledAdd={drafts.length >= MAX_PRODUCTS}
           />
@@ -200,7 +200,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
             kind="nen"
             title="然の商品（おやつ・トッピング）"
             description="マイページの「然の鹿肉の目安」は、1日の必要カロリー × おやつの上限（%）を、「目安に使う」然の商品の kcal で割ります。"
-            defaultLabel="目安に使う商品" defaultChip="使う" makeDefault="これを使う" addLabel="＋ 然の商品を追加" namePlaceholder="例：然 鹿肉ジャーキー" kcalPlaceholder="300"
+            defaultLabel="目安に使う商品" defaultChip="使う" makeDefault="これを使う" addLabel="＋ 然の商品を追加する" namePlaceholder="例：然 鹿肉ジャーキー" kcalPlaceholder="300"
             emptyTitle="まだ然の商品が登録されていません" emptyDescription="然の商品名と、100g あたりのカロリーを登録すると「然の鹿肉の目安」が出ます。"
             drafts={drafts} onUpdate={update} onDefault={setDefault} onRemove={remove} onAdd={() => add('nen')} disabledAdd={drafts.length >= MAX_PRODUCTS}
           />

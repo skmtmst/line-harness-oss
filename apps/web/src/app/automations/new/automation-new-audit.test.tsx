@@ -183,7 +183,7 @@ async function clickButton(el: HTMLElement, text: string): Promise<void> {
 async function openTestConfirmation(el: HTMLDivElement): Promise<void> {
   await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, '試すルール')
   await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-  await clickButton(el, '下書きに保存')
+  await clickButton(el, '下書きを保存する')
   await typeText(el.querySelector('input[aria-label="1人テストの友だちID"]') as HTMLInputElement, 'friend-1')
   await clickButton(el, '1人で試す')
   if (!el.textContent?.includes('送る前に確認してください')) throw new Error('1人テストの確認が出ませんでした')
@@ -207,7 +207,7 @@ describe('R484・R485・R488: 1人テストの確認と実行', () => {
     const send = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'この内容で送る') as HTMLButtonElement
     await act(async () => { send.click() })
     // 読み取り中にやめる。確認窓が消える。
-    await clickButton(el, 'やめる')
+    await clickButton(el, 'キャンセル')
     expect(el.textContent).not.toContain('送る前に確認してください')
     await act(async () => { releaseRead(ok(draftDetail)) })
     await act(async () => { await drainMicrotasks() })
@@ -337,7 +337,7 @@ describe('R486・R487・R489: 共通アクションの版と公開の照合', ()
     const el = await mountPage()
     await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, '試すルール')
     await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await typeText(el.querySelector('input[aria-label="1人テストの友だちID"]') as HTMLInputElement, 'friend-1')
     await clickButton(el, '1人で試す')
     expect(el.textContent).not.toContain('送る前に確認してください')

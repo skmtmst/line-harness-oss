@@ -117,7 +117,7 @@ function SettlementCloseDialog({
       onCancel={onClose}
       footer={(
         <div className="border-hairline flex justify-end gap-2 border-t pt-4">
-          <Button type="button" onClick={onClose} disabled={busy}>やめる</Button>
+          <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => { void closeSettlement() }} disabled={busy || !preview?.conversionCount}>
             {busy ? '締めています…' : `${yen(preview?.totalAmount ?? 0)} で締める`}
           </Button>

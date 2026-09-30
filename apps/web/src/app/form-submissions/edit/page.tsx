@@ -1058,7 +1058,7 @@ function FormEditInner() {
                             className="text-danger px-1 text-xs"
                             title="このページを削除"
                           >
-                            削除
+                            削除する
                           </button>
                         )}
                       </span>
@@ -1120,7 +1120,7 @@ function FormEditInner() {
                     disabled={selectedIndex < 0}
                     className="text-danger hover:bg-danger-bg rounded-control px-2 py-1 text-xs disabled:opacity-40"
                   >
-                    削除
+                    削除する
                   </button>
 
                   <div className="relative">
@@ -1131,7 +1131,7 @@ function FormEditInner() {
                       aria-haspopup="menu"
                       className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
                     >
-                      ＋ ブロックを追加（12種）
+                      ＋ ブロックを追加する（12種）
                     </button>
                     <ActionMenu
                       open={showAddMenu}
@@ -1253,7 +1253,7 @@ function FormEditInner() {
               title="フォームを保存（公開中の内容は変わりません）"
               className="border-hairline text-ink bg-canvas hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
             >
-              {saving ? '保存中...' : '下書きを保存'}
+              {saving ? '保存中...' : '下書きを保存する'}
             </button>
             <button
               onClick={() => void save(true)}

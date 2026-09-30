@@ -340,7 +340,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         <ListState
           kind="error"
           description={loadError}
-          action={<Button type="button" onClick={() => void load()}>保存した検索を再読み込み</Button>}
+          action={<Button type="button" onClick={() => void load()}>保存した検索を読み直す</Button>}
         />
       ) : items.length === 0 ? (
         /*

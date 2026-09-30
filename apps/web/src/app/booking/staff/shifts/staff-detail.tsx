@@ -892,7 +892,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             </div>
             <div className="border-hairline flex flex-wrap items-center gap-3 border-t px-4 py-3">
               <Button variant="primary" onClick={() => void saveRules()} disabled={savingRules}>
-                {savingRules ? '保存中…' : 'いつもの勤務時間を保存'}
+                {savingRules ? '保存中…' : 'いつもの勤務時間を保存する'}
               </Button>
               {rulesSavedAt ? <span className="text-success text-xs">保存しました。下の予約枠に反映されています。</span> : null}
               {ruleError ? <p className="text-danger w-full text-xs">{ruleError}</p> : null}
@@ -937,7 +937,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                     onClick={() => setBreakRows((current) => current.filter((item) => item.key !== row.key))}
                     className="text-danger hover:underline text-xs"
                   >
-                    削除
+                    削除する
                   </button>
                 </div>
               ))}
@@ -961,7 +961,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button variant="primary" onClick={() => void saveBreaks()} disabled={savingBreaks}>
-                {savingBreaks ? '保存中…' : '休憩を保存'}
+                {savingBreaks ? '保存中…' : '休憩を保存する'}
               </Button>
               {breaksSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {breakError ? <p className="text-danger w-full text-xs">{breakError}</p> : null}
@@ -997,7 +997,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                       onClick={() => setDateRows((current) => current.filter((item) => item.key !== row.key))}
                       className="text-danger hover:underline text-xs"
                     >
-                      削除
+                      削除する
                     </button>
                   </div>
                 ))}
@@ -1021,7 +1021,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button variant="primary" onClick={() => void saveBreakDates()} disabled={savingDates}>
-                {savingDates ? '保存中…' : 'この日だけの休憩を保存'}
+                {savingDates ? '保存中…' : 'この日だけの休憩を保存する'}
               </Button>
               {datesSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {dateError ? <p className="text-danger w-full text-xs">{dateError}</p> : null}
@@ -1074,8 +1074,8 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                       />
                     </span>
                     <span className="inline-flex gap-2 text-xs">
-                      <button onClick={() => void saveShiftRow(shift)} disabled={savingShift} className="text-action hover:underline disabled:opacity-50">更新</button>
-                      <button onClick={() => setRemoveTarget(shift)} className="text-danger hover:underline">削除</button>
+                      <button onClick={() => void saveShiftRow(shift)} disabled={savingShift} className="text-action hover:underline disabled:opacity-50">更新する</button>
+                      <button onClick={() => setRemoveTarget(shift)} className="text-danger hover:underline">削除する</button>
                     </span>
                   </div>
                 )

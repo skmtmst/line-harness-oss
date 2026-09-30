@@ -1202,7 +1202,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             ) : null}
             {detailTarget.status !== 'stopped' ? (
               <Button onClick={() => void openStop(detailTarget)}>
-                停止・削除
+                停止・削除する
               </Button>
             ) : null}
           </div>
@@ -1421,7 +1421,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         onCancel={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}
         footer={(
           <div className="flex justify-end gap-2">
-            <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>やめる</Button>
+            <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>キャンセル</Button>
             <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()}>
               {editSaving ? '保存中...' : 'この内容にする'}
             </Button>

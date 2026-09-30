@@ -1166,8 +1166,8 @@ function BookingsInner() {
                   open={broadcastConfirmOpen && activeBroadcastPreview !== null}
                   title="この申込者へ送信を開始しますか？"
                   description={`確認済みの ${activeBroadcastPreview?.recipientCount ?? 0} 人へ送信します。送信開始後は取り消せません。`}
-                  confirmLabel="送信を開始"
-                  cancelLabel="戻る"
+                  confirmLabel="送る"
+                  cancelLabel="キャンセル"
                   busy={broadcastBusy}
                   error={broadcastError}
                   onConfirm={() => void sendOccurrenceBroadcast()}
@@ -1400,7 +1400,7 @@ function BookingsInner() {
         title="この予約を運営側でキャンセルしますか？"
         description="予約は「キャンセル」になり、枠が空きます。友だちにはLINEでキャンセルのお知らせが届きます。送ったお知らせは取り消せません。この画面から元の「確定」に戻すことはできません。"
         confirmLabel="キャンセルにする"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
         destructive
         busy={cancelling}
@@ -1454,7 +1454,7 @@ function BookingsInner() {
               ? '順番を変える'
               : '見送る'
         }
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         busy={promotingWaitlist}
         error={waitlistOpError}
         /* 理由が必須。空のまま送らせない（確認ボタンを出さない）。 */
@@ -1491,7 +1491,7 @@ function BookingsInner() {
         title="この申し込みを断りますか？"
         description="予約は「拒否」になり、枠が空きます。友だちにはLINEで断りのお知らせが届きます。送ったお知らせは取り消せません。"
         confirmLabel="申し込みを断る"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
         destructive
         busy={busy}

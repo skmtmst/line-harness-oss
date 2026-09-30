@@ -184,7 +184,7 @@ it('D09: 早い日時の枠を追加して次へ進んでも既存枠を書き�
   await pickTime('slot-end', '11:00')
   await change('slot-cap', '7')
   st.listSlots.mockResolvedValue({ items: [early, old] })
-  await click('この枠を追加')
+  await click('この枠を追加する')
   await click('保存して公開設定へ')
   // ②→③の保存はイベント設定だけ。枠一覧の追加とは分離し、
   // slots[0](=追加した早い枠)へ古い枠の日時・定員を送らない。
@@ -199,7 +199,7 @@ it('D09: ①に戻って保存しても、更新先は概要段階で確定し�
   await pickTime('slot-end', '11:00')
   await change('slot-cap', '7')
   st.listSlots.mockResolvedValue({ items: [early, old] })
-  await click('この枠を追加')
+  await click('この枠を追加する')
   // ①へ戻って保存。firstSlotの値は old-slot から読んだものなので、
   // 早い枠(early-slot)ではなく old-slot へだけ送る。
   await render(1, 'event-1')
@@ -224,7 +224,7 @@ it('D11: 一括追加の途中失敗後は、残りだけを再送する', async
   // 時間帯を90分ちょうどにして1日1枠にする。
   await pickTime('band-end', '15:30')
   await change('bulk-cap', '10')
-  await click('まとめて追加')
+  await click('まとめて追加する')
   // 確認ダイアログは document.body への portal で描かれる。
   expect(document.body.textContent).toContain('3件の予約枠を追加しますか？')
 
@@ -233,7 +233,7 @@ it('D11: 一括追加の途中失敗後は、残りだけを再送する', async
     new EventSlotsPartialError('1件まで追加されました', [early]),
   )
   const dialogClick = async (text: string) => {
-    const b = Array.from(document.body.querySelectorAll('button'))
+    const b = Array.from(document.body.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button'))
       .find((x) => x.textContent?.trim() === text)!
     expect(b).toBeTruthy()
     await act(async () => b.click())

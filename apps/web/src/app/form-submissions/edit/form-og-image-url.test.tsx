@@ -169,7 +169,7 @@ function setOgUrl(value: string) {
 }
 
 async function clickSave() {
-  const button = [...host.querySelectorAll('button')].find((b) => b.textContent === '下書きを保存' && !b.disabled)
+  const button = [...host.querySelectorAll('button')].find((b) => b.textContent === '下書きを保存する' && !b.disabled)
   expect(button, '「下書きを保存」がある').toBeTruthy()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))

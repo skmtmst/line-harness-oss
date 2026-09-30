@@ -334,7 +334,7 @@ export default function ChoiceTable({
 
         <div className="border-hairline flex flex-wrap gap-2 border-t p-2">
           <button onClick={() => addChoice()} className={miniButton}>
-            ＋ 選択肢を追加
+            ＋ 選択肢を追加する
           </button>
           <button
             onClick={() => addChoice(choices[choices.length - 1])}
@@ -348,7 +348,7 @@ export default function ChoiceTable({
             disabled={choices.some((c) => c.isOther)}
             className={`${miniButton} disabled:opacity-40`}
           >
-            ＋「その他」を追加
+            ＋「その他」を追加する
           </button>
         </div>
       </div>
