@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
@@ -67,25 +67,42 @@ export default function EcIdentityCandidatesPage() {
   const [view, setView] = useState<'all' | 'candidate' | 'none' | 'conflict'>('all')
   const [sort, setSort] = useState<'newest' | 'confidence'>('newest')
 
+  /*
+   * R600残件：アカウント切替で先行した集計要求の応答が後から届いても
+   * 採用しない。番号の新しい要求だけを採用し、アカウントも照合して
+   * 「選んだアカウント」と「出ている集計」がずれないようにする。
+   * A→B→Aと戻っても最初のAの遅延応答は捨てる。遅延した失敗も今の
+   * アカウントの確定集計を壊さない。
+   */
+  const operationsReqRef = useRef(0)
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
+
   const loadOperations = useCallback(async () => {
     if (!selectedAccountId) {
+      operationsReqRef.current += 1
       setOperations(null)
       setOperationsState('empty')
       return
     }
+    const account = selectedAccountId
+    const req = ++operationsReqRef.current
+    const isCurrent = () => req === operationsReqRef.current && selectedAccountRef.current === account
     setOperationsState('loading')
     try {
       const response = await api.ecCommerce.operationIdentityCandidates({
-        lineAccountId: selectedAccountId,
+        lineAccountId: account,
         status: 'pending',
         limit: 100,
       })
+      if (!isCurrent()) return
       if (!response.success || !Array.isArray(response.data?.items) || !response.data?.summary) {
         throw new Error('invalid_identity_operations_response')
       }
       setOperations(response.data)
       setOperationsState('ready')
     } catch (error) {
+      if (!isCurrent()) return
       setOperationsState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
   }, [selectedAccountId])
