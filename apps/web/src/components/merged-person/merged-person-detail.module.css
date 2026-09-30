@@ -48,7 +48,7 @@
 .title {
   color: var(--color-ink);
   font-size: var(--text-title);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -88,7 +88,7 @@
 .sectionTitle {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -135,7 +135,7 @@
 .personName {
   color: var(--color-ink);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
 }
 
@@ -143,7 +143,7 @@
   border-radius: var(--radius-pill);
   padding: 2px 8px;
   font-size: var(--text-nano);
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.6;
   white-space: nowrap;
 }
@@ -181,7 +181,7 @@
   min-width: 20px;
   color: var(--color-ink-faint);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .priorityName {
@@ -272,7 +272,7 @@
 .editTitle {
   color: var(--color-ink);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 

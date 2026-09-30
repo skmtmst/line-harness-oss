@@ -70,7 +70,7 @@
 .current {
   border-bottom-color: var(--color-accent-deep);
   color: var(--color-accent-deep);
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 500; /* fontWeight: 500 */
   cursor: default;
 }
 

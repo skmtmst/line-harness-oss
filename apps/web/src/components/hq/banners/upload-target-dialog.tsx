@@ -80,7 +80,7 @@ export default function UploadTargetDialog({
         <p className="text-caption text-ink-secondary">まずプロジェクトを作ってください。画像はプロジェクトの中に入ります。</p>
       ) : (
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${uid}-project`} className="text-label font-bold text-ink">入れるプロジェクト</label>
+          <label htmlFor={`${uid}-project`} className="text-label font-medium text-ink">入れるプロジェクト</label>
           <Select
             aria-label="入れるプロジェクト"
             size="full"

@@ -40,6 +40,7 @@ import {
 import {
   moveTargetingGroup,
 } from './targeting-order'
+import { formatDay, formatNumber } from '@/lib/format'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -140,7 +141,7 @@ function MenuStatusBadge({ group }: { group: Pick<RichMenuGroupListItem, 'status
   if (group.publishingAt) {
     return (
       <StatusBadge tone="warning" size="compact">
-        {new Date(group.publishingAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} に公開
+        {formatDay(group.publishingAt)} に公開
       </StatusBadge>
     )
   }
@@ -706,7 +707,7 @@ export default function RichMenusListPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のタップ</p>
           <p className={`mt-1 text-2xl font-bold tabular-nums ${tapKpiReady ? 'text-ink' : 'text-ink-faint'}`}>
-            {tapKpiReady ? (tapStats?.total != null ? tapStats.total.toLocaleString('ja-JP') : '—') : '—'}
+            {tapKpiReady ? (tapStats?.total != null ? formatNumber(tapStats.total) : '—') : '—'}
             {tapKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
@@ -723,7 +724,7 @@ export default function RichMenusListPage() {
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {topArea
-              ? `${topArea.taps.toLocaleString('ja-JP')}回・タップ数の内訳は編集画面で見られます`
+              ? `${formatNumber(topArea.taps)}回・タップ数の内訳は編集画面で見られます`
               : tapKpiReady
                 ? // ★V7：今月のタップが1回以上あるのに「まだ押されていません」と矛盾していた。
                   (tapStats?.total ?? 0) > 0
@@ -956,19 +957,19 @@ export default function RichMenusListPage() {
                         <td className="px-4 py-3 text-right">
                           <p className="text-ink font-semibold tabular-nums">
                             {g.monthlyStats
-                              ? `${g.monthlyStats.taps.toLocaleString('ja-JP')}回`
+                              ? `${formatNumber(g.monthlyStats.taps)}回`
                               : tapStats
-                                ? `${(tapsByGroup.get(g.id) ?? 0).toLocaleString('ja-JP')}回`
+                                ? `${formatNumber((tapsByGroup.get(g.id) ?? 0))}回`
                                 : '—'}
                           </p>
                           <p className="text-ink-faint mt-1 text-micro">
                             {g.monthlyStats?.uniqueAudience.value == null
                               ? 'のべ人数は未取得'
-                              : `のべ${g.monthlyStats.uniqueAudience.value.toLocaleString('ja-JP')}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`}
+                              : `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`}
                           </p>
                         </td>
                         <td className="px-4 py-3 text-xs text-ink-secondary tabular-nums">
-                          {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}
+                          {formatDay(g.updatedAt)}
                         </td>
                         <td className="bg-canvas sticky right-0 py-3 pr-5 pl-4">
                           {/*
@@ -1280,9 +1281,9 @@ function ExternalImportWorkspace({
                     >
                       <span className="bg-canvas-sunken text-ink-faint flex h-10 items-center justify-center rounded-control">▧</span>
                       <span className="min-w-0"><strong className="text-ink block truncate text-sm">{menu.name || '名前なし'}</strong><span className="text-ink-faint block truncate text-xs">{menu.areasCount}面・切替なし・画像あり</span></span>
-                      <span className="text-ink hidden text-sm font-bold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
+                      <span className="text-ink hidden text-sm font-semibold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
                       <span className="text-ink-secondary hidden text-xs sm:block">作成日不明</span>
-                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-bold whitespace-nowrap">取り込む</span>
+                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-medium whitespace-nowrap">取り込む</span>
                     </button>
                   )
                 })}
@@ -1306,7 +1307,7 @@ function ExternalImportWorkspace({
                 <h2 className="text-ink text-sm font-bold">選んだメニューの中身</h2>
                 <p className="text-ink mt-3 text-sm font-semibold">{selected.name || '名前なし'}</p>
                 <div className="border-hairline bg-canvas-sunken mt-3 grid grid-cols-3 overflow-hidden rounded-control border" style={{ aspectRatio: `${selected.size.width} / ${selected.size.height}` }}>
-                  {areas.map((area) => <span key={area} className="border-hairline text-ink-faint flex items-center justify-center border text-xs font-bold">{area}</span>)}
+                  {areas.map((area) => <span key={area} className="border-hairline text-ink-faint flex items-center justify-center border text-xs font-medium">{area}</span>)}
                 </div>
                 <h3 className="text-ink-secondary mt-3 text-xs font-bold">面ごとの動き（LINEから読んだもの）</h3>
                 {selected.areas?.length ? (

@@ -324,7 +324,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-canvas-sunken text-ink-faint line-through"
                 title={title}
               >
                 {word.mark} {label}
@@ -335,7 +335,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-success font-medium"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-success-bg text-success font-medium"
                 title={title}
               >
                 {word.mark} {label}{ea.via === 'automation' && <span className="text-success">⚙</span>}
@@ -345,7 +345,7 @@ export default function AutoRepliesPage() {
           return (
             <span
               key={ea.accountId}
-              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-warning-bg text-warning"
+              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-warning-bg text-warning"
               title={title}
             >
               {word.mark} {label}
@@ -365,10 +365,10 @@ export default function AutoRepliesPage() {
           r.responseType === 'silent'
             ? 'text-ink-faint text-xs'
             : r.responseType === 'flex'
-              ? 'px-1.5 py-0.5 rounded bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
+              ? 'px-1.5 py-0.5 rounded-mini bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
               : r.responseType === 'image'
-                ? 'px-1.5 py-0.5 rounded bg-info-bg text-info text-[10px] font-medium'
-                : 'px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
+                ? 'px-1.5 py-0.5 rounded-mini bg-info-bg text-info text-[10px] font-medium'
+                : 'px-1.5 py-0.5 rounded-mini bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
         }
         title={word.note}
       >
@@ -693,10 +693,10 @@ export default function AutoRepliesPage() {
               <span
                 className={
                   row.status === 'reply'
-                    ? 'inline-flex items-center gap-0.5 rounded bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
+                    ? 'inline-flex items-center gap-0.5 rounded-mini bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
                     : row.status === 'silent'
-                      ? 'inline-flex items-center gap-0.5 rounded bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
-                      : 'inline-flex items-center gap-0.5 rounded bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
+                      ? 'inline-flex items-center gap-0.5 rounded-mini bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
+                      : 'inline-flex items-center gap-0.5 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
                 }
               >
                 {row.mark ? `${row.mark} ` : ''}アカウント名
@@ -839,7 +839,7 @@ export default function AutoRepliesPage() {
                 <th className="hidden px-4 py-3">累計</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-divider-soft">
               {/*
                 読めていないときに「ありません」と言わない。消えたように読める。
                 読込中・読めなかった・権限が無い・本当に0件を言い分ける。
@@ -890,7 +890,7 @@ export default function AutoRepliesPage() {
                     <td className="px-3 py-3">
                       {/* E-01: 止めた記録があれば、いつ・誰が・なぜを title で読める */}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-pill text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
                         title={stopNote(r) ?? undefined}
                       >
                         {r.isActive ? '有効' : '停止中'}
@@ -1124,7 +1124,7 @@ export default function AutoRepliesPage() {
           open={pendingDelete !== null}
           title={`自動応答「${pendingDelete?.item.name || pendingDelete?.item.keyword || 'すべてのメッセージ'}」を削除しますか？`}
           description="新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。"
-          confirmLabel="自動応答を削除"
+          confirmLabel="自動応答を削除する"
           destructive
           busy={deleting}
           error={deleteError}

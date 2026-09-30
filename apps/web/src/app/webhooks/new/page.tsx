@@ -244,7 +244,7 @@ function NewWebhookForm() {
 
       {/* #975 U067: イベントコードのCSV手入力をやめ、チェックで選ぶ。 */}
       <fieldset className="space-y-3">
-        <legend className="text-ink-secondary text-xs font-bold">
+        <legend className="text-ink-secondary text-xs font-medium">
           送るイベント<RequiredBadge />
         </legend>
         <div className="flex flex-wrap gap-2">
@@ -272,7 +272,7 @@ function NewWebhookForm() {
           <div className="space-y-3">
             {WEBHOOK_EVENT_GROUPS.map((group) => (
               <div key={group.id}>
-                <p className="text-ink-faint text-xs font-bold">{group.label}</p>
+                <p className="text-ink-faint text-xs font-medium">{group.label}</p>
                 <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
                   {group.events.map((event) => (
                     <li key={event.value}>

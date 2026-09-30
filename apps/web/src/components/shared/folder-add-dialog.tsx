@@ -91,8 +91,8 @@ export default function FolderAddDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
+      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-float">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -143,7 +143,7 @@ export default function FolderAddDialog({
             onClick={onClose}
             className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
           >
-            やめる
+            キャンセル
           </button>
           <button
             type="button"
@@ -151,7 +151,7 @@ export default function FolderAddDialog({
             disabled={saving || !name.trim()}
             className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
-            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '変更を保存' : '追加する')}
+            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '保存する' : '追加する')}
           </button>
         </div>
       </div>

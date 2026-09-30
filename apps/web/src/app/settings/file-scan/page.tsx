@@ -339,12 +339,12 @@ export default function FileScanSettingsPage() {
                       <RowActions
                         subjectName={item.filename}
                         edit={{ label: '使えるように戻す', onClick: () => { setReleaseTarget(item); setReleaseReason(''); setReleaseError('') } }}
-                        destructiveItem={{ id: 'delete', label: '消す', onSelect: () => { setDeleteTarget(item); setDeleteError('') } }}
+                        destructiveItem={{ id: 'delete', label: '削除する', onSelect: () => { setDeleteTarget(item); setDeleteError('') } }}
                       />
                     ) : item.status === 'rejected' ? (
                       <RowActions
                         subjectName={item.filename}
-                        destructiveItem={{ id: 'delete', label: '消す', onSelect: () => { setDeleteTarget(item); setDeleteError('') } }}
+                        destructiveItem={{ id: 'delete', label: '削除する', onSelect: () => { setDeleteTarget(item); setDeleteError('') } }}
                       />
                     ) : (
                       <span className="text-ink-faint">—</span>
@@ -436,8 +436,7 @@ export default function FileScanSettingsPage() {
             />
           </div>
           <div>
-            <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()}>
-              {configBusy ? '保存しています…' : '外の検査の設定を保存'}
+            <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">外の検査の設定を保存する
             </Button>
           </div>
         </div>
@@ -449,7 +448,7 @@ export default function FileScanSettingsPage() {
           title="使えるように戻す"
           description={`${releaseTarget.filename} は誤りだったとして、使えるように戻します。理由は記録に残ります。`}
           confirmLabel="使えるように戻す"
-          cancelLabel="やめる"
+          cancelLabel="キャンセル"
           busy={releaseBusy}
           error={releaseError || undefined}
           onCancel={() => { setReleaseTarget(null); setReleaseReason(''); setReleaseError('') }}
@@ -485,7 +484,7 @@ export default function FileScanSettingsPage() {
           title="外の検査を止める"
           description="外の検査サービスへの送信設定を消します。内蔵の簡易検査は続きます。もう一度使うには設定を入れ直します。"
           confirmLabel="外の検査を止める"
-          cancelLabel="やめる"
+          cancelLabel="キャンセル"
           busy={configBusy}
           error={stopError || undefined}
           onCancel={() => { setStopExternal(false); setStopError('') }}
@@ -496,10 +495,10 @@ export default function FileScanSettingsPage() {
       {deleteTarget ? (
         <ConfirmDialog
           open
-          title="ファイルを消す"
+          title="ファイルを削除する"
           description={`${deleteTarget.filename} を消します。中身は画面に出ません。監査の記録は残ります。`}
-          confirmLabel="消す"
-          cancelLabel="やめる"
+          confirmLabel="削除する"
+          cancelLabel="キャンセル"
           busy={deleteBusy}
           error={deleteError || undefined}
           onCancel={() => { setDeleteTarget(null); setDeleteError('') }}

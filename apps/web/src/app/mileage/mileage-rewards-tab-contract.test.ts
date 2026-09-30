@@ -86,7 +86,7 @@ describe('届かなかった交換', () => {
 
   it('理由・回数・最終日時を出す', () => {
     expect(code).toMatch(/failureMessage\s*\|\|\s*item\.failureCode/)
-    expect(code).toMatch(/attemptCount\.toLocaleString/)
+    expect(code).toMatch(/formatNumber\(item\.attemptCount\)/)
     expect(code).toMatch(/formatMileageDate\(item\.updatedAt\)/)
   })
 

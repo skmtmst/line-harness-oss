@@ -7,6 +7,7 @@ import Chip, { type ChipTone } from '@/components/shared/chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
+import { formatNumber } from '@/lib/format'
 
 const RESULT_OPTIONS = [
   { value: 'all', label: 'すべて' },
@@ -153,7 +154,7 @@ export default function BroadcastRecipients({
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           {aggregate.reason === 'all'
             ? '全員への配信は宛先の一覧を持ちません。'
-            : `この配信は集約だけの古い記録です${aggregate.legacySuccess != null ? `（届いた ${aggregate.legacySuccess.toLocaleString('ja-JP')}人）` : ''}。`}
+            : `この配信は集約だけの古い記録です${aggregate.legacySuccess != null ? `（届いた ${formatNumber(aggregate.legacySuccess)}人）` : ''}。`}
         </p>
       </section>
     )
@@ -163,9 +164,9 @@ export default function BroadcastRecipients({
   return (
     <section aria-label="宛先" className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <Chip tone="ok">届いた {summary.sent.toLocaleString('ja-JP')}</Chip>
-        <Chip tone="danger">失敗 {(summary.failedTemporary + summary.failedPermanent).toLocaleString('ja-JP')}</Chip>
-        <Chip tone="neutral">送る前 {(pending ?? 0).toLocaleString('ja-JP')}</Chip>
+        <Chip tone="ok">届いた {formatNumber(summary.sent)}</Chip>
+        <Chip tone="danger">失敗 {formatNumber((summary.failedTemporary + summary.failedPermanent))}</Chip>
+        <Chip tone="neutral">送る前 {formatNumber((pending ?? 0))}</Chip>
         <HelpTip label="宛先の数の説明">
           届いた・失敗・送る前は宛先の台帳の数です。送る前はまだ送っていない人数で、名前の一覧はありません。
         </HelpTip>
@@ -189,7 +190,7 @@ export default function BroadcastRecipients({
             </label>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={handleRetry} disabled={retryBusy || summary.retryableCount === 0}>
-                一時的な失敗 {summary.retryableCount.toLocaleString('ja-JP')}件を再送
+                一時的な失敗 {formatNumber(summary.retryableCount)}件を再送
               </Button>
               <Button variant="secondary" onClick={handleCsv} disabled={csvBusy}>
                 CSVに書き出す
@@ -217,8 +218,8 @@ export default function BroadcastRecipients({
             </ul>
           )}
           <p className="text-ink-faint text-xs">
-            {total > 0 ? `対象 ${total.toLocaleString('ja-JP')}人` : null}
-            {pending != null && pending > 0 ? ` ・ 送る前 ${pending.toLocaleString('ja-JP')}人は名前の一覧がありません` : null}
+            {total > 0 ? `対象 ${formatNumber(total)}人` : null}
+            {pending != null && pending > 0 ? ` ・ 送る前 ${formatNumber(pending)}人は名前の一覧がありません` : null}
           </p>
         </>
       )}

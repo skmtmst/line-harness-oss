@@ -103,7 +103,7 @@ describe('消せない理由', () => {
 
 describe('確かめた時刻', () => {
   it('JSTで出す', () => {
-    expect(checkedAtText('2026-08-30T01:00:00.000Z')).toContain('2026/08/30')
+    expect(checkedAtText('2026-08-30T01:00:00.000Z')).toContain('8月30日（日）')
   })
 
   it('読めなければ「—（未取得）」', () => {

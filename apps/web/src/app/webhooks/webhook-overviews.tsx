@@ -17,6 +17,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ActionCell, DataTable, NameCell, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
@@ -130,7 +131,7 @@ export function OutgoingKpis({
         title="この30日に送った"
         value={summaryMissing ? null : summary?.outgoing ?? null}
         unit="回"
-        detail={outgoingSuccess === null ? '集計を取得できませんでした' : `うち成功 ${outgoingSuccess.toLocaleString('ja-JP')}回`}
+        detail={outgoingSuccess === null ? '集計を取得できませんでした' : `うち成功 ${formatNumber(outgoingSuccess)}回`}
         loading={summaryLoading}
         variant="v6"
       />
@@ -449,11 +450,11 @@ export function OutgoingOverview({
                   <Td><span className="block truncate" title={payloadLabel(item)}>{payloadLabel(item)}</span></Td>
                   <Td align="right">
                     <span className="text-ink tabular-nums">
-                      {item.deliverySummary.total.toLocaleString('ja-JP')}回
+                      {formatNumber(item.deliverySummary.total)}回
                     </span>
                     {item.deliverySummary.pending > 0 ? (
                       <span className="text-ink-faint block text-xs">
-                        送信中 {item.deliverySummary.pending.toLocaleString('ja-JP')}回
+                        送信中 {formatNumber(item.deliverySummary.pending)}回
                       </span>
                     ) : null}
                   </Td>
@@ -471,9 +472,9 @@ export function OutgoingOverview({
                     {failed && item.deliverySummary.lastResult?.completedAt ? (
                       <span
                         className="text-ink-faint mt-1 block truncate text-xs"
-                        title={`最終 ${new Date(item.deliverySummary.lastResult.completedAt).toLocaleString('ja-JP')}`}
+                        title={`最終 ${formatDateTime(item.deliverySummary.lastResult.completedAt)}`}
                       >
-                        最終 {new Date(item.deliverySummary.lastResult.completedAt).toLocaleString('ja-JP')}
+                        最終 {formatDateTime(item.deliverySummary.lastResult.completedAt)}
                       </span>
                     ) : null}
                   </Td>
@@ -518,7 +519,7 @@ export function OutgoingOverview({
                             role="menu"
                             aria-label={`「${item.name}」の設定`}
                             onKeyDown={onSettingsMenuKeyDown}
-                            className="bg-canvas border-hairline rounded-card absolute top-1/2 right-full z-10 mr-2 flex min-w-max -translate-y-1/2 gap-2 border p-2 shadow-lg"
+                            className="bg-canvas border-hairline rounded-card absolute top-1/2 right-full z-10 mr-2 flex min-w-max -translate-y-1/2 gap-2 border p-2 shadow-float"
                           >
                           {/*
                             送信中でも**押せる状態のまま**にする(#707)。
@@ -564,7 +565,7 @@ export function OutgoingOverview({
                               {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
                               <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
                               <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
-                              <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除</Button>
+                              <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除する</Button>
                             </>
                           ) : null}
                           {/*
@@ -577,9 +578,7 @@ export function OutgoingOverview({
                             variant="secondary"
                             role="menuitem"
                             disabled={!lineAccountId || testingId !== null || !item.isActive}
-                            onClick={() => { setSettingsId(null); setTestTarget(item) }}
-                          >
-                            {testingId === item.id ? '試しています…' : '1回 試してみる'}
+                            onClick={() => { setSettingsId(null); setTestTarget(item) }} busy={testingId === item.id} busyLabel="試しています…">1回 試してみる
                           </Button>
                           </div>
                         ) : null}
@@ -620,7 +619,7 @@ export function OutgoingOverview({
             : ''
         }
         confirmLabel="この送り先へ送る"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         busy={testingId !== null}
         onConfirm={() => {
           if (testTarget) void runTest(testTarget)
@@ -978,7 +977,7 @@ export function IncomingOverview({
                       ? (selected.isActive ? '止めています…' : '動かしています…')
                       : (selected.isActive ? '止める' : '動かす')}
                   </Button>
-                  <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
+                  <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新する</Button>
                 </>
               ) : null}
               <Button
@@ -995,7 +994,7 @@ export function IncomingOverview({
                 届いたつもりで試す
               </Button>
               {canManage ? (
-                <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
+                <Button variant="secondary" onClick={() => onDelete(selected)}>削除する</Button>
               ) : null}
             </div>
             {canManage ? null : (
@@ -1088,9 +1087,7 @@ export function IncomingOverview({
                                   <Button
                                     variant="secondary"
                                     disabled={dismissingId !== null}
-                                    onClick={() => void linkUnmatched(item, candidate.friendId)}
-                                  >
-                                    {dismissingId === item.id ? '結び付けています…' : 'この人に結び付ける'}
+                                    onClick={() => void linkUnmatched(item, candidate.friendId)} busy={dismissingId === item.id} busyLabel="結び付けています…">この人に結び付ける
                                   </Button>
                                 </li>
                               ))}
@@ -1101,11 +1098,8 @@ export function IncomingOverview({
                           <Button
                             variant="secondary"
                             disabled={dismissingId !== null}
-                            onClick={() => void dismissUnmatched(item)}
-                          >
-                            {dismissingId === item.id
-                              ? '閉じています…'
-                              : item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
+                            onClick={() => void dismissUnmatched(item)} busy={dismissingId === item.id} busyLabel="閉じています…">
+                            {item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
                           </Button>
                         ) : (
                           <p className="text-ink-secondary text-xs">結び付け・確認は統括または管理者に頼んでください。</p>
@@ -1135,9 +1129,7 @@ export function IncomingOverview({
                         onClick={() => {
                           setUnmatchedMoreBusy(true)
                           setUnmatchedShown((shown) => shown + UNMATCHED_PAGE_SIZE)
-                        }}
-                      >
-                        {unmatchedMoreBusy ? '読み込んでいます…' : 'さらに表示'}
+                        }} busy={unmatchedMoreBusy} busyLabel="読み込んでいます…">さらに表示
                       </Button>
                     </div>
                   ) : null}
@@ -1233,8 +1225,7 @@ export function IncomingOverview({
         onCancel={() => setTestOpen(false)}
         footer={
           <div className="flex justify-end">
-            <Button variant="primary" onClick={() => void runIncomingTest()} disabled={testBusy || !testJson.trim()}>
-              {testBusy ? '試しています…' : '試す'}
+            <Button variant="primary" onClick={() => void runIncomingTest()} disabled={testBusy || !testJson.trim()} busy={testBusy} busyLabel="試しています…">試す
             </Button>
           </div>
         }
@@ -1244,7 +1235,7 @@ export function IncomingOverview({
         </label>
         <textarea
           id="incoming-test-json"
-          className="border-hairline text-ink mt-1 h-36 w-full rounded-lg border p-3 font-mono text-sm"
+          className="border-hairline text-ink mt-1 h-36 w-full rounded-control border p-3 font-mono text-sm"
           value={testJson}
           onChange={(event) => setTestJson(event.target.value)}
           placeholder='{"friendId": "…"}'
@@ -1333,12 +1324,7 @@ function incomingActionLabel(kind: string): string {
 function formatReceivedAt(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '受信時刻不明'
-  return date.toLocaleString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date)
 }
 
 function maskedSampleText(fields: NonNullable<IncomingWebhookDetail['latestSample']>['fields']): string {

@@ -67,8 +67,8 @@ describe('受信箱 保存した検索の完了判定', () => {
 
   it('設計と同じ入力案内と保存ボタン名を使う', () => {
     expect(DIALOG).toContain('placeholder="検索名を入力してください"')
-    expect(DIALOG).toContain("{saving ? '保存中' : '検索条件を保存'}")
-    expect(PAGE).toContain('現在の条件を保存')
+    expect(DIALOG).toContain("{saving ? '保存中' : '検索条件を保存する'}")
+    expect(PAGE).toContain('現在の条件を保存する')
   })
 
   it('保存する条件をモーダル内で変更でき、よく使う状態も保存する', () => {

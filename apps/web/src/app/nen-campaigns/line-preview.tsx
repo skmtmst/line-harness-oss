@@ -35,7 +35,7 @@ export function LineTalk({ children }: { children: React.ReactNode }) {
 }
 
 export function LineTextBubble({ text }: { text: string }) {
-  return <p className="max-w-xs self-start whitespace-pre-wrap rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-caption leading-6 text-ink shadow-card">{text}</p>
+  return <p className="max-w-xs self-start whitespace-pre-wrap rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-caption leading-6 text-ink shadow-card">{text}</p>
 }
 
 /** 画像＋分類＋見出し＋抜粋＋ボタンのカード（Flex の bubble を模した見本）。 */
@@ -62,9 +62,9 @@ export function LineCard({
       )}
       <div className="flex flex-col gap-2 p-3">
         {category ? <p className="text-micro font-semibold text-accent-deep">{category}</p> : null}
-        <p className="text-label font-bold leading-6 text-ink">{title}</p>
+        <p className="text-label font-medium leading-6 text-ink">{title}</p>
         {body ? <p className="whitespace-pre-wrap text-caption leading-6 text-ink-secondary">{body}</p> : null}
-        {buttonLabel ? <p className="mt-1 rounded-control bg-accent-deep py-2 text-center text-caption font-bold text-on-accent">{buttonLabel}</p> : null}
+        {buttonLabel ? <p className="mt-1 rounded-control bg-accent-deep py-2 text-center text-caption font-medium text-on-accent">{buttonLabel}</p> : null}
       </div>
     </div>
   )

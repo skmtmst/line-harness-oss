@@ -21,6 +21,7 @@ import { useManualHref } from '@/lib/use-manual-href'
 
 /* 監査 R468: 処理名と版の変わり方は version-diff.ts に集める。 */
 import { ACTION_LABELS, describeVersionChanges, versionChangeLines, versionChangeSummary } from '../version-diff'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 const CONSUMER_LABELS: Record<string, string> = {
   scenario: 'シナリオ配信',
@@ -309,7 +310,7 @@ function CommonActionVersionsInner() {
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <KpiCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
+        <KpiCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${formatDay(published.publishedAt)} に公開` : 'まだ公開していません'} />
         <KpiCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
         <KpiCard
           variant="v6"
@@ -399,7 +400,7 @@ function CommonActionVersionsInner() {
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
             <p className="text-ink-faint mt-1 text-sm">公開した版は書き換えられません。</p>
-            <p className="text-ink-faint mt-1 text-xs">この30日の実行 {summary?.executionCountThisMonth.toLocaleString('ja-JP') ?? '—'}回・失敗 {summary?.failureCountThisMonth.toLocaleString('ja-JP') ?? '—'}回{summaryError ? '（月次件数を取得できませんでした）' : ''}</p>
+            <p className="text-ink-faint mt-1 text-xs">この30日の実行 {formatNumber(summary?.executionCountThisMonth) ?? '—'}回・失敗 {formatNumber(summary?.failureCountThisMonth) ?? '—'}回{summaryError ? '（月次件数を取得できませんでした）' : ''}</p>
           </div>
         </div>
         <DataTable>
@@ -426,7 +427,7 @@ function CommonActionVersionsInner() {
                   <Td className="text-ink-secondary"><span className="block max-w-32 truncate" title={version.createdBy ?? '未取得'}>{version.createdBy || '未取得'}</span></Td>
                   <Td className="text-ink-secondary"><span className="block max-w-56 truncate" title={versionChangeLines(version, detail.versions).join('\n')}>{versionChangeSummary(version, detail.versions)}</span></Td>
                   <Td className="text-ink-secondary">{version.actions.length}個の処理</Td>
-                  <Td className="text-ink-secondary">{version.publishedAt ? new Date(version.publishedAt).toLocaleString('ja-JP') : '—'}</Td>
+                  <Td className="text-ink-secondary">{version.publishedAt ? formatDateTime(version.publishedAt) : '—'}</Td>
                   <ActionCell>
                     {!canManage ? <span className="text-ink-faint">閲覧のみ</span> : version.status === 'draft' ? (
                       <Button

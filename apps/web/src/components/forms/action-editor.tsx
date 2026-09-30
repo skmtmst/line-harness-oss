@@ -194,7 +194,7 @@ export default function ActionEditor({
             className="text-danger ml-auto px-1 text-xs hover:underline"
             aria-label="この動作を削除"
           >
-            削除
+            削除する
           </button>
         </div>
       ))}
@@ -203,7 +203,7 @@ export default function ActionEditor({
         onClick={() => onChange([...value, emptyAction('tag')])}
         className={`${miniButton} border-hairline rounded-control border border-dashed px-3 py-1.5`}
       >
-        ＋ 動作を追加
+        ＋ 動作を追加する
       </button>
     </div>
   )

@@ -239,7 +239,7 @@ const areaClass =
 function CharCount({ value, max }: { value: string; max: number }) {
   const over = value.length > max
   return (
-    <span className={`text-xs tabular-nums ${over ? 'text-danger font-bold' : 'text-ink-faint'}`}>
+    <span className={`text-xs tabular-nums ${over ? 'text-danger font-medium' : 'text-ink-faint'}`}>
       {value.length}/{max}
     </span>
   )
@@ -390,7 +390,7 @@ export default function QuestionEditor({
                   disabled={value.choices.length <= 1}
                   className="text-ink-faint hover:text-danger text-xs disabled:opacity-40"
                 >
-                  削除
+                  削除する
                 </button>
               </div>
             </div>
@@ -543,7 +543,7 @@ export default function QuestionEditor({
                     </p>
                     {dead.length > 0 ? (
                       <>
-                        <p className="text-warning text-xs font-bold">
+                        <p className="text-warning text-xs font-medium">
                           いま設定されている {dead.join('・')} は実行されません。
                         </p>
                         <button

@@ -19,18 +19,19 @@ import {
 } from '@/lib/api'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { AffiliatePaymentConfirmDialog } from './action-dialogs'
+import { formatDay, formatNumber } from '@/lib/format'
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
 function yen(value: number): string {
-  return `¥${Math.round(value).toLocaleString('ja-JP')}`
+  return `¥${formatNumber(Math.round(value))}`
 }
 
 function dateLabel(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
+  return formatDay(date)
 }
 
 function monthDay(value: string | null): { month: number | null; dayUnit: string } {
@@ -116,9 +117,9 @@ function SettlementCloseDialog({
       onCancel={onClose}
       footer={(
         <div className="border-hairline flex justify-end gap-2 border-t pt-4">
-          <Button type="button" onClick={onClose} disabled={busy}>やめる</Button>
-          <Button type="button" variant="primary" onClick={() => { void closeSettlement() }} disabled={busy || !preview?.conversionCount}>
-            {busy ? '締めています…' : `${yen(preview?.totalAmount ?? 0)} で締める`}
+          <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
+          <Button type="button" variant="primary" onClick={() => { void closeSettlement() }} disabled={busy || !preview?.conversionCount} busy={busy} busyLabel="締めています…">
+            {`${yen(preview?.totalAmount ?? 0)} で締める`}
           </Button>
         </div>
       )}
@@ -135,8 +136,8 @@ function SettlementCloseDialog({
                 </p>
               ) : null}
             </div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">払う相手</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.affiliates.length.toLocaleString('ja-JP')}人</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">払う相手</dt><dd className="text-ink mt-1 text-lg font-medium">{formatNumber(preview.affiliates.length)}人</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 text-lg font-medium">{formatNumber(preview.conversionCount)}件</dd></div>
           </dl>
           <div className="border-hairline overflow-hidden rounded-control border">
             <table className="w-full text-sm">
@@ -145,7 +146,7 @@ function SettlementCloseDialog({
                 {preview.affiliates.map((item) => (
                   <tr key={item.affiliateId}>
                     <td className="text-ink px-3 py-2 font-medium">{item.affiliateName}</td>
-                    <td className="text-ink-secondary px-3 py-2 text-right tabular-nums">{item.conversionCount.toLocaleString('ja-JP')}件</td>
+                    <td className="text-ink-secondary px-3 py-2 text-right tabular-nums">{formatNumber(item.conversionCount)}件</td>
                     <td className="text-ink px-3 py-2 text-right font-semibold tabular-nums">{yen(item.amount)}</td>
                     <td className="px-3 py-2">{item.bankProfileRegistered ? '登録済み' : <span className="text-warning">未登録</span>}</td>
                   </tr>
@@ -156,7 +157,7 @@ function SettlementCloseDialog({
           {excludedZero && excludedZero.count > 0 ? (
             <div className="border-hairline rounded-control border p-3">
               <p className="text-ink-secondary text-xs leading-5">
-                報酬が0円の成果 {excludedZero.count.toLocaleString('ja-JP')}件は、支払えないため今回の締め対象から外れています。
+                報酬が0円の成果 {formatNumber(excludedZero.count)}件は、支払えないため今回の締め対象から外れています。
               </p>
               <ul className="text-ink-faint mt-2 max-h-32 space-y-1 overflow-y-auto text-xs">
                 {excludedZero.rows.map((row) => (
@@ -167,7 +168,7 @@ function SettlementCloseDialog({
               </ul>
               {excludedZero.count > excludedZero.rows.length ? (
                 <p className="text-ink-faint mt-1 text-xs">
-                  ほか {(excludedZero.count - excludedZero.rows.length).toLocaleString('ja-JP')}件
+                  ほか {formatNumber((excludedZero.count - excludedZero.rows.length))}件
                 </p>
               ) : null}
             </div>
@@ -243,8 +244,7 @@ function PayoutStepUpDialog({
         <div className="border-hairline flex justify-end gap-2 border-t pt-4">
           <Button type="button" onClick={onClose} disabled={busy}>戻る</Button>
           {stepUpMethod !== 'none' && (
-            <Button type="button" variant="primary" onClick={() => { void exportCsv() }} disabled={busy || !ready}>
-              {busy ? '確認中…' : '本人確認してCSVを書き出す'}
+            <Button type="button" variant="primary" onClick={() => { void exportCsv() }} disabled={busy || !ready} busy={busy} busyLabel="確認中…">本人確認してCSVを書き出す
             </Button>
           )}
         </div>
@@ -405,9 +405,9 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
         else failedNames.push(statementTargets[index].affiliateName)
       })
       if (failedNames.length === 0) {
-        notifyToast(`${statementTargets.length.toLocaleString('ja-JP')}人分の支払明細を発行し、LINE通知を依頼しました。`)
+        notifyToast(`${formatNumber(statementTargets.length)}人分の支払明細を発行し、LINE通知を依頼しました。`)
       } else {
-        if (succeeded > 0) notifyToast(`${succeeded.toLocaleString('ja-JP')}人分の支払明細を発行しました。`)
+        if (succeeded > 0) notifyToast(`${formatNumber(succeeded)}人分の支払明細を発行しました。`)
         const shown = failedNames.slice(0, 5).join('、')
         const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5}人` : ''
         setOperationError(`${failedNames.length}人分を発行できませんでした（${shown}${rest}）。もう一度押すと失敗分を試し直せます。`)
@@ -455,10 +455,10 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
 
   const summaryUnavailable = error && !loading
   const closeDate = monthDay(preview?.periodTo ?? null)
-  const rowCountLabel = loading || error ? '—' : rows.length.toLocaleString('ja-JP')
+  const rowCountLabel = loading || error ? '—' : formatNumber(rows.length)
   const bankOkCount = rows.filter((item) => item.bankProfileRegistered).length
-  const bankOkLabel = loading || error ? '—' : bankOkCount.toLocaleString('ja-JP')
-  const missingBankLabel = loading || error ? '—' : missingBanks.toLocaleString('ja-JP')
+  const bankOkLabel = loading || error ? '—' : formatNumber(bankOkCount)
+  const missingBankLabel = loading || error ? '—' : formatNumber(missingBanks)
   const issuedCount = resumed?.affiliates.filter((item) => item.statementIssued).length ?? 0
 
   return (
@@ -468,7 +468,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           title="まだ払っていない"
           value={summaryUnavailable ? null : preview?.totalAmount ?? 0}
           unit="円"
-          detail={summaryUnavailable ? '読み込めませんでした' : `${rows.length.toLocaleString('ja-JP')}人ぶん・締める前の報酬`}
+          detail={summaryUnavailable ? '読み込めませんでした' : `${formatNumber(rows.length)}人ぶん・締める前の報酬`}
           loading={loading}
         />
         <KpiCard
@@ -501,7 +501,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
       {/* R44: 前の締めに間に合わなかった分が含まれることを明記する。 */}
       {preview?.carriedOver && preview.carriedOver.count > 0 ? (
         <Notice tone="info">
-          前の締めから持ち越した分 {preview.carriedOver.count.toLocaleString('ja-JP')}件・{yen(preview.carriedOver.amount)} を含んでいます。締める期間は {dateLabel(preview.periodFrom)}〜{dateLabel(preview.periodTo)} です。
+          前の締めから持ち越した分 {formatNumber(preview.carriedOver.count)}件・{yen(preview.carriedOver.amount)} を含んでいます。締める期間は {dateLabel(preview.periodFrom)}〜{dateLabel(preview.periodTo)} です。
         </Notice>
       ) : null}
 
@@ -517,15 +517,15 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
 
       {preview?.excludedZeroAmount && preview.excludedZeroAmount.count > 0 ? (
         <Notice tone="warn">
-          報酬が0円の成果 {preview.excludedZeroAmount.count.toLocaleString('ja-JP')}件は、支払えないため今回の締め対象から外れています。対象は「{dateLabel(preview.periodTo)} で締める」の確認画面で見られます。
+          報酬が0円の成果 {formatNumber(preview.excludedZeroAmount.count)}件は、支払えないため今回の締め対象から外れています。対象は「{dateLabel(preview.periodTo)} で締める」の確認画面で見られます。
         </Notice>
       ) : null}
 
       {closed ? (
         <Notice tone="success">
           {resumed
-            ? `${dateLabel(closed.closedAt)} に締めた記録を読み出しました。${issuedCount > 0 ? `明細は ${resumed!.affiliates.length.toLocaleString('ja-JP')}人中 ${issuedCount.toLocaleString('ja-JP')}人分が発行済みです。` : ''}${resumed!.batch ? ' 振込用CSVの準備も作成済みです。' : ' 明細と銀行用CSVの準備を続けられます。'}`
-            : `${dateLabel(closed.closedAt)} に ${yen(closed.totalAmount)}・${closed.conversionCount.toLocaleString('ja-JP')}件を締めました。明細と銀行用CSVを準備できます。`}
+            ? `${dateLabel(closed.closedAt)} に締めた記録を読み出しました。${issuedCount > 0 ? `明細は ${formatNumber(resumed!.affiliates.length)}人中 ${formatNumber(issuedCount)}人分が発行済みです。` : ''}${resumed!.batch ? ' 振込用CSVの準備も作成済みです。' : ' 明細と銀行用CSVの準備を続けられます。'}`
+            : `${dateLabel(closed.closedAt)} に ${yen(closed.totalAmount)}・${formatNumber(closed.conversionCount)}件を締めました。明細と銀行用CSVを準備できます。`}
         </Notice>
       ) : null}
       {operationError ? <Notice tone="danger" message={operationError} onClose={() => setOperationError('')} /> : null}
@@ -560,7 +560,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           {preview ? `${dateLabel(preview.periodTo)} で締める` : '期間を締める'}
         </Button>
         <Button onClick={() => { void issueStatements() }} disabled={!closed || operationBusy || statementTargets.length === 0}>
-          {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${statementTargets.length.toLocaleString('ja-JP')}人）` : '支払明細をまとめて出す'}
+          {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${formatNumber(statementTargets.length)}人）` : '支払明細をまとめて出す'}
         </Button>
         <Button onClick={() => { void preparePayout() }} disabled={!closed || operationBusy || Boolean(resumed?.batch)} title={resumed?.batch ? '振込用CSVの準備は作成済みです' : missingBanks > 0 ? '振込先が未登録の人がいる場合は、誰に依頼するかを確認できます' : undefined}>
           振込用CSVを書き出す
@@ -628,7 +628,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
                       </span>
                     ) : null}
                   </Td>
-                  <Td align="right" className="tabular-nums">認めた {item.conversionCount.toLocaleString('ja-JP')}件</Td>
+                  <Td align="right" className="tabular-nums">認めた {formatNumber(item.conversionCount)}件</Td>
                   <Td>
                     {item.bankProfileRegistered
                       ? <><span className="block font-medium">登録済み</span><span className="text-ink-faint block text-xs">口座番号は本人だけに表示</span></>

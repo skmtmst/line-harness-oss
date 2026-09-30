@@ -13,7 +13,7 @@ const impact: OperationImpactPreview = {
 describe('operationImpactText', () => {
   it('実測人数と日本時間の予約を表示する', () => {
     expect(operationImpactText('broadcast_dispatch', impact))
-      .toBe('2件（最も近い予約 8/25 20:00）／対象延べ1,284人')
+      .toBe('2件（最も近い予約 8月25日（火）20:00）／対象延べ1,284人')
     expect(operationImpactText('scenario_dispatch', impact)).toBe('4本／381人が進行中')
     expect(operationImpactText('reminder_dispatch', impact)).toBe('3本／対象0人')
     expect(operationImpactText('automation_actions', impact)).toBe('6本／実行待ち3件（2人）')

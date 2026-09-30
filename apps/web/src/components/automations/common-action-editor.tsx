@@ -142,7 +142,7 @@ export default function CommonActionEditor({
         onClick={() => onChange([...value, newCommonActionStep()])}
       >
         <Plus size={16} aria-hidden />
-        処理を追加
+        処理を追加する
       </Button>
     </div>
   )

@@ -79,6 +79,7 @@ import {
   SingleOperatorFields,
 } from '@/components/broadcasts/broadcast-approval'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
+import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -184,9 +185,7 @@ export function moveMessageTypeTabFocus(
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
 
 function formatScheduleTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ja-JP', {
-    timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit',
-  })
+  return formatTime(iso)
 }
 
 /**
@@ -255,8 +254,8 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <div className="max-w-[82%]">
-    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
-    {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-bold" title={button.value}>{button.label || 'ボタン'}</div>)}
+    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-[13px] shadow-card">{text || 'テキストを入力すると表示されます'}</div>
+    {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>{button.label || 'ボタン'}</div>)}
   </div>
   if (bubble.type === 'sticker') {
     const st = (bubble.content.state as MessageKindState | undefined)?.sticker
@@ -266,14 +265,14 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   }
   if (bubble.type === 'location') {
     const loc = (bubble.content.state as MessageKindState | undefined)?.location
-    return <div className="bg-canvas w-[82%] rounded-card p-3 text-[13px] shadow-sm">
+    return <div className="bg-canvas w-[82%] rounded-card p-3 text-[13px] shadow-card">
       <p className="text-ink font-bold">{loc?.title || '場所'}</p>
       <p className="text-ink-faint mt-0.5 text-[11px]">{loc?.address || '住所を入れると出ます'}</p>
     </div>
   }
   if (bubble.type === 'audio') {
     const au = (bubble.content.state as MessageKindState | undefined)?.audio
-    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-[13px] shadow-sm">
+    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-[13px] shadow-card">
       <span className="text-lg">▶</span>
       <span className="text-ink-faint text-[11px]">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
     </div>
@@ -281,20 +280,20 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   if (bubble.type === 'carousel') {
     const name = String(bubble.content.templateName ?? '')
     return <div className="flex w-full gap-2 overflow-x-auto pb-1">
-      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow">
+      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow-card">
         <div className="bg-canvas-sunken h-20 rounded-control" />
-        <p className="text-ink mt-2 truncate text-xs font-bold">{i === 0 ? (name || 'カルーセル') : '…'}</p>
+        <p className="text-ink mt-2 truncate text-xs font-medium">{i === 0 ? (name || 'カルーセル') : '…'}</p>
       </div>)}
     </div>
   }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-sm"><p className="text-xs font-bold text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
+  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-card"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded-mini bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
   }
-  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
+  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
 function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, onChange, onMove, onDelete }: {
@@ -308,14 +307,14 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
   const availableAssets = assets.filter((asset) => asset.kind === bubble.type)
   // 差し込みをカーソルの位置に入れるために、入力欄そのものを渡す。
   const textRef = useRef<HTMLTextAreaElement>(null)
-  return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+  return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
     {/*
       吹き出しの見出し行。狭い幅では2段に折る。折らないと、種類の選択肢と
       移動・削除ボタンが横に並んだまま表示域をはみ出し、解除や並べ替えが
       右側へ隠れる（監査 R149）。
     */}
     <div className="flex flex-wrap items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{index + 1}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-pill bg-accent-deep text-xs font-medium text-on-accent">{index + 1}</span>
       <Select
         aria-label={`吹き出し${index + 1}の種類`}
         value={bubble.type}
@@ -332,7 +331,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
       />
       <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
       <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
-      <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
+      <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除する</button>
     </div>
     <div className="p-4">
       {bubble.type === 'text' && <div>
@@ -348,10 +347,10 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
           />
         </div>
         <textarea ref={textRef} rows={6} maxLength={MAX_TEXT_LENGTH} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
-        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
+        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded-mini border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
       </div>}
       {bubble.type === 'flex' && <div>
-        <label className="mb-1 block text-xs font-bold text-ink-secondary">Flex JSON</label>
+        <label className="mb-1 block text-xs font-medium text-ink-secondary">Flex JSON</label>
         <textarea rows={8} value={String(bubble.content.flexJson ?? '')} onChange={(e) => onChange({ ...bubble, content: { ...bubble.content, flexJson: e.target.value, templateId: undefined, templateName: undefined } })} className="w-full resize-y rounded-card border border-hairline p-3 font-mono text-xs focus:border-accent focus:outline-none" />
       </div>}
       {/*
@@ -383,7 +382,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
       )}
       {['image','video','rich_video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
       {isContentTemplateType(bubble.type) && <div>
-        <label className="mb-1 block text-xs font-bold text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
+        <label className="mb-1 block text-xs font-medium text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
         <Combobox
           aria-label="コンテンツで作成したテンプレートから選択"
           placeholder="テンプレートを選択してください"
@@ -437,7 +436,7 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
         <h4 className="min-w-0 flex-1 text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
         <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
         <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
-        <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
+        <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除する</button>
       </div>
       {!embedded && <div className="mt-3 border-b border-hairline pb-3">
         <InsertToolbar
@@ -466,7 +465,7 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
         <Checkbox checked={!trackLinks} onCheckedChange={(checked) => onTrackLinksChange(!checked)} className="mt-3">このメッセージではURLを短縮しない</Checkbox>
         <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
           <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
-          {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>{'短縮して計測'}</span></div>) : (
+          {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>短縮して計測</span></div>) : (
             <p className="border-t border-hairline px-3 py-3 text-ink-faint">本文にURLはありません。</p>
           )}
         </div>
@@ -494,7 +493,7 @@ function MessageButtonsSection({ buttons, error, onChange }: {
           <h3 className="text-sm font-bold text-ink">ボタン</h3>
           <p className="mt-1 text-xs text-ink-faint">配信全体で1組です。1通目のメッセージの下に付きます。最大4つまで。</p>
         </div>
-        <Button type="button" onClick={() => onChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加</Button>
+        <Button type="button" onClick={() => onChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加する</Button>
       </div>
       <p className="mt-2 text-xs text-ink-faint">URL・PDFは https:// から始まるアドレスを入れてください。</p>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
@@ -1419,7 +1418,7 @@ export default function BroadcastForm({
     setTestSending(true)
     setError('')
     setTestResult(null)
-    const at = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+    const at = formatTime(new Date())
     try {
       const draft = await persistDraft(null, true)
       if (!draft) return
@@ -1520,10 +1519,10 @@ export default function BroadcastForm({
     ? (() => {
         const ex = preflight.exclusions
         const parts = [
-          ex.blocked > 0 ? `ブロック ${ex.blocked.toLocaleString('ja-JP')}人` : null,
-          ex.hidden > 0 ? `非表示 ${ex.hidden.toLocaleString('ja-JP')}人` : null,
-          ex.missingDestination > 0 ? `宛先不明 ${ex.missingDestination.toLocaleString('ja-JP')}人` : null,
-          ex.duplicate > 0 ? `重複 ${ex.duplicate.toLocaleString('ja-JP')}人` : null,
+          ex.blocked > 0 ? `ブロック ${formatNumber(ex.blocked)}人` : null,
+          ex.hidden > 0 ? `非表示 ${formatNumber(ex.hidden)}人` : null,
+          ex.missingDestination > 0 ? `宛先不明 ${formatNumber(ex.missingDestination)}人` : null,
+          ex.duplicate > 0 ? `重複 ${formatNumber(ex.duplicate)}人` : null,
         ].filter((part): part is string => part !== null)
         return parts.length > 0 ? `${parts.join('・')}を除外` : '除外なし'
       })()
@@ -1540,13 +1539,11 @@ export default function BroadcastForm({
     : quota.state === 'unavailable'
       ? '確認できませんでした'
       : quota.state === 'insufficient'
-        ? `不足しています（残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'} / ${quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通）`
-        : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'} / ${quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通（この配信で ${quota.planned.toLocaleString('ja-JP')}通を使用）`
+        ? `不足しています（残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通）`
+        : `残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通（この配信で ${formatNumber(quota.planned)}通を使用）`
   /** 対象の人数を数えた時刻。応答の evaluatedAt をJSTで出す。 */
   const evaluatedAtLabel = preflight?.audience?.evaluatedAt
-    ? new Date(preflight.audience.evaluatedAt).toLocaleString('ja-JP', {
-        timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
+    ? formatDateTime(preflight.audience.evaluatedAt)
     : null
   /** 把握できる重複配信。同じ時刻の前後1時間に入っている別の予約。 */
   const concurrentBroadcasts = preflight?.concurrentBroadcasts ?? []
@@ -1768,22 +1765,22 @@ export default function BroadcastForm({
               <h3 className="text-lg font-bold text-ink">配信内容</h3>
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">{confirmAudienceLabel} {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-bold text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
+                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-medium text-ink">{confirmAudienceLabel} {formatNumber(audienceCount)}人</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-medium text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">確認項目</h3>
               <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は配信できません。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">対象条件</dt><dd className="text-ink-secondary">除外{preflight?.exclusions?.total ?? 0}人を含めて確認済み</dd></div>
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">メッセージ表示</dt><dd className="text-ink-secondary">LINEプレビュー確認済み</dd></div>
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">送信枠</dt><dd className="text-ink-secondary">残り {quota?.remaining?.toLocaleString('ja-JP') ?? '—'} / {quota?.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">対象条件</dt><dd className="text-ink-secondary">除外{preflight?.exclusions?.total ?? 0}人を含めて確認済み</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">メッセージ表示</dt><dd className="text-ink-secondary">LINEプレビュー確認済み</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">送信枠</dt><dd className="text-ink-secondary">残り {formatNumber(quota?.remaining)} / {formatNumber(quota?.monthlyLimit)}通</dd></div>
               </dl>
             </section>
           </section>
         ) : null}
-        <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
+        <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-card`}>
           <div className="mb-4">
             <h3 className="text-lg font-bold text-ink">基本設定</h3>
             <p className="mt-1 text-sm text-ink-faint">管理名と保存先を設定します。</p>
@@ -1815,7 +1812,7 @@ export default function BroadcastForm({
           </div>
           <label className="mt-4 block">
             <span className="flex items-center justify-between gap-2 text-sm font-bold text-ink">
-              <span>社内メモ <span className="ml-1 rounded bg-canvas-sunken px-1.5 py-0.5 text-xs font-normal text-ink-faint">任意</span></span>
+              <span>社内メモ <span className="ml-1 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-xs font-normal text-ink-faint">任意</span></span>
               <span className="text-xs font-normal text-ink-faint">友だちには表示されません</span>
             </span>
             <textarea
@@ -1830,7 +1827,7 @@ export default function BroadcastForm({
         </section>
         {shows('basic') && (
           <>
-            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
               <h3 className="text-lg font-bold text-ink">配信方法</h3>
               <p className="mt-1 text-xs text-ink-faint">新規作成・テンプレート・過去の配信の複製から選べます。</p>
               {/*
@@ -1868,7 +1865,7 @@ export default function BroadcastForm({
               </RadioCardGroup>
             </section>
 
-            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h3 className="text-lg font-bold text-ink">最近の配信</h3>
@@ -1881,7 +1878,7 @@ export default function BroadcastForm({
                   <div key={broadcast.id} className="broadcast-recent-row grid items-center gap-3 border-b border-hairline px-3 py-2.5 text-xs last:border-b-0">
                     <div className="min-w-0"><p className="truncate font-bold text-action">{broadcast.title}</p><p className="truncate text-ink-faint">{typeLabel(broadcast.messageType)} 1通</p></div>
                     <span className="text-ink-secondary">{broadcast.status === 'sent' ? '送信済み' : broadcast.status === 'scheduled' ? '予約済み' : '下書き'}</span>
-                    <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? new Date(broadcast.sentAt ?? broadcast.scheduledAt ?? '').toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '未設定'}</span>
+                    <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '未設定'}</span>
                     <button type="button" className="text-left font-semibold text-action hover:underline" onClick={() => duplicateRecent(broadcast)}>複製する</button>
                   </div>
                 )) : <p className="p-5 text-sm text-ink-faint">最近の配信はまだありません。</p>}
@@ -1889,7 +1886,7 @@ export default function BroadcastForm({
             </section>
           </>
         )}
-        <section id="broadcast-step-audience" className={`${shows('audience') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
+        <section id="broadcast-step-audience" className={`${shows('audience') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-card`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             {/*
               番号は上の段（STEP 1〜5）に合わせる。**本文だけ別の番号を振らない。**
@@ -1903,10 +1900,10 @@ export default function BroadcastForm({
               <p className="mt-1 text-sm text-ink-faint">全員または詳細条件から、実際に送れる友だちを確認します。</p>
             </div>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
-              <p className="text-xs font-bold text-accent-deep">送信対象</p>
-              <p className="text-2xl font-black text-accent-deep">
-                {audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'}
-                <span className="ml-1 text-sm">人</span>
+              <p className="text-xs font-medium text-accent-deep">送信対象</p>
+              <p className="text-hero text-accent-deep">
+                {formatNumber(audienceDisplayCount)}
+                <span className="ml-1 text-sm font-normal">人</span>
               </p>
             </div>
           </div>
@@ -1937,10 +1934,10 @@ export default function BroadcastForm({
               <p className="text-ink text-sm">
                 分析で作った対象者
                 {audienceNotice.label && <span className="ml-1 text-ink-secondary text-xs">{audienceNotice.label}</span>}
-                <span className="ml-2 font-bold">{audienceNotice.memberCount.toLocaleString('ja-JP')}人</span>
+                <span className="ml-2 font-bold">{formatNumber(audienceNotice.memberCount)}人</span>
               </p>
               <p className="text-ink-faint text-xs">
-                {new Date(audienceNotice.expiresAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで有効・送る直前にもう一度確かめます
+                {formatDateTime(audienceNotice.expiresAt)}まで有効・送る直前にもう一度確かめます
               </p>
             </div>
           )}
@@ -2022,8 +2019,8 @@ export default function BroadcastForm({
                   ['除外', preflight.exclusions?.total ?? 0, 'text-warning'],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="rounded-control border border-hairline bg-canvas-sunken p-3">
-                    <p className="text-xs font-bold text-ink-faint">{label}</p>
-                    <p className="text-ink mt-1 text-2xl font-black tabular-nums">{Number(value).toLocaleString('ja-JP')}人</p>
+                    <p className="text-xs font-medium text-ink-faint">{label}</p>
+                    <p className="text-ink mt-1 text-hero tabular-nums">{formatNumber(Number(value))}人</p>
                   </div>
                 ))}
               </div>
@@ -2034,10 +2031,10 @@ export default function BroadcastForm({
                 <div className="mt-2 divide-y divide-hairline">
                   {preflight.audience.representatives.map((friend) => (
                     <div key={friend.friendId} className="flex items-center gap-3 py-3">
-                      {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-full object-cover" /> : (
-                        <span className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
+                      {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-pill object-cover" /> : (
+                        <span className="flex size-8 items-center justify-center rounded-pill bg-accent-soft text-xs font-medium text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
                       )}
-                      <div><p className="text-sm font-bold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
+                      <div><p className="text-sm font-semibold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
                     </div>
                   ))}
                   {preflight.audience.representatives.length === 0 && <p className="py-3 text-xs text-ink-faint">表示できる友だちはいません。</p>}
@@ -2062,7 +2059,7 @@ export default function BroadcastForm({
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className={`border-accent text-accent-deep rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
+              className={`border-accent text-accent-deep rounded-control border px-3 py-1 text-xs font-medium hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
             >
               テンプレートから選ぶ
             </button>
@@ -2131,9 +2128,9 @@ export default function BroadcastForm({
           />
         )}
         {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
+          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加する</Button>
           <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
-          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化</Button>
+          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化する</Button>
         </div>}
         </section>
         {/*
@@ -2142,7 +2139,7 @@ export default function BroadcastForm({
           （DOMには居るため既存テストは通っていた）。監査 #615。
         */}
         {showTemplatePicker && (
-          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-ink">テンプレート選択</h3>
@@ -2151,7 +2148,7 @@ export default function BroadcastForm({
               <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm font-semibold text-action hover:underline">メッセージ編集へ戻る</button>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-bold text-ink-secondary">名前・本文で検索
+              <label className="block text-xs font-medium text-ink-secondary">名前・本文で検索
                 <input
                   type="search"
                   aria-label="テンプレート名・本文で検索"
@@ -2161,7 +2158,7 @@ export default function BroadcastForm({
                   className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
                 />
               </label>
-              <label className="block text-xs font-bold text-ink-secondary">フォルダ
+              <label className="block text-xs font-medium text-ink-secondary">フォルダ
                 <Select
                   aria-label="テンプレートのフォルダ"
                   value={templatePickerFolderId}
@@ -2211,14 +2208,14 @@ export default function BroadcastForm({
         {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
-            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加</Link>
+            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
           </div>
           {currentStep === 'message' ? (
             <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink-secondary">
               <Zap size={17} className="text-ink-secondary" aria-hidden />
               {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'}
             </p>
-          ) : <div className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
+          ) : <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
             <Combobox
               aria-label="配信後のアクション"
               placeholder="実行しない"
@@ -2312,7 +2309,7 @@ export default function BroadcastForm({
           )}
 
           <div className="border-hairline mt-4 border-t pt-4">
-      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-bold">
+      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-medium">
         時間を分散して送る
         <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-[11px] font-normal">
           推奨
@@ -2339,7 +2336,7 @@ export default function BroadcastForm({
             <p className="text-sm font-bold text-ink">開封・クリックの集計</p>
             <p className="mt-1 text-xs text-ink-faint">
               {quota?.monthlyUsed !== null && quota?.monthlyUsed !== undefined && quota.monthlyLimit !== null
-                ? `LINEの月間送信枠を使います（今月 ${quota.monthlyUsed.toLocaleString('ja-JP')} / ${quota.monthlyLimit.toLocaleString('ja-JP')} 通）。`
+                ? `LINEの月間送信枠を使います（今月 ${formatNumber(quota.monthlyUsed)} / ${formatNumber(quota.monthlyLimit)} 通）。`
                 : 'LINEの月間送信枠を確認しています。'}
             </p>
           </div>
@@ -2351,9 +2348,9 @@ export default function BroadcastForm({
                 {[-1, 0, 1, 2].map((offset) => {
                   const base = scheduledDate ? new Date(`${scheduledDate}T00:00:00+09:00`) : null
                   if (base) base.setDate(base.getDate() + offset)
-                  const ymd = base ? base.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }) : '日付未設定'
+                  const ymd = base ? formatDay(base) : '日付未設定'
                   const concurrent = offset === 0 ? concurrentBroadcasts : []
-                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-bold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
+                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-semibold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
                 })}
               </div>
               {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
@@ -2375,7 +2372,7 @@ export default function BroadcastForm({
           {/* 「今すぐ」は日時を持たないので未設定扱いしない。予約と混同しないよう別の文にする。 */}
           <li className="flex items-center gap-2"><span className={scheduledLabel || sendMode === 'now' ? 'text-success' : 'text-warning'}>{scheduledLabel || sendMode === 'now' ? '✓' : '!'}</span><span>{sendMode === 'now' ? '今すぐ配信を選んでいます' : '配信日時が設定されています'}</span></li>
           <li className="flex items-center gap-2"><span className={testResult?.kind === 'success' ? 'text-success' : testResult ? 'text-danger' : 'text-warning'}>{testResult?.kind === 'success' ? '✓' : '!'}</span><span>{testResult?.kind === 'success' ? 'テスト送信が完了しています' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです'}</span></li>
-          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
+          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通不足しています` : quotaAvailable ? `送信枠は残り${formatNumber(quota.remaining)}通です` : '送信枠を確認できません'}</span></li>
         </ul>
         {!visualQaAugustCampaign && <Checkbox
           checked={previewConfirmed}
@@ -2400,7 +2397,7 @@ export default function BroadcastForm({
         <dl className="mt-5 divide-y divide-hairline text-sm">
           {[
             ['管理名', title.trim() || '（未入力）'],
-            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
             ['除外', visualQaAugustCampaign ? 'ブロック 12人を除外' : exclusionNote ?? '—'],
             ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
             ['送信枠', visualQaAugustCampaign ? '残り 8,700 / 10,000通' : quotaNote ?? '—'],
@@ -2462,9 +2459,9 @@ export default function BroadcastForm({
               <h3 className="text-lg font-bold text-ink">設定サマリー</h3>
               <p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-bold text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-bold text-ink">{selectedTemplate?.updatedAt ? new Date(selectedTemplate.updatedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-bold text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-medium text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-medium text-ink">{selectedTemplate?.updatedAt ? formatDateTime(selectedTemplate.updatedAt) : '—'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-medium text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2483,13 +2480,13 @@ export default function BroadcastForm({
                   : 'テンプレートを選ぶと表示されます'}
               </div>
             </section>
-            <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+            <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テストを送る</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>
         ) : preflightDialogOpen ? (
           <div className="space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-bold text-ink">{audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-bold text-danger">不足 {quota && quota.remaining !== null ? Math.max(0, quota.planned - quota.remaining).toLocaleString('ja-JP') : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-bold text-danger">要確認</dd></div></dl></section>
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-medium text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-medium text-ink">{formatNumber(audienceCount)}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-medium text-danger">不足 {quota && quota.remaining !== null ? formatNumber(Math.max(0, quota.planned - quota.remaining)) : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-medium text-danger">要確認</dd></div></dl></section>
             <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3><p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p><div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">8月限定キャンペーンのお知らせです。</div></section>
-            <div className="grid grid-cols-2 gap-2"><Button type="button">テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+            <div className="grid grid-cols-2 gap-2"><Button type="button">テストを送る</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>
         ) : currentStep === 'confirm' ? (
           <div className="space-y-3">
@@ -2511,11 +2508,11 @@ export default function BroadcastForm({
               <h3 className="font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
                   ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
-                  ['送信数', visualQaAugustCampaign ? '1,213通' : audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}通`],
+                  ['送信数', visualQaAugustCampaign ? '1,213通' : audienceCount === null ? '—' : `${formatNumber(audienceCount)}通`],
                   ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'],
-                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
+                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
               </dl>
             </section>
           </div>
@@ -2524,9 +2521,9 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-bold text-ink">未設定</dd></div>
-                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-bold text-ink">{bubbles.length}通</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-medium text-ink">未設定</dd></div>
+                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-medium text-ink">{bubbles.length}通</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2543,17 +2540,17 @@ export default function BroadcastForm({
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
                   ['配信日時', scheduledLabel ?? '未設定'],
                   ['送信数', `${bubbles.length}通`],
                   ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
-                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
+                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">送信枠</h3>
               <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
-              {quota ? <><p className="mt-3 text-sm font-bold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-bold ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
+              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{formatNumber(quota.planned)} / {formatNumber(quota.monthlyLimit)}通</p><div className="mt-2 h-2 overflow-hidden rounded-pill bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通` : `残り ${formatNumber(quota.remaining)}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
             </section>
             <LinePreview><div className="rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></LinePreview>
           </div>
@@ -2563,7 +2560,7 @@ export default function BroadcastForm({
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[['配信対象', '未設定'], ['配信日時', '未設定'], ['送信数', '—'], ['配信後', '未設定']].map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="font-bold text-ink">{value}</dd></div>
+                  <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="font-medium text-ink">{value}</dd></div>
                 ))}
               </dl>
             </section>
@@ -2573,7 +2570,7 @@ export default function BroadcastForm({
               </div>
             </LinePreview>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" disabled>テスト送信</Button>
+              <Button type="button" disabled>テストを送る</Button>
               <Button type="button" disabled>配信イメージを見る</Button>
             </div>
           </div>
@@ -2589,7 +2586,7 @@ export default function BroadcastForm({
               </div>
             </LinePreview>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テスト送信</Button>
+              <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テストを送る</Button>
               <Button type="button" disabled><Eye size={15} aria-hidden /> 配信イメージを見る</Button>
             </div>
           </div>
@@ -2612,7 +2609,7 @@ export default function BroadcastForm({
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()}>{currentStep === 'message' && <Save size={15} aria-hidden />}{saving ? '保存中…' : '下書き保存'}</Button>
+          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
               {currentStep === 'basic' ? '対象設定へ'
@@ -2621,20 +2618,20 @@ export default function BroadcastForm({
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()}>
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()} busy={saving}>
               {/*
                 予約と下書きを混同しない（IDEA-06）。「今すぐ配信」はここでは
                 送らず、下書きを保存して詳細画面の送信ボタンで実行する。
               */}
-              {saving ? '保存中…' : sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'}
+              {sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'}
             </Button>
           )}
         </>
       ) : (
         <>
           <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">キャンセル</button>
-          {(shows('message') || shows('confirm')) && <button disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50">{testSending ? '送信中…' : 'テスト送信'}</button>}
-          <button disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}</button>
+          {(shows('message') || shows('confirm')) && <button disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50">{testSending ? '送信中…' : 'テストを送る'}</button>}
+          <button disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</button>
         </>
       )}
       </>
@@ -2652,7 +2649,7 @@ export default function BroadcastForm({
       title="テンプレートを選択"
       description={selectedTemplate ? `「${selectedTemplate.name}」を一斉配信のメッセージに読み込みます。読み込み後も内容を編集できます。` : ''}
       confirmLabel="このテンプレートを使用"
-      cancelLabel="戻る"
+      cancelLabel="キャンセル"
       designNode="p97Tf"
       titleIcon={<CheckCircle2 size={22} />}
       onCancel={() => setSelectedTemplate(null)}
@@ -2689,9 +2686,9 @@ export default function BroadcastForm({
         </section>
         <section>
           <h3 className="text-sm font-bold text-ink">利用できる条件軸</h3>
-          <p className="mt-2 text-xs font-bold text-ink-secondary">標準互換（15軸）</p>
+          <p className="mt-2 text-xs font-medium text-ink-secondary">標準互換（15軸）</p>
           <div className="mt-2 flex flex-wrap gap-1.5">{STANDARD_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-secondary">{axis}</span>)}</div>
-          <p className="mt-3 text-xs font-bold text-ink-secondary">この画面だけの軸（6軸）</p>
+          <p className="mt-3 text-xs font-medium text-ink-secondary">この画面だけの軸（6軸）</p>
           <div className="mt-2 flex flex-wrap gap-1.5">{BROADCAST_ONLY_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-faint">{axis}</span>)}</div>
           <Notice tone="info" className="mt-3">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。未接続の軸は選択肢に出ません。</Notice>
         </section>
@@ -2702,10 +2699,10 @@ export default function BroadcastForm({
       open={preflightDialogOpen}
       title={quotaInsufficient ? '配信枠が不足しています' : '配信前チェック'}
       description={quotaInsufficient
-        ? `現在の送信枠では${quota?.planned.toLocaleString('ja-JP')}通を送信できません。対象を絞るか、配信設定を確認してください。`
+        ? `現在の送信枠では${formatNumber(quota?.planned)}通を送信できません。対象を絞るか、配信設定を確認してください。`
         : '対象・メッセージ・日時・送信枠を確認しました。'}
       confirmLabel="対象を見直す"
-      cancelLabel="戻る"
+      cancelLabel="キャンセル"
       designNode="vW4Es"
       titleIcon={quotaInsufficient ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
       onCancel={() => setPreflightDialogOpen(false)}
@@ -2747,7 +2744,7 @@ export default function BroadcastForm({
             <dd className="text-ink text-right font-medium">
               {confirmAudienceLabel}
               <span className="ml-2 tabular-nums">
-                {audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}
+                {audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}
               </span>
             </dd>
           </div>
@@ -2869,9 +2866,9 @@ export default function BroadcastForm({
 
     <ConfirmDialog
       open={testDialogOpen}
-      title="テスト送信"
+      title="テストを送る"
       description="登録済みのテスト送信先全員のLINEへ、表示確認用のメッセージを送ります。"
-      confirmLabel={testSending ? '送信中…' : 'テスト送信する'}
+      confirmLabel={testSending ? '送信中…' : 'テストを送る'}
       cancelLabel="キャンセル"
       busy={testSending}
       designNode="h0kahp"
@@ -2902,8 +2899,8 @@ export default function BroadcastForm({
             <ul className="space-y-2">
               {testRecipients.map((recipient) => (
                 <li key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
-                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
+                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-pill object-cover" /> : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-pill bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
                   )}
                   <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{recipient.displayName}</span>
                 </li>
@@ -2914,7 +2911,7 @@ export default function BroadcastForm({
               送信枠を使う。「消費しません」と書くと実装と食い違う。
             */}
             <Notice tone="info">
-              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {(testRecipients.length * bubbles.length).toLocaleString('ja-JP')}通）。
+              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {formatNumber((testRecipients.length * bubbles.length))}通）。
             </Notice>
           </>
         )}

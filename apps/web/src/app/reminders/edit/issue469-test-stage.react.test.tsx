@@ -129,9 +129,9 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     await flush()
 
     // 確認ダイアログから送信 → 422 未設定
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
     await flush()
     expect(screen.getAllByText('テスト送信先を設定してください').length).toBeGreaterThanOrEqual(1)
     // 送信先起因の失敗は送信先の表示も最新へ揃え直す（再読み込みされる）。
@@ -140,9 +140,9 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     // 設定後に同じ画面から再試行 → 成功。
     apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
     apiMocks.testDraft.mockReturnValue(ok({ sent: 1, recipientName: '田中 太郎', replayed: false, requestId: 'r1', testedAt: '2026-09-10T03:00:00.000Z' }))
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
     await flush()
     expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText(/テスト済み/).length).toBeGreaterThanOrEqual(1)
@@ -180,9 +180,9 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     expect(screen.queryByText(/Aの送信先/)).toBeNull()
     expect(screen.getByText('Bの実本文')).toBeTruthy()
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
     await flush()
     expect(apiMocks.testDraft.mock.calls[0][0]).toBe('rem-2')
   })
@@ -231,22 +231,22 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     await flush()
 
     // 1回目: 通信例外。窓は開いたまま、エラーは窓の中。
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
     await flush()
     expect(apiMocks.testDraft).toHaveBeenCalledTimes(1)
 
     // 2回目: 同じ窓からの再試行は同じ冪等キー。
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'もう一度送信' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'もう一度送る' }))
     await flush()
     expect(apiMocks.testDraft).toHaveBeenCalledTimes(2)
     expect(apiMocks.testDraft.mock.calls[1][1]).toBe(apiMocks.testDraft.mock.calls[0][1])
 
     // 成功後に「別のテストをもう一度送る」ときだけ新しいキー。
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
     await flush()
     expect(apiMocks.testDraft).toHaveBeenCalledTimes(3)
     expect(apiMocks.testDraft.mock.calls[2][1]).not.toBe(apiMocks.testDraft.mock.calls[0][1])
@@ -265,9 +265,9 @@ describe('リマインダ テスト送信段 (N-070)', () => {
 
     render(<Issue469ReminderTestStage reminderId="rem-1" />)
     await flush()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     await flush()
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テストを送る' }))
     await flush()
 
     // 窓は開いたまま、エラーは窓の中にあり、背面には出ない。
@@ -276,7 +276,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     expect(screen.queryByText('テスト送信に失敗しました。LINE連携と通知内容を確認してください。')).toBeNull()
 
     // 同じ窓から再試行して成功 → 窓が閉じ、失敗文はどこにも残らない。
-    fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度送信' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度送る' }))
     await flush()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByText(/送信結果を確認できませんでした/)).toBeNull()

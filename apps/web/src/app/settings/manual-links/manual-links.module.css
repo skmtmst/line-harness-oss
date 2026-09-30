@@ -81,7 +81,7 @@
   background: var(--color-danger-bg);
   color: var(--color-danger);
   font-size: var(--text-label);
-  font-weight: bold;
+  font-weight: 500;
   line-height: 1.6;
 }
 

@@ -320,7 +320,7 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
     // ★V7（m13g）：「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない。
     expect(labels.some((text) => text === '受信箱で開く')).toBe(false)
     expect(labels.some((text) => text?.includes('テンプレートを送る'))).toBe(true)
-    expect(labels).toContain('シナリオに登録')
+    expect(labels).toContain('シナリオに登録する')
 
     await act(async () => {
       menuItems().find((b) => b.textContent?.includes('テンプレートを送る'))!.click()
@@ -370,7 +370,7 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
     await eventually(() => expect(host.textContent).toContain('テスト太郎'))
 
     await act(async () => {
-      buttonByText('シナリオに登録').click()
+      buttonByText('シナリオに登録する').click()
     })
     await eventually(() => expect(document.querySelector('[data-scenario-picker]')).toBeTruthy())
     // 表示中アカウントのシナリオを選択肢として取る

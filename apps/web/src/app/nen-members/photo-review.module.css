@@ -33,7 +33,7 @@
 .sideTitle {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* 未接続の枠。値の場所には `—` を置き、理由を続けて書く。 */
@@ -41,7 +41,7 @@
   margin-top: 8px;
   color: var(--color-ink-faint);
   font-size: var(--text-display);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .sideNote {
@@ -69,7 +69,7 @@
 .reasonCount {
   color: var(--color-ink);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 

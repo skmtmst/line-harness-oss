@@ -144,7 +144,7 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     const notice = await screen.findByRole('status')
     expect(notice.textContent).toContain('送り直しました')
     /* 新しい期限が JST で出る。日付が読めないと「いつまでに受けてもらうか」が伝わらない。 */
-    expect(notice.textContent).toContain('3/4')
+    expect(notice.textContent).toContain('3月4日')
     expect(notice.textContent).toContain('期限内に受諾がなければ')
     expect(screen.queryByRole('alert')).toBeNull()
   })

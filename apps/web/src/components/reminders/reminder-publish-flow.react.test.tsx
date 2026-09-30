@@ -140,7 +140,7 @@ describe('リマインダ公開フローの実データ表示', () => {
     expect(screen.queryByText(/meet_url/)).toBeNull()
     expect(screen.queryByText(/meet\.google\.com/)).toBeNull()
     // フッターは下書きの実テスト記録を見る。
-    expect(screen.getByText(/テスト済み 2026\/09\/10/)).toBeTruthy()
+    expect(screen.getByText(/テスト済み 9月10日（木）/)).toBeTruthy()
     expect(screen.queryByText(/2026\/09\/06/)).toBeNull()
   })
 

@@ -142,7 +142,7 @@ function questionInput(): HTMLInputElement | null {
 }
 
 function saveButton(): HTMLButtonElement {
-  const found = [...document.querySelectorAll('button')].find((b) => b.textContent === '概要を保存')
+  const found = [...document.querySelectorAll('button')].find((b) => b.textContent === '概要を保存する')
   expect(found, '「概要を保存」がある').toBeTruthy()
   return found as HTMLButtonElement
 }

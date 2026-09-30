@@ -10,7 +10,7 @@ describe('V6 シナリオの読了率の母数', () => {
   it('現在配信中と読了済みの合計を母数にする', () => {
     expect(PAGE).toContain('const enrolled = active + completed')
     expect(PAGE).toContain('Math.round((completed / enrolled) * 100)')
-    expect(PAGE).toContain('`\u767b\u9332\u5408\u8a08 ${enrolled.toLocaleString(\'ja-JP\')}\u4eba\u306e\u3046\u3061 ${rate}%`')
+    expect(PAGE).toContain('`\u767b\u9332\u5408\u8a08 ${formatNumber(enrolled)}\u4eba\u306e\u3046\u3061 ${rate}%`')
   })
 
   it('購読中は現在稼働中の人数だと明記する', () => {

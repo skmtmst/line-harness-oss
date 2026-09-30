@@ -88,7 +88,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   it('保存・キャンセルは下部追従バーにしか置かない', () => {
     expect(PAGE).toContain("import StickyBar from '@/components/shared/sticky-bar'")
     const bar = PAGE.slice(PAGE.indexOf('<StickyBar'))
-    for (const label of ['キャンセル', '下書きに保存', 'つくって動かす']) {
+    for (const label of ['キャンセル', '下書きを保存する', 'つくって動かす']) {
       expect(bar, `${label} が追従バーの外にあります`).toContain(label)
     }
     // 追従バーより前に保存の押し口を置かない。
@@ -101,14 +101,14 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*height: 26px;/)
     expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*border-radius: var\(--radius-pill\);/)
     expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*font-size: var\(--text-caption\);/)
-    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*font-weight: 700;/)
+    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*font-weight: 500;/)
 
     // 主要ボタン 高さ40 / 角丸8 / 余白[0,14] / 13px / 700
     expect(CSS).toMatch(/\.action\s*\{[^}]*height: 40px;/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*border-radius: var\(--radius-control\);/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*padding: 0 14px;/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 700;/)
+    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 600;/)
 
     // 「動きを追加」だけ高さ44、行の中の小さな操作は 32 / r6
     expect(CSS).toMatch(/\.addAction\s*\{[^}]*height: 44px;/)
@@ -199,8 +199,8 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   })
 
   it('すること（動き）を複数持てる', () => {
-    expect(PAGE).toContain('動きを追加')
-    expect(PAGE).toContain('この動きを消す')
+    expect(PAGE).toContain('動きを追加する')
+    expect(PAGE).toContain('この動きを削除する')
     // 送る形は `draftActions()` にまとめた（確認画面とのずれ検出でも同じ形を使う）。
     // 名前が変わっても「入力の並びをそのまま送る」ことは崩さない。
     expect(PAGE).toContain('const draftActions = (): AutomationDraftAction[] => actions.map(')

@@ -47,7 +47,7 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
     expect(PAGE).toContain('useState<string>(editor.registrationFormId ??')
     /* 二重保存を防ぐ。 */
     expect(PAGE).toContain('disabled={savingRegistrationForm')
-    expect(PAGE).toContain('保存中…')
+    expect(PAGE).toContain('busy={savingRegistrationForm')
   })
 
   it('停止・削除・別アカウントは拒否理由を表示し選び直しを促す', () => {

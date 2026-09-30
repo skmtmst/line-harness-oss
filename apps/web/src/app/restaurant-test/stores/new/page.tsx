@@ -14,6 +14,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Checkbox from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import { formatDay } from '@/lib/format'
 
 const steps = [
   ['利用規約への同意', 'musuboの利用規約と、個人情報の取扱いをご確認ください。'],
@@ -29,11 +30,7 @@ function formatAgreementDate(value: string | null): string | null {
   if (!value) return null
   const parsed = new Date(value.replace(' ', 'T'))
   if (Number.isNaN(parsed.getTime())) return null
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(parsed)
+  return formatDay(parsed)
 }
 
 function ManualLink({ href, children }: { href: string; children: ReactNode }) {
@@ -206,7 +203,7 @@ export default function NewRestaurantStorePage() {
         const current = number === step && !created
         return <li key={title} className="relative flex gap-3 pb-6 last:pb-0">
           {number < steps.length && <span className="absolute left-[15px] top-8 h-[calc(100%-1rem)] w-px bg-hairline" />}
-          <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${complete ? 'bg-accent-deep text-on-accent' : current ? 'bg-ink text-canvas' : 'bg-canvas-sunken text-ink-faint'}`}>{complete ? '✓' : number}</span>
+          <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${complete ? 'bg-accent-deep text-on-accent' : current ? 'bg-ink text-canvas' : 'bg-canvas-sunken text-ink-faint'}`}>{complete ? '✓' : number}</span>
           <div>{number === STEP.TERMS && complete
             ? <Link href="/restaurant-test/terms" className="block"><p className="text-sm font-semibold text-success">{title}</p><p className="mt-1 text-xs leading-5 text-ink-faint">✓ 完了{agreementDate ? `（同意済み：${agreementDate}）` : ''}</p></Link>
             : <><p className={`text-sm font-semibold ${complete ? 'text-success' : current ? 'text-ink' : 'text-ink-faint'}`}>{title}</p><p className="mt-1 text-xs leading-5 text-ink-faint">{description}</p></>}</div>

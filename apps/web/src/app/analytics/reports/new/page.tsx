@@ -165,8 +165,7 @@ function OneTimeResultView({ accountId, schedule, runs, canManage, onRetryDone }
             <ul className="grid list-none gap-2 p-0">
               {latest.deliveryResults.map((item, index) => (
                 <li key={index} className="border-hairline rounded-control border px-3 py-2 text-xs">
-                  <span className="font-semibold">{deliveryChannelLabel(item.channel)}</span>
-                  {' ／ '}{item.recipient}
+                  <span className="font-semibold">{deliveryChannelLabel(item.channel)}</span> ／ {item.recipient}
                   {' ／ '}{deliveryStatusLabel(item.status)}
                   {item.reason && <span className="text-ink-secondary">（{item.reason}）</span>}
                 </li>
@@ -184,8 +183,7 @@ function OneTimeResultView({ accountId, schedule, runs, canManage, onRetryDone }
         <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="secondary" onClick={onRetryDone}>もう一度確認</Button>
           {canRetry && (
-            <Button disabled={retrying} onClick={() => void retry()}>
-              {retrying ? '送り直しています' : '届いていない分を送り直す'}
+            <Button disabled={retrying} onClick={() => void retry()} busy={retrying} busyLabel="送り直しています">届いていない分を送り直す
             </Button>
           )}
         </div>
@@ -753,7 +751,7 @@ function AnalyticsReportFormPage() {
         <aside className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
           <section className="border-success bg-success-bg rounded-card border p-5 md:col-span-2 xl:col-span-1">
             <h2 className="mb-3 text-sm font-semibold">{nextLabel} に、こう届きます(見本)</h2>
-            <div className="border-success rounded-card bg-canvas p-4 shadow-sm">
+            <div className="border-success rounded-card bg-canvas p-4 shadow-card">
               <strong className="text-sm">【週次】8/18〜8/24 のまとめ</strong>
               <p className="text-ink-faint mt-1 text-xs">数字はイメージです。</p>
               <div className="mt-3 grid grid-cols-3 gap-2"><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">友だち<b className="text-ink text-base">＋112</b></span><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">成果<b className="text-ink text-base">118件</b></span><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">売上<b className="text-ink text-base">¥312,400</b></span></div>
@@ -777,7 +775,7 @@ function AnalyticsReportFormPage() {
         status={editing
           ? <>「{editing.name}」を直しています。保存すると、次の{nextLabel}から新しい内容で届きます。</>
           : <>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>}
-        actions={<><Link className="text-ink-secondary inline-flex h-10 items-center px-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
+        actions={<><Link className="text-ink-secondary inline-flex h-10 items-center px-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(false)} busy={saving} busyLabel={(editing ? '保存しています' : '作っています')}>{(editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>

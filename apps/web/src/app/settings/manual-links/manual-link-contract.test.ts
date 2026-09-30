@@ -33,7 +33,7 @@ function row(over: Partial<ManualLinkRow> = {}): ManualLinkRow {
     taskId: null,
     name: '受信箱',
     url: 'https://help.line-harness.example/inbox',
-    checkedAt: '8/28 04:00',
+    checkedAt: '8月28日（金）4:00',
     status: 'ok',
     ...over,
   }
@@ -54,11 +54,11 @@ describe('リンクの状態', () => {
   */
   it('URL があっても、確かめていなければ「開けます」にしない', () => {
     expect(statusOf('https://example.com', null)).toBe('unset')
-    expect(statusOf('https://example.com', '8/28 04:00')).toBe('ok')
+    expect(statusOf('https://example.com', '8月28日（金）4:00')).toBe('ok')
   })
 
   it('URL が空なら「まだ決めていません」', () => {
-    expect(statusOf('', '8/28 04:00')).toBe('unset')
+    expect(statusOf('', '8月28日（金）4:00')).toBe('unset')
     expect(statusOf('   ', null)).toBe('unset')
   })
 })
@@ -71,7 +71,7 @@ describe('出せないものを出せるように見せない', () => {
 
   it('確かめていない日は `—`', () => {
     expect(checkedLabel(null)).toBe('—')
-    expect(checkedLabel('8/28 04:00')).toBe('8/28 04:00')
+    expect(checkedLabel('8月28日（金）4:00')).toBe('8月28日（金）4:00')
   })
 
   it('画面ごとの対応表が無いことを、行が無いのではなく口が無いと言う', () => {
@@ -97,7 +97,7 @@ describe('いま出せる行', () => {
       lastError: null, version: 2,
     })
     expect(row).toMatchObject({ screenId: '2-1', taskId: null, status: 'ok' })
-    expect(checkedLabel(row.checkedAt)).toBe('8/28 04:00')
+    expect(checkedLabel(row.checkedAt)).toBe('8月28日（金）4:00')
   })
 
   it('手元にあるのは作業ID 4件だけで、どれも未設定', () => {

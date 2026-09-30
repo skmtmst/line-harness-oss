@@ -16,8 +16,9 @@ import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { mileStatusLabel, text } from './photo-text'
+import { formatNumber } from '@/lib/format'
 
-const views = (value: unknown) => value == null ? '—（未取得）' : `${Number(value).toLocaleString('ja-JP')}回`
+const views = (value: unknown) => value == null ? '—（未取得）' : `${formatNumber(Number(value))}回`
 const PLACEMENT_CHOICES = [
   { type: 'rich_menu', label: 'リッチメニュー' },
   { type: 'column', label: 'NENコラム' },
@@ -185,7 +186,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
           const placements = placementsOf(item)
           const imageSrc = safePhotoSrc(item.image_url)
           return <Card key={text(item.id)} layout="vertical" overflow="hidden">
-            {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${photoPetDisplayName(item.pet_name, { honorific: false })}の公開写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-bold text-ink-faint">{text(item.image_url) ? '画像を表示できません' : '公開用画像を作成中です'}</div>}
+            {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${photoPetDisplayName(item.pet_name, { honorific: false })}の公開写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-medium text-ink-faint">{text(item.image_url) ? '画像を表示できません' : '公開用画像を作成中です'}</div>}
             <div className="p-2.5"><strong className="text-sm text-ink">{views(item.view_count)}</strong><h2 className="mt-0.5 text-base font-extrabold text-ink">{photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })}</h2><p className="mt-0.5 text-xs text-ink-faint">{text(item.owner_name) || '名前は伏せています'}</p>
               <div className="mt-1 text-xs text-ink-faint">{placements.length ? placements.map((placement) => <PlacementLine key={text(placement.id)} placement={placement} />) : <span>どこにも出していません</span>}</div>
               {/*
@@ -197,7 +198,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
                 <div className="flex justify-between gap-2"><dt>採用の記録</dt><dd className="text-right">{text(item.reviewed_at) ? `${formatPhotoReceivedAt(item.reviewed_at)}・${text(item.reviewed_by_name) || '担当未取得'}` : '—（未取得）'}</dd></div>
                 <div className="flex justify-between gap-2"><dt>マイル</dt><dd className="text-right">{mileStatusLabel(item.point_sync_status, Number(item.awarded_points) || 5)}</dd></div>
               </dl>
-              <div className="mt-2 flex items-center gap-2"><Button data-qa-open="J3Wxl8-placements" onClick={() => openPlacements(item)}>使う場所</Button><Button disabled={busyId === item.id} onClick={() => void withdraw(item)}>{busyId === item.id ? '外しています...' : '外す'}</Button></div>
+              <div className="mt-2 flex items-center gap-2"><Button data-qa-open="J3Wxl8-placements" onClick={() => openPlacements(item)}>使う場所</Button><Button disabled={busyId === item.id} onClick={() => void withdraw(item)} busy={busyId === item.id} busyLabel="外しています...">外す</Button></div>
             </div>
           </Card>
         })}
@@ -221,7 +222,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
           const remaining = remainingPlacements(item)
           const imageSrc = safePhotoSrc(item.image_url)
           return <Card key={text(item.id)} layout="vertical" overflow="hidden">
-            {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${photoPetDisplayName(item.pet_name, { honorific: false })}の写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-bold text-ink-faint">画像を表示できません</div>}
+            {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${photoPetDisplayName(item.pet_name, { honorific: false })}の写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-medium text-ink-faint">画像を表示できません</div>}
             <div className="p-2.5">
               <h3 className="text-base font-extrabold text-ink">{photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })}</h3>
               <p className="mt-0.5 text-xs font-semibold text-status-warn-deep">{pendingReason(item)}</p>
@@ -232,7 +233,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
               </div>
               <div className="mt-1 text-xs text-ink-faint">{placementsOf(item).map((placement) => <PlacementLine key={text(placement.id)} placement={placement} />)}</div>
               <p className="mt-2 border-t border-hairline pt-2 text-xs text-ink-faint">マイル：{mileStatusLabel(item.point_sync_status, Number(item.awarded_points) || 5)}（外しても付与済みのマイルは戻りません）</p>
-              <div className="mt-2"><Button disabled={busyId === item.id} onClick={() => void withdraw(item)}>{busyId === item.id ? '外しています...' : '掲載先から外す'}</Button></div>
+              <div className="mt-2"><Button disabled={busyId === item.id} onClick={() => void withdraw(item)} busy={busyId === item.id} busyLabel="外しています...">掲載先から外す</Button></div>
             </div>
           </Card>
         })}
@@ -246,7 +247,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
         {withdrawnItems.map((item) => {
           const imageSrc = safePhotoSrc(item.image_url)
           return <Card key={text(item.id)} layout="vertical" overflow="hidden">
-            {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${photoPetDisplayName(item.pet_name, { honorific: false })}の写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-bold text-ink-faint">画像を表示できません</div>}
+            {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${photoPetDisplayName(item.pet_name, { honorific: false })}の写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-medium text-ink-faint">画像を表示できません</div>}
             <div className="p-2.5">
               <h3 className="text-base font-extrabold text-ink">{photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })}</h3>
               <p className="mt-0.5 text-xs text-ink-faint">外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}{text(item.withdrawn_by_name) ? `・${text(item.withdrawn_by_name)}` : ''}</p>
@@ -262,14 +263,14 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
     open
     title={`${text(editing.pet_name) || 'この写真'}を使う場所`}
     description="選んだ場所へ公開用画像を出します。原本は公開しません。"
-    confirmLabel="使う場所を保存"
-    cancelLabel="戻る"
+    confirmLabel="使う場所を保存する"
+    cancelLabel="キャンセル"
     busy={busyId === editing.id}
     onCancel={() => setEditing(null)}
     onConfirm={() => void savePlacements()}
   >
     <fieldset className="grid gap-2">
-      <legend className="mb-2 text-sm font-extrabold text-ink">使う場所</legend>
+      <legend className="mb-2 text-sm font-medium text-ink">使う場所</legend>
       {PLACEMENT_CHOICES.map((choice) => <Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked
         ? [...current, choice.type]
         : current.filter((value) => value !== choice.type))}>{choice.label}</Checkbox>)}
