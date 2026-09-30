@@ -983,6 +983,8 @@ export async function createCustomerTestInstance(
 /**
  * テスト送信の操作自体を監査に残す。誰がどの定義を誰に試し送りしたかが
  * 後から分かる。対応状況の履歴（resolved/reopened）とは別action・別kind。
+ * 枠競合などで送る前に止めたときも outcome 付きで残し、送達の有無と
+ * 止めた理由を区別できるようにする(m26e R567)。
  */
 export async function recordCustomerTestAudit(
   db: D1Database,
@@ -992,6 +994,8 @@ export async function recordCustomerTestAudit(
     staffId: string;
     sourceEventId: string;
     recipientIds: string[];
+    outcome?: 'sent' | 'quota_insufficient';
+    errorMessage?: string;
   },
 ): Promise<void> {
   await db.prepare(`
@@ -1004,8 +1008,25 @@ export async function recordCustomerTestAudit(
       lineAccountId: input.lineAccountId,
       sourceEventId: input.sourceEventId,
       recipientIds: input.recipientIds,
+      ...(input.outcome ? { outcome: input.outcome } : {}),
+      ...(input.errorMessage ? { error: input.errorMessage } : {}),
     }), jstNow(),
   ).run();
+}
+
+/**
+ * 送る前に止めた試し送りの記録先を失敗で確定する。送達行のない成功前提の
+ * instance を残さないためのもので、送達行は作らない(m26e R567)。
+ */
+export async function failCustomerTestInstance(
+  db: D1Database,
+  input: { lineAccountId: string; instanceId: string },
+): Promise<boolean> {
+  const result = await db.prepare(`
+    UPDATE notification_instances SET status = 'failed', updated_at = ?
+     WHERE id = ? AND line_account_id = ? AND status = 'pending'
+  `).bind(jstNow(), input.instanceId, input.lineAccountId).run();
+  return Number(result.meta.changes ?? 0) === 1;
 }
 
 /**

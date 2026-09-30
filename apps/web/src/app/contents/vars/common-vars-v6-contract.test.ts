@@ -70,6 +70,16 @@ describe('V6共通情報一覧', () => {
     expect(EDIT_PAGE).not.toContain('placeholderText(item.name)')
   })
 
+  it('操作列は「編集」「削除する」の2個分の幅を持ち、隣の列へはみ出さない', () => {
+    // #1057で「削除」→「削除する」に延び、w-36（144px）では行のボタンが
+    // 隣の「使われている場所」へ被った（1152pxで再現）。2個と間隔で約148px
+    // 要るため、列幅176px（w-44）・内余白8px（px-2）・表の最小幅696pxにする。
+    expect(PAGE).toContain('min-w-[696px]')
+    expect(PAGE).toContain('sticky right-0 w-44 px-2 py-3')
+    expect(PAGE).toContain('sticky right-0 px-2 py-3 text-right')
+    expect(PAGE).not.toContain('sticky right-0 w-36 px-4 py-3')
+  })
+
   it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
     expect(PAGE).toContain("setStateFilter(value)")
     expect(PAGE).toContain("label: '使われている数が多い順'")
