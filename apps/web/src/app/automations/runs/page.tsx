@@ -139,6 +139,16 @@ export default function AutomationRunsPage() {
   const [detailError, setDetailError] = useState<null | 'error' | 'forbidden'>(null)
   /** 詳細の「もう一度読む」で取り直すための番号。 */
   const [detailReloadKey, setDetailReloadKey] = useState(0)
+  /*
+   * R493: 直リンク（?run=）の詳細取得の失敗も黙って捨てない。
+   * 一覧はそのまま使える状態にし、詳細の場所で失敗と再試行を出す。
+   * `forbidden` は権限不足（再読み込みを出さない）。
+   */
+  const [deepLinkRunId, setDeepLinkRunId] = useState<string | null>(null)
+  const [deepLinkLoading, setDeepLinkLoading] = useState(false)
+  const [deepLinkError, setDeepLinkError] = useState<null | 'error' | 'forbidden'>(null)
+  /** 直リンクの「もう一度読む」で取り直すための番号。 */
+  const [deepLinkReloadKey, setDeepLinkReloadKey] = useState(0)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryNotice, setRetryNotice] = useState('')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -208,6 +218,9 @@ export default function AutomationRunsPage() {
     setSelectedRun(null)
     setSelectedDetail(null)
     setDetailError(null)
+    setDeepLinkRunId(null)
+    setDeepLinkError(null)
+    setDeepLinkLoading(false)
     setConfirmCancel(false)
     setRetryNotice('')
   }, [selectedAccountId])
@@ -401,15 +414,24 @@ export default function AutomationRunsPage() {
   /*
    * R488: 1人テストの結果から `?run=<実行ID>` でこの記録へ飛べる。
    * 一覧に無い実行（テスト実行など）でも、詳細だけ開く。
+   * R493: 取得の失敗は黙って捨てない。一覧はそのまま使える状態にし、
+   * 詳細の場所で失敗と「もう一度読む」を出す（403は権限不足で再試行なし）。
    */
   useEffect(() => {
     const runId = new URLSearchParams(window.location.search).get('run')
     if (!runId) return
+    setDeepLinkRunId(runId)
     const accountAtStart = selectedAccountRef.current
     let cancelled = false
+    setDeepLinkLoading(true)
+    setDeepLinkError(null)
     api.automations.getRun(runId)
       .then((response) => {
-        if (cancelled || !response.success || selectedAccountRef.current !== accountAtStart) return
+        if (cancelled || selectedAccountRef.current !== accountAtStart) return
+        if (!response.success) {
+          setDeepLinkError('error')
+          return
+        }
         const detail = response.data
         setSelectedRun({
           id: detail.id,
@@ -427,10 +449,17 @@ export default function AutomationRunsPage() {
           canCancel: detail.canCancel,
         })
         setSelectedDetail(detail)
+        setDeepLinkError(null)
       })
-      .catch(() => {})
+      .catch((caught: unknown) => {
+        if (cancelled || selectedAccountRef.current !== accountAtStart) return
+        setDeepLinkError(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
+      })
+      .finally(() => {
+        if (!cancelled && selectedAccountRef.current === accountAtStart) setDeepLinkLoading(false)
+      })
     return () => { cancelled = true }
-  }, [])
+  }, [deepLinkReloadKey])
 
   return (
     <div data-design-node="DkPY0" className="flex flex-col gap-4">
@@ -532,6 +561,25 @@ export default function AutomationRunsPage() {
           </div>
         </div>
       )}
+
+      {!selectedRun && deepLinkRunId ? (
+        deepLinkLoading ? (
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+            <p className="text-sm text-ink-faint">読み込んでいます</p>
+          </section>
+        ) : deepLinkError === 'forbidden' ? (
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+            <p className="text-sm text-ink-secondary">この実行を見る権限がありません。</p>
+          </section>
+        ) : deepLinkError === 'error' ? (
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-ink-secondary">詳細を読み込めませんでした。記録は消えていません。</p>
+              <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読む</Button>
+            </div>
+          </section>
+        ) : null
+      ) : null}
 
       {selectedRun ? (
         <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
