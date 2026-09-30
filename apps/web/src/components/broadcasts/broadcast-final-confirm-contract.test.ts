@@ -39,8 +39,8 @@ describe('一斉配信の最終確認', () => {
   it('事前確認が数え終えた人数を対象画面の要約にも使う', () => {
     expect(FORM).toContain('const audienceDisplayCount = audienceCount')
     expect(FORM).not.toContain('api.segments.count(')
-    expect(FORM).toContain("audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'")
-    expect(FORM).toContain("audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`")
+    expect(FORM).toContain("formatNumber(audienceDisplayCount)")
+    expect(FORM).toContain("audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`")
   })
 
   it('数えられていないときは送らせない', () => {
@@ -50,7 +50,7 @@ describe('一斉配信の最終確認', () => {
   })
 
   it('未取得は「—」。0人と書かない', () => {
-    expect(FORM).toContain("{audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}")
+    expect(FORM).toContain("{audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}")
     // 除外人数は数としての口が無いので、無いときは `—`。
     expect(FORM).toContain('除外した人数はまだ取れません')
   })
@@ -102,14 +102,14 @@ describe('最終確認へのまとめ（IDEA-06）', () => {
   it('計算時刻は配信前チェックが数えた時刻だけを使う', () => {
     // 表示側で今の時刻を作ると「いつ数えた数か」が誤魔化せる。
     expect(FORM).toContain('preflight?.audience?.evaluatedAt')
-    expect(FORM).toContain('timeZone: \'Asia/Tokyo\'')
+    expect(FORM).toContain('formatDateTime(preflight.audience.evaluatedAt)')
   })
 
   it('送信枠は取得失敗・不足・残りを分け、0や空白で誤魔化さない', () => {
     expect(FORM).toContain("quota.state === 'unavailable'")
     expect(FORM).toContain("quota.state === 'insufficient'")
     expect(FORM).toContain('確認できませんでした')
-    expect(FORM).toContain('この配信で ${quota.planned.toLocaleString')
+    expect(FORM).toContain('この配信で ${formatNumber(quota.planned')
   })
 
   it('把握できる重複配信を、両方の確認へ出す', () => {

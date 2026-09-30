@@ -15,6 +15,7 @@ import Select from '@/components/shared/select'
 import { audienceText } from '@/app/webinars/overview-view'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
+import { formatNumber } from '@/lib/format'
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -30,7 +31,7 @@ import { notifyToast } from '@/components/shared/toast'
 /** 数を出してよいのは読めたときだけ。**読めていないものを 0 と書かない。** */
 function countText(value: number | undefined, available: boolean): string {
   return available && typeof value === 'number' && Number.isFinite(value)
-    ? value.toLocaleString('ja-JP')
+    ? formatNumber(value)
     : '—'
 }
 
@@ -346,7 +347,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
             {overview!.skippedReasons.map((reason) => (
               <li key={reason.code ?? 'unknown'} className="text-ink-secondary flex justify-between gap-4 text-xs">
                 <span>{reason.label}</span>
-                <span className="text-ink font-bold tabular-nums">{reason.count.toLocaleString('ja-JP')}件</span>
+                <span className="text-ink font-bold tabular-nums">{formatNumber(reason.count)}件</span>
               </li>
             ))}
           </ul>
@@ -383,8 +384,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       {error && <Notice tone="danger">{error}</Notice>}
 
       <div className="flex justify-end">
-        <Button variant="primary" onClick={() => void save()} disabled={saving}>
-          {saving ? '保存中…' : '通知の設定を保存'}
+        <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving}>通知の設定を保存する
         </Button>
       </div>
     </section>

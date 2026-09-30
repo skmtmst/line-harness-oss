@@ -1,4 +1,5 @@
 import type { RichMenuDeleteImpact } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /**
  * リッチメニューを消したときの影響（設計 `szXsT`／契約 #608）。
@@ -44,7 +45,7 @@ export function impactMatchesRequest(
  */
 export function audienceText(audience: RichMenuDeleteImpact['currentAudience']): string {
   if (audience.value === null) return NOT_AVAILABLE
-  return `${audience.value.toLocaleString('ja-JP')}人`
+  return `${formatNumber(audience.value)}人`
 }
 
 export function audienceReason(audience: RichMenuDeleteImpact['currentAudience']): string | null {

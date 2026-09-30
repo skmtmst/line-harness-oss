@@ -470,7 +470,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
               onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}
               className="ml-auto text-danger hover:underline"
             >
-              削除
+              削除する
             </button>
           </div>
         ))}
@@ -479,7 +479,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
           onClick={() => setRules((prev) => [...prev, { type: 'daily', time: '20:00' }])}
           className="rounded-control border px-3 py-1.5 text-sm font-medium hover:bg-canvas-sunken"
         >
-          ＋ ルール追加
+          ＋ ルールを追加する
         </button>
           </div>
         </details>
@@ -500,7 +500,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
       {hideBar ? null : (
       <StickyBar
         status="変更内容を確認して本番へ反映します"
-        actions={<button onClick={() => void requestSave()} disabled={saving} className="rounded-card bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-card disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
+        actions={<button onClick={() => void requestSave()} disabled={saving} className="rounded-card bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-card disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '保存する'}</button>}
       />
       )}
 

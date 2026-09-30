@@ -22,7 +22,7 @@ import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import { shortDate } from '../../lib/format-time'
+import { formatDay } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -36,8 +36,6 @@ const STAFF_DAYS = [
   { weekday: 0, label: '日曜日', short: '日' },
 ] as const
 
-const WEEKDAY_SHORT = ['日', '月', '火', '水', '木', '金', '土'] as const
-
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
 /**
@@ -47,10 +45,6 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
  */
 function weekdayOf(date: string): number {
   return new Date(`${date}T00:00:00Z`).getUTCDay()
-}
-
-function weekdayLabel(date: string): string {
-  return WEEKDAY_SHORT[weekdayOf(date)] ?? ''
 }
 
 /** 店舗の時間帯での「今日」(YYYY-MM-DD)。枠の範囲決めだけに使う。 */
@@ -517,7 +511,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     if (!selectedAccountId) return
     for (const row of dateRows) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !validRange(row.start, row.end)) {
-        setDateError(`${shortDate(row.date)}の日時を正しく入れてください。入力はそのまま残しています。`)
+        setDateError(`${formatDay(row.date)}の日時を正しく入れてください。入力はそのまま残しています。`)
         return
       }
     }
@@ -581,7 +575,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     if (!selectedAccountId) return
     const row = shiftRows[shift.id] ?? { start: shift.start_time, end: shift.end_time }
     if (!validRange(row.start, row.end)) {
-      setShiftError(`${shortDate(shift.work_date)}の時間を正しく入れてください（終わりは始まりより後にします）。入力はそのまま残しています。`)
+      setShiftError(`${formatDay(shift.work_date)}の時間を正しく入れてください（終わりは始まりより後にします）。入力はそのまま残しています。`)
       return
     }
     setSavingShift(true)
@@ -897,8 +891,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               })}
             </div>
             <div className="border-hairline flex flex-wrap items-center gap-3 border-t px-4 py-3">
-              <Button variant="primary" onClick={() => void saveRules()} disabled={savingRules}>
-                {savingRules ? '保存中…' : 'いつもの勤務時間を保存'}
+              <Button variant="primary" onClick={() => void saveRules()} disabled={savingRules} busy={savingRules}>いつもの勤務時間を保存する
               </Button>
               {rulesSavedAt ? <span className="text-success text-xs">保存しました。下の予約枠に反映されています。</span> : null}
               {ruleError ? <p className="text-danger w-full text-xs">{ruleError}</p> : null}
@@ -943,7 +936,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                     onClick={() => setBreakRows((current) => current.filter((item) => item.key !== row.key))}
                     className="text-danger hover:underline text-xs"
                   >
-                    削除
+                    削除する
                   </button>
                 </div>
               ))}
@@ -966,8 +959,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void saveBreaks()} disabled={savingBreaks}>
-                {savingBreaks ? '保存中…' : '休憩を保存'}
+              <Button variant="primary" onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks}>休憩を保存する
               </Button>
               {breaksSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {breakError ? <p className="text-danger w-full text-xs">{breakError}</p> : null}
@@ -982,11 +974,11 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.start < b.start ? -1 : 1))
                 .map((row) => (
                   <div key={row.key} className="border-hairline flex flex-wrap items-center gap-3 rounded-control border p-3 text-sm">
-                    <span className="font-semibold tabular-nums">{shortDate(row.date)}（{weekdayLabel(row.date)}）</span>
+                    <span className="font-semibold tabular-nums">{formatDay(row.date)}</span>
                     <span className="flex items-center gap-1 text-xs">
                       始め
                       <TimeField
-                        aria-label={`${shortDate(row.date)}の休憩の始まり`}
+                        aria-label={`${formatDay(row.date)}の休憩の始まり`}
                         value={row.start}
                         onChange={(v) => updateDateRow(row.key, { start: v })}
                       />
@@ -994,7 +986,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                     <span className="flex items-center gap-1 text-xs">
                       終わり
                       <TimeField
-                        aria-label={`${shortDate(row.date)}の休憩の終わり`}
+                        aria-label={`${formatDay(row.date)}の休憩の終わり`}
                         value={row.end}
                         onChange={(v) => updateDateRow(row.key, { end: v })}
                       />
@@ -1003,7 +995,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                       onClick={() => setDateRows((current) => current.filter((item) => item.key !== row.key))}
                       className="text-danger hover:underline text-xs"
                     >
-                      削除
+                      削除する
                     </button>
                   </div>
                 ))}
@@ -1026,8 +1018,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void saveBreakDates()} disabled={savingDates}>
-                {savingDates ? '保存中…' : 'この日だけの休憩を保存'}
+              <Button variant="primary" onClick={() => void saveBreakDates()} disabled={savingDates} busy={savingDates}>この日だけの休憩を保存する
               </Button>
               {datesSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {dateError ? <p className="text-danger w-full text-xs">{dateError}</p> : null}
@@ -1051,7 +1042,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <TimeField aria-label="シフトの終わり" value={newEnd} onChange={setNewEnd} className="mt-1" />
               </span>
               <div className="flex items-end">
-                <Button variant="primary" onClick={() => void addShift()} disabled={savingShift}>{savingShift ? '保存中…' : 'シフトを足す'}</Button>
+                <Button variant="primary" onClick={() => void addShift()} disabled={savingShift} busy={savingShift}>シフトを足す</Button>
               </div>
             </div>
             {shiftError ? <p className="text-danger mt-3 text-xs">{shiftError}</p> : null}
@@ -1062,11 +1053,11 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 const row = shiftRows[shift.id] ?? { start: shift.start_time, end: shift.end_time }
                 return (
                   <div key={shift.id} className="border-hairline flex flex-wrap items-center gap-3 rounded-control border p-3 text-sm">
-                    <span className="font-semibold tabular-nums">{shortDate(shift.work_date)}（{weekdayLabel(shift.work_date)}）</span>
+                    <span className="font-semibold tabular-nums">{formatDay(shift.work_date)}</span>
                     <span className="flex items-center gap-1 text-xs">
                       始め
                       <TimeField
-                        aria-label={`${shortDate(shift.work_date)}の始まり`}
+                        aria-label={`${formatDay(shift.work_date)}の始まり`}
                         value={row.start}
                         onChange={(v) => updateShiftRow(shift.id, { start: v })}
                       />
@@ -1074,14 +1065,14 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                     <span className="flex items-center gap-1 text-xs">
                       終わり
                       <TimeField
-                        aria-label={`${shortDate(shift.work_date)}の終わり`}
+                        aria-label={`${formatDay(shift.work_date)}の終わり`}
                         value={row.end}
                         onChange={(v) => updateShiftRow(shift.id, { end: v })}
                       />
                     </span>
                     <span className="inline-flex gap-2 text-xs">
-                      <button onClick={() => void saveShiftRow(shift)} disabled={savingShift} className="text-action hover:underline disabled:opacity-50">更新</button>
-                      <button onClick={() => setRemoveTarget(shift)} className="text-danger hover:underline">削除</button>
+                      <button onClick={() => void saveShiftRow(shift)} disabled={savingShift} className="text-action hover:underline disabled:opacity-50">更新する</button>
+                      <button onClick={() => setRemoveTarget(shift)} className="text-danger hover:underline">削除する</button>
                     </span>
                   </div>
                 )
@@ -1099,7 +1090,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                   <input aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
                 </label>
                 <div className="flex items-end">
-                  <Button onClick={() => void generateFromRules()} disabled={generating}>{generating ? '作成中…' : 'まとめて作る'}</Button>
+                  <Button onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">まとめて作る</Button>
                 </div>
               </div>
               <p className="text-ink-faint mt-2 text-xs">すでにある日は残します（上書きしません）。</p>
@@ -1119,7 +1110,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             {calendarId ? (
               <div className="mt-3 space-y-2 text-sm">
                 <p className="text-ink break-all tabular-nums">{calendarId}</p>
-                <p className="text-ink-faint text-xs">つながっています{calendarVerifiedAt ? `（最終確認 ${shortDate(calendarVerifiedAt.slice(0, 10))}）` : ''}</p>
+                <p className="text-ink-faint text-xs">つながっています{calendarVerifiedAt ? `（最終確認 ${formatDay(calendarVerifiedAt)}）` : ''}</p>
                 {calendarError ? <p className="text-danger text-xs">最新の確認で失敗しています：{calendarError}</p> : null}
                 <Button variant="secondary" onClick={() => setConfirmDisconnect(true)} disabled={disconnecting}>つながりを切る</Button>
               </div>
@@ -1135,8 +1126,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                     className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
                   />
                 </label>
-                <Button variant="primary" onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured}>
-                  {savingCalendar ? '確認中…' : 'つなげる'}
+                <Button variant="primary" onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured} busy={savingCalendar} busyLabel="確認中…">つなげる
                 </Button>
                 {calendarFormError ? <p className="text-danger text-xs">{calendarFormError}</p> : null}
               </div>
@@ -1162,7 +1152,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                   const showMonth = index === 0 || day === 1
                   const label = showMonth ? `${Number(item.date.slice(5, 7))}/${day}` : `${day}`
                   return (
-                    <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={`${item.date}（${weekdayLabel(item.date)}）`}>
+                    <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={`${formatDay(item.date)}`}>
                       <span className="block tabular-nums">{label}</span>
                       <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
                     </span>
@@ -1189,7 +1179,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
 
       <ConfirmDialog
         open={removeTarget !== null}
-        title={`「${removeTarget ? shortDate(removeTarget.work_date) : ''}」のシフトを消しますか？`}
+        title={`「${removeTarget ? formatDay(removeTarget.work_date) : ''}」のシフトを消しますか？`}
         description="この日のシフトを消すと、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。"
         confirmLabel="削除する"
         destructive

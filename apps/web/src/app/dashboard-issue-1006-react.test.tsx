@@ -300,9 +300,10 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
     const card = todayCard('今日の予約')
     /*
      * #673 で読込中の件数は「—」ではなく骨組み（スケルトン）に替わった。
-     * 前のアカウントの件数が残らないことは、骨組みと busy 印で確かめる。
+     * ★V7 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
      */
-    expect(card.querySelector('.animate-pulse')).not.toBeNull()
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    expect(card.querySelector('[data-skeleton]')).not.toBeNull()
     expect(card.querySelector('[aria-busy="true"]')).not.toBeNull()
     expect(card.textContent).not.toContain('1件')
   })
@@ -428,7 +429,7 @@ describe('A01-02 初期状態に戻すは確認なしに実行しない', () => 
     await act(async () => { button('初期状態に戻す').click() })
     expect(net.deletes).toBe(0)
     expect(dialog().textContent).toContain('削除して初期状態へ戻します')
-    await act(async () => { button('やめる').click() })
+    await act(async () => { button('キャンセル').click() })
     expect(net.deletes).toBe(0)
     expect(dialog().textContent).not.toContain('削除して初期状態へ戻します')
   })

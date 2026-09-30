@@ -1067,7 +1067,7 @@ function MediaLibraryInner() {
               kind="empty"
               title="まだメディアがありません"
               description="配信で使う画像・動画・音声・ファイルの置き場です。"
-              action={<Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button>}
+              action={<Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録する</Button>}
             />
           ) : (
             <ListState
@@ -1146,7 +1146,7 @@ function MediaLibraryInner() {
                         disabled={renamingBusy}
                         className="bg-accent-deep text-on-accent rounded-mini px-2 py-1 text-[11px] disabled:opacity-50"
                       >
-                        {renamingBusy ? '保存中…' : '保存'}
+                        {renamingBusy ? '保存中…' : '保存する'}
                       </button>
                     </div>
                   </div>
@@ -1314,8 +1314,7 @@ function MediaLibraryInner() {
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteMedia({ impact, busy: deleteBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()}>
-                  {deleteBusy ? '処理中…' : '削除する'}
+                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
                 </Button>
               ) : null}
             </div>
@@ -1393,15 +1392,13 @@ function MediaLibraryInner() {
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button type="button" onClick={() => setBulkConfirm(null)} disabled={bulkBusy}>
-              やめる
+              キャンセル
             </Button>
             <Button
               type="button"
               variant="primary"
               disabled={bulkBusy}
-              onClick={() => void runBulkDelete(bulkConfirm ?? [])}
-            >
-              {bulkBusy ? '処理中…' : '削除する'}
+              onClick={() => void runBulkDelete(bulkConfirm ?? [])} busy={bulkBusy} busyLabel="処理中…">削除する
             </Button>
           </div>
         }
@@ -1437,17 +1434,14 @@ function MediaLibraryInner() {
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button type="button" onClick={() => setArchiveTarget(null)} disabled={archiveBusy}>
-              やめる
+              キャンセル
             </Button>
             <Button
               type="button"
               variant="primary"
               disabled={archiveBusy || !archiveReason.trim()}
-              onClick={() => void confirmArchiveChange()}
-            >
-              {archiveBusy
-                ? '処理中…'
-                : archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
+              onClick={() => void confirmArchiveChange()} busy={archiveBusy} busyLabel="処理中…">
+              {archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
             </Button>
           </div>
         }

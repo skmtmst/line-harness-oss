@@ -22,6 +22,7 @@ import type {
   Tag,
   TrafficPool,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /** 選んだ流入元の人数、成果、友だち、追加時の動きをまとめて表示する。 */
 
@@ -325,7 +326,7 @@ function InflowLinkDetailPageContent() {
       ) : <>
         <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span>{/* R273: 一覧・一括操作と同じ言葉で受付状態を出す。赤は使わない（★V7）。 */}<span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.isActive ? '受付中' : '停止中'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
-          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除' : '受付を止める'}</Button></div>
+          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除する' : '受付を止める'}</Button></div>
         </div>
         {copyFailed && url && (
           <div role="alert" className="mb-4 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
@@ -350,7 +351,7 @@ function InflowLinkDetailPageContent() {
           最初に来た友だち）の注文だけを数える。友だちに結びついていない注文や
           経路の分からない注文は未計測としてここには出ない。
         */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /><MetricCard label="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? 'この経路から来た人の注文（累計）' : '注文の集計を取得できていません'} /><MetricCard label="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? `返金 ${ordersSummary.refunded.toLocaleString('ja-JP')}・取消 ${ordersSummary.cancelled.toLocaleString('ja-JP')}` : '注文の集計を取得できていません'} /></div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /><MetricCard label="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? 'この経路から来た人の注文（累計）' : '注文の集計を取得できていません'} /><MetricCard label="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? `返金 ${formatNumber(ordersSummary.refunded)}・取消 ${formatNumber(ordersSummary.cancelled)}` : '注文の集計を取得できていません'} /></div>
         {/*
           IDEA-18: 集計の期間・帰属ルール・計測できる範囲の断り書き。
           未計測を0と読ませないため、数えられないものを明記する。
@@ -409,7 +410,7 @@ function InflowLinkDetailPageContent() {
             {deleteChoice === 'delete' && <div className="rounded-control border border-status-danger bg-danger-bg p-4"><label htmlFor="inflow-delete-confirmation" className="text-sm font-medium text-danger">完全削除するには「{route.name}」と入力</label><input id="inflow-delete-confirmation" value={deleteConfirmationName} disabled={deleting} onChange={(event) => setDeleteConfirmationName(event.target.value)} autoComplete="off" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" /><p className="mt-1 text-xs text-danger">空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</p></div>}
             {deleteError && <Notice tone="danger" message={deleteError} />}
           </div>
-          <div className="flex items-center justify-between border-t border-hairline px-6 py-4" style={{ minHeight: 82 }}><p className="max-w-md text-xs text-ink-faint">選んだ方法を確認してから進みます。過去の友だち・タグ・分析記録は消えません。</p><div className="flex gap-2"><Button variant="secondary" disabled={deleting} onClick={() => setDeleteOpen(false)}>キャンセル</Button><Button onClick={() => void applyDeleteChoice()} disabled={deleting || (deleteChoice === 'delete' && deleteConfirmationName !== route.name)}>{deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除'}</Button></div></div>
+          <div className="flex items-center justify-between border-t border-hairline px-6 py-4" style={{ minHeight: 82 }}><p className="max-w-md text-xs text-ink-faint">選んだ方法を確認してから進みます。過去の友だち・タグ・分析記録は消えません。</p><div className="flex gap-2"><Button variant="secondary" disabled={deleting} onClick={() => setDeleteOpen(false)}>キャンセル</Button><Button onClick={() => void applyDeleteChoice()} disabled={deleting || (deleteChoice === 'delete' && deleteConfirmationName !== route.name)}>{deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除する'}</Button></div></div>
         </div>
       </div>}
     </div>
@@ -421,7 +422,7 @@ function MetricCard({ label, value, unit, detail }: { label: string; value: numb
     <div className="rounded-card border border-hairline bg-canvas p-4">
       <dt className="text-ink-faint text-xs">{label}</dt>
       <dd className="text-ink text-xl font-bold tabular-nums">
-        {value == null ? '—' : value.toLocaleString()}
+        {value == null ? '—' : formatNumber(value)}
         <span className="text-ink-faint ml-0.5 text-xs font-normal">{unit}</span>
       </dd>
       <p className="mt-1 text-xs text-ink-faint">{detail}</p>
@@ -457,7 +458,7 @@ function FunnelView({ funnel }: { funnel: EntryRouteFunnel }) {
                   進まなかった」に読める。取れていないだけなら、
                   施策を止める判断を誤る。
                 */}
-                {typeof s.value === 'number' ? s.value.toLocaleString() : '—'}
+                {typeof s.value === 'number' ? formatNumber(s.value) : '—'}
                 {typeof s.value === 'number' && pct !== null && (
                   <span className="ml-1.5 text-xs font-normal text-ink-faint">{pct}%</span>
                 )}

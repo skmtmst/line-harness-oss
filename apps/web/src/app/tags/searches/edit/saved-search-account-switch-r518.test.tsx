@@ -121,9 +121,9 @@ describe('R518 アカウント切替後の取得失敗', () => {
     // 前のアカウントの内容は残さない。
     expect(screen.queryByDisplayValue('Aの検索')).toBeNull()
     // 編集画面の操作は出さない。
-    expect(screen.queryByRole('button', { name: '複製して保存' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '変更を保存' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'この条件を削除' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '複製して保存する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'この条件を削除する' })).toBeNull()
     // Bの読込再試行は出す。
     const retry = screen.getByRole('button', { name: 'もう一度読み込む' })
     expect(retry).not.toBeNull()
@@ -135,7 +135,7 @@ describe('R518 アカウント切替後の取得失敗', () => {
     })
     await screen.findByDisplayValue('Bの検索')
     expect(screen.queryByDisplayValue('Aの検索')).toBeNull()
-    expect(screen.getByRole('button', { name: '複製して保存' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '複製して保存する' })).not.toBeNull()
   })
 
   test('403でAの内容を表示せず、再試行だけ出す', async () => {
@@ -149,7 +149,7 @@ describe('R518 アカウント切替後の取得失敗', () => {
 
     await screen.findByText('保存した検索を読み込めませんでした')
     expect(screen.queryByDisplayValue('Aの検索')).toBeNull()
-    expect(screen.queryByRole('button', { name: '複製して保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '複製して保存する' })).toBeNull()
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).not.toBeNull()
   })
 
@@ -164,7 +164,7 @@ describe('R518 アカウント切替後の取得失敗', () => {
 
     await screen.findByText('保存した検索が見つかりません')
     expect(screen.queryByDisplayValue('Aの検索')).toBeNull()
-    expect(screen.queryByRole('button', { name: '複製して保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '複製して保存する' })).toBeNull()
     expect(screen.getByRole('link', { name: '保存した検索の一覧へ戻る' })).not.toBeNull()
   })
 })

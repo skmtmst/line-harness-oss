@@ -32,6 +32,7 @@ import {
 } from './customer-kpis'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import styles from './customer-notifications.module.css'
+import { formatDateTime } from '@/lib/format'
 
 const customerFilters = [
   ['all', 'すべて'],
@@ -67,9 +68,7 @@ function formatUpdatedAt(iso: string | null | undefined): string {
   if (!iso) return '最終更新 —'
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '最終更新 —'
-  return `最終更新 ${date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  })}`
+  return `最終更新 ${formatDateTime(date)}`
 }
 
 function isIncomplete(setting: EcNotificationSetting): boolean {
@@ -560,7 +559,7 @@ function CustomerNotificationEditor({
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
       </div>
-      <Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button>
+      <Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button>
     </div>
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
@@ -637,7 +636,7 @@ function CustomerNotificationEditor({
     <div data-design="editor-footer" className="fixed bottom-0 left-0 right-0 z-20 min-w-0 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-6">
       <div className="ml-auto flex min-w-0 flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
         <p className="min-w-0 text-xs text-ink-faint">{definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '出しています。保存すると、次のお知らせから新しい文面が使われます。'}</p>
-        <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
+        <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存する' : 'お知らせを保存する'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
       </div>
     </div>
   </div>

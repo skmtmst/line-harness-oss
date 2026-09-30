@@ -155,8 +155,8 @@ export default function OpsTenantsPage() {
             />
             <span className="text-caption text-ink-secondary">飲食店機能</span>
           </label>
-          <Button type="submit" variant="primary">作成する</Button>
-          <Button onClick={() => setCreating(false)}>やめる</Button>
+          <Button onClick={() => setCreating(false)}>キャンセル</Button>
+          <Button type="submit" variant="primary">作る</Button>
         </form>
       ) : null}
 

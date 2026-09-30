@@ -91,7 +91,7 @@ afterEach(async () => {
 async function mountReady(overrides: Record<string, unknown> = {}) {
   mockConnector.mockResolvedValue({ success: true, data: overview(overrides) })
   render(<ConnectorPanel accountId="account-a" />)
-  await screen.findByRole('button', { name: '設定を保存' })
+  await screen.findByRole('button', { name: '設定を保存する' })
 }
 
 describe('#948 N-320: 影響件数の明示とやり直し規定の常時表示', () => {
@@ -114,7 +114,7 @@ describe('#948 N-322: 取り込みを止めるは保存必須であることを�
     expect(await screen.findByText(/まだ止まっていません。「設定を保存」を押すと止まります/)).toBeTruthy()
     expect(mockUpdate).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: '設定を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '設定を保存する' }))
     await screen.findByText('つなぎ先の設定を保存しました。')
     expect(mockUpdate).toHaveBeenCalledWith('account-a', expect.objectContaining({ status: 'paused' }))
   })
@@ -148,18 +148,18 @@ describe('#948 N-326: 保存できない理由を表示する', () => {
     await mountReady()
     const domain = document.querySelector('input[placeholder="nen-store.myshopify.com"]') as HTMLInputElement
     fireEvent.change(domain, { target: { value: '' } })
-    const save = screen.getByRole('button', { name: '設定を保存' }) as HTMLButtonElement
+    const save = screen.getByRole('button', { name: '設定を保存する' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(await screen.findByText('ショップのアドレスを入れると保存できます。')).toBeTruthy()
 
     fireEvent.change(domain, { target: { value: 'shop.example.com' } })
-    expect((screen.getByRole('button', { name: '設定を保存' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: '設定を保存する' }) as HTMLButtonElement).disabled).toBe(false)
     expect(screen.queryByText('ショップのアドレスを入れると保存できます。')).toBeNull()
   })
 
   it('鍵が未設定のつなぎ先では、32文字未満の理由を出す', async () => {
     await mountReady({ connector: { secretConfigured: false, secretLastFour: null, secretUpdatedAt: null } })
-    const save = screen.getByRole('button', { name: '設定を保存' }) as HTMLButtonElement
+    const save = screen.getByRole('button', { name: '設定を保存する' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(await screen.findByText('はじめてつなぐときは、32文字以上の鍵を入れてください。')).toBeTruthy()
   })

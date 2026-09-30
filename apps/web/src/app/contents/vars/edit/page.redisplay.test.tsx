@@ -240,7 +240,7 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), '受付終了')
     await setValue(byId('cv-change-reason'), '期間の修正')
-    await click(byExactText('button', '共通情報を保存'))
+    await click(byExactText('button', '共通情報を保存する'))
     expect(api.update).toHaveBeenCalledWith('var-1', 'account-1', expect.objectContaining({
       expectedVersion: 3, validFrom: '2026-09-16T10:00', validUntil: '2026-09-16T12:00',
       expiryBehavior: 'fallback', fallbackValue: '受付終了', changeReason: '期間の修正',
@@ -275,7 +275,7 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
       await setValue(control, nextValue)
     }
     await setValue(byId('cv-change-reason'), '値の更新')
-    await click(byExactText('button', '共通情報を保存'))
+    await click(byExactText('button', '共通情報を保存する'))
 
     expect(api.update).toHaveBeenCalledWith('var-1', 'account-1', expect.objectContaining({
       value: nextValue, expectedVersion: 1, impactProof: 'proof-1', changeReason: '値の更新',
@@ -289,7 +289,7 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
     await setValue(byId('cv-key'), 'redisplay_check')
     await setValue(byId('cv-value'), '平日 10:00〜18:00')
     await setValue(byId('cv-memo'), '更新は毎月1日に確認する')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledTimes(1)
     const created = api.create.mock.calls[0][0]
@@ -334,7 +334,7 @@ describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', ()
     await settle()
 
     await clearPickerDate('cv-value')
-    await click(byExactText('button', '共通情報を保存'))
+    await click(byExactText('button', '共通情報を保存する'))
 
     expect(api.update).not.toHaveBeenCalled()
     expect(host.textContent).toContain('値の日付を入力してください')
@@ -354,7 +354,7 @@ describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', ()
 
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), 'not-an-image')
-    await click(byExactText('button', '共通情報を保存'))
+    await click(byExactText('button', '共通情報を保存する'))
 
     expect(api.update).not.toHaveBeenCalled()
     expect(host.textContent).toContain('代替値は https:// からはじまるURLで入力してください')
@@ -373,7 +373,7 @@ describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', ()
     await settle()
 
     await setValue(byId('cv-value'), 'これはURLではありません')
-    await click(byExactText('button', '共通情報を保存'))
+    await click(byExactText('button', '共通情報を保存する'))
 
     expect(api.update).not.toHaveBeenCalled()
     expect(host.textContent).toContain('http://')

@@ -13,6 +13,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { parseJstDateTime, shortDateTime } from '@/lib/hq-banners'
 import { ChevronDown } from 'lucide-react'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 interface LineAccount {
   id: string
@@ -391,7 +392,7 @@ export default function HealthPage() {
                                       </span>
                                     </Td>
                                     <Td className="text-ink-faint text-xs">
-                                      {new Date(log.createdAt).toLocaleString('ja-JP')}
+                                      {formatDateTime(log.createdAt)}
                                     </Td>
                                   </Tr>
                                 )
@@ -433,8 +434,7 @@ export default function HealthPage() {
                   />
                 </div>
                 <div className="flex items-center gap-3">
-                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId}>
-                    {migrating ? '移行中...' : '移行を開始'}
+                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId} busy={migrating} busyLabel="移行中...">移行を開始
                   </Button>
                   <Button
                     type="button"
@@ -490,7 +490,7 @@ export default function HealthPage() {
                     <tbody>
                       {migrations.map((migration) => {
                         const status = statusConfig[migration.status]
-                        const countText = `${migration.migratedCount.toLocaleString('ja-JP')} / ${migration.totalCount.toLocaleString('ja-JP')} 人`
+                        const countText = `${formatNumber(migration.migratedCount)} / ${formatNumber(migration.totalCount)} 人`
                         const percent = migration.totalCount > 0
                           ? (migration.migratedCount / migration.totalCount) * 100
                           : 0
@@ -529,11 +529,11 @@ export default function HealthPage() {
                               )}
                             </Td>
                             <Td className="text-ink-faint text-xs">
-                              {new Date(migration.createdAt).toLocaleString('ja-JP')}
+                              {formatDateTime(migration.createdAt)}
                             </Td>
                             <Td className="text-ink-faint text-xs">
                               {migration.completedAt
-                                ? new Date(migration.completedAt).toLocaleString('ja-JP')
+                                ? formatDateTime(migration.completedAt)
                                 : '-'}
                             </Td>
                           </Tr>

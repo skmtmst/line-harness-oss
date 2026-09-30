@@ -12,6 +12,7 @@ import { api } from '@/lib/api'
 import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import DuplicatesStatsNotice from './duplicates-stats-notice'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 interface PerAccountStat {
   accountId: string
@@ -54,7 +55,6 @@ function formatRelative(iso: string): string {
   return `${hr}時間前`
 }
 
-const fmt = new Intl.NumberFormat('ja-JP')
 
 const CANDIDATE_PAGE_SIZE = 50
 
@@ -217,13 +217,13 @@ export default function DuplicatesPage() {
   const unfilteredCandidates = status === '' && debouncedQuery.trim() === ''
   const duplicateTotalText =
     statusCounts !== null
-      ? `${fmt.format(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`
+      ? `${formatNumber(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`
       : !unfilteredCandidates || candidateError || (candidatesLoading && candidateTotal === 0)
         ? '—'
-        : `${fmt.format(candidateTotal)}組`
+        : `${formatNumber(candidateTotal)}組`
   const duplicateDetail =
     statusCounts !== null
-      ? `${fmt.format(statusCounts.pending ?? 0)}組を確認待ち`
+      ? `${formatNumber(statusCounts.pending ?? 0)}組を確認待ち`
       : !unfilteredCandidates || candidateError
         ? '読み込めませんでした'
         : '内訳は読み込めませんでした'
@@ -289,7 +289,7 @@ export default function DuplicatesPage() {
               （読み込み50件で頭打ちにならない。）
             */}
             <KpiCard title="重複候補" value={null} unit="" valueText={duplicateTotalText} detail={duplicateDetail} />
-            <KpiCard title="確認済み" value={null} unit="" valueText={statusCounts !== null ? `${fmt.format(statusCounts.linked ?? 0)}組` : '—'} detail={statusCounts !== null ? '' : '読み込めませんでした'} help="統合ユーザーに紐付け済みの組数です" />
+            <KpiCard title="確認済み" value={null} unit="" valueText={statusCounts !== null ? `${formatNumber(statusCounts.linked ?? 0)}組` : '—'} detail={statusCounts !== null ? '' : '読み込めませんでした'} help="統合ユーザーに紐付け済みの組数です" />
             {/*
               friendDups は「重複した登録の行数」。送った通数ではない。
               以前はこれを「余分な配信回数」「1配信あたり浪費 ¥X」と言い切り、
@@ -314,8 +314,8 @@ export default function DuplicatesPage() {
                 title="1配信あたりの無駄"
                 value={null}
                 unit=""
-                valueText={`¥${fmt.format(data.wastedPerBroadcastYen)}`}
-                detail={`¥${fmt.format(data.msgUnitYen)}/通の見積り`}
+                valueText={`¥${formatNumber(data.wastedPerBroadcastYen)}`}
+                detail={`¥${formatNumber(data.msgUnitYen)}/通の見積り`}
                 description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
               />
             ) : (
@@ -327,7 +327,7 @@ export default function DuplicatesPage() {
                 description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
               />
             )}
-            <KpiCard title="根拠不足" value={null} unit="" valueText={lowConfidenceCount !== null ? `${fmt.format(lowConfidenceCount)}組` : '—'} detail={lowConfidenceCount !== null ? '' : '読み込めませんでした'} help="名前・画像だけの候補です" />
+            <KpiCard title="根拠不足" value={null} unit="" valueText={lowConfidenceCount !== null ? `${formatNumber(lowConfidenceCount)}組` : '—'} detail={lowConfidenceCount !== null ? '' : '読み込めませんでした'} help="名前・画像だけの候補です" />
           </section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-ink-secondary">
@@ -392,7 +392,7 @@ export default function DuplicatesPage() {
                     <td className="px-3 py-3 text-ink-secondary">{candidate.confidence.label === 'very_high' ? '最高' : candidate.confidence.label === 'high' ? '高' : candidate.confidence.label === 'medium' ? '中' : '低'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary" title={candidate.evidenceSummary.join('・')}>{candidate.evidenceSummary.join('・') || '根拠を確認'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
-                    <td className="px-3 py-3 text-ink-secondary">{new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="px-3 py-3 text-ink-secondary">{formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
                     <td className="whitespace-nowrap py-2 pr-5 pl-3 text-right"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
                   </tr>
@@ -427,7 +427,7 @@ export default function DuplicatesPage() {
                 </span>
               ) : candidateTotal > 0 ? (
                 <span>
-                  {fmt.format(candidateTotal)}組中 {fmt.format(rangeStart)}〜{fmt.format(rangeEnd)}組
+                  {formatNumber(candidateTotal)}組中 {formatNumber(rangeStart)}〜{formatNumber(rangeEnd)}組
                 </span>
               ) : null}
               {/* FRIEND-11: 51件目以降へ進めるページ送り。 */}
@@ -468,8 +468,8 @@ export default function DuplicatesPage() {
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
                         <td className="py-4 pr-4 pl-5 font-semibold text-ink" title={row.accountName}><span className="block truncate">{row.accountName}</span></td>
-                        <td className="px-4 py-4 text-right tabular-nums"><span>{fmt.format(row.friends)}</span></td>
-                        <td className="px-4 py-4 text-right tabular-nums"><span>{fmt.format(row.dups)}</span></td>
+                        <td className="px-4 py-4 text-right tabular-nums"><span>{formatNumber(row.friends)}</span></td>
+                        <td className="px-4 py-4 text-right tabular-nums"><span>{formatNumber(row.dups)}</span></td>
                         <td className="py-4 pr-5 pl-4 text-right tabular-nums">
                           <span>{(row.dupRate * 100).toFixed(0)}%</span>
                         </td>
@@ -543,7 +543,7 @@ export default function DuplicatesPage() {
                               key={col.accountId}
                               className="px-2 py-4 text-right tabular-nums"
                             >
-                              {fmt.format(overlap)}{' '}
+                              {formatNumber(overlap)}{' '}
                               <span className="text-xs text-ink-faint">
                                 ({(rate * 100).toFixed(0)}%)
                               </span>

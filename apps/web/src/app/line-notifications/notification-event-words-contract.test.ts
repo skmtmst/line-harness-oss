@@ -34,7 +34,7 @@ describe('LINE通知の見出しは、内部のイベントキーを出さない
   })
 
   it('最終更新は日本時間で、取れないときは数を作らない', () => {
-    expect(CODE).toContain("timeZone: 'Asia/Tokyo'")
+    expect(CODE).toContain('formatDateTime(date)')
     expect(CODE).toContain("return '最終更新 —'")
   })
 

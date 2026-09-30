@@ -16,6 +16,7 @@ import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/l
 import { formatEcShortDate as shortDate } from './ec-datetime'
 import ListRange from '@/components/ui/list-range'
 import styles from './ec-commerce-v6.module.css'
+import { formatNumber } from '@/lib/format'
 
 const FILTERS = [
   { key: 'all', label: 'すべて' },
@@ -101,7 +102,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
   return (
     <>
       <div className={styles.kpis}>
-        <KpiCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${summary?.monthlyAmount.toLocaleString('ja-JP')}`} />
+        <KpiCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary?.monthlyAmount)}`} />
         <KpiCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="" help="定期便の開始日から集計しています" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
         <KpiCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '解約理由の記録なし'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
         <KpiCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="" help="ECの決済状態から確認する人数です" />
@@ -112,7 +113,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
        * 定期便の変更・休止そのものはEC側（管理画面・お客様のマイページ）で行う。
        */}
       <NoteBar help="支払いを確認はECから届いた決済状態です" helpLabel="支払いを確認の意味">「支払いを確認」はECから届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」はECに登録された確定の予定日で、EC側で変わると次の同期で更新されます。購入後の案内は <Link href="/nen-campaigns" className="font-semibold underline">NEN配信</Link> で管理します。</NoteBar>
-      {(summary?.monthlyStats ?? []).length > 0 ? <div className="my-4 rounded-card border border-hairline bg-canvas p-4"><p className="text-sm font-semibold text-ink">月別の定期便</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{summary?.monthlyStats.slice(-6).map((item) => <div key={item.month} className="rounded-control bg-canvas-sunken px-3 py-2"><p className="text-xs text-ink-faint">{item.month}</p><p className="mt-1 text-sm font-semibold text-ink">{item.count.toLocaleString('ja-JP')}件</p><p className="text-xs text-ink-secondary">¥{item.amount.toLocaleString('ja-JP')}</p></div>)}</div></div> : null}
+      {(summary?.monthlyStats ?? []).length > 0 ? <div className="my-4 rounded-card border border-hairline bg-canvas p-4"><p className="text-sm font-semibold text-ink">月別の定期便</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{summary?.monthlyStats.slice(-6).map((item) => <div key={item.month} className="rounded-control bg-canvas-sunken px-3 py-2"><p className="text-xs text-ink-faint">{item.month}</p><p className="mt-1 text-sm font-semibold text-ink">{formatNumber(item.count)}件</p><p className="text-xs text-ink-secondary">¥{formatNumber(item.amount)}</p></div>)}</div></div> : null}
       <div className={styles.toolbar}>
         {/*
          * #948 N-325: placeholder は実際に検索する項目(ownerName・petName・
@@ -135,7 +136,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
                 <Td><span className={styles.cellStack}><span className={styles.cellMain} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.cycle ? ` ／ ${item.cycle}` : ''}</span><span className={styles.cellSub} title={item.items ?? undefined}>{item.petName ? `${item.petName}用` : 'ペット名 —'} ／ {item.items ?? '中身 未取得'}</span></span></Td>
                 <Td>{item.status === 'cancelled' ? '止まりました' : shortDate(item.nextShippingAt)}</Td>
                 <Td>{item.continuedCount === null ? '—' : `${item.continuedCount}回目`}</Td>
-                <Td align="right">{item.amount === null ? '—' : `¥${item.amount.toLocaleString('ja-JP')}`}</Td>
+                <Td align="right">{item.amount === null ? '—' : `¥${formatNumber(item.amount)}`}</Td>
                 <Td><span className={styles.cellStack}><span className={`${styles.status} ${STATUS_TONE[item.status]}`}>{item.statusLabel}</span>{item.riskReason || item.cancellationReason ? <span className={styles.cellSub}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
                 <ActionCell>
                   {/* #641: 主操作は枠つきボタン、残りは「その他（…）」へ集約。 */}
@@ -178,7 +179,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
       */}
       <p className={styles.footer}>
         {search.trim()
-          ? `このページの ${shown.length.toLocaleString('ja-JP')}件を表示（検索はページの中だけに効きます）`
+          ? `このページの ${formatNumber(shown.length)}件を表示（検索はページの中だけに効きます）`
           : <ListRange
               label={filter === 'all' ? '定期便' : '表示条件に合う定期便'}
               total={total}
@@ -186,7 +187,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
               last={(page - 1) * PAGE_SIZE + shown.length}
             />}
         {data && data.skipped.malformedSnapshots > 0
-          ? `／ 形が読めなかったお客様のぶん ${data.skipped.malformedSnapshots.toLocaleString('ja-JP')}件は数えていません`
+          ? `／ 形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)}件は数えていません`
           : ''}
       </p>
       <Pagination

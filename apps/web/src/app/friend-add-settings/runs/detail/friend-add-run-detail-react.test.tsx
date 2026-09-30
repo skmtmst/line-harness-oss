@@ -140,7 +140,7 @@ describe('R264〜R268 実行詳細', () => {
     })
     await render()
     const text = host.textContent ?? ''
-    expect(text).toContain('2026/09/16 10:00')
+    expect(text).toContain('9月16日（水）10:00')
     expect(text).toContain('はじめて')
     expect(text).toContain('紹介QR')
     expect(text).toContain('初回案内・第1版')

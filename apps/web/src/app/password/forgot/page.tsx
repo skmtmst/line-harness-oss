@@ -98,8 +98,7 @@ export default function PasswordForgotPage() {
           />
         </AuthField>
         <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
-        <Button type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full">
-          {busy ? '送っています…' : '再設定メールを送る'}
+        <Button type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full" busy={busy} busyLabel="送っています…">再設定メールを送る
         </Button>
       </form>
       <p className="text-caption text-ink-faint">
