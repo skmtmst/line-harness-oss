@@ -41,7 +41,10 @@ vi.mock('@/components/shared/condition-builder', async () => {
     default: () => <div data-testid="condition-builder" />,
     isEmptyCondition: actual.isEmptyCondition,
     isRuleComplete: actual.isRuleComplete,
+    isStructurallyEmpty: actual.isStructurallyEmpty,
     pruneCondition: actual.pruneCondition,
+    findConditionDraftIssue: actual.findConditionDraftIssue,
+    findInvalidRangeIssue: actual.findInvalidRangeIssue,
   }
 })
 

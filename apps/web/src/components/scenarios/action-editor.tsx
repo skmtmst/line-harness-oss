@@ -49,11 +49,9 @@ import {
 } from '@/lib/api'
 import Notice from '@/components/shared/notice'
 import ConditionBuilder, {
+  findConditionDraftIssue as findSharedConditionDraftIssue,
   findInvalidRangeIssue,
-  isEmptyCondition,
-  isRuleComplete,
   type SegmentCondition,
-  type SegmentRule,
 } from '@/components/shared/condition-builder'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -281,22 +279,10 @@ export function describeAction(action: ScenarioAction, lookups: ActionLookups): 
 /*
  * R243: 編集中の未完成行は保持し、保存のときに入力不足を案内する。
  * 未完成のまま黙って「条件なし」に置き換えない。
+ * 判定は共通のものを使う。空のかたまりだけの下書きも止める。
  */
 export function findConditionDraftIssue(draft: SegmentCondition | null): string | null {
-  if (!draft || isEmptyCondition(draft)) return null
-  const hasIncompleteRule = (rules: SegmentRule[]) => rules.some((rule) => !isRuleComplete(rule))
-  if (hasIncompleteRule(draft.rules ?? [])) {
-    return '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。'
-  }
-  for (const group of draft.groups ?? []) {
-    if ((group.rules ?? []).length === 0) {
-      return '空の「いずれか」の条件のかたまりがあります。項目を足すか、かたまりを外してください。'
-    }
-    if (hasIncompleteRule(group.rules ?? [])) {
-      return '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。'
-    }
-  }
-  return null
+  return findSharedConditionDraftIssue(draft)
 }
 
 export interface ActionEditorProps {

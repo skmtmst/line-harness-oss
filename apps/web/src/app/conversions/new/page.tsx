@@ -34,7 +34,7 @@ import CreatePage, {
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
+import ConditionBuilder, { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { originInfoOf } from '../origin-labels'
 import { useAccount } from '@/contexts/account-context'
@@ -389,6 +389,13 @@ export default function NewConversionPointPage() {
         }
         if (!lineAccountId) return '集計対象のLINEアカウントを選んでください（画面上部で選べます）'
         if (exclusionMemo.trim().length > 500) return '数えない条件のメモは500文字以内で入力してください'
+        /*
+         * S4-OR: 空の「いずれか」のかたまり・未完成の行は、黙って
+         * 「除外なし」に落とさない。足すつもりの条件が無いまま数えると
+         * 広く数えすぎるので、保存を止めて直し方を案内する。
+         */
+        const exclusionIssue = findConditionDraftIssue(exclusion)
+        if (exclusionIssue) return exclusionIssue
         // 起点に金額が無いのに注文の金額が残っていたら先に言う(通常は選べない)。
         if (!origin.valueModes.includes(valueMode)) {
           return 'この起点には注文の金額が無いため、金額の出し方は「決まった額を使う」か「金額を集計しない」を選んでください'
