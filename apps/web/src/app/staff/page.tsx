@@ -26,6 +26,7 @@ import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
   api,
+  describeSaveFailure,
   fetchApi,
   type AccessRoleBundle,
   type AccessRoleItem,
@@ -451,7 +452,9 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
         onClose()
         return
       }
-      const message = messageOf(caught)
+      // R497-SAVE-WORDING: 見せる範囲の保存だけは既存 helper で言い分ける。
+      // 生の API error:<status> を出さない。他の messageOf 呼びは変えない。
+      const message = describeSaveFailure(caught)
       setSaveError(message)
       setSaveConfirmError(message)
     } finally {
