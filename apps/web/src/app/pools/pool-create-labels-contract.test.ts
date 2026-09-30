@@ -42,6 +42,25 @@ describe('新規プール窓の常時ラベル (R617)', () => {
     expect(body, '表示名の欄がlabelに包まれていない').toMatch(/<label[^>]*>[\s\S]*?placeholder="例: ブランドA"/)
   })
 
+  it('slugと表示名はhtmlForとidで明示的に結び付いている（暗黙の関連付けはHelpTipのbuttonに奪われる）', () => {
+    const body = MODAL()
+    // 暗黙の関連付けだと、labelの中の最初のラベル可能要素（HelpTipの
+    // button）へ結び付き、実ブラウザで input.labels が空になる。
+    expect(body).toContain('htmlFor="create-pool-slug"')
+    expect(body).toContain('id="create-pool-slug"')
+    expect(body).toContain('htmlFor="create-pool-name"')
+    expect(body).toContain('id="create-pool-name"')
+  })
+
+  it('HelpTipはslugのlabelの外にある（入力欄の読み上げ名に混ざらない）', () => {
+    const body = MODAL()
+    const labelOpen = body.indexOf('<label htmlFor="create-pool-slug"')
+    const labelClose = body.indexOf('</label>', labelOpen)
+    expect(labelOpen, 'slugのlabelが見つからない').toBeGreaterThanOrEqual(0)
+    expect(body.slice(labelOpen, labelClose), 'HelpTipがlabelの中にある').not.toContain('HelpTip')
+    expect(body, 'slugのHelpTipが消えている').toContain('<HelpTip label="slugの説明">')
+  })
+
   it('最初の所属アカウントはhtmlForとidで結び付いている', () => {
     const body = MODAL()
     expect(body).toContain('htmlFor="create-pool-account"')
