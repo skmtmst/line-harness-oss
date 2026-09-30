@@ -275,8 +275,7 @@ function SaveAnalysisAction({
             className="border-hairline rounded-control min-w-64 flex-1 border px-3 py-2 text-sm"
             placeholder="保存する分析名"
           />
-          <Button onClick={() => void save()} disabled={saving || !name.trim()} variant="primary">
-            {saving ? '保存中' : 'この名前で保存する'}
+          <Button onClick={() => void save()} disabled={saving || !name.trim()} variant="primary" busy={saving} busyLabel="保存中">この名前で保存する
           </Button>
           <Button onClick={() => setOpen(false)} disabled={saving} variant="secondary">
             キャンセル
@@ -812,8 +811,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               }))}
             />
           </div>
-          <Button onClick={() => void runCross()} disabled={loading || !crossStorageRestored || !fieldId || Boolean(crossRunId)} variant="primary">
-            {loading ? '集計中' : `この${crossDays}日を集計`}
+          <Button onClick={() => void runCross()} disabled={loading || !crossStorageRestored || !fieldId || Boolean(crossRunId)} variant="primary" busy={loading} busyLabel="集計中">
+            {`この${crossDays}日を集計`}
           </Button>
         </div>
         <dl className="mt-3 grid gap-3 border-t border-hairline pt-3 sm:grid-cols-2">
@@ -1037,8 +1036,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                   <Notice tone="success">
                     {audience.memberCount}人を24時間の対象者として準備しました
                     {' '}
-                    <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>
-                    {' '}
+                    <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>{' '}
                     <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(audience.id)}`} className="font-medium text-action hover:underline">この対象者へ配信を作成</Link>
                   </Notice>
                 )}
@@ -1483,9 +1481,8 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                 <Button
                   onClick={() => void runNow()}
                   disabled={running || selectedFunnel?.status !== 'active'}
-                  variant="secondary"
-                >
-                  {running ? '再集計中' : `この${funnelDays}日を再集計`}
+                  variant="secondary" busy={running} busyLabel="再集計中">
+                  {`この${funnelDays}日を再集計`}
                 </Button>
                 {canManage && (
                   <button
@@ -1539,9 +1536,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                       <Button
                         onClick={() => void startEdit()}
                         disabled={editLoading || !selectedFunnel.currentVersion}
-                        variant="secondary"
-                      >
-                        {editLoading ? '定義を読み込み中' : '定義を編集'}
+                        variant="secondary" busy={editLoading} busyLabel="定義を読み込み中">定義を編集
                       </Button>
                       <Button
                         onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'stopped' })}
@@ -1798,8 +1793,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   <Notice tone="success" className="mt-3">
                     {funnelAudience.memberCount}人を24時間の対象者として準備しました
                     {' '}
-                    <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>
-                    {' '}
+                    <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>{' '}
                     <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="font-medium text-action hover:underline">この対象者へ配信を作成</Link>
                   </Notice>
                 )}
@@ -2181,9 +2175,8 @@ function FunnelForm({
         <Button
           onClick={save}
           disabled={saving}
-          variant="primary"
-        >
-          {saving ? '保存中...' : edit ? '新版として保存する' : '作る'}
+          variant="primary" busy={saving} busyLabel="保存中...">
+          {edit ? '新版として保存する' : '作る'}
         </Button>
         <Button
           onClick={onCancel}

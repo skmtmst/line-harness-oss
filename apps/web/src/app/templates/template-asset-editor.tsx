@@ -721,7 +721,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         </aside>
       </div>
 
-      <StickyBar status={saved ? '保存しました。一覧へ戻れます。' : '下書き（まだ誰にも送られません）'} actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving || saved} onClick={() => void save()}>下書きを保存する</Button><Button type="button" variant="primary" disabled={saving || saved} onClick={() => void save()}>{saving ? '保存中…' : saved ? '保存しました' : 'テンプレートを保存する'}</Button></>} />
+      <StickyBar status={saved ? '保存しました。一覧へ戻れます。' : '下書き（まだ誰にも送られません）'} actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving || saved} onClick={() => void save()}>下書きを保存する</Button><Button type="button" variant="primary" disabled={saving || saved} onClick={() => void save()} busy={saving} done={saved}>テンプレートを保存する</Button></>} />
 
       <ConfirmDialog
         open={pendingShape !== null}

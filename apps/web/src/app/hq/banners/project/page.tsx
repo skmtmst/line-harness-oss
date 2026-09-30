@@ -562,8 +562,7 @@ function ProjectInner() {
           actions={
             running ? (
               <>
-                <Button onClick={() => void cancelGeneration()} disabled={cancelling}>
-                  {cancelling ? '止めています…' : '残りをやめる'}
+                <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">残りをやめる
                 </Button>
                 <Button variant="primary" disabled>
                   <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />

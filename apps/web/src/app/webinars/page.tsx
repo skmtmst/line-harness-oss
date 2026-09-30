@@ -132,8 +132,7 @@ function WebinarFolderDialog({
         {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy}>
-            {busy ? '保存中…' : '保存する'}
+          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy} busy={busy}>保存する
           </Button>
         </div>
       </section>

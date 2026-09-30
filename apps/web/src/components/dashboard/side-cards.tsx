@@ -4,6 +4,7 @@ import type { BookingRequest, DashboardOverview, DashboardUpcoming, DeliveryFail
 import { api } from '@/lib/api'
 import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 /**
@@ -333,10 +334,15 @@ export function UpcomingCard({
       freshness={updatedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(updatedAt)}</span> : undefined}
     >
       {legacyLoading ? (
-        <div className="space-y-2">
-          <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
-          <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
-        </div>
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div className="space-y-2">
+              <Skeleton className="block h-5 w-full" />
+              <Skeleton className="block h-5 w-full" />
+            </div>
+          }
+        />
       ) : legacyFailed ? (
         <p className="text-ink-faint text-xs leading-relaxed">予定を読み込めませんでした。</p>
       ) : legacy.length === 0 ? (
@@ -418,9 +424,10 @@ export function DeliveryFailuresCard({ accountId }: { accountId?: string | null 
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">読み込めませんでした。</p>
         </>
       ) : (
-        <div className="space-y-2">
-          <div className="bg-canvas-sunken h-7 w-20 animate-pulse rounded-mini" />
-        </div>
+        <DelayedSkeleton
+          loading
+          skeleton={<Skeleton className="block h-7 w-20" />}
+        />
       )}
     </SideCard>
   )

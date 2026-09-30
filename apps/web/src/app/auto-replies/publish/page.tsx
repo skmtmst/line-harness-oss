@@ -937,8 +937,7 @@ function AutoReplyPublishInner() {
             <p>入力内容に一致するルールと実行予定のアクションを確認します。</p>
             <div className={"arp-dialogActions"}>
               <Button onClick={() => { setTestDialogOpen(false); setStage('conflicts') }}>競合と優先順位へ戻る</Button>
-              <Button data-qa-open="g46ja-run" onClick={runDryTest} disabled={busy || !selectedFriendId || !testMessage.trim()}>
-                {busy ? 'テスト中…' : '自動応答をテスト'}
+              <Button data-qa-open="g46ja-run" onClick={runDryTest} disabled={busy || !selectedFriendId || !testMessage.trim()} busy={busy} busyLabel="テスト中…">自動応答をテスト
               </Button>
               <Button variant="primary" disabled={!dryRun} onClick={() => setTestDialogOpen(false)}>
                 最終確認へ

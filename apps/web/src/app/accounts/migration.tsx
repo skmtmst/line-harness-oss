@@ -575,7 +575,7 @@ export default function AccountMigration() {
           )}
         </div>
         <div className="mt-4">
-          <Button variant="primary" disabled={busy} onClick={() => void createDryRun()}>{busy ? '確認中…' : 'テスト移行を実行'}</Button>
+          <Button variant="primary" disabled={busy} onClick={() => void createDryRun()} busy={busy} busyLabel="確認中…">テスト移行を実行</Button>
         </div>
         {message && <p role="status" className="text-ink-secondary mt-3 text-sm">{message}</p>}
       </section>

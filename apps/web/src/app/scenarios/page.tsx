@@ -26,6 +26,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
@@ -314,7 +315,7 @@ function StartScenarioDialog({
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'}>{busy ? '開始中…' : '配信を開始'}</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'} busy={busy} busyLabel="開始中…">配信を開始</Button>
         </div>
       </div>
     </div>
@@ -882,6 +883,11 @@ export default function ScenariosPage() {
           onRetry={() => void loadScenarios()}
         />
       ) : (
+        /*
+         * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。読み直し中は
+         * 行を消さず、表を薄めて上に 2px の線の帯を出す。
+         */
+        <RefreshCover refreshing={scenarioList.refreshing}>
         <ScenarioList
           scenarios={scenarios}
           isFiltered={scenarioFilterActive}
@@ -893,7 +899,6 @@ export default function ScenariosPage() {
           onDelete={handleDelete}
           onCreate={() => void handleCreate()}
         />
-      )}
       {scenarioList.pageCount > 1 ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <ListRange
@@ -904,6 +909,8 @@ export default function ScenariosPage() {
           <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
         </div>
       ) : null}
+        </RefreshCover>
+      )}
         </div>
       </div>
       </div>

@@ -456,9 +456,8 @@ function ScenarioModeContent() {
           <Button
             variant="primary"
             disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}
-            onClick={() => { if (selectedMode) void choose(selectedMode) }}
-          >
-            {saving !== null ? '作成中…' : id ? 'この方式で保存する' : 'この方式で作る'}
+            onClick={() => { if (selectedMode) void choose(selectedMode) }} busy={saving !== null} busyLabel="作成中…">
+            {id ? 'この方式で保存する' : 'この方式で作る'}
           </Button>
         </div>
       </div>

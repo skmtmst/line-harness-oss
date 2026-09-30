@@ -3546,9 +3546,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <Button
                         variant="primary"
                         onClick={() => void handleSaveMemo()}
-                        disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
-                      >
-                        {memoSaving ? '保存中...' : 'メモを保存する'}
+                        disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')} busy={memoSaving} busyLabel="保存中...">メモを保存する
                       </Button>
                     </div>
                   </div>
@@ -3600,9 +3598,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         variant="primary"
                         type="button"
                         onClick={() => void handleScheduleSend()}
-                        disabled={scheduling || messageOverLimit || !messageContent.trim() || !scheduleInput}
-                      >
-                        {scheduling ? '予約中...' : 'この日時で予約する'}
+                        disabled={scheduling || messageOverLimit || !messageContent.trim() || !scheduleInput} busy={scheduling} busyLabel="予約中...">この日時で予約する
                       </Button>
                     </div>
                     {scheduledSendsFailed && (
