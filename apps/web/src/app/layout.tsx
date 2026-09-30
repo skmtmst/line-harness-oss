@@ -17,6 +17,22 @@ import ToastHost from '@/components/shared/toast'
 const DEFAULT_TITLE = '然-NEN- LINE管理システム'
 
 /*
+ * ★V8 移行②: テーマの切り替え。
+ *
+ * `<html data-theme="v7|v8">` が globals.css の `[data-theme="v8"]` の
+ * 値を効かせるスイッチ。既定は v7（値は何も書かなくても :root のもの）。
+ *
+ *   環境変数 NEXT_PUBLIC_ADMIN_THEME=v8 … その環境（検証環境）の既定を v8 に
+ *   localStorage lh-admin-theme        … 担当者が設定画面の「画面の見た目
+ *                                         （試作）」でこのブラウザだけ切り替える
+ *
+ * localStorage は書き出しの時点では読めないので、描画が始まる前に
+ * 下の短いスクリプトで `<html>` の data-theme を差し替える。
+ */
+const ADMIN_THEME = process.env.NEXT_PUBLIC_ADMIN_THEME === 'v8' ? 'v8' : 'v7'
+const THEME_BOOT = `(function(){try{var t=localStorage.getItem('lh-admin-theme');if(t==='v7'||t==='v8'){document.documentElement.dataset.theme=t}}catch(e){}})()`
+
+/*
  * ★V7 の書体。英字と数字は Inter、かなと漢字は Noto Sans JP に見える
  * （--font-sans の並びが正本。Inter に日本語グリフが無いので、かなと漢字は
  * 自動で Noto Sans JP に落ちる）。
@@ -54,9 +70,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ja" className={`${inter.variable} ${notoSansJp.variable}`}>
+    <html lang="ja" data-theme={ADMIN_THEME} className={`${inter.variable} ${notoSansJp.variable}`}>
       {/* 書体は globals.css の --font-sans が正本（#976 U080）。inline style はやめる。 */}
       <body className="bg-canvas-sunken text-ink antialiased font-sans">
+        {/* localStorage のテーマ指定を描画前に反映する（白い板のちらつき防止） */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <ClientErrorReporter />
         <BrandTitle />
         <AppShell>
