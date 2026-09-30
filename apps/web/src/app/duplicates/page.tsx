@@ -9,6 +9,7 @@ import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { TableStateRow } from '@/components/shared/table'
 import { api } from '@/lib/api'
+import { isForbidden } from '@/components/shared/api-error-message'
 import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import DuplicatesStatsNotice from './duplicates-stats-notice'
@@ -247,13 +248,24 @@ export default function DuplicatesPage() {
             集計も候補一覧も両方読めなかったときだけ、1枚の失敗にする。
             どちらか一方が残っていれば下の枝でページを残し、
             失敗はその場所（集計欄・表の中）で出す（R598）。
+            R598残件：候補一覧の取得自体に権限が無い（403）ときは汎用の
+            通信失敗にせず、権限の案内にする。押しても直らない再試行は
+            出さない（`error` を渡すと ListState が言い分ける）。
           */}
-          <ListState
-            kind="error"
-            title="読み込めませんでした"
-            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
-            onRetry={() => load()}
-          />
+          {isForbidden(candidateFailure) ? (
+            <ListState
+              kind="error"
+              error={candidateFailure ?? undefined}
+              onRetry={() => load()}
+            />
+          ) : (
+            <ListState
+              kind="error"
+              title="読み込めませんでした"
+              description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+              onRetry={() => load()}
+            />
+          )}
         </>
       ) : (
         <>
@@ -271,10 +283,20 @@ export default function DuplicatesPage() {
             <DuplicatesStatsNotice failure={statsFailure} onRetry={() => load()} />
           ) : (
             error && (
-              <p className="text-ink-secondary text-xs" role="status">
-                再計算できませんでした。表示中の数字は前回の集計です。
-                <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => load()}>もう一度</button>
-              </p>
+              /*
+               * R598残件：取得済みの集計がある状態で取り直したら権限不足
+               * （403）だったときは、汎用の再計算失敗にせず集計欄と同じ
+               * 権限の案内にする。押しても直らない再試行は出さない。
+               * 503などは従来どおり再試行を残す。
+               */
+              isForbidden(statsFailure) ? (
+                <DuplicatesStatsNotice failure={statsFailure} onRetry={() => load()} />
+              ) : (
+                <p className="text-ink-secondary text-xs" role="status">
+                  再計算できませんでした。表示中の数字は前回の集計です。
+                  <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => load()}>もう一度</button>
+                </p>
+              )
             )
           )}
           {/*
