@@ -257,11 +257,15 @@ export default function NewCommonActionPage() {
 
       {error ? <p className="text-danger mt-4 text-sm" role="alert">{error}</p> : null}
       <StickyBar
-        status={saving ? '下書きを保存しています' : 'まだ保存していません'}
+        status={saving ? '下書きを保存しています' : resourcesFailed ? '選択肢を読み込めていないため保存できません' : 'まだ保存していません'}
         actions={(
           <>
             <Button href="/common-actions">キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={saving || resourcesLoading} busy={saving} busyLabel="保存中">下書きを保存する
+            {/*
+              監査 R585: 選択肢の取得失敗中は保存の入口を閉じる。
+              空の選択肢のまま保存へ進めない（兄弟画面 webinars/new と同じ形）。
+            */}
+            <Button variant="primary" onClick={() => void save()} disabled={saving || resourcesLoading || resourcesFailed} title={resourcesFailed ? '選択肢を読み込めていないため保存できません' : undefined} busy={saving} busyLabel="保存中">下書きを保存する
             </Button>
           </>
         )}

@@ -53,4 +53,11 @@ describe('作成の選択肢の失敗と0件の言い分け（監査 R585）', (
     // 真の0件の案内（選べる◯◯がありません）は残す。
     expect(EDITOR).toContain('選べる')
   })
+
+  it('作成は選択肢の取得失敗中は保存の入口を閉じ、理由を示す', () => {
+    // 空の選択肢のまま保存へ進めない（兄弟画面 webinars/new と同じ形）。
+    expect(NEW).toMatch(/disabled=\{[^}]*resourcesFailed/)
+    // 理由は欄の近くの案内だけでなく、保存ボタンの側（title・状態文）にも出す。
+    expect(NEW).toContain('選択肢を読み込めていないため保存できません')
+  })
 })
