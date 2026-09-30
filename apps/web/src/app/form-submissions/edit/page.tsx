@@ -49,6 +49,7 @@ import { conflictMessage } from './form-conflict-message'
 import { formSavedContentMatches, type FormSavedContent } from './form-save-reconcile'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ActionMenu from '@/components/shared/action-menu'
@@ -461,7 +462,7 @@ function FormEditInner() {
   const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
 
   /*
-   * 「保存せずに移動」を選んだとき、保存済み・読み直し直後の姿へ戻す。
+   * 「保存せずに移る」を選んだとき、保存済み・読み直し直後の姿へ戻す。
    *
    * `?tab=` だけ変わる移動や、移動先から同じ画面へ戻ったときに「消えます」と
    * 言ったはずの変更が残っていると困る。画面がアンマウントされない
@@ -1303,12 +1304,9 @@ function FormEditInner() {
         未保存のまま画面を離れようとしたときの確認。保存済みのフォームと
         集まった回答は変わらないが、画面上の下書きは消えるので聞く。
       */}
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、保存していない変更は消えます。先に保存しますか。"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="フォームへの変更"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
