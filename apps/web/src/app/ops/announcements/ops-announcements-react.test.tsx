@@ -218,7 +218,7 @@ describe('画面', () => {
     expect(navigation.push).not.toHaveBeenCalled()
   })
 
-  it('離脱の確認で「保存せずに移動」を押すと移動する（監査 R155）', async () => {
+  it('離脱の確認で「保存せずに移る」を押すと移動する（監査 R155）', async () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     await act(async () => {
@@ -230,7 +230,7 @@ describe('画面', () => {
     await act(async () => { link.click() })
     await flush()
     link.remove()
-    await act(async () => { button('保存せずに移動')!.click() })
+    await act(async () => { button('保存せずに移る')!.click() })
     await flush()
     expect(navigation.push).toHaveBeenCalledWith('/ops/knowledge')
   })

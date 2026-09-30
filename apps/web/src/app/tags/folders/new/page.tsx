@@ -277,8 +277,8 @@ function FolderEditor() {
               <div className="border-hairline mt-7 border-t pt-6">
                 <p className="text-ink mb-3 text-sm font-semibold">作成する場所</p>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setScope('tag')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'tag' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>タグ</button>
-                  <button type="button" onClick={() => setScope('friend_field')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'friend_field' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>友だち情報欄</button>
+                  <Button variant="secondary" className={(`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'tag' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => setScope('tag')}>タグ</Button>
+                  <Button variant="secondary" className={(`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'friend_field' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => setScope('friend_field')}>友だち情報欄</Button>
                 </div>
               </div>
             )}
@@ -301,7 +301,7 @@ function FolderEditor() {
               ) : undefined}
               actions={(
                 <>
-                  <button type="button" disabled={saving} onClick={close} className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium hover:bg-canvas-sunken disabled:opacity-40">キャンセル</button>
+                  <Button variant="secondary" className="text-ink-secondary px-4 py-2.5 font-medium h-auto whitespace-normal" type="button" disabled={saving} onClick={close}>キャンセル</Button>
                   <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()} busy={saving}>{editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存する</> : 'フォルダを追加する'}</Button>
                 </>
               )}

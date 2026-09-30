@@ -274,14 +274,7 @@ function DashboardPreview({ draft }: { draft: DashboardPreferences }) {
         <p className="text-ink-faint text-[11px]">実際のダッシュボードと同じ順番で表示します。</p>
         <div className="flex gap-1" role="tablist" aria-label="プレビューの画面幅">
           {([['pc', 'PC'], ['mobile', 'スマホ']] as const).map(([key, text]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={device === key}
-              onClick={() => setDevice(key)}
-              className={`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}
-            >{text}</button>
+            <Button variant="primary" className={(`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={key} type="button" role="tab" aria-selected={device === key} onClick={() => setDevice(key)}>{text}</Button>
           ))}
         </div>
       </div>

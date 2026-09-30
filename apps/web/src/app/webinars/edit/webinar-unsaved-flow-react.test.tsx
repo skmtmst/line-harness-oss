@@ -288,14 +288,14 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     expect(host.textContent).toContain('保存していない変更があります')
   })
 
-  it('「保存せずに移動」を選んだときだけ入力を捨てて一覧へ遷移する', async () => {
+  it('「保存せずに移る」を選んだときだけ入力を捨てて一覧へ遷移する', async () => {
     await openNotificationsPane()
     await act(async () => { buttonByText('通知を変更する').click() })
     await flush()
 
     await act(async () => { listLink().click() })
     await flush()
-    await act(async () => { buttonByText('保存せずに移動').click() })
+    await act(async () => { buttonByText('保存せずに移る').click() })
     await flush()
 
     expect(fixture.push).toHaveBeenCalledWith('/webinars')

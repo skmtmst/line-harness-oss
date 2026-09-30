@@ -10,6 +10,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
 import { formatDay } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /*
  * 一覧は `api.nenCampaigns.columns`（`NenColumn`・ラクダ語）を読む。
@@ -178,13 +179,9 @@ function NenColumnEditInner() {
                           ? '変更があります。保存するまで反映されません。'
                           : ''}
                 </p>
-                <button
-                  onClick={() => save(column)}
-                  disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}
-                  className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken shrink-0 border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
-                >
+                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}>
                   {savingId === column.id ? '保存中...' : '保存する'}
-                </button>
+                </Button>
               </div>
             </div>
           ))}
