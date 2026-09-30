@@ -367,6 +367,22 @@ function FriendsPageInner({
   }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
+  /*
+   * タグの付け外しは押した瞬間に一覧へ反映する（★V7 sTJsh §1）。
+   * 返す関数を呼ぶと変更前の並びへ戻る（元に戻す・失敗時の復元用）。
+   */
+  const applyFriendTags = useCallback((friendId: string, next: Tag[]) => {
+    const previous = friends.find((friend) => friend.id === friendId)?.tags ?? []
+    setFriends((current) =>
+      current.map((friend) => (friend.id === friendId ? { ...friend, tags: next } : friend)),
+    )
+    return () => {
+      setFriends((current) =>
+        current.map((friend) => (friend.id === friendId ? { ...friend, tags: previous } : friend)),
+      )
+    }
+  }, [friends])
+
   useEffect(() => void loadMarks(), [loadMarks])
   useEffect(() => setPage(1), [selectedAccountId])
   useEffect(() => {
@@ -699,7 +715,15 @@ function FriendsPageInner({
           hint="対象を確認してから操作を選んでください"
           below={selectedIds.size === 1 ? (
             <div className="mt-2">
-              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
+              <SingleFriendActions
+                friendId={[...selectedIds][0]}
+                friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'}
+                tags={allTags}
+                accountId={selectedAccountId}
+                onDone={loadFriends}
+                friendTags={friends.find((friend) => friend.id === [...selectedIds][0])?.tags ?? []}
+                onFriendTagsChange={(next) => applyFriendTags([...selectedIds][0], next)}
+              />
             </div>
           ) : undefined}
         >

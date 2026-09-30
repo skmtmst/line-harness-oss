@@ -12,7 +12,7 @@ import NewWebinarPage from './page'
  *
  * - 何も触っていない戻りはそのまま通す（確認を出さない）
  * - 名前・開催形式・フォルダを触っていたら「保存していない変更があります」
- * - 「保存せずに移動」で一覧へ、「編集を続ける」・Esc で残る
+ * - 「保存せずに移る」で一覧へ、「編集を続ける」・Esc で残る
  */
 
 const fixture = vi.hoisted(() => ({
@@ -124,15 +124,15 @@ describe('ウェビナー作成の未保存離脱確認（R18）', () => {
     expect(fixture.push).not.toHaveBeenCalled()
   })
 
-  it('「保存せずに移動」で一覧へ進む', async () => {
+  it('「保存せずに移る」で一覧へ進む', async () => {
     await render()
     await flush()
     await typeTitle('QAウェビナー')
     await act(async () => { fireEvent.click(backLink()) })
     await flush()
 
-    const leave = [...document.body.querySelectorAll('button')].find((b) => b.textContent === '保存せずに移動')
-    if (!leave) throw new Error('「保存せずに移動」が見つかりません')
+    const leave = [...document.body.querySelectorAll('button')].find((b) => b.textContent === '保存せずに移る')
+    if (!leave) throw new Error('「保存せずに移る」が見つかりません')
     await act(async () => { fireEvent.click(leave) })
     await flush()
 

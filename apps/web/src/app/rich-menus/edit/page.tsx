@@ -310,7 +310,7 @@ function Editor({
    * 公開のしかた（STEP3）の入力。工程の行き来（STEP1/2/3）で工程の部品が
    * 付け替わっても消えないよう、工程をまたぐここで持つ。予約の保存が
    * 成功した時点の入力を publishBaseline に写し、そこから変えた間だけ
-   * 未保存として扱う。「保存せずに移動」を選んだときだけ初期値へ戻す。
+   * 未保存として扱う。「保存せずに移る」を選んだときだけ初期値へ戻す。
    *
    * 入力はメニューIDごとに localStorage へ下書きとして残す
    * （publish-plan-draft.ts）。サーバーの下書きpayloadに公開予定の欄が
@@ -475,7 +475,7 @@ function Editor({
     busy: saving || publishing || unpublishing || deleting || busy,
   })
   /*
-   * 「保存せずに移動」を選んだときだけ、公開入力を初期値へ戻す。
+   * 「保存せずに移る」を選んだときだけ、公開入力を初期値へ戻す。
    * 取消・Escape（cancelLeave）では触らず、入力はそのまま残る。
    * 実際の遷移では画面ごと外れるが、確認の選択として明示しておく。
    */
@@ -487,7 +487,7 @@ function Editor({
    * N-162: 離脱確認の窓は step 1/2/3 のどこにいても出す。
    * targeting/publish は早期 return で別ツリーになるため、ここで要素化して
    * 全経路へ差し込む。step 1 だけに置くと、dirty 中のリンクが黙って止まり
-   * 「保存せずに移動」を選ぶ手段がなくなる。
+   * 「保存せずに移る」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューへの変更" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />

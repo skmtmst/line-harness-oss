@@ -7,7 +7,9 @@ import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
+import ValidationSummary from '@/components/shared/validation-summary'
 import { describeSaveFailure } from '@/lib/api'
+import type { FormErrors } from '@/lib/use-form-errors'
 
 /*
  * D005: `ApiError.message` は安全と判定されない応答では `API error: <番号>` の
@@ -71,6 +73,12 @@ export interface CreatePageProps {
   /** 保存前の確認。文字列を返すとその内容をエラーとして出し、保存しない */
   validate?: () => string | null
   /**
+   * 欄ごとの検査（★V7 sTJsh §6）。渡すと保存時に全欄を検査し、落ちた欄は
+   * 欄の下に理由・上にまとめを出して1つ目へフォーカスを移す。
+   * 欄は離れた時点でも1回だけ検査される（`useFormErrors` 参照）。
+   */
+  fields?: FormErrors
+  /**
    * 右の列。設計では作成画面の多くが「入力の左」と「見え方・注意の右」に
    * 分かれている。入力しながら、お客様側にどう出るかを見られるようにする。
    */
@@ -96,6 +104,7 @@ export default function CreatePage({
   successHref,
   onReset,
   validate,
+  fields,
   aside,
   saveLabel,
   showHeader = true,
@@ -112,8 +121,19 @@ export default function CreatePage({
   const run = async (andAnother: boolean) => {
     if (saving) return
     const validationError = validate?.()
+    /*
+     * 欄ごとの検査がある画面では、保存時に全欄をもう一度見て、落ちた欄は
+     * 欄の下に理由・上にまとめを出す（★V7 sTJsh §6）。直し方が分かる文なので
+     * 「保存できませんでした」だけの帯にはしない。画面全体の条件
+     * （アカウント未選択など）とは両方出す。
+     */
+    const fieldProblems = fields?.submit() ?? []
     if (validationError) {
       setError(validationError)
+      return
+    }
+    if (fieldProblems.length > 0) {
+      setError('')
       return
     }
     setSaving(true)
@@ -202,6 +222,10 @@ export default function CreatePage({
             v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
+          {/* 保存時に落ちた欄のまとめ（★V7 sTJsh §6）。欄の上の方に出す。 */}
+          {fields ? (
+            <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} />
+          ) : null}
           {children}
 
           {error && <p className="text-danger text-sm">{error}</p>}

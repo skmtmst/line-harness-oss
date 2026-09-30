@@ -135,7 +135,7 @@ describe('staff/new の未保存ガード', () => {
     expect(nameBox().value).toBe('山田')
   })
 
-  it('「保存せずに移動」を押すと一覧へ進む', async () => {
+  it('「保存せずに移る」を押すと一覧へ進む', async () => {
     await render()
     await flush()
 
@@ -144,7 +144,7 @@ describe('staff/new の未保存ガード', () => {
     await act(async () => { fireEvent.click(cancelLink()) })
     await flush()
 
-    await act(async () => { fireEvent.click(bodyButton('保存せずに移動')) })
+    await act(async () => { fireEvent.click(bodyButton('保存せずに移る')) })
     await flush()
 
     expect(fixture.push).toHaveBeenCalledWith('/staff?tab=members')

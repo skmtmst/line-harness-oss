@@ -274,9 +274,9 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
         open={leaveTarget !== null}
         description={pendingStatusChange
           ? (form.status === 'paused'
-            ? '「取り込みを止める」はまだ保存されていません。このまま移動すると、取り込みは止まりません。移動しますか？'
-            : '「取り込みを再開する」はまだ保存されていません。このまま移動すると、取り込みは再開しません。移動しますか？')
-          : 'このまま移動すると、入力した内容は保存されません。移動しますか？'}
+            ? '「取り込みを止める」はまだ保存されていません。このまま移ると、取り込みは止まりません。移りますか？'
+            : '「取り込みを再開する」はまだ保存されていません。このまま移ると、取り込みは再開しません。移りますか？')
+          : 'このまま移ると、入力した内容は保存されません。移りますか？'}
         cancelLabel="設定に戻る"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
