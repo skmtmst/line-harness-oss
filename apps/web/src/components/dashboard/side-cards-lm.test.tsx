@@ -102,8 +102,9 @@ describe('UpcomingCard（今後の予定）', () => {
 
   it('旧Workerでは予約だけの表示へ戻る', async () => {
     apiMocks.upcoming.mockRejectedValue(new Error('not found'))
+    // 予約の絞り込みは実際の時計と比べるため、固定日時だとその日を過ぎた時点で落ちる。
     const bookings = [
-      { id: 'bk-9', menu_name: '相談', friend_name: 'あおい', starts_at: '2026-09-30T01:00:00.000Z', status: 'confirmed' },
+      { id: 'bk-9', menu_name: '相談', friend_name: 'あおい', starts_at: new Date(Date.now() + 86_400_000).toISOString(), status: 'confirmed' },
     ]
     const el = mount(<UpcomingCard accountId="acc-1" bookings={bookings as never} loading={false} />)
     await flush()
