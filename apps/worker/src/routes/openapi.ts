@@ -5026,9 +5026,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['lineAccountId'],
+                required: ['lineAccountId', 'expectedVersion'],
                 properties: {
                   lineAccountId: { type: 'string' },
+                  expectedVersion: { type: 'integer', minimum: 1 },
                   name: { type: 'string' },
                   eventType: { type: 'string' },
                   conditions: { type: 'object' },
@@ -5043,7 +5044,7 @@ const spec = {
           '400': { description: '必須項目または通知方法の指定が不正' },
           '403': { description: 'このLINEアカウントを変更する権限がない' },
           '404': { description: 'お知らせが見つからない' },
-          '409': { description: 'isActive が指定された（公開・停止は別の操作で行う）' },
+          '409': { description: 'isActive が指定された（公開・停止は別の操作で行う）、または読んだ版が古い（現在値を返して開き直しを案内する）' },
         },
       },
     },
