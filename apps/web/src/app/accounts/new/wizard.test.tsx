@@ -105,14 +105,14 @@ describe('LINEアカウント作成ウィザード', () => {
     await enterConnectionStep()
     fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
     expect(await screen.findAllByText('Webhookの利用をオンにしてください')).toHaveLength(2)
-    expect((screen.getByRole('button', { name: '接続して保存' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '接続して保存する' }) as HTMLButtonElement).disabled).toBe(true)
     expect(calls.connect).not.toHaveBeenCalled()
   })
 
   it('未認証アカウントは保存直後から完了ボタンを使える', async () => {
     await enterConnectionStep()
     await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '接続して保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
     await screen.findByText('登録が完了しました', { selector: 'h2' })
     expect(calls.connect).toHaveBeenCalledWith({
       name: undefined,
@@ -135,7 +135,7 @@ describe('LINEアカウント作成ウィザード', () => {
     } })
     await enterConnectionStep()
     await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '接続して保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
     await screen.findByText('登録が完了しました', { selector: 'h2' })
     await screen.findByText('musubo 運営（契約者専用）の LINE を登録してください')
     expect(document.body.textContent).toContain('123456')
@@ -157,7 +157,7 @@ describe('LINEアカウント作成ウィザード', () => {
     calls.stepFollowerImport.mockImplementation(() => new Promise((resolve) => { finishStep = resolve }))
     await enterConnectionStep()
     await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '接続して保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
     expect(await screen.findAllByText(/既存の友だちを取り込んでいます/)).toHaveLength(2)
     expect((screen.getByRole('button', { name: '登録したアカウントを見る' }) as HTMLButtonElement).disabled).toBe(true)
     finishStep({ success: true, data: { state: {

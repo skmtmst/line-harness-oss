@@ -84,7 +84,7 @@ describe('R186 複数行テキストの既定値', () => {
     })
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '項目を作成' }))
+      fireEvent.click(screen.getByRole('button', { name: '項目を作る' }))
     })
 
     expect(mockState.payload).not.toBeNull()

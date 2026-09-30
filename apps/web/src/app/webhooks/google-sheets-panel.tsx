@@ -582,7 +582,7 @@ export default function GoogleSheetsPanel() {
                     required
                   />
                   <Button type="submit" variant="primary" disabled={busy !== null}>
-                    {busy === 'target' ? '確認しています…' : '保存'}
+                    {busy === 'target' ? '確認しています…' : '保存する'}
                   </Button>
                 </div>
               </form>

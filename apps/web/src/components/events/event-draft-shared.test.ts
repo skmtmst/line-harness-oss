@@ -171,6 +171,6 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
   })
 
   it('公開OFFの保存はボタン名も公開と読ませない(EVENT-02)', () => {
-    expect(WIZARD).toContain("draft.is_published === 1 ? '保存して公開' : '下書きとして保存'")
+    expect(WIZARD).toContain("draft.is_published === 1 ? '保存して公開' : '下書きを保存する'")
   })
 })

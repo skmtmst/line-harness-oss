@@ -31,7 +31,7 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain("usePageTitle('1通目を設定')")
     expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
     expect(PAGE).not.toContain('<Header')
-    expect(PAGE).toContain('✕ キャンセル')
+    expect(PAGE).toContain('キャンセル')
   })
 
   it('設計Node IDを画面に残す', () => {

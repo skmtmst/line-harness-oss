@@ -1176,7 +1176,7 @@ function Editor({
           onClick={addPage}
           className="px-3 py-1.5 text-sm font-medium border border-hairline rounded-control hover:bg-surface-pearl transition-colors"
         >
-          + ページ追加
+          ＋ ページを追加する
         </button>
       </div>
 
@@ -1536,7 +1536,7 @@ function Editor({
                 onClick={() => askRemovePage(activePage)}
                 className="shrink-0 px-3 py-2 text-sm font-medium border border-status-danger-border text-danger bg-canvas rounded-control hover:bg-danger-bg transition-colors"
               >
-                ページ削除
+                ページを削除する
               </button>
             </div>
           )}
@@ -1556,7 +1556,7 @@ function Editor({
               className="shrink-0 px-3 py-2 text-sm font-medium text-on-accent rounded-control transition-opacity hover:opacity-90"
               style={{ backgroundColor: 'var(--color-danger)' }}
             >
-              削除
+              削除する
             </button>
           </div>
         </div>
@@ -1726,7 +1726,7 @@ function Editor({
             disabled={saving || publishing || unpublishing || busy}
             className="rounded-control border border-hairline px-4 py-2 text-sm font-medium transition-colors hover:bg-surface-pearl disabled:opacity-50"
           >
-            {saving ? '保存中...' : '下書きに保存'}
+            {saving ? '保存中...' : '下書きを保存する'}
           </button>
           {/* #702: 共有Buttonのprimaryはaccent-deep＋白文字(5.44:1)。生のLINE緑だと2.78:1で落ちる。 */}
           <Button
@@ -1740,8 +1740,8 @@ function Editor({
             {publishing
               ? 'LINE 登録中...'
               : group.status === 'published'
-                ? 'LINE に再登録'
-                : 'LINE に登録'}
+                ? 'LINE に再登録する'
+                : 'LINE に登録する'}
           </Button>
         </div>
       )} />
@@ -1938,7 +1938,7 @@ function TargetingStep({
         </aside>
       </div>
 
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button>{readOnly ? null : <Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button>}<Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button>{readOnly ? null : <Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きを保存する'}</Button>}<Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
     </div>
   )
 }
@@ -2204,7 +2204,7 @@ function PublishStep({
       {/* N-151: 公開の履歴・失敗だけの再試行・LINEとの照合修復。 */}
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きを保存する</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
     </div>
   )
 }

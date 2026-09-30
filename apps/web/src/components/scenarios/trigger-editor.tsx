@@ -242,7 +242,7 @@ export default function TriggerEditor({
       description="どの出来事をきっかけに、どの友だちへ開始するかを設定します。変更は「開始条件を保存」を押すまで反映されません。"
       onCancel={onClose}
       onConfirm={() => void save()}
-      confirmLabel="開始条件を保存"
+      confirmLabel="開始条件を保存する"
       cancelLabel="キャンセル"
       busy={saving}
       error={error || undefined}

@@ -240,7 +240,7 @@ export default function RankSettingsTab({
                           subjectName={row.name.trim() || `ランク ${index + 1}`}
                           destructiveItem={{
                             id: `rank-delete-${row.id}`,
-                            label: 'ランクを削除',
+                            label: 'ランクを削除する',
                             onSelect: () => setRemoveTarget(index),
                           }}
                         />
@@ -260,7 +260,7 @@ export default function RankSettingsTab({
           */}
           <div className="mt-3">
             <button type="button" className="text-label font-semibold text-action" onClick={add} disabled={drafts.length >= 8}>
-              ＋ ランクを追加
+              ＋ ランクを追加する
             </button>
           </div>
         </section>
@@ -299,7 +299,7 @@ export default function RankSettingsTab({
         actions={(
           <>
             <Button variant="secondary" onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期する</Button>
           </>
         )}
       />
@@ -311,7 +311,7 @@ export default function RankSettingsTab({
         title={`「${removeTarget !== null ? drafts[removeTarget]?.name.trim() || `ランク ${removeTarget + 1}` : ''}」を削除しますか？`}
         description="行を外すと、保存したときにこのランクは消えます。保存する前なら下のキャンセルで元に戻せます。"
         confirmLabel="削除する"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         destructive
         onConfirm={() => {
           if (removeTarget !== null) remove(removeTarget)

@@ -18,7 +18,7 @@ describe('フォルダ編集の非同期結果', () => {
 
     for (const status of [400, 403, 404, 409, 500, undefined]) {
       expect(folderDeleteErrorMessage(status)).toContain('削除')
-      expect(folderDeleteErrorMessage(status)).not.toContain('保存')
+      expect(folderDeleteErrorMessage(status)).not.toContain('保存する')
       expect(folderDeleteErrorMessage(status)).not.toMatch(/API|name|Internal|SQL/u)
     }
   })

@@ -280,7 +280,7 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     const input = host.querySelector<HTMLInputElement>('input[type="text"]')
     expect(input).toBeTruthy()
     expect(input!.disabled).toBe(false)
-    expect(buttonsByText('保存')).toHaveLength(1)
+    expect(buttonsByText('保存する')).toHaveLength(1)
     expect(linksByText('項目を作る').length).toBeGreaterThan(0)
     expect(host.textContent).not.toContain('情報欄の値を保存できるのは')
   })
@@ -294,7 +294,7 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     expect(input!.disabled).toBe(true)
     expect(input!.value).toBe('既存の値')
     // 押すと403になる口は出さない
-    expect(buttonsByText('保存')).toHaveLength(0)
+    expect(buttonsByText('保存する')).toHaveLength(0)
     expect(linksByText('項目を作る')).toHaveLength(0)
     expect(host.textContent).toContain('情報欄の値を保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。')
   })
@@ -319,7 +319,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     // 個人情報の項目は編集できる
     expect(personal.disabled).toBe(false)
     expect(personal.value).toBe('090-0000-0000')
-    expect(buttonsByText('保存')).toHaveLength(1)
+    expect(buttonsByText('保存する')).toHaveLength(1)
     // 項目の定義を足す口はオーナー・管理者専用のまま
     expect(linksByText('項目を作る')).toHaveLength(0)
     expect(host.textContent).toContain('個人情報')
@@ -335,7 +335,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
       personal.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => {
-      buttonsByText('保存')[0].click()
+      buttonsByText('保存する')[0].click()
     })
     await eventually(() => {
       const call = net.calls.find((c) => c.name === 'friendFields.saveForFriend')
@@ -353,7 +353,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     expect(personal.disabled).toBe(true)
     // 値は読める
     expect(personal.value).toBe('090-0000-0000')
-    expect(buttonsByText('保存')).toHaveLength(0)
+    expect(buttonsByText('保存する')).toHaveLength(0)
     expect(linksByText('項目を作る')).toHaveLength(0)
   })
 
@@ -366,7 +366,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     expect(inputs()).toHaveLength(1)
     expect(host.textContent).toContain('個人情報の項目が 1 件あります。')
     expect(host.textContent).toContain('表示には個人情報の閲覧権限が要ります。')
-    expect(buttonsByText('保存')).toHaveLength(0)
+    expect(buttonsByText('保存する')).toHaveLength(0)
   })
 })
 

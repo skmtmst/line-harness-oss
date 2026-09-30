@@ -783,7 +783,7 @@ function OverviewStep({
           disabled={saving}
           className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
-          下書きとして保存
+          下書きを保存する
         </button>
         <button
           onClick={onNext}
@@ -1070,7 +1070,7 @@ function SlotsStep({
             disabled={busy}
             className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
           >
-            この枠を追加
+            この枠を追加する
           </button>
         </FormSection>
 
@@ -1162,7 +1162,7 @@ function SlotsStep({
             disabled={busy}
             className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
           >
-            まとめて追加
+            まとめて追加する
           </button>
         </FormSection>
 
@@ -1210,7 +1210,7 @@ function SlotsStep({
                             title={taken > 0 ? '申込が入っているため削除できません' : undefined}
                             className="text-danger text-xs hover:underline disabled:no-underline disabled:opacity-30"
                           >
-                            削除
+                            削除する
                           </button>
                         </ActionCell>
                       </Tr>
@@ -1546,7 +1546,7 @@ function PublishStep({
               EVENT-02: ボタン名は実際の保存結果と合わせる。公開OFFのまま
               「保存して公開」と出すと、下書き保存を公開と誤認する。
             */
-            label: draft.is_published === 1 ? '保存して公開' : '下書きとして保存',
+            label: draft.is_published === 1 ? '保存して公開' : '下書きを保存する',
             onClick: onPublish,
           }}
           saving={saving}

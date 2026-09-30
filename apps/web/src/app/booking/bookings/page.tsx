@@ -1487,7 +1487,7 @@ function ActionButtons({
           onClick={() => onAction('complete')}
           className="bg-info-bg text-info rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
-          完了
+          閉じる
         </button>
         <button
           onClick={() => onAction('no_show')}

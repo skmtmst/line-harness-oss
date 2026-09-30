@@ -263,8 +263,8 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
     open
     title={`${text(editing.pet_name) || 'この写真'}を使う場所`}
     description="選んだ場所へ公開用画像を出します。原本は公開しません。"
-    confirmLabel="使う場所を保存"
-    cancelLabel="戻る"
+    confirmLabel="使う場所を保存する"
+    cancelLabel="キャンセル"
     busy={busyId === editing.id}
     onCancel={() => setEditing(null)}
     onConfirm={() => void savePlacements()}

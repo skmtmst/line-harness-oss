@@ -864,7 +864,7 @@ function FirstStepContent() {
               disabled={saving || bodyOverLimit || loadState !== 'ready'}
               className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
             >
-              {saving ? '保存中…' : '作成して編集へ →'}
+              {saving ? '保存中…' : '作って編集へ →'}
             </button>
           </>
         )}

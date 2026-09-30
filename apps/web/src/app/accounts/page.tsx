@@ -98,7 +98,7 @@ export default function AccountsPage() {
           <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
             {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
           </Button>
-          <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>
+          <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録する</Button>
         </div>
       </div>
 

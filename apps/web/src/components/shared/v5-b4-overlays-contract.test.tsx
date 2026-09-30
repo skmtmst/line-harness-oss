@@ -40,7 +40,7 @@ describe('V5 B4 オーバーレイ共通部品', () => {
       <Notice tone="danger" message="処理に失敗しました。通信を確かめて、もう一度お試しください。" />
       <Notice tone="validation" message="入力内容を確認してください" />
       <Notice tone="error" message="処理に失敗しました。" />
-      <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'delete', label: '削除', tone: 'danger', onSelect: vi.fn() }]} />
+      <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect: vi.fn() }]} />
     </div>)
     // 帯は★V7 共通部品その2（uR9s8）へ1本化、操作メニューは V5 `hGpFq` から ★V7 `xifuV` へ移行した。
     for (const nodeId of ['VJKAT', 'uR9s8', 'xifuV']) expect(html).toContain(`data-design-node="${nodeId}"`)

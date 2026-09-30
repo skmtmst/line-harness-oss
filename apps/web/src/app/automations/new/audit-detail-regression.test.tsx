@@ -191,7 +191,7 @@ describe('AUDIT automation draft identity and data', () => {
     await typeText(name, '別の新しいルール')
     const tag = el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement
     await chooseOption(tag, 'tag-1')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     // 前の下書きを上書きせず、新しい下書きを作ってそこへ保存する。
     // DETAIL-13: 作成操作ごとの冪等鍵を渡す（この操作専用の鍵）。
     expect(mockCreate).toHaveBeenCalledWith(
@@ -213,7 +213,7 @@ describe('AUDIT automation draft identity and data', () => {
     expect(mockGet).toHaveBeenCalledWith('previous-draft', 'account-1')
     // 名前と中身がフォームへ戻る。
     expect((el.querySelector('input[id="au-name"]') as HTMLInputElement).value).toBe('途中のルール')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     // 新しい下書きは作らず、読んだ版を条件に同じ下書きを更新する。
     expect(mockCreate).not.toHaveBeenCalled()
     expect(mockUpdate).toHaveBeenCalledWith('previous-draft', 'account-1', expect.objectContaining({ expectedDraftVersionId: 'v7' }))
@@ -225,7 +225,7 @@ describe('AUDIT automation draft identity and data', () => {
     window.history.pushState(null, '', '/automations/new?draft=previous-draft')
     const el = await mountPage()
     expect(mockGet).toHaveBeenCalledWith('previous-draft', 'account-1')
-    const saveButton = findButton(el, '下書きに保存')
+    const saveButton = findButton(el, '下書きを保存する')
     expect(saveButton.disabled).toBe(true)
     expect(el.textContent).toContain('下書きを読み込んでいます')
     expect(mockUpdate).not.toHaveBeenCalled()
@@ -243,10 +243,10 @@ describe('AUDIT automation draft identity and data', () => {
     const el = await mountPage()
     await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, 'やり直すルール')
     await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
     expect(mockCreate).toHaveBeenCalledTimes(1)
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
     expect(mockCreate).toHaveBeenCalledTimes(2)
     const firstKey = mockCreate.mock.calls[0]?.[2]
@@ -265,10 +265,10 @@ describe('AUDIT automation draft identity and data', () => {
     const el = await mountPage()
     await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, 'やり直すルール')
     await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
     expect(mockCreate).toHaveBeenCalledTimes(1)
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
     expect(mockCreate).toHaveBeenCalledTimes(2)
     expect(mockCreate.mock.calls[1]?.[2]).toBe(mockCreate.mock.calls[0]?.[2])
@@ -297,7 +297,7 @@ describe('AUDIT automation draft identity and data', () => {
     // B店でB店の内容を入れて保存すると、B店の下書きとして作られる。
     await typeText(el.querySelector('#au-name') as HTMLInputElement, 'B店のルール')
     await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     expect(mockCreate).toHaveBeenCalledWith(
       'received-message-tag', 'account-2', expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
     )
@@ -313,7 +313,7 @@ describe('AUDIT automation draft identity and data', () => {
     const el = await mountPage()
     await typeText(el.querySelector('#au-name') as HTMLInputElement, '保存済みルール')
     await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     expect(el.textContent).toContain('下書きに保存しました')
     expect(el.textContent).not.toContain('まだ保存していません')
     // 保存のあとで直すと、ふたたび未保存側へ戻る。

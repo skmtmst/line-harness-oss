@@ -322,13 +322,13 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
       <StickyBar actions={(
         <>
         <Button onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}>
-          ＋ 追加
+          ＋ 追加する
         </Button>
         <button
           onClick={() => void save()}
           className="px-4 py-1.5 text-sm font-medium bg-action text-on-action rounded-control hover:bg-action-hover"
         >
-          保存
+          保存する
         </button>
         </>
       )} />
@@ -691,7 +691,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             ['CTAクリック', `${formatNumber(summary.ctaClicks)}人`],
             ['申込転換', percent(summary.ctaClicks, summary.reservations)],
           ]} previewBody={analytics.measurement?.state === 'available' ? 'もっとも視聴された区間を分析できます。' : analytics.measurement?.reason ?? '視聴区間の集計はまだ取得できていません。'}>
-            <div className="flex gap-2"><Button disabled title="分析の段では実行できません">テスト送信</Button><Button disabled title="分析の段では実行できません">公開ページを見る</Button></div>
+            <div className="flex gap-2"><Button disabled title="分析の段では実行できません">テストを送る</Button><Button disabled title="分析の段では実行できません">公開ページを見る</Button></div>
           </SummaryAside>
         </div>
       </div>
@@ -1210,7 +1210,7 @@ function VideoDesignStep({ webinar, editor, registrations, publicUrl, canOpenPub
         ['公開', webinarStatusLabel(webinar.status)],
         ['申込', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
       ]} previewBody={videoPreview(webinar).body ?? videoPreview(webinar).empty}>
-        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テスト送信</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
+        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テストを送る</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
         {/* 押せないときは理由を文字で出す。実行できるように見せて無反応にしない。 */}
         {!(canOpenPublicPage && publicUrl) && publicPageReason ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
       </SummaryAside>
@@ -1428,7 +1428,7 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
         ['視聴完了', NOTIFICATION_ROW_STATE[completedState].label],
         ['対象', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
       ]} previewBody={editor?.notificationMessages.registration || notificationPreview(null).empty}>
-        <div className="flex gap-2"><Button disabled={testing || notificationTestDone || testDisabledReason !== null} title={notificationTestDone ? 'テスト済みです' : testDisabledReason ?? undefined} onClick={() => setTestConfirmOpen(true)}>{testing ? '送信中…' : notificationTestDone ? 'テスト送信済み' : 'テスト送信'}</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
+        <div className="flex gap-2"><Button disabled={testing || notificationTestDone || testDisabledReason !== null} title={notificationTestDone ? 'テスト済みです' : testDisabledReason ?? undefined} onClick={() => setTestConfirmOpen(true)}>{testing ? '送信中…' : notificationTestDone ? 'テスト送信済み' : 'テストを送る'}</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
         {testResult ? <p className="text-ink-secondary text-xs" role="status">{testResult}</p> : null}
         {!(canOpenPublicPage && publicUrl) && publicPageReason ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
       </SummaryAside>
@@ -1437,7 +1437,7 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
         open={testConfirmOpen}
         title="通知をテスト送信しますか？"
         description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。"
-        confirmLabel="テスト送信する"
+        confirmLabel="テストを送る"
         busy={testing}
         onCancel={() => { if (!testing) setTestConfirmOpen(false) }}
         onConfirm={() => void runNotificationTest()}
@@ -1660,7 +1660,7 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
           disabled={saving || !loaded}
           className="rounded-mini bg-action px-4 py-1 text-sm text-on-action disabled:opacity-50"
         >
-          {saving ? '保存中...' : '保存'}
+          {saving ? '保存中...' : '保存する'}
         </button>
         </>
       )} />
@@ -1820,7 +1820,7 @@ function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registra
               <p className="text-warning text-sm">保存済みの申込フォームは公開中ではありません（停止・削除・別アカウント）。このままでは公開前確認を通りません。</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="primary" onClick={() => void saveRegistrationForm()} disabled={savingRegistrationForm || registrationFormState !== 'ready' || !accountId}>{savingRegistrationForm ? '保存中…' : '申込フォームを保存'}</Button>
+              <Button variant="primary" onClick={() => void saveRegistrationForm()} disabled={savingRegistrationForm || registrationFormState !== 'ready' || !accountId}>{savingRegistrationForm ? '保存中…' : '申込フォームを保存する'}</Button>
             </div>
             {registrationNotice ? <p className="text-ink-secondary text-sm">{registrationNotice}</p> : null}
             {registrationError ? <p className="text-danger text-sm" role="alert">{registrationError}</p> : null}
@@ -1833,7 +1833,7 @@ function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registra
         ['フォーム', primary?.formId ? '公開中' : '未設定'],
         ['申込', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
       ]} previewBody={primary?.body || 'CTAの説明文はまだ設定されていません。'} previewButton={primary?.buttonLabel || null}>
-        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テスト送信</Button><Button disabled title="この段では実行できません">公開ページを見る</Button></div>
+        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テストを送る</Button><Button disabled title="この段では実行できません">公開ページを見る</Button></div>
       </SummaryAside>
     </div>
   )
@@ -1967,7 +1967,7 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button onClick={() => setActions((current) => [...current, { trigger, actionType: 'add_tag', config: { tagId: '' } }])}>通知・アクションを追加</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? '保存中…' : '視聴後アクションを保存'}</Button>
+        <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? '保存中…' : '視聴後アクションを保存する'}</Button>
       </div>
       {notice ? <p className="text-ink-secondary text-sm">{notice}</p> : null}
         </section>
@@ -2678,7 +2678,7 @@ function EditWebinarInner() {
           status={unsavedPanes.size > 0 ? '保存していない変更があります' : undefined}
           actions={(
             <>
-              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()}>{savingForNav === 'draft' ? '保存中…' : '下書き保存'}</Button>
+              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()}>{savingForNav === 'draft' ? '保存中…' : '下書きを保存する'}</Button>
               <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handlePrimaryAction()}>{savingForNav === 'next' ? '保存中…' : primaryLabel}</Button>
             </>
           )}

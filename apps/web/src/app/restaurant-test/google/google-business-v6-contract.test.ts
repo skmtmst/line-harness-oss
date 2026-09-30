@@ -64,7 +64,7 @@ describe('Googleビジネス V6正本契約', () => {
     expect(draft).toContain("generate('polite')")
     expect(draft).toContain('data-gb3-action="save-draft"')
     expect(draft).toContain('onClick={() => void save()}')
-    expect(draft).toContain("'下書き保存'")
+    expect(draft).toContain("'下書きを保存する'")
     expect(draft).toContain('data-gb3-action="open-publish-confirm"')
     expect(draft).toContain('setConfirming(true)')
     expect(draft).toContain('disabled={!canOpenConfirm}')

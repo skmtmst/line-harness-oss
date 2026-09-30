@@ -331,7 +331,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
       />
       <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
       <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
-      <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
+      <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除する</button>
     </div>
     <div className="p-4">
       {bubble.type === 'text' && <div>
@@ -436,7 +436,7 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
         <h4 className="min-w-0 flex-1 text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
         <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
         <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
-        <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
+        <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除する</button>
       </div>
       {!embedded && <div className="mt-3 border-b border-hairline pb-3">
         <InsertToolbar
@@ -493,7 +493,7 @@ function MessageButtonsSection({ buttons, error, onChange }: {
           <h3 className="text-sm font-bold text-ink">ボタン</h3>
           <p className="mt-1 text-xs text-ink-faint">配信全体で1組です。1通目のメッセージの下に付きます。最大4つまで。</p>
         </div>
-        <Button type="button" onClick={() => onChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加</Button>
+        <Button type="button" onClick={() => onChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加する</Button>
       </div>
       <p className="mt-2 text-xs text-ink-faint">URL・PDFは https:// から始まるアドレスを入れてください。</p>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
@@ -2128,9 +2128,9 @@ export default function BroadcastForm({
           />
         )}
         {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
+          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加する</Button>
           <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
-          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化</Button>
+          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化する</Button>
         </div>}
         </section>
         {/*
@@ -2208,7 +2208,7 @@ export default function BroadcastForm({
         {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
-            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加</Link>
+            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
           </div>
           {currentStep === 'message' ? (
             <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink-secondary">
@@ -2480,13 +2480,13 @@ export default function BroadcastForm({
                   : 'テンプレートを選ぶと表示されます'}
               </div>
             </section>
-            <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+            <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テストを送る</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>
         ) : preflightDialogOpen ? (
           <div className="space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-medium text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-medium text-ink">{formatNumber(audienceCount)}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-medium text-danger">不足 {quota && quota.remaining !== null ? formatNumber(Math.max(0, quota.planned - quota.remaining)) : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-medium text-danger">要確認</dd></div></dl></section>
             <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3><p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p><div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">8月限定キャンペーンのお知らせです。</div></section>
-            <div className="grid grid-cols-2 gap-2"><Button type="button">テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+            <div className="grid grid-cols-2 gap-2"><Button type="button">テストを送る</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>
         ) : currentStep === 'confirm' ? (
           <div className="space-y-3">
@@ -2570,7 +2570,7 @@ export default function BroadcastForm({
               </div>
             </LinePreview>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" disabled>テスト送信</Button>
+              <Button type="button" disabled>テストを送る</Button>
               <Button type="button" disabled>配信イメージを見る</Button>
             </div>
           </div>
@@ -2586,7 +2586,7 @@ export default function BroadcastForm({
               </div>
             </LinePreview>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テスト送信</Button>
+              <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テストを送る</Button>
               <Button type="button" disabled><Eye size={15} aria-hidden /> 配信イメージを見る</Button>
             </div>
           </div>
@@ -2609,7 +2609,7 @@ export default function BroadcastForm({
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()}>{currentStep === 'message' && <Save size={15} aria-hidden />}{saving ? '保存中…' : '下書き保存'}</Button>
+          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()}>{currentStep === 'message' && <Save size={15} aria-hidden />}{saving ? '保存中…' : '下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
               {currentStep === 'basic' ? '対象設定へ'
@@ -2630,8 +2630,8 @@ export default function BroadcastForm({
       ) : (
         <>
           <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">キャンセル</button>
-          {(shows('message') || shows('confirm')) && <button disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50">{testSending ? '送信中…' : 'テスト送信'}</button>}
-          <button disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}</button>
+          {(shows('message') || shows('confirm')) && <button disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50">{testSending ? '送信中…' : 'テストを送る'}</button>}
+          <button disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</button>
         </>
       )}
       </>
@@ -2649,7 +2649,7 @@ export default function BroadcastForm({
       title="テンプレートを選択"
       description={selectedTemplate ? `「${selectedTemplate.name}」を一斉配信のメッセージに読み込みます。読み込み後も内容を編集できます。` : ''}
       confirmLabel="このテンプレートを使用"
-      cancelLabel="戻る"
+      cancelLabel="キャンセル"
       designNode="p97Tf"
       titleIcon={<CheckCircle2 size={22} />}
       onCancel={() => setSelectedTemplate(null)}
@@ -2702,7 +2702,7 @@ export default function BroadcastForm({
         ? `現在の送信枠では${formatNumber(quota?.planned)}通を送信できません。対象を絞るか、配信設定を確認してください。`
         : '対象・メッセージ・日時・送信枠を確認しました。'}
       confirmLabel="対象を見直す"
-      cancelLabel="戻る"
+      cancelLabel="キャンセル"
       designNode="vW4Es"
       titleIcon={quotaInsufficient ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
       onCancel={() => setPreflightDialogOpen(false)}
@@ -2866,9 +2866,9 @@ export default function BroadcastForm({
 
     <ConfirmDialog
       open={testDialogOpen}
-      title="テスト送信"
+      title="テストを送る"
       description="登録済みのテスト送信先全員のLINEへ、表示確認用のメッセージを送ります。"
-      confirmLabel={testSending ? '送信中…' : 'テスト送信する'}
+      confirmLabel={testSending ? '送信中…' : 'テストを送る'}
       cancelLabel="キャンセル"
       busy={testSending}
       designNode="h0kahp"

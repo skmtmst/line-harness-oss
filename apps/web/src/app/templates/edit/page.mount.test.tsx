@@ -307,7 +307,7 @@ async function navigateTo(search: string) {
   await settle()
 }
 
-const saveButton = () => findByText(container, 'button', '保存')
+const saveButton = () => findByText(container, 'button', '保存する')
 /*
  * 見比べるのは値だけにする。DOM の節をそのまま `expect` へ渡すと、
  * 落ちたときに節の中身を延々と書き出そうとして、**どの条件で落ちたのかが

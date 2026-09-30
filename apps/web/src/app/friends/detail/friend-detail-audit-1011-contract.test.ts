@@ -61,7 +61,7 @@ describe('友だち詳細 監査#1011の契約', () => {
     expect(PAGE).toContain('pendingTabActions')
     // 開発者向けの「口がまだありません」で行き止まりにしない。
     expect(PAGE).not.toContain('を引く口がまだありません')
-    expect(PAGE).toContain('この友だちをシナリオに登録')
+    expect(PAGE).toContain('この友だちをシナリオに登録する')
   })
 
   it('FRIEND-31: 狭い画面では補助プロフィールを畳む', () => {

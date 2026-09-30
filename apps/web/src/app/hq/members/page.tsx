@@ -494,7 +494,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
           status={canEdit ? undefined : '統括名の変更は管理者だけができます'}
           actions={
             <Button variant="primary" onClick={() => void save()} disabled={loading || saving || !canEdit}>
-              {saving ? '保存中…' : '統括名を保存'}
+              {saving ? '保存中…' : '統括名を保存する'}
             </Button>
           }
         />

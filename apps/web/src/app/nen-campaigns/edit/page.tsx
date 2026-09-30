@@ -183,7 +183,7 @@ function NenColumnEditInner() {
                   disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}
                   className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken shrink-0 border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
                 >
-                  {savingId === column.id ? '保存中...' : '保存'}
+                  {savingId === column.id ? '保存中...' : '保存する'}
                 </button>
               </div>
             </div>

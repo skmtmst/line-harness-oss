@@ -596,7 +596,7 @@ function BroadcastList() {
                     ...savedViews.map((view) => ({ value: view.id, label: view.name })),
                   ]}
                 />
-                <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
+                <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存する</Button>
               </>
             }
             filters={
@@ -659,7 +659,7 @@ function BroadcastList() {
                 onChange={(event) => setSavedViewName(event.target.value)}
                 className="border-hairline rounded-control min-w-64 border px-3 py-2 text-sm"
               />
-              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()}>{savedViewBusy ? '保存中…' : '保存'}</Button>
+              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()}>{savedViewBusy ? '保存中…' : '保存する'}</Button>
               <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
             </div>
           )}

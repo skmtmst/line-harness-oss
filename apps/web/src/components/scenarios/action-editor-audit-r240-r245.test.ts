@@ -67,7 +67,7 @@ describe('R240 動作名と要約は実際の設定から作る', () => {
 
   it('画面に行番号で決める分岐と固定の要約を残さない', () => {
     expect(EDITOR).not.toContain("index === 2 ? 'テキスト送信'")
-    expect(EDITOR).not.toContain('タグ「初回案内済み」を追加')
+    expect(EDITOR).not.toContain('タグ「初回案内済み」を追加する')
     expect(EDITOR).not.toContain('担当者へSlackと管理画面通知')
     expect(EDITOR).toContain('未設定')
     expect(EDITOR).toContain('describeAction(action, lookups)')
@@ -108,7 +108,7 @@ describe('R243 編集中の未完成行は保持し、保存時に入力不足�
   it('条件の変更で入力のたびに空値を取り除かない', () => {
     expect(EDITOR).not.toContain('pruneCondition(next)')
     expect(EDITOR).toContain('conditionDraft')
-    expect(EDITOR).toContain('条件を保存')
+    expect(EDITOR).toContain('条件を保存する')
   })
 })
 

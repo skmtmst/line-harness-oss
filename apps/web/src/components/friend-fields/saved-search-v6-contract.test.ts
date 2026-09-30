@@ -64,7 +64,7 @@ describe('V6 保存した検索の画面契約', () => {
     expect(list).toContain("setLoadError('')")
     expect(list).toContain('setItems([])')
     expect(list).toContain('kind="error"')
-    expect(list).toContain('保存した検索を再読み込み')
+    expect(list).toContain('保存した検索を読み直す')
     expect(list.indexOf('loadError ?')).toBeLessThan(list.indexOf('items.length === 0'))
   })
 })

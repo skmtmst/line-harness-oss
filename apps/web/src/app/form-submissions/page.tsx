@@ -1084,7 +1084,7 @@ export default function FormSubmissionsPage() {
                 disabled={!editingName.trim() || savingName}
                 className="rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent hover:brightness-92 disabled:opacity-50"
               >
-                {savingName ? '保存中...' : '保存'}
+                {savingName ? '保存中...' : '保存する'}
               </button>
             </div>
           </div>

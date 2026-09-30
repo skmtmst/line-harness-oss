@@ -37,14 +37,14 @@ describe('共通Pagination', () => {
 describe('共通Button', () => {
   it('通常ボタンのpropsとhidden属性を実要素へ渡す', () => {
     const html = renderToStaticMarkup(
-      <Button variant="primary" hidden aria-label="保存">
-        保存
+      <Button variant="primary" hidden aria-label="保存する">
+        保存する
       </Button>,
     )
     expect(html).toContain('<button')
     expect(html).toContain('type="button"')
     expect(html).toContain('hidden=""')
-    expect(html).toContain('aria-label="保存"')
+    expect(html).toContain('aria-label="保存する"')
   })
 
   it('リンクのpropsを捨てずにa要素へ渡す', () => {

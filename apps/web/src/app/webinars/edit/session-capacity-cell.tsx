@@ -99,10 +99,10 @@ export default function SessionCapacityCell({
         />
       </label>
       <Button onClick={() => void save()} disabled={busy}>
-        {busy ? '保存中…' : '保存'}
+        {busy ? '保存中…' : '保存する'}
       </Button>
       <button type="button" onClick={() => setEditing(false)} className="text-xs underline">
-        やめる
+        キャンセル
       </button>
       {error ? (
         <span className="text-danger w-full text-xs" role="alert">

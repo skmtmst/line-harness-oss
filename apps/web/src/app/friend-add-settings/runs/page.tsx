@@ -397,7 +397,7 @@ function FriendAddRunsInner() {
                   { value: 'partial_failed', label: '再送待ち' },
                 ]}
               />
-              <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
+              <Button onClick={() => void load()} disabled={loading}>一覧を更新する</Button>
             </div>
             </MenuPortal>
           </span>
@@ -575,8 +575,8 @@ function FriendAddRunsInner() {
             {(() => {
               const href = editHref('preview')
               return href
-                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテスト</Button>
-                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテスト</Button>
+                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテストする</Button>
+                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテストする</Button>
             })()}
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
