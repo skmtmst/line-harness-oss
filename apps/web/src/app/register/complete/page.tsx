@@ -10,7 +10,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
-import { authRequest, confirmError, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
+import { authRequest, confirmError, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
@@ -78,7 +78,7 @@ function CompleteInner() {
     })
     if (!res.ok || !res.data) {
       if (res.errors) setMessages((current) => ({ ...current, ...res.errors }))
-      setError(res.error || '登録を完了できませんでした')
+      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? '登録を完了できませんでした')
       setBusy(false)
       return
     }

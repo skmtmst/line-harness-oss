@@ -9,7 +9,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
-import { authRequest, emailError } from '@/lib/auth-email'
+import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
@@ -64,7 +64,7 @@ export default function OpsLoginPage() {
       next: 'ops',
     })
     if (!res.ok || !res.data) {
-      setError(res.error || 'ログインできませんでした')
+      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? 'ログインできませんでした')
       setBusy(null)
       return
     }
