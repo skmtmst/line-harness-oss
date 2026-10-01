@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarCheck2, Copy, Eye, List, Send } from 'lucide-react'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -18,6 +18,10 @@ import { ApiError, api, type ApiBroadcast } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { audienceSummary } from '@/lib/broadcast-summary'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
+import ReservedV8 from '../reserved-v8'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -55,10 +59,19 @@ function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | n
 }
 
 function ReservedBroadcastContent() {
-  usePageTitle('一斉配信・予約完了')
+  const adminTheme = useAdminTheme()
+  /*
+   * ★V8：上の帯のパンくずは「一斉配信 › 予約しました」。
+   * v7 ではパンくずが描かれないので、渡しても見た目は変わらない。
+   */
+  usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
+  usePageTitle(adminTheme === 'v8' ? '予約しました' : '一斉配信・予約完了')
   const router = useRouter()
   const id = useSearchParams().get('id')
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
+  // 閲覧のみ（夕18）：V8 の右の欄の操作を押せない形にする。
+  const staffRole = useStaffRole()
+  const canEdit = staffRole === null || canEditFeature('broadcast.definition.edit')
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   const [estimate, setEstimate] = useState<AudienceEstimate | null>(null)
   // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。一覧・詳細と同じ
@@ -309,6 +322,54 @@ function ReservedBroadcastContent() {
     }
   }
 
+  /*
+   * 予約の取消の確定。口の返事をそのまま出さない——409（もう予約中ではない）も
+   * 通信の失敗も、運用者にできることは同じ（読み直して確かめる）。
+   * v7・V8 どちらの確認ダイアログからもここを呼ぶ。
+   */
+  const confirmCancel = async () => {
+    if (cancelling) return
+    setCancelling(true)
+    setCancelError('')
+    try {
+      const res = await api.broadcasts.cancelReservation(broadcast.id)
+      if (!res.success) throw new Error(res.error)
+      setBroadcast(res.data)
+      setCancelled(true)
+      setCancelOpen(false)
+    } catch {
+      setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  /* ★V8：見せ方は別の部品へ。読み込み・取消・複製・テスト送信は同じものを渡す。 */
+  if (adminTheme === 'v8') {
+    return (
+      <ReservedV8
+        broadcast={broadcast}
+        estimate={estimate}
+        audienceLabel={audienceTarget}
+        accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
+        notificationText={notificationText}
+        canEdit={canEdit}
+        testSend={() => void testSend()}
+        duplicate={() => void duplicateBroadcast()}
+        actionBusy={actionBusy}
+        actionError={actionError}
+        clearActionError={() => setActionError('')}
+        cancelOpen={cancelOpen}
+        openCancel={() => { setCancelError(''); setCancelOpen(true) }}
+        closeCancel={() => { if (!cancelling) setCancelOpen(false) }}
+        confirmCancel={() => void confirmCancel()}
+        cancelling={cancelling}
+        cancelError={cancelError}
+        cancelled={cancelled}
+      />
+    )
+  }
+
   return (
     <div data-design-node="bPF0s" className="space-y-4 pb-10">
       <Link href="/broadcasts" className="text-action hover:text-action-hover inline-flex text-sm font-semibold hover:underline">
@@ -415,26 +476,7 @@ function ReservedBroadcastContent() {
           if (cancelling) return
           setCancelOpen(false)
         }}
-        onConfirm={async () => {
-          if (cancelling) return
-          setCancelling(true)
-          setCancelError('')
-          try {
-            const res = await api.broadcasts.cancelReservation(broadcast.id)
-            if (!res.success) throw new Error(res.error)
-            setBroadcast(res.data)
-            setCancelled(true)
-            setCancelOpen(false)
-          } catch {
-            /*
-              **口の返事をそのまま出さない。** 409（もう予約中ではない）も
-              通信の失敗も、運用者にできることは同じ——読み直して確かめる。
-            */
-            setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
-          } finally {
-            setCancelling(false)
-          }
-        }}
+        onConfirm={() => void confirmCancel()}
       >
         <dl className="text-ink-secondary space-y-1 text-xs">
           <div className="flex gap-2">

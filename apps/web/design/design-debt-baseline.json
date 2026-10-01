@@ -55,13 +55,25 @@
     "direct-secondary-button": 2,
     "arbitrary-value": 2
   },
+  "app/broadcasts/detail-v8.tsx": {
+    "unresolved-classname": 75
+  },
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 1
+  },
+  "app/broadcasts/list-v8.tsx": {
+    "unresolved-classname": 75
   },
   "app/broadcasts/page.tsx": {
     "arbitrary-value": 2,
     "unresolved-classname": 1,
     "direct-secondary-button": 1
+  },
+  "app/broadcasts/phone-mock-v8.tsx": {
+    "unresolved-classname": 16
+  },
+  "app/broadcasts/reserved-v8.tsx": {
+    "unresolved-classname": 34
   },
   "app/chats/page.tsx": {
     "arbitrary-value": 37,
@@ -647,7 +659,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 31
+    "unresolved-classname": 35
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 7
