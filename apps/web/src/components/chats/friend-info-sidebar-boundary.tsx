@@ -50,12 +50,7 @@ export default class FriendInfoSidebarBoundary extends Component<Props, State> {
       return (
         <div role="alert" data-friend-info-sidebar-state="failed" className="h-full w-full space-y-2 bg-canvas p-4">
           <p className="text-xs text-danger">顧客情報を読み込めませんでした</p>
-          <Button
-            variant="secondary"
-            className="text-ink-secondary items-center px-3 py-1.5 text-xs h-auto whitespace-normal"
-            type="button"
-            onClick={this.retry}
-          >
+          <Button variant="secondary" size="compact" type="button" onClick={this.retry}>
             もう一度試す
           </Button>
         </div>
