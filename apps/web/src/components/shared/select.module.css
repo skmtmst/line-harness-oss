@@ -184,8 +184,18 @@
   height: 36px;
   gap: 6px;
   padding: 0 10px 0 12px;
+  border-color: var(--color-control-border);
   font-size: var(--text-label);
   font-weight: 500;
+}
+
+/* 開いている・誤りの枠色は v8 でもそれぞれの意味の色を保つ。 */
+[data-theme='v8'] .openTrigger {
+  border-color: var(--color-accent);
+}
+
+[data-theme='v8'] .invalid .trigger {
+  border-color: var(--color-danger);
 }
 
 [data-theme='v8'] .option {

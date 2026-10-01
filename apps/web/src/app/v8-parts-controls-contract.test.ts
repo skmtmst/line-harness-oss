@@ -72,9 +72,9 @@ describe('V8 移行④a — 基本の操作系', () => {
     expect(labels).toContain('color: var(--color-ink)')
   })
 
-  it('トグル：オフの地は #c9ced6（語彙経由）、オンは変わらない', () => {
+  it('トグル：オフの地は操作する部品の枠色（control-border）、オンは変わらない', () => {
     const blocks = v8Blocks(css('toggle.module.css'), 'toggle')
-    expect(blocks).toContain('background: var(--color-toggle-off)')
+    expect(blocks).toContain('background: var(--color-control-border)')
     expect(blocks).toContain('background: var(--color-accent-deep)')
   })
 
