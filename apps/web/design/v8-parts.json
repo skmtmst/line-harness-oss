@@ -102,8 +102,8 @@
     {
       "pencil": "C9CaMS・E7USZ9・A2mryd",
       "name": "印のタイル",
-      "code": null,
-      "planned": "shared/icon-tile.tsx"
+      "code": "shared/icon-tile.tsx",
+      "v8Only": true
     },
     {
       "pencil": "KjC1z・f6zwfs",

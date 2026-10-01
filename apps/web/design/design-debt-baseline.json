@@ -568,6 +568,9 @@
   "components/shared/help-tip.tsx": {
     "unresolved-classname": 4
   },
+  "components/shared/icon-tile.tsx": {
+    "unresolved-classname": 1
+  },
   "components/shared/line-preview.tsx": {
     "unresolved-classname": 1
   },
