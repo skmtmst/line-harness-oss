@@ -72,7 +72,13 @@
  * 緑の輪郭、全部そろって確認できたら緑の輪郭が順に描かれる、
  * まちがえると横に揺れる（MOTION.md「OTP」）。
  */
+/* ★V8：桁の並びは中身の幅に（6×48＋5×8＝328、RfHCo「桁の並び」）。 */
+[data-theme='v8'] .group {
+  display: inline-flex;
+}
+
 [data-theme='v8'] .slot {
+  height: 48px; /* 桁 48×48（RfHCo） */
   border-color: var(--color-control-border);
   border-radius: var(--radius-card);
   background: var(--color-canvas-sunken);
