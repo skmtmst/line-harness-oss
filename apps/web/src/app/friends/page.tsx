@@ -39,7 +39,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
   （共通Buttonは設計と一致済みで、こちらへ寄せると他画面が動く）。
   幅は設計の実寸：詳細条件110 / 保存した検索130 / 検索70。
 */
-const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas text-label font-semibold text-ink hover:bg-canvas-sunken'
+const SEARCH_ROW_SECONDARY = 'inline-flex v7:h-9.5 v8:h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas text-label font-semibold text-ink hover:bg-canvas-sunken'
 
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'

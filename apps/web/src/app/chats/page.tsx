@@ -2412,7 +2412,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <Button type="button" size="compact" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <Button type="button" size="compact" className="v8:h-9" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           絞り込み
         </Button>
         {/*
@@ -2422,10 +2422,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           左側が画面外へ出た。幅も画面の左右16px以内に収める。
         */}
         <div>
-          {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。 */}
+          {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
           <Button
             type="button"
             size="compact"
+            className="v8:h-9"
             onClick={() => {
               setSavedViewsOpen((open) => !open)
               setSavedViewError('')
@@ -2519,8 +2520,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           )}
         </div>
-        {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。 */}
-        <Button href="/tags?tab=marks" size="compact" className="shrink-0">
+        {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
+        <Button href="/tags?tab=marks" size="compact" className="shrink-0 v8:h-9">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
           対応ルール
         </Button>
