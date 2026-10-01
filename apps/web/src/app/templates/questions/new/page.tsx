@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import QuestionEditor, {
   emptyQuestion,
@@ -201,8 +202,13 @@ function QuestionTemplatePageInner() {
         return
       }
       router.push('/templates')
-    } catch {
-      setError('保存できませんでした。通信状態を確認してもう一度お試しください。')
+    } catch (caught) {
+      // 実行時のAPI失敗（500を含む）は原因どおりの文で出す。実送はしない。
+      if (caught instanceof ApiError && caught.status === 500) {
+        setError(`${describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' })}`)
+      } else {
+        setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      }
     } finally {
       setSaving(false)
     }

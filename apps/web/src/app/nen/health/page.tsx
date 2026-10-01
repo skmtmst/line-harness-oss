@@ -41,6 +41,8 @@ function HealthInner() {
   const [kpis, setKpis] = useState<NenHealthKpis | null>(null)
   const [summaryPetId, setSummaryPetId] = useState<string | null>(null)
   const [summaryStatus, setSummaryStatus] = useState<SummaryStatus>('loading')
+  /** まとめの取得で捕まえた失敗。共通の失敗面へ渡し、403と429を言い分ける（M034）。 */
+  const [summaryError, setSummaryError] = useState<unknown>(null)
   /*
    * 「30日のまとめ」は対象スナップショットとして持つ（DEEP-23）。
    * 表示名・集計・印刷面はすべてこの1つから出すので、別ペットの遅い応答が
@@ -57,6 +59,7 @@ function HealthInner() {
     requestRef.current += 1
     setSummaryPetId(null)
     setSummary(null)
+    setSummaryError(null)
   }
 
   const changeTab = (next: HealthTabKey) => router.replace(next === 'logs' ? '/nen/health' : `/nen/health?tab=${next}`)
@@ -67,6 +70,7 @@ function HealthInner() {
     const account = selectedAccountId
     const petId = summaryPetId
     setSummaryStatus('loading')
+    setSummaryError(null)
     try {
       const res = await nenPetsApi.healthSummary(account, petId)
       if (!res.success) throw new Error(res.error)
@@ -75,8 +79,10 @@ function HealthInner() {
       if (requestRef.current !== request) return
       setSummary({ accountId: account, petId, data: res.data })
       setSummaryStatus('ready')
-    } catch {
+    } catch (caught) {
       if (requestRef.current !== request) return
+      // 失敗そのままを残す。共通の失敗面が403（再試行なし）と429（待ち案内）を言い分ける（M034）。
+      setSummaryError(caught)
       setSummaryStatus('error')
     }
   }, [selectedAccountId, summaryPetId])
@@ -89,6 +95,7 @@ function HealthInner() {
     requestRef.current += 1
     setSummaryPetId(null)
     setSummary(null)
+    setSummaryError(null)
   }
   // 表示・印刷に使うのは「選択中のアカウント＆ペットに一致するスナップショット」だけ。
   const activeSummary = summary && summaryPetId !== null && summary.accountId === selectedAccountId && summary.petId === summaryPetId ? summary.data : null
@@ -119,7 +126,7 @@ function HealthInner() {
         <HealthTab key={tab} accountId={selectedAccountId} concernOnly={tab === 'concern'} onKpis={setKpis} onOpenSummary={setSummaryPetId} />
       )}
 
-      <SummaryDrawer open={summaryPetId !== null} status={summaryStatus} summary={activeSummary} onClose={closeSummary} onRetry={() => void loadSummary()} onPrint={() => window.print()} />
+      <SummaryDrawer open={summaryPetId !== null} status={summaryStatus} summary={activeSummary} error={summaryError} onClose={closeSummary} onRetry={() => void loadSummary()} onPrint={() => window.print()} />
       {canPrint ? <SummarySheet summary={activeSummary!} /> : null}
     </div>
   )
