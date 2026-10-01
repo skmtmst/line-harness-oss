@@ -2224,6 +2224,11 @@ export interface AutoReplyDryRunResult {
   }>;
   actions: Array<{ kind: string }>;
   stateChanged: false;
+  /**
+   * m26c R552: 試験の記録直前に下書きが編集されていたら true。
+   * この結果は古い内容のものなので、公開条件に使わず再試験を求める。
+   */
+  staleTest?: boolean;
 }
 
 export interface AutoReplyPublishResult {

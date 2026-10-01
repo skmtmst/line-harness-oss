@@ -19,11 +19,13 @@ describe('LINE account authorization scope query', () => {
          is_active, is_default, tenant_id, display_order)
       VALUES (?, ?, ?, 'plain-token', 'plain-secret',
               'not-valid-ciphertext', 'not-valid-ciphertext',
-              'login-id', 'login-secret', 'liff-id', 1, 0, ?, ?)
+              ?, ?, ?, 1, 0, ?, ?)
     `);
-    insert.run('default-account', 'default-channel', '既定', DEFAULT_TENANT_ID, 1);
-    insert.run('legacy-account', 'legacy-channel', '旧行', null, 2);
-    insert.run('tenant-b-account', 'tenant-b-channel', 'B', 'tenant-b', 3);
+    // 542の一意制約(login_channel_id/liff_id)に合わせ、行ごとに別値を使う。
+    // 絞り込み(tenant_id)・認証範囲の主張は変えない。
+    insert.run('default-account', 'default-channel', '既定', 'login-id-default', 'login-secret-default', 'liff-id-default', DEFAULT_TENANT_ID, 1);
+    insert.run('legacy-account', 'legacy-channel', '旧行', 'login-id-legacy', 'login-secret-legacy', 'liff-id-legacy', null, 2);
+    insert.run('tenant-b-account', 'tenant-b-channel', 'B', 'login-id-tenant-b', 'login-secret-tenant-b', 'liff-id-tenant-b', 'tenant-b', 3);
 
     const rows = await getLineAccountScopeEntries(asD1(sqlite), DEFAULT_TENANT_ID);
 

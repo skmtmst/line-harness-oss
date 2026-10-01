@@ -96,7 +96,8 @@ beforeEach(() => {
   mocks.createAutomation.mockResolvedValue(automation);
   mocks.getAutomationLogs.mockResolvedValue([]);
   mocks.getAutoReplyById.mockResolvedValue(autoReply);
-  mocks.createAutoReply.mockResolvedValue(autoReply);
+  // 543の冪等性でcreateAutoReplyは{rule,replayed}を返す。製品の形に合わせる（assert無変更）。
+  mocks.createAutoReply.mockResolvedValue({ rule: autoReply, replayed: false });
   mocks.getFolderById.mockResolvedValue(null);
   mocks.getAutoReplyHitCounts.mockResolvedValue([]);
   mocks.getAffiliateOfferById.mockResolvedValue(offer);
