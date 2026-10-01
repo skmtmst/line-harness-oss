@@ -2083,6 +2083,20 @@ function PublishStep({
     }).then(() => refreshSchedules()).catch(() => refreshSchedules())
   }
 
+  /*
+   * R204残差: 「いますぐ出す」の注記も aside・確認窓・完了文と同じく設定別にする。
+   * 全枝共通の「保存したらすぐ、条件に当てはまる人のトーク画面に出ます」では、
+   * 条件あり（順次）・条件空（今0人）・登録のみ（登録だけ）と矛盾する。
+   * 実現されていない即時は言わない。「すぐ」は全員の既定のときだけ。
+   */
+  const nowNote = isDefaultForAll
+    ? '保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります'
+    : targetingEnabled && conditionEmpty
+      ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください'
+      : targetingEnabled
+        ? '保存するとLINEに登録され、条件に当てはまる人の画面に出来事のタイミングで順次出ます'
+        : 'LINEへの登録だけで、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください'
+
   return (
     <div data-design-node="UMiJ9" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
@@ -2096,7 +2110,7 @@ function PublishStep({
           <div className="mt-4">
             <RadioCardGroup legend="公開時期の選択" className="grid gap-3">
               {[
-                ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
+                ['now', 'いますぐ出す', nowNote],
                 ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
                 ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
               ].map(([value, label, note]) => (
