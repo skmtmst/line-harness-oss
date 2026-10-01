@@ -52,6 +52,13 @@ const DEDUPE_OPTIONS = [
   { value: '60', label: '1時間のあいだは1回だけ' },
 ]
 
+/**
+ * M032追加残差: 宛先の取得失敗時に保存を止める案内。宛先が回復したら
+ * この文言だけを解消する目安にする（他の保存・検証文言は消さない）。
+ */
+const RECIPIENTS_SAVE_GUARD_MESSAGE =
+  '受け取る人を読み込めませんでした。上の「もう一度読み込む」で取り直してから保存してください。'
+
 /** NOTIFY-04: ?id= があれば保存ずみのお知らせを開き直して直す。 */
 function readConditions(rule: { conditions: Record<string, unknown> }) {
   const conditions = rule.conditions
@@ -155,6 +162,9 @@ function NewOperatorNotificationInner() {
       if (!result.success) throw new Error(result.error)
       setRecipients(result.data)
       setRecipientsError(null)
+      // M032追加残差: 宛先が回復したら、保存ガード由来の古い文言だけを
+      // 解消する。他の保存・公開・テスト送信・検証文言は消さない。
+      setError((current) => (current === RECIPIENTS_SAVE_GUARD_MESSAGE ? '' : current))
       // NOTIFY-04: 再開したお知らせの宛先は保存ずみのもの。全選択で
       // 上書きすると、本人だけにしていた設定が全員へ広がる。
       if (!editId) {
@@ -224,7 +234,7 @@ function NewOperatorNotificationInner() {
        * 案内する文にする。
        */
       setError(recipientsError !== null
-        ? '受け取る人を読み込めませんでした。上の「もう一度読み込む」で取り直してから保存してください。'
+        ? RECIPIENTS_SAVE_GUARD_MESSAGE
         : '受け取るスタッフを1人以上選んでください。')
       return null
     }
