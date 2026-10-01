@@ -1,0 +1,150 @@
+/*
+ * ★V8 右の欄の「本物のスマホ」（夕15・絵 `F3X1Mo` / `cgiGB` / `cdZBf`）。
+ *
+ * LINE のトーク画面に近い形で届く見本を出す。枠・時計の帯・部屋名・
+ * 下のメニューまでをここで持つ（中身の吹き出しは BroadcastMessagePreview）。
+ */
+
+.phone {
+  overflow: hidden;
+  border: 10px solid #171a1f;
+  border-radius: 44px;
+  background: #171a1f;
+  box-shadow: 0 12px 32px rgb(15 23 32 / 0.18);
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 34px;
+  background: #7f93c4;
+  /* スマホの縦横比に寄せる。中身が少なくても形が保てるよう高さを持たせる。 */
+  min-height: 480px;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 22px 4px;
+  background: #ffffff;
+  color: #171a1f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Dynamic Island 相当の黒い楕円。 */
+.island {
+  width: 84px;
+  height: 22px;
+  border-radius: 999px;
+  background: #171a1f;
+}
+
+.statusIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chatHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-top: 1px solid rgb(15 23 32 / 0.06);
+  background: #ffffff;
+  color: #171a1f;
+}
+
+.chatName {
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatHeaderIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #4a525e;
+}
+
+.chatBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+/* 本文の上に乗る日時の札（「8/24（月）10:00 に届きます」）。 */
+.dateChip {
+  align-self: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.55);
+  color: #3c4450;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* 送信者の行：緑の顔の印＋部屋の名。 */
+.sender {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.senderAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #06c755;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.senderName {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 吹き出しのまとまり。プレビューの背景は白のまま出す。 */
+.bubbles {
+  font-size: 12px;
+}
+
+.bubbles :global(.shadow-card) {
+  box-shadow: none;
+}
+
+.chatFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 14px;
+  background: #ffffff;
+  color: #4a525e;
+  font-size: 10px;
+}
+
+.homeIndicator {
+  width: 120px;
+  height: 4px;
+  border-radius: 999px;
+  background: #171a1f;
+}
