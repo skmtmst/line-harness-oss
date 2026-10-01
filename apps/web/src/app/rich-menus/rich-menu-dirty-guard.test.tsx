@@ -910,6 +910,50 @@ describe('R204 「いますぐ出す」の注記（設定に合わせた説明�
 })
 
 /*
+ * R204残差: 日時・期間の注記も自動表示を断定しない。どちらも指定時刻の
+ * LINE登録予約であり、誰の画面に出るかは「公開すると何が変わるか」で決まる。
+ * 期間を万能に安全とも言わない。新API・期間機能の追加はしない。
+ */
+describe('R204 日時・期間の注記（自動表示を断定しない）', () => {
+  const SCHEDULED_NEW = '指定した時刻にLINEへ登録する予約です。誰の画面に出るかは「公開すると何が変わるか」で確認してください'
+  const PERIOD_NEW = '指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください'
+  const SCHEDULED_OLD = 'その時刻になったら自動で出ます。それまでは今のメニューのままです'
+  const PERIOD_OLD = '終わったら自動で元に戻します。キャンペーンはこれが安全です'
+
+  async function renderPublish(group: typeof GROUP) {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+  }
+
+  async function expectReservationNotes(group: typeof GROUP) {
+    await renderPublish(group)
+    expect(screen.getByText(SCHEDULED_NEW)).toBeTruthy()
+    expect(screen.getByText(PERIOD_NEW)).toBeTruthy()
+    expect(screen.queryByText(SCHEDULED_OLD)).toBeNull()
+    expect(screen.queryByText(PERIOD_OLD)).toBeNull()
+  }
+
+  test('登録のみでも日時・期間は「登録の予約」と言い、自動表示とは言わない', async () => {
+    await expectReservationNotes(GROUP)
+  })
+
+  test('条件が空でも日時・期間は「登録の予約」と言い、自動表示とは言わない', async () => {
+    await expectReservationNotes({ ...GROUP, targetingEnabled: true, targetingCondition: null })
+  })
+
+  test('条件ありでも日時・期間は「登録の予約」と言い、自動表示とは言わない', async () => {
+    await expectReservationNotes({
+      ...GROUP,
+      targetingEnabled: true,
+      targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
+    })
+  })
+})
+
+/*
  * R232: 複製に成功したのに確認窓が残ると、コピーの編集画面で
  * 「このコピーをさらに複製する？」に見えてしまう。成功時は窓を閉じ、
  * 失敗時は窓を開いたまま理由を出す。
