@@ -135,4 +135,22 @@
   border-width: 1.5px;
   border-color: var(--color-accent-deep);
 }
+
+/* ★V8「枠線の色」：未選択の ○ の輪郭は control-border。
+   選択中の緑・無効の灰・誤りの赤はそれぞれの色を保つ。 */
+[data-theme='v8'] .radio {
+  border-color: var(--color-control-border);
+}
+
+[data-theme='v8'] .radio:checked {
+  border-color: var(--color-accent-deep);
+}
+
+[data-theme='v8'] .disabled .radio {
+  border-color: var(--color-ink-disabled);
+}
+
+[data-theme='v8'] .invalid .radio {
+  border-color: var(--color-status-danger);
+}
 }

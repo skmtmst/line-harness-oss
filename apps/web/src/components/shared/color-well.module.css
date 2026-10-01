@@ -172,4 +172,10 @@
   font-variant-numeric: tabular-nums;
   outline: none;
 }
+
+/* ★V8「枠線の色」：色の見本の器と十六進の欄は control-border。 */
+[data-theme='v8'] .well,
+[data-theme='v8'] .hexField {
+  border-color: var(--color-control-border);
+}
 }
