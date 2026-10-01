@@ -123,13 +123,9 @@ export default function AppTopBar() {
   const logout = () => logoutAndGoToLogin()
 
   /*
-   * ★V8：帯の探す欄の行き先。全体検索の部品はまだ無いので、
-   * いちばん使う「友だちを名前・メモで絞る」へ着ける（友だち一覧は
-   * `?q=` で開いた語を最初から引く）。
+   * ★V8：帯の探す欄は V8 の外側から外した（オーナー決定 2026-10-01）。
+   * `?q=` の受け口自体は友だち一覧が持ち続ける。
    */
-  const globalSearch = (query: string) => {
-    router.push(`/friends?q=${encodeURIComponent(query)}`)
-  }
 
   /*
    * 一覧の取得に失敗したとき、札がただ空になるだけだと「アカウントが
@@ -165,7 +161,6 @@ export default function AppTopBar() {
       userName={staffName}
       onLogout={logout}
       notificationUnreadCount={notificationUnread}
-      onGlobalSearch={globalSearch}
       v8Chrome
     />
     </div>

@@ -92,6 +92,7 @@ export default function FriendListRow({
 
       <button
         type="button"
+        data-part="attention-star"
         aria-pressed={attention}
         aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
         onClick={(event) => {
@@ -292,6 +293,7 @@ export function FriendListCard({
         </div>
         <button
           type="button"
+          data-part="attention-star"
           aria-pressed={attention}
           aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
           onClick={(event) => {
