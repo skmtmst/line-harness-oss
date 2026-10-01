@@ -72,16 +72,23 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
     expect(tsx).toContain('last')
   })
 
-  it('段の題（CugIm）：題15/600・補足12・「？」と右端の行き先リンク', () => {
+  it('段の題（CugIm）：題15/600・行の高さ var・1行「…」＋title・リンクは縮まない', () => {
     const source = css('section-header.module.css')
     expect(source).toContain('font-size: 15px')
     expect(source).toContain('font-weight: 600')
     expect(source).toContain('color: var(--color-ink)')
     expect(source).toContain('gap: 6px')
+    expect(source).toContain('line-height: var(--text-lh, 1.4)')
     expect(source).toContain('margin-left: auto')
+    // 題は1行で「…」（全文は title）、リンクは縮まない
+    expect(source).toContain('white-space: nowrap')
+    expect(source).toContain('text-overflow: ellipsis')
+    expect(source).toContain('flex: 0 1 auto')
+    expect(source).toContain('flex-shrink: 0')
     const tsx = readFileSync(join(SHARED, 'section-header.tsx'), 'utf8')
     expect(tsx).toContain('HelpTip')
     expect(tsx).toContain('TextLink')
+    expect(tsx).toContain('title={typeof title')
   })
 
   it('チェックのカード（w6uYMd・RRxK5）：高68・余白14・オンで緑の地と描かれるチェック', () => {
@@ -100,7 +107,7 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
 
   it('切り替え（3つ dtJVi）：器shell・余白3・間隔2・白いつまみが滑る（120ms）・左右キー', () => {
     const source = css('segmented.module.css')
-    expect(source).toContain('padding: 3px')
+    expect(source).toContain('padding: 2px')
     expect(source).toContain('gap: 2px')
     expect(source).toContain('border-radius: var(--radius-control)')
     expect(source).toContain('background: var(--color-shell)')
