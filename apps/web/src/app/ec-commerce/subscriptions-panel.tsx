@@ -92,7 +92,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
       <ListState
         kind={state}
         title={state === 'empty' && !accountId ? 'LINEアカウントを選択してください' : state === 'empty' ? '定期便はまだありません' : undefined}
-        description={state === 'empty' && !accountId ? '左のメニュー上部で、確認するLINEアカウントを選びます。' : state === 'empty' ? 'ECから定期便が届くと、ここに並びます。' : undefined}
+        description={state === 'empty' && !accountId ? 'LINEアカウントを選ぶ欄で、確認するアカウントを選びます。' : state === 'empty' ? 'ECから定期便が届くと、ここに並びます。' : undefined}
         onRetry={state === 'error' ? () => void load() : undefined}
       />
     )

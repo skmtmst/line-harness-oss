@@ -430,7 +430,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                 ? '条件に合う取り込みの記録はありません'
                 : undefined}
           description={listState === 'empty' && !accountId
-            ? '左のメニュー上部で、確認するLINEアカウントを選びます。'
+            ? 'LINEアカウントを選ぶ欄で、確認するアカウントを選びます。'
             : listState === 'empty' && recordsNarrowing
               ? '検索語や表示条件を変えてください。'
               : undefined}
