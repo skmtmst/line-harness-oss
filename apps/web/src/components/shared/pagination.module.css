@@ -68,14 +68,60 @@ button.item:disabled {
 }
 
 /*
- * ★V8「ページ送り」（jX2Uw）：高さ 36・角丸 control・数字のマスは
- * 36×36 にそろえる。いまのページの緑は変えない。
+ * 帯の左端に出す件数の文（例「40件中 1〜20件を表示」）。v7 は帯の外に
+ * 従来の件数表示があるので、ここは v8 のときだけ出す。
  */
+.summary {
+  display: none;
+}
+
+/*
+ * ★V8「ページ送り」（jX2Uw）：帯の余白は上下10・左右20、間は 6。
+ * 各ボタンは 32×32・角丸 control・文字は 13px/1.5。前・次は「‹」「›」の
+ * 印だけの正方形にする。いまのページの緑は変えない。
+ */
+[data-theme='v8'] .pagination {
+  gap: 6px;
+  padding: 10px 20px;
+}
+
+[data-theme='v8'] .summary {
+  display: inline-flex;
+  align-items: center;
+  margin-right: auto;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* 中身は bare の ListRange（文字指定を持たない）を想定し、帯側が決める */
+
 [data-theme='v8'] .item {
-  height: 36px;
+  height: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 [data-theme='v8'] .page {
-  width: 36px;
+  width: 32px;
+}
+
+[data-theme='v8'] .control {
+  width: 32px;
+  padding: 0;
+}
+
+.controlGlyph {
+  display: none;
+}
+
+[data-theme='v8'] .controlLabel {
+  display: none;
+}
+
+[data-theme='v8'] .controlGlyph {
+  display: inline;
 }
 }

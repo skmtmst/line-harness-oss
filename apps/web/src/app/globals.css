@@ -580,6 +580,21 @@ html:not([data-theme="v8"]) .v8-only {
   }
 }
 
+/*
+ * ★V8「ページ送り」（jX2Uw）：帯そのものが「件数＋ボタン」を持つ。
+ * 帯を包む行（data-pagebar）は高さ固定・余白をやめ、外に出していた
+ * 件数の文（data-pagebar-out）は帯の中の summary へ移すので隠す。
+ * v7 は今までどおり。
+ */
+[data-theme="v8"] [data-pagebar] {
+  height: auto;
+  padding: 0;
+}
+
+[data-theme="v8"] [data-pagebar-out] {
+  display: none;
+}
+
 @keyframes v8-star-pop {
   0% {
     transform: scale(0.85);
