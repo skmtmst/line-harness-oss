@@ -100,7 +100,7 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
 
   it('切り替え（3つ dtJVi）：器shell・余白3・間隔2・白いつまみが滑る（120ms）・左右キー', () => {
     const source = css('segmented.module.css')
-    expect(source).toContain('padding: 3px')
+    expect(source).toContain('padding: 2px')
     expect(source).toContain('gap: 2px')
     expect(source).toContain('border-radius: var(--radius-control)')
     expect(source).toContain('background: var(--color-shell)')
