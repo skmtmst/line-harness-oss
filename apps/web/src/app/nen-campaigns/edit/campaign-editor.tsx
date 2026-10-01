@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Eye, FlaskConical, Gift, X } from 'lucide-react'
-import { ApiError, api, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
+import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
@@ -285,8 +285,9 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         setError('ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。')
         return
       }
-      const reason = error instanceof ApiError && error.message ? error.message : ''
-      setError(reason || '保存できませんでした。通信状態を確認して、もう一度お試しください。')
+      // M507フォロー：共通APIはWorker 5xxの本文を隠すため、生文は「API error: 500」に
+      // なる。既存 helper で運用者向け日本語へ変える（409分岐の後なので競合案内は不変）。
+      setError(describeSaveFailure(error))
     } finally {
       setSaving(false)
     }
