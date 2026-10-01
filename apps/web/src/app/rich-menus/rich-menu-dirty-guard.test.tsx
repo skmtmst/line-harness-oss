@@ -824,6 +824,49 @@ describe('R204 公開すると何が変わるか（設定に合わせた説明�
 })
 
 /*
+ * R204残差: 公開の確認窓も aside・完了文と同じく設定別に出る人を言う。
+ * 全設定共通の「出ません／友だちに表示を実行」は、全員既定・条件ありと矛盾する。
+ */
+describe('R204 公開の確認窓（設定に合わせた説明）', () => {
+  async function openPublishConfirm(group: typeof GROUP) {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
+    searchParams.value = new URLSearchParams('id=grp-1')
+    render(<RichMenuEditPage />)
+    await flush()
+    fireEvent.click(screen.getByText('LINE に登録する'))
+    await flush()
+  }
+
+  test('全員の既定なら「個別指定を除く全友だち」と言う', async () => {
+    await openPublishConfirm({ ...GROUP, isDefaultForAll: true })
+    expect(screen.getByText(/個別に指定した人を除く/)).toBeTruthy()
+    expect(screen.queryByText(/友だちのトーク画面には出ません/)).toBeNull()
+  })
+
+  test('条件ありなら「出来事で順次」と言う', async () => {
+    await openPublishConfirm({
+      ...GROUP,
+      targetingEnabled: true,
+      targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
+    })
+    expect(screen.getByText(/順次出ます/)).toBeTruthy()
+    expect(screen.queryByText(/友だちのトーク画面には出ません/)).toBeNull()
+  })
+
+  test('条件が空なら「今0人」と言い、直し方も添える', async () => {
+    await openPublishConfirm({ ...GROUP, targetingEnabled: true, targetingCondition: null })
+    expect(screen.getByText(/今0人/)).toBeTruthy()
+    expect(screen.queryByText(/すべての友だちの既定メニューになります/)).toBeNull()
+  })
+
+  test('登録のみなら「出ません／表示先で操作」と言う', async () => {
+    await openPublishConfirm(GROUP)
+    expect(screen.getByText(/この操作だけでは、友だちのトーク画面には出ません/)).toBeTruthy()
+    expect(screen.getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
+  })
+})
+
+/*
  * R232: 複製に成功したのに確認窓が残ると、コピーの編集画面で
  * 「このコピーをさらに複製する？」に見えてしまう。成功時は窓を閉じ、
  * 失敗時は窓を開いたまま理由を出す。

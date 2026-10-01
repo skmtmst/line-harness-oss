@@ -1648,9 +1648,19 @@ function Editor({
         onConfirm={() => void handlePublish()}
         onCancel={closeConfirm}
       >
-        <ul className="text-ink-secondary space-y-1 text-xs leading-5">
-          <li>・まだ起きないこと: この操作だけでは、友だちのトーク画面には出ません。</li>
-          <li>・次にすること: 友だちに見せるには、登録後に一覧の「友だちに表示」を実行してください。</li>
+        {/*
+        R204: aside と公開成功案内と同じく、確認窓でも設定別に出る人を言う。
+        全設定共通の「出ません／友だちに表示を実行」では、全員既定・条件ありの
+        場合と矛盾する。言い回しは成功案内とそろえる。
+      */}
+      <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+          <li>・出る人: {isDefaultForAll
+            ? '個別に指定した人を除く、すべての友だちの既定メニューになります。'
+            : targetingEnabled
+              ? (targetingCondition
+                ? '条件に当てはまる人の画面に、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+                : 'いまの条件では誰にも出ません（今0人）。条件を決めるか、「条件で出し分ける」をオフにしてください。')
+              : 'この操作だけでは、友だちのトーク画面には出ません。出すには登録後に一覧の「表示先」から操作してください。'}</li>
           <li>・戻せます: 登録したあとでも「LINEから取り下げ」で下書きに戻せます。</li>
         </ul>
       </ConfirmDialog>
