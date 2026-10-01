@@ -114,8 +114,13 @@ describe('集計', () => {
   });
 
   it('Stripe入金・返金・年払いを集計し、請求書の無い契約先だけ定価で補う', async () => {
-    const current = iso(-1);
-    const previous = iso(-35);
+    /*
+     * 集計は日本時間の月初・月末の文字列と比べる。日数で前後させる書き方だと
+     * 月はじめ・月おわりにまたいで別の月に入ってしまうため、月初そのものに合わせる。
+     * （下限は「以上」で比べるので月初は必ずその月に入る）
+     */
+    const current = resolvePeriod('month').from;
+    const previous = resolvePeriod('prev_month').from;
     const insert = testDb.raw.prepare(`INSERT INTO billing_invoices
       (id, tenant_id, status, amount_paid, amount_due, amount_refunded, currency, interval, paid_at, synced_at, created_at)
       VALUES (?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -150,11 +155,13 @@ describe('集計', () => {
   });
 
   it('使用量は今月の配信通数・バナー生成・メディア容量をプランの上限と比べる', async () => {
+    // 使用量は「今月」で数えるため、日数で前後させず今月の月初に合わせる。
+    const inThisMonth = resolvePeriod('month').from;
     testDb.raw.prepare(`INSERT INTO friends (id, line_user_id, display_name, line_account_id) VALUES ('f1', 'Uf1', '友だち', 'la-1')`).run();
     for (let i = 0; i < 4; i += 1) {
-      testDb.raw.prepare(`INSERT INTO messages_log (id, friend_id, line_account_id, direction, message_type, content, created_at) VALUES (?, 'f1', 'la-1', 'outgoing', 'text', 'hi', ?)`).run(`m${i}`, iso(-1));
+      testDb.raw.prepare(`INSERT INTO messages_log (id, friend_id, line_account_id, direction, message_type, content, created_at) VALUES (?, 'f1', 'la-1', 'outgoing', 'text', 'hi', ?)`).run(`m${i}`, inThisMonth);
     }
-    testDb.raw.prepare(`INSERT INTO banner_usage_ledger (id, tenant_id, units, reason, created_at) VALUES ('b1', 'tenant-a', 30, 'generate', ?)`).run(iso(-1));
+    testDb.raw.prepare(`INSERT INTO banner_usage_ledger (id, tenant_id, units, reason, created_at) VALUES ('b1', 'tenant-a', 30, 'generate', ?)`).run(inThisMonth);
     const body = await (await app(master).request('/api/ops/dashboard')).json() as Body;
     expect(body.data.usage[0]).toMatchObject({ tenantName: '株式会社サンプル', messages: 4, limits: { messages: 30_000 } });
     // バナー 30/150 = 20% が最大

@@ -76,13 +76,22 @@ describe('日時の選択（★V7）', () => {
   })
 
   it('日付を選ぶと時刻 10:00 で値が決まる（日本時間の文字列）', () => {
+    /*
+     * 空のときの暦は実際の時計の月を開くため、固定日付の札を押す書き方だと
+     * その日を過ぎた時点で札が無くなる（今日の札は名に「、今日」が付く）。
+     * 暦の「今日」から選び、期待する値も実際の時計から組み立てる。
+     */
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
     render(<DateTimeHarness initial="" />)
     fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
     expect(screen.getByRole('dialog', { name: '日時を選ぶ' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '日付' }))
-    fireEvent.click(screen.getByRole('button', { name: '2026年10月1日（木）' }))
-    expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
-    expect(screen.getByRole('button', { name: '送る日時' }).textContent).toContain('2026年10月1日（木）10:00')
+    fireEvent.click(screen.getByRole('button', { name: '今日' }))
+    expect(screen.getByTestId('value').textContent).toBe(`${ymd}T10:00`)
+    expect(screen.getByRole('button', { name: '送る日時' }).textContent)
+      .toContain(formatDateTimeLabel({ date: today, hours: 10, minutes: 0 }))
   })
 
   it('時・分を変えると値が替わる。箱は開いたまま', () => {

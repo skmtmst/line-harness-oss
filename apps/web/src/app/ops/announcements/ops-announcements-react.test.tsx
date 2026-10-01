@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsAnnouncementsPage from './page'
 import { previewLabel, toLocalInput, toPublishAt } from './format'
+import { formatLabel as formatDateLabel } from '@/components/shared/date-field'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -142,7 +143,14 @@ describe('画面', () => {
       setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '予約のお知らせ')
       setValue(document.querySelector<HTMLTextAreaElement>('textarea')!, '本文')
     })
-    // 公開日時の選択（★V7）で 2026-09-20 02:00 を選ぶ。値は今までどおり日本時間の文字列。
+    /*
+     * 公開日時の選択（★V7）で 20日 02:00 を選ぶ。値は今までどおり日本時間の文字列。
+     * 暦は実際の時計の月を開くため、固定の年月を書くとその月を過ぎた時点で日付の札が無くなる。
+     * 今月の20日を実際の時計から組み立てる（今日が20日のときは札の名に「、今日」が付くので前方一致で探す）。
+     */
+    const now = new Date()
+    const target = new Date(now.getFullYear(), now.getMonth(), 20)
+    const targetYmd = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-20`
     await act(async () => {
       document.querySelector<HTMLButtonElement>('button[aria-label="公開日時（日本時間）"]')!.click()
     })
@@ -152,7 +160,7 @@ describe('画面', () => {
     })
     await act(async () => {
       Array.from(document.querySelectorAll('button')).find((b) =>
-        (b.getAttribute('aria-label') ?? '').startsWith('2026年9月20日（日）'),
+        (b.getAttribute('aria-label') ?? '').startsWith(formatDateLabel(target)),
       )!.click()
     })
     await act(async () => {
@@ -164,7 +172,7 @@ describe('画面', () => {
     await act(async () => { button('配信を予約する')!.click() })
     await flush()
     const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
-    expect(post.body).toMatchObject({ mode: 'schedule', publishAt: '2026-09-20T02:00:00+09:00' })
+    expect(post.body).toMatchObject({ mode: 'schedule', publishAt: `${targetYmd}T02:00:00+09:00` })
   })
 
   it('契約者専用LINEが未設定なら注意を出し、LINE を含む送信は止める', async () => {

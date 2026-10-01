@@ -103,9 +103,14 @@ describe('PERF-12 テンプレート選択のサーバー絞り込み', () => {
     const send = db.raw.prepare(`INSERT INTO messages_log
       (id, friend_id, direction, message_type, content, template_id_at_send, created_at)
       VALUES (?, 'fr-1', 'outgoing', 'text', 'sent', ?, ?)`);
-    send.run('lg-1', 'tp-04', '2026-09-01T00:00:00Z');
-    send.run('lg-2', 'tp-04', '2026-09-02T00:00:00Z');
-    send.run('lg-3', 'tp-01', '2026-09-01T00:00:00Z');
+    /*
+     * 送信実績は「今月（日本時間）」の件数で数える。固定の年月を書くとその月を過ぎた時点で
+     * 全部0件になり、並びが作られた順（新しい順）に戻ってしまう。実際の時計の月に合わせる。
+     */
+    const jstMonth = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 7);
+    send.run('lg-1', 'tp-04', `${jstMonth}-01T00:00:00Z`);
+    send.run('lg-2', 'tp-04', `${jstMonth}-02T00:00:00Z`);
+    send.run('lg-3', 'tp-01', `${jstMonth}-01T00:00:00Z`);
     const data = ((await (await get('message_type=text&quick=frequent&page=1&limit=5')).json()) as Body).data;
     // 実績 2 > 1 > 0 の順。実績なし同士は新しい順。
     expect(data.items.map((t) => t.id)).toEqual(['tp-04', 'tp-01', 'tp-03', 'tp-02']);
