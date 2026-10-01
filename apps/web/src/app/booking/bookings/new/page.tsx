@@ -25,7 +25,7 @@ import {
   type ProxyBookingResult,
 } from '@/lib/api'
 import { canOperateBookings } from '../../lib/booking-permissions'
-import { describeApiFailure, isForbidden, loadFailureNotice } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { formatDateTime, formatDay, formatTime } from '@/lib/format'
 
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
@@ -446,7 +446,7 @@ export default function NewProxyBookingPage() {
   }, [selectedAccountId, friend, customer])
 
   // R534: メニュー取得専用の失敗保持。403は権限案内で再試行なし、
-  // それ以外は同じ条件で取り直せる。
+  // 429は混雑の待ち案内で再試行あり、それ以外は同じ条件で取り直せる。
   const [menusLoadError, setMenusLoadError] = useState<unknown>(null)
   const loadMenus = useCallback(async () => {
     if (!selectedAccountId) {
@@ -459,7 +459,7 @@ export default function NewProxyBookingPage() {
       setMenus(response.menus.filter((item) => item.is_active === 1))
     } catch (caught) {
       setMenusLoadError(caught)
-      setError(isForbidden(caught) ? loadFailureNotice(caught, '予約メニュー') : '予約メニューを読み込めませんでした')
+      setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '予約メニュー') : '予約メニューを読み込めませんでした')
     }
   }, [selectedAccountId])
 
