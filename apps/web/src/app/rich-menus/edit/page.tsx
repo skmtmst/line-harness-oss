@@ -2111,8 +2111,8 @@ function PublishStep({
             <RadioCardGroup legend="公開時期の選択" className="grid gap-3">
               {[
                 ['now', 'いますぐ出す', nowNote],
-                ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
-                ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
+                ['scheduled', '日時を決めて出す', '指定した時刻にLINEへ登録する予約です。誰の画面に出るかは「公開すると何が変わるか」で確認してください'],
+                ['period', '期間を決める', '指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください'],
               ].map(([value, label, note]) => (
                 <RadioCard
                   key={value}
