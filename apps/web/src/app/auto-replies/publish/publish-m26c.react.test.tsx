@@ -44,7 +44,9 @@ const mocks = vi.hoisted(() => {
 })
 const { MockApiError } = mocks
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  // describeSaveFailure は実物。EditDialog の非409保存失敗の案内が製品どおりになる。
+  describeSaveFailure: (await importOriginal<typeof import('@/lib/api')>()).describeSaveFailure,
   api: {
     autoReplies: {
       getDraft: mocks.getDraft,
