@@ -6421,8 +6421,11 @@ export const api = {
         /** 遡及実行の前に /retroactive-preview で受け取った引き換え券（N-047）。 */
         previewToken?: string
       },
-    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      /** M956: 応答消失後の再送用。同じ内容の再送では同じ値を送り、成功したら捨てる。 */
+      idempotencyKey?: string,
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number; replayed: boolean }>>(`/api/tags/${id}`, {
       method: 'PATCH',
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     /**
@@ -6437,8 +6440,11 @@ export const api = {
       accountId: string,
       expectedVersion: number,
       data: { name?: string; description?: string | null },
-    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      /** M956: 応答消失後の再送用。同じ内容の再送では同じ値を送り、成功したら捨てる。 */
+      idempotencyKey?: string,
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number; replayed: boolean }>>(`/api/tags/${id}`, {
       method: 'PATCH',
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
