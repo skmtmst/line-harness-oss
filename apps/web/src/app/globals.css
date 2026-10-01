@@ -475,10 +475,14 @@
  *
  *   control 8→10  ボタン・入力・選ぶ欄・探す欄の角丸（板「角丸 10」）
  *   panel  12→16  白い板・ダイアログの角丸（板「角丸 16」、ダイアログ 16〜20）
+ *   text-lh  1.4→1.5  部品の文字の行の高さ（Pencil の部品は全部 1.5。
+ *     部品側は `line-height: var(--text-lh, 1.4)` と書き、v7 は
+ *     既定値 1.4 が効いて1画素も変わらない）
  */
 [data-theme="v8"] {
   --radius-control: 10px;
   --radius-panel: 16px;
+  --text-lh: 1.5;
 }
 
 /*

@@ -522,6 +522,7 @@ function verifyV8Parts(lines, failures) {
       const body = v8EffectiveBody(css, spec.textCls ?? spec.cls)
       check('fs', [{ want: toNum(textNode.fs), got: toNum(resolveVars(declaration(body, 'font-size') ?? '', v8VarsCache)) }])
       check('fw', [{ want: toNum(textNode.fw), got: toNum(resolveVars(declaration(body, 'font-weight') ?? '', v8VarsCache)) }])
+      check('lh', [{ want: toNum(textNode.lh), got: toNum(resolveVars(declaration(body, 'line-height') ?? '', v8VarsCache)) }])
     }
 
     if (rows.length === 0) uncovered.push(`${entry.name}（${spec.id}）：比べられる宣言がありません`)

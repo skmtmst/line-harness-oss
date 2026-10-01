@@ -107,7 +107,7 @@
   font-size: var(--text-body);
   font-weight: 500;
   color: var(--color-ink);
-  line-height: 1.4;
+  line-height: var(--text-lh, 1.4);
 }
 
 .note {
