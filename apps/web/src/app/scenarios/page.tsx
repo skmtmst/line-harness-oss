@@ -30,6 +30,8 @@ import { RefreshCover } from '@/components/shared/refresh-cover'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
+import PageSizeSelect, { PAGE_SIZE_OPTIONS, usePageSize } from '@/components/ui/page-size-select'
+import { useIsV8 } from '@/lib/use-admin-theme'
 import Notice from '@/components/shared/notice'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
@@ -365,6 +367,12 @@ export default function ScenariosPage() {
    * `null` は「まだ数えられていない」。FolderPanel は `—` を出す。
    */
   const [overallTotal, setOverallTotal] = useState<number | null>(null)
+  /*
+    夕28: v8 は道具の段の右端に「表示件数」（10・20・50・画面ごとに覚える）。
+    サーバ側の件数（limit）にそのまま渡す。v7 は従来の50件固定のまま。
+  */
+  const isV8 = useIsV8()
+  const [pageSize, setPageSize] = usePageSize('scenarios')
 
   /*
    * 直近で選んでいるアカウント。切替後に前のアカウント宛の遅い応答が
@@ -455,7 +463,10 @@ export default function ScenariosPage() {
       stoppedOnly,
       createdThisMonthOnly,
       folderFilter,
+      /* 夕28: 件数が変わると1ページ目へ戻して取り直す（v8 の選び口。v7 は0で固定＝従来どおり）。 */
+      limit: isV8 ? pageSize : 0,
     }),
+    initialLimit: isV8 ? pageSize : undefined,
     load: loadScenarioPage,
   })
   const scenarios = scenarioList.items
@@ -851,6 +862,12 @@ export default function ScenariosPage() {
               </FilterChip>
             ))}
           </>
+        }
+        trailing={
+          /* 夕28: 道具の段の右端に「表示件数」。v7 は欄を出さない（見た目を変えない）。 */
+          <span className="v8-only">
+            <PageSizeSelect value={pageSize} onChange={setPageSize} options={[...PAGE_SIZE_OPTIONS]} />
+          </span>
         }
       />
 

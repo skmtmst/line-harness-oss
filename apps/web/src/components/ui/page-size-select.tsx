@@ -1,7 +1,38 @@
 'use client'
 
-import type { SelectHTMLAttributes } from 'react'
+import { useCallback, useState, type SelectHTMLAttributes } from 'react'
 import Select from '@/components/shared/select'
+
+/** 夕28: 一覧の右上に出す件数の選択肢は全画面で 10・20・50 にそろえる。 */
+export const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
+
+const PAGE_SIZE_STORAGE_PREFIX = 'lh-page-size:'
+
+/**
+ * 選んだ件数を画面ごとに覚える（夕28「選んだ件数は画面ごとに覚える」）。
+ * `key` は画面を表す短い名前（`tags`・`scenarios` など）。
+ * 保存できない環境（プライベートモード等）では、その画面の中だけで効く。
+ */
+export function usePageSize(key: string, fallback = 20): [number, (next: number) => void] {
+  const [size, setSize] = useState(() => {
+    if (typeof window === 'undefined') return fallback
+    try {
+      const stored = Number(window.localStorage.getItem(PAGE_SIZE_STORAGE_PREFIX + key))
+      return (PAGE_SIZE_OPTIONS as readonly number[]).includes(stored) ? stored : fallback
+    } catch {
+      return fallback
+    }
+  })
+  const update = useCallback((next: number) => {
+    setSize(next)
+    try {
+      window.localStorage.setItem(PAGE_SIZE_STORAGE_PREFIX + key, String(next))
+    } catch {
+      // 保存できなくても選んだ値はこの画面では効く
+    }
+  }, [key])
+  return [size, update]
+}
 
 /**
  * 一覧ツールバーの表示件数（監査 #668）。

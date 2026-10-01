@@ -16,6 +16,9 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
+import Pagination from '@/components/shared/pagination'
+import PageSizeSelect, { PAGE_SIZE_OPTIONS, usePageSize } from '@/components/ui/page-size-select'
+import { useIsV8 } from '@/lib/use-admin-theme'
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -158,6 +161,13 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
   const [query, setQuery] = useState('')
   const [usage, setUsage] = useState<'all' | 'used' | 'unused'>('all')
   const [dragId, setDragId] = useState<string | null>(null)
+  /*
+    夕28: v8 は道具の段の右端に「表示件数」（10・20・50・画面ごとに覚える）
+    とページ送りを持つ。v7 は従来どおり全件を並べる。
+  */
+  const isV8 = useIsV8()
+  const [pageSize, setPageSize] = usePageSize('support-marks')
+  const [page, setPage] = useState(1)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
   const [archiveImpact, setArchiveImpact] = useState<SupportMarkArchiveImpact | null>(null)
   const [replacementMarkId, setReplacementMarkId] = useState('')
@@ -218,6 +228,12 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
     if (usage === 'unused' && isUsed(mark)) return false
     return true
   }), [items, query, usage])
+
+  /* v8 だけ1ページ分に切る。v7 は全件のまま。絞り込みや件数が変わると1ページ目へ戻る。 */
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const shown = isV8 ? visible.slice((currentPage - 1) * pageSize, currentPage * pageSize) : visible
+  useEffect(() => setPage(1), [query, usage, pageSize])
 
   /*
     並び替えは /api/support-marks/reorder へ「動かせる行だけの新しい順」を
@@ -406,6 +422,10 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
           ]}
         />
         <span className="flex-1" />
+        {/* 夕28: 道具の段の右端に「表示件数」（v8 だけ。v7 は件数欄を出さない）。 */}
+        <span className="v8-only">
+          <PageSizeSelect value={pageSize} onChange={setPageSize} options={[...PAGE_SIZE_OPTIONS]} />
+        </span>
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>
 
@@ -465,7 +485,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                 <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ対応マークがありません" description="「＋ マークを作る」から最初のマークを作ってください。" /></td></tr>
               ) : visible.length === 0 ? (
                 <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う対応マークはありません" description="検索語か利用状態を変えてください。" /></td></tr>
-              ) : visible.map((mark) => (
+              ) : shown.map((mark) => (
                 <tr key={mark.id} className="hover:bg-canvas-sunken">
                   <td draggable={!mark.isInherited} onDragStart={() => setDragId(mark.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(mark.id)} className={`${mark.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`} title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}>
                     <ReorderGrip label={mark.name} disabled={mark.isInherited} disabledReason="共有マークは編集後に並び替えできます" onMove={(direction) => void keyboardMove(mark.id, direction)} />
@@ -519,7 +539,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
           */}
           {status === 'ready' && visible.length > 0 ? (
             <ul className="divide-y divide-hairline md:hidden">
-              {visible.map((mark) => (
+              {shown.map((mark) => (
                 <li key={mark.id} className="px-3 py-3">
                   <div className="flex items-start gap-2">
                     <span className="pt-1 text-hairline" title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}>
@@ -554,6 +574,13 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
           ) : null}
         </div>
       </div>
+
+      {/* 夕28: ページ送り（v8 だけ）。中身を出せていないときは出さない。 */}
+      {isV8 && status === 'ready' && visible.length > 0 ? (
+        <div className="mt-[14px] flex items-center justify-end">
+          <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
+        </div>
+      ) : null}
 
       <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card">
         <h2 className="text-sm font-bold text-ink">受信時自動変更・保管・初期値の安全確認</h2>

@@ -114,7 +114,8 @@ describe('QKx8Q 保存した検索の一覧', () => {
     expect(toolbar).toContain('setMatchFilter')
     expect(SAVED_LIST).toContain('<Th className="w-1/4 px-3 py-3">条件の要約</Th>')
     expect(SAVED_LIST).toContain('<Th className="w-1/6 px-3 py-3">使用先</Th>')
-    expect(withoutComments(SAVED_LIST)).toContain('{visible.map((search)')
+    // 夕28: v8 は1ページ分（shown）を描く。v7 は全件（visible）のまま。
+    expect(withoutComments(SAVED_LIST)).toContain('{shown.map((search)')
     expect(withoutComments(SAVED_LIST)).not.toContain('{items.map((search)')
   })
 
