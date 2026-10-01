@@ -1,0 +1,655 @@
+{
+ "margin": 12,
+ "scale": 2,
+ "theme": "v8",
+ "parts": {
+  "doYdE": {
+   "base": "button",
+   "impl": {
+    "route": "/friends",
+    "x": 570,
+    "y": 228.796875,
+    "w": 160,
+    "h": 36,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "button_button__ZmqfD button_primary__47Ym3 button_standard__la0uU"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 101,
+    "h": 36
+   }
+  },
+  "u101P": {
+   "base": "button",
+   "impl": {
+    "route": "/friends",
+    "x": 570,
+    "y": 228.796875,
+    "w": 160,
+    "h": 36,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "button_button__ZmqfD button_primary__47Ym3 button_standard__la0uU"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 93,
+    "h": 36
+   }
+  },
+  "KspUx": {
+   "base": "icon-button",
+   "impl": {
+    "route": "/",
+    "x": 1367,
+    "y": 145,
+    "w": 36,
+    "h": 36,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "icon-button_button__qkWwQ"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 36,
+    "h": 36
+   }
+  },
+  "g5Db8": {
+   "base": "text-link",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 440.5,
+    "w": 88,
+    "h": 18,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "text-link_root__nFOtP"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 88,
+    "h": 18
+   }
+  },
+  "wMMk6": {
+   "base": "select",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 118.578125,
+    "h": 36
+   }
+  },
+  "TkVyB": {
+   "base": "search-field",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 280,
+    "h": 36
+   }
+  },
+  "bkjTv": {
+   "base": "toggle",
+   "impl": {
+    "route": "/hq/billing",
+    "x": 1205.0625,
+    "y": 158.984375,
+    "w": 40,
+    "h": 22,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "toggle_toggle__A5Q3L billing_intervalToggle__HNSFW"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 36,
+    "h": 20
+   }
+  },
+  "dtJVi": {
+   "base": "segmented",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 432,
+    "w": 161.09375,
+    "h": 36,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "segmented_root__iAjzY"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 206.25,
+    "h": 36
+   }
+  },
+  "clV5c": {
+   "base": "tabs",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 520,
+    "h": 35
+   }
+  },
+  "O2fCAt": {
+   "base": "filter-chip",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 86,
+    "h": 36
+   }
+  },
+  "mpVfY": {
+   "base": "status-badge",
+   "impl": {
+    "route": "/",
+    "x": 1023,
+    "y": 442,
+    "w": 63,
+    "h": 16,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "status-badge_badge__8LXbx status-badge_warning__As1YW status-badge_compact__TQju"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 75,
+    "h": 22
+   }
+  },
+  "C6DGX": {
+   "base": "delta-chip",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 438.5,
+    "w": 67.578125,
+    "h": 22,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "delta-chip_root__waJ8j delta-chip_up__fC2DE"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 67.46875,
+    "h": 22
+   }
+  },
+  "h7Ch3y": {
+   "base": "chip",
+   "impl": {
+    "route": "/settings/file-scan",
+    "x": 416.375,
+    "y": 167.796875,
+    "w": 37.78125,
+    "h": 24,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "chip_chip___t6g9 chip_warn__Ogfdq"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 52,
+    "h": 22
+   }
+  },
+  "C9CaMS": {
+   "base": "icon-tile",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 438.5,
+    "w": 22,
+    "h": 22,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "icon-tile_root__ADAJ5 icon-tile_sm__va3Pc"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 22,
+    "h": 22
+   }
+  },
+  "KjC1z": {
+   "base": "help-tip",
+   "impl": {
+    "route": "/",
+    "x": 314,
+    "y": 442,
+    "w": 16,
+    "h": 16,
+    "bg": "rgb(250, 250, 251)",
+    "cls": "help-tip_button__bROVa"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 16,
+    "h": 16
+   }
+  },
+  "EsjP2": {
+   "base": "activity-item",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 424.5,
+    "w": 448,
+    "h": 50,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "activity-item_row__AdSiz"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 420,
+    "h": 50
+   }
+  },
+  "CugIm": {
+   "base": "section-header",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 438.5,
+    "w": 448,
+    "h": 22.5,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "section-header_root__aGd_D"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 420,
+    "h": 23
+   }
+  },
+  "Pp3nS": {
+   "base": "kpi-card",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 297,
+    "h": 122
+   }
+  },
+  "jX2Uw": {
+   "base": "pagination",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 1408,
+    "h": 52
+   }
+  },
+  "fNPdg": {
+   "base": "radio-card",
+   "impl": {
+    "route": "/broadcasts/new",
+    "x": 286,
+    "y": 396.796875,
+    "w": 222,
+    "h": 107,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "radio-card_card__UqtU6 radio-card_checked__HcjPF"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 220,
+    "h": 98
+   }
+  },
+  "w6uYMd": {
+   "base": "check-card",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 414,
+    "w": 448,
+    "h": 71,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "check-card_card__SoyDw check-card_checked__WpyCs"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 420,
+    "h": 68
+   }
+  },
+  "hNXm7": {
+   "base": "list-state",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 420,
+    "h": 187
+   }
+  },
+  "RfHCo": {
+   "base": "otp-input",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 225,
+    "w": 328,
+    "h": 73.5,
+    "bg": "rgb(255, 255, 255)",
+    "cls": ""
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 328,
+    "h": 74
+   }
+  },
+  "prbOC": {
+   "base": "delete-button",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 431.5,
+    "w": 48,
+    "h": 36,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "delete-button_tile__5Zo0r"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 48,
+    "h": 48
+   }
+  },
+  "KVkPg": {
+   "base": "color-well",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 502,
+    "w": 69,
+    "h": 36,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "color-well_well__9TCOR"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 99,
+    "h": 36
+   }
+  },
+  "LrB2L": {
+   "base": "button",
+   "impl": {
+    "route": "/broadcasts",
+    "x": 570,
+    "y": 228.796875,
+    "w": 160,
+    "h": 36,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "button_button__ZmqfD button_primary__47Ym3 button_standard__la0uU"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 80,
+    "h": 36
+   }
+  },
+  "WTAO4": {
+   "base": "text-field",
+   "impl": {
+    "route": "/automations/new",
+    "x": 286,
+    "y": 276.5,
+    "w": 690,
+    "h": 40,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "text-field_field__LSi0z text-field_single__jm7Fx"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 1408,
+    "h": 36
+   }
+  },
+  "S9U7v": {
+   "base": "checkbox",
+   "impl": {
+    "route": "/affiliate-offers/new",
+    "x": 284,
+    "y": 709.40625,
+    "w": 406.8125,
+    "h": 42.5,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "checkbox_root__A8IAz"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 189.234375,
+    "h": 20
+   }
+  },
+  "LxHpj": {
+   "base": "toggle",
+   "impl": {
+    "route": "/hq/billing",
+    "x": 1205.0625,
+    "y": 158.984375,
+    "w": 40,
+    "h": 22,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "toggle_toggle__A5Q3L billing_intervalToggle__HNSFW"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 36,
+    "h": 20
+   }
+  },
+  "XGJDa": {
+   "base": "filter-chip",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 74,
+    "h": 36
+   }
+  },
+  "MFTlt": {
+   "base": "avatar",
+   "impl": {
+    "route": "/chats",
+    "x": 278,
+    "y": 342,
+    "w": 40,
+    "h": 40,
+    "bg": "rgb(254, 240, 240)",
+    "cls": "avatar_avatar__C8wfq avatar_s40__y_j_Y avatar_t0__8fdSg"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 28,
+    "h": 28
+   }
+  },
+  "E7USZ9": {
+   "base": "icon-tile",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 520,
+    "y": 435.5,
+    "w": 28,
+    "h": 28,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "icon-tile_root__ADAJ5 icon-tile_md__sqYES"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 28,
+    "h": 28
+   }
+  },
+  "A2mryd": {
+   "base": "icon-tile",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 564,
+    "y": 433.5,
+    "w": 32,
+    "h": 32,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "icon-tile_root__ADAJ5 icon-tile_lg__Z_AM0"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 32,
+    "h": 32
+   }
+  },
+  "EnlYo": {
+   "base": "page-header",
+   "impl": {
+    "route": "/accounts/new",
+    "x": 25,
+    "y": 94,
+    "w": 1378,
+    "h": 77.5,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "page-header_header__fXRKA"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 900,
+    "h": 89
+   }
+  },
+  "ASVsl": {
+   "base": "table",
+   "impl": {
+    "route": "/",
+    "x": 266,
+    "y": 428,
+    "w": 820,
+    "h": 44,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "table_headRow__rGJh4"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 1408,
+    "h": 46
+   }
+  },
+  "JpOg0": {
+   "base": "data-table",
+   "impl": {
+    "route": "/",
+    "x": 266,
+    "y": 419,
+    "w": 820,
+    "h": 61,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "data-table_row__Tr2dO data-table_rowInteractive__EJG71"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 1408,
+    "h": 60
+   }
+  },
+  "r3xz1W": {
+   "base": "radio-card",
+   "impl": {
+    "route": "/broadcasts/new",
+    "x": 520,
+    "y": 396.796875,
+    "w": 222,
+    "h": 107,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "radio-card_card__UqtU6"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 220,
+    "h": 98
+   }
+  },
+  "RRxK5": {
+   "base": "check-card",
+   "impl": {
+    "route": "/visual-qa/v8-parts",
+    "x": 482,
+    "y": 414,
+    "w": 448,
+    "h": 71,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "check-card_card__SoyDw"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 420,
+    "h": 68
+   }
+  },
+  "ThDed": {
+   "base": "notice",
+   "impl": null,
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 520,
+    "h": 40
+   }
+  },
+  "cfVyj": {
+   "base": "line-preview",
+   "impl": {
+    "route": "/broadcasts/new?step=message",
+    "x": 1013,
+    "y": 168,
+    "w": 390,
+    "h": 133.5,
+    "bg": "rgb(255, 255, 255)",
+    "cls": "line-preview_frame__LvNM2"
+   },
+   "pencil": {
+    "x": 16,
+    "y": 16,
+    "w": 330,
+    "h": 690
+   }
+  }
+ }
+}

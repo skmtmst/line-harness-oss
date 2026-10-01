@@ -13,6 +13,7 @@ import ActivityItem from '@/components/shared/activity-item'
 import SectionHeader from '@/components/shared/section-header'
 import CheckCard from '@/components/shared/check-card'
 import SegmentedControl from '@/components/shared/segmented'
+import StatusBadge from '@/components/shared/status-badge'
 
 /*
  * ★V8 で新たに生えた部品（Pencil「OTP・削除・色を選ぶ」の節）の
@@ -71,6 +72,13 @@ export default function V8PartsPage() {
         <div className="mt-3 flex items-center gap-6">
           <TextLink href="/friends">受信箱を開く</TextLink>
           <TextLink href="/settings">配信設定へ</TextLink>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-ink">状態の札（送信済み・対応済み）</h2>
+        <div className="mt-3 flex items-center gap-3">
+          <StatusBadge tone="success">送信済み</StatusBadge>
         </div>
       </section>
 
