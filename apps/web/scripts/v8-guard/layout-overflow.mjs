@@ -15,7 +15,8 @@
  *   読み上げ専用の sr-only（1px）
  * STRESS=1 を付けると、開いたあと main の中の短い文字を長く・数を大きくしてから測る（報告だけ。終了コードは変えない）
  */
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { chromium } from '@playwright/test'
 import { ROUTES, WIDTHS, openPage } from './browser-env.mjs'
 
@@ -96,6 +97,6 @@ for (const theme of ['v7', 'v8']) {
   }
 }
 await browser.close()
-if (out) writeFileSync(out, JSON.stringify(res, null, 1))
+if (out) { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, JSON.stringify(res, null, 1)) }
 console.log(`${STRESS ? '長いデータで ' : ''}崩れの合計 ${bad}`)
 if (bad && !STRESS) process.exit(1)
