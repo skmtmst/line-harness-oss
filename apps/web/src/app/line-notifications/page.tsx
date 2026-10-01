@@ -929,6 +929,12 @@ function LineNotificationsPage() {
       .slice(0, 3)
     return ranked.map((item) => `${labelOf.get(item.eventType) ?? item.eventType} ${item.today}`).join('・')
   }, [sendCounts, settings])
+  /*
+   * R611: 一覧の取得に失敗したときは、上部の件数・送信枠も「取得中」の
+   * ままにしない。値は「—」のまま、注記を失敗の言葉へ変える。
+   * 権限不足も同じく、取れていないのに「取得中」とは出さない。
+   */
+  const customerLoadFailed = loadState === 'error' || loadState === 'forbidden'
   const kpis = customerNotificationKpis({
     ready: loadState === 'ready' && overview !== null,
     settingsCount: settings.length,
@@ -937,6 +943,7 @@ function LineNotificationsPage() {
     sentBreakdown,
     failed: overview?.failed ?? null,
     quota,
+    loadFailed: customerLoadFailed,
   })
   /*
    * send-countsだけ取れなかったときは、そのカードだけ「取得できませんでした」にする。
@@ -1250,6 +1257,12 @@ function LineNotificationsPage() {
         </div>
       </section>
     </KpiCollapse>
+    {/*
+      R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添え、
+      下の一覧の再読み込みへ案内する。読み直しの口は一覧の ListState が持つ
+      ので、ここにはボタンも帯も置かない。赤も使わない（★V7 `x63W5x`）。
+    */}
+    {loadState === 'error' ? <p className="text-xs text-ink-secondary">お知らせの件数は取得失敗です。下の一覧の「もう一度読み込む」から読み直してください。</p> : null}
     <div><NoteBar help="お知らせは売り込みではなく取引に必要な連絡です" helpLabel="お知らせの意味">これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
     {/*
       send-countsだけ読み込めなかったときの部分表示。一覧全体は残す。
