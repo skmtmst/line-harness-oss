@@ -56,6 +56,9 @@ describe('V6 機能32 運用状態の表示確認', () => {
     }
     expect(source).not.toContain("label: '定期処理'")
     expect(source).toContain('${CHECK_COUNT}項目を常に表示し、確認内容と最新結果を示します')
+    for (const key of ['line_connection', 'message_quota', 'external_integrations', 'webhook', 'dispatch_jobs', 'friend_change', 'monitoring_heartbeat', 'infra_canary', 'credential_expiry']) {
+      expect(source).toContain(`${key}: '`)
+    }
     expect(source).toContain('api.operations.health')
     expect(source).toContain('api.operations.runHealth')
     expect(source).toContain('result?.observedAt')
