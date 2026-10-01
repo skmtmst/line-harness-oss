@@ -4,29 +4,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBroadcast, updateBroadcast } from '../src/broadcasts.js';
+import { asD1 } from './d1-test-helper.js';
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-
-function asD1(sqlite: Database.Database): D1Database {
-  return {
-    prepare(query: string) {
-      const stmt = sqlite.prepare(query);
-      return {
-        bind(...params: unknown[]) {
-          return {
-            async run() {
-              const info = stmt.run(...params);
-              return { results: [], success: true, meta: { changes: info.changes } };
-            },
-            async first<T>() {
-              return (stmt.get(...params) as T) ?? null;
-            },
-          };
-        },
-      };
-    },
-  } as unknown as D1Database;
-}
 
 describe('createBroadcast', () => {
   let sqlite: Database.Database;

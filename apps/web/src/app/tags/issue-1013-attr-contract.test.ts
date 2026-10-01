@@ -90,8 +90,10 @@ describe('ATTR-09/10: 移行は事前確認のあと明示実行し、古い確�
   })
 
   it('確認前・実行中は実行ボタンを出さない', () => {
-    expect(MIGRATE).toContain('confirmed && !run')
+    // R548: 実行の受け付け後は実行ボタンに戻さず、同じrunの再取得・再開へつなげる。
+    expect(MIGRATE).toContain('confirmed && !executedRunId')
     expect(MIGRATE).toContain('disabled={executing || running}')
+    expect(MIGRATE).toContain('needsPollAction')
   })
 
   it('条件変更・アカウント切替で飛んでいる確認を無効にする', () => {
