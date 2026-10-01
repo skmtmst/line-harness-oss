@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/*
+ * `v7:` / `v8:` バリアント（★V8 移行）。
+ *
+ * Tailwind ユーティリティは部品の CSS Module より後の層に出るため、
+ * 呼び出し側の `h-9.5` のような指定が v8 規定にも勝ってしまう。
+ * 「v7 の見た目を1画素も変えない」ために、テーマのときだけ効く
+ * ユーティリティを `v7:h-9.5` の形で書けるようにする。
+ * data-theme は `<html>` に常に v7 か v8 が付く（layout.tsx）。
+ */
+@custom-variant v7 (&:where(:root:not([data-theme="v8"]) *));
+@custom-variant v8 (&:where([data-theme="v8"] *));
+
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
 [data-design-node="N2J629"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }

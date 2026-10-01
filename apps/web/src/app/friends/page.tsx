@@ -569,7 +569,7 @@ function FriendsPageInner({
               保存した検索
             </button>
           ) : null}
-          <Button variant="primary" className="h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap text-label font-medium border-0" type="submit">検索</Button>
+          <Button variant="primary" className="v7:h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap text-label v7:font-medium border-0" type="submit">検索</Button>
         </form>
 
         {advanced?.summary.length ? (
@@ -873,7 +873,7 @@ function FriendsPageHost() {
           active={tab}
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <Button variant="secondary" className="h-9.5 px-4 text-ink-secondary disabled:text-ink-disabled whitespace-normal" type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage}>表示中をCSVで書き出す</Button> : null}
+              {tab === 'list' ? <Button variant="secondary" className="v7:h-9.5 v7:px-4 text-ink-secondary disabled:text-ink-disabled whitespace-normal" type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage}>表示中をCSVで書き出す</Button> : null}
             </div>
           )}
         />
