@@ -867,6 +867,49 @@ describe('R204 公開の確認窓（設定に合わせた説明）', () => {
 })
 
 /*
+ * R204残差: 公開step3の「いますぐ出す」の注記も設定別にする。
+ * 全枝共通の「保存したらすぐ、条件に当てはまる人のトーク画面に出ます」は、
+ * 条件あり（順次）・条件空（今0人）・登録のみ（登録だけ）と矛盾する。
+ */
+describe('R204 「いますぐ出す」の注記（設定に合わせた説明）', () => {
+  async function renderPublish(group: typeof GROUP) {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+  }
+
+  test('全員の既定なら「個別指定を除く全友だちにすぐ出る」と言う', async () => {
+    await renderPublish({ ...GROUP, isDefaultForAll: true })
+    expect(screen.getByText('保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります')).toBeTruthy()
+    expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
+  })
+
+  test('条件ありなら「出来事のタイミングで順次」と言い、すぐ出るとは言わない', async () => {
+    await renderPublish({
+      ...GROUP,
+      targetingEnabled: true,
+      targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
+    })
+    expect(screen.getByText(/条件に当てはまる人の画面に出来事のタイミングで順次出ます/)).toBeTruthy()
+    expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
+  })
+
+  test('条件が空なら「今0人」と言う', async () => {
+    await renderPublish({ ...GROUP, targetingEnabled: true, targetingCondition: null })
+    expect(screen.getByText(/いまの条件では誰にも出ません（今0人）/)).toBeTruthy()
+    expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
+  })
+
+  test('登録のみなら「登録だけでは画面は変わらない」と言う', async () => {
+    await renderPublish(GROUP)
+    expect(screen.getByText(/LINEへの登録だけで、友だちの画面は変わりません/)).toBeTruthy()
+    expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
+  })
+})
+
+/*
  * R232: 複製に成功したのに確認窓が残ると、コピーの編集画面で
  * 「このコピーをさらに複製する？」に見えてしまう。成功時は窓を閉じ、
  * 失敗時は窓を開いたまま理由を出す。
