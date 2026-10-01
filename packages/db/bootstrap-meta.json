@@ -487,8 +487,9 @@
     "537_friend_field_create_idempotency.sql",
     "538_staff_invite_email_unique.sql",
     "540_support_mark_rule_create_idempotency.sql",
+    "541_tag_update_idempotency.sql",
     "542_line_account_login_liff_unique.sql",
     "543_auto_reply_create_idempotency.sql"
   ],
-  "migrationCount": 489
+  "migrationCount": 490
 }

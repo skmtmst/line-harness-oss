@@ -6667,6 +6667,17 @@ CREATE TABLE tag_groups (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE tag_update_requests (
+  id                  TEXT PRIMARY KEY,
+  tag_id              TEXT NOT NULL REFERENCES tags(id),
+  idempotency_key     TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  resulting_version   INTEGER NOT NULL,
+  response_json       TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at          TEXT NOT NULL,
+  UNIQUE(tag_id, idempotency_key)
+);
+
 CREATE TABLE "tags" (
   id                          TEXT PRIMARY KEY,
   name                        TEXT NOT NULL,
@@ -9079,6 +9090,9 @@ CREATE INDEX idx_support_marks_active
   ON support_marks(archived_at, display_order, created_at);
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
+
+CREATE INDEX idx_tag_update_requests_tag
+  ON tag_update_requests(tag_id, created_at DESC);
 
 CREATE UNIQUE INDEX idx_tags_account_exact_name
   ON tags(line_account_id, name) WHERE line_account_id IS NOT NULL;

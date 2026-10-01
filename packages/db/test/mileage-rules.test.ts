@@ -74,6 +74,8 @@ function asD1(sqlite: Database.Database): D1Database {
         bind(...params: unknown[]) {
           const statement = sqlite.prepare(sql);
           return {
+            sql,
+            params,
             async run() {
               const result = statement.run(...params);
               return { success: true, results: [], meta: { changes: result.changes } };
@@ -90,16 +92,23 @@ function asD1(sqlite: Database.Database): D1Database {
         },
       };
     },
+    // 本物の D1 batch と同じく全部まとめて確定する。途中で落ちたら
+    // 巻き戻る（better-sqlite3 の transaction が保証する）。
+    // 本物の D1 が持つ batch 用の同期実行口 runSyncForBatch を優先し
+    // （m25d R359 の原修正）、読み取り文は同期で結果を返す
+    // （m23w 088fa3b の原子性）。両方を1つの transaction に保つ。
     async batch<T>(statements: D1PreparedStatement[]) {
-      const results: unknown[] = [];
-      sqlite.transaction(() => {
-        for (const statement of statements) {
-          const sync = (statement as unknown as { runSyncForBatch?: <T>() => T }).runSyncForBatch;
-          if (sync) results.push(sync());
-          else results.push(statement.run());
+      const runBatch = sqlite.transaction((list: D1PreparedStatement[]) => list.map((item) => {
+        const sync = (item as unknown as { runSyncForBatch?: () => unknown }).runSyncForBatch;
+        if (sync) return sync();
+        const { sql, params } = item as unknown as { sql: string; params: unknown[] };
+        if (/^\s*(SELECT|WITH|PRAGMA)/i.test(sql)) {
+          return { success: true, results: sqlite.prepare(sql).all(...params), meta: {} };
         }
-      })();
-      return Promise.all(results) as T;
+        const info = sqlite.prepare(sql).run(...params);
+        return { success: true, results: [], meta: { changes: info.changes } };
+      }));
+      return runBatch(statements) as unknown as T;
     },
   } as unknown as D1Database;
 }
