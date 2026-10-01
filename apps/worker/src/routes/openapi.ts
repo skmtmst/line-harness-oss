@@ -1367,7 +1367,10 @@ const spec = {
       patch: {
         tags: ['Tags'],
         summary: 'タグ設定と同じ共通アクション下書きを連動更新',
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '応答消失後の再送用。同じ版・同じ内容の再送は保存済みを返す（M956）。省略可' },
+        ],
         requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['lineAccountId', 'expectedVersion'], properties: { lineAccountId: { type: 'string' }, expectedVersion: { type: 'integer', minimum: 1 }, automationId: { type: ['string', 'null'] }, automationDraftVersion: { type: ['string', 'null'] }, actions: { type: 'array' }, applyToExisting: { type: 'boolean', default: false }, previewToken: { type: 'string', description: 'applyToExisting の実行に必須。POST /api/tags/{id}/retroactive-preview が返す引き換え券（N-047）' } } } } } },
         responses: { '200': { description: 'Updated' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Tag or action draft version conflict / stale retroactive preview' }, '422': { description: 'Retroactive preview token required' } },
       },

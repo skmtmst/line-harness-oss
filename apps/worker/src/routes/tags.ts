@@ -8,7 +8,6 @@ import {
   createTagsBulk,
   deleteTag,
   updateTagMileageSettings,
-  enqueueHistoricTagMileage,
   getTagRetroactiveMileagePreview,
   type TagRetroactiveMileagePreview,
   getTagGroups,
@@ -1041,7 +1040,17 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         );
         if (blocked) return blocked;
       }
-      const detail = await updateTagDefinition(c.env.DB, {
+      // M956: 応答消失後の再送に備え、要求キーがあれば保存済みの結果を返す。
+      // 任意（付けない呼び出しは従来どおり版だけで守る）。空・長すぎは400。
+      const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+      if (idempotencyKey.length > 128) {
+        return c.json({ success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Idempotency-Keyは128文字以内で指定してください' }, 400);
+      }
+      const enqueueRetroactive = applyToExisting && mileage !== null
+        && (mileage.self > 0 || mileage.referrer > 0);
+      // M955: タグの保存と遡及キューの投入は同じバッチで確定する。
+      // 投入だけ落ちたら保存も巻き戻り、同版での再送でやり直せる。
+      const saved = await updateTagDefinition(c.env.DB, {
         tagId: c.req.param('id'),
         lineAccountId,
         expectedVersion,
@@ -1065,13 +1074,13 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
           : body.automationDraftVersion === null ? null : String(body.automationDraftVersion),
         actions,
         actorId: c.get('staff')?.id ?? null,
+      }, {
+        enqueueRetroactive,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
       });
-      const queued = applyToExisting && mileage && (mileage.self > 0 || mileage.referrer > 0)
-        ? await enqueueHistoricTagMileage(c.env.DB, detail.tag.id)
-        : 0;
       return c.json({
         success: true,
-        data: { ...tagDefinitionResponse(detail), queued },
+        data: { ...tagDefinitionResponse(saved.detail), queued: saved.queued, replayed: saved.replayed },
       });
     }
   } catch (err) {
@@ -1130,18 +1139,19 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
       );
       if (blocked) return blocked;
     }
-    const tag = await updateTagMileageSettings(c.env.DB, c.req.param('id'), {
+    // M955: マイル設定の更新と遡及キューの投入は同じバッチで確定する。
+    // 投入だけ落ちたら更新も巻き戻る。
+    const { tag, queued } = await updateTagMileageSettings(c.env.DB, c.req.param('id'), {
       rewardMiles,
       referralRewardMiles,
       multiplierBps,
       multiplierPriority,
+    }, {
+      enqueueRetroactive: applyToExisting && (rewardMiles > 0 || referralRewardMiles > 0),
     });
     if (!tag) return c.json({ success: false, error: 'Not found' }, 404);
     // 保存しただけで既存ユーザーへ付与しない。運用中アカウントでは影響が
     // 大きいため、画面で遡及を明示したときだけキューへ積む。
-    const queued = applyToExisting && (rewardMiles > 0 || referralRewardMiles > 0)
-      ? await enqueueHistoricTagMileage(c.env.DB, tag.id)
-      : 0;
     return c.json({ success: true, data: { tag: serializeTag(tag), queued } });
   } catch (err) {
     console.error('PATCH /api/tags/:id/mileage error:', err);
