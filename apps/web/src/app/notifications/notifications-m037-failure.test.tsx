@@ -9,7 +9,7 @@
  * - 既読付けは楽観更新（★V7 sTJsh §1）。裏の保存が失敗したら未読へ
  *   戻し、知らせに「もう一度」を出す（再試行の余地を言う）。
  */
-import React from 'react'
+import React, { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
@@ -170,6 +170,9 @@ describe('M037 既読付けの失敗は元に戻してやり直せる知らせ�
     fireEvent.click(screen.getByRole('button', { name: 'もう一度' }))
     await waitFor(() => expect(fixture.markRead).toHaveBeenCalledTimes(2))
     expect(fixture.markRead).toHaveBeenLastCalledWith('n1', 'account-a')
+    // 第2retryのpending中も未読印消失・全既読disabledを実DOMで見る。
+    expect(within(list).getByRole('button', { name: rowName }).textContent).not.toContain('（未読）')
+    expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(true)
     gates[1].resolve({ success: false, error: 'audit_unavailable' })
     await waitFor(() => expect(
       within(list).getByRole('button', { name: rowName }).textContent,
@@ -182,6 +185,8 @@ describe('M037 既読付けの失敗は元に戻してやり直せる知らせ�
     await waitFor(() => expect(fixture.markRead).toHaveBeenCalledTimes(3))
     expect(fixture.markRead).toHaveBeenLastCalledWith('n1', 'account-a')
     gates[2].resolve({ success: true })
+    // 実Promise microtaskをflushしてから成功完了をassert (pending同値のまま主張しない)。
+    await act(async () => { await Promise.resolve() })
     await waitFor(() => expect(
       within(list).getByRole('button', { name: rowName }).textContent,
     ).not.toContain('（未読）'))
