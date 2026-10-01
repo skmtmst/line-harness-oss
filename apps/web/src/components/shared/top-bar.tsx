@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, type ChangeEvent } from 'react'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import styles from './top-bar.module.css'
 
@@ -41,11 +41,6 @@ export interface TopBarProps {
    */
   notificationUnreadCount?: number
   /**
-   * ★V8：帯の探す欄を送ったときの動き。渡さないと欄を出さない
-   * （押せるものを偽物のまま置かない）。
-   */
-  onGlobalSearch?: (query: string) => void
-  /**
    * ★V8 外側の左側（畳むボタンとパンくず）を出すか。
    * 左メニューの無い殻（停止中のワークスペース等）では渡さない。
    * 畳むボタンは投げるだけなので、受け手の無い場所に置くと
@@ -74,7 +69,6 @@ export default function TopBar({
   userName,
   onLogout,
   notificationUnreadCount = 0,
-  onGlobalSearch,
   v8Chrome = false,
   className,
 }: TopBarProps) {
@@ -83,20 +77,18 @@ export default function TopBar({
     onAccountChange(event.target.value)
   }
   const current = accounts.find((account) => account.id === selectedAccountId)
-  const searchRef = useRef<HTMLInputElement>(null)
 
   /*
-   * ★V8 外側の2つの合図。⌘K は探す欄へ焦点、⌘\ は左メニューの畳み。
-   * v7 では要素も動きも出さない（テーマが v8 のときだけ受け付ける）。
+   * ★V8 外側の合図。⌘\ で左メニューを畳む。
+   * v7 では動きを出さない（テーマが v8 のときだけ受け付ける）。
+   * 帯の探す欄は V8 で外したので、探す欄への焦点合図は持たない
+   * （探すのは各一覧の中の欄が受ける）。
    */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return
       if (document.documentElement.dataset.theme !== 'v8') return
-      if (e.key === 'k' || e.key === 'K') {
-        e.preventDefault()
-        searchRef.current?.focus()
-      } else if (e.key === '\\') {
+      if (e.key === '\\') {
         e.preventDefault()
         window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT))
       }
@@ -104,13 +96,6 @@ export default function TopBar({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-
-  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const query = searchRef.current?.value.trim() ?? ''
-    if (!query || !onGlobalSearch) return
-    onGlobalSearch(query)
-  }
 
   return (
     <header className={classes} data-design-node="cBSCb">
@@ -155,23 +140,10 @@ export default function TopBar({
       <div className={styles.actions}>
         {showAccountSwitcher ? <>
           {/*
-            ★V8: 探す欄（幅260・高さ36・⌘K の札）。送ると友だち一覧を
-            その言葉で開く。行き先を渡されないときは欄自体を出さない。
+            ★V8: 帯の探す欄はオーナー決定で外した（2026-10-01）。
+            探すのは各一覧の中の欄が受ける。ここには行き先の曖昧な
+            全体検索を置かない。
           */}
-          {onGlobalSearch ? (
-            <form className={`${styles.search} v8-only`} role="search" onSubmit={submitSearch}>
-              <SearchIcon />
-              <input
-                ref={searchRef}
-                type="search"
-                className={styles.searchInput}
-                placeholder="友だちを探す"
-                aria-label="友だちを探す"
-                autoComplete="off"
-              />
-              <kbd className={styles.searchKbd}>⌘K</kbd>
-            </form>
-          ) : null}
           <label className={styles.accountField}>
           <span>LINEアカウント</span>
           {/*
@@ -234,8 +206,8 @@ export default function TopBar({
 
         <span className={styles.separator} aria-hidden="true" />
 
-        <button type="button" className={styles.logout} onClick={onLogout}>
-          <LogOutIcon /><span>ログアウト</span>
+        <button type="button" className={styles.logout} onClick={onLogout} aria-label="ログアウト">
+          <LogOutIcon /><span aria-hidden="true">ログアウト</span>
         </button>
       </div>
     </header>
@@ -276,16 +248,6 @@ function PanelLeftIcon() {
     <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect width="18" height="18" x="3" y="3" rx="2" />
       <path d="M9 3v18" />
-    </svg>
-  )
-}
-
-/* ★V8: 探す欄（lucide `search`） */
-function SearchIcon() {
-  return (
-    <svg className={`${styles.icon} ${styles.searchIcon}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
     </svg>
   )
 }
