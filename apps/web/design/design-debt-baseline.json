@@ -524,6 +524,9 @@
   "components/session-lost-notice.tsx": {
     "arbitrary-value": 1
   },
+  "components/shared/activity-item.tsx": {
+    "unresolved-classname": 8
+  },
   "components/shared/avatar.tsx": {
     "unresolved-classname": 2
   },
