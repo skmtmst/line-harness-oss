@@ -65,6 +65,36 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(source).not.toContain('api.health.getHealth')
   })
 
+  it('件数と対応は定義の実体から決まる（注釈を除いた狭い構造解析）', () => {
+    // ASTではない。注釈を落としたvisibleで実コードだけを見るので、
+    // 旧行を注釈に残したCHECK_COUNT=9固定も、対応先の取り違えも通らない。
+    const definitionsStart = visible.indexOf('const CHECK_DEFINITIONS')
+    const definitions = visible.slice(definitionsStart, visible.indexOf('\n]', definitionsStart) + 2)
+    const ids = [...definitions.matchAll(/id: '([a-z]+)'/g)].map((match) => match[1])
+    expect(ids).toEqual(['line', 'quota', 'api', 'webhook', 'delivery', 'friends', 'infra', 'credential', 'monitoring'])
+    expect(visible).toContain('const CHECK_COUNT = CHECK_DEFINITIONS.length')
+    expect(visible).not.toMatch(/const CHECK_COUNT = \d+/)
+    const mappingStart = visible.indexOf('const HEALTH_CHECK_ID')
+    const mapping = visible.slice(mappingStart, visible.indexOf('\n}', mappingStart) + 2)
+    const pairs = Object.fromEntries(
+      [...mapping.matchAll(/(\w+): '([a-z]+)'/g)].map((match) => [match[1], match[2]]),
+    )
+    expect(pairs).toEqual({
+      line_connection: 'line',
+      message_quota: 'quota',
+      external_integrations: 'api',
+      webhook: 'webhook',
+      dispatch_jobs: 'delivery',
+      friend_change: 'friends',
+      monitoring_heartbeat: 'monitoring',
+      infra_canary: 'infra',
+      credential_expiry: 'credential',
+    })
+    for (const template of ['${CHECK_COUNT}項目を確認し', '${CHECK_COUNT}項目のすべてが正常です', '${CHECK_COUNT}項目を常に表示し']) {
+      expect(visible).toContain(template)
+    }
+  })
+
   it('3つの概要カードと上部の主要操作を表示する', () => {
     for (const label of ['全体の状態', '最後の確認', '緊急停止状態']) {
       expect(source).toContain(`label="${label}"`)
