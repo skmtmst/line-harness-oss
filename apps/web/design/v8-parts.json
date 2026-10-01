@@ -113,8 +113,8 @@
     {
       "pencil": "x4FeKG・EsjP2",
       "name": "動きの印・動きの行",
-      "code": null,
-      "planned": "shared/activity-item.tsx"
+      "code": "shared/activity-item.tsx",
+      "v8Only": true
     },
     {
       "pencil": "EnlYo",
