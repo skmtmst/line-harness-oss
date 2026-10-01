@@ -233,3 +233,39 @@ describe('正常・空は従来どおり', () => {
     expect(host.textContent).toContain('まだフォームがありません')
   })
 })
+
+describe('R602補足: 取れていない総件数は「すべて」に数を出さない', () => {
+  it('フォーム503では「すべて 0」と言わず、失敗案内と再試行は残す', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/forms?')) throw new ApiError(503, 'Service Unavailable')
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    await mount()
+    // 未取得の総数は省略する（0と確定したように見せない）。
+    expect(host.textContent).toContain('すべて')
+    expect(host.textContent).not.toMatch(/すべて\s*\d/)
+    // R602の案内と立て直しの口はそのまま。
+    expect(host.textContent).toContain('表示できませんでした')
+    expect(retryButtons()).toHaveLength(1)
+  })
+
+  it('フォルダだけ503では「すべて 2」と一覧を残す', async () => {
+    apiFolders.list.mockImplementation(async () => {
+      throw new ApiError(503, 'Service Unavailable')
+    })
+    await mount()
+    expect(host.textContent).toMatch(/すべて\s*2/)
+    expect(host.textContent).toContain('箱フォーム')
+  })
+
+  it('正常200の実0は「すべて 0」のまま', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/forms?')) {
+        return { success: true, data: { items: [], total: 0, all_total: 0 } }
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    await mount()
+    expect(host.textContent).toMatch(/すべて\s*0/)
+  })
+})

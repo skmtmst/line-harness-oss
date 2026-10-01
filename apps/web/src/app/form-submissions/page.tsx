@@ -740,7 +740,9 @@ export default function FormSubmissionsPage() {
           // R25: 箱は選んだアカウントに付けて作る。staff には操作ごと出さない。
           onAddFolder={canManageFolders ? () => setFolderDialogOpen(true) : undefined}
           rows={[
-            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal },
+            // R602補足: まだ取れていない総数は数として出さない（0確定に見せない）。
+            // 正常200の実0・取得済みの数はそのまま出す。null は件数なしの約束。
+            { id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal },
             ...folders.map((folder, index) => ({
               id: folder.id,
               label: folder.name,
