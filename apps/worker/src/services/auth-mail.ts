@@ -11,6 +11,15 @@ import { sendPlainMail } from './plain-mail.js';
 export const SIGNUP_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
+/**
+ * 本文の最後に付ける署名（2026-09-30）。
+ *
+ * 会員登録メールが迷惑メールに振り分けられたため、誰が送ったメールかが本文だけで
+ * 分かるようにする。差出人を名乗らない短い本文は迷惑メール判定の材料になる。
+ * 呼び名は musubo でそろえる。
+ */
+const MAIL_FOOTER = ['', '---', 'musubo（ムスボ）', 'https://admin.musubo.jp', 'このメールは送信専用です。'];
+
 export async function sendSignupVerifyMail(env: Env['Bindings'], input: { email: string; completeUrl: string }): Promise<void> {
   await sendPlainMail(env, {
     to: input.email,
@@ -23,6 +32,7 @@ export async function sendSignupVerifyMail(env: Env['Bindings'], input: { email:
       '',
       'この URL の有効期限は 24 時間です。期限が過ぎたときは、登録画面からもう一度メールアドレスを入力してください。',
       'お心当たりが無い場合は、このメールを破棄してください。登録は行われません。',
+      ...MAIL_FOOTER,
     ].join('\n'),
   });
 }
@@ -41,6 +51,7 @@ export async function sendAlreadyRegisteredMail(env: Env['Bindings'], input: { e
       input.forgotUrl,
       '',
       'お心当たりが無い場合は、このメールを破棄してください。',
+      ...MAIL_FOOTER,
     ].join('\n'),
   });
 }
@@ -57,6 +68,7 @@ export async function sendPasswordResetMail(env: Env['Bindings'], input: { email
       '',
       'この URL の有効期限は 1 時間です。設定すると、ほかの端末のログインはすべて解除されます。',
       'お心当たりが無い場合は、このメールを破棄してください。パスワードは変わりません。',
+      ...MAIL_FOOTER,
     ].join('\n'),
   });
 }
