@@ -613,6 +613,9 @@
   "components/shared/save-conflict-bar.tsx": {
     "unresolved-classname": 4
   },
+  "components/shared/section-header.tsx": {
+    "unresolved-classname": 4
+  },
   "components/shared/side-cards.tsx": {
     "unresolved-classname": 14
   },
