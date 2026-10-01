@@ -94,4 +94,40 @@
   white-space: nowrap;
   text-align: right; /* 中身を右端にそろえ、右の余白を左（12px）と同じにする。 */
 }
+
+/*
+ * ★V8「表の行」（JpOg0）：行は高さ52前後・左右20・下に divider の
+ * 細い線だけ。名前は 13px/500、補足は 12px ink-faint。外側のカード枠は
+ * やめ、白い板の中に直接置く（箱の中に箱を作らない）。
+ */
+[data-theme='v8'] .frame {
+  border: 0;
+  border-radius: 0;
+}
+
+[data-theme='v8'] .row {
+  height: 52px;
+}
+
+[data-theme='v8'] .rowComfortable {
+  height: 56px;
+}
+
+[data-theme='v8'] .row + .row .bodyCell {
+  border-top: 1px solid var(--color-divider);
+}
+
+[data-theme='v8'] .bodyCell {
+  padding: 9px 20px;
+}
+
+[data-theme='v8'] .name {
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+
+[data-theme='v8'] .sub {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
 }

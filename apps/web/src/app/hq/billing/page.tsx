@@ -17,6 +17,7 @@ import {
   INVOICE_STATUS_LABELS,
   billingBanner,
   billingPlanPrice,
+  billingPriceNote,
   yen,
   type BillingInvoice,
   type BillingInterval,
@@ -159,9 +160,8 @@ function BillingInner() {
           tone={banner.tone}
           action={
             summary.portalAvailable ? (
-              <Button onClick={() => void portal()} disabled={busy !== null}>
-                <CreditCard aria-hidden="true" className="h-4 w-4" />
-                {busy === 'portal' ? '開いています…' : '支払い方法を管理'}
+              <Button onClick={() => void portal()} disabled={busy !== null} busy={busy === 'portal'} busyLabel="開いています…">
+                <CreditCard aria-hidden="true" className="h-4 w-4" />支払い方法を管理
               </Button>
             ) : undefined
           }
@@ -213,6 +213,7 @@ function BillingInner() {
                 <span className="text-caption text-ink-faint">/月（税込）</span>
               </div>
               {price.yearlyYen !== null ? <p className="text-caption text-ink-faint">年額 {yen(price.yearlyYen)}（税込）</p> : null}
+              {!price.fromStripe ? <p className="text-caption text-ink-faint">仮の料金です</p> : null}
             </div>
             <div className="border-t border-hairline" />
             <ul className="flex flex-1 flex-col gap-2">
@@ -232,9 +233,7 @@ function BillingInner() {
                 variant={plan.recommended ? 'primary' : 'secondary'}
                 onClick={() => void checkout(plan, interval)}
                 disabled={busy !== null || !canChoose || !price.available}
-                className="w-full"
-              >
-                {busy === plan.key ? '申込画面へ移動中…' : 'このプランにする'}
+                className="w-full" busy={busy === plan.key} busyLabel="申込画面へ移動中…">このプランにする
               </Button>
             )}
             {!price.available && !plan.current ? <p className="text-caption text-ink-faint">価格がまだ設定されていません</p> : null}
@@ -245,11 +244,12 @@ function BillingInner() {
 
       <p data-design="Note" data-design-node={interval === 'year' ? 'CqhfL' : 'MAzqO'} className="flex items-center gap-1.5 text-caption text-ink-faint">
         <Info aria-hidden="true" className="h-3.5 w-3.5" />
+        {/* R607：料金の出所は選んだ周期で変わる。料金とプラン内容の確定度は分けて案内する。 */}
         {!summary.stripeReady
-          ? '決済の接続設定がまだのため、申込ボタンは押せません。料金と内容は仮置きです。'
+          ? `決済の接続設定がまだのため、申込ボタンは押せません。${billingPriceNote(summary.plans, interval)}`
           : !isOwner
-            ? 'プランの申込と変更はオーナーだけができます。料金と内容は仮置きです。'
-            : '料金と内容は仮置きです。決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。'}
+            ? `プランの申込と変更はオーナーだけができます。${billingPriceNote(summary.plans, interval)}`
+            : `${billingPriceNote(summary.plans, interval)}決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。`}
       </p>
 
       <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className="flex flex-col rounded-card border border-hairline bg-canvas">

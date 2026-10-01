@@ -427,8 +427,7 @@ export default function MediaDetailDialog({
           <h2 className="text-ink mt-3 truncate text-xl font-bold" title={item.filename}>{item.filename}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={() => void downloadItem()} disabled={downloading}>
-            {downloading ? '取得中…' : 'ダウンロード'}
+          <Button type="button" onClick={() => void downloadItem()} disabled={downloading} busy={downloading} busyLabel="取得中…">ダウンロード
           </Button>
           {downloadError ? <p className="text-danger text-xs" role="alert">{downloadError}</p> : null}
           {impact && impact.usageCount > 0 ? (
@@ -503,8 +502,7 @@ export default function MediaDetailDialog({
             ) : null}
             <div className="mt-4 flex justify-end">
               {versionPreview?.canReplace ? (
-                <Button type="button" variant="primary" onClick={() => void publishVersion()} disabled={!changeReason.trim() || versionPhase === 'publishing'}>
-                  {versionPhase === 'publishing' ? '追加しています…' : '新しい版を追加する'}
+                <Button type="button" variant="primary" onClick={() => void publishVersion()} disabled={!changeReason.trim() || versionPhase === 'publishing'} busy={versionPhase === 'publishing'} busyLabel="追加しています…">新しい版を追加する
                 </Button>
               ) : (
                 <Button type="button" variant="primary" onClick={() => void prepareVersion()} disabled={!versionFile || versionPhase === 'uploading'}>
@@ -590,8 +588,7 @@ export default function MediaDetailDialog({
                 {termsError ? <Notice tone="danger" message={termsError} /> : null}
                 <div className="flex justify-end gap-2">
                   <Button type="button" onClick={() => setTermsEditing(false)} disabled={termsBusy}>キャンセル</Button>
-                  <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy}>
-                    {termsBusy ? '保存しています…' : '保存する'}
+                  <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy} busy={termsBusy} busyLabel="保存しています…">保存する
                   </Button>
                 </div>
               </div>
@@ -712,9 +709,7 @@ export default function MediaDetailDialog({
                       <Button
                         type="button"
                         onClick={() => void downloadVersion(version.versionNo)}
-                        disabled={downloadingVersion !== null}
-                      >
-                        {downloadingVersion === version.versionNo ? '取得中…' : 'この版をダウンロード'}
+                        disabled={downloadingVersion !== null} busy={downloadingVersion === version.versionNo} busyLabel="取得中…">この版をダウンロード
                       </Button>
                     </div>
                   </li>

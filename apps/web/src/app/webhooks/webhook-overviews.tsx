@@ -578,9 +578,7 @@ export function OutgoingOverview({
                             variant="secondary"
                             role="menuitem"
                             disabled={!lineAccountId || testingId !== null || !item.isActive}
-                            onClick={() => { setSettingsId(null); setTestTarget(item) }}
-                          >
-                            {testingId === item.id ? '試しています…' : '1回 試してみる'}
+                            onClick={() => { setSettingsId(null); setTestTarget(item) }} busy={testingId === item.id} busyLabel="試しています…">1回 試してみる
                           </Button>
                           </div>
                         ) : null}
@@ -1089,9 +1087,7 @@ export function IncomingOverview({
                                   <Button
                                     variant="secondary"
                                     disabled={dismissingId !== null}
-                                    onClick={() => void linkUnmatched(item, candidate.friendId)}
-                                  >
-                                    {dismissingId === item.id ? '結び付けています…' : 'この人に結び付ける'}
+                                    onClick={() => void linkUnmatched(item, candidate.friendId)} busy={dismissingId === item.id} busyLabel="結び付けています…">この人に結び付ける
                                   </Button>
                                 </li>
                               ))}
@@ -1102,11 +1098,8 @@ export function IncomingOverview({
                           <Button
                             variant="secondary"
                             disabled={dismissingId !== null}
-                            onClick={() => void dismissUnmatched(item)}
-                          >
-                            {dismissingId === item.id
-                              ? '閉じています…'
-                              : item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
+                            onClick={() => void dismissUnmatched(item)} busy={dismissingId === item.id} busyLabel="閉じています…">
+                            {item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
                           </Button>
                         ) : (
                           <p className="text-ink-secondary text-xs">結び付け・確認は統括または管理者に頼んでください。</p>
@@ -1136,9 +1129,7 @@ export function IncomingOverview({
                         onClick={() => {
                           setUnmatchedMoreBusy(true)
                           setUnmatchedShown((shown) => shown + UNMATCHED_PAGE_SIZE)
-                        }}
-                      >
-                        {unmatchedMoreBusy ? '読み込んでいます…' : 'さらに表示'}
+                        }} busy={unmatchedMoreBusy} busyLabel="読み込んでいます…">さらに表示
                       </Button>
                     </div>
                   ) : null}
@@ -1234,8 +1225,7 @@ export function IncomingOverview({
         onCancel={() => setTestOpen(false)}
         footer={
           <div className="flex justify-end">
-            <Button variant="primary" onClick={() => void runIncomingTest()} disabled={testBusy || !testJson.trim()}>
-              {testBusy ? '試しています…' : '試す'}
+            <Button variant="primary" onClick={() => void runIncomingTest()} disabled={testBusy || !testJson.trim()} busy={testBusy} busyLabel="試しています…">試す
             </Button>
           </div>
         }

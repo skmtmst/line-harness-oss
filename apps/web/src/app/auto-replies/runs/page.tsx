@@ -94,10 +94,25 @@ function AutoReplyRunsInner() {
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const exportCancelledRef = useRef(false)
+  /*
+   * R529: 対象IDが変わったら古いルールの表示と操作を残さない。
+   * 読み取りに世代番号を持たせ、遅れて届いた古い応答は捨てる。
+   * IDが変わった瞬間に古い表示も消す（失敗時は古い操作が出ない）。
+   */
+  const loadSeqRef = useRef(0)
 
   usePageTitle(data ? `${data.rule.name}・実行結果` : '自動応答・実行結果')
 
+  // IDが変わったらページを先頭に戻し、古いルールの表示と操作を消す。
+  useEffect(() => {
+    setPage(1)
+    setData(null)
+    setActionMessage('')
+  }, [requestedRuleId])
+
   const load = useCallback(async () => {
+    const seq = loadSeqRef.current + 1
+    loadSeqRef.current = seq
     setLoading(true)
     setError('')
     try {
@@ -106,6 +121,8 @@ function AutoReplyRunsInner() {
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       })
+      // 古い世代の応答は捨てる。遅いAの応答でBの表示へ戻さない。
+      if (loadSeqRef.current !== seq) return
       if (!response.success) throw new Error(response.error)
       /*
         **形が違う返事を、そのまま画面へ流さない。**
@@ -116,11 +133,18 @@ function AutoReplyRunsInner() {
       if (!response.data?.rule || !Array.isArray(response.data.items)) {
         throw new Error('runs_shape')
       }
+      // 対象IDを指定しているとき、応答の対象が今見ているIDと違うなら
+      // 捨てる（Bを見ているのにAが出ない）。ID無しの一覧はそのまま受ける。
+      if (requestedRuleId && (response.data.rule.id || '') !== requestedRuleId) return
       setData(response.data)
     } catch {
+      if (loadSeqRef.current !== seq) return
+      // Bの取得失敗でAの集計・操作を残さない。ID切替時は上で消しているが、
+      // 同じIDの再読み込み失敗でも古い表示に操作が残るため、失敗時は消す。
+      setData(null)
       setError('実行結果を読み込めませんでした。時間を置いてもう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (loadSeqRef.current === seq) setLoading(false)
     }
   }, [page, requestedRuleId])
 
@@ -230,8 +254,8 @@ function AutoReplyRunsInner() {
       )}
       <div className={styles.topActions}>
         <Link href="/auto-replies" className={styles.back}><ArrowLeft size={16} />自動応答一覧</Link>
-        <Button onClick={() => void exportCsv()} disabled={!data?.rule.id || exporting}>
-          <Download size={16} />{exporting ? '書き出しています' : '実行結果をCSVで書き出す'}
+        <Button onClick={() => void exportCsv()} disabled={!data?.rule.id || exporting} busy={exporting} busyLabel="書き出しています">
+          <Download size={16} />実行結果をCSVで書き出す
         </Button>
         {exporting ? (
           <Button variant="secondary" onClick={() => { exportCancelledRef.current = true }}>
@@ -285,10 +309,8 @@ function AutoReplyRunsInner() {
                               variant="secondary"
                               size="field"
                               onClick={() => void retryRun(item)}
-                              disabled={retryingId !== null}
-                            >
-                              <RotateCcw size={14} />
-                              {retryingId === item.id ? '実行しています' : 'もう一度実行'}
+                              disabled={retryingId !== null} busy={retryingId === item.id} busyLabel="実行しています">
+                              <RotateCcw size={14} />もう一度実行
                             </Button>
                           </div>
                         ) : null}
@@ -371,8 +393,8 @@ function AutoReplyRunsInner() {
           <>
             {/* 一時停止は更新口（owner/admin）なので見るだけには出さない。設定の編集への移動は操作ではないので残す。 */}
             {canManage && (
-              <Button onClick={() => void pause()} disabled={!data?.rule.id || data.rule.isActive !== true || pausing}>
-                <Pause size={16} />{pausing ? '停止しています' : '自動応答を一時停止'}
+              <Button onClick={() => void pause()} disabled={!data?.rule.id || data.rule.isActive !== true || pausing} busy={pausing} busyLabel="停止しています">
+                <Pause size={16} />自動応答を一時停止
               </Button>
             )}
             <Button variant="primary" href={data?.rule.id ? `/auto-replies/edit?id=${encodeURIComponent(data.rule.id)}` : '/auto-replies'}>

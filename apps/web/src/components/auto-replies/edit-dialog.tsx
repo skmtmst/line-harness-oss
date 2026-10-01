@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import { api } from '@/lib/api'
+import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
 import { validateFlexContent } from '@line-crm/shared'
-import type { SegmentCondition } from '@/lib/segment-condition'
+import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InlineActionList, { useActionOptions } from './inline-action-list'
 import {
@@ -24,6 +24,7 @@ import {
   type InlineAction,
 } from './draft-fields'
 import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -364,6 +365,22 @@ export default function EditDialog({
   const [friendConditionOpen, setFriendConditionOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * m26c R551: 下書き保存の競合（409）で、先行内容との比較と読み直しの
+   * 導線を出す。入力は保持し、読み直すまで消さない。
+   * m26c R569: 公開中ルールの一覧編集は下書きへ保存される。稼働中は
+   * 無変更なので、公開フローへ案内する。
+   */
+  const [conflictInfo, setConflictInfo] = useState<{
+    keyword: string
+    responseContent: string
+  } | null>(null)
+  const [draftSaved, setDraftSaved] = useState(false)
+  /*
+   * m26c R570: 新規作成の確認キーは窓ごとに1つ振り、窓を閉じるまで変えない。
+   * 成功の応答を失って同じ窓から送り直しても同じキーになり、二重に作らない。
+   */
+  const [createKey] = useState(() => crypto.randomUUID())
   // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
   const actionOptions = useActionOptions()
   // 一覧内で開く編集窓は共通のoverlay制御へ寄せる。Escape・Tab循環・背景
@@ -440,7 +457,17 @@ export default function EditDialog({
       // テキストのまま画像形式で保存させない（画像選択部品がJSONを書く）。
       setError('返信する画像を選んでください'); return
     }
+    /*
+     * R243: 空の「いずれか」のかたまり・未完成の行がある下書きは保存しない。
+     * そのまま送ると「絞り込みなし」へ黙って落ちる。編集中の表示は消さず、
+     * 不足の案内だけ出してAPI要求は0にする（page/listどちらの保存口もここ）。
+     * 素の空（null）は「絞り込みなし」として有効なので通す。
+     */
+    const conditionIssue = findConditionDraftIssue(friendConditions)
+    if (conditionIssue) { setError(conditionIssue); return }
     setError('')
+    setConflictInfo(null)
+    setDraftSaved(false)
     setSaving(true)
     try {
       const body: {
@@ -538,16 +565,40 @@ export default function EditDialog({
           expectedVersion: draft.versionNumber,
         })
       } else if (draft.id) {
-        await api.autoReplies.update(draft.id, body)
+        const updated = await api.autoReplies.update(draft.id, body)
+        if (updated.success && updated.data?.draftSaved) {
+          // m26c R569: 稼働中は無変更で下書きへ載った。閉じずに公開フローへ案内する。
+          setDraftSaved(true)
+          setSaving(false)
+          return
+        }
       } else {
         // AUTOREPLY-08: 新規作成は常に止まった状態で保存する。チェックを
         // 付けて作る形にすると「オフで保存したのに動く」の逆が起きる。
         // 動かすのは保存後の再開・公開操作だけ。
-        await api.autoReplies.create({ ...body, isActive: false })
+        await api.autoReplies.create({ ...body, isActive: false }, createKey)
       }
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      // m26c R551: 競合は入力を保持したまま、先行内容との比較と読み直しを出す。
+      if (e instanceof ApiError && e.status === 409) {
+        const data = e.data as {
+          currentVersion?: number
+          current?: { keyword?: string; responseContent?: string }
+        } | null
+        setError(e.message || 'ほかの変更が先に保存されました。最新の状態を読み直してください')
+        if (data?.current) {
+          setConflictInfo({
+            keyword: typeof data.current.keyword === 'string' ? data.current.keyword : '',
+            responseContent:
+              typeof data.current.responseContent === 'string' ? data.current.responseContent : '',
+          })
+        }
+      } else {
+        // R570: 409以外は既存 WRITE-01 の案内に寄せる。素の内部文
+        //（`API error: 500` など）は出さない。入力は保持したまま。
+        setError(describeSaveFailure(e))
+      }
     }
     setSaving(false)
   }
@@ -597,8 +648,7 @@ export default function EditDialog({
     <>
       {page ? (
         <>
-          <Button type="button" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '下書きを保存する'}
+          <Button type="button" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">下書きを保存する
           </Button>
           {step === 'basic' && <Button type="button" variant="primary" onClick={() => moveTo('trigger')}>反応条件へ</Button>}
           {step === 'trigger' && <Button type="button" variant="primary" onClick={() => moveTo('response')}>何を返すかへ</Button>}
@@ -607,8 +657,7 @@ export default function EditDialog({
       ) : (
         <>
           <Button type="button" onClick={onClose}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '保存する'}
+          <Button type="button" variant="primary" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">保存する
           </Button>
         </>
       )}
@@ -1002,11 +1051,11 @@ export default function EditDialog({
                 {WEEKDAY_LABELS.map((label, day) => {
                   const on = weekdays.length === 0 || weekdays.includes(day)
                   return (
-                    <button
-                      key={day}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => {
+                    <Button variant="secondary" className={(`rounded-control border px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'border-accent bg-accent-soft text-ink'
+                          : 'border-hairline text-ink-faint'
+                      }`) + ' h-auto whitespace-normal'} key={day} type="button" aria-pressed={on} onClick={() => {
                         // 何も選ばない＝すべての曜日。最初の1つを押したときは
                         // 「その曜日だけ」にする（全部入りから1つ外す、ではない）。
                         if (weekdays.length === 0) {
@@ -1032,15 +1081,9 @@ export default function EditDialog({
                         }
                         setWeekdays([...weekdays, day].sort((a, b) => a - b))
                         setWeekdayNotice(null)
-                      }}
-                      className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
-                        on
-                          ? 'border-accent bg-accent-soft text-ink'
-                          : 'border-hairline text-ink-faint'
-                      }`}
-                    >
+                      }}>
                       {label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -1125,13 +1168,11 @@ export default function EditDialog({
                 {MESSAGE_KIND_WORDS.map(({ key, label }) => {
                   const on = messageKinds.length === 0 || messageKinds.includes(key)
                   return (
-                    <button
-                      key={key}
-                      type="button"
-                      // R254: 選・不選を読み上げで区別できるようにする。
-                      // 曜日・一致のしかたの切り替えと同じ押した状態。
-                      aria-pressed={on}
-                      onClick={() =>
+                    <Button variant="primary" className={(`rounded-pill px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'bg-accent-deep text-on-accent'
+                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                      }`) + ' border-0 h-auto whitespace-normal'} key={key} type="button" aria-pressed={on} onClick={() =>
                         setMessageKinds((prev) => {
                           // 何も選んでいない状態は「全部」を意味する。そこから
                           // 1つ外すには、いったん全部を入れてから外す。
@@ -1140,15 +1181,9 @@ export default function EditDialog({
                             ? base.filter((k) => k !== key)
                             : [...base, key]
                         })
-                      }
-                      className={`rounded-pill px-2.5 py-1 text-xs transition-colors ${
-                        on
-                          ? 'bg-accent-deep text-on-accent'
-                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                      }`}
-                    >
+                      }>
                       {label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -1518,6 +1553,46 @@ export default function EditDialog({
             </>
           ) : null}
           {error && <p className="text-xs text-danger">{error}</p>}
+          {conflictInfo && (
+            <Notice tone="warn">
+              <p>ほかの担当者の保存が先に入っています。あなたの入力は消えていません。</p>
+              <Disclosure size="compact" title="先に保存された内容と比べる">
+                <dl className="mt-2 space-y-1 text-xs">
+                  <div className="flex gap-2">
+                    <dt className="text-ink-faint shrink-0">言葉</dt>
+                    <dd className="text-ink font-medium">{conflictInfo.keyword || '—'}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="text-ink-faint shrink-0">返信</dt>
+                    <dd className="text-ink whitespace-pre-wrap font-medium">
+                      {conflictInfo.responseContent || '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </Disclosure>
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => window.location.reload()}
+                >
+                  最新の状態を読み直す
+                </Button>
+              </div>
+            </Notice>
+          )}
+          {draftSaved && draft.id && (
+            <Notice
+              tone="info"
+              message="稼働中の定義は変えていません。下書きに保存しました。競合の確認・テストを経て公開してください。"
+              action={
+                <Button type="button" href={`/auto-replies/publish?id=${encodeURIComponent(draft.id)}`}>
+                  公開フローへ進む
+                </Button>
+              }
+              onClose={() => onSaved()}
+            />
+          )}
         </div>
         {/* ★V7: 窓の中身だけをスクロールさせ、保存の段は窓の下に固定する。 */}
         {!page && <StickyBar className="mx-5 mb-4 shrink-0" actions={stickyActions} />}

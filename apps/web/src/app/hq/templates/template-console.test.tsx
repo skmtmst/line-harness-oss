@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import TemplateConsole, { resolvedItems } from './template-console'
 import type { Preflight, TemplateDefinition, TemplateType } from '@/lib/hq-templates-api'
 
-const calls = vi.hoisted(() => Object.fromEntries(['uploadImage','context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
+const calls = vi.hoisted(() => Object.fromEntries(['uploadImage','deleteImage','context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
 vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag','template','rich_menu','form'], hqTemplatesApi: calls }))
 vi.mock('./template-definition-editor', () => {
   const freshDefinition = (type: TemplateType): TemplateDefinition => type === 'tag'

@@ -167,6 +167,11 @@ export default function ActionScoreRulesPage() {
    * 表示しない（入力を変えると番号が進み、古い応答は捨てられる）。
    */
   const testRunRef = useRef(0)
+  /*
+   * M505: 内容ごとの要求キー。同じ内容のやり直しは同じキーで送り、
+   * 応答消失後の再送は保存済みの結果として復帰する。内容を変えたら別のキー。
+   */
+  const saveKeyRef = useRef<{ fingerprint: string; key: string } | null>(null)
   // R303: 空の表示名で「設定を反映」したときの理由。欄の下で見せる。
   const [editError, setEditError] = useState('')
   // R130: 試算の入力ミスは窓の外ではなく窓の中・欄の下で見せる。
@@ -328,6 +333,13 @@ export default function ActionScoreRulesPage() {
   const saveDraft = async () => {
     if (!selectedAccountId || !bundle) return null
     const accountAtRequest = selectedAccountId
+    // M505: 同じ内容のやり直しは同じ要求キーで送る。応答消失後の再送は
+    // 保存済みの結果として復帰し、「ほかの人が先に保存」の輪にならない。
+    const fingerprint = JSON.stringify(bundle)
+    if (saveKeyRef.current?.fingerprint !== fingerprint) {
+      saveKeyRef.current = { fingerprint, key: crypto.randomUUID() }
+    }
+    const requestKey = saveKeyRef.current.key
     setBusy(true)
     setActionError('')
     try {
@@ -335,12 +347,16 @@ export default function ActionScoreRulesPage() {
         accountId: accountAtRequest,
         expectedDraftVersionId: configuration?.currentDraftVersionId ?? null,
         configuration: bundle,
-      })
+      }, { idempotencyKey: requestKey })
       if (accountAtRequest !== latestAccountRef.current) return null
       if (!response.success) throw new Error(response.error)
       setConfiguration(response.data)
       setBundle(cloneBundle(response.data))
-      notifyToast(`下書き（第${response.data.editableVersion.versionNumber}版）を保存しました。`)
+      if (response.replayed) {
+        notifyToast('直前の保存が通っていました。保存済みの内容を読み込みました。')
+      } else {
+        notifyToast(`下書き（第${response.data.editableVersion.versionNumber}版）を保存しました。`)
+      }
       return response.data
     } catch (error) {
       setActionError(fieldError(error))
@@ -524,8 +540,7 @@ export default function ActionScoreRulesPage() {
                 <Field label="点の上限" htmlFor="score-max"><TextInput id="score-max" type="number" value={bundle.bands.max} disabled={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></Field>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button onClick={() => void previewBands()} disabled={!canEdit || bandPreviewBusy}>
-                  {bandPreviewBusy ? '数えています' : 'この分けかただと何人入るか見る'}
+                <Button onClick={() => void previewBands()} disabled={!canEdit || bandPreviewBusy} busy={bandPreviewBusy} busyLabel="数えています">この分けかただと何人入るか見る
                 </Button>
                 {bandPreview ? (
                   <p className="text-xs text-ink-secondary" role="status">

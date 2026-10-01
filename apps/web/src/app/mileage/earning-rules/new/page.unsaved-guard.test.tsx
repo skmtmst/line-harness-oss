@@ -117,7 +117,7 @@ describe('mileage/earning-rules/new の未保存ガード', () => {
     expect((host.querySelector('input#sc-name') as HTMLInputElement).value).toBe('来てくれたら 500 マイル')
   })
 
-  it('「保存せずに移動」を押すと一覧へ進む', async () => {
+  it('「保存せずに移る」を押すと一覧へ進む', async () => {
     await render()
     await flush()
 
@@ -126,7 +126,7 @@ describe('mileage/earning-rules/new の未保存ガード', () => {
     fireEvent.click(cancelLink())
     await flush()
 
-    fireEvent.click(bodyButton('保存せずに移動'))
+    fireEvent.click(bodyButton('保存せずに移る'))
     await flush()
 
     expect(fixture.push).toHaveBeenCalledWith('/mileage?tab=earning-rules')

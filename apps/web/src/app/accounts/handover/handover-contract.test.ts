@@ -115,11 +115,11 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
         `${label} が canManage で守られていません`,
       ).toContain('canManage')
     }
-    gated("{issuing ? '発行中…' : '引き継ぎコードを出す'}", '引き継ぎコードを出す')
-    gated("{linking ? '確認中…' : 'コードを読む'}", 'コードを読む')
-    gated("{refreshing ? '確認中…' : '事前確認をやり直す'}", '事前確認をやり直す')
-    gated("{savingDecisions ? '保存中…' : '判断を保存する'}", '判断を保存する')
-    gated("{executing ? '実行中…' : '本実行へ進む'}", '本実行へ進む')
+    gated('busy={issuing} busyLabel="発行中…">引き継ぎコードを出す', '引き継ぎコードを出す')
+    gated('busy={linking} busyLabel="確認中…">コードを読む', 'コードを読む')
+    gated('busy={refreshing} busyLabel="確認中…">事前確認をやり直す', '事前確認をやり直す')
+    gated('busy={savingDecisions}>判断を保存する', '判断を保存する')
+    gated('busy={executing} busyLabel="実行中…">本実行へ進む', '本実行へ進む')
     gated('setCancelOpen(true)}>\n                  引き継ぎを取り消す', '引き継ぎを取り消す')
     gated('setRollbackOpen(true) }}>\n                切り戻す', '切り戻す')
     expect(PAGE).toContain('引き継ぎの変更はオーナーと管理者だけができます')

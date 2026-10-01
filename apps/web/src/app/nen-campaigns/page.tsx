@@ -6,6 +6,7 @@ import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
@@ -294,10 +295,27 @@ export default function NenCampaignsPage() {
     } catch { setNotice({ tone: 'error', text: 'ECのコラムを取り込めませんでした。通信の状態を確認して、もう一度お試しください。' }) }
     finally { setImporting(false) }
   }
+  /*
+   * M506: 複製中はボタンを押せなくし、要求キーで二重押し・再送を1本に収める。
+   * キーは複製元ごとに持ち回り、成功したら捨てる（次の複製は別の試行）。
+   */
+  const [duplicatingColumnId, setDuplicatingColumnId] = useState<string | null>(null)
+  const duplicateKeysRef = useRef<Record<string, string>>({})
   const duplicateColumn = async (column: NenColumn) => {
-    if (!selectedAccountId) return
-    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await loadTab('columns'); setSelectedColumnId(result.data.id) }
+    if (!selectedAccountId || duplicatingColumnId) return
+    setDuplicatingColumnId(column.id)
+    const requestKey = duplicateKeysRef.current[column.id]
+      ?? (duplicateKeysRef.current[column.id] = crypto.randomUUID())
+    try {
+      const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId, { idempotencyKey: requestKey })
+      if (!result.success) throw new Error()
+      delete duplicateKeysRef.current[column.id]
+      setNotice({ tone: 'success', text: result.replayed ? `「${column.title}」の複製は既にありました。複製を開きました。` : `「${column.title}」を下書きへ複製しました。` })
+      await loadTab('columns')
+      setSelectedColumnId(result.data.id)
+    }
     catch { setNotice({ tone: 'error', text: 'コラムを複製できませんでした。' }) }
+    finally { setDuplicatingColumnId(null) }
   }
   const testColumn = async (column: NenColumn) => {
     if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
@@ -388,7 +406,7 @@ export default function NenCampaignsPage() {
   const headerAction = tab === 'columns' ? (
     <span className="flex flex-wrap items-center justify-end gap-2">
       <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
-      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()} busy={importing} busyLabel="取り込んでいます…">ECのコラムを取り込む</Button>
     </span>
   )
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
@@ -418,16 +436,14 @@ export default function NenCampaignsPage() {
         plan={plan} onPlanChange={setPlan}
         introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
         onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
-        onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
+        onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
         onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
       />
       {/* #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。 */}
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="入力した紹介文が保存されていません"
-        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
+        subject="入力した紹介文"
         cancelLabel="書き続ける"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}

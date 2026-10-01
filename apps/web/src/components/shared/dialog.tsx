@@ -154,10 +154,9 @@ export default function Dialog({
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
             onClick={onConfirm}
-            disabled={busy}
-          >
+            disabled={busy} busy={busy} busyLabel="処理中…">
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
-            {busy ? '処理中…' : confirmLabel}
+            {confirmLabel}
           </Button>
         </div>
       ) : null)}

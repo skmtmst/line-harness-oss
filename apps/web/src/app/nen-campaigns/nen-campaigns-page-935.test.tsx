@@ -241,10 +241,10 @@ describe('紹介文の書きかけを守る（#935 N-301）', () => {
     expect(link).toBeDefined()
     await click(link!)
 
-    expect(bodyText()).toContain('このまま移動すると、入力した紹介文は保存されません')
+    expect(bodyText()).toContain('このまま移ると、入力した紹介文が消えます')
     expect(navigation.push).not.toHaveBeenCalled()
 
-    await click(bodyButton('保存せずに移動'))
+    await click(bodyButton('保存せずに移る'))
     expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns/columns/new')
   })
 

@@ -83,6 +83,13 @@ export default function SupportMarkRulesPanel({
   */
   const requestRef = useRef<RequestAt>({ accountId: null, markId: null, generation: 0 })
 
+  /*
+    **新しいルール1件に要求キー1つ。** 二度押し・応答喪失の送り直しで
+    同じルールが2件できないよう、作る窓を開けるたびに取り直す。
+    保存に失敗した直しの再送は同じキーで送る。
+  */
+  const ruleKeyRef = useRef<string>(crypto.randomUUID())
+
   const load = useCallback(async () => {
     if (!accountId || !markId) return
     requestRef.current = {
@@ -159,6 +166,7 @@ export default function SupportMarkRulesPanel({
     setDraft(EMPTY_DRAFT)
     setFailure(null)
     setTouched(false)
+    ruleKeyRef.current = crypto.randomUUID()
   }
 
   const openEdit = (rule: SupportMarkAutomationRule) => {
@@ -178,7 +186,7 @@ export default function SupportMarkRulesPanel({
     try {
       const res = call.kind === 'update'
         ? await api.supportMarks.updateAutomationRule(call.ruleId, accountId, call.expectedVersion, body)
-        : await api.supportMarks.createAutomationRule(markId, accountId, body)
+        : await api.supportMarks.createAutomationRule(markId, accountId, body, ruleKeyRef.current)
       if (!res.success) throw new Error('failed')
       setEditingId(null)
       await load()
@@ -382,9 +390,7 @@ export default function SupportMarkRulesPanel({
               data-qa-open="GMvBd-save"
               onMouseDown={() => setTouched(true)}
               onClick={() => void save()}
-              disabled={saving || errors.length > 0}
-            >
-              {saving ? '保存中…' : '保存する'}
+              disabled={saving || errors.length > 0} busy={saving}>保存する
             </Button>
           </div>
         </div>
