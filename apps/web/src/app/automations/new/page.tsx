@@ -803,6 +803,13 @@ export default function NewAutomationPage() {
    */
   const [resumeTarget, setResumeTarget] = useState<string | null | undefined>(undefined)
   const [resumeStatus, setResumeStatus] = useState<'none' | 'loading' | 'ready' | 'failed'>('none')
+  /*
+   * R532: 再開の読み込みが失敗した理由。通信断・対象なし・権限なしで
+   * 案内を分け、通信断では同じ下書きの再試行だけを出し、保存は止める。
+   */
+  const [resumeErrorKind, setResumeErrorKind] = useState<'gone' | 'forbidden' | 'network' | null>(null)
+  /* R532: 「もう一度読み込む」で再開の読み込みを走らせ直す番号。 */
+  const [resumeRetry, setResumeRetry] = useState(0)
   /* このアカウントに前に保存した下書きがある、という案内にだけ使う控え。 */
   const [storedDraftHint, setStoredDraftHint] = useState<StoredDraft | null>(null)
   /* DETAIL-15: 未保存・保存中・保存済み・保存後の変更・失敗を1つの状態から出す。 */
@@ -1052,7 +1059,9 @@ export default function NewAutomationPage() {
   /*
    * DETAIL-13: `?draft=` で示された下書きは、番号・中身・版を一緒に読む。
    * 読み終わるまで保存はできない（blockedReason で止める）。
-   * 読めない下書き（削除済み・別の店のもの）は、理由を出して新規に戻す。
+   * R532: 読めない下書きは理由を出して保存を止める。通信断では同じ
+   * 下書きの再試行だけを出し、対象なし・権限なしでは白紙への作り直しを
+   * 明示の選択にする。失敗中に別の新規下書きは作らない。
    */
   useEffect(() => {
     if (accountSwitchPendingRef.current) {
@@ -1085,6 +1094,7 @@ export default function NewAutomationPage() {
     const draftId = resumeTarget
     let cancelled = false
     setResumeStatus('loading')
+    setResumeErrorKind(null)
     setError('')
     setNotice('')
     api.automations
@@ -1093,8 +1103,9 @@ export default function NewAutomationPage() {
         if (cancelled || selectedAccountRef.current !== accountId) return
         if (!res.success) {
           setResumeStatus('failed')
+          setResumeErrorKind('gone')
           setError(
-            '指定された下書きは読み込めませんでした。削除されたか、ほかのアカウントの下書きの可能性があります。このまま入力すると新しいルールになります。',
+            '指定された下書きは読み込めませんでした。削除されたか、ほかのアカウントの下書きの可能性があります。',
           )
           return
         }
@@ -1139,16 +1150,27 @@ export default function NewAutomationPage() {
           setError('保存されていた「だれに」の条件は古い形のため読めませんでした。下の案内にしたがって付け直してください。')
         }
       })
-      .catch(() => {
+      .catch((caught: unknown) => {
         if (cancelled || selectedAccountRef.current !== accountId) return
         setResumeStatus('failed')
-        setError('下書きを読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
+        // R532: 失敗の理由を分ける。通信断では同じ下書きの再試行を出し、
+        // 対象なし・権限なしでは白紙への作り直しを選ばせる。
+        if (caught instanceof ApiError && caught.status === 404) {
+          setResumeErrorKind('gone')
+          setError('指定された下書きは見つかりませんでした。削除された可能性があります。')
+        } else if (caught instanceof ApiError && caught.status === 403) {
+          setResumeErrorKind('forbidden')
+          setError('指定された下書きを開く権限がありません。')
+        } else {
+          setResumeErrorKind('network')
+          setError('下書きを読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
+        }
       })
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId, resumeTarget])
+  }, [selectedAccountId, resumeTarget, resumeRetry])
 
   const selectedEvent = EVENTS.find((event) => event.value === eventType) ?? EVENTS[0]
   const usesKeyword = KEYWORD_EVENTS.includes(eventType)
@@ -1417,8 +1439,40 @@ export default function NewAutomationPage() {
     if (!canManage) return '操作する権限がありません'
     // DETAIL-13: 再開した下書きは、中身を読み終わるまで保存できない。
     if (resumeStatus === 'loading') return '下書きを読み込んでいます'
+    /*
+     * R532: 再開の読み込みに失敗したまま保存させない。Aの更新も新規作成も
+     * 実行されない。再試行でAを読めた後だけ保存でき、明示の作り直しでだけ
+     * 白紙に戻る。
+     */
+    if (resumeTarget && resumeStatus === 'failed') {
+      return resumeErrorKind === 'network'
+        ? '下書きを読み込めませんでした。下の「下書きをもう一度読み込む」で取り直してから保存してください'
+        : '指定された下書きを開けません。下の案内から読み直すか、白紙から作り直してください'
+    }
     return null
-  }, [canManage, resumeStatus])
+  }, [canManage, resumeStatus, resumeTarget, resumeErrorKind])
+
+  /*
+   * R532: 失敗した再開の読み込みを、同じ下書きでもう一度だけ走らせる。
+   * 読んだ組み合わせの記録を消して番号を進めるので、効果が取り直される。
+   */
+  const retryResume = () => {
+    resumedKeyRef.current = null
+    setResumeRetry((n) => n + 1)
+  }
+
+  /*
+   * R532: 白紙からの作り直し（明示の選択）。URLの指定を外して再開をやめ、
+   * この後保存したら別の新規下書きとして作る。失敗中の自動的な新規作成はしない。
+   */
+  const restartFresh = () => {
+    syncResumeUrl(null)
+    setResumeTarget(null)
+    setResumeStatus('none')
+    setResumeErrorKind(null)
+    setError('')
+    setNotice('')
+  }
 
   /*
    * DETAIL-15: 保存の状態は1本。未保存・保存中・保存済み・保存後の変更・
@@ -2303,6 +2357,23 @@ export default function NewAutomationPage() {
               {error}
             </p>
           ) : null}
+          {/*
+            R532: 再開の読み込み失敗中は保存が止まる。通信断では同じ下書きの
+            再試行だけを出し、対象なし・権限なしでは白紙への作り直しを選ばせる。
+            失敗中に別の新規下書きは作らない。
+          */}
+          {resumeTarget && resumeStatus === 'failed' ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={retryResume}>
+                下書きをもう一度読み込む
+              </Button>
+              {resumeErrorKind !== 'network' ? (
+                <Button variant="secondary" onClick={restartFresh}>
+                  白紙から作り直す
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {notice ? <p className={styles.note}>{notice}</p> : null}
           {canManage === false ? (
             <p className={styles.error} role="alert">
@@ -2339,9 +2410,7 @@ export default function NewAutomationPage() {
                 <Button
                   variant="secondary"
                   disabled={previewRefreshing}
-                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)}
-                >
-                  {previewRefreshing ? '数え直しています' : '人数をもう一度数える'}
+                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)} busy={previewRefreshing} busyLabel="数え直しています">人数をもう一度数える
                 </Button>
               </div>
             ) : null}
@@ -2349,9 +2418,7 @@ export default function NewAutomationPage() {
               <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
               <Button
                 onClick={() => void askOnePersonTest()}
-                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
-              >
-                {preparingTest ? '確認中...' : '1人で試す'}
+                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()} busy={preparingTest} busyLabel="確認中...">1人で試す
               </Button>
               <p className="mt-1 text-xs font-medium leading-relaxed text-ink-faint">保存した時点の内容で試します。変えた後は保存し直してから試してください。</p>
             </div>
@@ -2383,9 +2450,7 @@ export default function NewAutomationPage() {
                   <Button
                     variant="primary"
                     disabled={testing}
-                    onClick={() => void runOnePersonTest()}
-                  >
-                    {testing ? '送信中...' : 'この内容で送る'}
+                    onClick={() => void runOnePersonTest()} busy={testing} busyLabel="送信中...">この内容で送る
                   </Button>
                 </div>
               </div>

@@ -1250,6 +1250,22 @@ function FriendDetailInner() {
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
 
+  /*
+   * M012：読み込み 403（権限不足）は見つからない案内より先に分ける。
+   * 403 のとき error は空文字なので、後の `!error && !friend` の受け皿に
+   * 先に捕まると権限の面が出ない（監査 228-003 の再発）。順番で守る。
+   * 再試行口は出さない（押し直しても直らないため）。誰に確認するかを添える。
+   */
+  if (!loading && loadForbidden) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="この友だちを見る権限がありません"
+        description="見るには権限が要ります。オーナーか管理者の方に確認してください。"
+      />
+    )
+  }
+
   if (!loading && (friendMissing || (!error && !friend))) {
     return (
       <TargetMissing
@@ -1259,20 +1275,6 @@ function FriendDetailInner() {
         accountName={selectedAccount?.name}
         backHref="/friends"
         backLabel="友だち一覧へ戻る"
-      />
-    )
-  }
-
-  /*
-   * M012：読み込み 403（権限不足）。汎用の失敗面とは分け、再試行口は
-   * 出さない（押し直しても直らないため）。誰に確認するかを添える。
-   */
-  if (!loading && loadForbidden) {
-    return (
-      <TargetMissing
-        kind="error"
-        title="この友だちを見る権限がありません"
-        description="見るには権限が要ります。オーナーか管理者の方に確認してください。"
       />
     )
   }
@@ -1518,9 +1520,7 @@ function FriendDetailInner() {
                         type="button"
                         variant="primary"
                         onClick={() => void saveSupport()}
-                        disabled={supportBusy}
-                      >
-                        {supportBusy ? '処理中…' : '保存する'}
+                        disabled={supportBusy} busy={supportBusy} busyLabel="処理中…">保存する
                       </Button>
                       <Button
                         type="button"
@@ -1571,12 +1571,9 @@ function FriendDetailInner() {
                   ) : (
                     <span className="text-ink-faint text-xs">タグはありません</span>
                   )}
-                  <Link
-                    href={inboxHrefForFriend(friendId)}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-2 py-0.5 text-[11px]"
-                  >
+                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
                     ＋ 追加
-                  </Link>
+                  </Button>
                 </div>
               </div>
 
@@ -1894,9 +1891,7 @@ function FriendDetailInner() {
                           type="button"
                           variant="primary"
                           onClick={() => void enrollScenario()}
-                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'}
-                        >
-                          {scenarioBusy ? '登録中…' : 'このシナリオに登録する'}
+                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'} busy={scenarioBusy} busyLabel="登録中…">このシナリオに登録する
                         </Button>
                         <Button
                           type="button"
@@ -1969,9 +1964,8 @@ function FriendDetailInner() {
                         <Button
                           type="button"
                           onClick={() => void loadHistory(historyNextCursor)}
-                          disabled={historyLoadingMore}
-                        >
-                          {historyLoadingMore ? '読み込み中…' : historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
+                          disabled={historyLoadingMore} busy={historyLoadingMore} busyLabel="読み込み中…">
+                          {historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
                         </Button>
                       </div>
                     ) : null}
@@ -2031,19 +2025,14 @@ function FriendDetailInner() {
                           chip.id === BASIC_GROUP ? '' : `&group=${encodeURIComponent(chip.id)}`
                         }`
                         return (
-                          <Link
-                            key={chip.id}
-                            href={href}
-                            aria-current={active ? 'true' : undefined}
-                            className={`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          <Button variant="secondary" className={(`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
                               active
                                 ? 'border-accent bg-accent-soft text-accent-deep'
                                 : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-                            }`}
-                          >
+                            }`) + ' h-auto whitespace-normal'} key={chip.id} href={href} aria-current={active ? 'true' : undefined}>
                             {chip.label}
                             <span className="ml-1 text-ink-faint">{chip.count}</span>
-                          </Link>
+                          </Button>
                         )
                       })}
                     </div>
@@ -2152,20 +2141,13 @@ function FriendDetailInner() {
                     */}
                     {canSaveFields ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={save}
-                          disabled={saving}
-                          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-                        >
+                        <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={save} disabled={saving}>
                           {saving ? '保存中...' : '保存する'}
-                        </button>
+                        </Button>
                         {canManageFieldDefs && (
-                          <Link
-                            href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-                          >
+                          <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>
                             項目を作る
-                          </Link>
+                          </Button>
                         )}
                       </div>
                     ) : (
@@ -2260,9 +2242,7 @@ function FriendDetailInner() {
                         type="button"
                         variant="secondary"
                         disabled={submissionsLoadingMore}
-                        onClick={() => void loadSubmissions(submissionsNextCursor)}
-                      >
-                        {submissionsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                        onClick={() => void loadSubmissions(submissionsNextCursor)} busy={submissionsLoadingMore} busyLabel="読み込んでいます…">さらに読み込む
                       </Button>
                     </div>
                   ) : null}

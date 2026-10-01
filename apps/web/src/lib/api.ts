@@ -6421,8 +6421,11 @@ export const api = {
         /** 遡及実行の前に /retroactive-preview で受け取った引き換え券（N-047）。 */
         previewToken?: string
       },
-    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      /** M956: 応答消失後の再送用。同じ内容の再送では同じ値を送り、成功したら捨てる。 */
+      idempotencyKey?: string,
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number; replayed: boolean }>>(`/api/tags/${id}`, {
       method: 'PATCH',
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     /**
@@ -6437,8 +6440,11 @@ export const api = {
       accountId: string,
       expectedVersion: number,
       data: { name?: string; description?: string | null },
-    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      /** M956: 応答消失後の再送用。同じ内容の再送では同じ値を送り、成功したら捨てる。 */
+      idempotencyKey?: string,
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number; replayed: boolean }>>(`/api/tags/${id}`, {
       method: 'PATCH',
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
@@ -6751,9 +6757,14 @@ export const api = {
       markId: string,
       accountId: string,
       data: SaveSupportMarkAutomationRule,
+      idempotencyKey: string,
     ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
       `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
-      { method: 'POST', body: JSON.stringify(data) },
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
     ),
     updateAutomationRule: (
       ruleId: string,
@@ -6942,12 +6953,21 @@ export const api = {
         fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; recentOneTime?: RecentOneTimeReport[]; options: AnalyticsReportScheduleOptions }>>(
           `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         ),
+      /*
+       * R526: 応答消失後の再送で二重予約にしない要求キー。同じ試行の
+       * やり直しは同じキー、別の新規作成は別のキーで呼ぶ。サーバは
+       * 同じキー＋同じ内容なら既にある予約を返す（`replayed`）。
+       */
       create: (accountId: string, data: Omit<
         AnalyticsReportSchedule,
         'id' | 'lineAccountId' | 'status' | 'isOneTime' | 'nextRunAt' | 'createdBy' | 'createdAt' | 'updatedAt'
-      > & { sendOnce?: boolean }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+      > & { sendOnce?: boolean }, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<AnalyticsReportSchedule> & { replayed?: boolean }>(
         `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify(data) },
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+          ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
+        },
       ),
       update: (accountId: string, id: string, data: Omit<
         AnalyticsReportSchedule,
@@ -9629,6 +9649,8 @@ export const api = {
       lineAccountId?: string
       /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
       operationId?: string
+      /** R525: オフで登録したら最初の行から停止で作る。省略時は稼働。 */
+      isActive?: boolean
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -10108,9 +10130,17 @@ export const api = {
       公開は `Idempotency-Key` を付ける——二度押しで2回公開すると、
       同じ変更が2つの版として台帳に残る。
     */
-    createDraft: (body: AutoReplyDraftInput) =>
+    createDraft: (
+      body: AutoReplyDraftInput,
+      /**
+       * m26c R556: 応答を失った再送を同じ下書きへ復帰させる確認キー。
+       * 省略時は従来どおり作る。
+       */
+      idempotencyKey?: string,
+    ) =>
       fetchApi<ApiResponse<AutoReplyDraftVersion>>('/api/auto-replies/drafts', {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(body),
       }),
     getDraft: (id: string) =>
@@ -10125,7 +10155,7 @@ export const api = {
         method: 'POST',
       }),
     conflicts: (id: string) =>
-      fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[] }>>(`/api/auto-replies/${id}/conflicts`),
+      fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[]; source?: 'draft' | 'published' }>>(`/api/auto-replies/${id}/conflicts`),
     summary: (accountId: string) =>
       fetchApi<ApiResponse<{
         conflicts: AutoReplyConflictPair[];
@@ -10309,9 +10339,15 @@ export const api = {
       folderId?: string | null;
       /** 運用者だけが読むメモ。友だちへは出ない。1000字まで。 */
       internalMemo?: string | null;
-    }) =>
+    },
+    /**
+     * m26c R570: 応答を失った再送を同じ行へ復帰させる確認キー。
+     * 省略時は従来どおり作る。
+     */
+    idempotencyKey?: string) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(body),
       }),
     update: (id: string, body: {
@@ -10352,7 +10388,15 @@ export const api = {
       /** 運用者だけが読むメモ。省略は変更なし、null/'' で消す。 */
       internalMemo?: string | null;
     }) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
+      fetchApi<ApiResponse<{
+        id: string;
+        /**
+         * m26c R569: 公開中ルールの内容変更は稼働定義を変えず下書きへ保存する。
+         * true のとき稼働中は無変更で、下書き版に載った。公開フローへ案内する。
+         */
+        draftSaved?: boolean;
+        draftVersionNumber?: number;
+      }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',
         body: JSON.stringify(body),
       }),
@@ -10731,16 +10775,16 @@ export const api = {
           `/api/line-notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       get: (id: string, lineAccountId: string) =>
-        fetchApi<ApiResponse<NotificationRule>>(
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>(
           `/api/line-notifications/operator-rules/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       create: (data: { lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
-        fetchApi<ApiResponse<NotificationRule>>('/api/line-notifications/operator-rules', {
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>('/api/line-notifications/operator-rules', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      updateDraft: (id: string, lineAccountId: string, data: { name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
-        fetchApi<ApiResponse<NotificationRule>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
+      updateDraft: (id: string, lineAccountId: string, data: { expectedVersion: number; name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
           method: 'PATCH',
           body: JSON.stringify({ ...data, lineAccountId }),
         }),
@@ -11135,9 +11179,17 @@ export const api = {
       `/api/nen-campaigns/columns/import?lineAccountId=${encodeURIComponent(accountId)}`,
       { method: 'POST' },
     ),
-    duplicateColumn: (id: string, accountId: string) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }>>(
+    /*
+     * M506: 複製の要求キー。同じコラムのやり直しは同じキーで送り、
+     * サーバは同じ複製を返す（`replayed`）。別の複製は別のキーで呼ぶ。
+     */
+    duplicateColumn: (id: string, accountId: string, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }> & { replayed?: boolean }>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/duplicate`,
-      { method: 'POST', body: JSON.stringify({ accountId }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+        ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
+      },
     ),
     testColumn: (id: string, accountId: string, friendId: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/test-send`,
@@ -11994,13 +12046,18 @@ export const api = {
       fetchApi<ApiResponse<ActionScoreBands>>(
         `/api/action-scores/bands?accountId=${encodeURIComponent(accountId)}`,
       ),
+    /*
+     * M505: 応答消失後の再送の要求キー。同じ内容のやり直しは同じキーで送り、
+     * サーバは保存済みの結果を返す（`replayed`）。内容を変えたら別のキーにする。
+     */
     saveDraft: (data: {
       accountId: string
       expectedDraftVersionId: string | null
       configuration: ActionScoreRuleBundle
-    }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/draft', {
+    }, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration> & { replayed?: boolean }>('/api/action-scores/rules/draft', {
       method: 'PATCH',
       body: JSON.stringify(data),
+      ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
     }),
     testRules: (data: {
       accountId: string
@@ -14094,9 +14151,16 @@ export const bookingApi = {
     if (query?.trim()) params.set('q', query.trim());
     return fetchApi<{ customers: BookingCustomerSummary[] }>(`/api/booking/admin/customers?${params}`);
   },
-  createCustomer: (accountId: string, body: { display_name: string; phone: string; pet_name?: string }) =>
+  createCustomer: (
+    accountId: string,
+    body: { display_name: string; phone: string; pet_name?: string },
+    idempotencyKey?: string,
+  ) =>
     fetchApi<{ customer: BookingCustomerSummary }>(withAccount('/api/booking/admin/customers', accountId), {
-      method: 'POST', body: JSON.stringify(body),
+      method: 'POST',
+      // R559: 確定操作ごとに1つのキーで送り、応答消失後の再送で台帳を二重作成しない。
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+      body: JSON.stringify(body),
     }),
   getSettings: (accountId: string) =>
     fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),
@@ -14685,6 +14749,8 @@ export interface EventSlot {
   client_key?: string | null;
   /** 再送で既存枠に解決された場合 true。新規作成分は false。 */
   deduplicated?: boolean;
+  /** 枠の版。更新時はこの版を期待版として送り、古ければ409になる(m26g)。 */
+  version?: number;
 }
 
 /** createSlots に渡す1枠分の入力。client_key は再送を吸収するための任意キー。 */
@@ -15034,10 +15100,14 @@ export const eventsApi = {
     }
     return { items }
   })(),
-  updateSlot: (accountId: string, eventId: string, slotId: string, body: Partial<EventSlot>) =>
+  /**
+   * m26g: 枠の更新は期待版が必須。古い画面からの更新は409になり、
+   * 応答の data.current に最新の枠が入る。画面は読み直して差分を見せる。
+   */
+  updateSlot: (accountId: string, eventId: string, slotId: string, body: Partial<EventSlot>, expectedVersion: number) =>
     fetchApi<EventSlot>(
       withAccount(`/api/events/admin/events/${eventId}/slots/${slotId}`, accountId),
-      { method: 'PUT', body: JSON.stringify(body) },
+      { method: 'PUT', body: JSON.stringify({ ...body, expected_version: expectedVersion }) },
     ),
   deleteSlot: (accountId: string, eventId: string, slotId: string) =>
     fetchApi<void>(

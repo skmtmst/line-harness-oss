@@ -140,6 +140,13 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
    * 変わったら次の読み込みで埋め直す。
    */
   const initialLoadRef = useRef(true)
+  /*
+   * R540: アカウント切替より前の要求の応答は捨てる。遅れて届いた
+   * 古い一覧で表示・並び順・重複の注意を上書きしない。
+   */
+  const loadSeqRef = useRef(0)
+  /** 受け付けた一覧のアカウント。保存は選択中と一致するときだけ送る。 */
+  const loadedAccountRef = useRef<string | null>(null)
   const load = useCallback(async () => {
     const account = selectedAccountId
     if (!account) {
@@ -148,12 +155,15 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       setLoadState('error')
       return
     }
+    const seq = ++loadSeqRef.current
     setReloading(true)
     setLoadMessage('')
     try {
       const res = await api.supportMarks.list(account)
+      if (loadSeqRef.current !== seq) return
       if (!res.success) throw new Error(res.error)
       const rows = res.data
+      loadedAccountRef.current = account
       setItems(rows)
       const current = rows.find((mark) => mark.id === markId)
       if (current) {
@@ -178,6 +188,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         setLoadState('ready')
       }
     } catch (reason) {
+      // R540: 古い要求の失敗も今の画面には出さない。
+      if (loadSeqRef.current !== seq) return
       const status = (reason as { status?: number } | null)?.status
       if (status === 403) {
         setLoadMessage('')
@@ -187,8 +199,10 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         setLoadState('error')
       }
     } finally {
-      initialLoadRef.current = false
-      setReloading(false)
+      if (loadSeqRef.current === seq) {
+        initialLoadRef.current = false
+        setReloading(false)
+      }
     }
   }, [editing, markId, selectedAccountId])
 
@@ -204,7 +218,9 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
     if (!name.trim()) return setError('マーク名を入力してください')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     // R510: 一覧を読めていない間の保存は送らない（重複の注意も出せないため）。
+    // R540: 受け付けた一覧と選択中が違う（切替中・古い応答だけ）の保存も送らない。
     if (loadState !== 'ready' || roleBlocked || saveForbidden) return
+    if (loadedAccountRef.current !== selectedAccountId) return
     setSaving(true)
     setError('')
     setConflict(null)
@@ -268,6 +284,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       : loadState === 'forbidden' ? '対応マークを見る権限がありません'
         : roleBlocked ? '対応マークを作る権限がありません'
           : saveForbidden ? '対応マークを保存する権限がありません'
+            // R540: 切替中は古い一覧での保存を止め、理由を本文に出す。
+            : loadState === 'ready' && loadedAccountRef.current !== selectedAccountId ? 'アカウントを切り替えています。一覧を読み込むまでお待ちください'
             : !name.trim() ? 'マーク名を入力すると保存できます'
               : editing && !selected ? '編集中のマークを読み込めませんでした'
                 : null
@@ -450,7 +468,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       <StickyBar
         className="mt-4"
         status={blockedReason ?? (editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください')}
-        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saveDisabled} onClick={() => void save()}>{saving ? '保存中…' : editing ? '保存する' : '対応マークを作る'}</Button></>}
+        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saveDisabled} onClick={() => void save()} busy={saving}>{editing ? '保存する' : '対応マークを作る'}</Button></>}
       />
       </>
       )}

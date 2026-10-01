@@ -376,7 +376,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         ? pendingCount !== null && pendingCount > 0
           ? `動いています。配信待ちの${formatNumber(pendingCount)}通は予約したときの中身のまま届きます。保存した新しい中身は、次のきっかけからの配信に使われます。`
           : '動いています。保存した新しい中身は、次のきっかけからの配信に使われます。すでに配信待ちの分は、予約したときの中身のまま届きます。'
-        : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテストを送る</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存する'}</Button></>} />
+        : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテストを送る</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving}>配信内容を保存する</Button></>} />
       {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>

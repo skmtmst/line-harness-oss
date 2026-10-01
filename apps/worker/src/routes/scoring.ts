@@ -36,7 +36,9 @@ import {
   getMileageReward,
   getMileageRewardAdminOverview,
   getMileageRedemption,
+  isMileageRefundComplete,
   listMileageRedemptions,
+  refundMileageRewardRedemption,
   importMileageRewardCodes,
   publishMileageReward,
   reorderMileageEarningRules,
@@ -555,7 +557,39 @@ scoring.post(
        * 確かめられない手順は送り直さず照合待ちに残す（R364）。
        * やり直しは同じ交換IDを続け、残高の減算はしない
        * (deliverMileageReward は予約時の減算に触らない)。
+       *
+       * R362: 返却確定後に書き込みが中断した交換だけは例外。
+       * 台帳なしの refunded は残高が戻っていない取り残しなので、
+       * 欠けた書き込みを足して202で返す。書き込み済みの refunded は
+       * 従来どおり409で断る（二重返却なし）。
        */
+      if (redemption.status === 'refunded') {
+        if (await isMileageRefundComplete(c.env.DB, redemption.id)) {
+          return c.json({
+            success: false,
+            error: '失敗中・配送中の交換だけやり直せます',
+            code: 'redemption_not_retryable',
+          }, 409);
+        }
+        try {
+          await refundMileageRewardRedemption(c.env.DB, {
+            redemptionId: redemption.id,
+            reason: '中断した返却の再開',
+          });
+        } catch (error) {
+          if (!(error instanceof MileageRewardError && error.code === 'already_delivered')) {
+            throw error;
+          }
+        }
+        auditLog(c, 'mileage.redemption.retry', { kind: 'mileage_redemption', id: redemption.id });
+        const resumed = await deliverMileageReward(c.env.DB, redemption.id, {
+          credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        });
+        const fresh = await getMileageRedemption(c.env.DB, redemption.id);
+        const resumedData = { ...resumed, redemption: publicMileageRedemption(fresh ?? redemption) };
+        return c.json({ success: resumed.status === 'succeeded', data: resumedData },
+          resumed.status === 'succeeded' ? 200 : 202);
+      }
       if (redemption.status !== 'delivery_failed' && redemption.status !== 'delivering') {
         return c.json({
           success: false,

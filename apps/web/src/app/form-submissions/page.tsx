@@ -28,6 +28,7 @@ import CopyTextButton from '@/components/ui/copy-text-button'
 import HelpTip from '@/components/shared/help-tip'
 import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import './form-submissions.css'
 import { formatDay, formatNumber } from '@/lib/format'
 
@@ -171,6 +172,11 @@ export default function FormSubmissionsPage() {
   const [activeFolderId, setActiveFolderId] = useState('all')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  /**
+   * R602: 掴んだ失敗そのもの。描画側で `ListState error=` に渡し、
+   * 403（権限不足）と 503（通信失敗）の案内を言い分ける。
+   */
+  const [loadFailure, setLoadFailure] = useState<unknown>(null)
   const [query, setQuery] = useState(() => searchParams.get('q') || '')
   /**
    * #1060: 検索は Worker 側で絞る。1打鍵ごとの往復を避けるため、
@@ -219,6 +225,7 @@ export default function FormSubmissionsPage() {
     if (reviewMode && selectedAccountId) {
       setLoading(true)
       setLoadError('')
+      setLoadFailure(null)
       setReviewForbidden(false)
       try {
         const account = `account_id=${encodeURIComponent(selectedAccountId)}`
@@ -240,6 +247,7 @@ export default function FormSubmissionsPage() {
           setFormTotal(0)
           setFolderTotal(0)
         } else {
+          setLoadFailure(error)
           setLoadError('回答フォームを読み込めませんでした。')
           setForms([])
           setFolders([])
@@ -261,6 +269,7 @@ export default function FormSubmissionsPage() {
     }
     setLoading(true)
     setLoadError('')
+    setLoadFailure(null)
     try {
       const account = `account_id=${encodeURIComponent(selectedAccountId)}`
       // N-175 (#805): フォルダ絞りはサーバーが正本。選択をfolder_idで渡す。
@@ -273,32 +282,50 @@ export default function FormSubmissionsPage() {
       const paging = `&with_list_summary=1&page=${page}&limit=${pageSize}`
         + `&filter=${formFilter}&sort=${formSort}`
         + (fetchQuery.trim() ? `&q=${encodeURIComponent(fetchQuery.trim())}` : '')
-      const [res, folderRes] = await Promise.all([
+      /*
+       * R603: フォームと箱は別々に回収する（allSettled）。
+       * 箱だけ 503 のときに Promise.all だとフォーム7件まで消え
+       * 全面エラーになっていた。一覧と件数は残し、箱の場所にだけ
+       * 失敗と再試行を出す。
+       */
+      const [formsResult, foldersResult] = await Promise.allSettled([
         fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}${folder}${paging}`),
         api.folders.list('form', selectedAccountId),
       ])
-      if (!res.success || !folderRes.success) {
-        // 箱だけ取れないときは一覧を落とさない。箱の場所に小さく出す。
-        if (res.success && request === formRequest.current) {
-          const items = Array.isArray(res.data) ? res.data : res.data.items
-          setForms(items)
-          setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
-          setFolderTotal(Array.isArray(res.data) ? items.length : (res.data.all_total ?? res.data.total))
-          setFolders([])
-          setFolderError('フォルダを読み込めませんでした。')
-          return
-        }
-        throw new Error('load_failed')
+      if (request !== formRequest.current) return
+      const formsData = formsResult.status === 'fulfilled' && formsResult.value.success
+        ? formsResult.value.data
+        : null
+      if (formsData === null) {
+        // R602: フォーム自体が取れないときだけ全面エラーにする。
+        // 403 は描画側で権限の案内へ切り替えるため、失敗を残す。
+        setLoadFailure(formsResult.status === 'rejected' ? formsResult.reason : new Error('load_failed'))
+        setLoadError('回答フォームを読み込めませんでした。')
+        setForms([])
+        setFolders([])
+        setFormTotal(0)
+        setFolderTotal(0)
+        return
       }
-      if (request !== formRequest.current) return
-      setFolderError('')
-      const items = Array.isArray(res.data) ? res.data : res.data.items
+      const items = Array.isArray(formsData) ? formsData : formsData.items
       setForms(items)
-      setFolders(folderRes.data)
-      setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
-      setFolderTotal(Array.isArray(res.data) ? items.length : (res.data.all_total ?? res.data.total))
-    } catch {
+      setFormTotal(Array.isArray(formsData) ? items.length : formsData.total)
+      setFolderTotal(Array.isArray(formsData) ? items.length : (formsData.all_total ?? formsData.total))
+      // 箱だけ取れないときは一覧を落とさない。箱の場所に小さく出す。
+      const foldersData = foldersResult.status === 'fulfilled' && foldersResult.value.success
+        ? foldersResult.value.data
+        : null
+      if (foldersData === null) {
+        setFolders([])
+        setFolderError('フォルダを読み込めませんでした。')
+      } else {
+        setFolderError('')
+        setFolders(foldersData)
+      }
+    } catch (error) {
       if (request !== formRequest.current) return
+      // 両方を回収しているため、ここへ来るのは想定外の失敗だけ。
+      setLoadFailure(error)
       setLoadError('回答フォームを読み込めませんでした。')
       setForms([])
       setFolders([])
@@ -697,8 +724,7 @@ export default function FormSubmissionsPage() {
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Bar" className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" onClick={createDraft} disabled={creating}>
-            {creating ? '下書きを作成中' : '＋ フォームを作る'}
+          <Button variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">＋ フォームを作る
           </Button>
         </div>
       </div>
@@ -714,7 +740,9 @@ export default function FormSubmissionsPage() {
           // R25: 箱は選んだアカウントに付けて作る。staff には操作ごと出さない。
           onAddFolder={canManageFolders ? () => setFolderDialogOpen(true) : undefined}
           rows={[
-            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal },
+            // R602補足: まだ取れていない総数は数として出さない（0確定に見せない）。
+            // 正常200の実0・取得済みの数はそのまま出す。null は件数なしの約束。
+            { id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal },
             ...folders.map((folder, index) => ({
               id: folder.id,
               label: folder.name,
@@ -831,8 +859,10 @@ export default function FormSubmissionsPage() {
         ) : loadError ? (
           <ListState
             kind="error"
-            title="表示できませんでした"
-            description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+            // R602/m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ
+            // 切り替える。503などは従来どおり再試行を残す（scenarios と同じ形）。
+            description={isForbiddenOrRateLimited(loadFailure) ? undefined : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
+            error={loadFailure ?? undefined}
             onRetry={() => void loadForms()}
           />
         ) : reviewMode && reviewForbidden ? (
@@ -858,8 +888,7 @@ export default function FormSubmissionsPage() {
               title="まだフォームがありません"
               description="最初の1つを作ると、集まった回答もここから見られます。"
             action={(
-              <Button variant="primary" onClick={createDraft} disabled={creating}>
-                {creating ? '下書きを作成中' : '＋ フォームを作る'}
+              <Button variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">＋ フォームを作る
               </Button>
             )}
             />
@@ -1070,22 +1099,12 @@ export default function FormSubmissionsPage() {
             </label>
             {renameError && <p className="mt-2 text-xs text-status-danger">{renameError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingForm(null)}
-                disabled={savingName}
-                className="rounded-control border border-hairline px-4 py-2 text-sm text-ink-secondary hover:bg-surface-pearl disabled:opacity-50"
-              >
+              <Button variant="secondary" className="px-4 py-2 text-ink-secondary hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={() => setEditingForm(null)} disabled={savingName}>
                 キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => void saveName()}
-                disabled={!editingName.trim() || savingName}
-                className="rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent hover:brightness-92 disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void saveName()} disabled={!editingName.trim() || savingName}>
                 {savingName ? '保存中...' : '保存する'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1244,8 +1263,7 @@ export default function FormSubmissionsPage() {
               <div className="border-hairline rounded-control border p-3">
                 <p className="text-ink text-xs font-medium">受付だけ止める（おすすめ）</p>
                 <p className="text-ink-faint mt-1 text-xs">一覧と回答を残したまま、新しい回答だけを止めます。</p>
-                <Button className="mt-3" onClick={() => void stopAccepting()} disabled={stopping || deleting}>
-                  {stopping ? '停止中' : '受付だけ止める'}
+                <Button className="mt-3" onClick={() => void stopAccepting()} disabled={stopping || deleting} busy={stopping} busyLabel="停止中">受付だけ止める
                 </Button>
               </div>
             )}

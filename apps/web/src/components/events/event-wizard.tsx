@@ -41,6 +41,7 @@ import {
   resolveEventMultiAccountIds,
 } from './event-draft-shared'
 import { formatDay, formatNumber } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /**
  * イベントを作る（設計 V2 8-3-2 / 8-3-3 / 8-3-4）。
@@ -300,7 +301,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       if (slotPayload && id) {
         if (firstSlotId && slots.some((s) => s.id === firstSlotId)) {
           // 概要で確定した枠だけを更新する。ほかの枠の日時・定員は触らない。
-          await eventsApi.updateSlot(accountId, id, firstSlotId, slotPayload)
+          // m26g: 期待版つきで送り、古ければ409で止める（上書きしない）。
+          const firstSlot = slots.find((s) => s.id === firstSlotId)
+          await eventsApi.updateSlot(accountId, id, firstSlotId, slotPayload, firstSlot?.version ?? 1)
           /*
             EVENT-01: 保存した枠を一覧へ即時反映する。PUT の戻り値は枠の
             行だけで申込数(active_count)を持たないので、残席表示を狂わせ
@@ -476,20 +479,12 @@ function StepFooter({
 }) {
   return (
     <div className="border-hairline mt-5 flex flex-wrap justify-between gap-2 border-t pt-4">
-      <button
-        onClick={back.onClick}
-        disabled={saving}
-        className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-      >
+      <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={back.onClick} disabled={saving}>
         {back.label}
-      </button>
-      <button
-        onClick={next.onClick}
-        disabled={saving}
-        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-      >
+      </Button>
+      <Button variant="primary" className="px-5 py-2 font-medium border-0 h-auto whitespace-normal" onClick={next.onClick} disabled={saving}>
         {saving ? '保存中...' : next.label}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -778,20 +773,12 @@ function OverviewStep({
       </div>
 
       <div className="border-hairline mt-5 flex flex-wrap justify-between gap-2 border-t pt-4">
-        <button
-          onClick={onDraftSave}
-          disabled={saving}
-          className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-        >
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={onDraftSave} disabled={saving}>
           下書きを保存する
-        </button>
-        <button
-          onClick={onNext}
-          disabled={saving}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-        >
+        </Button>
+        <Button variant="primary" className="px-5 py-2 font-medium border-0 h-auto whitespace-normal" onClick={onNext} disabled={saving}>
           {saving ? '保存中...' : '概要を保存して次へ'}
-        </button>
+        </Button>
       </div>
       </div>
 
@@ -1065,13 +1052,9 @@ function SlotsStep({
               />
             </Field>
           </div>
-          <button
-            onClick={addOne}
-            disabled={busy}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-          >
+          <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={addOne} disabled={busy}>
             この枠を追加する
-          </button>
+          </Button>
         </FormSection>
 
         <FormSection
@@ -1101,21 +1084,15 @@ function SlotsStep({
               {['日', '月', '火', '水', '木', '金', '土'].map((w, i) => {
                 const on = weekdays.includes(i)
                 return (
-                  <button
-                    key={w}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() =>
+                  <Button variant="secondary" className={(`rounded-control border px-3 py-1.5 text-sm ${
+                      on ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-faint'
+                    }`) + ' h-auto whitespace-normal'} key={w} type="button" aria-pressed={on} onClick={() =>
                       setWeekdays((cur) =>
                         cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i],
                       )
-                    }
-                    className={`rounded-control border px-3 py-1.5 text-sm ${
-                      on ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-faint'
-                    }`}
-                  >
+                    }>
                     {w}
-                  </button>
+                  </Button>
                 )
               })}
             </div>
@@ -1157,13 +1134,9 @@ function SlotsStep({
               />
             </Field>
           </div>
-          <button
-            onClick={addBulk}
-            disabled={busy}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-          >
+          <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={addBulk} disabled={busy}>
             まとめて追加する
-          </button>
+          </Button>
         </FormSection>
 
         <FormSection

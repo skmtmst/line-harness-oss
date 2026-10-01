@@ -261,9 +261,7 @@ export default function NewWebinarPage() {
                     ? 'フォルダを読み込めていないため保存できません'
                     : undefined
               }
-              onClick={() => void save('list')}
-            >
-              {saving ? '保存中…' : '下書きを保存する'}
+              onClick={() => void save('list')} busy={saving}>下書きを保存する
             </Button>
             <Button
               variant="primary"

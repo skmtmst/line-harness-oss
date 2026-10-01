@@ -384,8 +384,7 @@ function FormResponsesInner() {
         </nav>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => document.getElementById('form-response-filter')?.focus()}>絞り込む</Button>
-          <Button onClick={() => void exportAll()} disabled={exporting || total === 0}>
-            {exporting ? (exportProgress || 'CSVを準備しています') : 'CSVで書き出す'}
+          <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={(exportProgress || 'CSVを準備しています')}>CSVで書き出す
           </Button>
           <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} variant="primary">フォームを編集</Button>
         </div>
@@ -531,8 +530,7 @@ function ResponseDetail({
             <dd className="text-ink mt-1 break-words text-sm whitespace-pre-wrap">{postActionsText(item.postActions)}</dd>
             {postActionsNeedRetry(item.postActions) && (
               <div className="mt-2">
-                <Button onClick={onRetryPostActions} disabled={retrying}>
-                  {retrying ? '再実行しています' : '未完の工程だけ再実行する'}
+                <Button onClick={onRetryPostActions} disabled={retrying} busy={retrying} busyLabel="再実行しています">未完の工程だけ再実行する
                 </Button>
                 {retryError && <p className="text-danger mt-2 text-xs">{retryError}</p>}
               </div>

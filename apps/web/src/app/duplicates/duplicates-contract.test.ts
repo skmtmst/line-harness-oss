@@ -69,3 +69,30 @@ describe('重複候補の全件到達と応答の新旧管理（#1011 FRIEND-11/
     expect(PAGE.indexOf('candidateError ?')).toBeLessThan(PAGE.indexOf('candidateTotal === 0 && !candidatesLoading'))
   })
 })
+
+/**
+ * R598: 集計（stats）だけ失敗しても候補一覧は残す。集計の失敗は集計欄の
+ * 1行で伝えて再試行し、両方失敗のときだけ1枚の失敗にする。
+ */
+describe('集計失敗でも候補一覧を残す（R598）', () => {
+  it('集計の失敗は集計欄の1行で出し、候補の表を残す', () => {
+    expect(PAGE).toContain('DuplicatesStatsNotice')
+    expect(PAGE).toContain('statsFailure')
+    // 集計が無くても（!data）候補の表へ進む。1枚の失敗は両方失敗の条件だけ。
+    expect(PAGE).toContain('!data && !candidatesLoading && candidates.length === 0 && candidateError')
+    expect(PAGE).toContain('<DuplicatesStatsNotice failure={statsFailure} onRetry={() => load()} />')
+  })
+
+  it('捕まえた失敗を残し、403を権限の案内に言い分ける', () => {
+    // 集計・候補とも catch の失敗をそのまま残す（loadFailureCopy が言い分ける）。
+    expect(PAGE).toContain('setStatsFailure(err)')
+    expect(PAGE).toContain('setCandidateFailure(err)')
+    expect(PAGE).toContain('error={candidateFailure ?? undefined}')
+  })
+
+  it('集計が無いとき数値カードは「—」にし、内訳は出さない', () => {
+    expect(PAGE).toContain('detail="読み込めませんでした"')
+    // 内訳とマトリックスは集計があるときだけ。
+    expect(PAGE.indexOf('{data ? (')).toBeGreaterThan(-1)
+  })
+})

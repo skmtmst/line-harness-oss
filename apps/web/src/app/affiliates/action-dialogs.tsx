@@ -114,9 +114,8 @@ export function AffiliateArchiveDialog({
               type="button"
               variant="primary"
               disabled={busy || phase !== 'ready' || archiveDisabled}
-              onClick={() => { void apply() }}
-            >
-              {busy ? '処理中…' : choice === 'pause' ? '紹介を止める' : 'アーカイブする'}
+              onClick={() => { void apply() }} busy={busy} busyLabel="処理中…">
+              {choice === 'pause' ? '紹介を止める' : 'アーカイブする'}
             </Button>
           )}
         </div>
@@ -141,9 +140,9 @@ export function AffiliateArchiveDialog({
               紹介者で絞ったもの、リンクはこの紹介者の内訳（リンク一覧）を開く。
             */}
             <dl className="mt-2 divide-y divide-danger/20 text-sm">
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.activeLinks)}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=affiliates&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-semibold">{yen(impact.unsettledReward)}</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions?tab=payment">ここを開く</a></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.pendingConversions)}件</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.activeLinks)}本</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href={`/conversions?tab=affiliates&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-semibold">{yen(impact.unsettledReward)}</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href="/conversions?tab=payment">ここを開く</Button></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.pendingConversions)}件</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href={`/conversions?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
             </dl>
             <p className="text-danger mt-2 text-xs leading-5">
               紹介リンクは開けなくなります。過去の成果・報酬・支払いの記録は消えません。
@@ -405,8 +404,8 @@ export function AffiliatePaymentConfirmDialog({
           <div className="flex shrink-0 items-center gap-2">
             <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />キャンセル</Button>
             {phase === 'ready' && preview ? (
-              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5">
-                <Check size={15} />{busy ? '処理中…' : `${yen(preview.amount)} で確定する`}
+              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
+                <Check size={15} />{`${yen(preview.amount)} で確定する`}
               </Button>
             ) : null}
           </div>

@@ -96,7 +96,8 @@ export async function updateNotificationRule(
   id: string,
   lineAccountId: string,
   updates: Partial<{ name: string; eventType: string; conditions: Record<string, unknown>; channels: string[]; isActive: boolean }>,
-): Promise<void> {
+  opts?: { expectedVersion?: number },
+): Promise<boolean> {
   const sets: string[] = [];
   const values: unknown[] = [];
   // 内容の版: 名前・きっかけ・条件・通知方法が変わったら+1する。
@@ -108,14 +109,22 @@ export async function updateNotificationRule(
   if (updates.conditions !== undefined) { sets.push('conditions = ?'); values.push(JSON.stringify(updates.conditions)); }
   if (updates.channels !== undefined) { sets.push('channels = ?'); values.push(JSON.stringify(updates.channels)); }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
-  if (sets.length === 0) return;
+  if (sets.length === 0) return true;
   if (bumpsVersion) sets.push('version = version + 1');
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
   values.push(lineAccountId);
-  await db.prepare(`UPDATE notification_rules SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+  // 画面が読んだ版と1文で突き合わせる。違う版からの保存は1行も
+  // 触らず false を返し、呼ぶ側が409で止める(m26e R565)。
+  const conditions = ['id = ?', 'line_account_id = ?'];
+  if (opts?.expectedVersion !== undefined) {
+    conditions.push('version = ?');
+    values.push(opts.expectedVersion);
+  }
+  const result = await db.prepare(`UPDATE notification_rules SET ${sets.join(', ')} WHERE ${conditions.join(' AND ')}`)
     .bind(...values).run();
+  return Number(result.meta.changes ?? 0) === 1;
 }
 
 export async function deleteNotificationRule(

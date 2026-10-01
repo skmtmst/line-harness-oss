@@ -664,8 +664,7 @@ function ResultsInner() {
                 ) : null}
                 {runs.pagination.nextCursor ? (
                   <div className="mt-3 flex justify-center">
-                    <Button onClick={loadMoreRuns} disabled={runsLoadingMore}>
-                      {runsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                    <Button onClick={loadMoreRuns} disabled={runsLoadingMore} busy={runsLoadingMore} busyLabel="読み込んでいます…">さらに読み込む
                     </Button>
                   </div>
                 ) : null}
@@ -733,9 +732,7 @@ function ResultsInner() {
               type="button"
               variant="primary"
               disabled={!moveScenarioId || opBusy !== null}
-              onClick={() => void confirmMove()}
-            >
-              {opBusy ? '移しています…' : 'このシナリオへ移す'}
+              onClick={() => void confirmMove()} busy={opBusy !== null} busyLabel="移しています…">このシナリオへ移す
             </Button>
           </div>
         )}

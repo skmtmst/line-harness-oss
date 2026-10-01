@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import KpiCard from '@/components/shared/kpi-card'
+import kpiStyles from '@/components/shared/kpi-card.module.css'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 
@@ -105,7 +106,7 @@ export default function FriendKpis() {
           友だち集計を読み込めませんでした。
         </Notice>
       ) : null}
-      <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-3.5 xl:grid-cols-4 ${kpiStyles.strip}`}>
         {cards.map((card) => (
           <KpiCard key={card.title} {...card} loading={loading} variant="v6" className="!min-h-25 !gap-1 !px-4 !py-3.5" />
         ))}

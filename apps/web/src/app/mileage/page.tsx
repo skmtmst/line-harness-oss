@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useRouter } from 'next/navigation'
 import { MoreHorizontal } from 'lucide-react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { isMileageFriendsV6Overview } from './friends-overview-guard'
 import MileageRewardsTab from './mileage-rewards-tab'
 import ActionMenu from '@/components/shared/action-menu'
 import Breadcrumb from '@/components/shared/breadcrumb'
@@ -40,6 +41,7 @@ import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { formatDay, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
@@ -130,20 +132,7 @@ function rankLabel(rank: string | null) {
   return null
 }
 
-function isMileageFriendsV6Overview(value: unknown): value is MileageFriendsV6Overview {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<MileageFriendsV6Overview>
-  return Array.isArray(candidate.items)
-    && !!candidate.summary
-    && typeof candidate.summary.totalMembers === 'number'
-    && typeof candidate.summary.withBalanceCount === 'number'
-    && typeof candidate.summary.available === 'number'
-    && typeof candidate.summary.pending === 'number'
-    && !!candidate.pagination
-    && typeof candidate.pagination.total === 'number'
-    && typeof candidate.pagination.limit === 'number'
-    && typeof candidate.pagination.offset === 'number'
-}
+/* D022: 友だち残高の応答検査は friends-overview-guard.ts にある。 */
 
 function isMileageEarningRulesV6Overview(value: unknown): value is MileageEarningRulesV6Overview {
   if (!value || typeof value !== 'object') return false
@@ -858,9 +847,7 @@ function MileagePageInner() {
           />
           <Button
             onClick={() => void saveRuleOrder()}
-            disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'}
-          >
-            {savingRuleOrder ? '保存しています' : '並び順を保存する'}
+            disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'} busy={savingRuleOrder} busyLabel="保存しています">並び順を保存する
           </Button>
           <Button onClick={exportRulesCsv} disabled={shownRules.length === 0} className="ml-auto">
             CSVで書き出す
@@ -1137,12 +1124,10 @@ function MileagePageInner() {
         </label>
       </Dialog>
 
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、たまる決めごとの並び順への変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="たまる決めごとの並び順への変更"
+        busy={savingRuleOrder}
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />

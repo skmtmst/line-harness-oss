@@ -193,8 +193,13 @@ export async function createAnalyticsReportSchedule(db: D1Database, input: {
   recipients: AnalyticsReportRecipient[]; channels: AnalyticsReportChannel[];
   alertRules: AnalyticsReportAlertRule[]; nextRunAt: string; createdBy: string; now: string;
   isOneTime?: boolean;
+  /**
+   * R526: 呼び出し側が振った要求キー（UUID）。応答消失後の再送で同じ
+   * 予約へ戻すため、行の主キーとして使う。省略時は従来どおり採番する。
+   */
+  id?: string;
 }) {
-  const id = crypto.randomUUID();
+  const id = input.id ?? crypto.randomUUID();
   await db.prepare(
     `INSERT INTO analytics_report_schedules (
        id, line_account_id, name, sections_json, saved_analysis_ids_json, cadence,
