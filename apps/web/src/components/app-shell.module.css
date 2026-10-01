@@ -162,3 +162,39 @@
     padding-top: 0;
   }
 }
+
+/* ---------------------------------------------------------------------
+ * ★V8（夕41）：設定の画面は白い板の中の左に「設定の中のメニュー」
+ * （幅208）を付ける。板の左端からメニューが始まるので、この画面では
+ * .content の余白を取り、中身の欄が従来どおりの余白を持つ。
+ * 1024px 未満では中のメニュー自体を畳む（部品側が display:none）。
+ * ------------------------------------------------------------------- */
+[data-theme="v8"] .contentSettings {
+  padding: 0;
+}
+
+[data-theme="v8"] .settingsBody {
+  min-width: 0;
+  padding: 24px 16px;
+}
+
+@media (min-width: 640px) {
+  [data-theme="v8"] .settingsBody {
+    padding-inline: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-theme="v8"] .settingsSplit {
+    display: flex;
+    align-items: stretch;
+    /* 上の帯 60 + 板の下余白 12 + 板の枠 2。中身が短い画面でも
+       左の線が板の下端まで届くようにする。 */
+    min-height: calc(100dvh - 74px);
+  }
+
+  [data-theme="v8"] .settingsBody {
+    flex: 1;
+    padding: 20px 24px 28px; /* .content の v8 の余白と同じ */
+  }
+}
