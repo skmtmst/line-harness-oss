@@ -114,4 +114,81 @@ describe('M037 既読付けの失敗は元に戻してやり直せる知らせ�
     await waitFor(() => expect(screen.getByText('通知を既読にできませんでした。')).toBeTruthy())
     expect(screen.getByRole('button', { name: 'もう一度' })).toBeTruthy()
   })
+
+  /*
+   * M037 faithful oracle: 未読row/count復元の実DOM検査。
+   * 実NotificationsPage/ToastHost/runOptimisticを描画し、API/router transportだけmock。
+   * 同じ描画rootを最後まで保ち、deferred応答でpending→復元→再試行→既読を追う。
+   * router.push spyはnative遷移の再現ではない (functional証拠・PARTIAL維持)。
+   */
+  it('未読rowと全既読ボタンが失敗で復元し、再試行の成功で既読へ戻る', async () => {
+    clearToastsForTest()
+    fixture.list.mockResolvedValueOnce({ success: true, data: ONE_UNREAD })
+    const gates: Array<{
+      resolve: (value: unknown) => void
+      reject: (reason?: unknown) => void
+    }> = []
+    fixture.markRead.mockImplementation(
+      () => new Promise((resolve, reject) => { gates.push({ resolve, reject }) }),
+    )
+    render(
+      <>
+        <ToastHost />
+        <NotificationsPage />
+      </>,
+    )
+
+    // 1. 初期: rowに（未読）、全既読ボタン活性、list1回。
+    const list = await screen.findByRole('list')
+    const rowName = /大事なお知らせ/
+    expect(within(list).getByRole('button', { name: rowName }).textContent).toContain('（未読）')
+    const markAll = screen.getByRole('button', { name: 'すべて既読にする' })
+    expect(markAll.disabled).toBe(false)
+    expect(fixture.list).toHaveBeenCalledTimes(1)
+
+    // 2. 実row click→同ID/accountへ単件API1回・push(/updates)。pending中は未読印消失・全既読disabled。
+    fireEvent.click(within(list).getByRole('button', { name: rowName }))
+    await waitFor(() => expect(fixture.markRead).toHaveBeenCalledTimes(1))
+    expect(fixture.markRead).toHaveBeenLastCalledWith('n1', 'account-a')
+    expect(fixture.push).toHaveBeenCalledTimes(1)
+    expect(fixture.push).toHaveBeenCalledWith('/updates')
+    expect(within(list).getByRole('button', { name: rowName }).textContent).not.toContain('（未読）')
+    expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(true)
+
+    // 3. 真正503reject→同じrow未読復元・全既読enabled・日本語Toast/もう一度。list1・markAllRead0。
+    gates[0].reject(new ApiError(503))
+    await waitFor(() => expect(
+      within(list).getByRole('button', { name: rowName }).textContent,
+    ).toContain('（未読）'))
+    expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(false)
+    await waitFor(() => expect(screen.getByText('通知を既読にできませんでした。')).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'もう一度' })).toBeTruthy()
+    expect(fixture.list).toHaveBeenCalledTimes(1)
+    expect(fixture.markAllRead).not.toHaveBeenCalled()
+
+    // 4. 実Toast retry→2回目は同ID/account、success:falseで再び復元 (二重増加なし)。
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度' }))
+    await waitFor(() => expect(fixture.markRead).toHaveBeenCalledTimes(2))
+    expect(fixture.markRead).toHaveBeenLastCalledWith('n1', 'account-a')
+    gates[1].resolve({ success: false, error: 'audit_unavailable' })
+    await waitFor(() => expect(
+      within(list).getByRole('button', { name: rowName }).textContent,
+    ).toContain('（未読）'))
+    expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(false)
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'もう一度' }).length).toBeGreaterThan(0))
+
+    // 5. retry→3回目 success:trueで既読・ボタンdisabledへ。失敗Toast解除・再取得なし。
+    fireEvent.click(screen.getAllByRole('button', { name: 'もう一度' })[0])
+    await waitFor(() => expect(fixture.markRead).toHaveBeenCalledTimes(3))
+    expect(fixture.markRead).toHaveBeenLastCalledWith('n1', 'account-a')
+    gates[2].resolve({ success: true })
+    await waitFor(() => expect(
+      within(list).getByRole('button', { name: rowName }).textContent,
+    ).not.toContain('（未読）'))
+    expect(screen.getByRole('button', { name: 'すべて既読にする' }).disabled).toBe(true)
+    expect(screen.queryByText('通知を既読にできませんでした。')).toBeNull()
+    expect(fixture.list).toHaveBeenCalledTimes(1)
+    expect(fixture.markAllRead).not.toHaveBeenCalled()
+    expect(fixture.push).toHaveBeenCalledTimes(1)
+  })
 })
