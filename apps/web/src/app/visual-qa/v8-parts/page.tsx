@@ -6,6 +6,7 @@ import ColorWell from '@/components/shared/color-well'
 import DeleteButton from '@/components/shared/delete-button'
 import OtpInput from '@/components/shared/otp-input'
 import TextLink from '@/components/shared/text-link'
+import DeltaChip from '@/components/shared/delta-chip'
 
 /*
  * ★V8 で新たに生えた部品（Pencil「OTP・削除・色を選ぶ」の節）の
@@ -61,6 +62,15 @@ export default function V8PartsPage() {
         <div className="mt-3 flex items-center gap-6">
           <TextLink href="/friends">受信箱を開く</TextLink>
           <TextLink href="/settings">配信設定へ</TextLink>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-ink">増減の札（良い・悪い・要確認）</h2>
+        <div className="mt-3 flex items-center gap-3">
+          <DeltaChip tone="up">+2.6%</DeltaChip>
+          <DeltaChip tone="down">−1.1pt</DeltaChip>
+          <DeltaChip tone="attention">要確認</DeltaChip>
         </div>
       </section>
 
