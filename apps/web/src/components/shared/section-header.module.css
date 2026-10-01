@@ -16,10 +16,16 @@
 
 .title {
   margin: 0;
+  /* 題は1行で「…」。全文は要素の title で読める（RESPONSIVE.md）。 */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-size: 15px;
   font-weight: 600;
   color: var(--color-ink);
-  line-height: 1.4;
+  line-height: var(--text-lh, 1.4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .note {
@@ -30,6 +36,7 @@
 .link {
   margin-left: auto;
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
 }
 }
