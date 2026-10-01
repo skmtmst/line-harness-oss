@@ -60,7 +60,10 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
   it('フォームはフォーム総件数を出す', () => {
     const src = read('form-submissions/page.tsx')
     // R12: 総数は「すべて」の行に出し、見出しには重ねて出さない。
-    expect(src).toContain("{ id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal }")
+    // R602補足: 未取得・読込中・取得失敗の総数は不明なので出さない
+    // （null は数を出さない約束。偽ゼロにしない）。
+    // 出どころは絞り込み前の総数（folderTotal）のまま変えない。
+    expect(src).toContain("{ id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal }")
     expect(src).not.toContain('`${folderTotal} 件`')
   })
 

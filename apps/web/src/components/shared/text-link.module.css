@@ -20,6 +20,11 @@
   font-weight: 500;
 }
 
+/* Pencil の文字は行の高さ 1.5（--text-lh）。v7 は書かない（既定のまま）。 */
+[data-theme='v8'] .label {
+  line-height: var(--text-lh);
+}
+
 .arrow {
   flex-shrink: 0;
 }
