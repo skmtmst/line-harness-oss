@@ -367,6 +367,7 @@ const V8_MEASURE = [
   { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: 'card', textCls: 'title' },
   { id: 'dtJVi', file: 'shared/segmented.module.css', cls: 'root', textCls: ['item', 'selected'] },
   { id: 'RfHCo', file: 'shared/otp-input.module.css', cls: 'group', node: '桁の並び', skipText: true },
+  { id: 'prbOC', file: 'shared/delete-button.module.css', cls: 'tile', skipText: true },
 ]
 
 /** `[data-theme="v8"] .cls { … }` の中身だけを取り出す（引用符の違いを吸収）。 */

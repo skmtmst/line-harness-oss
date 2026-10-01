@@ -2,7 +2,7 @@
 /*
  * 削除ボタン（Pencil ★V8 `prbOC`／`zopvP`）。
  *
- *   閉じたとき  48×36 のタイル（白地・細い枠・角丸 control）
+ *   閉じたとき  48×48 のタイル（白地・細い枠・角丸 16）。★V8実寸に合わせた
  *   開いたとき  右へ確認の帯が開く（✓ 赤 / ×）。開閉は 200ms
  *   Esc・× はどちらも「やめる」
  */
@@ -11,16 +11,16 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 36px;
+  height: 48px;
 }
 
 .tile,
 .confirm {
   display: inline-flex;
   align-items: center;
-  height: 36px;
+  height: 48px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-panel);
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
 }
@@ -50,9 +50,9 @@
 .confirm {
   position: absolute;
   left: 0;
-  gap: 2px;
+  gap: 8px;
   overflow: hidden;
-  padding: 0 4px;
+  padding: 0 10px;
   opacity: 0;
   transform: scaleX(0.6);
   transform-origin: left center;
@@ -62,12 +62,12 @@
 
 .confirm button {
   display: inline-flex;
-  width: 32px;
+  width: 28px;
   height: 28px;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: transparent;
   cursor: pointer;
 }
