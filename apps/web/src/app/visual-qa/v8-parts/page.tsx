@@ -12,6 +12,7 @@ import IconTile from '@/components/shared/icon-tile'
 import ActivityItem from '@/components/shared/activity-item'
 import SectionHeader from '@/components/shared/section-header'
 import CheckCard from '@/components/shared/check-card'
+import SegmentedControl from '@/components/shared/segmented'
 
 /*
  * ★V8 で新たに生えた部品（Pencil「OTP・削除・色を選ぶ」の節）の
@@ -26,6 +27,7 @@ export default function V8PartsPage() {
   const [color, setColor] = useState('#06c755')
   const [deleted, setDeleted] = useState(false)
   const [checks, setChecks] = useState({ a: true, b: false })
+  const [segment, setSegment] = useState('30d')
 
   return (
     <main className="mx-auto max-w-3xl space-y-10 p-8">
@@ -129,6 +131,22 @@ export default function V8PartsPage() {
             onChange={(v) => setChecks((c) => ({ ...c, b: v }))}
             title="タグで絞る"
             note="選んだタグの人だけに届きます"
+          />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-ink">切り替え（3つ。白いつまみが滑る）</h2>
+        <div className="mt-3">
+          <SegmentedControl
+            aria-label="期間"
+            options={[
+              { value: '7d', label: '7日' },
+              { value: '30d', label: '30日' },
+              { value: '90d', label: '90日' },
+            ]}
+            value={segment}
+            onChange={setSegment}
           />
         </div>
       </section>
