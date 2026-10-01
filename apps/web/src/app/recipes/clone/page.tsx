@@ -7,6 +7,7 @@ import { api, ApiError, type Recipe } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -117,12 +118,18 @@ function RecipeClone() {
     )
   }
 
+  /*
+   * M044: 403・429だけ共通文へ切り替える（権限・混雑の案内。再試行の
+   * 有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま。
+   */
+  const cloneFailure = loadError ? loadFailureCopy(loadError, 'レシピ') : null
+  const useCommonCopy = loadError ? isForbiddenOrRateLimited(loadError) : false
   if (status === 'error') {
     return (
       <TargetMissing
         kind="error"
-        title="レシピを読み込めませんでした"
-        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        title={useCommonCopy && cloneFailure ? cloneFailure.title : 'レシピを読み込めませんでした'}
+        description={useCommonCopy && cloneFailure ? cloneFailure.description : '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
         error={loadError ?? undefined}
         onRetry={() => refresh()}
       />

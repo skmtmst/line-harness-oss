@@ -26,4 +26,13 @@ describe('M044 レシピ複製の読み込み失敗', () => {
   it('404 以外の失敗を残す', () => {
     expect(PAGE).toContain('loadError')
   })
+
+  it('403・429だけ共通文へ切り替える目安を持つ', () => {
+    expect(PAGE).toContain('isForbiddenOrRateLimited')
+    expect(PAGE).toContain("loadFailureCopy(loadError, 'レシピ')")
+  })
+
+  it('画面固有の汎用文を残す（403・429以外は画面の文のまま）', () => {
+    expect(PAGE).toContain('レシピを読み込めませんでした')
+  })
 })
