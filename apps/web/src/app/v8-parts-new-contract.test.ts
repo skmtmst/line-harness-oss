@@ -57,9 +57,24 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
     expect(tsx).toContain("'sm' | 'md' | 'lg'")
   })
 
+  it('動きの印・動きの行（x4FeKG・EsjP2）：印24丸・縦線1・題13/500・補足・時刻', () => {
+    const source = css('activity-item.module.css')
+    expect(source).toContain('width: 24px')
+    expect(source).toContain('height: 24px')
+    expect(source).toContain('border-radius: var(--radius-pill)')
+    expect(source).toContain('background: var(--color-shell)')
+    expect(source).toContain('width: 1px')
+    expect(source).toContain('background: var(--color-hairline)')
+    expect(source).toContain('font-size: var(--text-label)')
+    expect(source).toContain('font-weight: 500')
+    expect(source).toContain('color: var(--color-ink-faint)')
+    const tsx = readFileSync(join(SHARED, 'activity-item.tsx'), 'utf8')
+    expect(tsx).toContain('last')
+  })
+
   it('台帳がこの回の部品を v8対応済みと数える', { timeout: 60_000 }, () => {
     const report = collectReport()
-    for (const name of ['リンク（→つき）', '増減の札', '印のタイル']) {
+    for (const name of ['リンク（→つき）', '増減の札', '印のタイル', '動きの印・動きの行']) {
       const part = report.parts.find((p) => p.name === name)
       expect(part?.status, `${name} が v8対応済みになっていない`).toBe('v8対応済み')
     }

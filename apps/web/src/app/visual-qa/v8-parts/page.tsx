@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MessageSquare, Tag, Users } from 'lucide-react'
+import { CheckCheck, MessageSquare, Send, Tag, Users } from 'lucide-react'
 import SampleScreenNotice from '@/components/ui/sample-screen-notice'
 import ColorWell from '@/components/shared/color-well'
 import DeleteButton from '@/components/shared/delete-button'
@@ -9,6 +9,7 @@ import OtpInput from '@/components/shared/otp-input'
 import TextLink from '@/components/shared/text-link'
 import DeltaChip from '@/components/shared/delta-chip'
 import IconTile from '@/components/shared/icon-tile'
+import ActivityItem from '@/components/shared/activity-item'
 
 /*
  * ★V8 で新たに生えた部品（Pencil「OTP・削除・色を選ぶ」の節）の
@@ -84,6 +85,15 @@ export default function V8PartsPage() {
           <IconTile icon={MessageSquare} size="lg" />
           <IconTile icon={Users} size="md" />
           <IconTile icon={Tag} size="md" />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-ink">動きの行（履歴が縦に繋がる）</h2>
+        <div className="mt-3 max-w-md">
+          <ActivityItem icon={Send} title="予約配信を送りました" note="朝のお知らせ・128人へ" time="10:42" />
+          <ActivityItem icon={CheckCheck} title="全員に届きました" note="失敗 0 件" time="10:44" />
+          <ActivityItem icon={Users} title="友だちが3人増えました" time="12:10" last />
         </div>
       </section>
 
