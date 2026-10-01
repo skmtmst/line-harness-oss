@@ -167,3 +167,27 @@ describe('V8 移行④c — V8 で新たに生えた部品', () => {
     }
   })
 })
+
+/*
+ * ★V8 移行③仕上げ — 注目の星（オーナー決定 2026-10-01）。
+ * オフは灰の線のまま、オンで黄色い塗り＋濃い黄の縁。
+ */
+describe('V8 移行 — 注目の星（選ぶと黄色）', () => {
+  const friendRow = readFileSync(join(WEB, 'src/components/friends/friend-list-row.tsx'), 'utf8')
+
+  it('v8 では選ぶと黄色い塗り＋濃い黄の縁（globals の data-part 規定）', () => {
+    const rule = globals.match(/\[data-theme="v8"\] \[data-part="attention-star"\]\[aria-pressed="true"\] svg \{([^}]*)\}/)
+    expect(rule, 'globals に注目の星の v8 規定が無い').not.toBeNull()
+    expect(rule![1]).toContain('fill: var(--color-star-on)')
+    expect(rule![1]).toContain('stroke: var(--color-star-on-edge)')
+  })
+
+  it('使う側（友だち一覧の行・カードの両方）に data-part="attention-star" が付く', () => {
+    expect(friendRow.match(/data-part="attention-star"/g)?.length).toBe(2)
+  })
+
+  it('オンになった瞬間、星がふくらんで戻る（動きを減らす設定では止まる）', () => {
+    expect(globals).toContain('@keyframes v8-star-pop')
+    expect(globals).toMatch(/prefers-reduced-motion: no-preference[\s\S]*?v8-star-pop/)
+  })
+})
