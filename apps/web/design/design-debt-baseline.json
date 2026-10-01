@@ -533,6 +533,9 @@
   "components/shared/breadcrumb.tsx": {
     "unresolved-classname": 4
   },
+  "components/shared/check-card.tsx": {
+    "unresolved-classname": 7
+  },
   "components/shared/checkbox.tsx": {
     "unresolved-classname": 9
   },
@@ -615,6 +618,9 @@
   },
   "components/shared/section-header.tsx": {
     "unresolved-classname": 4
+  },
+  "components/shared/segmented.tsx": {
+    "unresolved-classname": 3
   },
   "components/shared/side-cards.tsx": {
     "unresolved-classname": 14

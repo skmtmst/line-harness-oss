@@ -1,0 +1,118 @@
+@layer components {
+/*
+ * チェックのカード（Pencil ★V8 `w6uYMd`・`RRxK5`）。
+ *
+ *   カード：高さ 68・余白 14・間隔 12・角丸 card・枠 1px
+ *     オフ＝canvas 地＋hairline 枠、オン＝accent-soft 地＋accent-deep 枠
+ *   箱：18x18・枠 1.5px。オフの枠色は Pencil の #c9ced6
+ *     （toggle-off トークンと同値なのでそれを借りる）
+ *   角丸は共有のチェック（checkbox.tsx）と同じ radius-icon を使う
+ *   オンで白いチェック（12）が左下→右上へ描かれる（120ms）
+ *   V8 で新たに生えた部品のため v7 側の規定は持たない
+ */
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  padding: 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
+}
+
+.card:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.checked,
+.checked:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-deep);
+}
+
+.boxWrap {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.box {
+  appearance: none;
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--color-toggle-off);
+  border-radius: var(--radius-icon);
+  background: var(--color-canvas);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
+}
+
+.box:checked {
+  background: var(--color-accent-deep);
+  border-color: var(--color-accent-deep);
+}
+
+.box:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.mark {
+  position: absolute;
+  inset: 3px;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+/* 未選択では線を隠し、選択で dashoffset を 14→0 へ戻して描く。 */
+.mark path {
+  fill: none;
+  stroke: var(--color-canvas);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+}
+
+.box:checked ~ .mark path {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset var(--motion-fast) ease-out;
+}
+
+.disabled {
+  cursor: not-allowed;
+  background: var(--color-canvas-sunken);
+}
+
+.disabled .box {
+  border-color: var(--color-ink-disabled);
+  cursor: not-allowed;
+}
+
+.body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--text-body);
+  font-weight: 500;
+  color: var(--color-ink);
+  line-height: 1.4;
+}
+
+.note {
+  font-size: var(--text-caption);
+  color: var(--color-ink-secondary);
+  line-height: 1.5;
+}
+}

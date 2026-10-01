@@ -84,9 +84,23 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
     expect(tsx).toContain('TextLink')
   })
 
+  it('チェックのカード（w6uYMd・RRxK5）：高68・余白14・オンで緑の地と描かれるチェック', () => {
+    const source = css('check-card.module.css')
+    expect(source).toContain('min-height: 68px')
+    expect(source).toContain('padding: 14px')
+    expect(source).toContain('gap: 12px')
+    expect(source).toContain('border-radius: var(--radius-card)')
+    expect(source).toContain('background: var(--color-accent-soft)')
+    expect(source).toContain('border-color: var(--color-accent-deep)')
+    expect(source).toContain('width: 18px')
+    expect(source).toContain('stroke-dashoffset')
+    const tsx = readFileSync(join(SHARED, 'check-card.tsx'), 'utf8')
+    expect(tsx).toContain('type="checkbox"')
+  })
+
   it('台帳がこの回の部品を v8対応済みと数える', { timeout: 60_000 }, () => {
     const report = collectReport()
-    for (const name of ['リンク（→つき）', '増減の札', '印のタイル', '動きの印・動きの行', '段の題']) {
+    for (const name of ['リンク（→つき）', '増減の札', '印のタイル', '動きの印・動きの行', '段の題', 'チェックのカード']) {
       const part = report.parts.find((p) => p.name === name)
       expect(part?.status, `${name} が v8対応済みになっていない`).toBe('v8対応済み')
     }
