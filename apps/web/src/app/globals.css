@@ -515,16 +515,25 @@ html:not([data-theme="v8"]) .v8-only {
 }
 
 /*
- * ★V8（夕14・夕21）：左メニューが開いたままの狭い幅で表の右が板の外に
- * 切れないよう、1366px 未満では表を横送りにする（列を消さない）。
- * 中の表・グリッドは列の最小幅の和ぶんだけ広げる。
+ * ★V8（夕21）：全列が要る表だけ横送りにする（列は消さない）。
+ * 中の表・グリッドは `--scroll-min` で表ごとの最小幅を渡す。
+ *
+ * 端の影は「送れる方向にまだ列がある」印：スクロール位置に固定された
+ * 影（scroll）を、中身と一緒に動く白い覆い（local）が端で隠す
+ * （Verou のスクロール影）。端まで送る・戻ると影は消える。
  */
 @media (max-width: 1365px) {
   [data-theme="v8"] [data-scroll-x] {
     overflow-x: auto;
+    background:
+      linear-gradient(to right, var(--color-canvas) 30%, rgb(255 255 255 / 0)) 0 0 / 40px 100% no-repeat local,
+      linear-gradient(to left, var(--color-canvas) 30%, rgb(255 255 255 / 0)) 100% 0 / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(29 29 31 / 0.18), rgb(29 29 31 / 0)) 0 0 / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(29 29 31 / 0.18), rgb(29 29 31 / 0)) 100% 0 / 12px 100% no-repeat scroll;
+    background-color: var(--color-canvas);
   }
   [data-theme="v8"] [data-scroll-x] > * {
-    min-width: 1050px;
+    min-width: var(--scroll-min, 0px);
   }
 }
 

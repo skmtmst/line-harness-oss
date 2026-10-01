@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ApiError, api, fetchApi } from '@/lib/api'
@@ -937,11 +937,16 @@ function InflowLinksPageInner({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-control border border-hairline bg-canvas" data-scroll-x>
+        <div
+          className="overflow-hidden rounded-control border border-hairline bg-canvas"
+          data-scroll-x
+          style={{ '--scroll-min': '1060px' } as CSSProperties}
+        >
           {/*
             ★V8（夕21・STATES-ALL）：1152 幅で見出しと日付の列があふれる。
-            1366px 未満では横送りにする（globals.css の [data-scroll-x]）。
-            v7・広い幅では従来どおり。
+            全列が要る表なので列は消さず、1366px 未満では横送りにする
+            （globals.css の [data-scroll-x]。最小幅は表ごとに --scroll-min
+            で渡す）。v7・広い幅では従来どおり。
           */}
           <table className="w-full table-fixed text-xs">
             <colgroup>
