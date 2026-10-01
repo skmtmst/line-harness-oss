@@ -365,6 +365,7 @@ const V8_MEASURE = [
   { id: 'EsjP2', file: 'shared/activity-item.module.css', cls: 'row', textCls: 'title' },
   { id: 'CugIm', file: 'shared/section-header.module.css', cls: 'root', textCls: 'title' },
   { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: 'card', textCls: 'title' },
+  { id: 'dtJVi', file: 'shared/segmented.module.css', cls: 'root', textCls: ['item', 'selected'] },
   { id: 'RfHCo', file: 'shared/otp-input.module.css', cls: 'group', node: '桁の並び', skipText: true },
 ]
 
@@ -381,10 +382,22 @@ function v8ScopedBody(css, cls) {
   return bodies.join(';')
 }
 
+/** `.a, .b:hover { X }` を `.a { X } .b:hover { X }` に分解し、単独表記の規則として読める形にする。 */
+function splitSelectorGroups(css) {
+  return css.replace(/([^{}\n][^{}]*?)\{([^}]*)\}/g, (m, sel, body) => {
+    if (!sel.includes(',')) return m
+    return sel
+      .split(',')
+      .map((s) => `${s.trim()} {${body}}`)
+      .join('\n')
+  })
+}
+
 /** v8 での実効値：素の規定（base）＋ v8 上書き（後勝ち）。cls は合成可（同じ要素に付く複数クラス）。 */
 function v8EffectiveBody(css, cls) {
+  const flat = splitSelectorGroups(css)
   return (Array.isArray(cls) ? cls : [cls])
-    .flatMap((c) => [ruleBody(css, c), v8ScopedBody(css, c)])
+    .flatMap((c) => [ruleBody(flat, c), v8ScopedBody(flat, c)])
     .filter(Boolean)
     .join(';')
 }
@@ -492,11 +505,11 @@ function verifyV8Parts(lines, failures) {
       const gotR = toNum(resolveVars(declaration(body, 'border-radius') ?? '', v8VarsCache))
       check('r', [{ want: wantR, got: wantR !== null && wantR >= 999 && gotR !== null && gotR >= 999 ? wantR : gotR }])
       check('h', [{
-        want: toNum(outer.h),
+        want: toNum(outer.h ?? outer.bh),
         got: toNum(resolveVars(declaration(body, 'height') ?? declaration(body, 'min-height') ?? '', v8VarsCache)),
       }])
       check('w', [{
-        want: toNum(outer.w),
+        want: toNum(outer.w ?? outer.bw),
         got: toNum(resolveVars(declaration(body, 'width') ?? declaration(body, 'min-width') ?? '', v8VarsCache)),
       }])
       if (outer.sw !== undefined) {
