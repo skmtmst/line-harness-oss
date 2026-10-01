@@ -368,6 +368,7 @@ const V8_MEASURE = [
   { id: 'dtJVi', file: 'shared/segmented.module.css', cls: 'root', textCls: ['item', 'selected'] },
   { id: 'RfHCo', file: 'shared/otp-input.module.css', cls: 'group', node: '桁の並び', skipText: true },
   { id: 'prbOC', file: 'shared/delete-button.module.css', cls: 'tile', skipText: true },
+  { id: 'KjC1z', file: 'shared/help-tip.module.css', cls: 'button', textCls: 'mark' },
 ]
 
 /** `[data-theme="v8"] .cls { … }` の中身だけを取り出す（引用符の違いを吸収）。 */
@@ -536,6 +537,7 @@ function verifyV8Parts(lines, failures) {
       const body = v8EffectiveBody(css, spec.textCls ?? spec.cls)
       check('fs', [{ want: toNum(textNode.fs), got: toNum(resolveVars(declaration(body, 'font-size') ?? '', v8VarsCache)) }])
       check('fw', [{ want: toNum(textNode.fw), got: toNum(resolveVars(declaration(body, 'font-weight') ?? '', v8VarsCache)) }])
+      check('lh', [{ want: toNum(textNode.lh), got: toNum(resolveVars(declaration(body, 'line-height') ?? '', v8VarsCache)) }])
     }
 
     if (rows.length === 0) uncovered.push(`${entry.name}（${spec.id}）：比べられる宣言がありません`)

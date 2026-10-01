@@ -46,6 +46,17 @@
   opacity: 0.45;
 }
 
+/* ★V8（夕17・prbOC）：地は灰色 #f5f5f7（shell）・枠なし。 */
+[data-theme='v8'] .tile {
+  border: 0;
+  background: var(--color-shell);
+}
+
+[data-theme='v8'] .tile:hover:not(:disabled) {
+  background: var(--color-shell-gray);
+  color: var(--color-status-danger);
+}
+
 /* 確認の帯。閉じている間は畳んで隠す。 */
 .confirm {
   position: absolute;
