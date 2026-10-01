@@ -124,6 +124,7 @@
   height: 36px;
   gap: 8px;
   padding: 0 12px;
+  border-color: var(--color-control-border);
 }
 
 [data-theme='v8'] .input {

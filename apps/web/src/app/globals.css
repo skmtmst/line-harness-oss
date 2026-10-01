@@ -477,10 +477,14 @@
  *
  *   control 8→10  ボタン・入力・選ぶ欄・探す欄の角丸（板「角丸 10」）
  *   panel  12→16  白い板・ダイアログの角丸（板「角丸 16」、ダイアログ 16〜20）
+ *   control-border  操作する部品の枠の色（入力・選ぶ・検索・チェック・
+ *     ラジオ・トグルのオフ・OTP・色を選ぶ・カードの中の印）。カードや
+ *     表・外側の板の枠は hairline のまま（#868e98、板「枠線の色」）
  */
 [data-theme="v8"] {
   --radius-control: 10px;
   --radius-panel: 16px;
+  --color-control-border: #868e98;
 }
 
 /*

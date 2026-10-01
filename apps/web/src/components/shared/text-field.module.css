@@ -71,4 +71,13 @@
     height: 44px;
   }
 }
+
+/* ★V8「枠線の色」：操作する欄の枠は control-border。誤りの赤は変えない。 */
+[data-theme='v8'] .field {
+  border-color: var(--color-control-border);
+}
+
+[data-theme='v8'] .invalid {
+  border-color: var(--color-status-danger);
+}
 }
