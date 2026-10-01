@@ -98,9 +98,30 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
     expect(tsx).toContain('type="checkbox"')
   })
 
+  it('切り替え（3つ dtJVi）：器shell・余白3・間隔2・白いつまみが滑る（120ms）・左右キー', () => {
+    const source = css('segmented.module.css')
+    expect(source).toContain('padding: 3px')
+    expect(source).toContain('gap: 2px')
+    expect(source).toContain('border-radius: var(--radius-control)')
+    expect(source).toContain('background: var(--color-shell)')
+    expect(source).toContain('background: var(--color-canvas)')
+    expect(source).toContain('border-radius: var(--radius-segment)')
+    expect(source).toContain('padding: 6px 12px')
+    expect(source).toContain('font-size: var(--text-label)')
+    expect(source).toContain('font-weight: 600')
+    expect(source).toContain('line-height: 1.5')
+    expect(source).toContain('var(--motion-fast)')
+    const tsx = readFileSync(join(SHARED, 'segmented.tsx'), 'utf8')
+    expect(tsx).toContain('role="group"')
+    expect(tsx).toContain('aria-pressed')
+    expect(tsx).toContain('ArrowLeft')
+    expect(tsx).toContain('ArrowRight')
+    expect(tsx).toContain('ResizeObserver')
+  })
+
   it('台帳がこの回の部品を v8対応済みと数える', { timeout: 60_000 }, () => {
     const report = collectReport()
-    for (const name of ['リンク（→つき）', '増減の札', '印のタイル', '動きの印・動きの行', '段の題', 'チェックのカード']) {
+    for (const name of ['リンク（→つき）', '増減の札', '印のタイル', '動きの印・動きの行', '段の題', 'チェックのカード', '切り替え（3つ）']) {
       const part = report.parts.find((p) => p.name === name)
       expect(part?.status, `${name} が v8対応済みになっていない`).toBe('v8対応済み')
     }
