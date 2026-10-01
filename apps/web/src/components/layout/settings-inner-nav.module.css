@@ -2,14 +2,57 @@
  * ★V8（夕41）：設定の画面の、白い板の中の左の「設定の中のメニュー」。
  * 幅 208。いまの画面は薄い地＋太字。
  * 部品は v8 のときだけ描く（app-shell.tsx でテーマを見て分岐）ので、
- * ここの値は全部 v8 のもの。1024px 未満（メニューが引き出しになる幅）
- * では中のメニュー自体を畳む。
+ * ここの値は全部 v8 のもの。
+ *
+ * 幅の決まり（MIGRATION-RISKS §4「白い板が 1100px を切ったら脇の欄は
+ * 畳む」に合わせた）：
+ *   - 1280px 以上：左の欄（幅 208）
+ *   - 1024〜1279px：上の帯（横に1列、入らなければ横に送る）
+ *   - 1024px 未満（メニューが引き出しになる幅）：畳む
  */
 .root {
   display: none;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .root {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--color-hairline);
+    padding: 8px 16px;
+  }
+
+  .root .list {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .root .list > li {
+    display: flex;
+    align-items: center;
+  }
+
+  .root .item,
+  .root .child {
+    white-space: nowrap;
+  }
+
+  /* 横の帯では「機能設定の下」の段差と「専用」の小見出しは畳む。 */
+  .root .children {
+    flex-direction: row;
+    margin: 0;
+  }
+
+  .root .groupLabel {
+    margin: 0;
+    padding: 0 4px;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 1280px) {
   .root {
     display: block;
     width: 208px;
