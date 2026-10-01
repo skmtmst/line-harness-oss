@@ -5,6 +5,7 @@ import SampleScreenNotice from '@/components/ui/sample-screen-notice'
 import ColorWell from '@/components/shared/color-well'
 import DeleteButton from '@/components/shared/delete-button'
 import OtpInput from '@/components/shared/otp-input'
+import TextLink from '@/components/shared/text-link'
 
 /*
  * ★V8 で新たに生えた部品（Pencil「OTP・削除・色を選ぶ」の節）の
@@ -52,6 +53,14 @@ export default function V8PartsPage() {
           ) : (
             <DeleteButton onConfirm={() => setDeleted(true)} label="この項目を削除" />
           )}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-ink">リンク（→つき。乗せると矢印が右へ）</h2>
+        <div className="mt-3 flex items-center gap-6">
+          <TextLink href="/friends">受信箱を開く</TextLink>
+          <TextLink href="/settings">配信設定へ</TextLink>
         </div>
       </section>
 

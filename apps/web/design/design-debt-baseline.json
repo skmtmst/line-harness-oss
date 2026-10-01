@@ -622,11 +622,14 @@
   "components/shared/text-field.tsx": {
     "unresolved-classname": 2
   },
+  "components/shared/text-link.tsx": {
+    "unresolved-classname": 3
+  },
   "components/shared/toggle.tsx": {
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 35
+    "unresolved-classname": 31
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 7
