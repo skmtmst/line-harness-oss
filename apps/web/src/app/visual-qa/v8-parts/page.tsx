@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { MessageSquare, Tag, Users } from 'lucide-react'
 import SampleScreenNotice from '@/components/ui/sample-screen-notice'
 import ColorWell from '@/components/shared/color-well'
 import DeleteButton from '@/components/shared/delete-button'
 import OtpInput from '@/components/shared/otp-input'
 import TextLink from '@/components/shared/text-link'
 import DeltaChip from '@/components/shared/delta-chip'
+import IconTile from '@/components/shared/icon-tile'
 
 /*
  * ★V8 で新たに生えた部品（Pencil「OTP・削除・色を選ぶ」の節）の
@@ -71,6 +73,17 @@ export default function V8PartsPage() {
           <DeltaChip tone="up">+2.6%</DeltaChip>
           <DeltaChip tone="down">−1.1pt</DeltaChip>
           <DeltaChip tone="attention">要確認</DeltaChip>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-ink">印のタイル（小・中・大）</h2>
+        <div className="mt-3 flex items-end gap-4">
+          <IconTile icon={MessageSquare} size="sm" />
+          <IconTile icon={MessageSquare} size="md" />
+          <IconTile icon={MessageSquare} size="lg" />
+          <IconTile icon={Users} size="md" />
+          <IconTile icon={Tag} size="md" />
         </div>
       </section>
 
