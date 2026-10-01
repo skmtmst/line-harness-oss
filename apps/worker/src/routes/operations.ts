@@ -10,6 +10,7 @@ import {
   getOperationAlert,
   getOperationIncident,
   getOperationRequestReceipt,
+  hasOperationRequestReceiptForResource,
   inspectIncidentRestoreDrift,
   listOperationDeploymentEvents,
   listOperationAlerts,
@@ -110,6 +111,189 @@ async function queueOperationNotifications(
     console.error(`operation ${input.eventKind} notification enqueue error:`, error);
     return { failed: ['line', 'email'] };
   }
+}
+
+function sameCapabilities(left: OperationCapability[], right: OperationCapability[]): boolean {
+  if (left.length !== right.length) return false;
+  const orderedLeft = [...left].sort();
+  const orderedRight = [...right].sort();
+  return orderedLeft.every((capability, index) => capability === orderedRight[index]);
+}
+
+function parseRestoreReport(raw: string | null): unknown {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/*
+ * R573: 停止の状態確定後に receipt の保存だけ失敗したときの再送を補う。
+ *
+ * receipt が無い再送は停止処理へ進み、版が進んでいるため版競合になる。
+ * 置き去りの部分実行か、他人の確定済み要求との競合かは、動いている停止記録と
+ * receipt の有無で見分ける。同じ担当者・同じ内容の停止記録が動いたままで、
+ * 誰の receipt も結び付いていないときだけ、記録と通知準備を足して再送として
+ * 返す。記録がある対象・内容が違う要求は従来どおり競合にする。
+ */
+async function repairOrphanedStop(
+  c: Context<Env>,
+  input: {
+    accountId: string | null;
+    capabilities: OperationCapability[];
+    reason: string;
+    actorId: string;
+    idempotencyKey: string;
+    requestHash: string;
+  },
+): Promise<Response | null> {
+  const raced = await getOperationRequestReceipt(c.env.DB, 'stop', input.actorId, input.idempotencyKey);
+  if (raced) {
+    if (raced.requestHash !== input.requestHash) return null;
+    const racedIncident = await getOperationIncident(c.env.DB, raced.resourceId);
+    if (!racedIncident) return null;
+    const racedControl = await getOperationControlSet(c.env.DB, racedIncident.lineAccountId);
+    const racedNotifications = await queueOperationNotifications(c, {
+      incidentId: racedIncident.id,
+      eventKind: 'stopped',
+      payload: {
+        lineAccountId: racedIncident.lineAccountId,
+        capabilities: racedIncident.capabilities,
+        reason: racedIncident.reason,
+        actorId: input.actorId,
+      },
+    });
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: { status: 'changed', control: racedControl, incident: racedIncident, notifications: racedNotifications },
+    });
+  }
+  const control = await getOperationControlSet(c.env.DB, input.accountId);
+  const incidentId = control.activeIncidentId;
+  if (!incidentId) return null;
+  const incident = await getOperationIncident(c.env.DB, incidentId);
+  if (!incident || incident.status !== 'stopped') return null;
+  if (incident.actorId !== input.actorId) return null;
+  if (incident.reason !== input.reason || !sameCapabilities(incident.capabilities, input.capabilities)) return null;
+  if (await hasOperationRequestReceiptForResource(c.env.DB, 'stop', incident.id)) return null;
+  await saveOperationRequestReceipt(c.env.DB, {
+    action: 'stop', actorId: input.actorId, idempotencyKey: input.idempotencyKey,
+    requestHash: input.requestHash, resourceId: incident.id,
+  });
+  const notifications = await queueOperationNotifications(c, {
+    incidentId: incident.id,
+    eventKind: 'stopped',
+    payload: {
+      lineAccountId: incident.lineAccountId,
+      capabilities: incident.capabilities,
+      reason: incident.reason,
+      actorId: input.actorId,
+    },
+  });
+  const fresh = await getOperationControlSet(c.env.DB, incident.lineAccountId);
+  return c.json({
+    success: true,
+    duplicate: true,
+    data: { status: 'changed', control: fresh, incident, notifications },
+  });
+}
+
+/*
+ * R573: 復旧の状態確定後に receipt の保存だけ失敗したときの再送を補う。
+ *
+ * 復旧済みの再送は対象外(OPERATION_NOT_STOPPED)に、版だけ進んだ部分復旧の
+ * 再送は版競合になる。どちらも「自分が確定させた対象に誰の receipt も無い」
+ * ときだけ、記録と通知準備を足して再送として返す。他人が確定させた対象は
+ * 従来どおり競合・対象外にする。
+ */
+async function repairOrphanedRestore(
+  c: Context<Env>,
+  input: {
+    incidentId: string;
+    expectedVersion: number;
+    actorId: string;
+    idempotencyKey: string;
+    requestHash: string;
+  },
+): Promise<Response | null> {
+  const action = `restore:${input.incidentId}`;
+  const raced = await getOperationRequestReceipt(c.env.DB, action, input.actorId, input.idempotencyKey);
+  if (raced) {
+    if (raced.requestHash !== input.requestHash) return null;
+    const replayed = await getOperationIncident(c.env.DB, raced.resourceId);
+    if (!replayed) return null;
+    const racedControl = await getOperationControlSet(c.env.DB, replayed.lineAccountId);
+    const racedNotifications = await queueOperationNotifications(c, {
+      incidentId: replayed.id,
+      eventKind: 'restored',
+      payload: { lineAccountId: replayed.lineAccountId, actorId: input.actorId },
+    });
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: {
+        status: replayed.status === 'resolved' ? 'restored' : 'partial',
+        control: racedControl,
+        incident: replayed,
+        report: parseRestoreReport(replayed.restoreReportJson),
+        notifications: racedNotifications,
+      },
+    });
+  }
+  const incident = await getOperationIncident(c.env.DB, input.incidentId);
+  if (!incident) return null;
+  if (await hasOperationRequestReceiptForResource(c.env.DB, action, incident.id)) return null;
+  const control = await getOperationControlSet(c.env.DB, incident.lineAccountId);
+  if (incident.status === 'resolved') {
+    if (incident.resolvedByActorId !== input.actorId) return null;
+    await saveOperationRequestReceipt(c.env.DB, {
+      action, actorId: input.actorId, idempotencyKey: input.idempotencyKey,
+      requestHash: input.requestHash, resourceId: incident.id,
+    });
+    const notifications = await queueOperationNotifications(c, {
+      incidentId: incident.id,
+      eventKind: 'restored',
+      payload: { lineAccountId: incident.lineAccountId, actorId: input.actorId },
+    });
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: {
+        status: 'restored',
+        control,
+        incident,
+        report: parseRestoreReport(incident.restoreReportJson),
+        notifications,
+      },
+    });
+  }
+  if (incident.status !== 'stopped') return null;
+  if (control.activeIncidentId !== incident.id) return null;
+  if (control.actorId !== input.actorId) return null;
+  if (control.version <= input.expectedVersion) return null;
+  await saveOperationRequestReceipt(c.env.DB, {
+    action, actorId: input.actorId, idempotencyKey: input.idempotencyKey,
+    requestHash: input.requestHash, resourceId: incident.id,
+  });
+  const notifications = await queueOperationNotifications(c, {
+    incidentId: incident.id,
+    eventKind: 'restored',
+    payload: { lineAccountId: incident.lineAccountId, actorId: input.actorId },
+  });
+  return c.json({
+    success: true,
+    duplicate: true,
+    data: {
+      status: 'partial',
+      control,
+      incident,
+      report: parseRestoreReport(incident.restoreReportJson),
+      notifications,
+    },
+  });
 }
 
 function staleHealth(run: Awaited<ReturnType<typeof getLatestOperationHealthRun>>) {
@@ -494,6 +678,15 @@ operations.post(
         detail,
       });
       if (result.status === 'conflict') {
+        const repaired = await repairOrphanedStop(c, {
+          accountId,
+          capabilities,
+          reason: body.reason.trim(),
+          actorId,
+          idempotencyKey,
+          requestHash,
+        });
+        if (repaired) return repaired;
         return c.json({
           success: false,
           error: '別の管理者が先に変更しました。最新の状態を読み直してください。',
@@ -630,9 +823,25 @@ operations.post(
         actorId,
       });
       if (result.status === 'not_found') {
+        const repaired = await repairOrphanedRestore(c, {
+          incidentId: incident.id,
+          expectedVersion: Number(body.expectedVersion),
+          actorId,
+          idempotencyKey,
+          requestHash,
+        });
+        if (repaired) return repaired;
         return c.json({ success: false, error: '復旧できる緊急停止ではありません', code: 'OPERATION_NOT_STOPPED' }, 409);
       }
       if (result.status === 'conflict') {
+        const repaired = await repairOrphanedRestore(c, {
+          incidentId: incident.id,
+          expectedVersion: Number(body.expectedVersion),
+          actorId,
+          idempotencyKey,
+          requestHash,
+        });
+        if (repaired) return repaired;
         return c.json({
           success: false,
           error: '別の管理者が先に変更しました。最新の状態を読み直してください。',
