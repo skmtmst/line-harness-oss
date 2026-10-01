@@ -290,20 +290,23 @@ describe('保存500は日本語の再試行案内を出す（T05/T08）', () => 
     render(<Page />)
     expect(await screen.findByTestId('tag-editor')).toBeTruthy()
 
+    // 実UIの遡及ONと同じく、編集器の値自体も遡及ありにする。
+    const valuesRetroOn = { ...values, applyToExisting: true } as unknown as TagEditorValues
     await act(async () => {
-      await captured.onSave(values, false, true, 'preview-1')
+      await captured.onSave(valuesRetroOn, false, true, 'preview-1')
     })
     expect(await screen.findByText(/サーバー側で保存できませんでした/)).toBeTruthy()
     expect(screen.queryByText(/API error/)).toBeNull()
 
     await act(async () => {
-      await captured.onSave(values, false, true, 'preview-1')
+      await captured.onSave(valuesRetroOn, false, true, 'preview-1')
     })
     expect(await screen.findByText('保存済みでした。')).toBeTruthy()
     const patches = tagPatchCalls(calls)
     expect(patches).toHaveLength(2)
-    // 遡及の引き換え券は送るが、再送の同一性には入れない。
-    expect(JSON.parse(String(patches[0]?.init.body))).toMatchObject({ previewToken: 'preview-1' })
+    // 実payloadは遡及あり＋引き換え券付き。引き換え券は再送の同一性に入れない。
+    expect(JSON.parse(String(patches[0]?.init.body))).toMatchObject({ applyToExisting: true, previewToken: 'preview-1' })
+    expect(JSON.parse(String(patches[1]?.init.body))).toMatchObject({ applyToExisting: true, previewToken: 'preview-1' })
     const keys = idempotencyKeys(calls)
     expect(keys[0]).toBeTruthy()
     expect(keys[1]).toBe(keys[0])
