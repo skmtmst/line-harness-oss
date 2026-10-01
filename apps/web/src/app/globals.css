@@ -549,6 +549,38 @@ html:not([data-theme="v8"]) .v8-only {
   padding: 0;
 }
 
+/*
+ * ★V8「注目の星」（Pencil zcGgI / w0R1PQ・オーナー決定 2026-10-01）：
+ * オフは灰の線のまま、オンで黄色い塗り（#fbbf24）＋濃い黄の縁（#f59e0b）。
+ * 使う側（友だち一覧の行）は `data-part="attention-star"` を付けるだけ。
+ * オンになった瞬間、星が小さくふくらんで戻る（200ms・MOTION.md）。
+ */
+[data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
+  color: var(--color-star-on-edge);
+  fill: var(--color-star-on);
+  stroke: var(--color-star-on-edge);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
+    animation: v8-star-pop var(--motion-base) var(--motion-ease-out);
+  }
+}
+
+@keyframes v8-star-pop {
+  0% {
+    transform: scale(0.85);
+  }
+
+  60% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
 /* ---------------------------------------------------------------------
  * #673 触った感触（emil/apple/interaction-design）
  *

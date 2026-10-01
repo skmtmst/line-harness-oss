@@ -2,8 +2,9 @@
  * ★V8 移行③「外側 v8」の固定。
  *
  *   - 地は灰（--color-shell）、中身は白い板1枚（radius 16・枠・影・右下 12px）
- *   - 上の帯は高さ 60・パンくず（アカウント › 画面名）・探す欄（⌘K）・
- *     通知ベル・自分。左メニューは畳める（64px・⌘\・localStorage）
+ *   - 上の帯は高さ 60・パンくず（アカウント › 画面名）・通知ベル・自分。
+ *     探す欄は帯から外した（オーナー決定 2026-10-01）。
+ *     左メニューは畳める（64px・⌘\・localStorage）
  *   - 黄色の版の帯は v8 では出さない
  *   - 全部 v8 だけに効く（v7 の見た目を動かさない）
  */
@@ -75,15 +76,29 @@ describe('外側の殻（V8 移行③）', () => {
     expect(topBar).toContain('crumbCurrent')
   })
 
-  it('帯の右に 探す欄（⌘K の札）・通知・自分。探す欄は送ると友だち一覧へ', () => {
-    expect(topBar).toContain('role="search"')
-    expect(topBar).toContain('⌘K')
-    expect(topBarCss).toContain('width: 260px')
+  it('帯の右は 通知・自分（探す欄は V8 で外した）。友だち一覧の ?q= 受け口は残す', () => {
+    expect(topBar).not.toContain('role="search"')
+    expect(topBar).not.toContain('⌘K')
+    expect(topBar).not.toContain('onGlobalSearch')
+    expect(appTopBar).not.toContain('/friends?q=')
     expect(topBar).toContain('href="/notifications"')
     expect(topBar).toContain('bellBadge')
-    expect(appTopBar).toContain('/friends?q=')
-    // 受け口がある（押して何も起きない欄にしない）
+    // `?q=` で開く受け口は一覧側の機能なので残る
     expect(friends).toContain("searchParams.get('q')")
+  })
+
+  it('帯が混まないよう、v8 はアカウント名 128px・自分の名前 104px で「…」に収める', () => {
+    const account = topBarCss.match(/\[data-theme="v8"\] \.accountName \{([^}]*)\}/)
+    expect(account, 'v8 の .accountName の規定が無い').not.toBeNull()
+    expect(account![1]).toContain('max-width: 128px')
+    const user = topBarCss.match(/\[data-theme="v8"\] \.user \{([^}]*)\}/)
+    expect(user, 'v8 の .user の規定が無い').not.toBeNull()
+    expect(user![1]).toContain('max-width: 104px')
+  })
+
+  it('1152 未満ではログアウトを印だけにする（字は消えても aria-label が残る）', () => {
+    expect(topBarCss).toMatch(/@media \(max-width: 1151px\)[\s\S]*?\.logout span[\s\S]*?display: none/)
+    expect(topBar).toContain('aria-label="ログアウト"')
   })
 
   it('v8 の帯は 1024px から出す（v7 は 1280px のまま）', () => {
