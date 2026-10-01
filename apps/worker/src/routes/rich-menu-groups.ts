@@ -1775,6 +1775,16 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
     expectedVersion,
   });
   if (!saved.ok) {
+    // 保存の直前に消されていたら、不在として一覧へ戻す。
+    if (saved.currentVersion === null) {
+      return c.json(
+        {
+          success: false,
+          error: 'このリッチメニューは見つかりません。削除された可能性があります。一覧から選び直してください。',
+        },
+        404,
+      );
+    }
     return c.json(
       {
         success: false,

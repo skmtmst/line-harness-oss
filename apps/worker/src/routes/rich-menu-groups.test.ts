@@ -908,6 +908,22 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
     });
     expect(res.status).toBe(409);
   });
+
+  test('保存先が消えていたら 404（版の不一致ではなく不在）', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValueOnce({
+      ok: false, reason: 'version_conflict', currentVersion: null,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 1, name: 'new' }),
+    });
+    expect(res.status).toBe(404);
+  });
 });
 
 // ----- GET /api/rich-menu-groups/:groupId/delete-impact -----

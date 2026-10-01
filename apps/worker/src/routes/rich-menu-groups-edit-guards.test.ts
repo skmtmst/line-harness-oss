@@ -168,6 +168,8 @@ describe('M950: 保存の部分書き込みを残さない', () => {
     // 直し前はここで name='新しい名前' だけ残る（部分書き込み）。
     expect(groupRow('g1').name).toBe('メニュー');
     expect(pageNames('g1')).toEqual(['ページ1']);
+    // 版の検査と書込が別取引だと、版上げだけが残る。版も戻る（進まない）。
+    expect(groupRow('g1').version).toBe(1);
   });
 
   test('正常保存は meta と pages が両方反映され版が +1', async () => {
@@ -484,4 +486,78 @@ describe('M954: 画像アップロードの R2 孤児', () => {
     };
     expect(row.k).toContain('rich-menus/acc-1/g1/p1/');
   });
+});
+
+// ---------------------------------------------------------------------------
+// M950/M951 追加照合：版の検査と書込は同じ取引で行う
+// ---------------------------------------------------------------------------
+
+describe('M950/M951: 保存の交錯で古い書込が勝たない', () => {
+  /**
+   * A が版を読んで止まっている間に B が保存を終え、A の書込が最後に来る
+   * 交錯。版の検査と書込が別取引だと、A の無条件の書込が B を黙って
+   * 上書きする（両方 200）。同じ取引なら A の書込全体が戻って 409 になる。
+   */
+  test('Aの書込がBの確定より後に来たら A は 409 で B が残る', async () => {
+    insertGroup('g1', 'draft');
+    insertPage('g1', 'p1', 0);
+    insertArea('p1', 'a1');
+
+    let releaseBatch!: () => void;
+    let batchReached = false;
+    const batchGate = new Promise<void>((resolve) => {
+      releaseBatch = resolve;
+    });
+    const gatedDb = {
+      prepare: (sql: string) =>
+        (db as unknown as { prepare: (s: string) => unknown }).prepare(sql),
+      batch: (stmts: []) => {
+        if (!batchReached) {
+          batchReached = true;
+          return batchGate.then(() =>
+            (db as unknown as { batch: (s: []) => Promise<unknown[]> }).batch(stmts),
+          );
+        }
+        return (db as unknown as { batch: (s: []) => Promise<unknown[]> }).batch(stmts);
+      },
+    } as unknown as D1Database;
+
+    const saveBody = (expectedVersion: number, name: string, pageName: string) => ({
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedVersion,
+        name,
+        pages: [{ name: pageName, orderIndex: 0, areas: [VALID_AREA] }],
+      }),
+    });
+    const appA = setupApp(gatedDb, r2);
+    const appB = setupApp(db, r2);
+    const reqA = authed('/api/rich-menu-groups/g1', saveBody(1, 'Aさんの名前', 'Aページ'));
+    const resAPromise = appA.request(reqA.path, reqA.init);
+
+    // A が書込の取引に入るまで待つ（A は版上げ済み・書込前のことがある）。
+    const deadline = Date.now() + 10000;
+    while (!batchReached) {
+      if (Date.now() > deadline) throw new Error('A did not reach batch');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    // A が止まっている間に読んだ今の版で B が保存する。
+    const versionNow = (
+      raw.prepare(`SELECT version AS v FROM rich_menu_groups WHERE id = 'g1'`).get() as { v: number }
+    ).v;
+    const reqB = authed('/api/rich-menu-groups/g1', saveBody(versionNow, 'Bさんの名前', 'Bページ'));
+    const resB = await appB.request(reqB.path, reqB.init);
+    expect(resB.status).toBe(200);
+    const bodyB = (await resB.json()) as { success: boolean; data: { version: number } };
+
+    releaseBatch();
+    const resA = await resAPromise;
+
+    // 直し前は A が 200 で Aさんの名前・Aページが残る（B が消える）。
+    expect(resA.status).toBe(409);
+    expect(groupRow('g1').name).toBe('Bさんの名前');
+    expect(pageNames('g1')).toEqual(['Bページ']);
+    expect(groupRow('g1').version).toBe(bodyB.data.version);
+  }, 20000);
 });
