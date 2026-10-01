@@ -33,6 +33,8 @@ export interface ReservedV8Props {
   estimate: AudienceEstimate | null
   /** 宛先の条件の要約（一覧・詳細と同じ audienceSummary を親で作る）。 */
   audienceLabel: string
+  /** 承認待ちのときの承認者名（絵 `cdZBf` の「承認：名前」）。取れなければ null。 */
+  approverName: string | null
   accountName: string
   notificationText: string
   /** 閲覧のみ（夕18）：変える操作は押せない形にする。 */
@@ -56,6 +58,7 @@ export default function ReservedV8({
   broadcast,
   estimate,
   audienceLabel,
+  approverName,
   accountName,
   notificationText,
   canEdit,
@@ -75,7 +78,11 @@ export default function ReservedV8({
   const scheduledLabel = broadcast.scheduledAt ? formatBroadcastDateTime(broadcast.scheduledAt) : '日時未設定'
   const audienceCount = estimate?.audienceCount ?? null
   const bubbleCount = broadcast.messageBubbles?.length ?? (broadcast.messageContent ? 1 : 0)
-  const approverLabel = broadcast.approvalStatus === 'approved' ? '（承認済み）' : broadcast.approvalStatus === 'pending' ? '（承認待ち）' : ''
+  const approverLabel = broadcast.approvalStatus === 'approved'
+    ? '（承認済み）'
+    : broadcast.approvalStatus === 'pending'
+      ? approverName ? `（承認：${approverName}）` : '（承認待ち）'
+      : ''
 
   return (
     <div className={styles.board}>
@@ -116,11 +123,15 @@ export default function ReservedV8({
         <div className={styles.main}>
           {/* 「できた」の箱。ボタンは真ん中（オーナー指摘「こういうのは真ん中」）。 */}
           <section className={styles.doneCard}>
-            <span className={styles.doneIcon}>
-              <CalendarCheck2 size={24} aria-hidden="true" />
-            </span>
-            <h3 className={styles.doneTitle}>一斉配信を予約しました</h3>
-            <p className={styles.doneDesc}>送る前にもう一度、対象の人数を数え直します</p>
+            <div className={styles.doneHead}>
+              <span className={styles.doneIcon}>
+                <CalendarCheck2 size={20} aria-hidden="true" />
+              </span>
+              <div>
+                <h3 className={styles.doneTitle}>一斉配信を予約しました</h3>
+                <p className={styles.doneDesc}>送る前にもう一度、対象の人数を数え直します</p>
+              </div>
+            </div>
             <dl className={`${styles.sideDl} ${styles.doneTable}`}>
               <div className={styles.sideDlRow}><dt>管理名</dt><dd>{broadcast.title}</dd></div>
               <div className={styles.sideDlRow}>

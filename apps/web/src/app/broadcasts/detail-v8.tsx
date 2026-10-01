@@ -55,9 +55,6 @@ const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'sent', label: '送信済み' },
 ]
 
-/** 終わった状態：着いた段までを済み（✓）にし、いまの輪は出さない。 */
-const FINISHED_STATUSES = new Set(['sent', 'partial_failed', 'failed', 'stopped', 'expired'])
-
 const BRANCH_LABELS: Record<string, string> = {
   partial_failed: '一部失敗',
   failed: '失敗',
@@ -466,14 +463,17 @@ function DeliveryRail({ broadcast, approval }: { broadcast: ApiBroadcast; approv
     : displayStatus === 'expired' ? (approvalInvolved ? 'pending_approval' : 'draft')
     : displayStatus
   const currentIndex = Math.max(0, steps.findIndex((step) => step.key === progressKey))
-  const finished = FINISHED_STATUSES.has(displayStatus)
   const branchLabel = BRANCH_LABELS[displayStatus]
 
   return (
     <ol className={styles.rail} aria-label="配信の状態">
+      {/*
+        終わった状態でも「いまの段」は輪のまま（絵 F3X1Mo：送信済みは
+        最後の段が ✓ ではなく今いる場所の印）。
+      */}
       {steps.map((step, index) => {
-        const done = finished ? index <= currentIndex : index < currentIndex
-        const current = !finished && index === currentIndex
+        const done = index < currentIndex
+        const current = index === currentIndex
         return (
           <li key={step.key} className={`${styles.railStep} ${done ? styles.railDone : current ? styles.railCurrent : ''}`}>
             {index > 0 ? <span className={styles.railLine} aria-hidden="true" /> : null}

@@ -81,6 +81,7 @@ function ReservedBroadcastContent() {
     scenarios: Array<{ id: string; name: string }>
   } | null>(null)
   const [notificationText, setNotificationText] = useState('')
+  const [approverName, setApproverName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   /*
    * 存在しない予約（404）と通信の失敗（503など）は別の案内にする（R582）。
@@ -117,6 +118,7 @@ function ReservedBroadcastContent() {
     setLoading(true)
     setNotFound(false)
     setEstimate(null)
+    setApproverName(null)
     try {
       const result = await api.broadcasts.get(id)
       if (!isCurrent()) return
@@ -143,6 +145,21 @@ function ReservedBroadcastContent() {
             if (!tags && !scenarios) return
             setAudienceNames({ tags: tags ?? [], scenarios: scenarios ?? [] })
           })
+      }
+      // 絵 cdZBf: 承認待ちの予約は状態行に「承認：名前」を出す。
+      // 名前が取れなくても予約の表示は出し続ける（「承認待ち」の表記に残る）。
+      if (result.data.approvalStatus === 'pending' && result.data.lineAccountId) {
+        void Promise.allSettled([
+          api.broadcasts.approval.get(id),
+          api.broadcasts.approval.candidates(result.data.lineAccountId),
+        ]).then(([stateRes, candidatesRes]) => {
+          if (!isCurrent()) return
+          if (stateRes.status !== 'fulfilled' || !stateRes.value.success) return
+          if (candidatesRes.status !== 'fulfilled' || !candidatesRes.value.success) return
+          const approverId = stateRes.value.data.approval.approverStaffId
+          const name = candidatesRes.value.data.find((c) => c.id === approverId)?.name
+          if (name) setApproverName(name)
+        })
       }
       /*
        * 通知設定と人数の再集計は互いに待たない。直列に待つと予約完了の
@@ -351,6 +368,7 @@ function ReservedBroadcastContent() {
         broadcast={broadcast}
         estimate={estimate}
         audienceLabel={audienceTarget}
+        approverName={approverName}
         accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
         notificationText={notificationText}
         canEdit={canEdit}
