@@ -10,6 +10,10 @@ import type { Tag } from '@line-crm/shared'
 import type { TagDefinition, TagDependencies } from '@/lib/api'
 import type { TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 
+vi.hoisted(() => {
+  // 実 api モジュールは読み込み時に API_URL を要求するため、先に決めておく。
+  process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
+})
 const state = vi.hoisted(() => ({ search: 'id=t1' }))
 const apiCalls = vi.hoisted(() => ({
   definition: vi.fn(),
@@ -48,20 +52,26 @@ vi.mock('@/components/shell/page-chrome', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a1', selectedAccount: { name: 'A店' } }),
 }))
-vi.mock('@/lib/api', () => ({
-  ApiError: fakes.FakeApiError,
-  api: {
-    tags: {
-      definition: (...args: unknown[]) => apiCalls.definition(...args),
-      dependencies: (...args: unknown[]) => apiCalls.dependencies(...args),
-      updateDefinition: (...args: unknown[]) => apiCalls.updateDefinition(...args),
-      updateArchivedNameAndDescription: (...args: unknown[]) => apiCalls.updateArchived(...args),
+vi.mock('@/lib/api', async (importOriginal) => {
+  // 保存失敗の文言は本物の describeSaveFailure で付ける（WRITE-01 の契約）。
+  // ApiError だけは既存試験の Fake のままにし、原 assert を変えない。
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ApiError: fakes.FakeApiError,
+    describeSaveFailure: actual.describeSaveFailure,
+    api: {
+      tags: {
+        definition: (...args: unknown[]) => apiCalls.definition(...args),
+        dependencies: (...args: unknown[]) => apiCalls.dependencies(...args),
+        updateDefinition: (...args: unknown[]) => apiCalls.updateDefinition(...args),
+        updateArchivedNameAndDescription: (...args: unknown[]) => apiCalls.updateArchived(...args),
+      },
+      tagGroups: {
+        list: (...args: unknown[]) => apiCalls.listGroups(...args),
+      },
     },
-    tagGroups: {
-      list: (...args: unknown[]) => apiCalls.listGroups(...args),
-    },
-  },
-}))
+  }
+})
 vi.mock('@/components/friend-fields/tag-editor-v4', () => ({
   definitionsForSave: (actions: unknown) => actions,
   linkedActionFromDefinition: (action: unknown) => action,
@@ -100,6 +110,7 @@ function okFixtures() {
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
   state.search = 'id=t1'
   for (const fn of Object.values(apiCalls)) fn.mockReset()
   captured.onSave = undefined as unknown as typeof captured.onSave
@@ -199,5 +210,138 @@ describe('M956 保存の再送は同じ要求キー', () => {
     // 成功した保存のキーは捨て、次の保存は新しいキー。
     expect(thirdKey).toBeTruthy()
     expect(thirdKey).not.toBe(firstKey)
+  })
+})
+
+/*
+ * T05/T08: 保存の500は正規 fetchApi 境界を通し、内部文ではなく
+ * 日本語の再試行案内を出す。Error("network") の直接 reject だけを
+ * HTTP500 の合格証拠にしない。
+ */
+type PatchedCall = { url: string; init: RequestInit }
+
+function stubPatchThenReplayed() {
+  const calls: PatchedCall[] = []
+  let first = true
+  const stub = vi.fn(async (url: unknown, init?: RequestInit) => {
+    calls.push({ url: String(url), init: init ?? {} })
+    if (String(url).endsWith('/api/client-errors')) {
+      return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => '{}' }
+    }
+    if (first) {
+      first = false
+      // 実 Worker と同じ正規形式の500（routes/tags.ts の catch）。
+      const body = { success: false, error: 'Internal server error' }
+      return { ok: false, status: 500, headers: { get: () => null }, json: async () => body, text: async () => JSON.stringify(body) }
+    }
+    const body = { success: true, data: { queued: 0, replayed: true } }
+    return { ok: true, status: 200, headers: { get: () => null }, json: async () => body, text: async () => JSON.stringify(body) }
+  })
+  vi.stubGlobal('fetch', stub as unknown as typeof fetch)
+  return calls
+}
+
+async function useRealSave() {
+  const real = await vi.importActual<typeof import('@/lib/api')>('@/lib/api')
+  apiCalls.updateDefinition.mockImplementation((...args: unknown[]) =>
+    (real.api.tags.updateDefinition as unknown as (...call: unknown[]) => Promise<unknown>)(...args),
+  )
+}
+
+function tagPatchCalls(calls: PatchedCall[]) {
+  return calls.filter((call) => call.url.endsWith('/api/tags/t1') && call.init.method === 'PATCH')
+}
+
+function idempotencyKeys(calls: PatchedCall[]) {
+  return tagPatchCalls(calls).map((call) => (call.init.headers as Record<string, string>)?.['Idempotency-Key'])
+}
+
+describe('保存500は日本語の再試行案内を出す（T05/T08）', () => {
+  it('通常保存の500は日本語案内・同画面の再送で保存済み', async () => {
+    okFixtures()
+    const calls = stubPatchThenReplayed()
+    await useRealSave()
+    render(<Page />)
+    expect(await screen.findByTestId('tag-editor')).toBeTruthy()
+
+    await act(async () => {
+      await captured.onSave(values, false, false)
+    })
+    expect(await screen.findByText(/サーバー側で保存できませんでした/)).toBeTruthy()
+    expect(screen.queryByText(/API error/)).toBeNull()
+    // 編集器は残り、再送できる状態を保つ。
+    expect(screen.getByTestId('tag-editor')).toBeTruthy()
+
+    await act(async () => {
+      await captured.onSave(values, false, false)
+    })
+    expect(await screen.findByText('保存済みでした。')).toBeTruthy()
+    // 応答消失後の再送は同じ要求キー（M956 を保つ）。
+    const keys = idempotencyKeys(calls)
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).toBe(keys[0])
+  })
+
+  it('遡及確認後の保存500も日本語案内・引き換え券を付けて再送成功', async () => {
+    okFixtures()
+    const calls = stubPatchThenReplayed()
+    await useRealSave()
+    render(<Page />)
+    expect(await screen.findByTestId('tag-editor')).toBeTruthy()
+
+    await act(async () => {
+      await captured.onSave(values, false, true, 'preview-1')
+    })
+    expect(await screen.findByText(/サーバー側で保存できませんでした/)).toBeTruthy()
+    expect(screen.queryByText(/API error/)).toBeNull()
+
+    await act(async () => {
+      await captured.onSave(values, false, true, 'preview-1')
+    })
+    expect(await screen.findByText('保存済みでした。')).toBeTruthy()
+    const patches = tagPatchCalls(calls)
+    expect(patches).toHaveLength(2)
+    // 遡及の引き換え券は送るが、再送の同一性には入れない。
+    expect(JSON.parse(String(patches[0]?.init.body))).toMatchObject({ previewToken: 'preview-1' })
+    const keys = idempotencyKeys(calls)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).toBe(keys[0])
+  })
+})
+
+describe('保管済みタグの保存500も日本語案内を出す', () => {
+  it('入力を保持し、再送で保存する', async () => {
+    const archivedTag = { ...tag, status: 'archived', description: '説明前' } as unknown as Tag
+    apiCalls.definition.mockResolvedValue({ success: true, data: { tag: archivedTag, automation: null } })
+    apiCalls.dependencies.mockResolvedValue({ success: true, data: dependencies })
+    apiCalls.listGroups.mockResolvedValue({ success: true, data: [] })
+    const calls = stubPatchThenReplayed()
+    const real = await vi.importActual<typeof import('@/lib/api')>('@/lib/api')
+    apiCalls.updateArchived.mockImplementation((...args: unknown[]) =>
+      (real.api.tags.updateArchivedNameAndDescription as unknown as (...call: unknown[]) => Promise<unknown>)(...args),
+    )
+    const { notifyToast } = await import('@/components/shared/toast')
+    render(<Page />)
+    const nameInput = await screen.findByDisplayValue('通常タグ')
+    const saveButton = await screen.findByRole('button', { name: '保存する' })
+
+    await act(async () => {
+      saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(await screen.findByText(/サーバー側で保存できませんでした/)).toBeTruthy()
+    expect(screen.queryByText(/API error/)).toBeNull()
+    // 入力は保持される。
+    expect((nameInput as HTMLInputElement).value).toBe('通常タグ')
+
+    await act(async () => {
+      saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    // 再送は保存済みとして返る（M956）。
+    expect(notifyToast).toHaveBeenCalledWith('保存済みでした。')
+    const keys = idempotencyKeys(calls)
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).toBe(keys[0])
   })
 })

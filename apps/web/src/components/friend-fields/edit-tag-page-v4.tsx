@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
+import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -129,7 +129,8 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
       notifyToast(result.data.replayed ? '保存済みでした。' : '保存しました。')
       onSaved(result.data.tag)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      // 500等は ApiError の内部文（API error: 500）を出さず、既存の保存失敗案内へ。
+      setError(describeSaveFailure(reason))
     } finally {
       setSaving(false)
     }
@@ -253,7 +254,8 @@ export default function EditTagPageV4() {
       }
       await load()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      // 500等は ApiError の内部文（API error: 500）を出さず、既存の保存失敗案内へ。
+      setError(describeSaveFailure(reason))
     } finally {
       setSaving(false)
     }
