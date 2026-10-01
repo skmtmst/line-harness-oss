@@ -211,6 +211,7 @@ shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
 shared-button-importer components/broadcasts/broadcast-step-rail.tsx
 shared-button-importer components/broadcasts/segment-preset-controls.tsx
+shared-button-importer components/chats/friend-info-sidebar-boundary.tsx
 shared-button-importer components/chats/friend-info-sidebar.tsx
 shared-button-importer components/chats/inbox-filter-panel.tsx
 shared-button-importer components/chats/inbox-kpis.tsx
