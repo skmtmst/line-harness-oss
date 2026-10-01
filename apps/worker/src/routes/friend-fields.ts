@@ -251,8 +251,13 @@ function convertMigrationValue(value: string, targetType: FriendFieldType): Omit
   const trimmed = value.trim();
   if (!trimmed) return { convertedValue: null, status: 'invalid', reason: '空欄です' };
   if (targetType === 'number') {
+    /*
+     * R549: 保存側（validateFriendFieldValue）と同じ物差しで判定する。
+     * 以前は Number() で見ていたため 0x10・1e5 などを「移せる」と数え、
+     * 保存では拒否されて件数が合わなかった。カンマ区切りは両側で外す。
+     */
     const normalized = trimmed.replace(/,/g, '');
-    return Number.isFinite(Number(normalized))
+    return /^[-+]?(\d+(\.\d+)?|\.\d+)$/.test(normalized) && Number.isFinite(Number(normalized))
       ? { convertedValue: normalized, status: 'convertible', reason: null }
       : { convertedValue: null, status: 'review', reason: '数値として確認できません' };
   }
@@ -477,6 +482,17 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
       return c.json({ success: false, code: 'PREVIEW_STALE', error: '事前確認後に値または使用先が変わりました。やり直してください' }, 409);
     }
     if (!await queueFieldMigration(c.env.DB, run.id, idempotencyKey)) {
+      /*
+       * D036: 前の試しが途中で止まった分は続けられる。実行は「まだの行だけ」を
+       * 拾い直し、件数は表から数え直すため、値を二重に書かない。
+       * 終わった分・止めた分は今までどおり409で断る。
+       */
+      const current = await getFieldMigrationRun(c.env.DB, run.id, scope);
+      if (current && (current.status === 'queued' || current.status === 'running')) {
+        const resume = executeFieldMigration(c.env.DB, run.id, target.type as FriendFieldType, c.get('staff').id);
+        try { c.executionCtx.waitUntil(resume); } catch { await resume; }
+        return c.json({ success: true, data: { runId: run.id } }, 202);
+      }
       return c.json({ success: false, code: 'RUN_STATE_CHANGED', error: '移行状態が変わりました。実行状況を確認してください' }, 409);
     }
     const execution = executeFieldMigration(c.env.DB, run.id, target.type as FriendFieldType, c.get('staff').id);
