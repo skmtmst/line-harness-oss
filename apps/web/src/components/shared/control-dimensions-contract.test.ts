@@ -60,6 +60,29 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(offenders).toEqual([])
   })
 
+  it('部品の CSS Module は、ビルド時に先頭で層の順番を宣言される', async () => {
+    /*
+     * Tailwind v4 の出力は層の順番を先頭で宣言しない。部品の CSS が
+     * globals.css より先に読まれると、最初に現れた `@layer components` が
+     * 1番目の層になり、後から来る base（preflight）が部品に勝つ。
+     * ボタンの地・枠・余白、入力欄の枠が全部消えた（検証環境 2026-10-02）。
+     * postcss-layer-order.cjs が各 CSS Module の先頭へ順番を足す。
+     */
+    const config = read('../../../postcss.config.mjs')
+    expect(config).toMatch(/'\.\/postcss-layer-order\.cjs'[\s\S]*'@tailwindcss\/postcss'/)
+
+    const { default: postcss } = await import('postcss')
+    const { default: layerOrder } = await import('../../../postcss-layer-order.cjs')
+    const run = (css: string, from: string) =>
+      postcss([layerOrder()]).process(css, { from }).then((r) => r.css)
+
+    const button = await run(read('./button.module.css'), '/x/button.module.css')
+    expect(button.startsWith('@layer properties, theme, base, components, utilities;')).toBe(true)
+    // 層を使わない CSS Module と globals.css には足さない
+    expect(await run('.a{color:red}', '/x/plain.module.css')).toBe('.a{color:red}')
+    expect(await run('@layer components{.a{color:red}}', '/x/globals.css')).toBe('@layer components{.a{color:red}}')
+  })
+
   it('代表的な画面側上書きも規定値に戻す', () => {
     const folderSelect = read('../chats/template-folder-select.tsx')
     const users = read('../users/users-filters.tsx')
