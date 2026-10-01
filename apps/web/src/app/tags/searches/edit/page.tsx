@@ -33,6 +33,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
@@ -961,22 +962,20 @@ function SavedSearchEditInner() {
       </div>
 
       <StickyBar
-        destructive={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-control bg-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除する</button>}
+        destructive={<Button variant="danger" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'}>この条件を削除する</Button>}
         actions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
             <Button type="button" disabled={saving} onClick={() => void duplicate()}>複製して保存する</Button>
-            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>
+            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}>保存する</Button>
           </>
         )}
       />
       <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、検索条件への変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="検索条件への変更"
+        busy={saving}
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />

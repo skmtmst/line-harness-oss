@@ -172,9 +172,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
         type="button"
         variant="secondary"
         onClick={() => void start()}
-        disabled={!accountId || requesting || running}
-      >
-        {requesting && !active ? '書き出しを依頼しています…' : 'CSVで書き出す'}
+        disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…">CSVで書き出す
       </Button>
 
       {error ? (

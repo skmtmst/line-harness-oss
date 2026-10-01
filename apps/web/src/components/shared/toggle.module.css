@@ -58,4 +58,21 @@
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
+
+/*
+ * ★V8「トグル」（bkjTv・LxHpj）：大きさ・つまみ・オンの緑は v7 と同じ。
+ * オフの地は操作する部品の枠色（control-border）に合わせる。
+ * 「消せない項目」はオフに見せてはいけないので髪線の灰のまま保つ。
+ */
+[data-theme='v8'] .toggle {
+  background: var(--color-control-border);
+}
+
+[data-theme='v8'] .on {
+  background: var(--color-accent-deep);
+}
+
+[data-theme='v8'] .locked {
+  background: var(--color-hairline);
+}
 }

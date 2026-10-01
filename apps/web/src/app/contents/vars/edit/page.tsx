@@ -87,6 +87,13 @@ function EditCommonVarInner() {
   const [error, setError] = useState('')
   /** 取得の失敗の内訳（保存・入力の失敗とは分ける）。 */
   const [loadFailure, setLoadFailure] = useState<'missing' | 'error' | null>(null)
+  /**
+   * R591: フォルダと更新予定は詳細と独立した取得状態にする。
+   * どちらかが落ちても詳細の結果まで捨てない。本体が出たまま、
+   * 落ちた欄だけ理由と再試行を出す。
+   */
+  const [foldersError, setFoldersError] = useState(false)
+  const [schedulesError, setSchedulesError] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showImpactReview, setShowImpactReview] = useState(false)
 
@@ -205,6 +212,46 @@ function EditCommonVarInner() {
     }))
   }, [impact])
 
+  /**
+   * R591: フォルダだけを読み直す。詳細の入力欄には触らない。
+   * 一覧が読めなくても「未分類だけ」とは言わず、失敗と再試行を出す。
+   */
+  const loadFolders = useCallback(async (accountId: string) => {
+    try {
+      const folderList = await api.folders.list('common_var')
+      if (accountId !== latestAccountRef.current) return
+      if (folderList.success) {
+        setFolders(folderList.data)
+        setFoldersError(false)
+      } else {
+        setFoldersError(true)
+      }
+    } catch {
+      if (accountId !== latestAccountRef.current) return
+      setFoldersError(true)
+    }
+  }, [])
+
+  /**
+   * R591・R592: 更新予定だけを読み直す。404も「見つかりません」に
+   * せず予定欄の失敗にする（本体の有無は詳細の取得が決める）。
+   */
+  const loadSchedules = useCallback(async (varId: string, accountId: string) => {
+    try {
+      const scheduleList = await api.commonVars.schedules(varId, accountId)
+      if (accountId !== latestAccountRef.current) return
+      if (scheduleList.success) {
+        setSchedules(scheduleList.data)
+        setSchedulesError(false)
+      } else {
+        setSchedulesError(true)
+      }
+    } catch {
+      if (accountId !== latestAccountRef.current) return
+      setSchedulesError(true)
+    }
+  }, [])
+
   const load = useCallback(async () => {
     if (!id) {
       setLoading(false)
@@ -223,16 +270,52 @@ function EditCommonVarInner() {
     setLoading(true)
     setError('')
     setLoadFailure(null)
+    setFoldersError(false)
+    setSchedulesError(false)
     try {
-      const [detail, folderList, scheduleList] = await Promise.all([
-        api.commonVars.detail(id, accountAtRequest),
-        api.folders.list('common_var'),
-        api.commonVars.schedules(id, accountAtRequest),
+      // R591: 3つは並列に読んだまま、結果だけ独立に扱う。
+      // フォルダ・予定の失敗で詳細の結果まで捨てない。
+      const [detailResult, folderResult, scheduleResult] = await Promise.all([
+        api.commonVars.detail(id, accountAtRequest).then(
+          (data) => ({ ok: true as const, data }),
+          (caught: unknown) => ({ ok: false as const, caught }),
+        ),
+        api.folders.list('common_var').then(
+          (data) => ({ ok: true as const, data }),
+          (caught: unknown) => ({ ok: false as const, caught }),
+        ),
+        api.commonVars.schedules(id, accountAtRequest).then(
+          (data) => ({ ok: true as const, data }),
+          (caught: unknown) => ({ ok: false as const, caught }),
+        ),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
-      if (folderList.success) setFolders(folderList.data)
-      if (scheduleList.success) setSchedules(scheduleList.data)
-      const found = detail.success ? detail.data : undefined
+      // フォルダと予定は独立した取得状態。落ちた欄は各欄で扱う。
+      if (folderResult.ok && folderResult.data.success) {
+        setFolders(folderResult.data.data)
+        setFoldersError(false)
+      } else {
+        setFoldersError(true)
+      }
+      if (scheduleResult.ok && scheduleResult.data.success) {
+        setSchedules(scheduleResult.data.data)
+        setSchedulesError(false)
+      } else {
+        // R592: 予定の404も「見つかりません」にせず予定欄の失敗にする。
+        setSchedulesError(true)
+      }
+      // 詳細だけが画面全体の成否を決める。
+      if (!detailResult.ok) {
+        if (detailResult.caught instanceof ApiError && detailResult.caught.status === 404) {
+          setError('この共通情報は見つかりませんでした')
+          setLoadFailure('missing')
+        } else {
+          setError('読み込みに失敗しました。もう一度読み込んでください。')
+          setLoadFailure('error')
+        }
+        return
+      }
+      const found = detailResult.data.success ? detailResult.data.data : undefined
       if (!found) {
         setError('この共通情報は見つかりませんでした')
         setLoadFailure('missing')
@@ -247,19 +330,15 @@ function EditCommonVarInner() {
       setValidUntil(utcToJstLocalInput(found.validUntil))
       setExpiryBehavior(found.expiryBehavior ?? 'stop')
       setFallbackValue(found.fallbackValue ?? '')
-    } catch (caught) {
+    } catch {
+      // 各取得の失敗は上で欄ごとに扱う。ここは想定外の壊れ方だけ。
       if (accountAtRequest !== latestAccountRef.current) return
-      if (caught instanceof ApiError && caught.status === 404) {
-        setError('この共通情報は見つかりませんでした')
-        setLoadFailure('missing')
-      } else {
-        setError('読み込みに失敗しました。もう一度読み込んでください。')
-        setLoadFailure('error')
-      }
+      setError('読み込みに失敗しました。もう一度読み込んでください。')
+      setLoadFailure('error')
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [accountLoading, id, selectedAccountId])
+  }, [accountLoading, id, loadFolders, loadSchedules, selectedAccountId])
 
   useEffect(() => {
     void load()
@@ -281,17 +360,15 @@ function EditCommonVarInner() {
       const currentVersion = body.currentVersion
       setItem((prev) => (prev ? { ...prev, version: currentVersion } : prev))
     }
+    // R591: 詳細と予定は別々に取り直す。予定が落ちても詳細の版は進める。
     try {
-      const [detail, scheduleList] = await Promise.all([
-        api.commonVars.detail(varId, accountId),
-        api.commonVars.schedules(varId, accountId),
-      ])
+      const detail = await api.commonVars.detail(varId, accountId)
       if (accountId !== latestAccountRef.current) return
-      if (scheduleList.success) setSchedules(scheduleList.data)
       if (detail.success) setItem(detail.data)
     } catch {
       // 読み直せなくても入力は残る。版が古いままの次の保存は同じ文で断る。
     }
+    await loadSchedules(varId, accountId)
   }
 
   const save = async () => {
@@ -461,7 +538,7 @@ function EditCommonVarInner() {
    * 離脱の確認はどの画面状態にいても出す。影響確認の一覧へ切り替えた表示
    * （ImpactReview）は別ツリーへ早期 return するため、要素化して両方の
    * 経路へ差し込む。片方だけに置くと dirty 中のリンクが黙って止まり、
-   * 「保存せずに移動」を選ぶ手段がなくなる。
+   * 「保存せずに移る」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="共通情報への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
@@ -777,8 +854,8 @@ function EditCommonVarInner() {
                     />
                     {statusError ? <p className="text-danger text-xs">{statusError}</p> : null}
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="primary" disabled={statusBusy} onClick={() => void applyStatus()}>
-                        {statusBusy ? '変更中…' : statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
+                      <Button type="button" variant="primary" disabled={statusBusy} onClick={() => void applyStatus()} busy={statusBusy} busyLabel="変更中…">
+                        {statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
                       </Button>
                       <Button type="button" disabled={statusBusy} onClick={() => setStatusAction(null)}>
                         キャンセル
@@ -819,6 +896,26 @@ function EditCommonVarInner() {
                       onChange={(value) => { setSaved(false); setFolderId(value) }}
                       options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                     />
+                    {/*
+                      R591: 一覧が読めなくても「未分類だけ」とは言わない。
+                      失敗と再試行を欄の下に出し、いまの設定のまま保存できる
+                      ことを伝える（読み込めなかった時の赤は使わない）。
+                    */}
+                    {foldersError ? (
+                      <div className="mt-1 space-y-1" data-folders-state="error">
+                        <p className="text-ink-secondary text-xs">
+                          フォルダの一覧を読み込めませんでした。いまの設定のまま保存できます。
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (item && selectedAccountId) void loadFolders(selectedAccountId)
+                          }}
+                        >
+                          再読み込み
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -944,6 +1041,28 @@ function EditCommonVarInner() {
               </section>
 
               <section className="bg-canvas rounded-card border-hairline border p-4">
+                {/*
+                  R591・R592: 予定が読めないときは「予定なし」と混ぜない。
+                  失敗と再試行をこの欄に出し、いまの値のまま保存できることを
+                  伝える（読み込めなかった時の赤は使わない）。
+                */}
+                {schedulesError ? (
+                  <div data-schedules-state="error">
+                    <p className="text-ink-secondary text-sm">
+                      更新の予定を読み込めませんでした。いまの値のまま保存できます。
+                    </p>
+                    <Button
+                      type="button"
+                      className="mt-3"
+                      onClick={() => {
+                        if (item && selectedAccountId) void loadSchedules(item.id, selectedAccountId)
+                      }}
+                    >
+                      再読み込み
+                    </Button>
+                  </div>
+                ) : (
+                <>
                 <Checkbox
                   checked={schedules.length > 0 || draft !== null}
                   onCheckedChange={(checked) => {
@@ -982,6 +1101,8 @@ function EditCommonVarInner() {
                     いま値を保存しても、この予定は消えません。予定の時刻になると、ここに登録した値へ変わります。
                   </p>
                 ) : null}
+                </>
+                )}
               </section>
 
               <section className="bg-canvas rounded-card border-hairline border p-4">
@@ -1159,13 +1280,9 @@ function EditCommonVarInner() {
           */}
           <StickyBar
             destructive={(
-              <button
-                type="button"
-                onClick={() => void openDelete()}
-                className="rounded-control bg-danger text-on-accent px-4 py-2 text-sm font-bold"
-              >
+              <Button variant="danger" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" type="button" onClick={() => void openDelete()}>
                 この共通情報を削除する
-              </button>
+              </Button>
             )}
             actions={(
               <>
@@ -1194,9 +1311,7 @@ function EditCommonVarInner() {
                       return
                     }
                     void save()
-                  }}
-                >
-                  {saving ? '保存中…' : '共通情報を保存する'}
+                  }} busy={saving}>共通情報を保存する
                 </Button>
               </>
             )}
@@ -1266,18 +1381,12 @@ function EditCommonVarInner() {
               {scheduleFieldError ? <p className="text-danger mt-1 text-xs">{scheduleFieldError}</p> : null}
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setDraft(null)}
-                className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm"
-              >
+              <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" onClick={() => setDraft(null)}>
                 キャンセル
-              </button>
-              <button
-                onClick={() => void addSchedule()}
-                className="bg-accent-deep text-on-accent rounded-control px-6 py-2 text-sm font-medium"
-              >
+              </Button>
+              <Button variant="primary" className="px-6 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void addSchedule()}>
                 登録する
-              </button>
+              </Button>
             </div>
           </div>
         </div>

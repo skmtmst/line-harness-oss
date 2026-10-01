@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import BulkBar from '@/components/shared/bulk-bar'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -435,30 +436,9 @@ export default function ScenarioList({
         {moveNotice}
       </span>
       {/*
-        複数選択の一括操作は、選んでいる間だけ表の上に出す帯。
+        複数選択の一括操作は、選んでいる間だけ表の下に出す帯（★V7 仕上げ §2）。
         フォルダ移動の受け口はここと行の「その他」だけに絞る（NEXT-25）。
       */}
-      {canMove && selectedCount > 0 && (
-        <div className="border-hairline bg-accent-soft flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2">
-          <span className="text-ink text-sm font-medium tabular-nums">
-            {selectedCount}件を選択中
-          </span>
-          <button
-            type="button"
-            onClick={() => openMove([...selectedIds])}
-            className="text-action text-sm font-medium hover:underline"
-          >
-            フォルダを移動
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedIds(new Set())}
-            className="text-ink-faint text-xs hover:underline"
-          >
-            選択を解除
-          </button>
-        </div>
-      )}
       <div className="overflow-x-auto">
         {/*
           名前だけが残り幅を受け取り、ほかの列は内容に合わせて固定する。
@@ -684,6 +664,21 @@ export default function ScenarioList({
           </tbody>
         </table>
       </div>
+
+      {/*
+        一括バーは表のすぐ下（下端から8px上がって出る）。選択が0件に
+        戻ると下がって消える。操作は白地ボタン＋取り消す「選択を解除」。
+      */}
+      {canMove ? (
+        <BulkBar count={selectedCount} className="mx-3 mb-3">
+          <Button variant="secondary" size="compact" onClick={() => openMove([...selectedIds])}>
+            フォルダを移動
+          </Button>
+          <Button variant="secondary" size="compact" onClick={() => setSelectedIds(new Set())}>
+            選択を解除
+          </Button>
+        </BulkBar>
+      ) : null}
 
       {confirmDialog}
       {moveDialog}

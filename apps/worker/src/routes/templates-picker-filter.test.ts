@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
+import { jstNow } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { templates } from './templates.js';
@@ -103,9 +104,10 @@ describe('PERF-12 テンプレート選択のサーバー絞り込み', () => {
     const send = db.raw.prepare(`INSERT INTO messages_log
       (id, friend_id, direction, message_type, content, template_id_at_send, created_at)
       VALUES (?, 'fr-1', 'outgoing', 'text', 'sent', ?, ?)`);
-    send.run('lg-1', 'tp-04', '2026-09-01T00:00:00Z');
-    send.run('lg-2', 'tp-04', '2026-09-02T00:00:00Z');
-    send.run('lg-3', 'tp-01', '2026-09-01T00:00:00Z');
+    const thisMonth = jstNow().slice(0, 7);
+    send.run('lg-1', 'tp-04', `${thisMonth}-01T00:00:00+09:00`);
+    send.run('lg-2', 'tp-04', `${thisMonth}-02T00:00:00+09:00`);
+    send.run('lg-3', 'tp-01', `${thisMonth}-01T00:00:00+09:00`);
     const data = ((await (await get('message_type=text&quick=frequent&page=1&limit=5')).json()) as Body).data;
     // 実績 2 > 1 > 0 の順。実績なし同士は新しい順。
     expect(data.items.map((t) => t.id)).toEqual(['tp-04', 'tp-01', 'tp-03', 'tp-02']);

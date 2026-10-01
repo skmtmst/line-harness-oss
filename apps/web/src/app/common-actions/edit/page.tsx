@@ -41,7 +41,7 @@ function EditCommonActionInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   /** 取得の失敗の内訳（保存の失敗とは分ける）。 */
-  const [loadFailure, setLoadFailure] = useState<'missing' | 'forbidden' | 'error' | null>(null)
+  const [loadFailure, setLoadFailure] = useState<'missing' | 'forbidden' | 'no-draft' | 'error' | null>(null)
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -58,6 +58,8 @@ function EditCommonActionInner() {
     }
     let cancelled = false
     setLoading(true)
+    /* 監査 R584: 再読込を始めたら古い取得失敗文を消す。残ると復旧が分からない。 */
+    setError('')
     setLoadFailure(null)
     Promise.all([
       api.commonActions.get(id, selectedAccountId),
@@ -67,13 +69,23 @@ function EditCommonActionInner() {
       if (!detailResponse.success || !resourceResponse.success) throw new Error('下書きを読み込めませんでした')
       const detail = detailResponse.data
       const draft = detail.versions.find((version) => version.id === detail.currentDraftVersionId)
-      if (!draft) throw new Error('編集中の下書きがありません。版の画面から新版を作ってください。')
+      /*
+       * 監査 R583: 下書きなしは通信の失敗ではない。再読込では直らないので
+       * 通信障害の1枚にせず、版の画面で新版を作る案内にする。
+       */
+      if (!draft) {
+        setError('編集中の下書きがありません。公開済みの版はそのままです。')
+        setLoadFailure('no-draft')
+        return
+      }
       setName(detail.name)
       setDescription(detail.description ?? '')
       setActions(draft.actions)
       setDraftVersionId(draft.id)
       setDraftRevision(draft.draftRevision ?? 1)
       setSaveConflict(false)
+      /* 監査 R584: 復旧後は古い取得失敗文を残さない。編集欄の下に出し直さない。 */
+      setError('')
       setResources(resourceResponse.data)
     }).catch((caught) => {
       /*
@@ -191,6 +203,21 @@ function EditCommonActionInner() {
         kind="not-found"
         title="この共通アクションは見つかりません"
         description="削除されたか、別のLINEアカウントのものです。版の画面から選び直してください。"
+        backHref={`/common-actions/versions?id=${encodeURIComponent(id)}`}
+        backLabel="版の画面へ戻る"
+      />
+    )
+  }
+  /*
+   * 監査 R583: 下書きなしは通信障害ではない。再読込の口ではなく、
+   * ★V7 TargetMissing で版の画面（前の版から新版を作る入口）へ戻す。
+   */
+  if (error && !draftVersionId && loadFailure === 'no-draft') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="編集中の下書きがありません"
+        description="公開済みの版はそのままです。版の画面で前の版から新版を作ると、編集を続けられます。"
         backHref={`/common-actions/versions?id=${encodeURIComponent(id)}`}
         backLabel="版の画面へ戻る"
       />

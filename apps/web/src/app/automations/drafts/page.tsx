@@ -1,6 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 import AutomationDraftEditor from '@/components/automations/automation-draft-editor'
 import TargetMissing from '@/components/shared/target-missing'
@@ -19,14 +20,12 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 */
 function AutomationDraftPageInner() {
   usePageTitle('見本から作った下書き')
-  const [draftId, setDraftId] = useState<string | null | undefined>(undefined)
-
-  useEffect(() => {
-    setDraftId(new URLSearchParams(window.location.search).get('id'))
-  }, [])
-
-  /* 読み終えるまでは何も描かない。一瞬だけ「ありません」が見えるのを避ける。 */
-  if (draftId === undefined) return null
+  /*
+   * R531: 対象IDはURLから反応的に読む。開いたままIDがA→Bへ変わったら、
+   * 前の下書きの表示と保存先を残さない。`key` で編集器ごと作り直すので、
+   * 古い入力・版・保存先がBへ混ざらない。
+   */
+  const draftId = useSearchParams().get('id')
 
   if (!draftId) {
     return (
@@ -40,7 +39,7 @@ function AutomationDraftPageInner() {
     )
   }
 
-  return <AutomationDraftEditor draftId={draftId} />
+  return <AutomationDraftEditor key={draftId} draftId={draftId} />
 }
 
 export default function AutomationDraftPage() {

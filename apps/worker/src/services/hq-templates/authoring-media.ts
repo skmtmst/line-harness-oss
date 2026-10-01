@@ -16,11 +16,23 @@ export function isRegisteredHqMedia(object: R2Object | null, media: MessageTempl
   } catch { return false; }
 }
 
+const dimensionParam = (value: string | null): number | null => {
+  if (value === null) return null;
+  if (!/^\d+$/.test(value)) error('INVALID_IMAGE');
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 20000) error('INVALID_IMAGE');
+  return parsed;
+};
+
 /** Authenticated raw upload. No fetch-by-URL, client-selected key or account credential. */
 export async function uploadHqImage(bucket: R2Bucket, authority: HqTemplateAuthority, request: Request, publicBaseUrl: string) {
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || !/^[A-Za-z0-9_-]{1,128}$/.test(authority.tenantId)) error('FORBIDDEN');
   const url = new URL(request.url), purpose = url.searchParams.get('purpose'), filename = url.searchParams.get('filename') ?? '';
   if (!['message', 'rich_menu'].includes(purpose ?? '') || !filename.trim() || filename.length > 200 || /[\\/\u0000-\u001f]/.test(filename)) error('INVALID_IMAGE');
+  // R568: the editor tells which size it can adopt. A declared size that the
+  // image does not match is rejected here, before any R2 write.
+  const expectedWidth = dimensionParam(url.searchParams.get('width')), expectedHeight = dimensionParam(url.searchParams.get('height'));
+  if ((expectedWidth === null) !== (expectedHeight === null)) error('INVALID_IMAGE');
   const max = purpose === 'rich_menu' ? 1024 * 1024 : 8 * 1024 * 1024;
   const declared = request.headers.get('content-length');
   if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > max || Number(declared) < 1)) error('MEDIA_SIZE_LIMIT');
@@ -30,6 +42,7 @@ export async function uploadHqImage(bucket: R2Bucket, authority: HqTemplateAutho
   const mimeType = image!.format === 'png' ? 'image/png' : 'image/jpeg';
   if (request.headers.get('content-type') !== mimeType) error('INVALID_IMAGE');
   if (purpose === 'rich_menu' && !validateRichMenuImage(bytes, bytes.length).ok) error('INVALID_RICH_MENU_IMAGE');
+  if (purpose === 'rich_menu' && expectedWidth !== null && expectedHeight !== null && (image!.width !== expectedWidth || image!.height !== expectedHeight)) error('INVALID_RICH_MENU_IMAGE');
   const origin = new URL(publicBaseUrl);
   if (origin.protocol !== 'https:' || origin.username || origin.password || origin.search || origin.hash) error('INVALID_PUBLIC_ORIGIN');
   const contentHash = await hash(bytes), id = await hash(new TextEncoder().encode(JSON.stringify([authority.tenantId, purpose, filename, contentHash])));
@@ -48,4 +61,32 @@ export async function uploadHqImage(bucket: R2Bucket, authority: HqTemplateAutho
   } catch { /* reconcile the exact key below */ }
   if (!isRegisteredHqMedia(await bucket.head(r2Key), media, authority.tenantId)) error('UPLOAD_UNCONFIRMED');
   return media;
+}
+
+/**
+ * R568: reclaim an upload that was never adopted (cancelled edit, replaced
+ * image). Only the owning tenant's own uploads path can be removed, and only
+ * after the stored ownership mark is verified. Missing objects are a
+ * successful no-op so cancel cleanup stays idempotent; anything outside the
+ * caller's ownership is NOT_FOUND without revealing what exists.
+ */
+export async function deleteHqImage(bucket: R2Bucket, authority: HqTemplateAuthority, r2Key: unknown): Promise<{ deleted: boolean }> {
+  if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || !/^[A-Za-z0-9_-]{1,128}$/.test(authority.tenantId)) error('FORBIDDEN');
+  const key = typeof r2Key === 'string' ? r2Key : '';
+  if (key.length < 1 || key.length > 400) error('INVALID_IMAGE');
+  const prefix = `hq-templates/${authority.tenantId}/uploads/`;
+  const rest = key.startsWith(prefix) ? key.slice(prefix.length) : '';
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(rest)) error('INVALID_IMAGE');
+  const object = await bucket.head(key);
+  if (!object) return { deleted: false };
+  const stored = object.customMetadata ?? {};
+  if (stored.hqTenant !== authority.tenantId) error('NOT_FOUND');
+  let registered = false;
+  try {
+    const manifest: unknown = JSON.parse(stored.hqMedia ?? 'null');
+    registered = Boolean(manifest) && typeof manifest === 'object';
+  } catch { registered = false; }
+  if (!registered) error('NOT_FOUND');
+  await bucket.delete(key);
+  return { deleted: true };
 }

@@ -659,7 +659,7 @@ function BroadcastList() {
                 onChange={(event) => setSavedViewName(event.target.value)}
                 className="border-hairline rounded-control min-w-64 border px-3 py-2 text-sm"
               />
-              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()}>{savedViewBusy ? '保存中…' : '保存する'}</Button>
+              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy}>保存する</Button>
               <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
             </div>
           )}

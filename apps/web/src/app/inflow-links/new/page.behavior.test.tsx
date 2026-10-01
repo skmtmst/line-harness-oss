@@ -164,7 +164,7 @@ describe('流入リンクの新規作成(実React)', () => {
     await click(byExactText('a', 'キャンセル'))
 
     byExactTextInBody('h2', '保存していない変更があります')
-    await click(byExactTextInBody('button', '保存せずに移動'))
+    await click(byExactTextInBody('button', '保存せずに移る'))
     expect(routerPush).toHaveBeenCalledWith('/inflow-links')
     expect(api.create).not.toHaveBeenCalled()
   })

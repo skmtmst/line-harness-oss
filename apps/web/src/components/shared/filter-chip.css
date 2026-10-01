@@ -84,3 +84,21 @@
     min-height: 44px;
   }
 }
+
+/*
+ * ★V8「絞り込みの札」（O2fCAt・XGJDa）：高さ30・文字12/500。
+ * 選んだ札は緑ではなく墨の地に白文字（押せるボタンと
+ * 区別するため、V8 は状態のオンを墨で出す）。
+ */
+[data-theme='v8'] .v6-filter-chip {
+  height: 30px;
+  gap: 5px;
+  padding: 0 10px;
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+[data-theme='v8'] .v6-filter-chip[aria-pressed='true'] {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+}

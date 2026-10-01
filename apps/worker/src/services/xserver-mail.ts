@@ -1,5 +1,6 @@
 import { connect } from 'cloudflare:sockets';
 import PostalMime, { type Address } from 'postal-mime';
+import { NEN_FROM_NAME } from './mail-from-name.js';
 import { storeSupportEmail } from './support-email.js';
 
 const CONNECTION_TIMEOUT_MS = 15_000;
@@ -19,6 +20,8 @@ type SendMailInput = {
   from: string;
   subject: string;
   body: string;
+  /** 差出人の表示名。省略時は 然-NEN- の窓口名。 */
+  fromName?: string;
   inReplyTo?: string;
   references?: string;
 };
@@ -315,7 +318,7 @@ export async function sendXServerMail(env: XServerMailEnv, input: SendMailInput)
     const headers = [
       `Date: ${new Date().toUTCString()}`,
       `Message-ID: ${messageId}`,
-      `From: =?UTF-8?B?${encodeBase64('然-NEN- お客様窓口')}?= <${safeHeader(input.from)}>`,
+      `From: =?UTF-8?B?${encodeBase64(safeHeader(input.fromName || NEN_FROM_NAME))}?= <${safeHeader(input.from)}>`,
       `To: <${safeHeader(input.to)}>`,
       `Reply-To: <${safeHeader(input.from)}>`,
       `Subject: =?UTF-8?B?${encodeBase64(safeHeader(input.subject))}?=`,

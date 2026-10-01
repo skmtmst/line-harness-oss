@@ -65,10 +65,21 @@ function ruleFixture() {
   }
 }
 
+/* D022: 見本は実APIの形に合わせる（monthChange・rankCounts・expiringMiles30d・nextExpiringAt・measuredAt は必須）。 */
 const friendsOverview = {
   items: [],
-  summary: { totalMembers: 1, withBalanceCount: 1, available: 100, pending: 0 },
+  summary: {
+    totalMembers: 1,
+    withBalanceCount: 1,
+    available: 100,
+    pending: 0,
+    monthChange: 0,
+    rankCounts: [],
+    expiringMiles30d: null,
+    nextExpiringAt: null,
+  },
   pagination: { total: 1, limit: 1, offset: 0 },
+  measuredAt: '2026-09-10T00:00:00.000Z',
 }
 
 /*

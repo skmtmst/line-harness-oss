@@ -31,6 +31,7 @@ import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import { loadFailureCopy } from '@/components/shared/api-error-message'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -186,6 +187,12 @@ function InflowLinksPageInner({
   const [loading, setLoading] = useState(true)
   // 一覧そのものを引けなかったとき。空（1件も無い）と言い分けるために持つ。
   const [loadFailed, setLoadFailed] = useState(false)
+  /*
+   * M029: 引けなかった原因そのもの。403は権限の案内にし、押しても
+   * 直らない再試行の口は出さない。429は待ち秒数を添えて再試行を残す。
+   * `ListState kind="error"` に `error` ごと渡す（m23mの共通文）。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [sort, setSort] = useState<RouteSort>('friends-desc')
   const [filter, setFilter] = useState<RouteFilter>('all')
   const [pageSize, setPageSize] = useState(20)
@@ -235,6 +242,7 @@ function InflowLinksPageInner({
       requestGeneration === loadRequestRef.current && accountAtRequest === latestAccountRef.current
     setLoading(true)
     setLoadFailed(false)
+    setLoadError(null)
     // ref-summary は selectedAccountId を渡すと「そのアカで実流入があった
     // ref_code のみ」に絞れる。pool_id NULL のリンクが多い現状ではアカ別の
     // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
@@ -292,10 +300,12 @@ function InflowLinksPageInner({
           })),
         )
       }
-    } catch {
+    } catch (e) {
       if (!isCurrent()) return
       // 一覧そのものが引けない。空と言い分けるため、失敗として覚える。
+      // M029: 原因も残し、403・429を言い分けた1枚にする。
       setLoadFailed(true)
+      setLoadError(e)
       setSummary(null)
       setSummaryAvailable(false)
     } finally {
@@ -702,6 +712,12 @@ function InflowLinksPageInner({
   */
   const routeCountAvailable = !loading && !loadFailed
   /*
+   * M029: 取得失敗の1枚の中身。403は権限の案内で再試行なし、
+   * 429は待ち秒数つきで再試行あり、それ以外は今までどおりの1枚。
+   * 原因が無い（成功応答の失敗）は共通の1枚に倒す。
+   */
+  const loadFailure = loadError ? loadFailureCopy(loadError, '流入経路') : null
+  /*
     #980: 「流入経路」タブの件数は一覧と同じ集合から数えてホストへ渡す。
     フォルダ選択・検索・絞り込みで変わる数ではなく、「このアカウントに
     見えている流入経路の総数」= accountFilteredRows（FolderPanel の
@@ -916,26 +932,41 @@ function InflowLinksPageInner({
       {loading ? (
         <ListState kind="loading" title="流入経路を読み込んでいます" />
       ) : loadFailed ? (
+        /*
+         * M029: 原因をそのまま渡す。403は権限の案内になり再試行の口は
+         * 出ない（押しても直らない）。429とそれ以外は同じ画面から
+         * 取り直せる（`onRetry` が再取得する）。
+         */
         <ListState
           kind="error"
-          title="流入経路を読み込めませんでした"
-          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          action={
-            <Button variant="secondary" onClick={() => void load()}>
-              流入経路を再読み込み
-            </Button>
-          }
+          title={loadFailure?.title}
+          description={loadFailure?.description}
+          error={loadError ?? undefined}
+          onRetry={loadFailure?.retryable ? () => void load() : undefined}
         />
       ) : sortedRows.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
-          description={
-            selectedGenre
-              ? '上の「＋ 流入リンクを作る」から作ると、ここに出ます。'
-              : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
-          }
-        />
+        /*
+         * R173: 絞り込み・検索で0件のときは「まだ無い」と言わない。
+         * 登録があるのに未登録向けの案内（最初のフォルダ作り）を出すと、
+         * あるはずの経路が消えたように見える。条件を変える案内にする。
+         */
+        accountFilteredRows.length > 0 && (normalizedSearch !== '' || filter !== 'all' || selectedGenre !== '') ? (
+          <ListState
+            kind="empty"
+            title="条件に合う流入経路がありません"
+            description="検索や絞り込みの条件を変えてください。"
+          />
+        ) : (
+          <ListState
+            kind="empty"
+            title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
+            description={
+              selectedGenre
+                ? '上の「＋ 流入リンクを作る」から作ると、ここに出ます。'
+                : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
+            }
+          />
+        )
       ) : (
         <div className="overflow-hidden rounded-control border border-hairline bg-canvas">
           <table className="w-full table-fixed text-xs">
@@ -1452,8 +1483,8 @@ function BulkRoutesDialog({
             キャンセル
           </Button>
           {action && affected.length > 0 ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }}>
-              {busy ? '実行中…' : `${formatNumber(affected.length)}件に実行する`}
+            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
+              {`${formatNumber(affected.length)}件に実行する`}
             </Button>
           ) : null}
         </div>

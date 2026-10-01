@@ -196,8 +196,7 @@ export default function OpsMembersPage() {
                     ) : (
                       <span className="inline-flex gap-2">
                         {m.isActive && m.activationState !== 'active' ? (
-                          <Button size="field" onClick={() => void resend(m)} disabled={resendingId !== null}>
-                            {resendingId === m.staffId ? '送信中…' : '再送'}
+                          <Button size="field" onClick={() => void resend(m)} disabled={resendingId !== null} busy={resendingId === m.staffId} busyLabel="送信中…">再送
                           </Button>
                         ) : null}
                         <Button size="field" onClick={() => setToggling(m)} disabled={busy}>

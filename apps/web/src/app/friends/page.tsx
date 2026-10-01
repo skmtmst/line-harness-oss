@@ -20,6 +20,7 @@ import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
+import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
@@ -101,6 +102,12 @@ function FriendsPageInner({
   const scoredOnly = searchParams.get('scoredOnly') === '1'
   const audienceId = searchParams.get('audienceId')?.trim() || ''
   const directSavedSearchId = searchParams.get('savedSearch')
+  /*
+   * ★V8：上の帯の探す欄からの受け口（`/friends?q=…`）。URL に語が
+   * あれば最初からその言葉で絞る。保存してある一覧の状態では
+   * 上書きしない（明示の指示を優先）。
+   */
+  const directQuery = (searchParams.get('q') ?? '').trim()
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -113,14 +120,20 @@ function FriendsPageInner({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(20)
   const [selectedTagId, setSelectedTagId] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [searchSubmitted, setSearchSubmitted] = useState('')
+  const [searchInput, setSearchInput] = useState(directQuery)
+  const [searchSubmitted, setSearchSubmitted] = useState(directQuery)
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [responseFilter, setResponseFilter] = useState<ResponseFilter>('all')
   const [operatorId, setOperatorId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  /*
+   * 読み直し中（★V7 sTJsh §2）。行が出ているあとの再取得では
+   * 一覧を消さず、表を薄めて上に線の帯を出す。
+   */
+  const [refreshing, setRefreshing] = useState(false)
+  const hasRowsRef = useRef(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])
@@ -133,6 +146,7 @@ function FriendsPageInner({
    */
   const loadContextRef = useRef({ accountId: selectedAccountId, page, pageSize })
   loadContextRef.current = { accountId: selectedAccountId, page, pageSize }
+  hasRowsRef.current = friends.length > 0
 
   /*
    * IDEA-03「3ページ以上の移動と戻る操作で条件・位置を保持」。
@@ -143,7 +157,7 @@ function FriendsPageInner({
    */
   const restoredRef = useRef(false)
   const [restored, setRestored] = useState(false)
-  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId)
+  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directQuery !== ''
   useEffect(() => {
     if (restoredRef.current || accountLoading) return
     restoredRef.current = true
@@ -294,9 +308,19 @@ function FriendsPageInner({
     const requestedAccountId = selectedAccountId
     const requestedPage = page
     const requestedPageSize = pageSize
-    setLoadStatus('loading')
-    setFriends([])
-    setTotal(0)
+    /*
+     * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。すでに行が出て
+     * いるときは消さず薄めるだけにし、件数・ページ番号も新しい答えが
+     * 来るまで前のままにする。行が無いとき（初回・失敗あと）は
+     * 従来どおり読み込みの1枚を出す。
+     */
+    if (hasRowsRef.current) {
+      setRefreshing(true)
+    } else {
+      setLoadStatus('loading')
+      setFriends([])
+      setTotal(0)
+    }
     setBulkOpen(false)
     setSelectedIds(new Set())
     try {
@@ -328,10 +352,12 @@ function FriendsPageInner({
         setTotal(response.data.total)
         setSelectedIds(new Set())
         setLoadStatus('ready')
+        setRefreshing(false)
       } else {
         setFriends([])
         setTotal(0)
         setLoadStatus('error')
+        setRefreshing(false)
       }
     } catch {
       if (requestId !== loadRequestRef.current) return
@@ -342,10 +368,27 @@ function FriendsPageInner({
       setFriends([])
       setTotal(0)
       setLoadStatus('error')
+      setRefreshing(false)
     }
   }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
+  /*
+   * タグの付け外しは押した瞬間に一覧へ反映する（★V7 sTJsh §1）。
+   * 返す関数を呼ぶと変更前の並びへ戻る（元に戻す・失敗時の復元用）。
+   */
+  const applyFriendTags = useCallback((friendId: string, next: Tag[]) => {
+    const previous = friends.find((friend) => friend.id === friendId)?.tags ?? []
+    setFriends((current) =>
+      current.map((friend) => (friend.id === friendId ? { ...friend, tags: next } : friend)),
+    )
+    return () => {
+      setFriends((current) =>
+        current.map((friend) => (friend.id === friendId ? { ...friend, tags: previous } : friend)),
+      )
+    }
+  }, [friends])
+
   useEffect(() => void loadMarks(), [loadMarks])
   useEffect(() => setPage(1), [selectedAccountId])
   useEffect(() => {
@@ -526,7 +569,7 @@ function FriendsPageInner({
               保存した検索
             </button>
           ) : null}
-          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-control bg-accent-deep text-label font-medium text-on-accent hover:brightness-92">検索</button>
+          <Button variant="primary" className="h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap text-label font-medium border-0" type="submit">検索</Button>
         </form>
 
         {advanced?.summary.length ? (
@@ -637,34 +680,6 @@ function FriendsPageInner({
         ) : null}
       </section>
 
-      {selectedIds.size > 0 ? (
-        <section className={`rounded-card border border-accent-border bg-accent-soft p-3 shadow-card`} data-design="V4BulkBar">
-          <div className="flex flex-wrap items-center gap-2">
-            <strong className="text-sm text-ink">{selectedIds.size}人を選択中</strong>
-            <span className="text-xs text-ink-secondary">対象を確認してから操作を選んでください</span>
-            {selectedIds.size > 1 && canRunBulk(staffRole) ? (
-              <Button
-                variant="primary"
-                className="ml-auto"
-                data-qa-open="IAf7j"
-                onClick={() => setBulkOpen(true)}
-              >
-                操作を選ぶ
-              </Button>
-            ) : null}
-            {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
-              /* 権限が無いときは押し口を出さない。理由だけ書く。 */
-              <span className="text-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
-            ) : null}
-          </div>
-          {selectedIds.size === 1 ? (
-            <div className="mt-2">
-              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
       <BulkRunDialog
         open={bulkOpen}
         friendIds={selectedFriendIds}
@@ -678,6 +693,7 @@ function FriendsPageInner({
       <FriendListTable
           friends={friends}
           status={loadStatus}
+          refreshing={refreshing}
           emptyTitle={emptyMessage.title}
           emptyDescription={emptyMessage.description}
           onRetry={() => void loadFriends()}
@@ -693,6 +709,45 @@ function FriendsPageInner({
           onPageSizeChange={(size) => resetPageWith(() => setPageSize(size as (typeof PAGE_SIZE_OPTIONS)[number]))}
           onToggleAttention={toggleAttention}
       />
+
+      {/*
+        ★V7 仕上げ §2: 一括バーは表のすぐ下に置き、1件でも選ぶと
+        下端から8px上がって出る。0件で下がって消える。
+      */}
+      <span data-design="V4BulkBar" className="block">
+        <BulkBar
+          count={selectedIds.size}
+          unit="人"
+          hint="対象を確認してから操作を選んでください"
+          below={selectedIds.size === 1 ? (
+            <div className="mt-2">
+              <SingleFriendActions
+                friendId={[...selectedIds][0]}
+                friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'}
+                tags={allTags}
+                accountId={selectedAccountId}
+                onDone={loadFriends}
+                friendTags={friends.find((friend) => friend.id === [...selectedIds][0])?.tags ?? []}
+                onFriendTagsChange={(next) => applyFriendTags([...selectedIds][0], next)}
+              />
+            </div>
+          ) : undefined}
+        >
+          {selectedIds.size > 1 && canRunBulk(staffRole) ? (
+            <Button
+              variant="secondary"
+              data-qa-open="IAf7j"
+              onClick={() => setBulkOpen(true)}
+            >
+              操作を選ぶ
+            </Button>
+          ) : null}
+          {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
+            /* 権限が無いときは押し口を出さない。理由だけ書く。 */
+            <span className="text-ink-faint text-xs">一括操作ができるのはオーナーと管理者だけです</span>
+          ) : null}
+        </BulkBar>
+      </span>
 
       {advancedOpen ? (
         <style>{`
@@ -818,7 +873,7 @@ function FriendsPageHost() {
           active={tab}
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken disabled:text-ink-disabled">表示中をCSVで書き出す</button> : null}
+              {tab === 'list' ? <Button variant="secondary" className="h-9.5 px-4 text-ink-secondary disabled:text-ink-disabled whitespace-normal" type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage}>表示中をCSVで書き出す</Button> : null}
             </div>
           )}
         />

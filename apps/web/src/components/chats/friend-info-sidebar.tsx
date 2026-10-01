@@ -8,6 +8,7 @@ import { tagTextColor } from '@/lib/presentation'
 import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { GripVertical, X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 
@@ -481,18 +482,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-ink">顧客情報</h3>
           </div>
-          <button
-            type="button"
-            ref={settingsButtonRef}
-            onClick={() => {
+          <Button variant="secondary" className="mr-14 h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-[11px] text-ink-faint" type="button" ref={settingsButtonRef} onClick={() => {
               if (!showSettings) updateSettingsPanelPos()
               setShowSettings(!showSettings)
-            }}
-            aria-expanded={showSettings}
-            className="mr-14 inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-[11px] font-semibold text-ink-faint hover:bg-canvas-sunken"
-          >
+            }} aria-expanded={showSettings}>
             表示項目
-          </button>
+          </Button>
         </div>
         {showSettings && typeof document !== 'undefined' ? createPortal(
           <div
@@ -592,26 +587,27 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4 space-y-3 animate-pulse">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-pill bg-shell-gray" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-shell-gray rounded-mini w-32" />
-                <div className="h-2 bg-shell rounded-mini w-20" />
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div className="p-4 space-y-3 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-pill bg-shell-gray" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-shell-gray rounded-mini w-32" />
+                    <div className="h-2 bg-shell rounded-mini w-20" />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            }
+          />
         ) : error ? (
           /* INBOX-08: 失敗は文字だけにせず、その場で再試行できるようにする。 */
           <div className="space-y-2 p-4">
             <p className="text-xs text-danger">{error}</p>
-            <button
-              type="button"
-              onClick={() => setFriendRetry((key) => key + 1)}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-1.5 text-xs font-semibold"
-            >
+            <Button variant="secondary" className="text-ink-secondary items-center px-3 py-1.5 text-xs h-auto whitespace-normal" type="button" onClick={() => setFriendRetry((key) => key + 1)}>
               再試行する
-            </button>
+            </Button>
           </div>
         ) : friend ? (
           <div className="flex flex-col divide-y divide-hairline">
@@ -644,12 +640,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   ブロック済
                 </span>
               )}
-              <a
-                href={`/friends/detail?id=${friend.id}`}
-                className="border-hairline text-action mt-3 inline-flex items-center rounded-control border px-3 py-2 text-xs font-semibold hover:bg-canvas-sunken"
-              >
+              <Button variant="secondary" className="text-action mt-3 items-center px-3 py-2 text-xs h-auto whitespace-normal" href={`/friends/detail?id=${friend.id}`}>
                 友だち詳細
-              </a>
+              </Button>
             </div>
 
             {/*
@@ -677,7 +670,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">マイル</h4>
               {mileage.kind === 'loading' ? (
-                <div className="h-24 animate-pulse rounded-card bg-shell" />
+                <DelayedSkeleton loading skeleton={<div className="h-24 animate-pulse rounded-card bg-shell" />} />
               ) : mileage.kind === 'error' ? (
                 /* INBOX-08: 失敗と未登録を分け、その場で再試行できる。 */
                 <div className="space-y-1.5">
@@ -863,7 +856,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 </a>
               </div>
               {friendFields.kind === 'loading' ? (
-                <div className="h-10 animate-pulse rounded-control bg-canvas-sunken" />
+                <DelayedSkeleton loading skeleton={<Skeleton className="block h-10 w-full rounded-control" />} />
               ) : friendFields.kind === 'error' ? (
                 <div className="space-y-1.5">
                   <p className="text-[11px] text-danger">項目を読み込めませんでした</p>

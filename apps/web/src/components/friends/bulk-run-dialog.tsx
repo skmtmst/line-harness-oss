@@ -496,9 +496,8 @@ export default function BulkRunDialog({
               <Button
                 variant="primary"
                 disabled={!canExecute({ preview, busy, irreversibleConfirmed, reversible })}
-                onClick={() => void execute()}
-              >
-                {busy ? '実行中…' : `${countText(preview.targetCount, '人')}に実行`}
+                onClick={() => void execute()} busy={busy} busyLabel="実行中…">
+                {`${countText(preview.targetCount, '人')}に実行`}
               </Button>
             </div>
           </div>

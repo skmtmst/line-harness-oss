@@ -229,6 +229,11 @@
   --radius-icon: 3px;
   /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
   --radius-mini: 6px;
+  /* Pencil ★V8 印のタイル（C9CaMS・E7USZ9・A2mryd）。小22→7、中28・大32→9。 */
+  --radius-tile-sm: 7px;
+  --radius-tile: 9px;
+  /* Pencil ★V8 切り替えの項目（dtJVi）。器は $radius-control、中の項目は 8。 */
+  --radius-segment: 8px;
   /* Pencil `$radius-lg`(18px)。`PhxG6` の友だちアバター(40x40)と
      保存条件チップ用。Tailwind 既定の `rounded-lg` は上書きしない
      （既存85ファイルの角丸が8pxから18pxへ変わってしまう）。 */
@@ -373,6 +378,62 @@
    */
   --default-transition-duration: 120ms;
   --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- ★V8 で増える語彙 -------------------------------------------------
+   * V8 移行② で足した名前。値はどのテーマでも同じ新しい語彙なので
+   * `@theme` に置く（V8 だけ値が違うものは下の `[data-theme="v8"]` へ）。
+   * 移行が終わるまで v7 の画面はこれらを読まない。
+   *
+   * 出どころ: Pencil ★V8 板（lh-work/design/v8/）と COMPONENT-MAP.md の
+   * オーナー決まり。
+   */
+
+  /*
+   * 表の区切り線。hairline（#dadde2）より薄い #eceef1。
+   * 表の行の間・数の帯の縦線など、板の中の細かい割れ目に使う。
+   */
+  --color-divider: #eceef1;
+  /* 表の見出しの行の地（★V8 表の寸法「見出し 44・地 table-head」）。 */
+  --color-table-head: #fafafb;
+  /* 受信箱で自分が送った吹き出しの地（★V8 受信箱の型）。 */
+  --color-chat-outgoing: #dff5e7;
+  /*
+   * 白い板の枠と影（★V8 外側「灰色の地に白い板1枚」）。
+   * 枠は ink の 8%、影は 4% で、hairline の実線より弱い輪郭にする。
+   */
+  --color-board-line: #1d1d1f14;
+  --shadow-board: 0 1px 2px #1d1d1f0a;
+  /* 左メニューで「いまの項目」の白い札にのせる薄い影（ink 8%）。 */
+  --shadow-nav-active: 0 1px 2px #1d1d1f14;
+  /*
+   * 灰色の地の上での「乗せたとき」の薄い白（左メニューの項目の hover）。
+   * 地より少し明るいだけなので、板の中の hover には使わない。
+   */
+  --color-nav-hover: #ffffff8c;
+  /*
+   * 印のタイル（数の帯のアイコン地）の6色。**タイルの中だけで使う**決まりで、
+   * 状態の色・アクセントとは別系統。画面のボタンや文字には使わない。
+   */
+  --color-icon-tile-green: #16a34a;
+  --color-icon-tile-orange: #f97316;
+  --color-icon-tile-blue: #3b82f6;
+  --color-icon-tile-purple: #8b5cf6;
+  --color-icon-tile-slate: #64748b;
+  --color-icon-tile-red: #ef4444;
+
+  /*
+   * 主ボタンの緑の影＋内側の白い照り（Pencil V8 ボタン/主 doYdE の
+   * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
+   * なりすぎないようにする。
+   */
+  --shadow-primary-action:
+    0 1px 2px #087a3e40,
+    inset 0 1px 0 rgb(255 255 255 / 0.15);
+  /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
+  --color-toggle-off: #c9ced6;
+  /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
+  --color-star-on: #fbbf24;
+  --color-star-on-edge: #f59e0b;
 }
 
 :root {
@@ -396,8 +457,141 @@
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
+  /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
+  --motion-pulse: 1.2s;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 テーマ（V8 移行②）
+ *
+ * `<html data-theme="v8">` のときだけ効く、V7 と値の違うトークン。
+ * ここに無いトークンは :root（＝V7）の値がそのまま効く。
+ * 既定は v7。検証環境は環境変数 NEXT_PUBLIC_ADMIN_THEME=v8、担当者は
+ * 設定画面の「画面の見た目（試作）」で切り替える（layout.tsx 参照）。
+ *
+ * 値の出どころは Pencil ★V8（~/Downloads/LINE-Harness-V8.pen）と
+ * lh-work/design/v8/COMPONENT-MAP.md。部品ごとの移行（④）で、部品が
+ * 必要とする値をここへ足していく。
+ *
+ *   control 8→10  ボタン・入力・選ぶ欄・探す欄の角丸（板「角丸 10」）
+ *   panel  12→16  白い板・ダイアログの角丸（板「角丸 16」、ダイアログ 16〜20）
+ *   text-lh  1.4→1.5  部品の文字の行の高さ（Pencil の部品は全部 1.5。
+ *     部品側は `line-height: var(--text-lh, 1.4)` と書き、v7 は
+ *     既定値 1.4 が効いて1画素も変わらない）
+ *   control-border  操作する部品の枠の色（入力・選ぶ・検索・チェック・
+ *     ラジオ・トグルのオフ・OTP・色を選ぶ・カードの中の印）。カードや
+ *     表・外側の板の枠は hairline のまま（#868e98、板「枠線の色」）
+ */
+[data-theme="v8"] {
+  --radius-control: 10px;
+  --radius-panel: 16px;
+  --text-lh: 1.5;
+  --color-control-border: #868e98;
+}
+
+/*
+ * ★V8 移行③: 外側（灰色の地・白い板1枚・上の帯）。
+ *
+ * 構造は v7 と同じ HTML のまま、v8 のときだけ見た目を切り替える。
+ * 画面をまたぐ規定（地の色・出し分けの印）はここへ。部品の中の値は
+ * 各部品の CSS Module が `[data-theme="v8"]` で上書きする。
+ *
+ * `.v8-only` / `.v7-only` は「そのテーマのときだけ出る要素」の印。
+ * v8 の新しい操作（検索・通知・メニュー畳み）は v7 では描かない。
+ */
+[data-theme="v8"] .v7-only {
+  display: none !important;
+}
+
+html:not([data-theme="v8"]) .v8-only {
+  display: none !important;
+}
+
+/* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
+[data-theme="v8"] body {
+  background-color: var(--color-shell);
+}
+
+/* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
+   メニューと組むので、狭い PC 幅でも帯を畳まない。 */
+@media (min-width: 1024px) {
+  [data-theme="v8"] .v8-topbar-wrap {
+    display: block;
+  }
+}
+
+/*
+ * ★V8「骨格の行」（MOTION.md）：v7 の点滅（animate-pulse）ではなく、
+ * 光が左から右へ流れる（1200ms・繰り返し）。`data-skeleton` は
+ * shared/skeleton.tsx が付ける印。Tailwind の animate-pulse（utilities
+ * 層）よりここ（層なし）が強いので、v8 ではこの動きが勝つ。
+ * 「動きを減らす」設定では末尾の規定で一瞬になる。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-skeleton] {
+    background-image: linear-gradient(
+      100deg,
+      transparent 40%,
+      rgb(255 255 255 / 0.55) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: v8-skeleton-shimmer 1200ms linear infinite;
+  }
+}
+
+@keyframes v8-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * ★V8「手順」（NUOgw）：白い板の中に枠付きカードを重ねない。
+ * 段の丸・文字・つなぎ線は変えず、囲い（枠・地・余白）だけを取る。
+ */
+[data-theme="v8"] [data-part="stepper"] {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+/*
+ * ★V8「注目の星」（Pencil zcGgI / w0R1PQ・オーナー決定 2026-10-01）：
+ * オフは灰の線のまま、オンで黄色い塗り（#fbbf24）＋濃い黄の縁（#f59e0b）。
+ * 使う側（友だち一覧の行）は `data-part="attention-star"` を付けるだけ。
+ * オンになった瞬間、星が小さくふくらんで戻る（200ms・MOTION.md）。
+ */
+[data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
+  color: var(--color-star-on-edge);
+  fill: var(--color-star-on);
+  stroke: var(--color-star-on-edge);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
+    animation: v8-star-pop var(--motion-base) var(--motion-ease-out);
+  }
+}
+
+@keyframes v8-star-pop {
+  0% {
+    transform: scale(0.85);
+  }
+
+  60% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* ---------------------------------------------------------------------
@@ -453,6 +647,114 @@ aside[aria-label="フォルダ"] .shadow-lg {
   box-shadow: var(--shadow-overlay);
 }
 
+/* ---------------------------------------------------------------------
+ * ★V7 仕上げ「読み込みと初回表示の動き」（`z97zZN` §1・§3 / `sTJsh` §2）
+ * ------------------------------------------------------------------- */
+
+/*
+ * §3 骨組みの明滅。不透明度 1↔0.55・1.2秒の ease-in-out。光が流れる
+ * 演出（shimmer）は使わない。Tailwind 既定の `animate-pulse`（2秒・0.5）
+ * をここで V7 の速さに揃えるので、既存の骨組みもこの規定に乗る。
+ * 新しく骨組みを置くときは shared の `Skeleton` を使う。
+ * 「動きを減らす」設定では末尾の reduced-motion 規定が一瞬にする。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-pulse {
+    animation: v7-skeleton-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
+  }
+}
+
+@keyframes v7-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/*
+ * §1 最初に開いたときの入り方。不透明度 0→1＋下から8px上がる、
+ * --motion-base(200ms) の ease-out。同じ段の中では 1 つずつ 40ms ずらし、
+ * 4 つ目以降は同時に出す（板の「全体 320ms 以内」）。ずらし幅の 40ms は
+ * 板の指定値で、--motion-* は transition の長さの系なのでここでは
+ * 直接値を書く。表の行には使わず、表ごとに 1 回だけかける
+ * （入れ物に `.v7-stagger` を付ける）。`both` の終端が最終表示なので、
+ * reduced-motion で一瞬に潰れても表示は正しい。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .v7-stagger > * {
+    animation: v7-rise var(--motion-base) var(--motion-ease-out) both;
+  }
+  .v7-stagger > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .v7-stagger > :nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .v7-stagger > :nth-child(n + 4) {
+    animation-delay: 120ms;
+  }
+}
+
+@keyframes v7-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/*
+ * `sTJsh` §2 前の表示を残したまま読み直す。読み直し中は中身を 0.55 に
+ * 薄め、上に 2px の線の帯を流す。出す・消すの判定（0.3 秒より早い応答
+ * では出さない）は shared `RefreshCover` が持つ。reduced-motion では
+ * 棒は左端に置いたままにする（止まっていても「読み直し中」の印になる）。
+ */
+.v7-refresh {
+  position: relative;
+}
+
+.v7-refresh-dim {
+  opacity: 0.55;
+}
+
+.v7-refresh-line {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 2px;
+  overflow: hidden;
+}
+
+.v7-refresh-line::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  border-radius: 1px;
+  background: var(--color-accent);
+  content: '';
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .v7-refresh-line::before {
+    animation: v7-refresh-sweep 1s var(--motion-ease-in-out) infinite;
+  }
+}
+
+@keyframes v7-refresh-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
 /*
  * フォルダパネルは枠線だけの平らな面だったので、カードの影で面から
  * 浮かせる。パネル内の「…」メニュー（Tailwind の shadow-lg）は
@@ -464,6 +766,16 @@ aside[aria-label="フォルダ"] {
 
 aside[aria-label="フォルダ"] .shadow-lg {
   box-shadow: var(--shadow-float);
+}
+
+/*
+ * 欄の誤りは枠を赤くする（★V7 sTJsh §6）。共有入力部品は各自の CSS で
+ * 持っているが、画面に直接書いた `<input>` も同じ色になるようここで揃える。
+ */
+input[aria-invalid='true'],
+textarea[aria-invalid='true'],
+select[aria-invalid='true'] {
+  border-color: var(--color-danger);
 }
 
 /*
@@ -495,7 +807,7 @@ aside[aria-label="フォルダ"] .shadow-lg {
 
   @media (prefers-reduced-motion: no-preference) {
     :is(button, [role='button']):not(:disabled, [aria-disabled='true'], .w-full, [role='tab'], [role='option'], [role='menuitem'], [role='switch'], [role='gridcell'] *):active {
-      scale: 0.96;
+      scale: 0.98;
     }
   }
 }
@@ -582,9 +894,9 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   }
 
   /*
-   * #673 押した感触。ボタンは160msかけて少し沈み（scale 0.97）、離すと
-   * 戻る。押した瞬間の反応は `--motion-instant` 系ではなく、指に追従
-   * して見える 160ms にする（#673 の指定値）。
+   * #673 押した感触。★V7 仕上げ §2「押した」にそろえて、沈む動きは
+   * 上の `scale` 規定（0.98倍・motion-instant）に一本化した。
+   * ここに残すのは色と影のなめらか化だけ。
    *
    * 部品が持っている transition（共通 Button の CSS Module、
    * `transition-colors` などのユーティリティ）は base 層より強いので
@@ -594,17 +906,11 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
     transition:
-      transform 160ms var(--motion-ease-out),
       background-color var(--motion-fast) ease-out,
       border-color var(--motion-fast) ease-out,
       color var(--motion-fast) ease-out,
       box-shadow var(--motion-fast) ease-out,
       opacity var(--motion-fast) ease-out;
-  }
-
-  button:not(:disabled):active,
-  [role="button"]:not([aria-disabled="true"]):active {
-    transform: scale(0.97);
   }
 
   /*

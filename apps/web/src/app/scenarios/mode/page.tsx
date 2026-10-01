@@ -9,6 +9,8 @@ import { ApiError, api } from '@/lib/api'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
+import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
@@ -44,6 +46,13 @@ function ScenarioModeContent() {
   const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(
     id ? 'loading' : 'ready',
   )
+  /*
+   * D023: id ありの読み込み失敗は決まった文だけで読み直し口が無い。
+   * 捕まえた失敗を共通部品へ渡し、その場で読み直せるようにする
+   * （403 は再試行を出さない、429 は待ち案内）。
+   */
+  const [scenarioError, setScenarioError] = useState<unknown>(null)
+  const [scenarioReloadKey, setScenarioReloadKey] = useState(0)
   const [saving, setSaving] = useState<DeliveryMode | null>(null)
   /*
    * ★V7: 2択はカードごとの緑ボタンで即確定させない。カード全体を選ぶ
@@ -111,6 +120,7 @@ function ScenarioModeContent() {
     // id があるときだけ既存の行を読む。新規（id なし）は読む行が無い。
     if (id) {
     setScenarioState('loading')
+    setScenarioError(null)
     void scenarioReferenceData.scenario(id)
       .then((res) => {
         if (!active) return
@@ -120,19 +130,19 @@ function ScenarioModeContent() {
           setFolderId(res.data.folderId ?? '')
           setScenarioState('ready')
         } else {
-          setError('シナリオを読み込めませんでした。時間をおいてもう一度お試しください。')
+          setScenarioError(null)
           setScenarioState('error')
         }
       })
-      .catch(() => {
+      .catch((caught) => {
         if (active) {
-          setError('シナリオを読み込めませんでした。時間をおいてもう一度お試しください。')
+          setScenarioError(caught)
           setScenarioState('error')
         }
       })
     }
     return () => { active = false }
-  }, [id])
+  }, [id, scenarioReloadKey])
 
   /*
    * SCENARIO-20: フォルダはアカウント単位。無指定で全権限範囲を取ると、
@@ -329,6 +339,26 @@ function ScenarioModeContent() {
             シナリオ名と配信方式を決めると作成されます。途中で閉じても一覧には残りません。
           </Notice>
         )}
+        {/* D023: id ありの読み込み失敗は読み直し口つきの1枚にする。
+            403・429だけ共通理由へ切り替える（保存不可文は残し両立。再試行の
+            有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま。 */}
+        {(() => {
+          const scenarioFailure = scenarioError ? loadFailureCopy(scenarioError, 'シナリオ') : null
+          const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
+          return id && scenarioState === 'error' ? (
+            <TargetMissing
+              kind="error"
+              title={useCommonReason && scenarioFailure ? scenarioFailure.title : 'シナリオを読み込めませんでした'}
+              description={
+                useCommonReason && scenarioFailure
+                  ? `配信方式の選択・保存はできません。${scenarioFailure.description}`
+                  : '配信方式の選択・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'
+              }
+              error={scenarioError ?? undefined}
+              onRetry={() => setScenarioReloadKey((key) => key + 1)}
+            />
+          ) : null
+        })()}
         {error && <Notice tone="danger" message={error} />}
       </div>
 
@@ -456,9 +486,8 @@ function ScenarioModeContent() {
           <Button
             variant="primary"
             disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}
-            onClick={() => { if (selectedMode) void choose(selectedMode) }}
-          >
-            {saving !== null ? '作成中…' : id ? 'この方式で保存する' : 'この方式で作る'}
+            onClick={() => { if (selectedMode) void choose(selectedMode) }} busy={saving !== null} busyLabel="作成中…">
+            {id ? 'この方式で保存する' : 'この方式で作る'}
           </Button>
         </div>
       </div>

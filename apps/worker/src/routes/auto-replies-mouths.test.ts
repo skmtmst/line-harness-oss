@@ -246,7 +246,8 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
     expect(saved.status).toBe(200);
     await expect(saved.json()).resolves.toMatchObject({
       data: {
-        versionNumber: 2,
+        // m26c R551: 保存ごとに版が進む。同じ版の後続保存は競合になる。
+        versionNumber: 3,
         settings: {
           receiveSources: ['line', 'email'],
           internalMemo: '担当者だけが読むメモ',
@@ -258,13 +259,13 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
 
     const stale = await target.instance.request(
       '/api/auto-replies/rule-1/draft',
-      request('PUT', { ...settings(), expectedVersion: 1 }),
+      request('PUT', { ...settings(), expectedVersion: 2 }),
       target.bindings,
     );
     expect(stale.status).toBe(409);
     await expect(stale.json()).resolves.toMatchObject({
       code: 'VERSION_CONFLICT',
-      data: { currentVersion: 2 },
+      data: { currentVersion: 3 },
     });
   });
 });

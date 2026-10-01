@@ -260,6 +260,9 @@ const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | '
   { id: 'monitoring', label: '見張り自体', icon: '◎', description: '5分ごとの確認が動いているか', threshold: '10分止まると「エラー」', href: '/emergency?tab=health' },
 ]
 
+/** 常時描画する確認項目の数。案内の文言はここから作り、数だけ書き換えない。 */
+const CHECK_COUNT = CHECK_DEFINITIONS.length
+
 const HEALTH_CHECK_ID: Record<OperationHealthCheckKey, HealthCheckId> = {
   line_connection: 'line',
   message_quota: 'quota',
@@ -440,8 +443,8 @@ function OperationAlertsPanel({
           <div><dt className="font-medium text-ink-faint">担当</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{alert.acknowledgedById ?? 'まだ受領されていません。下の「受領する」で担当が記録されます。'}</dd></div>
           <div><dt className="font-medium text-ink-faint">直し方</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{response.recovery} <Link href={response.href} className="font-medium text-action hover:underline focus-visible:underline">対象画面へ</Link></dd></div>
         </dl>}
-        {alert.status === 'open' && <div className="flex flex-wrap items-end gap-2"><label className="min-w-56 flex-1 text-xs font-medium text-ink-secondary" htmlFor={`operation-alert-note-${alert.id}`}>受領メモ（任意）<input id={`operation-alert-note-${alert.id}`} value={notes[alert.id] ?? ''} maxLength={500} onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))} disabled={busy} className="border-hairline rounded-control mt-1 block min-h-9 w-full border bg-canvas px-3 text-sm font-normal text-ink" /></label><Button variant="primary" disabled={busy} onClick={() => void onAcknowledge(alert, notes[alert.id] ?? '')}>{busy ? '保存中…' : '受領する'}</Button></div>}
-        {alert.notification.failed + alert.notification.unconfigured > 0 && <button type="button" disabled={busy} onClick={() => void onRetry(alert)} className="rounded-control min-h-9 border border-danger px-3 text-xs font-semibold text-danger disabled:opacity-50">{busy ? '処理しています…' : alert.notification.unconfigured > 0 ? '通知先を再確認する' : '失敗した通知を再送する'}</button>}
+        {alert.status === 'open' && <div className="flex flex-wrap items-end gap-2"><label className="min-w-56 flex-1 text-xs font-medium text-ink-secondary" htmlFor={`operation-alert-note-${alert.id}`}>受領メモ（任意）<input id={`operation-alert-note-${alert.id}`} value={notes[alert.id] ?? ''} maxLength={500} onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))} disabled={busy} className="border-hairline rounded-control mt-1 block min-h-9 w-full border bg-canvas px-3 text-sm font-normal text-ink" /></label><Button variant="primary" disabled={busy} onClick={() => void onAcknowledge(alert, notes[alert.id] ?? '')} busy={busy}>受領する</Button></div>}
+        {alert.notification.failed + alert.notification.unconfigured > 0 && <Button variant="danger" className="min-h-9 px-3 text-xs text-danger disabled:opacity-50 h-auto whitespace-normal" type="button" disabled={busy} onClick={() => void onRetry(alert)}>{busy ? '処理しています…' : alert.notification.unconfigured > 0 ? '通知先を再確認する' : '失敗した通知を再送する'}</Button>}
       </div>
     })}</div>
   </section>
@@ -605,7 +608,7 @@ function HealthPanel({
   const isNormal = displayedSeverity === 'normal'
   const resultTitle = isNormal ? '異常なし' : displayedSeverity === 'warning' ? '注意' : displayedSeverity === 'danger' ? 'エラー' : '確認できない項目があります'
   const resultDescription = isNormal
-    ? '6項目を確認し、現在、確認できる異常はありません。'
+    ? `${CHECK_COUNT}項目を確認し、現在、確認できる異常はありません。`
     : displayedSeverity === 'warning'
       ? '注意が必要な項目があります。チェック結果を確認してください。'
       : displayedSeverity === 'danger'
@@ -671,17 +674,17 @@ function HealthPanel({
       <div className="rounded-card border-hairline flex flex-wrap items-center gap-3 border bg-canvas px-4 py-3">
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
         <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? '6項目のすべてが正常です。' : ''}`}</p>
+          <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? `${CHECK_COUNT}項目のすべてが正常です。` : ''}`}</p>
           <p className="mt-0.5 text-xs text-ink-faint">
             {loading ? '最新の状態を読み込んでいます。' : `${resultDescription}${isStale ? '' : ` 次は${formatOperationDate(nextCheckedAt)}に自動で確かめます。`}`}
           </p>
         </div>
-        <Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-danger px-3 text-xs font-semibold text-on-accent hover:opacity-90">緊急停止を確認</Link>
+        <Button variant="danger" className="min-h-9 items-center px-3 text-xs hover:opacity-90 border-0 h-auto whitespace-normal" href="/emergency?tab=control">緊急停止を確認</Button>
       </div>
       {alertNotice && <div className={`rounded-control px-4 py-3 text-xs font-medium ${alertNotice.tone === 'success' ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`} role="status">{alertNotice.text}</div>}
       <OperationAlertsPanel alerts={alerts} failed={alertsFailed} busyId={alertBusyId} onAcknowledge={acknowledgeAlert} onRetry={retryAlertNotifications} />
       <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
-        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-ink">チェック結果</h2><p className="mt-0.5 text-xs text-ink-faint">6項目を常に表示し、確認内容と最新結果を示します</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-xs font-bold">5分ごと</span></div>
+        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-ink">チェック結果</h2><p className="mt-0.5 text-xs text-ink-faint">{`${CHECK_COUNT}項目を常に表示し、確認内容と最新結果を示します`}</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-xs font-bold">5分ごと</span></div>
         <div className="hidden grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint lg:grid">
           <span>確認する項目</span><span>結果</span><span>いまの数字</span><span>目安</span><span>最後の確認</span><span>操作</span>
         </div>
@@ -699,7 +702,7 @@ function HealthPanel({
                 <p className="text-xs leading-relaxed text-ink-secondary">{check.detail}</p>
                 <p className="text-xs leading-relaxed text-ink-faint">{check.threshold}</p>
                 <p className="text-xs text-ink-faint">{formatOperationDate(check.observedAt)}</p>
-                <Link href={check.href} className="rounded-control border-hairline inline-flex min-h-9 items-center justify-center border bg-canvas px-3 text-xs font-semibold text-ink-secondary hover:bg-canvas-sunken">中身を見る</Link>
+                <Button variant="secondary" className="min-h-9 items-center justify-center px-3 text-xs text-ink-secondary h-auto whitespace-normal" href={check.href}>中身を見る</Button>
               </div>
             )
           })}
@@ -1170,7 +1173,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
       <div className="border-hairline rounded-card sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border bg-canvas px-4 py-3 shadow-float">
         <p className="text-xs font-semibold text-ink-faint">4つのうち{selectedTargets.length}つを選択 ／ {accountName} ／ 理由「{reason}」</p>
-        <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={mutationLocked || isStopped} className="rounded-control min-h-10 px-4 text-xs font-semibold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><button onClick={openStopConfirm} disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl} className="rounded-control min-h-10 bg-danger px-4 text-xs font-semibold text-on-accent hover:opacity-90 disabled:opacity-50">緊急停止する</button></div>
+        <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={mutationLocked || isStopped} className="rounded-control min-h-10 px-4 text-xs font-semibold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><Button variant="danger" className="min-h-10 px-4 text-xs hover:opacity-90 disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={openStopConfirm} disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl}>緊急停止する</Button></div>
       </div>
 
       {confirmMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title">
@@ -1187,7 +1190,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
           </>}
             <div><label className="block text-sm font-medium text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="mt-2 min-h-11 rounded-control border border-hairline px-3 text-sm" style={{ width: 280 }} /><p className="mt-2 text-xs text-ink-faint">この操作は記録に残り、ログインユーザーへ通知されます。</p></div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4" style={{ minHeight: 84 }}><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} className="min-h-11 rounded-control px-4 text-sm font-semibold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={mutationLocked || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`min-h-11 rounded-control px-4 text-sm font-semibold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4" style={{ minHeight: 84 }}><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} className="min-h-11 rounded-control px-4 text-sm font-semibold text-action hover:bg-action-soft">キャンセル</button><Button variant="danger" className={(`min-h-11 rounded-control px-4 text-sm font-semibold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`) + ' border-0 h-auto whitespace-normal'} onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={mutationLocked || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</Button></div></div>
         </div>
       </div>}
       {stepUpMode && (
@@ -1236,9 +1239,9 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
             <div className="mt-6 flex justify-end gap-2">
               <button onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={mutationLocked} className="rounded-control min-h-11 px-4 text-sm font-bold text-action">戻る</button>
               {stepUpMethod !== 'none' && (
-                <button onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={mutationLocked || !stepUpReady} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger hover:brightness-90' : 'bg-info hover:brightness-90'}`}>
+                <Button variant="danger" className={(`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger hover:brightness-90' : 'bg-info hover:brightness-90'}`) + ' border-0 h-auto whitespace-normal'} onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={mutationLocked || !stepUpReady}>
                   {running ? '確認中...' : stepUpMode === 'stop' ? '本人確認して停止' : '本人確認して復旧'}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -1434,7 +1437,7 @@ function EmergencyPageInner() {
       ? '止める配信を選び、理由を入力して緊急停止します。'
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
   const headerAction = tab === 'health'
-    ? <button type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-semibold text-on-accent hover:brightness-90 disabled:opacity-50">{manualBusy ? '↻ 確認中…' : '↻ いますぐ確かめる'}</button>
+    ? <Button variant="primary" className="min-h-9 px-3 text-xs hover:brightness-90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy}>{manualBusy ? '↻ 確認中…' : '↻ いますぐ確かめる'}</Button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
   return <div className="flex flex-col gap-4"><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }

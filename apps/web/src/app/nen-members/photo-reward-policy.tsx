@@ -312,8 +312,7 @@ function PhotoRewardPolicyDrawer({
                   />
                 </label>
                 {createError && <p className="mt-2 text-xs text-danger">{createError}</p>}
-                <Button variant="primary" disabled={creating} onClick={() => void doCreate()} className="mt-2">
-                  {creating ? '保存中...' : '新しい版を保存する'}
+                <Button variant="primary" disabled={creating} onClick={() => void doCreate()} className="mt-2" busy={creating} busyLabel="保存中...">新しい版を保存する
                 </Button>
               </div>
             )}

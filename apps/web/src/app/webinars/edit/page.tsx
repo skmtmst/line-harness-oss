@@ -576,7 +576,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     const watching = summary ? Math.max(0, summary.viewers - summary.completed) : 0
     return (
       <div className="space-y-4" data-design-node="Q8sHa">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <div className="flex flex-wrap items-center gap-2"><Select aria-label="参加者の分類で絞り込む" size="page-size" value={participantFilter} onChange={(value) => setParticipantFilter(value as '' | WebinarParticipantClassification)} options={PARTICIPANT_FILTER_OPTIONS} /><Button disabled={csvBusy} onClick={() => downloadParticipantsCsv(participantFilter || undefined)}>{csvBusy ? '書き出しています…' : '参加者をCSVで書き出す'}</Button></div> : null}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <div className="flex flex-wrap items-center gap-2"><Select aria-label="参加者の分類で絞り込む" size="page-size" value={participantFilter} onChange={(value) => setParticipantFilter(value as '' | WebinarParticipantClassification)} options={PARTICIPANT_FILTER_OPTIONS} /><Button disabled={csvBusy} onClick={() => downloadParticipantsCsv(participantFilter || undefined)} busy={csvBusy} busyLabel="書き出しています…">参加者をCSVで書き出す</Button></div> : null}</div>
         {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
         {summary ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -624,7 +624,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               <div className="border-hairline border-t px-4 py-3 text-center">
                 {moreError ? <p className="text-danger mb-2 text-xs" role="alert">{moreError}</p> : null}
                 {nextCursor ? (
-                  <Button onClick={() => void loadMoreParticipants()} disabled={loadingMore}>{loadingMore ? '読み込み中…' : '続きを読み込む'}</Button>
+                  <Button onClick={() => void loadMoreParticipants()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込み中…">続きを読み込む</Button>
                 ) : null}
               </div>
             ) : null}
@@ -672,7 +672,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     ] as const
     return (
       <div className="space-y-4" data-design-node="yxyzQ">
-        <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{analyticsSections.map((item) => <a key={item.label} href={item.href} className="border-hairline bg-canvas text-ink-secondary rounded-control border px-3 py-2 text-sm font-semibold hover:underline">{item.label}</a>)}</nav>{participantsState === 'ready' ? <div className="flex gap-2">{onOpenParticipants ? <Button onClick={onOpenParticipants}>参加者一覧へ</Button> : null}<Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()}>{csvBusy ? '書き出しています…' : 'CSVで書き出す'}</Button></div> : null}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{analyticsSections.map((item) => <Button variant="secondary" className="text-ink-secondary px-3 py-2 hover:underline h-auto whitespace-normal" key={item.label} href={item.href}>{item.label}</Button>)}</nav>{participantsState === 'ready' ? <div className="flex gap-2">{onOpenParticipants ? <Button onClick={onOpenParticipants}>参加者一覧へ</Button> : null}<Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button></div> : null}</div>
         {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
         <div className="flex flex-col gap-4 xl:flex-row">
           <div className="min-w-0 flex-1 space-y-3">
@@ -773,8 +773,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             <p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p>
           </div>
           {participantsState === 'ready' ? (
-            <Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()}>
-              {csvBusy ? '書き出しています…' : '参加者をCSVで書き出す'}
+            <Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()} busy={csvBusy} busyLabel="書き出しています…">参加者をCSVで書き出す
             </Button>
           ) : null}
         </div>
@@ -1428,7 +1427,7 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
         ['視聴完了', NOTIFICATION_ROW_STATE[completedState].label],
         ['対象', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
       ]} previewBody={editor?.notificationMessages.registration || notificationPreview(null).empty}>
-        <div className="flex gap-2"><Button disabled={testing || notificationTestDone || testDisabledReason !== null} title={notificationTestDone ? 'テスト済みです' : testDisabledReason ?? undefined} onClick={() => setTestConfirmOpen(true)}>{testing ? '送信中…' : notificationTestDone ? 'テスト送信済み' : 'テストを送る'}</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
+        <div className="flex gap-2"><Button disabled={testing || notificationTestDone || testDisabledReason !== null} title={notificationTestDone ? 'テスト済みです' : testDisabledReason ?? undefined} onClick={() => setTestConfirmOpen(true)} busy={testing} busyLabel="送信中…">{notificationTestDone ? 'テスト送信済み' : 'テストを送る'}</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
         {testResult ? <p className="text-ink-secondary text-xs" role="status">{testResult}</p> : null}
         {!(canOpenPublicPage && publicUrl) && publicPageReason ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
       </SummaryAside>
@@ -1820,7 +1819,7 @@ function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registra
               <p className="text-warning text-sm">保存済みの申込フォームは公開中ではありません（停止・削除・別アカウント）。このままでは公開前確認を通りません。</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="primary" onClick={() => void saveRegistrationForm()} disabled={savingRegistrationForm || registrationFormState !== 'ready' || !accountId}>{savingRegistrationForm ? '保存中…' : '申込フォームを保存する'}</Button>
+              <Button variant="primary" onClick={() => void saveRegistrationForm()} disabled={savingRegistrationForm || registrationFormState !== 'ready' || !accountId} busy={savingRegistrationForm}>申込フォームを保存する</Button>
             </div>
             {registrationNotice ? <p className="text-ink-secondary text-sm">{registrationNotice}</p> : null}
             {registrationError ? <p className="text-danger text-sm" role="alert">{registrationError}</p> : null}
@@ -1967,7 +1966,7 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button onClick={() => setActions((current) => [...current, { trigger, actionType: 'add_tag', config: { tagId: '' } }])}>通知・アクションを追加</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? '保存中…' : '視聴後アクションを保存する'}</Button>
+        <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving}>視聴後アクションを保存する</Button>
       </div>
       {notice ? <p className="text-ink-secondary text-sm">{notice}</p> : null}
         </section>
@@ -2025,7 +2024,7 @@ function PublicPreviewStep({
         ['公開期間', deliveryWindow(webinar)],
         ['対象', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
       ]} previewBody={editor.publicDescription || webinar.title}>
-        <div className="flex gap-2"><Button disabled={testing || !publicUrl} onClick={() => void testPublicPage()}>{testing ? '確認中…' : editor.publicPage.test?.status === 'passed' ? 'ページ確認済み' : 'ページをテスト'}</Button>{canOpenPublicPage ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
+        <div className="flex gap-2"><Button disabled={testing || !publicUrl} onClick={() => void testPublicPage()} busy={testing} busyLabel="確認中…">{editor.publicPage.test?.status === 'passed' ? 'ページ確認済み' : 'ページをテスト'}</Button>{canOpenPublicPage ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
         {testNotice ? <p className="text-ink-secondary text-xs">{testNotice}</p> : null}
         {!canOpenPublicPage ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
       </SummaryAside>
@@ -2166,7 +2165,7 @@ function ReviewStep({ webinar, editor, registrations, ctaCount, onBack, onPublis
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => onBack('basic')}>基本設定へ戻る</Button>
         <Button onClick={() => onBack('video')}>動画へ戻る</Button>
-        <Button variant="primary" disabled={!validation || blockers.length > 0 || publishing} onClick={() => void publish()}>{publishing ? '公開中…' : 'この版を公開'}</Button>
+        <Button variant="primary" disabled={!validation || blockers.length > 0 || publishing} onClick={() => void publish()} busy={publishing} busyLabel="公開中…">この版を公開</Button>
       </div>
       {publishError ? <p className="text-danger text-xs" role="alert">{publishError}</p> : null}
       <p className="text-ink-faint text-xs">公開時点の版を固定し、編集中の下書きとは分けて保存します。</p>
@@ -2312,7 +2311,7 @@ function EditWebinarInner() {
   /*
     離脱の確認はどの段・どの画面状態にいても出す。読み込み失敗や未指定の
     分岐は別ツリーへ早期 return するため、ここで要素化して全経路へ差し込む。
-    片方だけに置くと、dirty 中のリンクが黙って止まり「保存せずに移動」を
+    片方だけに置くと、dirty 中のリンクが黙って止まり「保存せずに移る」を
     選ぶ手段がなくなる。
   */
   const leaveConfirmDialog = (
@@ -2678,8 +2677,8 @@ function EditWebinarInner() {
           status={unsavedPanes.size > 0 ? '保存していない変更があります' : undefined}
           actions={(
             <>
-              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()}>{savingForNav === 'draft' ? '保存中…' : '下書きを保存する'}</Button>
-              <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handlePrimaryAction()}>{savingForNav === 'next' ? '保存中…' : primaryLabel}</Button>
+              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()} busy={savingForNav === 'draft'}>下書きを保存する</Button>
+              <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handlePrimaryAction()} busy={savingForNav === 'next'}>{primaryLabel}</Button>
             </>
           )}
         />

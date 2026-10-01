@@ -24,10 +24,12 @@ export function useOverlayFocus(
 ): RefObject<HTMLDivElement | null> {
   const containerRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
+  const initialFocusRef = useRef(initialFocus)
 
   useEffect(() => {
     onCloseRef.current = onClose
-  }, [onClose])
+    initialFocusRef.current = initialFocus
+  }, [onClose, initialFocus])
 
   useEffect(() => {
     if (!open) return
@@ -44,7 +46,7 @@ export function useOverlayFocus(
     const focusable = () =>
       Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
     // 初回フォーカスの予約は cleanup で取消せるようにしておく。
-    const initialFocusFrame = requestAnimationFrame(() => (initialFocus?.() ?? focusable()[0])?.focus())
+    const initialFocusFrame = requestAnimationFrame(() => (initialFocusRef.current?.() ?? focusable()[0])?.focus())
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !closeDisabled) {

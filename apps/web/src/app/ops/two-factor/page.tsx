@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
@@ -12,6 +12,7 @@ import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
 import OtpInput from '@/components/shared/otp-input'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 
 /**
  * 運営コンソールの 2要素認証の設定（★V6 37-10-B `NAJKx`）。
@@ -31,39 +32,70 @@ export default function OpsTwoFactorPage() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // M504：QR を作れなかったとき。読み込み中の骨組みと区別し、表示し直しの口を出す。
+  const [qrFailed, setQrFailed] = useState(false)
+  const [qrAttempt, setQrAttempt] = useState(0)
+  const cancelledRef = useRef(false)
 
-  useEffect(() => {
-    let cancelled = false
+  // M504：用意に失敗しても、その場でもう一度読み込める。
+  const load = useCallback(async () => {
+    setError('')
+    setQrFailed(false)
+    setState('loading')
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    void (async () => {
+    try {
+      const handoffToken = captureAdminSessionHandoff()
+      const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders(handoffToken) })
+      if (!res.ok) throw new Error('unauthenticated')
+      const body = await res.json() as { success?: boolean; data?: Session; csrfToken?: string }
+      if (!body.success || !body.data) throw new Error('unauthenticated')
+      if (body.csrfToken) localStorage.setItem('lh_csrf', body.csrfToken)
+      if (cancelledRef.current) return
+      // 運営メンバー（登録済み）か、2要素認証待ちの人だけ
+      if (!body.data.platformAdmin && body.data.platformAdminState !== 'awaiting_totp') { setState('denied'); return }
+      setSession(body.data)
+      /*
+       * R615: QR準備の失敗はログイン切れではない。fetchApi は 4xx/5xx を
+       * 例外で投げるので、そのままでは下の catch でログインへ送られ、
+       * 失敗の案内も再試行も出ない。準備だけを別に捕まえ、ログイン中の
+       * まま理由と取り直しを出す。
+       */
+      let setup: Awaited<ReturnType<typeof api.staff.beginTwoFactorSetup>> | null = null
       try {
-        const handoffToken = captureAdminSessionHandoff()
-        const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders(handoffToken) })
-        if (!res.ok) throw new Error('unauthenticated')
-        const body = await res.json() as { success?: boolean; data?: Session; csrfToken?: string }
-        if (!body.success || !body.data) throw new Error('unauthenticated')
-        if (body.csrfToken) localStorage.setItem('lh_csrf', body.csrfToken)
-        if (cancelled) return
-        // 運営メンバー（登録済み）か、2要素認証待ちの人だけ
-        if (!body.data.platformAdmin && body.data.platformAdminState !== 'awaiting_totp') { setState('denied'); return }
-        setSession(body.data)
-        const setup = await api.staff.beginTwoFactorSetup(body.data.id)
-        if (cancelled) return
-        if (!setup.success) { setError(setup.error || 'QRコードを用意できませんでした'); setState('ready'); return }
-        setUri(setup.data.provisioningUri)
-        setManualKey(setup.data.manualKey)
-        setState('ready')
+        setup = await api.staff.beginTwoFactorSetup(body.data.id)
       } catch {
-        if (!cancelled) window.location.assign('/ops/login')
+        setup = null
       }
-    })()
-    return () => { cancelled = true }
+      if (cancelledRef.current) return
+      if (!setup || !setup.success) {
+        setError(!setup || typeof setup.error !== 'string' || !setup.error ? 'QRコードを用意できませんでした' : setup.error)
+        setState('ready')
+        return
+      }
+      setUri(setup.data.provisioningUri)
+      setManualKey(setup.data.manualKey)
+      setState('ready')
+    } catch {
+      if (!cancelledRef.current) window.location.assign('/ops/login')
+    }
   }, [])
 
   useEffect(() => {
+    cancelledRef.current = false
+    void load()
+    return () => { cancelledRef.current = true }
+  }, [load])
+
+  useEffect(() => {
     if (!uri) return
-    void qrToDataURL(uri, { width: 200, margin: 1 }).then(setQr)
-  }, [uri])
+    let cancelled = false
+    setQr('')
+    setQrFailed(false)
+    void qrToDataURL(uri, { width: 200, margin: 1 })
+      .then((data) => { if (!cancelled) setQr(data) })
+      .catch(() => { if (!cancelled) setQrFailed(true) })
+    return () => { cancelled = true }
+  }, [uri, qrAttempt])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -109,11 +141,19 @@ export default function OpsTwoFactorPage() {
           {error ? (
             <Notice tone="danger" message={error} className="w-full" />
           ) : null}
+          {error && !uri ? (
+            <Button onClick={() => void load()} className="w-full">もう一度読み込む</Button>
+          ) : null}
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
             <img src={qr} alt="認証アプリ登録用のQRコード" className="h-52 w-52 rounded-control border border-hairline" />
+          ) : qrFailed ? (
+            <div className="flex w-full flex-col items-center gap-2">
+              <p role="alert" className="text-center text-caption text-danger">QRコードを表示できませんでした。接続を確かめて、もう一度お試しください。</p>
+              <Button onClick={() => setQrAttempt((n) => n + 1)}>QRをもう一度表示する</Button>
+            </div>
           ) : (
-            <div className="h-52 w-52 animate-pulse rounded-control bg-canvas-sunken" aria-hidden="true" />
+            <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
           )}
           <div className="text-center">
             <p className="text-caption text-ink-faint">読み取れないときは、このキーを手で入力</p>
@@ -125,8 +165,7 @@ export default function OpsTwoFactorPage() {
               <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
             </AuthField>
           </div>
-          <Button type="submit" variant="primary" disabled={busy || !uri} className="w-full">
-            {busy ? '確認しています…' : '確認して登録を完了する'}
+          <Button type="submit" variant="primary" disabled={busy || !uri} className="w-full" busy={busy} busyLabel="確認しています…">確認して登録を完了する
           </Button>
           <p className="text-center text-caption text-ink-faint">
             確認が通ると、安全のため一度ログアウトします。メールとパスワード、次に6桁の数字でログインし直してください
