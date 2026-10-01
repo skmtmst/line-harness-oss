@@ -232,6 +232,8 @@
   /* Pencil ★V8 印のタイル（C9CaMS・E7USZ9・A2mryd）。小22→7、中28・大32→9。 */
   --radius-tile-sm: 7px;
   --radius-tile: 9px;
+  /* Pencil ★V8 切り替えの項目（dtJVi）。器は $radius-control、中の項目は 8。 */
+  --radius-segment: 8px;
   /* Pencil `$radius-lg`(18px)。`PhxG6` の友だちアバター(40x40)と
      保存条件チップ用。Tailwind 既定の `rounded-lg` は上書きしない
      （既存85ファイルの角丸が8pxから18pxへ変わってしまう）。 */
