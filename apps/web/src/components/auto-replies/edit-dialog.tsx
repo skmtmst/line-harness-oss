@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import { ApiError, api } from '@/lib/api'
+import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
 import { validateFlexContent } from '@line-crm/shared'
 import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
@@ -595,7 +595,9 @@ export default function EditDialog({
           })
         }
       } else {
-        setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+        // R570: 409以外は既存 WRITE-01 の案内に寄せる。素の内部文
+        //（`API error: 500` など）は出さない。入力は保持したまま。
+        setError(describeSaveFailure(e))
       }
     }
     setSaving(false)
