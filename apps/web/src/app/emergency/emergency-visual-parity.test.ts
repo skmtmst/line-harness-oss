@@ -43,17 +43,19 @@ describe('V6 機能32 運用状態の表示確認', () => {
 
   it('仮表示を解除し、異常がないときは異常なしと表示する', () => {
     expect(source).toContain("const resultTitle = isNormal ? '異常なし'")
-    expect(source).toContain('6項目を確認し、現在、確認できる異常はありません。')
+    expect(source).toContain('const CHECK_COUNT = CHECK_DEFINITIONS.length')
+    expect(source).toContain('${CHECK_COUNT}項目を確認し、現在、確認できる異常はありません。')
+    expect(source).toContain("${CHECK_COUNT}項目のすべてが正常です。")
     expect(source).not.toContain('UI確認モード（仮表示）')
     expect(source).not.toContain('全UI確認（仮表示）')
   })
 
-  it('サーバーが保存した6つのチェック項目を常に表示する', () => {
-    for (const label of ['LINE接続', '月間配信数', 'API・外部連携', 'Webhook', '配信処理', '友だち変化']) {
+  it('サーバーが保存した9つのチェック項目を常に表示する', () => {
+    for (const label of ['LINE接続', '月間配信数', 'API・外部連携', 'Webhook', '配信処理', '友だち変化', '裏の仕組み', '鍵の期限', '見張り自体']) {
       expect(source).toContain(`label: '${label}'`)
     }
     expect(source).not.toContain("label: '定期処理'")
-    expect(source).toContain('6項目を常に表示し、確認内容と最新結果を示します')
+    expect(source).toContain('${CHECK_COUNT}項目を常に表示し、確認内容と最新結果を示します')
     expect(source).toContain('api.operations.health')
     expect(source).toContain('api.operations.runHealth')
     expect(source).toContain('result?.observedAt')
