@@ -72,6 +72,11 @@
   position: relative;
 }
 
+/* ★V8（夕13）：進みの棒の溝は track の色（TOKENS-20261001）。 */
+[data-theme="v8"] .track {
+  background: var(--color-track);
+}
+
 .fill {
   position: absolute;
   inset: 0;
