@@ -72,6 +72,12 @@ vi.mock('@/lib/api', () => {
   return {
     ApiError,
     fetchApi: vi.fn(),
+    // R497-SAVE-WORDING: page が保存catchで使う。本物（api.ts）の
+    // 非ApiError分岐と同一。この画面が流す入力は全てこの分岐に落ちる。
+    describeSaveFailure: (err: unknown) => {
+      if (err instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(err.message)) return err.message
+      return '保存できませんでした。通信が切れている可能性があります。接続を確かめて、もう一度お試しください。'
+    },
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
@@ -180,6 +186,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     }))
     await mount()
     fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    // R497: 何も変えない保存は更新要求を送らない。二度押しの検証は変更ありで行う。
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
 
     const save = screen.getByRole('button', { name: /見せる範囲を保存/ })
     await act(async () => {
@@ -263,6 +271,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
   it('見せる範囲の保存は再ログインを確認し、取消・成功・失敗を正しく出す', async () => {
     await mount()
     fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    // R497: 何も変えない保存は確認窓を出さず閉じるだけ。確認の検証は変更ありで行う。
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
 
     expect(screen.getByText('保存すると、対象者のすべてのログインが終了します。新しい権限で使うには、対象者がもう一度ログインする必要があります。')).toBeTruthy()

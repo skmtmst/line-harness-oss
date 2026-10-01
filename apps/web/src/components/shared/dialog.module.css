@@ -227,4 +227,35 @@
     width: 100%;
   }
 }
+
+/*
+ * ★V8「ダイアログ」（q3DPdz）：大きさは 800 / 560 の2段にそろえ、
+ * 余白は 24。角丸は --radius-panel が v8 で 16 になるのでそのまま。
+ */
+[data-theme='v8'] .panel {
+  width: min(800px, 100%);
+  padding: 24px;
+}
+
+[data-theme='v8'] .compactConfirmation,
+[data-theme='v8'] .destructiveConfirmation {
+  width: min(560px, 100%);
+}
+
+/* ★V8 の動き（MOTION.md「ダイアログ」）：下から 8px 上がりながら入る。 */
+[data-theme='v8'] .panel {
+  animation: dialog-v8-enter var(--motion-base) var(--motion-ease-out);
+}
+
+@keyframes dialog-v8-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 }

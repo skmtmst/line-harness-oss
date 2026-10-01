@@ -34,6 +34,14 @@ export default function NewCommonActionPage() {
   const [actions, setActions] = useState<CommonActionStep[]>([newCommonActionStep()])
   const [resources, setResources] = useState<CommonActionResources>(EMPTY_RESOURCES)
   const [resourcesLoading, setResourcesLoading] = useState(true)
+  /*
+   * 監査 R585: 選択肢の取得失敗と真の0件を分ける。失敗時は欄の近くに
+   * 再取得の口を出し、入力（名前・説明・処理）は保ったまま取り直す。
+   */
+  const [resourcesFailed, setResourcesFailed] = useState(false)
+  const [resourcesError, setResourcesError] = useState('')
+  /** 失敗したあとの「もう一度読み込む」で選択肢だけ取り直すための番号。 */
+  const [resourcesReloadKey, setResourcesReloadKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   /* 見本の選び欄の表示値。選ぶと受け渡す（素の select の defaultValue 相当）。 */
@@ -51,26 +59,39 @@ export default function NewCommonActionPage() {
     }
     let cancelled = false
     setResourcesLoading(true)
+    setResourcesFailed(false)
+    setResourcesError('')
     api.commonActions.resources(selectedAccountId)
       .then((response) => {
-        if (!cancelled && response.success) setResources(response.data)
+        if (cancelled) return
+        // 応答は来たが失敗扱いのときも、空のまま（真の0件）にせず失敗として覚える。
+        if (!response.success) {
+          setResourcesFailed(true)
+          setResourcesError(response.error || '選択肢を読み込めませんでした。通信の状態を確認して、もう一度読み込んでください。')
+          return
+        }
+        setResources(response.data)
+        setResourcesFailed(false)
+        setResourcesError('')
       })
       .catch((caught) => {
         if (cancelled) return
-        // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+        // m23m: 403・429は共通の1枚（権限の案内・待ち案内）の言葉を使う。
         // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+        // R585: 選択肢の失敗は欄の近くに出し、下の保存失敗の赤字とは分ける。
+        setResourcesFailed(true)
         if (isForbiddenOrRateLimited(caught)) {
-          setError(loadFailureNotice(caught, '選択肢'))
+          setResourcesError(loadFailureNotice(caught, '選択肢'))
           return
         }
         const message = caught instanceof Error ? caught.message : ''
-        setError(message && !/^API error: /.test(message) ? message : '選択肢を読み込めませんでした')
+        setResourcesError(message && !/^API error: /.test(message) ? message : '選択肢を読み込めませんでした。通信の状態を確認して、もう一度読み込んでください。')
       })
       .finally(() => {
         if (!cancelled) setResourcesLoading(false)
       })
     return () => { cancelled = true }
-  }, [accountLoading, canManage, selectedAccountId])
+  }, [accountLoading, canManage, selectedAccountId, resourcesReloadKey])
 
   const save = async () => {
     if (!selectedAccountId) {
@@ -164,8 +185,20 @@ export default function NewCommonActionPage() {
             {resourcesLoading ? (
               <div className="border-hairline rounded-card border bg-canvas p-8 text-center text-sm text-ink-faint">選択肢を読み込んでいます</div>
             ) : (
-              <div className="compact-common-action-editor"><CommonActionEditor value={plainActions} resources={resources} stepNumbers={stepNumbers(actions)} onChange={updatePlainActions} /></div>
+              <div className="compact-common-action-editor"><CommonActionEditor value={plainActions} resources={resources} resourcesFailed={resourcesFailed} stepNumbers={stepNumbers(actions)} onChange={updatePlainActions} /></div>
             )}
+            {/*
+              監査 R585: 選択肢の取得失敗は欄の近くに出し、入力を保ったまま
+              選択肢だけを取り直す。真の0件（欄ごとの「選べる◯◯がありません」）
+              とは分け、ここでは赤を使わない。
+            */}
+            {!resourcesLoading && resourcesFailed ? (
+              <div className="border-hairline rounded-card mt-3 border bg-canvas p-4" role="alert">
+                <p className="text-ink text-sm font-semibold">選択肢を読み込めませんでした</p>
+                <p className="text-ink-secondary mt-1 text-sm">{resourcesError} 入力した名前や処理はそのままです。</p>
+                <Button className="mt-3" onClick={() => setResourcesReloadKey((key) => key + 1)}>選択肢をもう一度読み込む</Button>
+              </div>
+            ) : null}
             <BranchEditors
               steps={actions}
               resources={resources}
@@ -224,12 +257,15 @@ export default function NewCommonActionPage() {
 
       {error ? <p className="text-danger mt-4 text-sm" role="alert">{error}</p> : null}
       <StickyBar
-        status={saving ? '下書きを保存しています' : 'まだ保存していません'}
+        status={saving ? '下書きを保存しています' : resourcesFailed ? '選択肢を読み込めていないため保存できません' : 'まだ保存していません'}
         actions={(
           <>
             <Button href="/common-actions">キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={saving || resourcesLoading}>
-              {saving ? '保存中' : '下書きを保存する'}
+            {/*
+              監査 R585: 選択肢の取得失敗中は保存の入口を閉じる。
+              空の選択肢のまま保存へ進めない（兄弟画面 webinars/new と同じ形）。
+            */}
+            <Button variant="primary" onClick={() => void save()} disabled={saving || resourcesLoading || resourcesFailed} title={resourcesFailed ? '選択肢を読み込めていないため保存できません' : undefined} busy={saving} busyLabel="保存中">下書きを保存する
             </Button>
           </>
         )}

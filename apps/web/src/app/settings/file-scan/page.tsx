@@ -436,8 +436,7 @@ export default function FileScanSettingsPage() {
             />
           </div>
           <div>
-            <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()}>
-              {configBusy ? '保存しています…' : '外の検査の設定を保存する'}
+            <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">外の検査の設定を保存する
             </Button>
           </div>
         </div>

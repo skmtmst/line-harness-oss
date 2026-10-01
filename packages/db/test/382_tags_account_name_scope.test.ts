@@ -39,6 +39,10 @@ function setup() {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
   db.exec(legacy);
+  // 541 が 382 より後に tag_update_requests（tags への外部キー付き）を作った。
+  // 移行前の姿を再現するこの器には含めない。残すと 382 自身の番兵
+  // （参照数=14・未知の参照があれば中止）が正しく止めてしまう。
+  db.exec('DROP TABLE IF EXISTS tag_update_requests');
   for (let i = 1; i <= 3; i++) insert(db, 'line_accounts', {
     id: `account-${i}`, channel_id: `fixture-channel-${i}`, name: `店舗${i}`,
     channel_access_token: 'fixture', channel_secret: 'fixture',

@@ -155,10 +155,12 @@ describe('DeliveryFailuresCard（今日の配信の失敗）', () => {
     expect(el.textContent).toContain('読み込めませんでした')
   })
 
-  it('読込中は骨組みを出す', () => {
+  it('読込中は骨組みを出す', async () => {
     apiMocks.deliveryFailureOrigins.mockReturnValue(new Promise(() => {}))
     const el = mount(<DeliveryFailuresCard accountId="acc-1" />)
-    expect(el.querySelector('.animate-pulse')).not.toBeNull()
+    /* ★V7 仕上げ §3: 骨組みは 0.3 秒待ってから出る。 */
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    expect(el.querySelector('[data-skeleton]')).not.toBeNull()
     expect(el.textContent).not.toContain('読み込めませんでした')
   })
 })

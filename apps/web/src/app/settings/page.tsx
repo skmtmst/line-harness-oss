@@ -17,6 +17,7 @@ import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
 import { clearFeatureSettingsCache, loadFeatureSettings } from '@/lib/feature-settings-cache'
 import { createAccountRequestGuard } from './account-request-guard'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ThemePreviewSwitch from '@/components/theme-preview-switch'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   groupEnabledCount,
@@ -971,12 +972,10 @@ export default function SettingsPage() {
             variant="primary"
             onClick={() => void save()}
             disabled={loading || saving || loadFailed || !dirty}
-            title={!dirty && !loading ? '変更すると保存できます' : undefined}
-          >
+            title={!dirty && !loading ? '変更すると保存できます' : undefined} busy={saving}>
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {saving ? '保存中…' : '機能設定を保存する'}
+            </svg>機能設定を保存する
           </Button>
           {!loading && !loadFailed && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
           </>
@@ -1032,6 +1031,7 @@ export default function SettingsPage() {
               onRetry={() => void load()}
             />
           ) : (
+            <>
             <div className={ordering ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'grid gap-4'}>
               {/*
                 利用状況の取得自体に失敗したとき。バッジは付かないので、
@@ -1099,6 +1099,14 @@ export default function SettingsPage() {
                 </Link>
               </div>}
             </div>
+
+            {/*
+              ★V8 移行②: 新しい見た目を担当者が試すための切り替え。
+              設定画面のいちばん下に1つだけ置く（このブラウザだけに効く）。
+              読み込み中・読み込み失敗の画面には出さない（偽の操作を置かない決まり）。
+            */}
+            <ThemePreviewSwitch />
+            </>
           )}
         </>
       )}

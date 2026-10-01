@@ -18,9 +18,11 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
+  findConditionDraftIssue,
   findInvalidRangeIssue,
   isEmptyCondition,
   isRuleComplete,
+  isStructurallyEmpty,
   pruneCondition,
   type SegmentCondition,
   type SegmentRule,
@@ -53,8 +55,8 @@ function Shell({
   const panelRef = useOverlayFocus(true, onClose)
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-float" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
-        <div className={`border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-float" style={wide ? { marginBlock: 68, height: 912, maxHeight: 'calc(100dvh - 168px)', maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
+        <div className={`border-hairline flex shrink-0 flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
           <div className="min-w-0">
             <h2 id={titleId} className="text-ink text-lg font-bold">{title}</h2>
             {description && <p className="text-ink-secondary mt-0.5 text-sm">{description}</p>}
@@ -68,8 +70,8 @@ function Shell({
             ×
           </button>
         </div>
-        <div className={`flex-1 px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
-        {footer && <div className={`border-hairline flex justify-end gap-2 border-t px-6 ${wide ? 'py-3' : 'py-4'}`}>{footer}</div>}
+        <div className={`min-h-0 flex-1 overflow-y-auto px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
+        {footer && <div className={`border-hairline flex shrink-0 justify-end gap-2 border-t px-6 ${wide ? 'py-3' : 'py-4'}`}>{footer}</div>}
       </div>
     </div>
   )
@@ -131,6 +133,8 @@ export function ConditionDialog({
   const [error, setError] = useState('')
   /* R247: 入力済みの不正範囲は欄の下で知らせて止める。保存済みは維持する。 */
   const [rangeError, setRangeError] = useState('')
+  /* S4-OR: 空のかたまり・未完成の行は黙って落とさず、直し方を案内して止める。 */
+  const [draftError, setDraftError] = useState('')
 
   return (
     <Shell
@@ -140,17 +144,10 @@ export function ConditionDialog({
       wide
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-          >
+          <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={async () => {
+          </Button>
+          <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
                * 欄の下で知らせて止める。保存済みの条件は維持する。
@@ -161,6 +158,16 @@ export function ConditionDialog({
                 return
               }
               setRangeError('')
+              /*
+               * S4-OR: 空の「いずれか」のかたまり・未完成の行は、そのまま
+               * 反映すると広い相手へ送られる。落とさず、直し方を案内する。
+               */
+              const draftIssue = findConditionDraftIssue(draft)
+              if (draftIssue) {
+                setDraftError(draftIssue)
+                return
+              }
+              setDraftError('')
               setSaving(true)
               setError('')
               try {
@@ -177,11 +184,9 @@ export function ConditionDialog({
               } finally {
                 setSaving(false)
               }
-            }}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-          >
+            }}>
             {saving ? '保存中…' : 'この条件を反映'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -190,6 +195,9 @@ export function ConditionDialog({
       )}
       {rangeError && (
         <Notice tone="validation" className="mb-4" message={rangeError} />
+      )}
+      {draftError && (
+        <Notice tone="validation" className="mb-4" message={draftError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
@@ -222,7 +230,11 @@ export function ConditionDialog({
                   type="button"
                   onClick={() => {
                     const next = { ...draft, rules: draft.rules.filter((_, r) => r !== i) }
-                    setDraft(isEmptyCondition(next) ? null : next)
+                    /*
+                     * S4-OR: 残った空のかたまりは下書きとして残す。素の空
+                     * （行もかたまりも無し）のときだけ null へ戻す。
+                     */
+                    setDraft(isStructurallyEmpty(next) ? null : next)
                   }}
                   className="text-danger shrink-0 text-xs"
                 >
@@ -245,7 +257,8 @@ export function ConditionDialog({
                       ...draft,
                       groups: (draft.groups ?? []).filter((_, g) => g !== gi),
                     }
-                    setDraft(isEmptyCondition(next) ? null : next)
+                    /* S4-OR: 消したかたまり以外は残す。素の空のときだけ null。 */
+                    setDraft(isStructurallyEmpty(next) ? null : next)
                   }}
                   className="text-danger shrink-0 text-xs"
                 >
@@ -461,17 +474,10 @@ export function OnCompleteDialog({
       onClose={onClose}
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-          >
+          <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={async () => {
+          </Button>
+          <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
                * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
@@ -500,11 +506,9 @@ export function OnCompleteDialog({
               } finally {
                 setSaving(false)
               }
-            }}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-          >
+            }}>
             {saving ? '保存中…' : '変更する'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -547,13 +551,9 @@ export function OnCompleteDialog({
         <p className="text-ink-secondary mt-0.5 mb-2 text-xs">
           配り終えた人に対して、タグ・友だち情報・対応マークなどを動かします。
         </p>
-        <button
-          type="button"
-          onClick={onOpenActions}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-4 text-sm"
-        >
+        <Button variant="secondary" className="text-ink-secondary h-10 px-4 whitespace-normal" type="button" onClick={onOpenActions}>
           アクション設定{actionCount > 0 ? `（${actionCount} 件）` : ''}
-        </button>
+        </Button>
       </div>
 
       {draftMode === 'move' && (
@@ -974,7 +974,7 @@ export function TestSendDialog({
                 )}
               </Notice>
             )}
-          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()}>{sending ? '送信中…' : result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
+          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
         </div>
       </div>
     )
@@ -991,21 +991,12 @@ export function TestSendDialog({
       // ここに確認中のフッターは要らない。
       footer={
         <>
-        <button
-          type="button"
-          onClick={onClose}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-        >
+        <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
           キャンセル
-        </button>
-        <button
-          type="button"
-          disabled={!selected || sending}
-          onClick={openConfirm}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
           内容を確認
-        </button>
+        </Button>
         </>
       }
     >

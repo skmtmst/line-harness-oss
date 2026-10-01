@@ -46,7 +46,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import { api, fetchApi } from '@/lib/api'
+import { ApiError, api, fetchApi } from '@/lib/api'
 import EcCommercePage from './page'
 
 const mockFetchApi = fetchApi as unknown as ReturnType<typeof vi.fn>
@@ -137,12 +137,12 @@ function action(id: string, overrides: Record<string, unknown> = {}) {
   }
 }
 
-function recordsList(items: ReturnType<typeof action>[], total = items.length) {
-  return {
-    items,
-    total,
-    summary: { pending: 0, processing: 0, succeeded: items.length, skipped: 0, retryable_failed: 0, permanent_failed: 0 },
-  }
+function recordsList(
+  items: ReturnType<typeof action>[],
+  total = items.length,
+  summary = { pending: 0, processing: 0, succeeded: items.length, skipped: 0, retryable_failed: 0, permanent_failed: 0 },
+) {
+  return { items, total, summary }
 }
 
 let container: HTMLDivElement | null = null
@@ -452,6 +452,132 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
     await act(async () => { await drainMicrotasks() })
     expect(eventsCalls.at(-1)).not.toContain('query=')
     expect(searchInput(el).value).toBe('')
+  })
+})
+
+/*
+ * R599: `/api/ec-commerce/events` だけが 503・403・404 で落ち、
+ * 集計が 200 のとき、状態タブが「処理中0」「失敗0」と未取得を 0件に
+ * 見せていた。一覧由来の状態別件数は取れるまで出さず、失敗理由と
+ * やり直しを出し、再試行の成功で実数へ戻る、を実mountで見張る。
+ * 「すべて」の数は集計由来なので、取れている間は残る。
+ * 空の一覧（取れたうえでの 0件）は実数の 0 を出す。失敗と区別する。
+ */
+describe('R599 一覧未取得の状態別件数', () => {
+  function statusTabText(el: HTMLDivElement, label: string): string | null {
+    const tab = Array.from(el.querySelectorAll('[role="tab"]'))
+      .find((node) => (node.textContent ?? '').startsWith(label))
+    return tab ? tab.textContent : null
+  }
+
+  function retryListButton(el: HTMLDivElement): HTMLButtonElement {
+    const button = Array.from(el.querySelectorAll('button'))
+      .find((node) => node.textContent === 'もう一度読み込む')
+    if (!button) throw new Error('「もう一度読み込む」ボタンが見つかりません')
+    return button as HTMLButtonElement
+  }
+
+  async function failEventsOnly(el: HTMLDivElement, r: Root, status: number) {
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(111)))
+      eventsDeferreds[0].reject(new ApiError(status, `EC events ${status}`))
+      await drainMicrotasks()
+    })
+  }
+
+  it('一覧503＋集計200では「処理中」「失敗」に0を出さず、理由とやり直しを出す', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 503)
+
+    expect(el.textContent).toContain('取り込みの記録を読み込めませんでした')
+    expect(retryListButton(el)).toBeTruthy()
+    // 一覧由来の状態別件数は未取得（数を出さない）。
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+    expect(statusTabText(el, '処理完了')).toBe('処理完了')
+    expect(statusTabText(el, '送信なし')).toBe('送信なし')
+    // 集計由来の「すべて」は取れているので残る。
+    expect(statusTabText(el, 'すべて')).toBe('すべて111')
+  })
+
+  it('一覧403では権限不足を出し、状態別件数に0を出さない', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 403)
+
+    expect(el.textContent).toContain('表示する権限がありません')
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+    expect(statusTabText(el, 'すべて')).toBe('すべて111')
+  })
+
+  it('一覧404では読み込み失敗を出し、状態別件数に0を出さない', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 404)
+
+    expect(el.textContent).toContain('取り込みの記録を読み込めませんでした')
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+  })
+
+  it('やり直しの成功で状態別件数が実数に戻る', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 503)
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+
+    await act(async () => { retryListButton(el).click() })
+    await act(async () => { await drainMicrotasks() })
+    expect(eventsCalls).toHaveLength(2)
+
+    await act(async () => {
+      eventsDeferreds[1].resolve(ok(recordsList(
+        [action('1')],
+        1,
+        { pending: 1, processing: 2, succeeded: 5, skipped: 1, retryable_failed: 3, permanent_failed: 1 },
+      )))
+      await drainMicrotasks()
+    })
+
+    expect(el.textContent).not.toContain('取り込みの記録を読み込めませんでした')
+    expect(statusTabText(el, '処理中')).toBe('処理中3')
+    expect(statusTabText(el, '失敗')).toBe('失敗4')
+    expect(statusTabText(el, '処理完了')).toBe('処理完了5')
+    expect(statusTabText(el, '送信なし')).toBe('送信なし1')
+  })
+
+  it('正常時は実数を出す', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(111)))
+      eventsDeferreds[0].resolve(ok(recordsList(
+        [action('1')],
+        1,
+        { pending: 1, processing: 2, succeeded: 5, skipped: 1, retryable_failed: 3, permanent_failed: 1 },
+      )))
+      await drainMicrotasks()
+    })
+
+    expect(statusTabText(el, '処理中')).toBe('処理中3')
+    expect(statusTabText(el, '失敗')).toBe('失敗4')
+  })
+
+  it('空の一覧は「記録はありません」と実数の0を出す', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(0)))
+      eventsDeferreds[0].resolve(ok(recordsList([], 0)))
+      await drainMicrotasks()
+    })
+
+    expect(el.textContent).toContain('記録はありません')
+    // 取れたうえでの 0件なので、実数の 0 を出す（隠さない）。
+    expect(statusTabText(el, '処理中')).toBe('処理中0')
+    expect(statusTabText(el, '失敗')).toBe('失敗0')
   })
 })
 

@@ -134,9 +134,8 @@ export default function OpsAuditPage() {
           見出しの横では繰り返さない。
         */}
         <div className="flex items-center gap-2">
-          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0}>
-            <Download aria-hidden="true" className="h-4 w-4" />
-            {exporting ? '書き出しています…' : 'CSVで書き出す'}
+          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
+            <Download aria-hidden="true" className="h-4 w-4" />CSVで書き出す
           </Button>
         </div>
       </div>

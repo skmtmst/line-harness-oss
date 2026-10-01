@@ -118,8 +118,8 @@ function SettlementCloseDialog({
       footer={(
         <div className="border-hairline flex justify-end gap-2 border-t pt-4">
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => { void closeSettlement() }} disabled={busy || !preview?.conversionCount}>
-            {busy ? '締めています…' : `${yen(preview?.totalAmount ?? 0)} で締める`}
+          <Button type="button" variant="primary" onClick={() => { void closeSettlement() }} disabled={busy || !preview?.conversionCount} busy={busy} busyLabel="締めています…">
+            {`${yen(preview?.totalAmount ?? 0)} で締める`}
           </Button>
         </div>
       )}
@@ -244,8 +244,7 @@ function PayoutStepUpDialog({
         <div className="border-hairline flex justify-end gap-2 border-t pt-4">
           <Button type="button" onClick={onClose} disabled={busy}>戻る</Button>
           {stepUpMethod !== 'none' && (
-            <Button type="button" variant="primary" onClick={() => { void exportCsv() }} disabled={busy || !ready}>
-              {busy ? '確認中…' : '本人確認してCSVを書き出す'}
+            <Button type="button" variant="primary" onClick={() => { void exportCsv() }} disabled={busy || !ready} busy={busy} busyLabel="確認中…">本人確認してCSVを書き出す
             </Button>
           )}
         </div>

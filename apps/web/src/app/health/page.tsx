@@ -349,15 +349,12 @@ export default function HealthPage() {
                             ボタンの代わりに理由を出す（最終の門はサーバ）。
                           */}
                           {canMigrate ? (
-                            <button
-                              onClick={() => {
+                            <Button variant="danger" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => {
                                 setMigrateFrom(account.id)
                                 setMigrateToId('')
-                              }}
-                              className="px-3 py-1.5 rounded-control text-on-accent text-xs font-medium bg-danger hover:brightness-92 transition-colors"
-                            >
+                              }}>
                               友だちを移行する
-                            </button>
+                            </Button>
                           ) : (
                             <p className="text-xs text-ink-secondary">友だちの移行はオーナーだけができます。</p>
                           )}
@@ -434,8 +431,7 @@ export default function HealthPage() {
                   />
                 </div>
                 <div className="flex items-center gap-3">
-                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId}>
-                    {migrating ? '移行中...' : '移行を開始'}
+                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId} busy={migrating} busyLabel="移行中...">移行を開始
                   </Button>
                   <Button
                     type="button"

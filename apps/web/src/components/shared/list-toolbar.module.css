@@ -100,4 +100,12 @@
     flex: none;
     max-width: 100%;
   }
+
+  /*
+   * ★V8「道具の1段」（c4n9Kr）：段と段の間は 12。置く道具は
+   * すべて高さ 36・角丸 control（各部品側の v8 規定が効く）。
+   */
+  [data-theme='v8'] .toolbar {
+    gap: 12px;
+  }
 }

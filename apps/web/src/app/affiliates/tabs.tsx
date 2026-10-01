@@ -1433,9 +1433,7 @@ export function CreateAffiliateModal({
           <Button
             variant="primary"
             onClick={() => { void handleSubmit() }}
-            disabled={submitting || !selected}
-          >
-            {submitting ? '作成中...' : '作る'}
+            disabled={submitting || !selected} busy={submitting} busyLabel="作成中...">作る
           </Button>
         </div>
       )}
@@ -3229,13 +3227,9 @@ function SettlementEditor({
       </p>
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex items-center gap-2">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="rounded-mini border border-hairline px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-surface-pearl disabled:opacity-40"
-        >
+        <Button variant="secondary" className="rounded-mini px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-surface-pearl h-auto whitespace-normal" onClick={save} disabled={saving}>
           {saving ? '保存中...' : '取り決めを保存する'}
-        </button>
+        </Button>
         {/* #670 22: emerald-600 は白地で 3.8:1 しかなく AA 未満。共通トークンの濃い緑へ。 */}
         {saved && <span className="text-xs font-semibold text-success">保存しました</span>}
       </div>

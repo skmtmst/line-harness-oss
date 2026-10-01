@@ -101,8 +101,7 @@ export default function RegisterPage() {
               文書のページはまだ公開されていません。公開までの間、内容は{' '}
               <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="text-action underline underline-offset-2">
                 お問い合わせ
-              </a>
-              {' '}からご確認いただけます。
+              </a> からご確認いただけます。
             </p>
           ) : null}
           {agreeMessage ? (
@@ -112,8 +111,7 @@ export default function RegisterPage() {
           ) : null}
         </div>
 
-        <Button type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full">
-          {busy ? '送っています…' : '確認メールを送る'}
+        <Button type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full" busy={busy} busyLabel="送っています…">確認メールを送る
         </Button>
       </form>
 

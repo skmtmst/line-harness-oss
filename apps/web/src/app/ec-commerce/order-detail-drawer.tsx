@@ -122,8 +122,7 @@ function EventBlock({
               ) : null}
             </div>
             {action.retryAvailable ? (
-              <Button type="button" disabled={retryingId === action.id} onClick={() => onRetry(action)}>
-                {retryingId === action.id ? '戻しています…' : 'もう一度やる'}
+              <Button type="button" disabled={retryingId === action.id} onClick={() => onRetry(action)} busy={retryingId === action.id} busyLabel="戻しています…">もう一度やる
               </Button>
             ) : null}
           </div>
@@ -226,8 +225,7 @@ export default function OrderDetailDrawer({
                   ? <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{order.customerName ?? '友だちを見る'}</Link>
                   : order.customerName ?? <span className="text-ink-faint">LINEの友だちと結びついていません</span>}
                 {friendId ? null : (
-                  <span className={styles.cellSub}>
-                    {'　'}<Link className={styles.textLink} href="/ec-commerce/identity-candidates">会員のつき合わせへ</Link>
+                  <span className={styles.cellSub}>　<Link className={styles.textLink} href="/ec-commerce/identity-candidates">会員のつき合わせへ</Link>
                   </span>
                 )}
               </dd></div>

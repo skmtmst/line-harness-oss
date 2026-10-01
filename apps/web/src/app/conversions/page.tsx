@@ -18,7 +18,7 @@ import type { ConversionPoint } from '@line-crm/shared'
 import { deduplicationLabel } from './dedup'
 import { originInfoOf } from './origin-labels'
 import { readExclusionCondition, readExclusionMemo, readExclusionView, type ExclusionCondition } from './conversion-exclusion'
-import { pruneCondition } from '@/components/shared/condition-builder'
+import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import KpiCard from '@/components/shared/kpi-card'
 
@@ -354,6 +354,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const [loadFailed, setLoadFailed] = useState(false)
+  /**
+   * R596: 集計だけの失敗は一覧と分けて持つ。集計が読めなくても一覧は
+   * 残し、集計の数値カードだけを「—」と再試行にする。loadFailed と一緒に
+   * 倒すと、一覧まで消えて「登録したものが消えた」に見える。
+   */
+  const [reportFailed, setReportFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   /**
@@ -363,6 +369,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 表示を上書きしてしまう。応答が返った時点で番号が変わっていたら捨てる。
    */
   const loadSeq = useRef(0)
+  /*
+   * 今選ばれているアカウントの控え。再試行の遅れた応答が、切り替え後の
+   * アカウントの表示を上書きしないよう、応答が返った時点で照合する。
+   * effect の後より先に描画時の代入で最新化する（切り替え直後の
+   * 応答との競合を狭めるため）。
+   */
+  const accountIdRef = useRef(accountId)
+  accountIdRef.current = accountId
   /** 検索は1文字ごとに口を叩かず、少し待ってから読み直す。 */
   const [debouncedQuery, setDebouncedQuery] = useState('')
   useEffect(() => {
@@ -440,6 +454,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     const seq = ++loadSeq.current
     setLoading(true)
     setLoadFailed(false)
+    setReportFailed(false)
     setDefinitions(null)
     setSummaryReport(null)
     setListTruncated(false)
@@ -483,9 +498,46 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     if (reportResult.status === 'fulfilled' && reportResult.value.success
       && Array.isArray(reportResult.value.data.byDefinition)) {
       setSummaryReport(reportResult.value.data)
+    } else {
+      // R596: 集計だけ読めないときも黙って「—」にしない。数値カードに
+      // 失敗と再試行を出すため、由来を残す。
+      setReportFailed(true)
     }
-    setLoading(false)
+    // 古い読み込みは表示の後片付けもしない。新しい読み込みの
+    // 「読み込み中」を先に消してしまうため（R596 回帰と同じ競合）。
+    if (loadSeq.current === seq) setLoading(false)
   }, [accountId, debouncedQuery, sort])
+
+  /**
+   * R596: 集計だけを読み直す。一覧は触らないので、再試行のあいだも
+   * 行は残る。復旧したら数値カードが数値へ戻る。
+   *
+   * 再試行の応答が遅れたとき、切り替え後のアカウントの表示を上書き
+   * しない（R596 回帰）。`load` と同じ世代番号を進め、応答が返った
+   * 時点で世代とアカウントを照合する。成功・失敗どちらの応答も捨てる。
+   */
+  const reloadReport = useCallback(async () => {
+    const seq = ++loadSeq.current
+    const requestAccountId = accountId
+    const range = definitionRange(30)
+    try {
+      const response = await api.conversions.definitionReport({
+        ...range, lineAccountId: accountId ?? undefined,
+      })
+      if (loadSeq.current !== seq) return
+      if (accountIdRef.current !== requestAccountId) return
+      if (response.success && Array.isArray(response.data.byDefinition)) {
+        setSummaryReport(response.data)
+        setReportFailed(false)
+      } else {
+        setReportFailed(true)
+      }
+    } catch {
+      if (loadSeq.current !== seq) return
+      if (accountIdRef.current !== requestAccountId) return
+      setReportFailed(true)
+    }
+  }, [accountId])
 
   useEffect(() => { void load() }, [load])
 
@@ -558,6 +610,16 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       setEditError('数えない条件のメモは500文字以内で入力してください')
       return
     }
+    /*
+     * S4-OR: 空の「いずれか」のかたまり・未完成の行は、黙って
+     * 「除外なし」に落とさない。足すつもりの条件が無いまま数えると
+     * 広く数えすぎるので、版上げを止めて直し方を案内する。
+     */
+    const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
+    if (exclusionIssue) {
+      setEditError(exclusionIssue)
+      return
+    }
     setEditSaving(true)
     setEditError('')
     try {
@@ -566,7 +628,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         expectedVersion: editTarget.version,
         name,
         sourceType: editForm.sourceType,
-        // R40: 数えない条件とメモも次の版に入れる。書きかけの行は落とす。
+        // R40: 数えない条件とメモも次の版に入れる。書きかけの行・空のかたまりは上で止める。
         sourceConfig: {
           ...editTarget.sourceConfig,
           exclusion: pruneCondition(editForm.exclusion),
@@ -883,7 +945,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           title="決めてある成果地点"
           value={definitions?.pagination.total ?? null}
           unit="個"
-          detail={definitions ? `動いているもの ${definitions.stateCounts.active}個` : '読み込み中'}
+          /*
+           * R595: 一覧が読めないときは値が「—」になる。3段目まで
+           * 「読み込み中」のままだと直っているように見えるので、由来を書く。
+           */
+          detail={definitions ? `動いているもの ${definitions.stateCounts.active}個` : loadFailed ? '一覧を読み込めませんでした' : '読み込み中'}
           loading={loading}
         />
         <KpiCard
@@ -893,16 +959,30 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           badge={summaryReport?.kpis.countChangeRate == null
             ? undefined
             : `${summaryReport.kpis.countChangeRate > 0 ? '+' : ''}${summaryReport.kpis.countChangeRate}%`}
-          detail={kpi.previousCount === null
-            ? '前の30日の比較は読み込めませんでした'
-            : `前の30日 ${formatNumber(kpi.previousCount)}件`}
+          /*
+           * R596: 集計だけ読めないときは一覧を残し、このカードだけ
+           * 失敗と再試行にする。再試行は集計だけ読み直すので行は消えない。
+           */
+          detail={reportFailed
+            ? 'この30日の集計を読み込めませんでした'
+            : kpi.previousCount === null
+              ? '前の30日の比較は読み込めませんでした'
+              : `前の30日 ${formatNumber(kpi.previousCount)}件`}
+          onRetry={reportFailed && !loading ? () => void reloadReport() : undefined}
+          retryLabel="集計を再読み込み"
           loading={loading}
         />
         <KpiCard
           title="金額がついた成果"
           value={summaryReport ? kpi.currentValue : null}
           unit="円"
-          detail={`${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`}
+          /*
+           * R595: 一覧が読めないとき points は空なので、そのまま数えると
+           * 「0個の成果地点」と誤る。未取得は数えない。
+           */
+          detail={definitions
+            ? `${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`
+            : loadFailed ? '金額の内訳を読み込めませんでした' : '読み込み中'}
           loading={loading}
         />
         <KpiCard
@@ -911,7 +991,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           unit="個"
           badge={kpi.unusedCount > 0 ? '確認' : undefined}
           badgeTone={kpi.unusedCount > 0 ? 'neutral' : 'accent'}
-          detail="決めたのに使われていません"
+          detail={loadFailed ? '一覧を読み込めませんでした' : '決めたのに使われていません'}
           loading={loading}
         />
       </KpiCollapse>
@@ -924,8 +1004,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button href="/conversions/new" variant="primary">＋ 成果地点を作る</Button>
-        <Button onClick={() => void exportCsv()} disabled={exporting}>
-          {exporting ? '書き出しています' : 'CSVで書き出す'}
+        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">CSVで書き出す
         </Button>
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
@@ -945,14 +1024,19 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         }}
         filters={
           <>
+            {/*
+              R595: 一覧が未取得のとき札に 0 を出すと「0件ある」と誤読する。
+              FilterChip は件数が無いとき印を出さない決まりなので、
+              未取得は渡さない（部品側で隠れる）。
+            */}
             {([
-              ['all', 'すべて', definitions?.pagination.total ?? 0],
-              ['active', '動いている', definitions?.stateCounts.active ?? 0],
-              ['draft', '下書き', definitions?.stateCounts.draft ?? 0],
-              ['invalid', '入力不良', definitions?.stateCounts.invalid ?? 0],
-              ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped ?? 0],
-              ['stopped', '止めている', definitions?.stateCounts.stopped ?? 0],
-              ['unused', 'どこからも使われていない', definitions?.stateCounts.unused ?? 0],
+              ['all', 'すべて', definitions?.pagination.total],
+              ['active', '動いている', definitions?.stateCounts.active],
+              ['draft', '下書き', definitions?.stateCounts.draft],
+              ['invalid', '入力不良', definitions?.stateCounts.invalid],
+              ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped],
+              ['stopped', '止めている', definitions?.stateCounts.stopped],
+              ['unused', 'どこからも使われていない', definitions?.stateCounts.unused],
             ] as const).map(([value, label, total]) => (
               <FilterChip
                 key={value}
@@ -1168,13 +1252,20 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-faint text-xs">利用先の名前は詳細で確認できます。追加するときは分析画面でこの成果地点を選びます。</p>
         <div className="flex items-center gap-2 text-xs">
-          <ListRange
-            className="tabular-nums"
-            label="成果地点"
-            total={definitions?.pagination.total ?? shown.length}
-            first={shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
-            last={Math.min(page * PAGE_SIZE, shown.length)}
-          />
+          {/*
+            R595: 一覧が未取得のとき「成果地点 0件」と出すと、失敗なのに
+            空と誤読する。未取得は件数自体を出さない（失敗の案内は上の
+            ListState が担う）。
+          */}
+          {definitions == null ? null : (
+            <ListRange
+              className="tabular-nums"
+              label="成果地点"
+              total={definitions.pagination.total}
+              first={shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
+              last={Math.min(page * PAGE_SIZE, shown.length)}
+            />
+          )}
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       </div>
@@ -1190,9 +1281,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               <Button
                 variant="primary"
                 disabled={publishing}
-                onClick={() => void publishDraft(detailTarget)}
-              >
-                {publishing ? '公開しています' : '計測をはじめる（公開）'}
+                onClick={() => void publishDraft(detailTarget)} busy={publishing} busyLabel="公開しています">計測をはじめる（公開）
               </Button>
             ) : null}
             {detailTarget.status !== 'stopped' ? (
@@ -1422,8 +1511,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         footer={(
           <div className="flex justify-end gap-2">
             <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>キャンセル</Button>
-            <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()}>
-              {editSaving ? '保存中...' : 'この内容にする'}
+            <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()} busy={editSaving} busyLabel="保存中...">この内容にする
             </Button>
           </div>
         )}
@@ -1811,8 +1899,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
           ]}
           onChange={(value) => setPeriodDays(Number(value))}
         />
-        <Button onClick={() => void exportCsv()} disabled={exporting}>
-          {exporting ? '書き出しています' : '成果地点の一覧をCSVで書き出す'}
+        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">成果地点の一覧をCSVで書き出す
         </Button>
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}

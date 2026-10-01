@@ -300,9 +300,10 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
     const card = todayCard('今日の予約')
     /*
      * #673 で読込中の件数は「—」ではなく骨組み（スケルトン）に替わった。
-     * 前のアカウントの件数が残らないことは、骨組みと busy 印で確かめる。
+     * ★V7 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
      */
-    expect(card.querySelector('.animate-pulse')).not.toBeNull()
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    expect(card.querySelector('[data-skeleton]')).not.toBeNull()
     expect(card.querySelector('[aria-busy="true"]')).not.toBeNull()
     expect(card.textContent).not.toContain('1件')
   })
