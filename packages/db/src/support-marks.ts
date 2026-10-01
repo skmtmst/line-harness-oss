@@ -611,35 +611,89 @@ export async function updateSupportMark(
   // 移行前の共通マークは選択中アカウントへ複製し、そのアカウントの
   // 友だちだけを付け替える。他アカウントの表示や設定は変えない。
   if (existing.is_inherited === 1) {
-    const cloned = await createSupportMark(db, scope, {
-      name: input.name ?? existing.name,
-      color: input.color ?? existing.color,
-      isDefault: input.isDefault ?? Boolean(existing.is_default),
-      autoOnInbound: input.autoOnInbound ?? Boolean(existing.auto_on_inbound),
-      displayOrder: input.displayOrder ?? existing.display_order,
-    });
-    await db
-      .prepare(
-        `UPDATE friends SET support_mark_id = ?
-          WHERE support_mark_id = ? AND line_account_id = ?`,
-      )
-      .bind(cloned.id, existing.id, scope.lineAccountId)
-      .run();
-    return cloned;
-  }
-
-  if (input.isDefault === true) {
-    await db
-      .prepare(
+    /*
+     * D031: 版を送った複製は、元の版を1つ進める要求で取り合う。
+     * 同じ版の同時実行は負けた側が409になり、複製の二重作成を防ぐ。
+     * 版を送らない古い呼び出しは従来どおり作る（後方互換）。
+     */
+    if (input.expectedVersion !== undefined) {
+      const claimed = await db
+        .prepare(
+          `UPDATE support_marks SET version = version + 1, updated_at = ?, updated_by = ?
+            WHERE id = ? AND version = ?`,
+        )
+        .bind(jstNow(), input.actorId ?? null, id, input.expectedVersion)
+        .run();
+      if (Number(claimed.meta.changes ?? 0) !== 1) {
+        const latest = await getSupportMarkById(db, id, scope);
+        if (!latest) return null;
+        return 'conflict';
+      }
+    }
+    /*
+     * D033: 複製の作成と友だちの付け替えを同じ取引（D1バッチ）で確定する。
+     * 付け替えで失敗したら複製も戻り、送り直しで孤児の複製が増えない。
+     */
+    const cloneId = crypto.randomUUID();
+    const now = jstNow();
+    const cloneStatements: D1PreparedStatement[] = [];
+    const cloneIsDefault = input.isDefault ?? Boolean(existing.is_default);
+    if (cloneIsDefault) {
+      cloneStatements.push(db.prepare(
         `UPDATE support_marks SET is_default = 0
-          WHERE id != ? AND id IN (
+          WHERE id IN (
             SELECT mark_id FROM support_mark_scopes
              WHERE tenant_id = ? AND line_account_id = ?
           )`,
-      )
-      .bind(id, scope.tenantId, scope.lineAccountId)
-      .run();
+      ).bind(scope.tenantId, scope.lineAccountId));
+    }
+    cloneStatements.push(
+      db
+        .prepare(
+          `INSERT INTO support_marks
+             (id, name, color, is_default, auto_on_inbound, display_order, created_at,
+              version, updated_at, created_by, updated_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+        )
+        .bind(
+          cloneId,
+          input.name ?? existing.name,
+          input.color ?? existing.color,
+          cloneIsDefault ? 1 : 0,
+          (input.autoOnInbound ?? Boolean(existing.auto_on_inbound)) ? 1 : 0,
+          input.displayOrder ?? existing.display_order,
+          now,
+          now,
+          input.actorId ?? null,
+          input.actorId ?? null,
+        ),
+      db
+        .prepare(
+          `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .bind(cloneId, scope.tenantId, scope.lineAccountId, now),
+      db.prepare(
+        `INSERT INTO operation_audit
+           (id, target_kind, target_id, action, actor_id, friend_id, detail_json)
+         VALUES (?, 'support_mark', ?, 'created', ?, NULL, ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        cloneId,
+        input.actorId ?? null,
+        JSON.stringify({ lineAccountId: scope.lineAccountId, automationRuleCount: 0 }),
+      ),
+      db
+        .prepare(
+          `UPDATE friends SET support_mark_id = ?
+            WHERE support_mark_id = ? AND line_account_id = ?`,
+        )
+        .bind(cloneId, existing.id, scope.lineAccountId),
+    );
+    await db.batch(cloneStatements);
+    return getSupportMarkById(db, cloneId, scope);
   }
+
   const sets: string[] = [];
   const values: unknown[] = [];
   const put = (col: string, v: unknown) => {
@@ -656,15 +710,42 @@ export async function updateSupportMark(
     put('updated_at', jstNow());
     put('updated_by', input.actorId ?? null);
     values.push(id, scope.tenantId, scope.lineAccountId);
+    let where = `WHERE id = ? AND id IN (
+            SELECT mark_id FROM support_mark_scopes
+             WHERE tenant_id = ? AND line_account_id = ?
+          )`;
+    if (input.expectedVersion !== undefined) {
+      /*
+       * D031: 版の照合を更新文自体に入れる。読んでから書くまでの隙に
+       * 別の担当者が変えていても、後勝ちで上書きしない。
+       */
+      where += ' AND version = ?';
+      values.push(input.expectedVersion);
+    }
+    const updated = await db
+      .prepare(`UPDATE support_marks SET ${sets.join(', ')} ${where}`)
+      .bind(...values)
+      .run();
+    if (input.expectedVersion !== undefined && Number(updated.meta.changes ?? 0) !== 1) {
+      const latest = await getSupportMarkById(db, id, scope);
+      if (!latest) return null;
+      return 'conflict';
+    }
+  }
+  /*
+   * D031: 既定の付け替えは本体の確定後に回す。版が進んでいて止まるときに、
+   * 既定だけ外れる半端な状態を作らない。
+   */
+  if (input.isDefault === true) {
     await db
       .prepare(
-        `UPDATE support_marks SET ${sets.join(', ')}
-          WHERE id = ? AND id IN (
+        `UPDATE support_marks SET is_default = 0
+          WHERE id != ? AND id IN (
             SELECT mark_id FROM support_mark_scopes
              WHERE tenant_id = ? AND line_account_id = ?
           )`,
       )
-      .bind(...values)
+      .bind(id, scope.tenantId, scope.lineAccountId)
       .run();
   }
   return getSupportMarkById(db, id, scope);
