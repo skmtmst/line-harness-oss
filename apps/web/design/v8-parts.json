@@ -124,8 +124,8 @@
     {
       "pencil": "CugIm",
       "name": "段の題",
-      "code": null,
-      "planned": "shared/section-header.tsx"
+      "code": "shared/section-header.tsx",
+      "v8Only": true
     },
     {
       "pencil": "Pp3nS",
