@@ -161,9 +161,11 @@ describe('m21o タグ一覧のフォルダ欄と件数', () => {
     })
 
     it('短い列は固定幅に詰め、割合は54%＋固定308pxに収める', () => {
-      // 固定：並び替え44＋人数80＋表示56＋操作128＝308。
+      // 固定：並び替え44＋人数80＋表示56（v7）＋操作128＝308。
+      // v8 は「表示」列の代わりに左端の星列44（夕30・同じ部品に統一）。
       expect(source).toMatch(/<Th style=\{\{ width: 80 \}\}[^>]*>人数</)
-      expect(source).toMatch(/<Th style=\{\{ width: 56 \}\}>表示</)
+      expect(source).toMatch(/<Th style=\{\{ width: 56 \}\} className="v7-only">表示</)
+      expect(source).toMatch(/<Th style=\{\{ width: 44 \}\} className="v8-only text-center">/)
       // 割合：タグ20＋フォルダ10＋付け方11＋連動13＝54。残りは使用先が吸う。
       expect(source).toMatch(/<Th style=\{\{ width: '20%' \}\}>タグ</)
       expect(source).toMatch(/<Th style=\{\{ width: '10%' \}\}>フォルダ</)

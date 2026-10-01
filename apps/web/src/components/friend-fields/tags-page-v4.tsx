@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Star, Trash2, X } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import ActionMenu from '@/components/shared/action-menu'
+import AttentionStar from '@/components/shared/attention-star'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
@@ -1012,6 +1013,11 @@ export default function TagsPageV4({
                       128pxへ広げる（枠付きボタンのため64pxでは切れる）。
                       短い列は固定にして詰め、使用先は狭めても title で読める。
                     */}
+                    {/*
+                      夕30: v8 は一覧の星を「行の左端・同じ部品」に統一。
+                      見出しの左端にも星の印を置く（v7 は右端の「表示」列のまま）。
+                    */}
+                    <Th style={{ width: 44 }} className="v8-only text-center"><Star aria-hidden="true" className="mx-auto h-4 w-4 text-ink-faint" /><span className="sr-only">友だち一覧に表示する</span></Th>
                     <Th style={{ width: 44 }}><span className="sr-only">並び替え</span></Th>
                     <Th style={{ width: '20%' }}>タグ</Th>
                     <Th style={{ width: '10%' }}>フォルダ</Th>
@@ -1019,7 +1025,7 @@ export default function TagsPageV4({
                     <Th style={{ width: '11%' }} className="cq-hide-below-830 whitespace-nowrap">付け方</Th>
                     <Th style={{ width: '13%' }} className="whitespace-nowrap" title="マイル・アクションとの連動">連動</Th>
                     <Th>使用先</Th>
-                    <Th style={{ width: 56 }}>表示</Th>
+                    <Th style={{ width: 56 }} className="v7-only">表示</Th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
                     {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。操作列は中身（編集＋…）に合わせ128px（m21o・m22bで64pxのはみ出しを解消）。 */}
                     <Th style={{ width: 128 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
@@ -1058,6 +1064,14 @@ export default function TagsPageV4({
                           「並び替え」ボタンで出し入れしない。押す前は
                           並び替えられることに気づけないため。
                         */}
+                        {/* 夕30: v8 では星は行の左端（友だち一覧と同じ部品）。v7 は右端の「表示」列のまま。 */}
+                        <Td onClick={(event) => event.stopPropagation()} className="v8-only text-center">
+                          <AttentionStar
+                            pressed={Boolean(tag.isStarred)}
+                            label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
+                            onToggle={() => void toggleStar(tag)}
+                          />
+                        </Td>
                         <Td
                           draggable
                           onClick={(event) => event.stopPropagation()}
@@ -1104,8 +1118,8 @@ export default function TagsPageV4({
                           </div>
                         </Td>
                         <Td className="truncate text-label text-ink" title={usageLabel(tag)}>{usageLabel(tag)}</Td>
-                        <Td onClick={(event) => event.stopPropagation()}>
-                          {/* 設計 `zMlMX`。押すと友だち一覧への表示を切り替える。 */}
+                        <Td onClick={(event) => event.stopPropagation()} className="v7-only">
+                          {/* 設計 `zMlMX`。押すと友だち一覧への表示を切り替える（v7 だけ）。 */}
                           <button
                             type="button"
                             aria-pressed={Boolean(tag.isStarred)}
@@ -1166,6 +1180,14 @@ export default function TagsPageV4({
                       return (
                         <li key={tag.id} className="cursor-pointer px-3 py-3" onClick={() => router.push(`/tags/edit?id=${tag.id}`)}>
                           <div className="flex items-start gap-2">
+                            {/* 夕30: v8 では星は行の左端。v7 は右端の操作の中のまま。 */}
+                            <span className="v8-only pt-0.5" onClick={(event) => event.stopPropagation()}>
+                              <AttentionStar
+                                pressed={Boolean(tag.isStarred)}
+                                label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
+                                onToggle={() => void toggleStar(tag)}
+                              />
+                            </span>
                             <span className="pt-1 text-hairline" onClick={(event) => event.stopPropagation()}>
                               <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
                             </span>
@@ -1191,9 +1213,9 @@ export default function TagsPageV4({
                               <button
                                 type="button"
                                 aria-pressed={Boolean(tag.isStarred)}
+                                className={`v7-only ${tag.isStarred ? 'text-status-warn-deep' : 'text-hairline hover:text-status-warn-deep'}`}
                                 aria-label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
                                 onClick={(event) => { event.stopPropagation(); void toggleStar(tag) }}
-                                className={tag.isStarred ? 'text-status-warn-deep' : 'text-hairline hover:text-status-warn-deep'}
                               >
                                 <StarIcon filled={Boolean(tag.isStarred)} />
                               </button>
