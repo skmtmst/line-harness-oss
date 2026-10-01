@@ -1970,6 +1970,7 @@ const RICH_MENU_BASE = {
   targetingEnabled: true,
   folderId: 'rich-menu-folder-members',
   displayOrder: 1,
+  version: 1,
   thumbnailR2Key: null,
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-20T00:00:00.000Z',
