@@ -22,6 +22,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatNumber } from '@/lib/format'
 
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -456,7 +457,7 @@ export default function AdvancedSearchDialog({
          * 組み換え（項目・比較方法・値の縦3段化）は、画面の幅ではなく
          * このパネルの幅で切り替える（#984 U011再）。
          */
-        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-2xl"
+        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
@@ -482,7 +483,7 @@ export default function AdvancedSearchDialog({
               <div>
                 <p className="text-micro font-medium text-ink-faint">現在の条件に一致</p>
                 <p className="mt-0.5 text-xl font-bold tabular-nums text-ink">
-                  {counting ? '…' : count === null ? '—' : `${count.toLocaleString('ja-JP')}人`}
+                  {counting ? '…' : count === null ? '—' : `${formatNumber(count)}人`}
                 </p>
               </div>
               {countFailed ? (
@@ -504,7 +505,7 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-card border border-hairline bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
-            <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-bold">
+            <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-medium">
               AND
             </span>
             <span className="text-ink text-sm font-bold">すべて満たす条件</span>
@@ -684,7 +685,7 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-panel border border-hairline bg-canvas p-3">
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-action px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
+              <span className="rounded-pill bg-action px-2 py-0.5 text-xs font-medium text-on-action">OR</span>
               <span className="text-sm font-bold text-ink">いずれか1つ以上満たす条件</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
@@ -799,7 +800,7 @@ export default function AdvancedSearchDialog({
             </button>
             {savedNotice ? <span className="text-xs font-semibold text-accent-deep">{savedNotice}</span> : null}
             {savedSearchEnabled ? (
-              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
+              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存する</Button>
             ) : null}
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
@@ -811,9 +812,8 @@ export default function AdvancedSearchDialog({
               type="button"
               variant="primary"
               className="px-5"
-              onClick={() => onApply({ params, summary, editorState })}
-            >
-              {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
+              onClick={() => onApply({ params, summary, editorState })} busy={counting} busyLabel="再計算中…">
+              {count === null ? 'この条件で表示' : `${formatNumber(count)}人を表示`}
             </Button>
           </div>
         </div>
@@ -844,7 +844,7 @@ export default function AdvancedSearchDialog({
             {saveError ? <p className="mt-3 text-sm text-danger">{saveError}</p> : null}
             <div className="mt-5 flex justify-end gap-2">
               <Button type="button" onClick={() => setSaveOpen(false)}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>
+              <Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving}>保存する</Button>
             </div>
           </section>
         </div>
@@ -913,9 +913,9 @@ function OrAxisPicker({
             onAdd(condition)
             setDraft('')
           }}
-          className="shrink-0 rounded-full border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
+          className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
         >
-          ＋ 追加
+          ＋ 追加する
         </button>
       </div>
       {waitingForOptions ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}

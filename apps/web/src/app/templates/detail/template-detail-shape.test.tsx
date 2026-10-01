@@ -152,7 +152,7 @@ describe('D008: 形の違う詳細応答', () => {
     expect(screenText()).toContain('このテンプレートは見つかりません')
     // 存在しない相手への操作口は出さない。
     expect(byText('a', 'テンプレートを編集')).toBeNull()
-    expect(byText('button', 'テンプレートを削除')).toBeNull()
+    expect(byText('button', 'テンプレートを削除する')).toBeNull()
     expect(byText('button', '使用中のため削除できません')).toBeNull()
   })
 
@@ -163,6 +163,6 @@ describe('D008: 形の違う詳細応答', () => {
 
     expect(screenText()).toContain('{{name}}さん、いつもありがとうございます。')
     expect(byText('a', 'テンプレートを編集')).not.toBeNull()
-    expect(byText('button', 'テンプレートを削除')).not.toBeNull()
+    expect(byText('button', 'テンプレートを削除する')).not.toBeNull()
   })
 })

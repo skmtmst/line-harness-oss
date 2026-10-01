@@ -79,6 +79,8 @@ function NewOperatorNotificationInner() {
   // NOTIFY-04: id付きで開いたときは最初からそのIDを更新先にする。
   // 読み込み失敗のまま新規作成へ落ちると、同じお知らせが増える。
   const [savedRuleId, setSavedRuleId] = useState<string | null>(editId)
+  // 開いたときの版。保存のたびに読んだ版を送り、古い版からの上書きを止める。
+  const [ruleVersion, setRuleVersion] = useState<number | null>(null)
   const [ruleLoading, setRuleLoading] = useState(Boolean(editId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -103,6 +105,7 @@ function NewOperatorNotificationInner() {
         if (!result.success) throw new Error(result.error)
         const rule = result.data
         const saved = readConditions(rule)
+        setRuleVersion(typeof rule.version === 'number' ? rule.version : null)
         setName(rule.name)
         setEventType(rule.eventType)
         setThreshold(saved.threshold)
@@ -220,12 +223,20 @@ function NewOperatorNotificationInner() {
         },
         channels: emailFallback ? ['dashboard', 'line', 'email'] : ['dashboard', 'line'],
       }
+      // 開き直さずに版が分からないまま保存すると、ほかの人の編集を消す。
+      if (savedRuleId && ruleVersion === null) {
+        setError('お知らせの版が分かりません。一覧へ戻って開き直してください。')
+        return null
+      }
       // 2回目以降は作り直さず書き換える。作り直すと同じお知らせが増える。
       const result = savedRuleId
-        ? await api.lineNotifications.operatorRules.updateDraft(savedRuleId, selectedAccountId, payload)
+        ? await api.lineNotifications.operatorRules.updateDraft(savedRuleId, selectedAccountId, {
+          expectedVersion: ruleVersion ?? 1, ...payload,
+        })
         : await api.lineNotifications.operatorRules.create({ lineAccountId: selectedAccountId, ...payload })
       if (!result.success) throw new Error('save failed')
       setSavedRuleId(result.data.id)
+      if (typeof result.data.version === 'number') setRuleVersion(result.data.version)
       setError('')
       return result.data.id
     } catch (caught) {
@@ -235,6 +246,7 @@ function NewOperatorNotificationInner() {
         // 一覧から開いたあとに消された等。新規作成へ逃がすと別物が増える。
         setError('お知らせが見つかりません。一覧へ戻って開き直してください。')
       } else if (caught instanceof ApiError && caught.status === 409) {
+        // 版の競合はサーバーが開き直しを案内する文を返す。そのまま出す。
         setError(caught.message)
       } else if (caught instanceof ApiError && caught.status === 400) {
         setError(caught.message)
@@ -280,7 +292,7 @@ function NewOperatorNotificationInner() {
     <div data-design-node="N2gAza" data-selects-wide className="space-y-4 pb-24">
       <div className="flex items-center justify-between gap-3"><nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/line-notifications" className="text-action hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-action hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
-      </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテスト送信</Button></div>
+      </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテストを送る</Button></div>
 
       <div className="mb-4"><NoteBar>宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは別の画面で作ります。</NoteBar></div>
 
@@ -374,8 +386,8 @@ function NewOperatorNotificationInner() {
       <StickyBar
         status={ruleLoading ? '保存ずみのお知らせを読み込んでいます…' : savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
         actions={<>
-          <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
-          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きに保存'}</Button>
+          <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
+          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading} busy={saving}>{savedRuleId ? '保存し直す' : '下書きを保存する'}</Button>
           <Button onClick={() => void publish()} disabled={saving || ruleLoading} variant="primary">運用者へのお知らせを公開</Button>
         </>}
       />

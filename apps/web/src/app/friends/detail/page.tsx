@@ -33,6 +33,7 @@ import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { loadFailureKind } from './load-failure-kind'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 /**
  * 友だち詳細。
@@ -264,11 +265,11 @@ function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimel
       className={`text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs @lg:grid @lg:border-b-0 ${last ? 'last:border-b-0' : ''}`}
       style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}
     >
-      <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
+      <span>{formatDateTime(item.occurredAt)}</span>
       <span>{timelineTypeLabel(item.type)}</span>
       <span className="min-w-0 flex-1 basis-full @lg:basis-auto">
         {statusLabel ? (
-          <span className="border-hairline bg-canvas-sunken text-ink-faint mr-1.5 inline-block rounded-full border px-1.5 py-px font-semibold leading-4">
+          <span className="border-hairline bg-canvas-sunken text-ink-faint mr-1.5 inline-block rounded-pill border px-1.5 py-px font-semibold leading-4">
             {statusLabel}
           </span>
         ) : null}
@@ -1119,7 +1120,7 @@ function FriendDetailInner() {
     ...(canManageFieldDefs
       ? [{
           id: 'scenario-enroll',
-          label: 'シナリオに登録',
+          label: 'シナリオに登録する',
           icon: <ListPlus size={16} />,
           onSelect: () => void openScenarioPicker(),
         }]
@@ -1159,7 +1160,7 @@ function FriendDetailInner() {
       <>
         {canManageFieldDefs ? (
           <Button type="button" variant="primary" onClick={() => void openScenarioPicker()}>
-            この友だちをシナリオに登録
+            この友だちをシナリオに登録する
           </Button>
         ) : null}
         <Button href="/scenarios">シナリオ一覧を見る</Button>
@@ -1249,6 +1250,22 @@ function FriendDetailInner() {
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
 
+  /*
+   * M012：読み込み 403（権限不足）は見つからない案内より先に分ける。
+   * 403 のとき error は空文字なので、後の `!error && !friend` の受け皿に
+   * 先に捕まると権限の面が出ない（監査 228-003 の再発）。順番で守る。
+   * 再試行口は出さない（押し直しても直らないため）。誰に確認するかを添える。
+   */
+  if (!loading && loadForbidden) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="この友だちを見る権限がありません"
+        description="見るには権限が要ります。オーナーか管理者の方に確認してください。"
+      />
+    )
+  }
+
   if (!loading && (friendMissing || (!error && !friend))) {
     return (
       <TargetMissing
@@ -1258,20 +1275,6 @@ function FriendDetailInner() {
         accountName={selectedAccount?.name}
         backHref="/friends"
         backLabel="友だち一覧へ戻る"
-      />
-    )
-  }
-
-  /*
-   * M012：読み込み 403（権限不足）。汎用の失敗面とは分け、再試行口は
-   * 出さない（押し直しても直らないため）。誰に確認するかを添える。
-   */
-  if (!loading && loadForbidden) {
-    return (
-      <TargetMissing
-        kind="error"
-        title="この友だちを見る権限がありません"
-        description="見るには権限が要ります。オーナーか管理者の方に確認してください。"
       />
     )
   }
@@ -1409,19 +1412,19 @@ function FriendDetailInner() {
               取り損ねは「取得できませんでした」＋再試行で「—」と区別する。
             */}
             <div className="border-hairline border-b bg-canvas px-5 py-4">
-              <div className="flex items-center justify-between"><p className="text-ink text-xs font-bold">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る →</Link></div>
+              <div className="flex items-center justify-between"><p className="text-ink text-xs font-medium">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る →</Link></div>
               <div className="bg-canvas-sunken mt-2 flex items-center justify-between rounded-control px-3 py-3">
                 <span className="text-ink-faint text-xs">
                   利用可能
                   {mileage && mileage.pending > 0
-                    ? ` ・ 確定待ち ${mileage.pending.toLocaleString('ja-JP')}`
+                    ? ` ・ 確定待ち ${formatNumber(mileage.pending)}`
                     : ''}
                 </span>
                 <strong className="text-ink text-base font-bold tabular-nums">
                   {mileageStatus === 'loading'
                     ? '…'
                     : mileage
-                      ? mileage.available.toLocaleString('ja-JP')
+                      ? formatNumber(mileage.available)
                       : '—'}
                   <span className="ml-1 text-xs font-semibold">mile</span>
                 </strong>
@@ -1457,7 +1460,7 @@ function FriendDetailInner() {
                       aria-expanded={supportEditing}
                       className="text-action shrink-0 text-xs hover:underline"
                     >
-                      {supportEditing ? 'やめる' : '編集'}
+                      {supportEditing ? 'キャンセル' : '編集'}
                     </button>
                   ) : (
                     <Link href={inboxHrefForFriend(friendId)} className="text-action shrink-0 text-xs hover:underline">
@@ -1517,9 +1520,7 @@ function FriendDetailInner() {
                         type="button"
                         variant="primary"
                         onClick={() => void saveSupport()}
-                        disabled={supportBusy}
-                      >
-                        {supportBusy ? '処理中…' : '保存する'}
+                        disabled={supportBusy} busy={supportBusy} busyLabel="処理中…">保存する
                       </Button>
                       <Button
                         type="button"
@@ -1570,12 +1571,9 @@ function FriendDetailInner() {
                   ) : (
                     <span className="text-ink-faint text-xs">タグはありません</span>
                   )}
-                  <Link
-                    href={inboxHrefForFriend(friendId)}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-2 py-0.5 text-[11px]"
-                  >
+                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
                     ＋ 追加
-                  </Link>
+                  </Button>
                 </div>
               </div>
 
@@ -1658,7 +1656,7 @@ function FriendDetailInner() {
                     <dt className="text-ink-faint">追加日</dt>
                     <dd className="text-ink-secondary">
                       {friend?.createdAt
-                        ? new Date(friend.createdAt).toLocaleDateString('ja-JP')
+                        ? formatDay(friend.createdAt)
                         : '—'}
                     </dd>
                   </div>
@@ -1820,7 +1818,7 @@ function FriendDetailInner() {
                         友だち追加の記録は本体の作成日時から出す実データ。
                         活動履歴が0件のときは、この記録だけが履歴になる。
                       */}
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
                       {historyStatus === 'ready' && historyItems.length === 0 ? (
                         <p className="text-ink-faint px-4 pb-4 text-xs">
                           上の「友だち追加の記録」以外の活動履歴はまだありません。
@@ -1831,7 +1829,7 @@ function FriendDetailInner() {
                 </section>
                 {/*
                   NEXT-09: 対象者を引き継ぐ操作と、汎用一覧への移動を分ける。
-                  「シナリオに登録」はこの友だちを対象に選んで実行できる。
+                  「シナリオに登録する」はこの友だちを対象に選んで実行できる。
                   一覧へ行くだけのものは名前を「一覧を見る」に変えて混同させない。
                 */}
                 <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
@@ -1846,7 +1844,7 @@ function FriendDetailInner() {
                         }
                         aria-expanded={scenarioPickerOpen}
                       >
-                        シナリオに登録
+                        シナリオに登録する
                       </Button>
                     ) : null}
                     {/* ★V7：この友だちに関係の無い「〜一覧を見る」は外した（左のメニューから行ける）。 */}
@@ -1893,16 +1891,14 @@ function FriendDetailInner() {
                           type="button"
                           variant="primary"
                           onClick={() => void enrollScenario()}
-                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'}
-                        >
-                          {scenarioBusy ? '登録中…' : 'このシナリオに登録する'}
+                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'} busy={scenarioBusy} busyLabel="登録中…">このシナリオに登録する
                         </Button>
                         <Button
                           type="button"
                           onClick={() => setScenarioPickerOpen(false)}
                           disabled={scenarioBusy}
                         >
-                          やめる
+                          キャンセル
                         </Button>
                       </div>
                     </div>
@@ -1941,7 +1937,7 @@ function FriendDetailInner() {
                     {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
                     {!historyNextCursor ? (
                       <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
-                        <span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span>
+                        <span>{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span>
                         <span>友だち追加</span>
                         <span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
                         <span>システム</span>
@@ -1968,9 +1964,8 @@ function FriendDetailInner() {
                         <Button
                           type="button"
                           onClick={() => void loadHistory(historyNextCursor)}
-                          disabled={historyLoadingMore}
-                        >
-                          {historyLoadingMore ? '読み込み中…' : historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
+                          disabled={historyLoadingMore} busy={historyLoadingMore} busyLabel="読み込み中…">
+                          {historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
                         </Button>
                       </div>
                     ) : null}
@@ -2030,19 +2025,14 @@ function FriendDetailInner() {
                           chip.id === BASIC_GROUP ? '' : `&group=${encodeURIComponent(chip.id)}`
                         }`
                         return (
-                          <Link
-                            key={chip.id}
-                            href={href}
-                            aria-current={active ? 'true' : undefined}
-                            className={`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          <Button variant="secondary" className={(`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
                               active
                                 ? 'border-accent bg-accent-soft text-accent-deep'
                                 : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-                            }`}
-                          >
+                            }`) + ' h-auto whitespace-normal'} key={chip.id} href={href} aria-current={active ? 'true' : undefined}>
                             {chip.label}
                             <span className="ml-1 text-ink-faint">{chip.count}</span>
-                          </Link>
+                          </Button>
                         )
                       })}
                     </div>
@@ -2135,7 +2125,7 @@ function FriendDetailInner() {
                     )}
 
                     {warnings.length > 0 && (
-                      <ul className="bg-warning-bg text-warning mb-3 space-y-1 rounded-lg p-3 text-xs">
+                      <ul className="bg-warning-bg text-warning mb-3 space-y-1 rounded-control p-3 text-xs">
                         {warnings.map((w) => (
                           <li key={w}>{w}</li>
                         ))}
@@ -2151,20 +2141,13 @@ function FriendDetailInner() {
                     */}
                     {canSaveFields ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={save}
-                          disabled={saving}
-                          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-                        >
-                          {saving ? '保存中...' : '保存'}
-                        </button>
+                        <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={save} disabled={saving}>
+                          {saving ? '保存中...' : '保存する'}
+                        </Button>
                         {canManageFieldDefs && (
-                          <Link
-                            href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-                          >
+                          <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>
                             項目を作る
-                          </Link>
+                          </Button>
                         )}
                       </div>
                     ) : (
@@ -2224,9 +2207,9 @@ function FriendDetailInner() {
                       return (
                       <li key={s.id} className="py-3 first:pt-0 last:pb-0">
                         <div className="flex items-baseline justify-between gap-2">
-                          <p className="text-ink text-sm font-medium">{s.formName}</p>
+                          <p className="text-ink text-sm font-semibold">{s.formName}</p>
                           <p className="text-ink-faint text-xs">
-                            {new Date(s.createdAt).toLocaleString('ja-JP')}
+                            {formatDateTime(s.createdAt)}
                           </p>
                         </div>
                         <dl className="mt-1.5 space-y-0.5">
@@ -2259,9 +2242,7 @@ function FriendDetailInner() {
                         type="button"
                         variant="secondary"
                         disabled={submissionsLoadingMore}
-                        onClick={() => void loadSubmissions(submissionsNextCursor)}
-                      >
-                        {submissionsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                        onClick={() => void loadSubmissions(submissionsNextCursor)} busy={submissionsLoadingMore} busyLabel="読み込んでいます…">さらに読み込む
                       </Button>
                     </div>
                   ) : null}

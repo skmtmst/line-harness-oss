@@ -118,7 +118,7 @@ async function makeDirty() {
     ?? [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')].find((item) => !item.disabled)
   if (!toggle) throw new Error('切替可能な機能がありません')
   await act(async () => { toggle.click(); await Promise.resolve() })
-  expect(button('機能設定を保存').disabled).toBe(false)
+  expect(button('機能設定を保存する').disabled).toBe(false)
 }
 
 async function fillReason(text: string) {
@@ -137,7 +137,7 @@ describe('N-444 機能設定の変更理由', () => {
     expect(reasonInput()).toBeNull()
     await makeDirty()
     expect(reasonInput()).not.toBeNull()
-    await act(async () => { button('機能設定を保存').click(); await settle() })
+    await act(async () => { button('機能設定を保存する').click(); await settle() })
     expect(network.puts).toHaveLength(0)
     expect(document.body.textContent).toContain('変更理由を入力してください')
   })
@@ -146,11 +146,11 @@ describe('N-444 機能設定の変更理由', () => {
     await render()
     await makeDirty()
     await fillReason('   ')
-    await act(async () => { button('機能設定を保存').click(); await settle() })
+    await act(async () => { button('機能設定を保存する').click(); await settle() })
     expect(network.puts).toHaveLength(0)
 
     await fillReason('  使わない配信を止めるため  ')
-    await act(async () => { button('機能設定を保存').click(); await settle(); await settle() })
+    await act(async () => { button('機能設定を保存する').click(); await settle(); await settle() })
     expect(network.puts).toHaveLength(1)
     expect(network.puts[0].accountId).toBe('account-a')
     expect(network.puts[0].body.reason).toBe('使わない配信を止めるため')
@@ -161,12 +161,12 @@ describe('N-444 機能設定の変更理由', () => {
     await makeDirty()
     await fillReason('失敗させる')
     network.saveFails = true
-    await act(async () => { button('機能設定を保存').click(); await settle() })
+    await act(async () => { button('機能設定を保存する').click(); await settle() })
     expect(network.puts).toHaveLength(1)
     expect(reasonInput()!.value).toBe('失敗させる')
 
     network.saveFails = false
-    await act(async () => { button('機能設定を保存').click(); await settle(); await settle() })
+    await act(async () => { button('機能設定を保存する').click(); await settle(); await settle() })
     expect(network.puts).toHaveLength(2)
     expect(reasonInput()).toBeNull()
   })
@@ -175,7 +175,7 @@ describe('N-444 機能設定の変更理由', () => {
     await render()
     await makeDirty()
     await fillReason('Aでの理由')
-    await act(async () => { button('変更を取り消す').click() })
+    await act(async () => { button('キャンセル').click() })
     expect(reasonInput()).toBeNull()
 
     await makeDirty()
@@ -187,12 +187,12 @@ describe('N-444 機能設定の変更理由', () => {
     // Bでは理由が消えているので、入力なしでは保存を送れない。
     // Aの理由が残っていたら、この保存がAの理由で通ってしまう。
     await makeDirty()
-    await act(async () => { button('機能設定を保存').click(); await settle() })
+    await act(async () => { button('機能設定を保存する').click(); await settle() })
     expect(network.puts).toHaveLength(0)
     expect(document.body.textContent).toContain('変更理由を入力してください')
 
     await fillReason('Bでの理由')
-    await act(async () => { button('機能設定を保存').click(); await settle(); await settle() })
+    await act(async () => { button('機能設定を保存する').click(); await settle(); await settle() })
     expect(network.puts).toHaveLength(1)
     expect(network.puts[0].accountId).toBe('account-b')
     expect(network.puts[0].body.reason).toBe('Bでの理由')

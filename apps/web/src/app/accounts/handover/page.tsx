@@ -29,6 +29,7 @@ import {
   MATCH_BUCKETS,
   totalsMatch,
 } from './handover-view'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -54,9 +55,7 @@ const statusStep: Record<AccountHandover['status'], number> = {
 
 function formatMonthDayTime(value: string | null): string {
   if (!value) return '未取得'
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
-  }).format(new Date(value))
+  return formatDateTime(new Date(value))
 }
 
 /**
@@ -76,6 +75,9 @@ function Handover() {
   const canManage = staffRole === null || canManageRole(staffRole)
   const [account, setAccount] = useState<LineAccount | null>(null)
   const [accounts, setAccounts] = useState<LineAccount[]>([])
+  /** 補助の一覧（受け取り先の名前）だけの失敗。本体は隠さず、ここだけ読み直す（R521）。 */
+  const [accountsFailed, setAccountsFailed] = useState(false)
+  const [accountsRetrying, setAccountsRetrying] = useState(false)
   const [handover, setHandover] = useState<HandoverView | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
@@ -105,22 +107,54 @@ function Handover() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
+  /**
+   * 補助の一覧（受け取り先の名前）だけを読む。本体とは成否を分ける。
+   * ここが503でも引継ぎの内容は隠さない（R521）。成功したら印を消す。
+   */
+  const loadAccounts = useCallback(async () => {
+    try {
+      const accountsRes = await api.lineAccounts.list()
+      if (!accountsRes.success) {
+        setAccountsFailed(true)
+        return
+      }
+      setAccounts(accountsRes.data)
+      setAccountsFailed(false)
+    } catch {
+      setAccountsFailed(true)
+    }
+  }, [])
+
+  /** 補助の一覧だけ読み直す。二度押しを止める。 */
+  const retryAccounts = useCallback(async () => {
+    if (accountsRetrying) return
+    setAccountsRetrying(true)
+    try {
+      await loadAccounts()
+    } finally {
+      setAccountsRetrying(false)
+    }
+  }, [accountsRetrying, loadAccounts])
+
   const load = useCallback(async () => {
     if (!id) return
     setStatus('loading')
     setMissing(false)
+    /*
+      補助の一覧は本体と並行に読むが、成否は分けて持つ。ここが失敗しても
+      下の本体の読み込みは続け、画面全体を失敗にしない（R521）。
+    */
+    void loadAccounts()
     try {
-      const [accountRes, accountsRes, handoversRes] = await Promise.all([
+      const [accountRes, handoversRes] = await Promise.all([
         api.lineAccounts.get(id),
-        api.lineAccounts.list(),
         api.accountHandovers.listForAccount(id),
       ])
-      if (!accountRes.success || !accountsRes.success || !handoversRes.success) {
+      if (!accountRes.success || !handoversRes.success) {
         setStatus('error')
         return
       }
       setAccount(accountRes.data)
-      setAccounts(accountsRes.data)
       const current = handoversRes.data[0]
       if (!current) {
         setHandover(null)
@@ -149,7 +183,7 @@ function Handover() {
       }
       setStatus('error')
     }
-  }, [id])
+  }, [id, loadAccounts])
 
   useEffect(() => { void load() }, [load])
   usePageTitle('乗り換え・引き継ぎ')
@@ -270,7 +304,7 @@ function Handover() {
       setRollbackOpen(false)
       const detail = await api.accountHandovers.get(handover.id)
       if (detail.success) setHandover(detail.data as HandoverView)
-      notifyToast(`切り戻しました。${res.data.restoredCount.toLocaleString('ja-JP')}人を元のアカウントへ戻しました。`)
+      notifyToast(`切り戻しました。${formatNumber(res.data.restoredCount)}人を元のアカウントへ戻しました。`)
     } catch (caught) {
       setRollbackError(
         caught instanceof ApiError && caught.message && !/^API error: /.test(caught.message)
@@ -328,7 +362,7 @@ function Handover() {
       const moved = result.data.movedCount ?? result.data.plannedCount ?? 0
       notifyToast(
         result.data.failureReason
-          ?? `本実行が終わりました。${moved.toLocaleString('ja-JP')}人を移しました。`,
+          ?? `本実行が終わりました。${formatNumber(moved)}人を移しました。`,
       )
     } catch {
       setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。')
@@ -404,8 +438,7 @@ function Handover() {
             {executeError && <Notice tone="danger" className="mt-3"><p>{executeError}</p></Notice>}
             {canManage && (
               <Button type="button" variant="primary" className="mt-3" disabled={issuing}
-                onClick={() => { setExecuteError(''); void issueCode() }}>
-                {issuing ? '発行中…' : '引き継ぎコードを出す'}
+                onClick={() => { setExecuteError(''); void issueCode() }} busy={issuing} busyLabel="発行中…">引き継ぎコードを出す
               </Button>
             )}
           </Card>
@@ -426,8 +459,7 @@ function Handover() {
                   aria-label="引き継ぎコード"
                 />
                 <Button type="button" variant="primary" disabled={linking || !linkCode.trim()}
-                  onClick={() => void submitLinkCode()}>
-                  {linking ? '確認中…' : 'コードを読む'}
+                  onClick={() => void submitLinkCode()} busy={linking} busyLabel="確認中…">コードを読む
                 </Button>
               </div>
             )}
@@ -466,14 +498,14 @@ function Handover() {
           return (
             <li key={step.order} className="border-hairline bg-canvas rounded-control flex min-w-0 items-center gap-3 border p-3">
               <span className={completed
-                ? 'bg-success text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'
+                ? 'bg-success text-on-accent flex size-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium'
                 : active
-                  ? 'bg-action text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'
-                  : 'bg-canvas-sunken text-ink-secondary flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'}>
+                  ? 'bg-action text-on-accent flex size-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium'
+                  : 'bg-canvas-sunken text-ink-secondary flex size-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium'}>
                 {completed ? '✓' : step.order}
               </span>
               <span className="min-w-0">
-                <span className="text-ink-faint block text-xs font-bold">STEP {step.order}</span>
+                <span className="text-ink-faint block text-xs font-medium">STEP {step.order}</span>
                 <span className="text-ink block text-xs font-medium leading-relaxed">{step.label}</span>
               </span>
             </li>
@@ -491,14 +523,38 @@ function Handover() {
                 className="grid text-sm"
                 style={{ gridTemplateColumns: '7rem minmax(0, 1fr) minmax(0, 1fr)' }}
               >
-                <div className="bg-canvas-sunken border-hairline border-b px-3 py-2 text-xs font-bold">アカウント</div>
+                <div className="bg-canvas-sunken border-hairline border-b px-3 py-2 text-xs font-medium">アカウント</div>
                 <div className="border-hairline border-b border-l px-3 py-2">{account.name}（{account.channelId}）</div>
                 <div className="border-hairline border-b border-l px-3 py-2">{destination ? `${destination.name}（${destination.channelId}）` : '未取得'}</div>
-                <div className="bg-canvas-sunken px-3 py-2 text-xs font-bold">プロバイダー</div>
+                <div className="bg-canvas-sunken px-3 py-2 text-xs font-medium">プロバイダー</div>
                 <div className="border-hairline border-l px-3 py-2">乗り換え元</div>
                 <div className="border-hairline border-l px-3 py-2">受け取り先</div>
               </div>
             </div>
+            {/*
+              補助の一覧だけ読めないとき。本体は隠さず、この帯だけ出す。
+              全体失敗の1枚（TargetMissing）とは別に、ここだけ読み直せる（R521）。
+              赤は使わない（読み込めなかった時の決まり）。
+            */}
+            {accountsFailed && (
+              <Notice
+                tone="warn"
+                className="mt-3"
+                message="受け取り先の一覧だけ読み込めませんでした。引き継ぎの内容はそのまま見られます。"
+                action={(
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={accountsRetrying}
+                    onClick={() => void retryAccounts()}
+                    busy={accountsRetrying}
+                    busyLabel="読み込んでいます"
+                  >
+                    一覧だけ読み直す
+                  </Button>
+                )}
+              />
+            )}
             {handover.providerMatch === 'different' && (
               <Notice tone="warn" className="mt-3">
                 <p className="font-bold">プロバイダーが違うので、友だちのIDは自動でつなげません</p>
@@ -517,7 +573,7 @@ function Handover() {
                 <div key={bucket.key} className="border-hairline rounded-card border p-4">
                   <p className="text-ink-faint text-xs">{bucket.label}</p>
                   <p className="text-ink mt-1 text-2xl font-semibold">
-                    {countsAreComplete ? `${handover.counts?.[bucket.key].toLocaleString('ja-JP')}人` : '—'}
+                    {countsAreComplete ? `${formatNumber(handover.counts?.[bucket.key])}人` : '—'}
                   </p>
                   <p className="text-ink-faint mt-1 text-xs">{bucket.note}</p>
                 </div>
@@ -612,7 +668,7 @@ function Handover() {
                               ]}
                             />
                           ) : (
-                            <span className="border-hairline rounded-full border px-2 py-1 text-xs">
+                            <span className="border-hairline rounded-pill border px-2 py-1 text-xs">
                               {shown === 'link' ? '同じ人' : shown === 'new' ? '新しく作る' : '引き継がない'}
                             </span>
                           )}
@@ -632,8 +688,7 @@ function Handover() {
                   ? <p role="alert" className="text-danger text-xs">{decisionError}</p>
                   : <p className="text-ink-secondary text-xs">{Object.keys(decisionEdits).length}件の書き換えをまだ保存していません。</p>}
                 <Button type="button" variant="primary" disabled={savingDecisions}
-                  onClick={() => void saveDecisions()}>
-                  {savingDecisions ? '保存中…' : '判断を保存する'}
+                  onClick={() => void saveDecisions()} busy={savingDecisions}>判断を保存する
                 </Button>
               </div>
             )}
@@ -644,7 +699,7 @@ function Handover() {
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              <Button href={`/accounts/detail?id=${account.id}`}>やめる</Button>
+              <Button href={`/accounts/detail?id=${account.id}`}>キャンセル</Button>
               {/* 取り消しは進行中だけ。終わった引き継ぎは切り戻しで戻す。変更なので見るだけには出さない。 */}
               {canManage && handover.status !== 'completed' && handover.status !== 'failed' && (
                 <Button type="button" variant="danger"
@@ -655,8 +710,7 @@ function Handover() {
             </div>
             {canManage && (
               <div className="flex flex-wrap gap-2">
-                <Button type="button" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()}>
-                  {refreshing ? '確認中…' : '事前確認をやり直す'}
+                <Button type="button" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()} busy={refreshing} busyLabel="確認中…">事前確認をやり直す
                 </Button>
                 <Button
                   type="button"
@@ -668,9 +722,7 @@ function Handover() {
                       && handover.declaredFriendTotal !== undefined
                       && handover.counts !== null
                       && handover.declaredFriendTotal !== handover.counts.sourceTotal)}
-                  onClick={() => { setExecuteError(''); setConfirmOpen(true) }}
-                >
-                  {executing ? '実行中…' : '本実行へ進む'}
+                  onClick={() => { setExecuteError(''); setConfirmOpen(true) }} busy={executing} busyLabel="実行中…">本実行へ進む
                 </Button>
               </div>
             )}
@@ -680,7 +732,7 @@ function Handover() {
             && handover.rollbackDeadline > new Date().toISOString() && (
             <div className="border-hairline rounded-control flex flex-wrap items-center justify-between gap-2 border px-4 py-3">
               <div>
-                <p className="text-ink text-sm font-medium">移した友だちを元へ戻す</p>
+                <p className="text-ink text-sm font-semibold">移した友だちを元へ戻す</p>
                 <p className="text-ink-secondary mt-1 text-xs">
                   {formatMonthDayTime(handover.rollbackDeadline)} まで切り戻せます。動かした友だちだけを元のアカウントへ戻します。
                 </p>

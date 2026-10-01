@@ -123,7 +123,7 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
       fireEvent.click(option!)
     })
     await settle(50)
-    const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存')
+    const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存する')
     expect(save).toBeTruthy()
     await act(async () => {
       fireEvent.click(save!)

@@ -27,7 +27,7 @@ describe('U043: テンプレート行の操作は「編集」と「…」メニ�
   it('副操作はメニュー項目として渡す', () => {
     expect(page).toContain("label: '一斉配信で使う'")
     expect(page).toContain("label: '使用先を見る'")
-    expect(page).toContain("label: 'テンプレートを削除'")
+    expect(page).toContain("label: 'テンプレートを削除する'")
     expect(page).toContain("tone: 'danger'")
   })
 })

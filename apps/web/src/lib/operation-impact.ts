@@ -1,23 +1,17 @@
 import type { OperationImpactPreview } from './api'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 export type EmergencyStopTarget = keyof OperationImpactPreview
 
 function formatCount(value: number): string {
-  return value.toLocaleString('ja-JP')
+  return formatNumber(value)
 }
 
 function formatScheduledAt(value: string | null | undefined): string | null {
   if (!value) return null
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return formatDateTime(date)
 }
 
 /** 一覧と最終確認で同じ実測値を読み上げる。未取得は0人へ潰さない。 */

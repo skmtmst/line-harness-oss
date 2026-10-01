@@ -1,4 +1,5 @@
 import type { LineAccount } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /**
  * LINEアカウントの詳細・編集（設計 ★V6 33-3 `T9rA9`）。
@@ -50,8 +51,8 @@ export function capacityLabel(account: LineAccount): string {
   const cap = account.friendCapacity
   const warn = account.capacityWarnAt
   if (cap === null || cap === undefined) return '上限は未設定'
-  const warnText = warn === null || warn === undefined ? '警告なし' : `警告 ${warn.toLocaleString('ja-JP')}`
-  return `上限 ${cap.toLocaleString('ja-JP')}／${warnText}`
+  const warnText = warn === null || warn === undefined ? '警告なし' : `警告 ${formatNumber(warn)}`
+  return `上限 ${formatNumber(cap)}／${warnText}`
 }
 
 /**

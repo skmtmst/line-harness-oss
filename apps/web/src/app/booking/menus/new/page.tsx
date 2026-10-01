@@ -22,6 +22,7 @@ import { classifyApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { bookingMenuError } from '../menu-validation'
+import { formatNumber } from '@/lib/format'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
@@ -244,7 +245,7 @@ export default function NewBookingMenuPage() {
     ? 'お問い合わせ'
     : priceMode === 'free'
       ? '無料'
-      : `¥${Number(basePrice).toLocaleString()}`
+      : `¥${formatNumber(Number(basePrice))}`
 
   /*
    * 作成途中の離脱確認。名前・時間・料金・担当・タグのどれかに手を付けて
@@ -284,7 +285,7 @@ export default function NewBookingMenuPage() {
           ? '担当の設定をやり直す'
           : isActive
             ? 'つくって出す'
-            : '下書きに保存'
+            : '下書きを保存する'
       }
       showHeader={false}
       variant="v6"
@@ -654,6 +655,8 @@ export default function NewBookingMenuPage() {
             {/*
              * R536: 403は権限不足で、押しても直らない再試行は出さない。
              * それ以外は入力を保ったまま同じ画面から取り直せる。
+             * DEEP-17（#1043更新）: 取得失敗は「未登録」と混ぜず、入力保持と
+             * 取り直しの口を出す。空（0人）は下の別の言葉で登録へ誘導する。
              */}
             <p className="text-ink-faint text-sm">
               {classifyApiFailure(staffError) === 'forbidden'
@@ -681,7 +684,7 @@ export default function NewBookingMenuPage() {
                 <Checkbox
                   checked={assigned.has(s.id)}
                   onCheckedChange={() => toggle(s.id)}
-                  className="border-hairline hover:bg-canvas-sunken rounded-md border p-2.5"
+                  className="border-hairline hover:bg-canvas-sunken rounded-mini border p-2.5"
                 >
                   <span className="text-ink text-sm">{s.display_name || s.name}</span>
                   {s.role && <span className="text-ink-faint text-xs">{s.role}</span>}
@@ -718,7 +721,7 @@ export default function NewBookingMenuPage() {
            * ルールではない。R306: 未設定と取得失敗は別の言葉で出す。
            */}
           <ActionSummary
-            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${bookingMileage.toLocaleString()} 付ける`}
+            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${formatNumber(bookingMileage)} 付ける`}
             detail={
               mileageLoadState === 'loading'
                 ? 'マイル設定を読み込んでいます…'
@@ -735,7 +738,7 @@ export default function NewBookingMenuPage() {
                   ? '未取得'
                   : bookingMileage === null
                     ? '未設定'
-                    : `予約で ${bookingMileage.toLocaleString()}`
+                    : `予約で ${formatNumber(bookingMileage)}`
             }
             href="/mileage?tab=earning-rules"
           />

@@ -9,6 +9,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -194,7 +195,7 @@ function PoolCard({
     <div className="bg-canvas border-hairline rounded-card border p-4">
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="min-w-0">
-          <h3 className="flex items-center gap-2 font-medium">
+          <h3 className="flex items-center gap-2 font-semibold">
             <span className="min-w-0 truncate" title={pool.name}>{pool.name}</span>
             {isMain && (
               <StatusBadge tone="info" size="compact">
@@ -214,7 +215,7 @@ function PoolCard({
               onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
               className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
             >
-              削除
+              削除する
             </button>
           )}
         </div>
@@ -426,7 +427,7 @@ function CreatePoolModal({
         className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6"
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 id="create-pool-title" className="text-lg font-medium">新規プール</h2>
+          <h2 id="create-pool-title" className="text-lg font-semibold">新規プール</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
@@ -434,24 +435,49 @@ function CreatePoolModal({
         {error && (
           <Notice tone="danger" message={error} />
         )}
-        <input
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          placeholder="slug (例: brand-a)"
-          className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 font-mono text-sm"
-        />
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="表示名 (例: ブランドA)"
-          className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
-        />
-        <Select
-          aria-label="最初の所属アカウント"
-          value={activeAccountId}
-          onChange={(value) => setActiveAccountId(value)}
-          options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
-        />
+        {/*
+          R617: 項目名がplaceholderだけだと、入力後に何の欄か消える。
+          labelと入力欄はhtmlForとidで結び付ける。暗黙の関連付けだと、
+          labelの中のHelpTipのbuttonが先に来て入力欄へ結び付かなくなる
+          （実ブラウザで input.labels が空になる）ため、HelpTipはlabelの
+          外へ置き、入力欄の読み上げ名に混ざらないようにする。
+          読み上げ名（placeholder・aria-label由来）は元からあるので残す。
+        */}
+        <div>
+          <div className="mb-1 flex items-center gap-1">
+            <label htmlFor="create-pool-slug" className="text-ink-secondary text-sm font-medium">slug</label>
+            <HelpTip label="slugの説明">
+              公開URLに使う識別子です。
+            </HelpTip>
+          </div>
+          <input
+            id="create-pool-slug"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="例: brand-a"
+            className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 font-mono text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="create-pool-name" className="text-ink-secondary mb-1 block text-sm font-medium">表示名</label>
+          <input
+            id="create-pool-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: ブランドA"
+            className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="create-pool-account" className="text-ink-secondary mb-1 block text-sm font-medium">最初の所属アカウント</label>
+          <Select
+            id="create-pool-account"
+            aria-label="最初の所属アカウント"
+            value={activeAccountId}
+            onChange={(value) => setActiveAccountId(value)}
+            options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+          />
+        </div>
         <div className="border-hairline flex justify-end gap-2 border-t pt-2">
           <Button variant="secondary" onClick={onClose}>
             キャンセル
@@ -460,9 +486,7 @@ function CreatePoolModal({
             variant="primary"
             onClick={() => { void onSubmit() }}
             disabled={submitting || !slug || !name || !activeAccountId}
-            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:brightness-90 disabled:opacity-50"
-          >
-            {submitting ? '作成中…' : '作成'}
+            className="text-sm px-3 py-1.5 rounded-mini bg-action text-on-accent hover:brightness-90 disabled:opacity-50" busy={submitting} busyLabel="作成中…">作る
           </Button>
         </div>
       </div>

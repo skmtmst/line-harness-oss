@@ -152,7 +152,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'forbidden'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存')!.click()
+      findButton('下書きを保存する')!.click()
     })
     await flush()
     expect(container.textContent).toContain('権限')
@@ -163,7 +163,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'serverError'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存')!.click()
+      findButton('下書きを保存する')!.click()
     })
     await flush()
     expect(container.textContent).toContain('時間をおいて')
@@ -174,7 +174,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'offline'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存')!.click()
+      findButton('下書きを保存する')!.click()
     })
     await flush()
     expect(container.textContent).not.toContain('Failed to fetch')
@@ -200,7 +200,7 @@ describe('M003 応答消失後の再送は保存済みとして扱う', () => {
     net.reconcileContent = 'same'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存')!.click()
+      findButton('下書きを保存する')!.click()
     })
     await flush()
     await flush()
@@ -217,7 +217,7 @@ describe('M003 応答消失後の再送は保存済みとして扱う', () => {
     net.reconcileContent = 'other'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存')!.click()
+      findButton('下書きを保存する')!.click()
     })
     await flush()
     await flush()

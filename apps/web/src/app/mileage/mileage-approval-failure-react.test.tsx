@@ -43,12 +43,23 @@ vi.mock('@/lib/admin-session', () => ({ adminSessionHeaders: () => ({}) }))
 
 const { default: MileagePage } = await import('./page')
 
+/* D022: 見本は実APIの形に合わせる（monthChange・expiringMiles30d・nextExpiringAt・measuredAt は必須）。 */
 const overview = {
   success: true,
   data: {
     items: [],
-    summary: { totalMembers: 0, withBalanceCount: 0, available: 0, pending: 0, rankCounts: [] },
+    summary: {
+      totalMembers: 0,
+      withBalanceCount: 0,
+      available: 0,
+      pending: 0,
+      monthChange: 0,
+      rankCounts: [],
+      expiringMiles30d: null,
+      nextExpiringAt: null,
+    },
     pagination: { total: 0, limit: 20, offset: 0 },
+    measuredAt: '2026-09-10T00:00:00.000Z',
   },
 }
 

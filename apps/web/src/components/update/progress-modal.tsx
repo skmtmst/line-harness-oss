@@ -118,19 +118,19 @@ export function ProgressModal({
   }, [updateId])
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="update-progress-title"
-        className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
+        className="bg-canvas rounded-control shadow-float w-full max-w-md p-6"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <h2 id="update-progress-title" className="text-lg font-semibold">
             アップデート中{' '}
             {mode === 'polling' && (
-              <span className="text-xs text-gray-500">(polling)</span>
+              <span className="text-xs text-ink-faint">(polling)</span>
             )}
           </h2>
           {/* 実行中は閉じられない（従来どおり）。終了後だけ×を出す。 */}
@@ -139,7 +139,7 @@ export function ProgressModal({
               type="button"
               onClick={onClose}
               aria-label="閉じる"
-              className="rounded p-1 text-gray-500 hover:bg-gray-100"
+              className="rounded-mini p-1 text-ink-faint hover:bg-shell"
             >
               <X aria-hidden="true" className="h-5 w-5" />
             </button>
@@ -147,7 +147,7 @@ export function ProgressModal({
         </div>
         <ul className="space-y-1 font-mono text-sm">
           {events.length === 0 && (
-            <li className="text-gray-500">接続中...</li>
+            <li className="text-ink-faint">接続中...</li>
           )}
           {events.map((e, i) => (
             <li key={i} className="flex items-center gap-2">
@@ -161,25 +161,25 @@ export function ProgressModal({
           ))}
         </ul>
         {final && (
-          <div className="mt-4 p-3 rounded bg-gray-50">
+          <div className="mt-4 p-3 rounded-mini bg-surface-pearl">
             {final.status === 'success' && (
               <p className="text-success font-semibold">完了しました</p>
             )}
             {final.status === 'rolled_back' && (
-              <p className="text-amber-700">
+              <p className="text-warning">
                 失敗。前バージョンに復旧済み。
                 {final.error && (
-                  <span className="block text-xs mt-1 text-gray-600">
+                  <span className="block text-xs mt-1 text-ink-secondary">
                     {final.error}
                   </span>
                 )}
               </p>
             )}
             {final.status === 'failed' && (
-              <p className="text-red-700">
+              <p className="text-danger">
                 失敗 + 復旧失敗。手動対応が必要です。
                 {final.error && (
-                  <span className="block text-xs mt-1 text-gray-600">
+                  <span className="block text-xs mt-1 text-ink-secondary">
                     {final.error}
                   </span>
                 )}

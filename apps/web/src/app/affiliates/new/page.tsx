@@ -15,6 +15,8 @@ import { TextInput } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { formatNumber } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /**
  * 入力欄の幅。
@@ -120,6 +122,12 @@ export default function NewAffiliatePage() {
   // 追加情報の保存だけをやり直す。
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [partialSave, setPartialSave] = useState(false)
+  /*
+   * R525残部: 登録で確定した稼働状態（保存済みの真実）と、やり直しで送る
+   * 指定（未保存の切り替え）は別に持つ。切り替えただけで知らせが
+   * 「まだ始まっていない」「既に始まっている」と嘘をつかないようにする。
+   */
+  const [savedIsActive, setSavedIsActive] = useState<boolean | null>(null)
   // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
   // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
   // 作らず、ここと onReset だけで作り直す。
@@ -140,6 +148,7 @@ export default function NewAffiliatePage() {
     draftAccountRef.current = selectedAccountId
     setCreatedId(null)
     setPartialSave(false)
+    setSavedIsActive(null)
     setOperationId(crypto.randomUUID())
     setFriendId('')
     setSelectedFriend(null)
@@ -227,6 +236,7 @@ export default function NewAffiliatePage() {
         setCopied(false)
         setCreatedId(null)
         setPartialSave(false)
+        setSavedIsActive(null)
         setOperationId(crypto.randomUUID())
       }}
       onSave={async () => {
@@ -245,16 +255,28 @@ export default function NewAffiliatePage() {
               issueInitialLink: true,
               lineAccountId: selectedAccountId,
               operationId,
+              // R525: 計測オフの登録は最初の行から停止で作る。追加情報の
+              // 保存が失敗しても稼働では残らない。
+              isActive: startTracking,
             })
             if (!res.success) throw new Error('create_failed')
             affiliateId = res.data.id
             setCreatedId(affiliateId)
+            // 保存された行の稼働状態へ寄せる。応答消失後の再送が古い行を
+            // 回収したときも、画面の表示と再試行の送り先がずれない。
+            // 応答に稼働状態が無いときは送った指定のままにする。
+            const persistedIsActive =
+              typeof res.data.isActive === 'boolean' ? res.data.isActive : startTracking
+            setStartTracking(persistedIsActive)
+            setSavedIsActive(persistedIsActive)
           } catch {
             throw new Error('アフィリエイターを登録できませんでした。入力を確認して、もう一度お試しください。')
           }
         }
-        // 連絡先・保留期間・支払いサイクル・通知・計測の開始は作成のAPIが
-        // 受けないので、続けて更新する。1つの操作として見えるようにまとめる。
+        // 連絡先・保留期間・支払いサイクル・通知は作成のAPIが受けないので、
+        // 続けて更新する。1つの操作として見えるようにまとめる。
+        // 計測の開始だけは作成のAPIへ渡す（R525）。更新でのみ送ると、
+        // 更新の失敗時に稼働の行が残ってしまう。
         // 名前・報酬率も更新APIが受けるので、途中保存後にここを直して
         // 再開した分もまとめて送る（一部項目だけだと画面上の変更を失う、
         // Issue #686）。
@@ -329,6 +351,34 @@ export default function NewAffiliatePage() {
             <p className="mt-1">
               下の「追加情報の保存を再開する」で続けるか、未保存の追加情報を破棄して一覧へ戻れます。
             </p>
+            {/*
+              R525残部: 知らせの1文目は保存済みの真実（savedIsActive）だけを
+              言う。未保存の切り替え（startTracking）は2文目で「再開するとき
+              どう送るか」として別に言う。混ぜると、オン保存→オフ切替で
+              「まだ始まっていない」、オフ保存→オン切替で「既に始まっている」
+              と嘘をつく。失敗・警告の文なので ? には入れない。
+            */}
+            {savedIsActive === true ? (
+              <p className="mt-1">
+                基本情報の登録で計測は既に始まっています。
+                {startTracking
+                  ? 'このまま追加情報だけを保存します。'
+                  : '再開するときは計測をオフに切り替えて保存します。'}
+              </p>
+            ) : savedIsActive === false ? (
+              <p className="mt-1">
+                基本情報の登録は計測オフで済んでいるので、計測はまだ始まっていません。
+                {startTracking
+                  ? '再開するときは計測をオンに切り替えて保存します。'
+                  : 'このまま追加情報だけを保存します。'}
+              </p>
+            ) : (
+              <p className="mt-1">
+                {startTracking
+                  ? '「すぐに計測を始める」がオンなので、基本情報の登録で計測は既に始まっています。'
+                  : '「すぐに計測を始める」がオフなので、計測は始まらないまま追加情報だけを保存します。'}
+              </p>
+            )}
           </Notice>
         ) : null}
         <div className="grid gap-3 lg:grid-cols-3">
@@ -435,7 +485,7 @@ export default function NewAffiliatePage() {
               ) : (
                 <div className="mt-2 flex max-w-lg flex-wrap items-center justify-between gap-2">
                   <p className="text-ink-faint text-xs tabular-nums">
-                    {friendLoading ? '友だちを読み込んでいます' : `全${friendTotal.toLocaleString('ja-JP')}件`}
+                    {friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)}件`}
                   </p>
                   {friendPageCount > 1 ? (
                     <Select
@@ -546,18 +596,14 @@ export default function NewAffiliatePage() {
               {previewUrl ?? '—'}
             </code>
             {previewUrl && (
-              <button
-                type="button"
-                onClick={() => {
+              <Button variant="secondary" className="px-2 py-1 text-xs h-auto whitespace-normal" type="button" onClick={() => {
                   void navigator.clipboard?.writeText(previewUrl).then(
                     () => setCopied(true),
                     () => setCopied(false),
                   )
-                }}
-                className="border-hairline text-ink rounded-control hover:bg-canvas-sunken border px-2 py-1 text-xs font-semibold"
-              >
+                }}>
                 コピー
-              </button>
+              </Button>
             )}
           </div>
           <p className="text-ink-faint text-micro mt-1">

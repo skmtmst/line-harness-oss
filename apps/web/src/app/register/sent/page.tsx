@@ -31,7 +31,7 @@ export default function RegisterSentPage() {
         <Mail className="h-7 w-7 text-accent-deep" />
       </span>
       <div className="flex w-full flex-col gap-1.5 rounded-control bg-surface-pearl px-4 py-3.5">
-        <p className="text-label font-bold text-ink">メールが届かないときは</p>
+        <p className="text-label font-medium text-ink">メールが届かないときは</p>
         <p className="text-caption text-ink-secondary">・迷惑メールフォルダを確かめてください</p>
         <p className="text-caption text-ink-secondary">・URL の有効期限は 24 時間です</p>
         <p className="text-caption text-ink-secondary">・アドレスを間違えたときは、もう一度最初から入力してください</p>

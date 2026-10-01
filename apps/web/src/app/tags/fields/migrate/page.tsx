@@ -20,6 +20,7 @@ import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import { formatDateTime } from '@/lib/format'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 
@@ -38,14 +39,14 @@ const RUN_RUNNING = new Set<FriendFieldMigrationRun['status']>(['previewed', 'qu
 
 function FieldSummary({ title, field, kind }: { title: string; field: FriendField; kind: 'source' | 'target' }) {
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+    <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
       <p className="text-xs font-semibold text-ink-faint">{title}</p>
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-ink">{field.name}</h2>
           <p className="mt-1 font-mono text-xs text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
         </div>
-        <span className={kind === 'source' ? 'rounded-full bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep'}>
+        <span className={kind === 'source' ? 'rounded-pill bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep'}>
           {FIELD_TYPE_LABELS[field.type]}
         </span>
       </div>
@@ -370,7 +371,7 @@ function MigrateFriendField() {
           <span className="xl:hidden">↓</span>
           <span className="hidden xl:block">→</span>
         </div>
-        <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-sm">
+        <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-card">
           <p className="text-xs font-semibold text-ink-secondary">移行先の項目</p>
           {target ? (
             <div className="mt-3">
@@ -430,20 +431,20 @@ function MigrateFriendField() {
         </section>
       </div>
 
-      <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-base font-bold text-ink">値を変換できるか事前確認</h2><p className="mt-1 text-sm text-ink-secondary">登録済みの値を読み取り、移行できる数だけを確認します。</p></div>
-          <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (!target && targetMode === 'existing' && !existingTargetId)}>
-            {checking ? '確認しています…' : targetMode === 'new' && !createdTarget ? '項目を作成して事前確認' : '事前確認する'}
+          <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
+            {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
           </Button>
         </div>
         {preview ? (
           <div className="mt-5">
             <div className="grid gap-3 sm:grid-cols-4">
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.total}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.convertible}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-bold text-warning">{preview.summary.review}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-bold text-danger">{preview.summary.invalid}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-semibold text-ink">{preview.summary.total}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-semibold text-ink">{preview.summary.convertible}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-semibold text-warning">{preview.summary.review}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-semibold text-danger">{preview.summary.invalid}人</p></div>
             </div>
             {preview.rows.length ? (
               <DataTable className="mt-4">
@@ -455,7 +456,7 @@ function MigrateFriendField() {
         ) : <p className="mt-4 text-sm text-ink-faint">まだ事前確認していません。未取得を0人として表示しません。</p>}
       </section>
 
-      <section data-design="Usage" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Usage" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <h2 className="text-base font-bold text-ink">切り替わる使用先</h2>
         {preview ? preview.usageTargets.length > 0 ? (
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
@@ -463,17 +464,17 @@ function MigrateFriendField() {
           </div>
         ) : <Notice tone="success" className="mt-3">切り替えが必要な使用先はありません。</Notice>
           : <p className="mt-3 text-sm text-ink-faint">事前確認すると、回答フォームや自動処理などの使用先を表示します。</p>}
-        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{new Date(preview.previewExpiresAt).toLocaleString('ja-JP')}</p> : null}
+        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{formatDateTime(preview.previewExpiresAt)}</p> : null}
       </section>
 
       {run ? (
-        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-live="polite">
+        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-live="polite">
           <h2 className="text-base font-bold text-ink">移行の結果</h2>
           <p className="mt-2 text-sm font-semibold text-ink">{RUN_STATUS_LABELS[run.status]}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-bold text-accent-deep">{run.summary.succeeded}人</p></div>
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-bold text-danger">{run.summary.failed}人</p></div>
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-bold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-semibold text-accent-deep">{run.summary.succeeded}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-semibold text-danger">{run.summary.failed}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-semibold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
           </div>
           {run.rows.filter((row) => row.status === 'failed').length ? (
             <DataTable className="mt-4">
@@ -489,7 +490,7 @@ function MigrateFriendField() {
           */}
           {run.rollbackDeadline ? (
             <p className="mt-3 text-xs leading-5 text-ink-faint">
-              元の項目の値は {new Date(run.rollbackDeadline).toLocaleString('ja-JP')} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。
+              元の項目の値は {formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。
             </p>
           ) : null}
         </section>
@@ -498,18 +499,17 @@ function MigrateFriendField() {
       <StickyBar
         status={run ? RUN_STATUS_LABELS[run.status] : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : 'まだ事前確認していません'}
         actions={<>
-          <Button href="/tags?tab=fields">移行をやめる</Button>
+          <Button href="/tags?tab=fields">キャンセル</Button>
           {confirmed && !run ? (
             <Button type="button" onClick={() => void runPreview()} disabled={checking || running}>確認をやり直す</Button>
           ) : null}
           {confirmed && !run ? (
-            <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running}>
-              {running ? '実行中…' : '移行を実行する'}
+            <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running} busy={running} busyLabel="実行中…">移行を実行する
             </Button>
           ) : null}
           {!confirmed ? (
-            <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)}>
-              {checking ? '確認しています…' : targetMode === 'new' && !createdTarget ? '項目を作成して事前確認' : '事前確認する'}
+            <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
+              {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
             </Button>
           ) : null}
         </>}

@@ -1,6 +1,7 @@
 'use client'
 import Notice from '@/components/shared/notice'
 import styles from './message-type-tabs.module.css'
+import Button from '@/components/shared/button'
 
 /*
  * 送るものの種別を選ぶタブ。
@@ -87,24 +88,15 @@ export default function MessageTypeTabs({ value, onChange, children }: MessageTy
           const disabled = Boolean(kind.disabledReason)
           const active = kind.value === value
           return (
-            <button
-              key={kind.value}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              disabled={disabled}
-              title={kind.disabledReason}
-              onClick={() => !disabled && onChange(kind.value)}
-              className={`${styles.tab} px-3 text-micro font-bold transition-colors ${
+            <Button variant="secondary" className={(`${styles.tab} px-3 text-micro font-medium transition-colors ${
                 active
                   ? 'border-hairline bg-canvas text-ink border'
                   : disabled
                     ? 'text-ink-faint cursor-not-allowed opacity-50'
                     : 'text-ink-secondary hover:bg-canvas'
-              }`}
-            >
+              }`) + ' h-auto whitespace-normal'} key={kind.value} type="button" role="tab" aria-selected={active} disabled={disabled} title={kind.disabledReason} onClick={() => !disabled && onChange(kind.value)}>
               {kind.label}
-            </button>
+            </Button>
           )
         })}
       </div>

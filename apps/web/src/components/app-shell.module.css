@@ -113,9 +113,9 @@
   padding: 8px 14px;
   border-radius: var(--radius-control);
   background: var(--color-ink);
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
   transform: translateY(-200%);
 }
 
@@ -126,4 +126,39 @@
 /* 本文へ移動で焦点を受ける。枠は出さない（焦点は本文の最初の操作へ Tab で進む）。 */
 .main:focus {
   outline: none;
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 外側（移行③・Pencil `zUg8S` / lh-pro-ui §1）
+ *
+ * 地は全体が shell の灰。左メニューと上の帯は地の上に直接置き、
+ * 中身だけを白い板1枚に載せる（板の外に中身を置かない）。
+ * PC 幅（1024px 以上）だけの見た目で、モバイルの引き出しは v7 のまま。
+ * ------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  [data-theme="v8"] .main {
+    margin: 0 12px 12px 0;
+    border: 1px solid var(--color-board-line);
+    border-radius: var(--radius-panel);
+    background: var(--color-canvas);
+    box-shadow: var(--shadow-board);
+  }
+
+  /* 板の中の余白は板が持つ。内容の左右は 24px。 */
+  [data-theme="v8"] .content,
+  [data-theme="v8"] .contentFull {
+    padding: 20px 24px 28px;
+  }
+}
+
+/* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの
+   固定ヘッダー分の上余白は 1024px から要らない。 */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  [data-theme="v8"] .side {
+    padding-top: 0;
+  }
+
+  [data-theme="v8"] .workspace > .main {
+    padding-top: 0;
+  }
 }

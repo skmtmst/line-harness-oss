@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Button from '@/components/shared/button'
 
 interface Props {
   liffId: string | null
@@ -31,8 +32,8 @@ export default function AccountSetupUrls({ liffId, heading }: Props) {
   const liffEndpointUrl = base && liffId ? `${base}?liffId=${encodeURIComponent(liffId)}` : ''
 
   return (
-    <div className="space-y-3 mt-4 pt-4 border-t border-gray-100">
-      <p className="text-xs font-medium text-gray-700">
+    <div className="space-y-3 mt-4 pt-4 border-t border-divider-soft">
+      <p className="text-xs font-medium text-ink-secondary">
         {heading ?? 'LINE Developers Console に登録すべき URL'}
       </p>
       <div className="space-y-2">
@@ -73,8 +74,8 @@ function UrlRow({ label, hint, url }: { label: string; hint: string; url: string
   return (
     <div>
       <div className="mb-1 flex flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-xs font-medium text-gray-600">{label}</span>
-        <span className="text-[10px] text-gray-400">{hint}</span>
+        <span className="text-xs font-medium text-ink-secondary">{label}</span>
+        <span className="text-[10px] text-ink-faint">{hint}</span>
       </div>
       <div className="flex min-w-0 items-stretch gap-1">
         <input
@@ -82,16 +83,11 @@ function UrlRow({ label, hint, url }: { label: string; hint: string; url: string
           value={url}
           placeholder="—"
           onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 truncate rounded border border-gray-200 bg-gray-50 px-2 py-1.5 font-mono text-xs text-gray-700"
+          className="min-w-0 flex-1 truncate rounded-mini border border-hairline bg-surface-pearl px-2 py-1.5 font-mono text-xs text-ink-secondary"
         />
-        <button
-          type="button"
-          onClick={onCopy}
-          disabled={!url}
-          className="shrink-0 rounded border border-gray-200 px-2 text-xs font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
+        <Button variant="secondary" className="shrink-0 rounded-mini px-2 text-xs font-medium hover:bg-surface-pearl h-auto whitespace-normal" type="button" onClick={onCopy} disabled={!url}>
           {copied ? '✓' : 'コピー'}
-        </button>
+        </Button>
       </div>
     </div>
   )

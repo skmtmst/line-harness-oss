@@ -48,6 +48,7 @@ import {
 } from './trigger-helpers'
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
+import { formatNumber, formatTime } from '@/lib/format'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -650,7 +651,7 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
 
 /** 保存した時刻の表示（DETAIL-15）。分まであれば「いつ保存したか」は読める。 */
 const formatClock = (time: number): string =>
-  new Date(time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  formatTime(time)
 
 /**
  * 「この内容で送る」と押したときに送る中身を、押す前に固めた控え（N-358）。
@@ -802,6 +803,13 @@ export default function NewAutomationPage() {
    */
   const [resumeTarget, setResumeTarget] = useState<string | null | undefined>(undefined)
   const [resumeStatus, setResumeStatus] = useState<'none' | 'loading' | 'ready' | 'failed'>('none')
+  /*
+   * R532: 再開の読み込みが失敗した理由。通信断・対象なし・権限なしで
+   * 案内を分け、通信断では同じ下書きの再試行だけを出し、保存は止める。
+   */
+  const [resumeErrorKind, setResumeErrorKind] = useState<'gone' | 'forbidden' | 'network' | null>(null)
+  /* R532: 「もう一度読み込む」で再開の読み込みを走らせ直す番号。 */
+  const [resumeRetry, setResumeRetry] = useState(0)
   /* このアカウントに前に保存した下書きがある、という案内にだけ使う控え。 */
   const [storedDraftHint, setStoredDraftHint] = useState<StoredDraft | null>(null)
   /* DETAIL-15: 未保存・保存中・保存済み・保存後の変更・失敗を1つの状態から出す。 */
@@ -1051,7 +1059,9 @@ export default function NewAutomationPage() {
   /*
    * DETAIL-13: `?draft=` で示された下書きは、番号・中身・版を一緒に読む。
    * 読み終わるまで保存はできない（blockedReason で止める）。
-   * 読めない下書き（削除済み・別の店のもの）は、理由を出して新規に戻す。
+   * R532: 読めない下書きは理由を出して保存を止める。通信断では同じ
+   * 下書きの再試行だけを出し、対象なし・権限なしでは白紙への作り直しを
+   * 明示の選択にする。失敗中に別の新規下書きは作らない。
    */
   useEffect(() => {
     if (accountSwitchPendingRef.current) {
@@ -1084,6 +1094,7 @@ export default function NewAutomationPage() {
     const draftId = resumeTarget
     let cancelled = false
     setResumeStatus('loading')
+    setResumeErrorKind(null)
     setError('')
     setNotice('')
     api.automations
@@ -1092,8 +1103,9 @@ export default function NewAutomationPage() {
         if (cancelled || selectedAccountRef.current !== accountId) return
         if (!res.success) {
           setResumeStatus('failed')
+          setResumeErrorKind('gone')
           setError(
-            '指定された下書きは読み込めませんでした。削除されたか、ほかのアカウントの下書きの可能性があります。このまま入力すると新しいルールになります。',
+            '指定された下書きは読み込めませんでした。削除されたか、ほかのアカウントの下書きの可能性があります。',
           )
           return
         }
@@ -1138,16 +1150,27 @@ export default function NewAutomationPage() {
           setError('保存されていた「だれに」の条件は古い形のため読めませんでした。下の案内にしたがって付け直してください。')
         }
       })
-      .catch(() => {
+      .catch((caught: unknown) => {
         if (cancelled || selectedAccountRef.current !== accountId) return
         setResumeStatus('failed')
-        setError('下書きを読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
+        // R532: 失敗の理由を分ける。通信断では同じ下書きの再試行を出し、
+        // 対象なし・権限なしでは白紙への作り直しを選ばせる。
+        if (caught instanceof ApiError && caught.status === 404) {
+          setResumeErrorKind('gone')
+          setError('指定された下書きは見つかりませんでした。削除された可能性があります。')
+        } else if (caught instanceof ApiError && caught.status === 403) {
+          setResumeErrorKind('forbidden')
+          setError('指定された下書きを開く権限がありません。')
+        } else {
+          setResumeErrorKind('network')
+          setError('下書きを読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
+        }
       })
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId, resumeTarget])
+  }, [selectedAccountId, resumeTarget, resumeRetry])
 
   const selectedEvent = EVENTS.find((event) => event.value === eventType) ?? EVENTS[0]
   const usesKeyword = KEYWORD_EVENTS.includes(eventType)
@@ -1416,8 +1439,40 @@ export default function NewAutomationPage() {
     if (!canManage) return '操作する権限がありません'
     // DETAIL-13: 再開した下書きは、中身を読み終わるまで保存できない。
     if (resumeStatus === 'loading') return '下書きを読み込んでいます'
+    /*
+     * R532: 再開の読み込みに失敗したまま保存させない。Aの更新も新規作成も
+     * 実行されない。再試行でAを読めた後だけ保存でき、明示の作り直しでだけ
+     * 白紙に戻る。
+     */
+    if (resumeTarget && resumeStatus === 'failed') {
+      return resumeErrorKind === 'network'
+        ? '下書きを読み込めませんでした。下の「下書きをもう一度読み込む」で取り直してから保存してください'
+        : '指定された下書きを開けません。下の案内から読み直すか、白紙から作り直してください'
+    }
     return null
-  }, [canManage, resumeStatus])
+  }, [canManage, resumeStatus, resumeTarget, resumeErrorKind])
+
+  /*
+   * R532: 失敗した再開の読み込みを、同じ下書きでもう一度だけ走らせる。
+   * 読んだ組み合わせの記録を消して番号を進めるので、効果が取り直される。
+   */
+  const retryResume = () => {
+    resumedKeyRef.current = null
+    setResumeRetry((n) => n + 1)
+  }
+
+  /*
+   * R532: 白紙からの作り直し（明示の選択）。URLの指定を外して再開をやめ、
+   * この後保存したら別の新規下書きとして作る。失敗中の自動的な新規作成はしない。
+   */
+  const restartFresh = () => {
+    syncResumeUrl(null)
+    setResumeTarget(null)
+    setResumeStatus('none')
+    setResumeErrorKind(null)
+    setError('')
+    setNotice('')
+  }
 
   /*
    * DETAIL-15: 保存の状態は1本。未保存・保存中・保存済み・保存後の変更・
@@ -2028,7 +2083,7 @@ export default function NewAutomationPage() {
             {triggerEventGroups.map((group) =>
               group.events.length === 0 ? null : (
                 <div key={group.id} className="mb-3">
-                  <p className="mb-2 text-xs font-bold text-ink-faint">{group.label}</p>
+                  <p className="mb-2 text-xs font-medium text-ink-faint">{group.label}</p>
                   <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
                     {group.events.map((event) => (
                       <button
@@ -2136,18 +2191,18 @@ export default function NewAutomationPage() {
             {/* AUTOMATION-02: 要約と同じ条件から作った札。条件が本当に無いときだけ「条件なし」。 */}
             <div className="mt-3 flex flex-wrap gap-2">
               {usesKeyword && keyword.trim() ? (
-                <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">「{keyword.trim()}」を含む</span>
+                <span className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">「{keyword.trim()}」を含む</span>
               ) : null}
               {conditionSummaries.map((text, index) => (
                 <span
                   key={`${index}-${text}`}
-                  className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary"
+                  className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary"
                 >
                   {text}
                 </span>
               ))}
               {!((usesKeyword && keyword.trim()) || conditionSummaries.length > 0) ? (
-                <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">条件なし</span>
+                <span className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">条件なし</span>
               ) : null}
             </div>
             {conditionUnreadable ? (
@@ -2179,7 +2234,7 @@ export default function NewAutomationPage() {
                 <p className="mt-2 text-xs text-ink-faint">標準互換（15軸）。一斉配信やシナリオと同じ条件です。</p>
               </div>
             )}
-            <p className="mt-3 text-xs font-bold text-info">いまの条件に当てはまる友だち　保存後に見込み人数を確認できます。</p>
+            <p className="mt-3 text-xs font-medium text-info">いまの条件に当てはまる友だち　保存後に見込み人数を確認できます。</p>
           </Step>
 
           <Step step={3} done={actions.length > 0} title="何をするか" note="上から順に実行します。">
@@ -2196,7 +2251,7 @@ export default function NewAutomationPage() {
                         setActions((current) => current.filter((item) => item.key !== row.key))
                       }
                     >
-                      この動きを消す
+                      この動きを削除する
                     </button>
                   </div>
 
@@ -2292,7 +2347,7 @@ export default function NewAutomationPage() {
                 className={`${styles.action} ${styles.actionSecondary} ${styles.addAction}`}
                 onClick={() => setActions((current) => [...current, newActionDraft()])}
               >
-                動きを追加
+                動きを追加する
               </button>
             </div>
           </Step>
@@ -2301,6 +2356,23 @@ export default function NewAutomationPage() {
             <p className={styles.error} role="alert">
               {error}
             </p>
+          ) : null}
+          {/*
+            R532: 再開の読み込み失敗中は保存が止まる。通信断では同じ下書きの
+            再試行だけを出し、対象なし・権限なしでは白紙への作り直しを選ばせる。
+            失敗中に別の新規下書きは作らない。
+          */}
+          {resumeTarget && resumeStatus === 'failed' ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={retryResume}>
+                下書きをもう一度読み込む
+              </Button>
+              {resumeErrorKind !== 'network' ? (
+                <Button variant="secondary" onClick={restartFresh}>
+                  白紙から作り直す
+                </Button>
+              ) : null}
+            </div>
           ) : null}
           {notice ? <p className={styles.note}>{notice}</p> : null}
           {canManage === false ? (
@@ -2324,7 +2396,7 @@ export default function NewAutomationPage() {
 
           <section className={styles.sideCard}>
             <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
-            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
+            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${formatNumber(previewCount)}人`}</p>
             <p className={styles.sideMissingNote}>
               {/* AUTOMATION-03: 人数の失敗は保存の失敗ではない。下書きは残っている。 */}
               {previewFailed
@@ -2338,9 +2410,7 @@ export default function NewAutomationPage() {
                 <Button
                   variant="secondary"
                   disabled={previewRefreshing}
-                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)}
-                >
-                  {previewRefreshing ? '数え直しています' : '人数をもう一度数える'}
+                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)} busy={previewRefreshing} busyLabel="数え直しています">人数をもう一度数える
                 </Button>
               </div>
             ) : null}
@@ -2348,15 +2418,13 @@ export default function NewAutomationPage() {
               <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
               <Button
                 onClick={() => void askOnePersonTest()}
-                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
-              >
-                {preparingTest ? '確認中...' : '1人で試す'}
+                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()} busy={preparingTest} busyLabel="確認中...">1人で試す
               </Button>
               <p className="mt-1 text-xs font-medium leading-relaxed text-ink-faint">保存した時点の内容で試します。変えた後は保存し直してから試してください。</p>
             </div>
             {testConfirmation ? (
               <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" role="dialog" aria-label="1人テストの確認">
-                <p className="text-xs font-bold text-ink">送る前に確認してください</p>
+                <p className="text-xs font-medium text-ink">送る前に確認してください</p>
                 <p className="text-xs leading-5 text-ink-secondary">送り先：{testConfirmation.friendId}</p>
                 <div className="text-xs leading-5 text-ink-secondary">
                   <p>送る内容：</p>
@@ -2366,7 +2434,7 @@ export default function NewAutomationPage() {
                 </div>
                 <p className="text-xs leading-5 text-ink-secondary">起きること：{testConfirmation.effects.join('、')}。取り消せません。</p>
                 {canonicalJson(draftActions()) !== testConfirmation.actionsFingerprint ? (
-                  <p className="text-xs font-bold leading-5 text-ink">画面の入力は、ここに出ている内容と違います。送られるのは、保存済みのこの内容です。</p>
+                  <p className="text-xs font-medium leading-5 text-ink">画面の入力は、ここに出ている内容と違います。送られるのは、保存済みのこの内容です。</p>
                 ) : null}
                 <div className="flex gap-2">
                   <Button
@@ -2377,14 +2445,12 @@ export default function NewAutomationPage() {
                       setTestConfirmation(null)
                     }}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                   <Button
                     variant="primary"
                     disabled={testing}
-                    onClick={() => void runOnePersonTest()}
-                  >
-                    {testing ? '送信中...' : 'この内容で送る'}
+                    onClick={() => void runOnePersonTest()} busy={testing} busyLabel="送信中...">この内容で送る
                   </Button>
                 </div>
               </div>
@@ -2395,7 +2461,7 @@ export default function NewAutomationPage() {
              */}
             {testRun ? (
               <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" aria-label="1人テストの実行">
-                <p className="text-xs font-bold text-ink">試した実行：{testRunStatusLabel(testRun.status)}</p>
+                <p className="text-xs font-medium text-ink">試した実行：{testRunStatusLabel(testRun.status)}</p>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
@@ -2419,7 +2485,7 @@ export default function NewAutomationPage() {
              */}
             {saveOutcome === 'published' && publishedRuleId ? (
               <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" aria-label="公開済みの案内">
-                <p className="text-xs font-bold text-ink">この内容はすでに公開済みです</p>
+                <p className="text-xs font-medium text-ink">この内容はすでに公開済みです</p>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
@@ -2479,7 +2545,7 @@ export default function NewAutomationPage() {
               disabled={saving || Boolean(blockedReason)}
               onClick={() => void save(false)}
             >
-              下書きに保存
+              下書きを保存する
             </button>
             <button
               type="button"
@@ -2517,26 +2583,26 @@ export default function NewAutomationPage() {
       >
         <dl className="space-y-2 text-sm">
           <div>
-            <dt className="text-xs font-bold text-ink-faint">名前</dt>
+            <dt className="text-xs font-medium text-ink-faint">名前</dt>
             <dd className="font-semibold text-ink">{name.trim()}</dd>
           </div>
           <div>
-            <dt className="text-xs font-bold text-ink-faint">きっかけ</dt>
+            <dt className="text-xs font-medium text-ink-faint">きっかけ</dt>
             <dd className="text-ink">{selectedEvent.label}（{triggerConfigSummary}）</dd>
           </div>
           <div>
-            <dt className="text-xs font-bold text-ink-faint">だれに</dt>
+            <dt className="text-xs font-medium text-ink-faint">だれに</dt>
             <dd className="text-ink">
               {targetSummary}
-              {previewCount !== null ? ` 見込み ${previewCount.toLocaleString('ja-JP')}人` : ''}
+              {previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-bold text-ink-faint">すること</dt>
+            <dt className="text-xs font-medium text-ink-faint">すること</dt>
             <dd className="text-ink">{actionSummary || '未設定'}</dd>
           </div>
           <div>
-            <dt className="text-xs font-bold text-ink-faint">最初に動くのは</dt>
+            <dt className="text-xs font-medium text-ink-faint">最初に動くのは</dt>
             <dd className="text-ink">
               {['datetime', 'daily', 'weekly'].includes(eventType)
                 ? `次の決めた時刻（${triggerConfigSummary}）`
@@ -2589,7 +2655,7 @@ function SummaryStep({ number, label, value, active = false }: { number: number;
   return (
     <div className="flex min-w-0 items-center gap-3">
       <span className={`${styles.stepBadge} ${active ? '' : styles.stepBadgeIdle}`}>{number}</span>
-      <span className="flex min-w-0 flex-col"><small className="text-xs font-bold text-ink-faint">{label}</small><strong className="truncate text-sm text-ink" title={value}>{value}</strong></span>
+      <span className="flex min-w-0 flex-col"><small className="text-xs font-medium text-ink-faint">{label}</small><strong className="truncate text-sm text-ink" title={value}>{value}</strong></span>
     </div>
   )
 }

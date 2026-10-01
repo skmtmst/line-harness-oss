@@ -41,7 +41,10 @@ vi.mock('@/components/shared/condition-builder', async () => {
     default: () => <div data-testid="condition-builder" />,
     isEmptyCondition: actual.isEmptyCondition,
     isRuleComplete: actual.isRuleComplete,
+    isStructurallyEmpty: actual.isStructurallyEmpty,
     pruneCondition: actual.pruneCondition,
+    findConditionDraftIssue: actual.findConditionDraftIssue,
+    findInvalidRangeIssue: actual.findInvalidRangeIssue,
   }
 })
 
@@ -102,7 +105,7 @@ describe('SC-02c: 「現在の条件」は実際の下書きを出す', () => {
       operator: 'AND',
       rules: [{ type: 'tag_exists', value: 'tag-1' }],
     })
-    fireEvent.click(screen.getByText('削除'))
+    fireEvent.click(screen.getByText('削除する'))
     expect(document.body.textContent).toContain('条件なし')
     expect(document.body.textContent).toContain('条件はまだありません')
   })

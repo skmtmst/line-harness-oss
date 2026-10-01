@@ -9,6 +9,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import DateTimeField from '@/components/shared/date-time-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatDateTime } from '@/lib/format'
 
 
 const JST_PARTS = new Intl.DateTimeFormat('en-CA', {
@@ -43,9 +44,7 @@ export function dateTimeLocalJstToUtcIso(value: string): string | null {
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string }) {
@@ -140,7 +139,7 @@ export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string })
           <Td>{item.status === 'active' ? '有効' : item.status === 'cancelled' ? '取消済み' : item.status}</Td>
           <Td>{formatDate(item.createdAt)}</Td>
           <Td align="right"><div className="flex flex-wrap justify-end gap-2">
-            {item.status === 'active' ? <><Button size="field" disabled={actioningId === item.id} onClick={() => void saveDate(item)}>基準日を保存</Button><Button size="field" variant="secondary" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'cancel')}>取消</Button></> : null}
+            {item.status === 'active' ? <><Button size="field" disabled={actioningId === item.id} onClick={() => void saveDate(item)}>基準日を保存する</Button><Button size="field" variant="secondary" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'cancel')}>取消</Button></> : null}
             {item.status === 'cancelled' ? <Button size="field" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'resume')}>再開</Button> : null}
           </div></Td>
         </Tr>)}

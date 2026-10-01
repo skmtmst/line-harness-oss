@@ -109,7 +109,7 @@ describe('通知の設定がまだ無いウェビナー（WEBINAR-09）', () => 
     })
     await mount()
     await act(async () => { button('通知の設定を入力する').click() })
-    await act(async () => { button('通知の設定を保存').click() })
+    await act(async () => { button('通知の設定を保存する').click() })
 
     expect(net.saveNotifications).toHaveBeenCalledWith('w1', {
       registrationEnabled: false,

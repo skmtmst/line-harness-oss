@@ -53,7 +53,7 @@ describe('R161: イベントの書きかけがある間の離脱確認', () => {
     fireEvent.click(screen.getByRole('link', { name: 'イベント予約' }))
     await screen.findByText('保存していない変更があります')
 
-    fireEvent.click(screen.getByRole('button', { name: '保存せずに移動' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
     await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/events'))
   })
 

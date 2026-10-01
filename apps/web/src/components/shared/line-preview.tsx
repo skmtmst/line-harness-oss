@@ -11,11 +11,13 @@
  * まま残し、静かな説明だけ `note`（題の横の？）へ入れる。失敗・警告・
  * 数字そのものは ? に入れない（共通ルール 2-1b）。
  *
- * 見た目はトークンのユーティリティだけで組む。CSS Module を持たないので、
+ * 見た目はトークンのユーティリティだけで組む。V8 の枠の上書きだけ
+ * `line-preview.module.css`（`[data-theme='v8']` の下）に置く。
  * 幅・高さ・配置は呼び出し側が包んで渡す（部品は幅を持たない）。
  */
 import type { ReactNode } from 'react'
 import HelpTip from './help-tip'
+import styles from './line-preview.module.css'
 
 export interface LinePreviewProps {
   /** 枠の中身。各画面の吹き出し・カードをそのまま渡す。 */
@@ -44,7 +46,7 @@ export default function LinePreview({
   empty = false,
 }: LinePreviewProps) {
   return (
-    <section aria-label="LINEプレビュー" className="rounded-card bg-line-talk p-4">
+    <section aria-label="LINEプレビュー" className={`${styles.frame} rounded-card bg-line-talk p-4`}>
       <p className="flex items-center justify-center gap-1.5 text-center text-sm font-bold text-ink">
         <span>LINEプレビュー</span>
         {note ? <HelpTip label="LINEプレビューの説明">{note}</HelpTip> : null}

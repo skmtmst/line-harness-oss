@@ -134,7 +134,7 @@
 }
 
 .selected {
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .selectedBackground:hover,
@@ -174,5 +174,21 @@
   margin-top: 4px;
   color: var(--color-danger);
   font-size: var(--text-caption);
+}
+
+/*
+ * ★V8「選ぶ欄」（wMMk6）：高さ36・左12右10・文字13/500。
+ * 開いた矢印は ink-faint のまま（v7 と同じ）。
+ */
+[data-theme='v8'] .trigger {
+  height: 36px;
+  gap: 6px;
+  padding: 0 10px 0 12px;
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+
+[data-theme='v8'] .option {
+  font-size: var(--text-label);
 }
 }

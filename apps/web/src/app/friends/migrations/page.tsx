@@ -20,6 +20,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { parseFriendCsv, type FriendImportRow } from './friend-csv'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type ImportSummary = { add: number; update: number; unchanged: number; conflict: number; error: number }
 
@@ -188,7 +189,6 @@ export default function FriendMigrationsPage() {
           {([['basic', '基本（名前・LINEアカウント・登録日）', false], ['tags_fields', 'タグ・友だち情報', true], ['support', '対応状況・対応マーク・担当者', true]] as const).map(([value, label, unavailable]) => <Checkbox key={value} checked={columns.includes(value)} onCheckedChange={() => toggleColumn(value)} disabled={unavailable} description={unavailable ? 'まだ書き出せません' : undefined}>{label}</Checkbox>)}
         </fieldset>
         <p className="text-ink-secondary mt-2 text-xs">今書き出せるのは基本の5列だけです。タグ・友だち情報、対応情報は入りません。</p>
-        <p className="text-ink-faint mt-2 text-xs">電話番号やメールなどの個人情報は、見る権限がある人だけ選べます。</p>
         <p className="text-ink-secondary mt-4 text-sm">文字コード： UTF-8</p><p className="text-ink-faint mt-1 text-xs">Shift_JISの書き出しはまだ使えません。今はUTF-8を選んでください。</p>
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void createExport()}>書き出しを作る</Button>{exportResult && <a className="text-action text-sm font-semibold hover:underline" href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${exportResult.downloadUrl}`}>CSVをダウンロード（{exportResult.rowCount ?? '—'}件）</a>}</div>
         {manageLocked ? <p className="text-ink-secondary mt-2 text-xs">{MANAGE_FORBIDDEN}</p> : null}
@@ -212,7 +212,7 @@ export default function FriendMigrationsPage() {
           <div className="mt-2">
             <AttachmentRow
               name={file.name}
-              meta={`${rows.length.toLocaleString()}行・${formatImportBytes(file.size)}`}
+              meta={`${formatNumber(rows.length)}行・${formatImportBytes(file.size)}`}
               onRemove={() => void onPickFile(null)}
             />
           </div>
@@ -228,7 +228,7 @@ export default function FriendMigrationsPage() {
     <section className="bg-canvas rounded-card border-hairline overflow-hidden border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink flex items-center gap-1 text-sm font-bold">書き出し・取り込みの履歴<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip></h2></div>{jobs.length === 0 ? <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" /> : <><table className="w-full"><thead><TableHeadRow>{/*
                   表の外側の余白は左右で同じにする。状態の札は中身の幅で固定し、
                   残りは本文の列で吸収する。
-                */}<Th className="pl-5">日時</Th><Th>種類</Th><Th>対象</Th><Th>件数</Th><Th>実行した人</Th><Th className="w-28 pr-5">状態</Th></TableHeadRow></thead><tbody>{jobs.map((job) => <tr key={`${job.kind}-${job.id}`} className="border-hairline border-t"><td className="py-3 pr-4 pl-5 text-sm"><span className="block">{new Date(job.created_at).toLocaleString('ja-JP')}</span></td><td className="px-4 py-3 text-sm">{job.kind === 'export' ? '書き出し' : '取り込み'}</td><td className="px-4 py-3 text-sm">{accounts.find((account) => account.id === job.line_account_id)?.name ?? '—'}</td>{/*
+                */}<Th className="pl-5">日時</Th><Th>種類</Th><Th>対象</Th><Th>件数</Th><Th>実行した人</Th><Th className="w-28 pr-5">状態</Th></TableHeadRow></thead><tbody>{jobs.map((job) => <tr key={`${job.kind}-${job.id}`} className="border-hairline border-t"><td className="py-3 pr-4 pl-5 text-sm"><span className="block">{formatDateTime(job.created_at)}</span></td><td className="px-4 py-3 text-sm">{job.kind === 'export' ? '書き出し' : '取り込み'}</td><td className="px-4 py-3 text-sm">{accounts.find((account) => account.id === job.line_account_id)?.name ?? '—'}</td>{/*
                   m22d: 単位は見出しの「件数」が持つ。行ごとに「○件」と書くと、
                   同じ数が並んだだけで同じ件数が3回出る。一覧の件数は下の
                   ListRangeの1か所に出す。

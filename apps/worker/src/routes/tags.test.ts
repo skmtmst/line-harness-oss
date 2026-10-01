@@ -571,8 +571,7 @@ describe('PATCH /api/tags/:id/mileage', () => {
 
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
-    dbMocks.updateTagMileageSettings.mockResolvedValue(storedTag);
-    dbMocks.enqueueHistoricTagMileage.mockResolvedValue(12);
+    dbMocks.updateTagMileageSettings.mockResolvedValue({ tag: storedTag, queued: 0 });
     dbMocks.getTagRetroactiveMileagePreview.mockResolvedValue(PREVIEW);
     accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
       allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: true, isAccountScoped: false, accounts: [],
@@ -588,12 +587,18 @@ describe('PATCH /api/tags/:id/mileage', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+    expect(dbMocks.updateTagMileageSettings).toHaveBeenCalledWith(
+      expect.anything(),
+      'tag-1',
+      expect.objectContaining({ rewardMiles: 100, referralRewardMiles: 20 }),
+      expect.objectContaining({ enqueueRetroactive: false }),
+    );
     await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 0 } });
   });
 
   test('遡及はサーバーの事前計算(previewToken)付きでキューへ登録する', async () => {
     const previewToken = await previewTokenFor({ self: 100, referrer: 20 });
+    dbMocks.updateTagMileageSettings.mockResolvedValueOnce({ tag: storedTag, queued: 12 });
     const res = await patch('/api/tags/tag-1/mileage', {
       rewardMiles: 100,
       referralRewardMiles: 20,
@@ -604,7 +609,13 @@ describe('PATCH /api/tags/:id/mileage', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(dbMocks.enqueueHistoricTagMileage).toHaveBeenCalledWith(expect.anything(), 'tag-1');
+    // M955: 更新と投入は同じバッチ。投入は updateTagMileageSettings の内側で行う。
+    expect(dbMocks.updateTagMileageSettings).toHaveBeenCalledWith(
+      expect.anything(),
+      'tag-1',
+      expect.objectContaining({ rewardMiles: 100, referralRewardMiles: 20 }),
+      expect.objectContaining({ enqueueRetroactive: true }),
+    );
     await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 12 } });
   });
 
@@ -737,10 +748,13 @@ describe('旧タグ経路の名前検査と色の受付終了', () => {
       allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: false, isAccountScoped: false, accounts: [],
     });
     dbMocks.updateTagDefinition.mockImplementation(async (_db: unknown, input: { tagId: string; expectedVersion: number; isStarred?: boolean }) => ({
-      tag: { ...TAG_ROW, id: input.tagId, line_account_id: 'a1', version: input.expectedVersion + 1, is_starred: input.isStarred ? 1 : 0 },
-      automation: null,
+      detail: {
+        tag: { ...TAG_ROW, id: input.tagId, line_account_id: 'a1', version: input.expectedVersion + 1, is_starred: input.isStarred ? 1 : 0 },
+        automation: null,
+      },
+      queued: 0,
+      replayed: false,
     }));
-    dbMocks.enqueueHistoricTagMileage.mockResolvedValue(0);
   });
 
   test('作成で81文字・制御文字は400で書かない', async () => {
@@ -779,10 +793,13 @@ describe('PATCH /api/tags/:id は expectedVersion 必須(#715)', () => {
       allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: false, isAccountScoped: false, accounts: [],
     });
     dbMocks.updateTagDefinition.mockImplementation(async (_db: unknown, input: { tagId: string; expectedVersion: number; isStarred?: boolean }) => ({
-      tag: { ...TAG_ROW, id: input.tagId, line_account_id: 'a1', version: input.expectedVersion + 1, is_starred: input.isStarred ? 1 : 0 },
-      automation: null,
+      detail: {
+        tag: { ...TAG_ROW, id: input.tagId, line_account_id: 'a1', version: input.expectedVersion + 1, is_starred: input.isStarred ? 1 : 0 },
+        automation: null,
+      },
+      queued: 0,
+      replayed: false,
     }));
-    dbMocks.enqueueHistoricTagMileage.mockResolvedValue(0);
   });
 
   test('版が無いと400で定義口へ進まない', async () => {
@@ -806,6 +823,7 @@ describe('PATCH /api/tags/:id は expectedVersion 必須(#715)', () => {
     expect(dbMocks.updateTagDefinition).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ tagId: 'tag-1', lineAccountId: 'a1', expectedVersion: 3, isStarred: true }),
+      expect.objectContaining({ enqueueRetroactive: false }),
     );
     await expect(res.json()).resolves.toMatchObject({ success: true, data: { version: 4 } });
   });

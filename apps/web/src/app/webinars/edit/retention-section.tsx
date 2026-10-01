@@ -3,6 +3,7 @@
 import HelpTip from '@/components/shared/help-tip'
 import { Th } from '@/components/shared/table'
 import type { WebinarAnalytics } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 function fmtMin(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -137,7 +138,7 @@ export default function RetentionSection({
                     y={padTop + 2}
                     className="fill-info"
                     fontSize={12}
-                    fontWeight={700}
+                    fontWeight={500}
                   >
                     申し込みボタン（{fmtMin(ctaAtSeconds ?? 0)}）
                   </text>
@@ -169,7 +170,7 @@ export default function RetentionSection({
             <div className="border-hairline bg-surface-pearl rounded-control border p-3">
               <p className="text-ink-secondary text-xs">始まりに見ていた</p>
               <p className="text-ink mt-1 text-lg font-bold tabular-nums">
-                {started.toLocaleString('ja-JP')}人
+                {formatNumber(started)}人
               </p>
             </div>
             <div className="border-hairline bg-surface-pearl rounded-control border p-3">
@@ -180,7 +181,7 @@ export default function RetentionSection({
                 </HelpTip>
               </p>
               <p className="text-ink mt-1 text-lg font-bold tabular-nums">
-                {completed.toLocaleString('ja-JP')}人（{completedRate}）
+                {formatNumber(completed)}人（{completedRate}）
               </p>
             </div>
             <div className="border-hairline bg-surface-pearl rounded-control border p-3">
@@ -193,7 +194,7 @@ export default function RetentionSection({
 
           {heartbeatRejects > 0 && (
             <p className="text-warning mt-3 text-xs">
-              異常な報告を{heartbeatRejects.toLocaleString('ja-JP')}件除いています（視聴時間に数えていません）。
+              異常な報告を{formatNumber(heartbeatRejects)}件除いています（視聴時間に数えていません）。
             </p>
           )}
         </>

@@ -127,10 +127,10 @@ describe('R497/R498 権限保存の画面', () => {
       fireEvent.click(screen.getByRole('button', { name: '変更する' }))
     })
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /変更を保存/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '✓ 保存する' })).toBeTruthy()
     })
     await act(async () => {
-      const save = screen.getByRole('button', { name: /変更を保存/ })
+      const save = screen.getByRole('button', { name: '✓ 保存する' })
       fireEvent.click(save)
       fireEvent.click(save)
     })

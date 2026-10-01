@@ -15,7 +15,8 @@ const topBar = read('../../../components/shell/app-top-bar.tsx')
  */
 describe('統括の左下アカウントメニュー', () => {
   it('統括のサイドバーだけに置き、アカウントの画面は下端に何も置かない（§1-2 の例外）', () => {
-    expect(sidebar).toContain("{isHq ? <HqAccountMenu /> : <div className={styles.footer} />}")
+    // V8 移行③: 畳んだメニューでは枠ごと隠す collapseHide の皮で包む。
+    expect(sidebar).toContain("{isHq ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}")
   })
 
   it('メニューにはメンバー管理・課金プラン・お問い合わせ・ログアウトを置き、まだ無い画面（プロフィール）は出さない', () => {
@@ -73,7 +74,7 @@ describe('メンバー管理（36-5）', () => {
 
   it('保存は下部追従バーにしか置かない', () => {
     expect(members).toContain('<StickyBar')
-    expect(members).toContain('統括名を保存')
+    expect(members).toContain('統括名を保存する')
   })
 })
 

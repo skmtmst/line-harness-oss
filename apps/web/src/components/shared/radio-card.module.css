@@ -20,7 +20,7 @@
   padding: 0;
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .items {
@@ -110,7 +110,7 @@
 .title {
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -120,5 +120,19 @@
   font-size: var(--text-caption);
   font-weight: 400;
   line-height: 1.5;
+}
+
+/*
+ * ★V8「選ぶカード」：余白 14・選ぶと枠 1.5px の濃い緑＋地 accent-soft。
+ * 形と動き（120ms ease-out）は v7 のまま。
+ */
+[data-theme='v8'] .card {
+  padding: 14px;
+}
+
+[data-theme='v8'] .checked,
+[data-theme='v8'] .checked:hover {
+  border-width: 1.5px;
+  border-color: var(--color-accent-deep);
 }
 }

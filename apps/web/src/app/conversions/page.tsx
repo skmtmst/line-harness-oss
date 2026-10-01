@@ -18,7 +18,7 @@ import type { ConversionPoint } from '@line-crm/shared'
 import { deduplicationLabel } from './dedup'
 import { originInfoOf } from './origin-labels'
 import { readExclusionCondition, readExclusionMemo, readExclusionView, type ExclusionCondition } from './conversion-exclusion'
-import { pruneCondition } from '@/components/shared/condition-builder'
+import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import KpiCard from '@/components/shared/kpi-card'
 
@@ -82,7 +82,7 @@ function exclusionLine(sourceConfig: Record<string, unknown>): string {
 /** R41: 詳細の「金額」行の1行。起点の対応表と同じ言葉を使う。 */
 function valueModeLine(item: Pick<ConversionDefinitionListItem, 'sourceType' | 'valueMode' | 'value'>): string {
   if (item.valueMode === 'fixed') {
-    return item.value == null ? '決まった額（金額なし）' : `決まった額（1件 ¥${item.value.toLocaleString('ja-JP')}）`
+    return item.value == null ? '決まった額（金額なし）' : `決まった額（1件 ¥${formatNumber(item.value)}）`
   }
   if (item.valueMode === 'source') return `起点の金額を使う（${originInfoOf(item.sourceType).amount}）`
   return '金額を集計しない'
@@ -229,6 +229,7 @@ import Dialog from '@/components/shared/dialog'
 import { TextField } from '@/components/shared/text-field'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import ListRange from '@/components/ui/list-range'
+import { formatNumber } from '@/lib/format'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -278,7 +279,7 @@ function sourceTriggerLabel(point: Pick<ConversionDefinitionListItem, 'measureMe
 function usageLabel(point: ConversionDefinitionListItem): string {
   if (point.usageCount === 0) return 'どこからも使われていません'
   if (point.usageNames?.length) return point.usageNames.join('・')
-  return `${point.usageCount.toLocaleString('ja-JP')}か所で使用中`
+  return `${formatNumber(point.usageCount)}か所で使用中`
 }
 
 /**
@@ -353,6 +354,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const [loadFailed, setLoadFailed] = useState(false)
+  /**
+   * R596: 集計だけの失敗は一覧と分けて持つ。集計が読めなくても一覧は
+   * 残し、集計の数値カードだけを「—」と再試行にする。loadFailed と一緒に
+   * 倒すと、一覧まで消えて「登録したものが消えた」に見える。
+   */
+  const [reportFailed, setReportFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   /**
@@ -362,6 +369,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 表示を上書きしてしまう。応答が返った時点で番号が変わっていたら捨てる。
    */
   const loadSeq = useRef(0)
+  /*
+   * 今選ばれているアカウントの控え。再試行の遅れた応答が、切り替え後の
+   * アカウントの表示を上書きしないよう、応答が返った時点で照合する。
+   * effect の後より先に描画時の代入で最新化する（切り替え直後の
+   * 応答との競合を狭めるため）。
+   */
+  const accountIdRef = useRef(accountId)
+  accountIdRef.current = accountId
   /** 検索は1文字ごとに口を叩かず、少し待ってから読み直す。 */
   const [debouncedQuery, setDebouncedQuery] = useState('')
   useEffect(() => {
@@ -439,6 +454,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     const seq = ++loadSeq.current
     setLoading(true)
     setLoadFailed(false)
+    setReportFailed(false)
     setDefinitions(null)
     setSummaryReport(null)
     setListTruncated(false)
@@ -482,9 +498,46 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     if (reportResult.status === 'fulfilled' && reportResult.value.success
       && Array.isArray(reportResult.value.data.byDefinition)) {
       setSummaryReport(reportResult.value.data)
+    } else {
+      // R596: 集計だけ読めないときも黙って「—」にしない。数値カードに
+      // 失敗と再試行を出すため、由来を残す。
+      setReportFailed(true)
     }
-    setLoading(false)
+    // 古い読み込みは表示の後片付けもしない。新しい読み込みの
+    // 「読み込み中」を先に消してしまうため（R596 回帰と同じ競合）。
+    if (loadSeq.current === seq) setLoading(false)
   }, [accountId, debouncedQuery, sort])
+
+  /**
+   * R596: 集計だけを読み直す。一覧は触らないので、再試行のあいだも
+   * 行は残る。復旧したら数値カードが数値へ戻る。
+   *
+   * 再試行の応答が遅れたとき、切り替え後のアカウントの表示を上書き
+   * しない（R596 回帰）。`load` と同じ世代番号を進め、応答が返った
+   * 時点で世代とアカウントを照合する。成功・失敗どちらの応答も捨てる。
+   */
+  const reloadReport = useCallback(async () => {
+    const seq = ++loadSeq.current
+    const requestAccountId = accountId
+    const range = definitionRange(30)
+    try {
+      const response = await api.conversions.definitionReport({
+        ...range, lineAccountId: accountId ?? undefined,
+      })
+      if (loadSeq.current !== seq) return
+      if (accountIdRef.current !== requestAccountId) return
+      if (response.success && Array.isArray(response.data.byDefinition)) {
+        setSummaryReport(response.data)
+        setReportFailed(false)
+      } else {
+        setReportFailed(true)
+      }
+    } catch {
+      if (loadSeq.current !== seq) return
+      if (accountIdRef.current !== requestAccountId) return
+      setReportFailed(true)
+    }
+  }, [accountId])
 
   useEffect(() => { void load() }, [load])
 
@@ -557,6 +610,16 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       setEditError('数えない条件のメモは500文字以内で入力してください')
       return
     }
+    /*
+     * S4-OR: 空の「いずれか」のかたまり・未完成の行は、黙って
+     * 「除外なし」に落とさない。足すつもりの条件が無いまま数えると
+     * 広く数えすぎるので、版上げを止めて直し方を案内する。
+     */
+    const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
+    if (exclusionIssue) {
+      setEditError(exclusionIssue)
+      return
+    }
     setEditSaving(true)
     setEditError('')
     try {
@@ -565,7 +628,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         expectedVersion: editTarget.version,
         name,
         sourceType: editForm.sourceType,
-        // R40: 数えない条件とメモも次の版に入れる。書きかけの行は落とす。
+        // R40: 数えない条件とメモも次の版に入れる。書きかけの行・空のかたまりは上で止める。
         sourceConfig: {
           ...editTarget.sourceConfig,
           exclusion: pruneCondition(editForm.exclusion),
@@ -882,7 +945,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           title="決めてある成果地点"
           value={definitions?.pagination.total ?? null}
           unit="個"
-          detail={definitions ? `動いているもの ${definitions.stateCounts.active}個` : '読み込み中'}
+          /*
+           * R595: 一覧が読めないときは値が「—」になる。3段目まで
+           * 「読み込み中」のままだと直っているように見えるので、由来を書く。
+           */
+          detail={definitions ? `動いているもの ${definitions.stateCounts.active}個` : loadFailed ? '一覧を読み込めませんでした' : '読み込み中'}
           loading={loading}
         />
         <KpiCard
@@ -892,16 +959,30 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           badge={summaryReport?.kpis.countChangeRate == null
             ? undefined
             : `${summaryReport.kpis.countChangeRate > 0 ? '+' : ''}${summaryReport.kpis.countChangeRate}%`}
-          detail={kpi.previousCount === null
-            ? '前の30日の比較は読み込めませんでした'
-            : `前の30日 ${kpi.previousCount.toLocaleString()}件`}
+          /*
+           * R596: 集計だけ読めないときは一覧を残し、このカードだけ
+           * 失敗と再試行にする。再試行は集計だけ読み直すので行は消えない。
+           */
+          detail={reportFailed
+            ? 'この30日の集計を読み込めませんでした'
+            : kpi.previousCount === null
+              ? '前の30日の比較は読み込めませんでした'
+              : `前の30日 ${formatNumber(kpi.previousCount)}件`}
+          onRetry={reportFailed && !loading ? () => void reloadReport() : undefined}
+          retryLabel="集計を再読み込み"
           loading={loading}
         />
         <KpiCard
           title="金額がついた成果"
           value={summaryReport ? kpi.currentValue : null}
           unit="円"
-          detail={`${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`}
+          /*
+           * R595: 一覧が読めないとき points は空なので、そのまま数えると
+           * 「0個の成果地点」と誤る。未取得は数えない。
+           */
+          detail={definitions
+            ? `${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`
+            : loadFailed ? '金額の内訳を読み込めませんでした' : '読み込み中'}
           loading={loading}
         />
         <KpiCard
@@ -910,7 +991,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           unit="個"
           badge={kpi.unusedCount > 0 ? '確認' : undefined}
           badgeTone={kpi.unusedCount > 0 ? 'neutral' : 'accent'}
-          detail="決めたのに使われていません"
+          detail={loadFailed ? '一覧を読み込めませんでした' : '決めたのに使われていません'}
           loading={loading}
         />
       </KpiCollapse>
@@ -923,8 +1004,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button href="/conversions/new" variant="primary">＋ 成果地点を作る</Button>
-        <Button onClick={() => void exportCsv()} disabled={exporting}>
-          {exporting ? '書き出しています' : 'CSVで書き出す'}
+        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">CSVで書き出す
         </Button>
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
@@ -944,14 +1024,19 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         }}
         filters={
           <>
+            {/*
+              R595: 一覧が未取得のとき札に 0 を出すと「0件ある」と誤読する。
+              FilterChip は件数が無いとき印を出さない決まりなので、
+              未取得は渡さない（部品側で隠れる）。
+            */}
             {([
-              ['all', 'すべて', definitions?.pagination.total ?? 0],
-              ['active', '動いている', definitions?.stateCounts.active ?? 0],
-              ['draft', '下書き', definitions?.stateCounts.draft ?? 0],
-              ['invalid', '入力不良', definitions?.stateCounts.invalid ?? 0],
-              ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped ?? 0],
-              ['stopped', '止めている', definitions?.stateCounts.stopped ?? 0],
-              ['unused', 'どこからも使われていない', definitions?.stateCounts.unused ?? 0],
+              ['all', 'すべて', definitions?.pagination.total],
+              ['active', '動いている', definitions?.stateCounts.active],
+              ['draft', '下書き', definitions?.stateCounts.draft],
+              ['invalid', '入力不良', definitions?.stateCounts.invalid],
+              ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped],
+              ['stopped', '止めている', definitions?.stateCounts.stopped],
+              ['unused', 'どこからも使われていない', definitions?.stateCounts.unused],
             ] as const).map(([value, label, total]) => (
               <FilterChip
                 key={value}
@@ -1028,7 +1113,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             name: point.name,
             status: point.state !== 'active' && STATE_LABELS[point.state] ? (
               <span
-                className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
+                className={`inline-block rounded-mini px-1.5 py-0.5 text-xs font-semibold ${
                   point.state === 'draft' ? 'bg-info-bg text-info'
                     : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
                     : 'bg-canvas-sunken text-ink-faint'
@@ -1039,7 +1124,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               </span>
             ) : undefined,
             summary: sourceTriggerLabel(point),
-            metric: `この30日 ${point.metrics.netCount.toLocaleString('ja-JP')}件`,
+            metric: `この30日 ${formatNumber(point.metrics.netCount)}件`,
             primaryAction: (
               <Button
                 href={`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`}
@@ -1102,7 +1187,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     {/* 状態名が無いときは空の札を出さない。口が state を返さない行で灰色の空札が出ていた。 */}
                     {point.state !== 'active' && STATE_LABELS[point.state] ? (
                       <p
-                        className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
+                        className={`mt-1 inline-block rounded-mini px-1.5 py-0.5 text-xs font-semibold ${
                           point.state === 'draft' ? 'bg-info-bg text-info'
                             : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
                             : 'bg-canvas-sunken text-ink-faint'
@@ -1120,12 +1205,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     </p>
                   </td>
                   <td className="text-ink whitespace-nowrap px-4 py-3 text-right text-sm tabular-nums">
-                    {point.metrics.netCount.toLocaleString('ja-JP')}件
+                    {formatNumber(point.metrics.netCount)}件
                   </td>
                   <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
                     {point.value === null
                       ? '金額なし'
-                      : `¥${point.metrics.netValue.toLocaleString('ja-JP')}`}
+                      : `¥${formatNumber(point.metrics.netValue)}`}
                   </td>
                   <td className={point.usageCount === 0
                     ? 'text-warning w-1/4 px-4 py-3 text-sm'
@@ -1167,13 +1252,20 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-faint text-xs">利用先の名前は詳細で確認できます。追加するときは分析画面でこの成果地点を選びます。</p>
         <div className="flex items-center gap-2 text-xs">
-          <ListRange
-            className="tabular-nums"
-            label="成果地点"
-            total={definitions?.pagination.total ?? shown.length}
-            first={shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
-            last={Math.min(page * PAGE_SIZE, shown.length)}
-          />
+          {/*
+            R595: 一覧が未取得のとき「成果地点 0件」と出すと、失敗なのに
+            空と誤読する。未取得は件数自体を出さない（失敗の案内は上の
+            ListState が担う）。
+          */}
+          {definitions == null ? null : (
+            <ListRange
+              className="tabular-nums"
+              label="成果地点"
+              total={definitions.pagination.total}
+              first={shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
+              last={Math.min(page * PAGE_SIZE, shown.length)}
+            />
+          )}
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       </div>
@@ -1189,9 +1281,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               <Button
                 variant="primary"
                 disabled={publishing}
-                onClick={() => void publishDraft(detailTarget)}
-              >
-                {publishing ? '公開しています' : '計測をはじめる（公開）'}
+                onClick={() => void publishDraft(detailTarget)} busy={publishing} busyLabel="公開しています">計測をはじめる（公開）
               </Button>
             ) : null}
             {detailTarget.status !== 'stopped' ? (
@@ -1201,7 +1291,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             ) : null}
             {detailTarget.status !== 'stopped' ? (
               <Button onClick={() => void openStop(detailTarget)}>
-                停止・削除
+                停止・削除する
               </Button>
             ) : null}
           </div>
@@ -1245,9 +1335,9 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               {/* R40: 数えない条件とメモを詳細でも確認できる。 */}
               <div className="col-span-2"><dt className="text-ink-faint">数えない条件</dt><dd className="text-ink mt-1 font-semibold">{exclusionLine(detailTarget.sourceConfig)}</dd></div>
               <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
-              <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.netCount.toLocaleString('ja-JP')}件</dd></div>
+              <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{formatNumber(detailTarget.metrics.netCount)}件</dd></div>
               <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
-              <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.reversedCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.reversedCount}件・¥${(detailTarget.metrics.reversedValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
+              <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.reversedCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.reversedCount}件・¥${formatNumber((detailTarget.metrics.reversedValue ?? 0))}`}</dd></div>
             </dl>
             {detailTarget.stateReason ? (
               <Notice tone="warn" message={detailTarget.stateReason} />
@@ -1275,9 +1365,9 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   {definitionEvents.map((event) => (
                     <li key={event.id} className="text-ink-secondary flex items-baseline justify-between gap-2">
                       <span className="text-ink min-w-0">
-                        <span className="font-medium">{event.friendName ?? '名前のない友だち'}</span>
+                        <span className="font-semibold">{event.friendName ?? '名前のない友だち'}</span>
                         <span
-                          className={`ml-2 inline-block rounded px-1.5 py-0.5 font-semibold ${
+                          className={`ml-2 inline-block rounded-mini px-1.5 py-0.5 font-semibold ${
                             event.status === 'cancelled' ? 'bg-danger-bg text-danger'
                               : event.status === 'pending' ? 'bg-info-bg text-info'
                               : event.status === 'rejected' ? 'bg-canvas-sunken text-ink-faint'
@@ -1288,7 +1378,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                         </span>
                         {/* R42: 金額なしは0円と区別して出す。 */}
                         {event.value !== null ? (
-                          <span className="text-ink-faint ml-2 tabular-nums">¥{event.value.toLocaleString('ja-JP')}</span>
+                          <span className="text-ink-faint ml-2 tabular-nums">¥{formatNumber(event.value)}</span>
                         ) : (
                           <span className="text-ink-faint ml-2">金額なし</span>
                         )}
@@ -1420,9 +1510,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         onCancel={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}
         footer={(
           <div className="flex justify-end gap-2">
-            <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>やめる</Button>
-            <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()}>
-              {editSaving ? '保存中...' : 'この内容にする'}
+            <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>キャンセル</Button>
+            <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()} busy={editSaving} busyLabel="保存中...">この内容にする
             </Button>
           </div>
         )}
@@ -1617,7 +1706,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               <p className="text-ink-secondary text-sm">
                 これまでに数えた{' '}
                 <strong className="text-ink tabular-nums">
-                  {stopTarget.metrics.netCount.toLocaleString('ja-JP')}件
+                  {formatNumber(stopTarget.metrics.netCount)}件
                 </strong>
                 の記録と金額は、そのまま残ります。停止の影響は {stopImpact?.stopImpact.affectedUsageCount ?? '—'}か所です。
               </p>
@@ -1810,8 +1899,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
           ]}
           onChange={(value) => setPeriodDays(Number(value))}
         />
-        <Button onClick={() => void exportCsv()} disabled={exporting}>
-          {exporting ? '書き出しています' : '成果地点の一覧をCSVで書き出す'}
+        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">成果地点の一覧をCSVで書き出す
         </Button>
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
@@ -1824,19 +1912,19 @@ function ReportTab({ accountId }: { accountId: string | null }) {
           badge={report.kpis.countChangeRate == null
             ? undefined
             : `${report.kpis.countChangeRate > 0 ? '+' : ''}${report.kpis.countChangeRate}%`}
-          detail={`前の${periodDays}日 ${report.kpis.previousNetCount.toLocaleString('ja-JP')}件`}
+          detail={`前の${periodDays}日 ${formatNumber(report.kpis.previousNetCount)}件`}
         />
         <KpiCard
           title="金額"
           value={report.kpis.netValue}
           unit="円"
-          detail={`前の${periodDays}日 ¥${report.kpis.previousNetValue.toLocaleString('ja-JP')}`}
+          detail={`前の${periodDays}日 ¥${formatNumber(report.kpis.previousNetValue)}`}
         />
         <KpiCard
           title="1件あたり"
           value={report.kpis.averageNetValue === null ? null : Math.round(report.kpis.averageNetValue)}
           unit="円"
-          detail={previousAverage === null ? `前の${periodDays}日は成果なし` : `前の${periodDays}日 ¥${previousAverage.toLocaleString('ja-JP')}`}
+          detail={previousAverage === null ? `前の${periodDays}日は成果なし` : `前の${periodDays}日 ¥${formatNumber(previousAverage)}`}
         />
         <KpiCard
           title="いちばん伸びた"
@@ -1844,7 +1932,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
           unit="%"
           badge={fastest && fastestRate > 0 ? `+${fastestRate}%` : undefined}
           detail={fastest
-            ? `${fastest.conversionPointName} ${fastest.netCount.toLocaleString('ja-JP')}件（前の${periodDays}日 ${fastest.previousNetCount.toLocaleString('ja-JP')}件）`
+            ? `${fastest.conversionPointName} ${formatNumber(fastest.netCount)}件（前の${periodDays}日 ${formatNumber(fastest.previousNetCount)}件）`
             : '比較できる成果はありません'}
         />
       </KpiCollapse>
@@ -1861,12 +1949,12 @@ function ReportTab({ accountId }: { accountId: string | null }) {
             <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint" aria-label="棒の色と成果地点の対応">
               {daily.names.map((name, index) => (
                 <li key={name} className="flex items-center gap-1">
-                  <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-sm ${index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info' : 'bg-canvas-sunken'}`} />
+                  <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-mini ${index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info' : 'bg-canvas-sunken'}`} />
                   {name}
                 </li>
               ))}
               <li className="flex items-center gap-1">
-                <span aria-hidden="true" className="bg-canvas-sunken inline-block h-2.5 w-2.5 rounded-sm" />
+                <span aria-hidden="true" className="bg-canvas-sunken inline-block h-2.5 w-2.5 rounded-mini" />
                 そのほか
               </li>
             </ul>
@@ -1877,7 +1965,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
             {daily.days.map((day, index) => (
               <div key={day.day} className="flex h-full min-w-0 flex-1 flex-col justify-end">
                 <div
-                  className="flex w-full flex-col-reverse overflow-hidden rounded-sm"
+                  className="flex w-full flex-col-reverse overflow-hidden rounded-mini"
                   style={{ height: `${Math.max(4, Math.round((day.total / daily.max) * 100))}%` }}
                   title={`${day.day} ${day.total}件`}
                 >
@@ -1929,8 +2017,8 @@ function ReportTab({ accountId }: { accountId: string | null }) {
                   .map((row) => (
                     <tr key={row.day}>
                       <td className="text-ink px-4 py-2 tabular-nums">{row.day}</td>
-                      <td className="text-ink px-4 py-2 text-right tabular-nums">{row.count.toLocaleString('ja-JP')}件</td>
-                      <td className="text-ink-secondary px-4 py-2 text-right tabular-nums">¥{row.value.toLocaleString('ja-JP')}</td>
+                      <td className="text-ink px-4 py-2 text-right tabular-nums">{formatNumber(row.count)}件</td>
+                      <td className="text-ink-secondary px-4 py-2 text-right tabular-nums">¥{formatNumber(row.value)}</td>
                       <td className="text-ink-secondary px-4 py-2 text-xs">{row.points.join('・')}</td>
                     </tr>
                   ))}
@@ -1973,10 +2061,10 @@ function ReportTab({ accountId }: { accountId: string | null }) {
                       ) : null}
                     </td>
                     <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
-                      {row.netCount.toLocaleString('ja-JP')}件
+                      {formatNumber(row.netCount)}件
                     </td>
                     <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                      {row.previousNetCount.toLocaleString('ja-JP')}件
+                      {formatNumber(row.previousNetCount)}件
                     </td>
                     <td className={changeRate > 0
                       ? 'text-success px-4 py-3 text-right text-sm font-semibold tabular-nums'
@@ -1992,7 +2080,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
                             : <span className="text-ink-faint">（母数の記録なし）</span>}
                         </span>
                       )) : (topRoute ? `全体では ${topRoute.label}` : '経路の記録はありません')}
-                      <p className="text-ink-faint mt-1 text-xs">取消: {row.cancellationCount == null ? '台帳未接続' : `${row.cancellationCount}件・¥${(row.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</p>
+                      <p className="text-ink-faint mt-1 text-xs">取消: {row.cancellationCount == null ? '台帳未接続' : `${row.cancellationCount}件・¥${formatNumber((row.cancellationValue ?? 0))}`}</p>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button href="/conversions?tab=points">中身を見る</Button>

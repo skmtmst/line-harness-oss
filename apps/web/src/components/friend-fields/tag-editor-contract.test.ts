@@ -38,6 +38,13 @@ describe('タグの編集', () => {
   })
 
   it('編集からタグを複製できる', () => {
-    expect(EDITOR).toContain('複製して新規作成')
+    expect(EDITOR).toContain('複製して作る')
+  })
+
+  it('R620: 遡及OFFの編集サマリーは既存への遡及を案内しない', () => {
+    // 連動ON・遡及OFFで「さかのぼって積みます」と「反映されません」が
+    // 同時に出ていた。遡及の案内は連動ONかつ遡及ONのときだけ出す。
+    expect(EDITOR).toContain('linked && applyToExisting')
+    expect(EDITOR).toContain('いま付いている${tag?.friendCount ?? 0}人には反映されません')
   })
 })

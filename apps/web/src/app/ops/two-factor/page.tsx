@@ -12,6 +12,7 @@ import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
 import OtpInput from '@/components/shared/otp-input'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 
 /**
  * 運営コンソールの 2要素認証の設定（★V6 37-10-B `NAJKx`）。
@@ -87,7 +88,7 @@ export default function OpsTwoFactorPage() {
       title="2要素認証を設定"
       description={
         <>
-          <span className="mb-1 block text-caption font-bold text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
           運営コンソールは2要素認証が必須です。認証アプリ（Google Authenticator など）でQRコードを読み取り、表示された6桁の数字を入れてください。確認が通ると登録が完了します。
         </>
       }
@@ -113,11 +114,11 @@ export default function OpsTwoFactorPage() {
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
             <img src={qr} alt="認証アプリ登録用のQRコード" className="h-52 w-52 rounded-control border border-hairline" />
           ) : (
-            <div className="h-52 w-52 animate-pulse rounded-control bg-canvas-sunken" aria-hidden="true" />
+            <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
           )}
           <div className="text-center">
             <p className="text-caption text-ink-faint">読み取れないときは、このキーを手で入力</p>
-            <p className="mt-1 break-all font-mono text-label font-bold tracking-wider text-ink">{manualKey || '—'}</p>
+            <p className="mt-1 break-all font-mono text-label font-medium tracking-wider text-ink">{manualKey || '—'}</p>
           </div>
           <div className="w-full">
             <AuthField label="認証アプリの6桁の数字" htmlFor="ops-totp-code">
@@ -125,8 +126,7 @@ export default function OpsTwoFactorPage() {
               <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
             </AuthField>
           </div>
-          <Button type="submit" variant="primary" disabled={busy || !uri} className="w-full">
-            {busy ? '確認しています…' : '確認して登録を完了する'}
+          <Button type="submit" variant="primary" disabled={busy || !uri} className="w-full" busy={busy} busyLabel="確認しています…">確認して登録を完了する
           </Button>
           <p className="text-center text-caption text-ink-faint">
             確認が通ると、安全のため一度ログアウトします。メールとパスワード、次に6桁の数字でログインし直してください

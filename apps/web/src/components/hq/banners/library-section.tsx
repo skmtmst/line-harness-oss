@@ -253,8 +253,8 @@ export default function LibrarySection({
           )}
           {status === 'ready' && nextBefore ? (
             <div className="flex justify-center">
-              <Button onClick={() => void loadMore()} disabled={loadingMore}>
-                {loadingMore ? '読み込んでいます…' : `さらに${PAGE_SIZE}枚を表示`}
+              <Button onClick={() => void loadMore()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込んでいます…">
+                {`さらに${PAGE_SIZE}枚を表示`}
               </Button>
             </div>
           ) : null}

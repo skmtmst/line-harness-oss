@@ -22,6 +22,7 @@ import { fetchApi } from '@/lib/api'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { formatDay, formatNumber } from '@/lib/format'
 
 /** EC連携画面（order-detail-drawer）の状態文言とそろえる。 */
 const ORDER_STATUS_TEXT: Record<string, string> = {
@@ -68,14 +69,14 @@ type LoadState = 'loading' | 'ready' | 'error'
 
 function formatMoney(currency: string, amount: number | null): string {
   if (amount === null) return '—'
-  return `${currency === 'JPY' ? '¥' : ''}${amount.toLocaleString('ja-JP')}`
+  return `${currency === 'JPY' ? '¥' : ''}${formatNumber(amount)}`
 }
 
 function formatDate(iso: string): string {
   if (!iso) return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  return formatDay(d)
 }
 
 export default function RefOrdersPanel({
@@ -134,7 +135,7 @@ export default function RefOrdersPanel({
   return (
     <div>
       <p className="text-xs font-semibold text-ink-faint uppercase">
-        この経路からの注文{state === 'ready' ? `（全${total.toLocaleString('ja-JP')}件）` : ''}
+        この経路からの注文{state === 'ready' ? `（全${formatNumber(total)}件）` : ''}
       </p>
       {/*
         IDEA-18: 帰属ルールと計測できない範囲を明細のすぐそばで説明する。
@@ -164,7 +165,7 @@ export default function RefOrdersPanel({
           description="この経路から来た友だちの注文が記録されると、ここに表示されます。"
         />
       ) : (
-        <div className="mt-2 overflow-hidden rounded-lg border border-hairline bg-canvas">
+        <div className="mt-2 overflow-hidden rounded-control border border-hairline bg-canvas">
           <table className="w-full text-xs">
             <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
               <TableHeadRow>

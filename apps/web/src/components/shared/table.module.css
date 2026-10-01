@@ -67,7 +67,7 @@
 .stateTitle {
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .stateDescription {
@@ -81,12 +81,31 @@
   border-radius: var(--radius-control);
   color: var(--color-accent-deep);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: underline;
 }
 
 .stateRetry:focus-visible {
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
+}
+
+/*
+ * ★V8「表の見出し」：高さ44・左右20・地 table-head・上下に細い線・
+ * 文字 12px/500 ink-secondary。v7 は枠カード内の見出しだったが、
+ * V8 では白い板の中に直接置く（箱の中に箱を作らない）。
+ */
+[data-theme='v8'] .headRow {
+  height: 44px;
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-table-head);
+}
+
+[data-theme='v8'] .headRow .cell {
+  padding: 13px 20px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
 }
 }

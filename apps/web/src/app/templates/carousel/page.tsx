@@ -23,6 +23,7 @@ import {
   toActionPayload,
   type InlineAction,
 } from '@/components/auto-replies/draft-fields'
+import Button from '@/components/shared/button'
 
 /**
  * カルーセルの編集。
@@ -602,7 +603,7 @@ function CarouselEditorInner() {
                   disabled={i === 0}
                   aria-label={`パネル ${i + 1} を左へ移動`}
                   title={i === 0 ? 'いちばん左です' : '左へ移動'}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   ←
                 </button>
@@ -611,7 +612,7 @@ function CarouselEditorInner() {
                   disabled={i === panels.length - 1}
                   aria-label={`パネル ${i + 1} を右へ移動`}
                   title={i === panels.length - 1 ? 'いちばん右です' : '右へ移動'}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   →
                 </button>
@@ -625,16 +626,16 @@ function CarouselEditorInner() {
                   }
                   disabled={panels.length >= MAX_COLUMNS}
                   title={panels.length >= MAX_COLUMNS ? `パネルは${MAX_COLUMNS}枚までです` : undefined}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   複製
                 </button>
                 {panels.length > 1 && (
                   <button
                     onClick={() => setPanels((prev) => prev.filter((_, j) => j !== i))}
-                    className="text-danger hover:bg-danger-bg rounded px-2 py-1 text-xs"
+                    className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
                   >
-                    削除
+                    削除する
                   </button>
                 )}
                 </div>
@@ -701,7 +702,7 @@ function CarouselEditorInner() {
                   このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）
                 </p>
                 {panel.actions.map((action, ai) => (
-                  <div key={ai} className="border-hairline mb-2 rounded-lg border p-3">
+                  <div key={ai} className="border-hairline mb-2 rounded-control border p-3">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <input
                         type="text"
@@ -724,20 +725,15 @@ function CarouselEditorInner() {
                             { value: 'action' as const, label: '押されたときに何かする' },
                           ]
                         ).map((o) => (
-                          <button
-                            key={o.value}
-                            type="button"
-                            onClick={() =>
+                          <Button variant="primary" className={(`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`) + ' border-0 h-auto whitespace-normal'} key={o.value} type="button" onClick={() =>
                               update(i, {
                                 actions: panel.actions.map((a, j) =>
                                   j === ai ? { ...a, kind: o.value } : a,
                                 ),
                               })
-                            }
-                            className={`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
-                          >
+                            }>
                             {o.label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                       {panel.actions.length > 1 && (
@@ -745,7 +741,7 @@ function CarouselEditorInner() {
                           onClick={() =>
                             update(i, { actions: panel.actions.filter((_, j) => j !== ai) })
                           }
-                          className="text-danger hover:bg-danger-bg ml-auto rounded px-2 text-xs"
+                          className="text-danger hover:bg-danger-bg ml-auto rounded-mini px-2 text-xs"
                         >
                           外す
                         </button>
@@ -794,14 +790,11 @@ function CarouselEditorInner() {
                   </div>
                 ))}
                 {panel.actions.length < MAX_ACTIONS && (
-                  <button
-                    onClick={() =>
+                  <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() =>
                       update(i, { actions: [...panel.actions, emptyChoice()] })
-                    }
-                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs"
-                  >
-                    ＋ 選択肢を追加
-                  </button>
+                    }>
+                    ＋ 選択肢を追加する
+                  </Button>
                 )}
               </div>
             </div>
@@ -852,12 +845,9 @@ function CarouselEditorInner() {
           </section>
 
           {panels.length < MAX_COLUMNS && (
-            <button
-              onClick={() => setPanels((prev) => [...prev, emptyPanel()])}
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-            >
-              パネルを追加（{panels.length} / {MAX_COLUMNS}）
-            </button>
+            <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => setPanels((prev) => [...prev, emptyPanel()])}>
+              パネルを追加する（{panels.length} / {MAX_COLUMNS}）
+            </Button>
           )}
 
           {error && (
@@ -890,7 +880,7 @@ function CarouselEditorInner() {
             <div className="bg-canvas-sunken rounded-card overflow-x-auto p-3">
               <div className="flex gap-2">
                 {panels.map((panel, i) => (
-                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-white">
+                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-card bg-canvas">
                     {typeof panel.thumbnailImageUrl === 'string' && /^https?:\/\//.test(panel.thumbnailImageUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={panel.thumbnailImageUrl} alt="" className="h-28 w-full object-cover" />
@@ -938,7 +928,7 @@ function CarouselEditorInner() {
             <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
               <li>・パネルは{MAX_COLUMNS}枚まで。多いと最後まで見てもらえません</li>
               <li>・ボタンは1パネルにつき{MAX_ACTIONS}つまでです（LINEの仕様）</li>
-              <li>・パネル本文は{TEXT_MAX_WITH_IMAGE}文字まで。超えると途中で切れて表示されます</li>
+              <li>・パネル本文はタイトルか画像があると{TEXT_MAX_WITH_IMAGE}文字まで、両方なければ{TEXT_MAX_WITHOUT_IMAGE}文字までです。超えると途中で切れて表示されます</li>
               <li>
                 ・画像は横1024 × 縦678pxを推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
               </li>
@@ -950,13 +940,9 @@ function CarouselEditorInner() {
           </section>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={save}
-              disabled={saving || loadFailed}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
+            <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={save} disabled={saving || loadFailed}>
+              {saving ? '保存中...' : '保存する'}
+            </Button>
             {/*
               D009: 未保存のままの「キャンセル」は番兵が止めて確認窓を出す。
               素の Link のまま置く（止める役は useUnsavedGuard が受け持つ）。

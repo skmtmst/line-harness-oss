@@ -36,7 +36,7 @@ export default function SidebarVersion() {
   if (!lines) return <p className="border-t border-hairline px-4 pb-3 pt-2.5 text-micro text-ink-faint">版の情報なし</p>
   return (
     <div className="border-t border-hairline px-4 pb-3 pt-2.5">
-      <p className="truncate text-caption font-bold text-ink-secondary" title={lines.line1}>{lines.line1}</p>
+      <p className="truncate text-caption font-medium text-ink-secondary" title={lines.line1}>{lines.line1}</p>
       {lines.line2 ? <p className="mt-0.5 text-micro text-ink-faint">{lines.line2}</p> : null}
     </div>
   )

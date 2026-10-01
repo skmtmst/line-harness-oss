@@ -20,6 +20,7 @@ import Notice from '@/components/shared/notice'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { Tabs } from '@/components/shared/tabs'
 import ListState from '@/components/shared/list-state'
+import { runOptimistic } from '@/lib/undoable'
 import {
   dashboardNotificationDestination,
   isDashboardNotificationData,
@@ -97,33 +98,52 @@ function NotificationsPageInner() {
 
   useEffect(() => { void load(0, false) }, [load])
 
-  const markRead = async (item: NotificationCenterItem) => {
+  /*
+   * 既読は取り消せる軽い操作なので、押した瞬間に画面へ反映して裏で
+   * 保存する（★V7 sTJsh §1）。失敗したら未読へ戻してやり直せる
+   * 知らせを出す。
+   */
+  const markRead = (item: NotificationCenterItem) => {
     if (!selectedAccountId) return
     if (item.isRead) return
-    try {
-      const response = await api.notifications.center.markRead(item.id, selectedAccountId)
-      if (!response.success) throw new Error(response.error)
-      setItems((current) => current.map((row) => row.id === item.id ? { ...row, isRead: true } : row))
-      setCounts((current) => current ? { ...current, unread: Math.max(0, current.unread - 1) } : current)
-    } catch {
-      setError('通知を既読にできませんでした。')
+    const accountId = selectedAccountId
+    const apply = (isRead: boolean) => {
+      setItems((current) => current.map((row) => (row.id === item.id ? { ...row, isRead } : row)))
+      setCounts((current) =>
+        current ? { ...current, unread: Math.max(0, current.unread + (isRead ? -1 : 1)) } : current,
+      )
     }
+    apply(true)
+    runOptimistic({
+      request: () => api.notifications.center.markRead(item.id, accountId),
+      revert: () => apply(false),
+      failureMessage: '通知を既読にできませんでした。',
+      retry: () => markRead(item),
+    })
   }
 
   const openNotification = (item: NotificationCenterItem) => {
-    void markRead(item)
+    markRead(item)
     router.push(dashboardNotificationDestination(item))
   }
 
-  const markAllRead = async () => {
+  const markAllRead = () => {
     if (!selectedAccountId || !counts || counts.unread === 0) return
-    try {
-      const response = await api.notifications.center.markAllRead(selectedAccountId, filter)
-      if (!response.success) throw new Error(response.error)
-      await load(0, false)
-    } catch {
-      setError('通知をまとめて既読にできませんでした。')
-    }
+    const accountId = selectedAccountId
+    const beforeItems = items
+    const beforeCounts = counts
+    setItems((current) => current.map((row) => ({ ...row, isRead: true })))
+    setCounts((current) => (current ? { ...current, unread: 0 } : current))
+    runOptimistic({
+      request: () => api.notifications.center.markAllRead(accountId, filter),
+      revert: () => {
+        setItems(beforeItems)
+        setCounts(beforeCounts)
+      },
+      failureMessage: '通知をまとめて既読にできませんでした。',
+      retry: markAllRead,
+      onSuccess: () => void load(0, false),
+    })
   }
 
   const filters: Array<{ id: DashboardNotificationFilter; label: string; count: number | null }> = [
@@ -188,7 +208,7 @@ function NotificationsPageInner() {
                   {item.isRead ? (
                     <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" />
                   ) : (
-                    <span aria-hidden="true" className="bg-action mt-1.5 h-2 w-2 shrink-0 rounded-full" />
+                    <span aria-hidden="true" className="bg-action mt-1.5 h-2 w-2 shrink-0 rounded-pill" />
                   )}
                   <span className="min-w-0 flex-1">
                     <span className={item.isRead ? 'text-ink block truncate text-sm' : 'text-ink block truncate text-sm font-semibold'}>

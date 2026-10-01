@@ -105,7 +105,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
 
   return (
     <div className="space-y-2">
-      {label && <div className="text-sm font-medium text-gray-700">{label}</div>}
+      {label && <div className="text-sm font-medium text-ink-secondary">{label}</div>}
       <div className="flex justify-end">
         <button
           type="button"
@@ -138,7 +138,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
             }
           }}
           placeholder="https://... (外部 CDN / R2 URL)"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="w-full rounded-mini border border-hairline px-3 py-2 text-sm"
         />
       ) : previewUrl ? (
         <div
@@ -146,23 +146,23 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
           onDrop={onDrop}
           onPaste={onPaste}
           tabIndex={0}
-          className="rounded-lg border-2 border-dashed border-gray-300 bg-white p-4 transition-colors hover:border-gray-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+          className="rounded-control border-2 border-dashed border-hairline bg-canvas p-4 transition-colors hover:border-ink-disabled focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
         >
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewUrl} alt="" className="h-24 w-24 rounded object-cover ring-1 ring-gray-200" />
+            <img src={previewUrl} alt="" className="h-24 w-24 rounded-mini object-cover ring-1 ring-hairline" />
             <div className="flex-1 space-y-2">
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                className="text-xs font-medium text-gray-700 underline"
+                className="text-xs font-medium text-ink-secondary underline"
               >
                 差し替え
               </button>
               <button
                 type="button"
                 onClick={() => onChange(null)}
-                className="ml-3 text-xs font-medium text-rose-600 underline"
+                className="ml-3 text-xs font-medium text-status-danger underline"
               >
                 取り消し
               </button>
@@ -194,7 +194,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
           />
         </div>
       )}
-      {error && <div className="text-xs text-rose-600">{error}</div>}
+      {error && <div className="text-xs text-status-danger">{error}</div>}
     </div>
   )
 }

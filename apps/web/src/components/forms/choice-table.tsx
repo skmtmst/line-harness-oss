@@ -18,6 +18,7 @@ import ActionEditor from './action-editor'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { cellInput, miniButton, type FormRefs } from './form-refs'
+import Button from '@/components/shared/button'
 
 const MODES: { value: NonNullable<FormInputBlock['choiceMode']>; label: string }[] = [
   { value: 'tag', label: 'タグ追加' },
@@ -156,16 +157,13 @@ export default function ChoiceTable({
                 )}
 
                 {mode === 'action' && (
-                  <button
-                    onClick={() =>
+                  <Button variant="secondary" className={(`${miniButton} border-hairline rounded-control border px-2 py-1.5 text-left`) + ' h-auto whitespace-normal'} onClick={() =>
                       setOpenChoiceId(openChoiceId === choice.id ? null : choice.id)
-                    }
-                    className={`${miniButton} border-hairline rounded-control border px-2 py-1.5 text-left`}
-                  >
+                    }>
                     {choice.actions?.length
                       ? `${choice.actions.length}件の動作`
                       : '動作を決める'}
-                  </button>
+                  </Button>
                 )}
 
                 <div className="flex items-center gap-1 whitespace-nowrap">
@@ -334,7 +332,7 @@ export default function ChoiceTable({
 
         <div className="border-hairline flex flex-wrap gap-2 border-t p-2">
           <button onClick={() => addChoice()} className={miniButton}>
-            ＋ 選択肢を追加
+            ＋ 選択肢を追加する
           </button>
           <button
             onClick={() => addChoice(choices[choices.length - 1])}
@@ -348,7 +346,7 @@ export default function ChoiceTable({
             disabled={choices.some((c) => c.isOther)}
             className={`${miniButton} disabled:opacity-40`}
           >
-            ＋「その他」を追加
+            ＋「その他」を追加する
           </button>
         </div>
       </div>

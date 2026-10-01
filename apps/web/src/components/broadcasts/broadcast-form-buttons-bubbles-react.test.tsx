@@ -130,13 +130,13 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
     try {
       expect(headings()).toEqual(['1通目・テキスト'])
       await act(async () => {
-        buttonByText('メッセージを追加')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('メッセージを追加する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(headings()).toEqual(['1通目・テキスト', '2通目・テキスト'])
       // 各テキストの下に編集欄が出ていた頃は、ここが2つになっていた。
       const addButtons = [...container.querySelectorAll('button')].filter(
-        (button) => (button.textContent ?? '').includes('＋ ボタンを追加'),
+        (button) => (button.textContent ?? '').includes('＋ ボタンを追加する'),
       )
       expect(addButtons).toHaveLength(1)
     } finally {
@@ -148,7 +148,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
     await renderForm()
     try {
       await act(async () => {
-        buttonByText('メッセージを追加')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('メッセージを追加する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       await act(async () => {
@@ -170,7 +170,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
 
       // 2通目をテキストのまま削除できる（画像へ切り替える裏技は要らない）。
       const deleteButtons = [...container.querySelectorAll('button')].filter(
-        (button) => button.textContent === '削除' && !button.disabled,
+        (button) => button.textContent === '削除する' && !button.disabled,
       )
       expect(deleteButtons).toHaveLength(2)
       await act(async () => {
@@ -194,13 +194,13 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       })
       await flush()
       await act(async () => {
-        buttonByText('＋ ボタンを追加')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('＋ ボタンを追加する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
 
       // 空のまま保存すると、何番の何が足りないかを言う（理由のない失敗にしない）。
       await act(async () => {
-        buttonByText('下書き保存')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('下書きを保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(container.textContent).toContain('ボタン1の名前を入力してください')
@@ -214,7 +214,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       })
       await flush()
       await act(async () => {
-        buttonByText('下書き保存')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('下書きを保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(container.textContent).toContain('ボタン1のURLを入力してください')
@@ -230,7 +230,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       // 入力欄の近くにも https の制限が出る。
       expect(container.textContent).toContain('ボタン1のURLは https:// から始めてください')
       await act(async () => {
-        buttonByText('下書き保存')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('下書きを保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(createApi).not.toHaveBeenCalled()
@@ -244,7 +244,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       })
       await flush()
       await act(async () => {
-        buttonByText('下書き保存')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('下書きを保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(createApi).toHaveBeenCalledTimes(1)

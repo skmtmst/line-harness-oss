@@ -51,7 +51,7 @@ describe('メニューの下の版の表示（m18e・設計E）', () => {
     act(() => { root.render(<SidebarVersion />) })
     await settle()
     expect(host.textContent).toContain('Ver. 2.7.0（a1b2c3d）')
-    expect(host.textContent).toContain('9/27 13:05 配備・検証環境')
+    expect(host.textContent).toContain('9月27日（日）13:05 配備・検証環境')
     expect(host.textContent).not.toContain('版の情報なし')
   })
 
