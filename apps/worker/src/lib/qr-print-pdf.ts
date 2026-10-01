@@ -110,7 +110,7 @@ export function buildQrPrintPdf(input: QrPrintSheetInput): Uint8Array {
   objects.push(
     `<< /Title <${utf16beHex(`${input.accountName} 友だち追加QRコード`)}>`
     + ` /Subject <${utf16beHex(input.url)}>`
-    + ` /Creator <${utf16beHex('LINE Harness')}> >>`,
+    + ` /Creator <${utf16beHex('musubo')}> >>`,
   );
 
   const encoder = new TextEncoder();
