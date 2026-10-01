@@ -514,20 +514,6 @@ html:not([data-theme="v8"]) .v8-only {
   background-color: var(--color-shell);
 }
 
-/*
- * ★V8（夕14・WIDTHS-20261001）：1280 など左メニューが開いたままの狭い幅で
- * 友だち一覧の右の列が板の外に切れる。v8 では 1366px 未満で表を横送りにする
- * （列を消さない）。中のグリッドは列の最小幅の和ぶんだけ広げる。
- */
-@media (max-width: 1365px) {
-  [data-theme="v8"] [data-scroll-x] {
-    overflow-x: auto;
-  }
-  [data-theme="v8"] [data-scroll-x] > * {
-    min-width: 1050px;
-  }
-}
-
 /* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
    メニューと組むので、狭い PC 幅でも帯を畳まない。 */
 @media (min-width: 1024px) {

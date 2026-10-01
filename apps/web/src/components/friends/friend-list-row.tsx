@@ -10,6 +10,7 @@ import type { FriendListColumn } from './friend-list-table'
 import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
 import { formatDay } from '@/lib/format'
+import styles from './friend-list-table.module.css'
 
 interface Props {
   friend: FriendListItem
@@ -17,7 +18,6 @@ interface Props {
   onToggleSelect?: () => void
   onToggleAttention?: () => void
   visibleColumns: Set<FriendListColumn>
-  gridTemplateColumns: string
 }
 
 function statusView(status: FriendListItem['chatStatus']) {
@@ -51,7 +51,6 @@ export default function FriendListRow({
   onToggleSelect,
   onToggleAttention,
   visibleColumns,
-  gridTemplateColumns,
 }: Props) {
   const router = useRouter()
   const status = statusView(friend.chatStatus)
@@ -78,8 +77,7 @@ export default function FriendListRow({
           openDetail()
         }
       }}
-      className="grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none"
-      style={{ gridTemplateColumns }}
+      className={`grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none ${styles.cols}`}
     >
       <div onClick={(event) => event.stopPropagation()}>
         {/* ★V7 共通 チェックボックス（gvjpx）。 */}
@@ -205,7 +203,7 @@ export default function FriendListRow({
         計測なしは空欄にせず「不明」と出す（詳細と同じ言葉）。
       */}
       {visibleColumns.has('source') ? (
-        <div className="min-w-0">
+        <div className="min-w-0" data-column="source">
           <p className={`truncate text-xs ${friend.firstTrackedLinkName ? 'text-ink-secondary' : 'text-ink-faint'}`} title={friend.firstTrackedLinkName || '不明'}>
             {friend.firstTrackedLinkName || '不明'}
           </p>
@@ -233,7 +231,7 @@ export function FriendListCard({
   onToggleSelect,
   onToggleAttention,
   visibleColumns,
-}: Omit<Props, 'gridTemplateColumns'>) {
+}: Props) {
   const router = useRouter()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage

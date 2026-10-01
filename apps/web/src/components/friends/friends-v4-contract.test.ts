@@ -7,6 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'page.tsx'), 'utf8')
 const TABLE = readFileSync(join(HERE, 'friend-list-table.tsx'), 'utf8')
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
+const TABLE_CSS = readFileSync(join(HERE, 'friend-list-table.module.css'), 'utf8')
 const KPIS = readFileSync(join(HERE, 'friend-kpis.tsx'), 'utf8')
 const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'kpi-card.module.css'), 'utf8')
 const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
@@ -68,8 +69,14 @@ describe('友だちV6の画面契約', () => {
   it('1440pxと1920pxで横スクロールを前提にしない', () => {
     expect(TABLE).not.toContain('overflow-x-auto')
     expect(TABLE).toContain('gridTemplateColumns')
-    expect(ROW).toContain('style={{ gridTemplateColumns }}')
+    expect(TABLE).toContain("'--friend-cols'")
+    expect(ROW).toContain('styles.cols')
     expect(TABLE).toContain('truncate')
+    /* 夕14: v8 の 1366px 未満では流入元列を隠す（横送りより先に大事でない列を隠す）。 */
+    expect(TABLE_CSS).toContain("data-theme='v8'")
+    expect(TABLE_CSS).toContain('--friend-cols-narrow')
+    expect(TABLE_CSS).toContain("data-column='source'")
+    expect(ROW).toContain('data-column="source"')
   })
 
   it('V6のカード影と操作色を守る', () => {
