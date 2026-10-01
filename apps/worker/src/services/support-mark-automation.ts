@@ -91,6 +91,44 @@ function parseRule(row: RuleRow): SupportMarkAutomationRule | null {
   };
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * D035: 条件の形の検査。
+ *
+ * buildSegmentWhere は rules/groups が無い条件を「全員一致」(1=1)として通すため、
+ * {bogus:true} のような未知の形も保存できてしまい、稼働後に意味をなさない
+ * ルールが残る。ここでは SegmentCondition の骨組み（operator/rules/groups・
+ * 各欄の値・入れ子の組）だけを確かめ、未知の鍵や変な値を 422 で止める。
+ * 既知の種類ごとの中身の正しさは buildSegmentWhere が見る。
+ */
+function assertSegmentConditionShape(condition: unknown): void {
+  if (!isPlainObject(condition)) throw new Error('rule_condition_invalid');
+  for (const key of Object.keys(condition)) {
+    if (key !== 'operator' && key !== 'rules' && key !== 'groups') {
+      throw new Error('rule_condition_invalid');
+    }
+  }
+  const { operator, rules, groups } = condition as {
+    operator?: unknown; rules?: unknown; groups?: unknown;
+  };
+  if (operator !== undefined && operator !== 'AND' && operator !== 'OR') {
+    throw new Error('rule_condition_invalid');
+  }
+  if (rules !== undefined && !Array.isArray(rules)) throw new Error('rule_condition_invalid');
+  if (groups !== undefined && !Array.isArray(groups)) throw new Error('rule_condition_invalid');
+  for (const rule of (rules as unknown[] | undefined) ?? []) {
+    if (!isPlainObject(rule) || typeof rule.type !== 'string') {
+      throw new Error('rule_condition_invalid');
+    }
+  }
+  for (const group of (groups as unknown[] | undefined) ?? []) {
+    assertSegmentConditionShape(group);
+  }
+}
+
 export function validateSupportMarkAutomationRuleInput(
   input: SaveSupportMarkAutomationRule,
 ): void {
@@ -104,7 +142,8 @@ export function validateSupportMarkAutomationRuleInput(
     || input.manualProtectionMinutes > 10080) {
     throw new Error('manual_protection_invalid');
   }
-  if (input.condition) {
+  if (input.condition !== null && input.condition !== undefined) {
+    assertSegmentConditionShape(input.condition);
     try {
       buildSegmentWhere(input.condition);
     } catch {
@@ -157,6 +196,152 @@ export async function listSupportMarkAutomationRulesForAccount(
   return (await rowsForAccount(db, scope.lineAccountId))
     .map(parseRule)
     .filter((item): item is SupportMarkAutomationRule => Boolean(item));
+}
+
+export class SupportMarkRuleCreateError extends Error {
+  constructor(public readonly code: 'idempotency_conflict', message: string) {
+    super(message);
+    this.name = 'SupportMarkRuleCreateError';
+  }
+}
+
+/**
+ * D034: 同じ要求キーの再送で二重に作らないための指紋。
+ *
+ * 名前・出来事・条件・優先度・手動保護・有効状態が1つでも違えば
+ * 別の要求とみなし、作らず止める（対応マーク作成のR512と同じ約束）。
+ */
+function supportMarkRuleCreateFingerprint(
+  markId: string,
+  input: SaveSupportMarkAutomationRule,
+): string {
+  return JSON.stringify({
+    markId,
+    name: input.name.trim(),
+    event: input.event,
+    condition: input.condition ?? null,
+    priority: input.priority,
+    manualProtectionMinutes: input.manualProtectionMinutes,
+    isActive: input.isActive,
+  });
+}
+
+export interface SupportMarkRuleCreateResult {
+  rule: SupportMarkAutomationRule;
+  /** 同じ要求キーの再送で、保存済みのルールを返した。 */
+  replayed: boolean;
+}
+
+/**
+ * D034: 要求キー付きで自動変更ルールを作る。
+ *
+ * 応答だけ失った再試行は、同じキー・同じ内容なら保存済みのルールを
+ * 返す（作り直さない）。同じキーに異なる内容が来たら作らず止める。
+ * 要求キーの行は本体と同じD1バッチで確定するため、同時に同じキーが
+ * 送られても1件だけ残る（負けた側のバッチは巻き戻る）。
+ */
+export async function createSupportMarkAutomationRuleIdempotent(
+  db: D1Database,
+  scope: SupportMarkScope,
+  markId: string,
+  actorId: string,
+  input: SaveSupportMarkAutomationRule,
+  idempotencyKey: string,
+): Promise<SupportMarkRuleCreateResult | null> {
+  validateSupportMarkAutomationRuleInput(input);
+  if (!await getSupportMarkById(db, markId, scope)) return null;
+  const fingerprint = supportMarkRuleCreateFingerprint(markId, input);
+  const findRequest = () => db.prepare(
+    `SELECT rule_id, request_fingerprint
+       FROM support_mark_rule_create_requests
+      WHERE line_account_id = ? AND idempotency_key = ?`,
+  ).bind(scope.lineAccountId, idempotencyKey).first<{
+    rule_id: string;
+    request_fingerprint: string;
+  }>();
+  const previous = await findRequest();
+  if (previous) {
+    if (previous.request_fingerprint !== fingerprint) {
+      throw new SupportMarkRuleCreateError(
+        'idempotency_conflict',
+        '同じ要求キーに異なる内容が指定されました。一覧を確認してください',
+      );
+    }
+    const rule = await currentRule(db, scope, previous.rule_id);
+    if (rule) return { rule, replayed: true };
+    // 保存済みのはずのルールが無い（保管済み等）。古い予約を消して作り直す。
+    await db.prepare(
+      `DELETE FROM support_mark_rule_create_requests
+        WHERE line_account_id = ? AND idempotency_key = ?`,
+    ).bind(scope.lineAccountId, idempotencyKey).run();
+  }
+  const id = crypto.randomUUID();
+  const versionId = crypto.randomUUID();
+  const now = jstNow();
+  const payload = versionPayload(markId, input);
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO automation_definitions
+           (id, line_account_id, name, description, status, priority, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, '対応マークの自動変更', ?, ?, ?, ?, ?)`,
+      ).bind(
+        id,
+        scope.lineAccountId,
+        input.name.trim(),
+        input.isActive ? 'active' : 'stopped',
+        input.priority,
+        actorId,
+        now,
+        now,
+      ),
+      db.prepare(
+        `INSERT INTO automation_versions
+           (id, automation_id, version_number, status, trigger_type, trigger_config,
+            condition_config, action_config, created_by, created_at, published_at)
+         VALUES (?, ?, 1, 'published', 'support_mark_change', ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        versionId,
+        id,
+        payload.triggerConfig,
+        payload.conditionConfig,
+        payload.actionConfig,
+        actorId,
+        now,
+        now,
+      ),
+      db.prepare('UPDATE automation_definitions SET current_published_version_id = ? WHERE id = ?')
+        .bind(versionId, id),
+      db.prepare(
+        `INSERT INTO support_mark_rule_create_requests
+           (id, line_account_id, mark_id, idempotency_key, request_fingerprint,
+            rule_id, response_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        scope.lineAccountId,
+        markId,
+        idempotencyKey,
+        fingerprint,
+        id,
+        JSON.stringify({ ruleId: id }),
+        now,
+      ),
+    ]);
+  } catch (err) {
+    // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
+    // 勝者がいなければ元の失敗をそのまま返す（握りつぶさない）。
+    const raced = await findRequest().catch(() => null);
+    if (raced?.request_fingerprint === fingerprint) {
+      const rule = await currentRule(db, scope, raced.rule_id).catch(() => null);
+      if (rule) return { rule, replayed: true };
+    }
+    throw err;
+  }
+  const created = (await rowsForAccount(db, scope.lineAccountId)).map(parseRule)
+    .find((item) => item?.id === id) ?? null;
+  if (!created) return null;
+  return { rule: created, replayed: false };
 }
 
 export async function createSupportMarkAutomationRule(

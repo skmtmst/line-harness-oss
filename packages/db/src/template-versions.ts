@@ -172,20 +172,22 @@ async function pinnedVersionNumber(
 /**
  * 利用先の参照を書き換える（全消し→全入れ）。保存のたびに呼ぶ。
  * 存在しないテンプレートは書かない。本文の写しは残るので送りは壊れない。
+ *
+ * m26c R569/R570: 参照の書込文だけを組み立てて返す。呼び出し側が
+ * ルール行・版と1回の batch に束ね、途中失敗で食い違わないようにする。
  */
-export async function syncTemplateReferences(
+export async function planSyncTemplateReferenceStatements(
   db: D1Database,
   consumerKind: TemplateReferenceConsumerKind,
   consumerId: string,
   templateIds: string[],
-): Promise<void> {
+): Promise<D1PreparedStatement[]> {
   const unique = [...new Set(templateIds.filter(Boolean))];
-  await db
-    .prepare(
+  const statements: D1PreparedStatement[] = [
+    db.prepare(
       `DELETE FROM template_references WHERE consumer_kind = ? AND consumer_id = ?`,
-    )
-    .bind(consumerKind, consumerId)
-    .run();
+    ).bind(consumerKind, consumerId),
+  ];
   for (const templateId of unique) {
     const versionNumber = await pinnedVersionNumber(db, templateId);
     if (versionNumber === null) {
@@ -195,15 +197,24 @@ export async function syncTemplateReferences(
         .first<{ id: string }>();
       if (!exists) continue;
     }
-    await db
-      .prepare(
+    statements.push(
+      db.prepare(
         `INSERT OR IGNORE INTO template_references
            (id, template_id, template_version_number, consumer_kind, consumer_id, reference_mode, created_at)
          VALUES (?, ?, ?, ?, ?, 'fixed', ?)`,
-      )
-      .bind(crypto.randomUUID(), templateId, versionNumber, consumerKind, consumerId, jstNow())
-      .run();
+      ).bind(crypto.randomUUID(), templateId, versionNumber, consumerKind, consumerId, jstNow()),
+    );
   }
+  return statements;
+}
+
+export async function syncTemplateReferences(
+  db: D1Database,
+  consumerKind: TemplateReferenceConsumerKind,
+  consumerId: string,
+  templateIds: string[],
+): Promise<void> {
+  await db.batch(await planSyncTemplateReferenceStatements(db, consumerKind, consumerId, templateIds));
 }
 
 /** テンプレートを使う利用先の参照を全部返す。版の表示に使う。 */
