@@ -11,7 +11,7 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Copy, Download, MoreHorizontal, Send, Trash2 } from 'lucide-react'
+import { Check, Copy, Download, MoreHorizontal, Trash2 } from 'lucide-react'
 import {
   api,
   type ApiBroadcast,
@@ -30,7 +30,6 @@ import {
   ApproverSection,
   formatApprovalDateTime,
 } from '@/components/broadcasts/broadcast-approval'
-import { notifyToast } from '@/components/shared/toast'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { formatNumber } from '@/lib/format'
 import { formatBroadcastDateTime } from './detail/broadcast-insight-display'
@@ -145,7 +144,6 @@ export default function BroadcastDetailV8({
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
-  const [testBusy, setTestBusy] = useState(false)
 
   const editHref = `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`
   const duplicateHref = `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`
@@ -153,20 +151,6 @@ export default function BroadcastDetailV8({
   /* 下書きの現在地＝ `draft_step`（止まった手順）。なければ1つ目。 */
   const draftStepIndex = Math.max(0, CREATION_STEPS.findIndex((step) => step.key === broadcast.draftStep))
   const resumeStep = CREATION_STEPS[draftStepIndex]
-
-  const testSend = async () => {
-    if (testBusy) return
-    setTestBusy(true)
-    try {
-      const res = await api.broadcasts.testSend(broadcast.id)
-      if (!res.success) throw new Error(res.error)
-      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0}件・失敗 ${res.failed ?? 0}件）。`)
-    } catch {
-      notifyToast('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。')
-    } finally {
-      setTestBusy(false)
-    }
-  }
 
   const deleteBroadcast = async () => {
     if (deleting) return
@@ -275,14 +259,11 @@ export default function BroadcastDetailV8({
             items={menuItems}
             anchorRef={menuButtonRef}
           />
-          <Button size="field" onClick={onExportCsv}>
-            <Download size={14} aria-hidden="true" />
-            CSVで書き出す
-          </Button>
-          {(isDraft || displayStatus === 'pending_approval') && (
-            <Button size="field" onClick={() => void testSend()} busy={testBusy} busyLabel="送信中…" disabled={!canEdit}>
-              <Send size={14} aria-hidden="true" />
-              テストを送る
+          {/* CSVは送った配信だけ（v7 と同じ出し分け）。下書き・予約には出さない。 */}
+          {isSent && (
+            <Button size="field" onClick={onExportCsv}>
+              <Download size={14} aria-hidden="true" />
+              CSVで書き出す
             </Button>
           )}
           {isDraft && (
