@@ -79,8 +79,8 @@
     {
       "pencil": "C6DGX・OEQxt・r9qfM2",
       "name": "増減の札",
-      "code": null,
-      "planned": "shared/delta-chip.tsx"
+      "code": "shared/delta-chip.tsx",
+      "v8Only": true
     },
     {
       "pencil": "h7Ch3y",
