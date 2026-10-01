@@ -44,6 +44,13 @@ function NenColumnEditInner() {
   const [savedId, setSavedId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<{ id: string; message: string } | null>(null)
   /*
+   * M507残差: 409で止めるだけでは元受入「最新を見せる」に届かない。
+   * 読み直した最新の紹介文を、下書きを置き換えず同カード内に
+   * 読み取り専用で別表示するためのもの。保存成功・読み直しで消す。
+   * 書き直しても消さない（比べながら直す助けに残す）。
+   */
+  const [latestIntro, setLatestIntro] = useState<{ id: string; text: string } | null>(null)
+  /*
    * #935 N-301: 紹介文を書きかけのまま離れると消えていた。
    * 保存済みの紹介文と違う間だけ、ブラウザ離脱・画面内リンク・戻る操作を止めて確認する。
    * hooksは分岐の前に置く（下の早期returnより先に呼ぶ）。
@@ -57,6 +64,7 @@ function NenColumnEditInner() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    setLatestIntro(null)
     if (!selectedAccountId) {
       setColumns([])
       setLoading(false)
@@ -100,6 +108,8 @@ function NenColumnEditInner() {
         ? { ...item, introText: drafts[column.id] ?? item.introText, updatedAt: res.data?.updatedAt ?? item.updatedAt }
         : item))
       setSavedId(column.id)
+      // M507残差: 保存を通したら比べる相手は要らない。比較表示を消す。
+      setLatestIntro(null)
     } catch (e) {
       // M507: 競合時は最新の紹介文を読み直し、入力は残したまま比べながら
       // 保存し直せるようにする。
@@ -109,7 +119,10 @@ function NenColumnEditInner() {
           setColumns((current) => current.map((item) => item.id === column.id
             ? { ...item, introText: latest.introText ?? item.introText, updatedAt: latest.updatedAt ?? item.updatedAt }
             : item))
+          // M507残差: 下書きは置き換えない。最新の紹介文は同カードに別表示する。
+          setLatestIntro({ id: column.id, text: latest.introText ?? '' })
         } else {
+          setLatestIntro(null)
           void load()
         }
         setSaveError({ id: column.id, message: 'ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。' })
@@ -176,6 +189,19 @@ function NenColumnEditInner() {
                 maxLength={1500}
                 className="border-hairline rounded-control w-full resize-y border px-3 py-2 text-sm"
               />
+              {/*
+                M507残差: 下書きは置き換えず、読み直した最新の紹介文を
+                同カード内に読み取り専用で別表示する。箱の中に箱は作らず
+                余白と文字の段（見出し12・本文14）だけで区切る。
+              */}
+              {latestIntro?.id === column.id && (
+                <div className="mt-2">
+                  <p className="text-ink-faint text-xs">ほかの人が保存した最新の紹介文</p>
+                  <p className="text-ink-secondary mt-1 text-sm whitespace-pre-wrap">
+                    {latestIntro.text === '' ? '（空になっています）' : latestIntro.text}
+                  </p>
+                </div>
+              )}
               {/*
                 U102: 1つの保存ボタンのために72pxの StickyBar を
                 カードごとに繰り返していた。状態と保存を1行の行操作へ
