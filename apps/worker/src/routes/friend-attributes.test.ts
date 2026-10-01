@@ -70,6 +70,12 @@ const supportMarkAutomation = {
   listSupportMarkAutomationRules: vi.fn(),
   listSupportMarkAutomationRulesForAccount: vi.fn(),
   createSupportMarkAutomationRule: vi.fn(),
+  createSupportMarkAutomationRuleIdempotent: vi.fn(),
+  SupportMarkRuleCreateError: class SupportMarkRuleCreateError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+    }
+  },
   updateSupportMarkAutomationRule: vi.fn(),
   archiveSupportMarkAutomationRule: vi.fn(),
   validateSupportMarkAutomationRuleInput: vi.fn(),
@@ -216,6 +222,14 @@ beforeEach(() => {
     id: 'rule-1', name: '担当者が決まったら対応中へ', markId: 'm-1', event: 'staff_assigned',
     condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
     version: 1, updatedAt: '2026-09-04T09:00:00+09:00',
+  });
+  supportMarkAutomation.createSupportMarkAutomationRuleIdempotent.mockResolvedValue({
+    rule: {
+      id: 'rule-1', name: '担当者が決まったら対応中へ', markId: 'm-1', event: 'staff_assigned',
+      condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
+      version: 1, updatedAt: '2026-09-04T09:00:00+09:00',
+    },
+    replayed: false,
   });
   supportMarkAutomation.updateSupportMarkAutomationRule.mockResolvedValue({
     id: 'rule-1', version: 2,
@@ -675,15 +689,31 @@ describe('対応マーク', () => {
       '/api/support-marks/m-1/automation-rules?lineAccountId=account-1',
       'POST',
       input,
+      'owner',
+      { 'Idempotency-Key': 'test-key-1' },
     );
     expect(res.status).toBe(201);
-    expect(supportMarkAutomation.createSupportMarkAutomationRule).toHaveBeenCalledWith(
+    expect(supportMarkAutomation.createSupportMarkAutomationRuleIdempotent).toHaveBeenCalledWith(
       env.DB,
       { tenantId: 'tenant-1', lineAccountId: 'account-1' },
       'm-1',
       'u-1',
       input,
+      'test-key-1',
     );
+  });
+
+  it('自動変更ルールの作成は要求キーが無いと作らない', async () => {
+    const res = await req(
+      '/api/support-marks/m-1/automation-rules?lineAccountId=account-1',
+      'POST',
+      {
+        name: '受信で未対応へ', event: 'message_received', condition: null,
+        priority: 10, manualProtectionMinutes: 0, isActive: true,
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(supportMarkAutomation.createSupportMarkAutomationRuleIdempotent).not.toHaveBeenCalled();
   });
 
   it('版競合を成功扱いにせず409で読み直しを促す', async () => {
@@ -725,7 +755,7 @@ describe('対応マーク', () => {
       priority: 10, manualProtectionMinutes: 0, isActive: true,
     }, 'staff');
     expect(res.status).toBe(403);
-    expect(supportMarkAutomation.createSupportMarkAutomationRule).not.toHaveBeenCalled();
+    expect(supportMarkAutomation.createSupportMarkAutomationRuleIdempotent).not.toHaveBeenCalled();
   });
 
   it('保管は読み込んだ版を必須にし、競合を409で返す', async () => {
