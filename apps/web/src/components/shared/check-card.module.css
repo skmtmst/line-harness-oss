@@ -115,4 +115,13 @@
   color: var(--color-ink-secondary);
   line-height: 1.5;
 }
+
+/* ★V8「枠線の色」：オフの箱の枠は control-border。選んだ緑は変えない。 */
+[data-theme='v8'] .box {
+  border-color: var(--color-control-border);
+}
+
+[data-theme='v8'] .box:checked {
+  border-color: var(--color-accent-deep);
+}
 }
