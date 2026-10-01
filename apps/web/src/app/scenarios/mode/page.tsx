@@ -9,6 +9,7 @@ import { ApiError, api } from '@/lib/api'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -338,16 +339,26 @@ function ScenarioModeContent() {
             シナリオ名と配信方式を決めると作成されます。途中で閉じても一覧には残りません。
           </Notice>
         )}
-        {/* D023: id ありの読み込み失敗は読み直し口つきの1枚にする。 */}
-        {id && scenarioState === 'error' ? (
-          <TargetMissing
-            kind="error"
-            title="シナリオを読み込めませんでした"
-            description="配信方式の選択・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
-            error={scenarioError ?? undefined}
-            onRetry={() => setScenarioReloadKey((key) => key + 1)}
-          />
-        ) : null}
+        {/* D023: id ありの読み込み失敗は読み直し口つきの1枚にする。
+            403・429だけ共通理由へ切り替える（保存不可文は残し両立。再試行の
+            有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま。 */}
+        {(() => {
+          const scenarioFailure = scenarioError ? loadFailureCopy(scenarioError, 'シナリオ') : null
+          const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
+          return id && scenarioState === 'error' ? (
+            <TargetMissing
+              kind="error"
+              title={useCommonReason && scenarioFailure ? scenarioFailure.title : 'シナリオを読み込めませんでした'}
+              description={
+                useCommonReason && scenarioFailure
+                  ? `配信方式の選択・保存はできません。${scenarioFailure.description}`
+                  : '配信方式の選択・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'
+              }
+              error={scenarioError ?? undefined}
+              onRetry={() => setScenarioReloadKey((key) => key + 1)}
+            />
+          ) : null
+        })()}
         {error && <Notice tone="danger" message={error} />}
       </div>
 
