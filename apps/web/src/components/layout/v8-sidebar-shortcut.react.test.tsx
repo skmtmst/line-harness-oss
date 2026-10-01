@@ -80,10 +80,11 @@ function renderShell() {
         roleLabel="統括"
         userName="山田"
         onLogout={() => undefined}
-        onGlobalSearch={() => undefined}
         v8Chrome
       />
       <Sidebar />
+      {/* 帯の探す欄は V8 で外した。入力中の合図を確かめる欄は fixture で持つ。 */}
+      <input data-testid="field" aria-label="件名" />
       <textarea data-testid="memo" defaultValue="" />
       <div data-testid="editor" contentEditable />
     </>,
@@ -154,22 +155,22 @@ describe('V8-1085-KEYBOARD-01: ⌘\\ は1回だけ畳む', () => {
 
   it('入力欄・複数行・直接編集での文字入力は畳まない', () => {
     renderShell()
-    const search = document.querySelector('input[aria-label="友だちを探す"]') as HTMLInputElement
+    const field = document.querySelector('[data-testid="field"]') as HTMLInputElement
     const memo = document.querySelector('[data-testid="memo"]') as HTMLTextAreaElement
     const editor = document.querySelector('[data-testid="editor"]') as HTMLDivElement
-    keydown(search, { key: 'a' })
+    keydown(field, { key: 'a' })
     keydown(memo, { key: 'あ' })
     keydown(editor, { key: 'a' })
-    keydown(search, { key: '\\' })
+    keydown(field, { key: '\\' })
     expect(collapsedValue()).toBe('0')
     expect(isCollapsed()).toBe(false)
   })
 
   it('入力欄にいても ⌘\\ は1回だけ畳む', () => {
     renderShell()
-    const search = document.querySelector('input[aria-label="友だちを探す"]') as HTMLInputElement
-    search.focus()
-    keydown(search, { key: '\\', metaKey: true })
+    const field = document.querySelector('[data-testid="field"]') as HTMLInputElement
+    field.focus()
+    keydown(field, { key: '\\', metaKey: true })
     expect(collapsedValue()).toBe('1')
     expect(isCollapsed()).toBe(true)
   })
