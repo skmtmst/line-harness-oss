@@ -10,6 +10,7 @@ import TextLink from '@/components/shared/text-link'
 import DeltaChip from '@/components/shared/delta-chip'
 import IconTile from '@/components/shared/icon-tile'
 import ActivityItem from '@/components/shared/activity-item'
+import SectionHeader from '@/components/shared/section-header'
 
 /*
  * ★V8 で新たに生えた部品（Pencil「OTP・削除・色を選ぶ」の節）の
@@ -94,6 +95,21 @@ export default function V8PartsPage() {
           <ActivityItem icon={Send} title="予約配信を送りました" note="朝のお知らせ・128人へ" time="10:42" />
           <ActivityItem icon={CheckCheck} title="全員に届きました" note="失敗 0 件" time="10:44" />
           <ActivityItem icon={Users} title="友だちが3人増えました" time="12:10" last />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-ink">段の題（補足・？・右にリンク）</h2>
+        <div className="mt-3 max-w-md space-y-4">
+          <SectionHeader title="最近の動き" note="この30日" href="/friends" linkLabel="すべて見る" />
+          <SectionHeader
+            title="今月の完了率"
+            helpLabel="今月の完了率の説明"
+            help="完了した配信 ÷ 予約した配信。失敗や取消は完了に含みません。"
+            href="/analytics"
+            linkLabel="分析で見る"
+          />
+          <SectionHeader title="題だけ" />
         </div>
       </section>
 
