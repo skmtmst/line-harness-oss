@@ -6,7 +6,7 @@
  * 実useStaffRole/useAccountを使い、mockは輸送 (api)・router transport・URLSearchParams adapterのみ。
  * router spyはnative遷移の再現ではない。原条件未達なら結果として返し、期待を弱めない。
  */
-import React, { act, type ReactNode } from 'react'
+import React, { act, Profiler, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
@@ -30,10 +30,15 @@ const transport = vi.hoisted(() => ({
 }))
 const netCalls = vi.hoisted(() => ({ count: 0 }))
 
+const searchCalls = vi.hoisted(() => ({ count: 0 }))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace }),
-  // 安定したURLSearchParams transport adapter (id=synthetic-rule固定)。
-  useSearchParams: () => new URLSearchParams('id=synthetic-rule'),
+  // 安定したURLSearchParams transport adapter (id=synthetic-rule固定・呼出回数で実body再実行を裏付け)。
+  useSearchParams: () => {
+    searchCalls.count += 1
+    return new URLSearchParams('id=synthetic-rule')
+  },
 }))
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: ReactNode; href: string }) =>
@@ -153,6 +158,38 @@ function SelectAccountButton() {
   )
 }
 
+/*
+ * 同一elementを使い回すとroot.renderがbailoutし描画自体が起きない。
+ * 毎回freshなactual Page JSX (同type/key/id/account) でrenderし、
+ * Profilerのupdate増＋mount不増で実component再描画を裏付ける。
+ */
+const profile = { commits: 0, mounts: 0 }
+function LeafProfiler({ children }: { children: ReactNode }) {
+  return (
+    <Profiler
+      id="j7-leaf"
+      onRender={(_id, phase) => {
+        profile.commits += 1
+        if (phase === 'mount') profile.mounts += 1
+      }}
+    >
+      {children}
+    </Profiler>
+  )
+}
+function buildTree() {
+  return (
+    <PageChromeProvider>
+      <AccountProvider>
+        <SelectAccountButton />
+        <LeafProfiler>
+          <AutoReplyEditPage />
+        </LeafProfiler>
+      </AccountProvider>
+    </PageChromeProvider>
+  )
+}
+
 let host: HTMLDivElement
 let root: Root
 
@@ -170,6 +207,9 @@ async function selectAccount() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   netCalls.count = 0
+  searchCalls.count = 0
+  profile.commits = 0
+  profile.mounts = 0
   vi.stubGlobal('fetch', vi.fn(async () => {
     netCalls.count += 1
     throw new TypeError('unexpected actual fetch in faithful oracle')
@@ -213,15 +253,7 @@ describe('J7 R528 literal same-view rerender (原条件照合・別結果)', () 
     const gate = deferred<unknown>()
     transport.getDraft.mockReturnValueOnce(gate.promise)
     mountTree()
-    const tree = (
-      <PageChromeProvider>
-        <AccountProvider>
-          <SelectAccountButton />
-          <AutoReplyEditPage />
-        </AccountProvider>
-      </PageChromeProvider>
-    )
-    await act(async () => { root.render(tree) })
+    await act(async () => { root.render(buildTree()) })
     await selectAccount()
 
     // 失敗確認: actual失敗領域と再試行control、編集入力はまだない。
@@ -233,11 +265,18 @@ describe('J7 R528 literal same-view rerender (原条件照合・別結果)', () 
 
     // 復旧はtransport mode変更だけ。callback/account/ID/roleの変更なし。
     transport.getDraft.mockResolvedValue({ success: true, data: DRAFT })
-    // literal same-view rerender: 同じtree・key/type/account/role/id不変、retry非click。
-    await act(async () => { root.render(tree) })
+    // literal same-view rerender: fresh JSX・同type/key/id/account・retry非click。
+    const commitsBefore = profile.commits
+    const mountsBefore = profile.mounts
+    const searchBefore = searchCalls.count
+    await act(async () => { root.render(buildTree()) })
     await act(async () => { await Promise.resolve() })
 
-    // 実測: 追加取得なし・実フォームなし・notice残存。原literal回復期待とは食い違う。
+    // 実測: Profiler update増＋mount不増＋useSearchParams呼出増で実再描画を裏付け。
+    // 追加取得なし・実フォームなし・notice残存。原literal回復期待とは食い違う。
+    expect(profile.commits).toBeGreaterThan(commitsBefore)
+    expect(profile.mounts).toBe(mountsBefore)
+    expect(searchCalls.count).toBeGreaterThan(searchBefore)
     expect(transport.getDraft).toHaveBeenCalledTimes(1)
     expect(screen.getByText('表示できませんでした')).toBeTruthy()
     expect(screen.queryByPlaceholderText('例：営業時間外の案内')).toBeNull()

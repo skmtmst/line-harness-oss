@@ -6,7 +6,7 @@
  * 実canOperateBookings/useAccountを使い、mockは輸送 (bookingApi/api)・router transportのみ。
  * router spyはnative遷移の再現ではない。原条件未達なら結果として返し、期待を弱めない。
  */
-import React, { act, type ReactNode } from 'react'
+import React, { act, Profiler, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
@@ -126,6 +126,38 @@ function SelectAccountButton() {
   )
 }
 
+/*
+ * 同一elementを使い回すとroot.renderがbailoutし描画自体が起きない。
+ * 毎回freshなactual Page JSX (stable type・非memo・同id/account) でrenderし、
+ * Profilerのupdate増＋mount不増で実component再描画を裏付ける。
+ */
+const profile = { commits: 0, mounts: 0 }
+function LeafProfiler({ children }: { children: ReactNode }) {
+  return (
+    <Profiler
+      id="j7-leaf"
+      onRender={(_id, phase) => {
+        profile.commits += 1
+        if (phase === 'mount') profile.mounts += 1
+      }}
+    >
+      {children}
+    </Profiler>
+  )
+}
+function buildTree() {
+  return (
+    <PageChromeProvider>
+      <AccountProvider>
+        <SelectAccountButton />
+        <LeafProfiler>
+          <NewProxyBookingPage />
+        </LeafProfiler>
+      </AccountProvider>
+    </PageChromeProvider>
+  )
+}
+
 let host: HTMLDivElement
 let root: Root
 
@@ -143,6 +175,8 @@ async function selectAccount() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   netCalls.count = 0
+  profile.commits = 0
+  profile.mounts = 0
   vi.stubGlobal('fetch', vi.fn(async () => {
     netCalls.count += 1
     throw new TypeError('unexpected actual fetch in faithful oracle')
@@ -179,15 +213,7 @@ describe('J7 R534 literal same-view rerender (原条件照合・別結果)', () 
     const gate = deferred<unknown>()
     transport.listMenus.mockReturnValueOnce(gate.promise)
     mountTree()
-    const tree = (
-      <PageChromeProvider>
-        <AccountProvider>
-          <SelectAccountButton />
-          <NewProxyBookingPage />
-        </AccountProvider>
-      </PageChromeProvider>
-    )
-    await act(async () => { root.render(tree) })
+    await act(async () => { root.render(buildTree()) })
     await selectAccount()
 
     // 失敗確認: actualメニュー失敗と再試行control、候補optionはまだない。
@@ -202,11 +228,16 @@ describe('J7 R534 literal same-view rerender (原条件照合・別結果)', () 
 
     // 復旧はtransport mode変更だけ。
     transport.listMenus.mockResolvedValue({ menus: [MENU] })
-    // literal same-view rerender: 同じtree・Retry非click・入力は触らない。
-    await act(async () => { root.render(tree) })
+    // literal same-view rerender: fresh leaf props・同id/account・Retry非click・入力は触らない。
+    const commitsBefore = profile.commits
+    const mountsBefore = profile.mounts
+    await act(async () => { root.render(buildTree()) })
     await act(async () => { await Promise.resolve() })
 
-    // 実測: 追加取得なし・候補なし・notice残存・入力保持。原literal回復期待とは食い違う。
+    // 実測: Profiler update増＋mount不増で実再描画を裏付け。
+    // 追加取得なし・候補なし・notice残存・入力保持。原literal回復期待とは食い違う。
+    expect(profile.commits).toBeGreaterThan(commitsBefore)
+    expect(profile.mounts).toBe(mountsBefore)
     expect(transport.listMenus).toHaveBeenCalledTimes(1)
     expect(screen.getByText('予約メニューを読み込めませんでした')).toBeTruthy()
     expect((screen.getByRole('textbox', { name: 'お客様からの要望' }) as HTMLTextAreaElement).value).toBe('J7 note')
