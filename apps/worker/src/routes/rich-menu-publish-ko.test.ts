@@ -342,7 +342,7 @@ describe('O: 10ページ上限と新しいボタンの動き', () => {
     const res = await setupApp(db, r2).request('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages }),
+      body: JSON.stringify({ expectedVersion: 1, pages }),
     });
     expect(res.status).toBe(400);
     const body = await res.json() as { error: string };
@@ -352,7 +352,7 @@ describe('O: 10ページ上限と新しいボタンの動き', () => {
     const okPatch = await setupApp(db, r2).request('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: pages.slice(0, 10) }),
+      body: JSON.stringify({ expectedVersion: 1, pages: pages.slice(0, 10) }),
     });
     expect(okPatch.status).toBe(200);
   });
