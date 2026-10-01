@@ -485,6 +485,10 @@ export default function PhotoReviewsPage() {
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       reviewKeys.current.delete(id)
+      // M508フォロー：成功が確定した同generationで前の失敗案内を消す。
+      // review()のcatchが入れた案内が対象。入力チェックは reasonError・
+      // accountNotice、読み直しの失敗は setLoadError と別の置き場なので消えない。
+      setNotice('')
       const notification = response.data.notificationStatus === 'sent'
         ? '投稿者へLINEで通知しました。'
         : '審査結果は保存しましたが、LINE通知は送れませんでした。一覧から再送できます。'
