@@ -182,6 +182,12 @@ export default function FriendListTable({
         </div>
       </div>
 
+      {/*
+        ★V8（夕14・WIDTHS-20261001）：1280px 幅で右の列が板の外に切れる。
+        1366px 未満では表を横送りにする（globals.css の [data-scroll-x]）。
+        v7・広い幅では従来どおり。見出しと行を同じ箱で送るのでズレない。
+      */}
+      <div data-scroll-x>
       {/* FRIEND-17: 列見出しは表と対になるため、カード表示の幅では出さない。 */}
       <div className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid" style={{ gridTemplateColumns }}>
         <div>
@@ -274,6 +280,7 @@ export default function FriendListTable({
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
       </div>
       </RefreshCover>
+      </div>
     </section>
   )
 }
