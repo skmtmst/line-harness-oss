@@ -31,9 +31,24 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
     expect(tsx).toContain('ArrowRight')
   })
 
+  it('増減の札（C6DGX・OEQxt・r9qfM2）：余白 2/7・文字12/600・3色', () => {
+    const source = css('delta-chip.module.css')
+    expect(source).toContain('padding: 2px 7px')
+    expect(source).toContain('border-radius: var(--radius-mini)')
+    expect(source).toContain('font-size: var(--text-caption)')
+    expect(source).toContain('font-weight: 600')
+    expect(source).toContain('background: var(--color-success-bg)')
+    expect(source).toContain('background: var(--color-status-danger-soft)')
+    expect(source).toContain('background: var(--color-status-warn-soft)')
+    const tsx = readFileSync(join(SHARED, 'delta-chip.tsx'), 'utf8')
+    expect(tsx).toContain("'up' | 'down' | 'attention'")
+  })
+
   it('台帳がこの回の部品を v8対応済みと数える', { timeout: 60_000 }, () => {
     const report = collectReport()
-    const part = report.parts.find((p) => p.name === 'リンク（→つき）')
-    expect(part?.status, 'リンク（→つき）が v8対応済みになっていない').toBe('v8対応済み')
+    for (const name of ['リンク（→つき）', '増減の札']) {
+      const part = report.parts.find((p) => p.name === name)
+      expect(part?.status, `${name} が v8対応済みになっていない`).toBe('v8対応済み')
+    }
   })
 })

@@ -556,6 +556,9 @@
   "components/shared/delete-button.tsx": {
     "unresolved-classname": 5
   },
+  "components/shared/delta-chip.tsx": {
+    "unresolved-classname": 1
+  },
   "components/shared/disclosure.tsx": {
     "unresolved-classname": 6
   },
