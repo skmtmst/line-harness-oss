@@ -32,7 +32,9 @@ export default function SectionHeader({
 }) {
   return (
     <div className={styles.root}>
-      <h3 className={styles.title}>{title}</h3>
+      <h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
+        {title}
+      </h3>
       {note ? <span className={styles.note}>{note}</span> : null}
       {help && helpLabel ? <HelpTip label={helpLabel}>{help}</HelpTip> : null}
       {href && linkLabel ? (
