@@ -4027,6 +4027,37 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   return { success: true, data: EMPTY_PAGE }
 }
 
+/*
+ * 長いデータ（VISUAL_QA_LONG=1 のときだけ。既定では何も変えない）。
+ * 本番の長い名前・長い題・長い URL・タグの多い人で、画面が崩れないかを見るため
+ * （V8 の積み替えの見張り。2026-10-01、試験用データが短く崩れが隠れていた）。
+ * 名前・題・説明・本文の短い文字に長い名前を足し、タグを10個に増やし、URL を長くする。
+ * id・状態・種類などの値には触らない（画面の分岐を変えないため）。
+ */
+const LONG_DATA = process.env.VISUAL_QA_LONG === '1'
+const LONG_TEXT_KEYS = new Set(['displayName', 'name', 'title', 'description', 'realName', 'content', 'label', 'subject'])
+const LONG_URL_KEYS = new Set(['url', 'originalUrl', 'linkUrl'])
+function lengthen(value, key = '') {
+  if (Array.isArray(value)) {
+    const items = value.map((v) => lengthen(v))
+    if (key === 'tags' && items.length > 0 && items.length < 10) {
+      return Array.from({ length: 10 }, (_, i) => {
+        const base = items[i % items.length]
+        return typeof base === 'object' && base ? { ...base, id: `${base.id ?? 'tag'}-long-${i}` } : base
+      })
+    }
+    return items
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, lengthen(v, k)]))
+  }
+  if (typeof value === 'string') {
+    if (LONG_TEXT_KEYS.has(key) && value.length > 0 && value.length <= 40) return `${value}（とても長い名前のサンプルです・全角で三十文字を超えます）`
+    if (LONG_URL_KEYS.has(key) && /^https?:\/\//.test(value)) return `${value}${value.includes('?') ? '&' : '?'}utm_source=line&utm_medium=message&utm_campaign=autumn-new-products-2026-very-long-campaign-name`
+  }
+  return value
+}
+
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`)
   const origin = req.headers.origin ?? '*'
@@ -5064,7 +5095,7 @@ const server = createServer((req, res) => {
     res.writeHead(200).end(JSON.stringify(fixed))
     return
   }
-  res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+  res.writeHead(200).end(JSON.stringify(LONG_DATA ? lengthen(bodyFor(method, url.pathname, url.searchParams)) : bodyFor(method, url.pathname, url.searchParams)))
 })
 
 /*
