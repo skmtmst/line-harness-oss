@@ -11,6 +11,7 @@ import DeltaChip from '@/components/shared/delta-chip'
 import IconTile from '@/components/shared/icon-tile'
 import ActivityItem from '@/components/shared/activity-item'
 import SectionHeader from '@/components/shared/section-header'
+import CheckCard from '@/components/shared/check-card'
 
 /*
  * ★V8 で新たに生えた部品（Pencil「OTP・削除・色を選ぶ」の節）の
@@ -24,6 +25,7 @@ export default function V8PartsPage() {
   const [code, setCode] = useState('')
   const [color, setColor] = useState('#06c755')
   const [deleted, setDeleted] = useState(false)
+  const [checks, setChecks] = useState({ a: true, b: false })
 
   return (
     <main className="mx-auto max-w-3xl space-y-10 p-8">
@@ -110,6 +112,24 @@ export default function V8PartsPage() {
             linkLabel="分析で見る"
           />
           <SectionHeader title="題だけ" />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-bold text-ink">チェックのカード（選ぶと緑に）</h2>
+        <div className="mt-3 max-w-md space-y-2">
+          <CheckCard
+            checked={checks.a}
+            onChange={(v) => setChecks((c) => ({ ...c, a: v }))}
+            title="友だち全員に送る"
+            note="登録している全員が対象になります"
+          />
+          <CheckCard
+            checked={checks.b}
+            onChange={(v) => setChecks((c) => ({ ...c, b: v }))}
+            title="タグで絞る"
+            note="選んだタグの人だけに届きます"
+          />
         </div>
       </section>
 
