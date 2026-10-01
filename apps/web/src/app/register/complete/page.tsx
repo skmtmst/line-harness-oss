@@ -10,7 +10,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
-import { authRequest, confirmError, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
+import { authRequest, confirmError, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
@@ -78,7 +78,7 @@ function CompleteInner() {
     })
     if (!res.ok || !res.data) {
       if (res.errors) setMessages((current) => ({ ...current, ...res.errors }))
-      setError(res.error || '登録を完了できませんでした')
+      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? '登録を完了できませんでした')
       setBusy(false)
       return
     }
@@ -90,7 +90,11 @@ function CompleteInner() {
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
-    else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
+    else if (res.csrfToken) {
+      // M045: 保存に失敗しても登録は進める（Cookie のセッションで足りる）。
+      // 投げたままにすると登録中の表示で止まる。
+      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
+    }
     window.location.assign('/hq')
   }
 

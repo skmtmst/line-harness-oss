@@ -14151,9 +14151,16 @@ export const bookingApi = {
     if (query?.trim()) params.set('q', query.trim());
     return fetchApi<{ customers: BookingCustomerSummary[] }>(`/api/booking/admin/customers?${params}`);
   },
-  createCustomer: (accountId: string, body: { display_name: string; phone: string; pet_name?: string }) =>
+  createCustomer: (
+    accountId: string,
+    body: { display_name: string; phone: string; pet_name?: string },
+    idempotencyKey?: string,
+  ) =>
     fetchApi<{ customer: BookingCustomerSummary }>(withAccount('/api/booking/admin/customers', accountId), {
-      method: 'POST', body: JSON.stringify(body),
+      method: 'POST',
+      // R559: 確定操作ごとに1つのキーで送り、応答消失後の再送で台帳を二重作成しない。
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+      body: JSON.stringify(body),
     }),
   getSettings: (accountId: string) =>
     fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),
