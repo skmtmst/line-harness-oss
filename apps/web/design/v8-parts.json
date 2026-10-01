@@ -58,8 +58,8 @@
     {
       "pencil": "dtJVi",
       "name": "切り替え（3つ）",
-      "code": null,
-      "planned": "shared/segmented.tsx"
+      "code": "shared/segmented.tsx",
+      "v8Only": true
     },
     {
       "pencil": "clV5c",

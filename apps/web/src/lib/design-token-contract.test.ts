@@ -38,6 +38,10 @@ const ALLOWED_SAME_VALUE = [
   // 600 へ畳む別名。700 が効くのは text-hero（28px の大きな数）だけで、
   // 既存の font-bold 書き込みを全部書き換えずに済ませるための名残。
   '--font-weight-bold / --font-weight-extrabold',
+  // ★V8「切り替え（3つ）」（dtJVi）：器は $radius-control（v8 で10へ）、
+  // 中の項目は 8 のまま。v7 ではたまたま同じ 8 だが、v8 では別の値に
+  // なるので名前を畳めない。
+  '--radius-control / --radius-segment',
 ]
 
 /**

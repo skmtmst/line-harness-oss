@@ -232,6 +232,8 @@
   /* Pencil ★V8 印のタイル（C9CaMS・E7USZ9・A2mryd）。小22→7、中28・大32→9。 */
   --radius-tile-sm: 7px;
   --radius-tile: 9px;
+  /* Pencil ★V8 切り替えの項目（dtJVi）。器は $radius-control、中の項目は 8。 */
+  --radius-segment: 8px;
   /* Pencil `$radius-lg`(18px)。`PhxG6` の友だちアバター(40x40)と
      保存条件チップ用。Tailwind 既定の `rounded-lg` は上書きしない
      （既存85ファイルの角丸が8pxから18pxへ変わってしまう）。 */
@@ -475,10 +477,18 @@
  *
  *   control 8→10  ボタン・入力・選ぶ欄・探す欄の角丸（板「角丸 10」）
  *   panel  12→16  白い板・ダイアログの角丸（板「角丸 16」、ダイアログ 16〜20）
+ *   text-lh  1.4→1.5  部品の文字の行の高さ（Pencil の部品は全部 1.5。
+ *     部品側は `line-height: var(--text-lh, 1.4)` と書き、v7 は
+ *     既定値 1.4 が効いて1画素も変わらない）
+ *   control-border  操作する部品の枠の色（入力・選ぶ・検索・チェック・
+ *     ラジオ・トグルのオフ・OTP・色を選ぶ・カードの中の印）。カードや
+ *     表・外側の板の枠は hairline のまま（#868e98、板「枠線の色」）
  */
 [data-theme="v8"] {
   --radius-control: 10px;
   --radius-panel: 16px;
+  --text-lh: 1.5;
+  --color-control-border: #868e98;
 }
 
 /*
