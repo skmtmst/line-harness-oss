@@ -164,8 +164,8 @@
     {
       "pencil": "w6uYMd・RRxK5",
       "name": "チェックのカード",
-      "code": null,
-      "planned": "shared/check-card.tsx"
+      "code": "shared/check-card.tsx",
+      "v8Only": true
     },
     {
       "pencil": "Q6cQB・tnWX9",
