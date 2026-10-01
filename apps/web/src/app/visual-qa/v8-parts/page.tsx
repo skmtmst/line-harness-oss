@@ -101,7 +101,7 @@ export default function V8PartsPage() {
       <section>
         <h2 className="text-sm font-bold text-ink">段の題（補足・？・右にリンク）</h2>
         <div className="mt-3 max-w-md space-y-4">
-          <SectionHeader title="最近の動き" note="直近30日" href="/friends" linkLabel="すべて見る" />
+          <SectionHeader title="最近の動き" note="この30日" href="/friends" linkLabel="すべて見る" />
           <SectionHeader
             title="今月の完了率"
             helpLabel="今月の完了率の説明"
