@@ -60,27 +60,25 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(offenders).toEqual([])
   })
 
-  it('部品の CSS Module は、ビルド時に先頭で層の順番を宣言される', async () => {
+  it('部品の CSS Module は先頭で層の順番を宣言する', () => {
     /*
      * Tailwind v4 の出力は層の順番を先頭で宣言しない。部品の CSS が
      * globals.css より先に読まれると、最初に現れた `@layer components` が
      * 1番目の層になり、後から来る base（preflight）が部品に勝つ。
      * ボタンの地・枠・余白、入力欄の枠が全部消えた（検証環境 2026-10-02）。
-     * postcss-layer-order.cjs が各 CSS Module の先頭へ順番を足す。
+     * どの順で読まれても同じになるよう、各ファイルの1行目で順番を宣言する。
+     *
+     * ★V8 移行が済んで不要になったら、次の1行で全部消せる（この試験も消す）:
+     *   grep -rl 'layer-order: V8 移行後に消す' apps/web/src | xargs sed -i '' '/layer-order: V8 移行後に消す/d'
      */
-    const config = read('../../../postcss.config.mjs')
-    expect(config).toMatch(/'\.\/postcss-layer-order\.cjs'[\s\S]*'@tailwindcss\/postcss'/)
-
-    const { default: postcss } = await import('postcss')
-    const { default: layerOrder } = await import('../../../postcss-layer-order.cjs')
-    const run = (css: string, from: string) =>
-      postcss([layerOrder()]).process(css, { from }).then((r) => r.css)
-
-    const button = await run(read('./button.module.css'), '/x/button.module.css')
-    expect(button.startsWith('@layer properties, theme, base, components, utilities;')).toBe(true)
-    // 層を使わない CSS Module と globals.css には足さない
-    expect(await run('.a{color:red}', '/x/plain.module.css')).toBe('.a{color:red}')
-    expect(await run('@layer components{.a{color:red}}', '/x/globals.css')).toBe('@layer components{.a{color:red}}')
+    const line = '@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */'
+    const dir = new URL('.', import.meta.url)
+    const modules = readdirSync(dir).filter((name) => name.endsWith('.module.css'))
+    const offenders = modules.filter((name) => {
+      const css = read(`./${name}`)
+      return css.includes('@layer components') && !css.startsWith(`${line}\n@layer components {`)
+    })
+    expect(offenders).toEqual([])
   })
 
   it('代表的な画面側上書きも規定値に戻す', () => {
