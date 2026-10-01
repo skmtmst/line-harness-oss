@@ -2,7 +2,7 @@
 /*
  * 切り替え（3つ）（Pencil ★V8 `dtJVi`）。
  *
- *   器：shell 地・余白 3・間隔 2・角丸 control
+ *   器：shell 地・余白 2・間隔 2・角丸 control（高さ 36。Pencil は余白 3→2 に更新済み）
  *   つまみ（選択中）：canvas の白・角丸 8・中の文字 13/600 ink
  *   未選択：文字 13/500 ink-secondary（地は器の shell が透ける）
  *   つまみは前の位置から 120ms で滑って着く。
@@ -13,7 +13,7 @@
   position: relative;
   display: inline-flex;
   gap: 2px;
-  padding: 3px;
+  padding: 2px;
   border-radius: var(--radius-control);
   background: var(--color-shell);
 }
@@ -21,8 +21,8 @@
 /* 白いつまみ。選択項目の後ろへ位置・幅を JS で合わせる。 */
 .thumb {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
+  top: 2px;
+  bottom: 2px;
   left: 0;
   border-radius: var(--radius-segment);
   background: var(--color-canvas);
