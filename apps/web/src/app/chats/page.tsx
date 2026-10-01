@@ -2393,7 +2393,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            */
           { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話' },
         ].map((filter) => (
-          <Button variant="secondary" className={`h-8 shrink-0 items-center whitespace-nowrap rounded-pill border px-3 text-xs font-semibold transition-colors ${
+          <Button variant="secondary" className={`v7:h-8 shrink-0 items-center whitespace-nowrap rounded-pill border px-3 text-xs font-semibold transition-colors ${
               quickFilter === filter.key
                 ? 'border-accent-deep bg-accent-soft text-accent-deep'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
@@ -3184,7 +3184,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     **同じ場所に同じ1つのボタン**を置く。閉じる口が右パネルの
                     中にしか無いと、閉じたあと戻す口を別の場所で探すことになる。
                   */}
-                  <Button variant="secondary" className="h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 text-xs text-action" type="button" data-inbox-v6="customer-info-toggle" onClick={() => setShowFriendInfo((current) => !current)} aria-expanded={showFriendInfo}>
+                  <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 text-xs text-action" type="button" data-inbox-v6="customer-info-toggle" onClick={() => setShowFriendInfo((current) => !current)} aria-expanded={showFriendInfo}>
                     {showFriendInfo
                       ? <PanelRightClose aria-hidden="true" size={14} />
                       : <PanelRightOpen aria-hidden="true" size={14} />}
@@ -3432,10 +3432,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 <div className="mb-2 flex items-center gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
-                    <Button variant="secondary" className="h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowTemplatePicker(true)}>
+                    <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowTemplatePicker(true)}>
                       ▧ テンプレートを選択
                     </Button>
-                    <Button variant="secondary" className="h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowComposerOptions((v) => !v)}>
+                    <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowComposerOptions((v) => !v)}>
                       ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </Button>
                     {/*
@@ -3443,7 +3443,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       琥珀色に変わる。窓が上に出るので、どのボタンから出た窓
                       なのかが分かる印が要る。
                     */}
-                    <Button variant="secondary" className={`h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
+                    <Button variant="secondary" className={`v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
                         showMemoEditor
                           ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
                           : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
@@ -3912,7 +3912,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               重なりが上部を覆っている画面幅で閉じられなくなる。
               実際そうなっていた。
             */}
-            <Button variant="secondary" className="absolute top-[17px] right-3 z-10 h-8 w-8 items-center justify-center text-ink-faint whitespace-normal" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
+            <Button variant="secondary" className="absolute top-[17px] right-3 z-10 v7:h-8 w-8 items-center justify-center text-ink-faint whitespace-normal" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
               <X aria-hidden="true" className="h-4 w-4" />
             </Button>
             {selectedThreadId ? (
