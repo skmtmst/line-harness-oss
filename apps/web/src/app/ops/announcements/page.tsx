@@ -17,6 +17,7 @@ import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-u
 import { previewLabel, toLocalInput, toPublishAt } from './format'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -59,6 +60,18 @@ type Form = {
 }
 const EMPTY: Form = { subject: '', body: '', audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], channels: ['line', 'screen'], publishAt: '' }
 
+/*
+ * 一覧の読み込み失敗の説明。403・429 は説明を渡さず、ListState が捕まえた
+ * 失敗から共通の1枚（権限の案内・待ち案内）を作る。それ以外は捕まえた言葉を
+ * そのまま出す（通信断の「通信できませんでした」など）。
+ */
+function loadDescription(err: unknown): string | undefined {
+  if (isForbiddenOrRateLimited(err)) return undefined
+  if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
+  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
+  return undefined
+}
+
 export default function OpsAnnouncementsPage() {
   const [rows, setRows] = useState<OpsAnnouncement[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -81,7 +94,7 @@ export default function OpsAnnouncementsPage() {
    * 場所に、入力の検証・保存・削除の失敗（formError）は作る欄の上に出す。
    * まとめると「件名を入力してください」で一覧まで失敗表示に変わる（監査 R154）。
    */
-  const [loadError, setLoadError] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [formError, setFormError] = useState('')
   const [notice, setNotice] = useState('')
   const [confirmSend, setConfirmSend] = useState(false)
@@ -93,13 +106,20 @@ export default function OpsAnnouncementsPage() {
   const [baseline, setBaseline] = useState<Form>(EMPTY)
 
   const load = useCallback(async () => {
-    setLoadError('')
-    const res = await opsCall(api.ops.announcements.list())
-    setLoaded(true)
-    if (!res.success) { setLoadError(res.error || '読み込めませんでした'); return }
-    setRows(res.data)
-    setLineConfigured(res.noticeLineConfigured)
-    setLinked(res.linked)
+    setLoadError(null)
+    try {
+      const res = await api.ops.announcements.list()
+      if (!res.success) { setLoadError(new Error(res.error || '読み込めませんでした')); return }
+      setRows(res.data)
+      setLineConfigured(res.noticeLineConfigured)
+      setLinked(res.linked)
+    } catch (caught) {
+      // M038：捕まえた失敗をそのまま残す。ListState が 403 は権限の案内
+      // （再試行なし）・429 は待ち案内に切り替える。
+      setLoadError(caught)
+    } finally {
+      setLoaded(true)
+    }
   }, [])
 
   useEffect(() => { void load() }, [load])
@@ -297,7 +317,7 @@ export default function OpsAnnouncementsPage() {
             <ListState kind="loading" title="読み込んでいます" />
           ) : loadError && rows.length === 0 ? (
             // 「まだ無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
-            <ListState kind="error" title="お知らせを表示できませんでした" onRetry={() => void load()} />
+            <ListState kind="error" title="お知らせを表示できませんでした" description={loadDescription(loadError)} error={loadError ?? undefined} onRetry={() => void load()} />
           ) : rows.length === 0 ? (
             <div className="bg-canvas rounded-card border-hairline border">
               <ListState kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
