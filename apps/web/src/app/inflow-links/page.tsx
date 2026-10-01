@@ -937,7 +937,12 @@ function InflowLinksPageInner({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-control border border-hairline bg-canvas">
+        <div className="overflow-hidden rounded-control border border-hairline bg-canvas" data-scroll-x>
+          {/*
+            ★V8（夕21・STATES-ALL）：1152 幅で見出しと日付の列があふれる。
+            1366px 未満では横送りにする（globals.css の [data-scroll-x]）。
+            v7・広い幅では従来どおり。
+          */}
           <table className="w-full table-fixed text-xs">
             <colgroup>
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
