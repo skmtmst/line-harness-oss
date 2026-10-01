@@ -44,9 +44,22 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
     expect(tsx).toContain("'up' | 'down' | 'attention'")
   })
 
+  it('印のタイル（C9CaMS・E7USZ9・A2mryd）：22/28/32・白地・hairline・角丸 7/9', () => {
+    const source = css('icon-tile.module.css')
+    expect(source).toContain('width: 22px')
+    expect(source).toContain('width: 28px')
+    expect(source).toContain('width: 32px')
+    expect(source).toContain('background: var(--color-canvas)')
+    expect(source).toContain('border: 1px solid var(--color-hairline)')
+    expect(source).toContain('border-radius: var(--radius-tile-sm)')
+    expect(source).toContain('border-radius: var(--radius-tile)')
+    const tsx = readFileSync(join(SHARED, 'icon-tile.tsx'), 'utf8')
+    expect(tsx).toContain("'sm' | 'md' | 'lg'")
+  })
+
   it('台帳がこの回の部品を v8対応済みと数える', { timeout: 60_000 }, () => {
     const report = collectReport()
-    for (const name of ['リンク（→つき）', '増減の札']) {
+    for (const name of ['リンク（→つき）', '増減の札', '印のタイル']) {
       const part = report.parts.find((p) => p.name === name)
       expect(part?.status, `${name} が v8対応済みになっていない`).toBe('v8対応済み')
     }
