@@ -29,7 +29,7 @@ export default function WebinarLinePreview({
       {body ? (
         <>
           <p className="rounded-card bg-canvas p-4 text-sm leading-relaxed whitespace-pre-wrap text-ink">{body}</p>
-          {buttonLabel ? <p className="bg-accent-deep text-on-accent rounded-control mx-auto mt-3 w-fit px-4 py-2 text-xs font-bold">{buttonLabel}</p> : null}
+          {buttonLabel ? <p className="bg-accent-deep text-on-accent rounded-control mx-auto mt-3 w-fit px-4 py-2 text-xs font-medium">{buttonLabel}</p> : null}
         </>
       ) : null}
     </LinePreview>

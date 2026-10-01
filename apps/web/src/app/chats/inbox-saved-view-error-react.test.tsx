@@ -152,7 +152,7 @@ async function openSaveDialog() {
   expect(toggle, '「保存した検索」の開閉ボタン').toBeTruthy()
   await act(async () => { toggle!.click() })
   await flush()
-  const openCreate = findButton(host, '現在の条件を保存')
+  const openCreate = findButton(host, '現在の条件を保存する')
   expect(openCreate, '「現在の条件を保存」ボタン').toBeTruthy()
   await act(async () => { openCreate!.click() })
   await flush()
@@ -172,7 +172,7 @@ async function typeName(dialog: HTMLElement, name: string) {
 }
 
 async function submit(dialog: HTMLElement) {
-  const button = findButton(dialog, '検索条件を保存')
+  const button = findButton(dialog, '検索条件を保存する')
   expect(button, '「検索条件を保存」ボタン').toBeTruthy()
   await act(async () => { button!.click() })
   await flush()

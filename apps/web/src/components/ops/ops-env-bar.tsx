@@ -20,8 +20,8 @@ export default function OpsEnvBar() {
     <div
       data-design-node="OGkIw"
       className={production
-        ? 'flex h-8 items-center justify-between bg-ink px-5 text-caption font-bold text-on-accent'
-        : 'flex h-8 items-center justify-between bg-status-warn-deep px-5 text-caption font-bold text-on-accent'}
+        ? 'flex h-8 items-center justify-between bg-ink px-5 text-caption font-medium text-on-accent'
+        : 'flex h-8 items-center justify-between bg-status-warn-deep px-5 text-caption font-medium text-on-accent'}
     >
       <span className="flex items-center gap-2">
         <ShieldCheck aria-hidden="true" className="h-4 w-4" />

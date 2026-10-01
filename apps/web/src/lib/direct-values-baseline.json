@@ -1,0 +1,207 @@
+{
+  "app/contents/contents-permission-behavior.spec.mjs": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/ec-commerce/ec-commerce-issue-685-server.mjs": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/form-submissions/edit/form-design-settings.tsx": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/form-submissions/page.tsx": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/global-error.tsx": {
+    "color": 3,
+    "radius": 2,
+    "shadow": 0
+  },
+  "app/inflow-links/new/page.tsx": {
+    "color": 2,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/nen-members/page.tsx": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "app/ops/support/format.ts": {
+    "color": 0,
+    "radius": 5,
+    "shadow": 0
+  },
+  "app/staff/page.tsx": {
+    "color": 2,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/tags/folders/new/page.tsx": {
+    "color": 8,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/visual-qa/v7-progress-filedrop/page.tsx": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/visual-qa/v8-parts/page.tsx": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/accounts/account-ordering.tsx": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 2
+  },
+  "components/dashboard/qr-dialog.tsx": {
+    "color": 4,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/flex-preview.tsx": {
+    "color": 6,
+    "radius": 2,
+    "shadow": 1
+  },
+  "components/friend-attributes-v2/tag-list-v2.tsx": {
+    "color": 7,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/friend-fields/support-mark-editor.tsx": {
+    "color": 6,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/friend-fields/tag-archived-edit.spec.mjs": {
+    "color": 2,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/friend-fields/tag-editor-v4.tsx": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/friend-fields/tags-page-v4.tsx": {
+    "color": 3,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/friends/tag-badge.tsx": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/ops/impersonation-bar.tsx": {
+    "color": 2,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/reminders/reminder-v6-ui.module.css": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/shared/avatar.module.css": {
+    "color": 1,
+    "radius": 1,
+    "shadow": 1
+  },
+  "components/shared/color-well.module.css": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 2
+  },
+  "components/shared/color-well.tsx": {
+    "color": 24,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/shared/combobox.module.css": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "components/shared/data-table.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/date-field.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 2
+  },
+  "components/shared/folder-add-dialog.tsx": {
+    "color": 8,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/shared/kpi-card.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/list-state.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/menu-portal.tsx": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/shared/multi-select.module.css": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "components/shared/otp-input.module.css": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 3
+  },
+  "components/shared/radio-card.module.css": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "components/shared/save-conflict-bar.module.css": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "components/shared/select.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "lib/hq-banners.ts": {
+    "color": 10,
+    "radius": 0,
+    "shadow": 0
+  },
+  "lib/hq-template-authoring.ts": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "lib/presentation.ts": {
+    "color": 2,
+    "radius": 0,
+    "shadow": 0
+  }
+}

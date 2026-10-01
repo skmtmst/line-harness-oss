@@ -69,7 +69,8 @@ describe('#673 A. カード・パネルの立体感', () => {
 
   it('モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む', () => {
     // components/shared/ は変更できないため、globals.css の属性規定で上書きする。
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-float\)/)
+    // ★V7: ダイアログは最前面（段3）の影 `--shadow-overlay`。
+    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-overlay\)/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--shadow-card\)/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\] \.shadow-lg\s*\{[^}]*var\(--shadow-float\)/)
   })
@@ -95,9 +96,11 @@ describe('#673 A. カード・パネルの立体感', () => {
 })
 
 describe('#673 B. 触った感触', () => {
-  it('ボタンは160msのease-outで scale(0.97) に沈む', () => {
-    expect(GLOBALS_CODE).toMatch(/button:not\(:disabled\):active[\s\S]*?transform:\s*scale\(0\.97\)/)
-    expect(GLOBALS_CODE).toMatch(/transform 160ms var\(--motion-ease-out\)/)
+  it('ボタンは motion-instant(80ms) で 0.98倍に沈む（★V7 仕上げ §2）', () => {
+    expect(GLOBALS_CODE).toMatch(/:active[\s\S]*?scale:\s*0\.98/)
+    expect(GLOBALS_CODE).toMatch(/scale var\(--motion-instant\)/)
+    // 旧 #673 の transform: scale(0.97) は scale 規定と二重に効くため外した
+    expect(GLOBALS_CODE).not.toContain('transform: scale(0.97)')
   })
 
   it('transition: all を使わない（#648の教訓）', () => {
@@ -132,9 +135,13 @@ describe('#673 指標カードのスケルトン', () => {
 
     const section = host.querySelector('section[aria-label="受信箱の対応状況"]')
     expect(section?.getAttribute('aria-busy')).toBe('true')
-    // 「要返信」＋4指標＋待ち時間の骨組み。実数の「—」は出さない。
-    expect(host.querySelectorAll('.animate-pulse').length).toBeGreaterThanOrEqual(5)
-    expect(section?.textContent).not.toContain('—')
+    /*
+     * ★V7 仕上げ §3: 骨組みは 0.3 秒待ってから出す（速い応答では出さない）。
+     * 出る前は本物の場所を不可視で取るので、実数の「—」は見えない。
+     * 「要返信」＋4指標＋待ち時間の骨組み。
+     */
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    expect(host.querySelectorAll('[data-skeleton]').length).toBeGreaterThanOrEqual(5)
 
     const stats = {
       waiting: 3,
@@ -148,7 +155,9 @@ describe('#673 指標カードのスケルトン', () => {
       resolveStats?.({ success: true, data: stats })
     })
     expect(section?.getAttribute('aria-busy')).toBeNull()
-    expect(host.querySelectorAll('.animate-pulse').length).toBe(0)
+    // ★V7 §3: 出した骨組みは最低 0.4 秒残る。待ってから実数を確かめる。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)) })
+    expect(host.querySelectorAll('[data-skeleton]').length).toBe(0)
     expect(section?.textContent).toContain('要返信 3件')
     expect(section?.textContent).toContain('5件')
   })
@@ -159,6 +168,8 @@ describe('#673 指標カードのスケルトン', () => {
     // 読込中は「—」ではなく animate-pulse の骨組みを出す。
     expect(page).toMatch(/function LiveDataCard[\s\S]*?loading = false/)
     expect(page).toMatch(/aria-busy=\{loading \|\| undefined\}/)
-    expect(page).toContain('animate-pulse')
+    // ★V7 仕上げ §3: 骨組みは共有の Skeleton/DelayedSkeleton（0.3秒遅延・0.4秒最低表示）。
+    expect(page).toContain('DelayedSkeleton')
+    expect(page).toContain('Skeleton')
   })
 })

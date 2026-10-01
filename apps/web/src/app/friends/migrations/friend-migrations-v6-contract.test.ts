@@ -78,6 +78,11 @@ describe('V6 機能3 UID・CSV移行', () => {
     expect(CSV_PAGE).toContain('今書き出せるのは基本の5列だけです')
   })
 
+  it('R604 電話番号・メールが選べると示唆しない', () => {
+    expect(CSV_PAGE).not.toContain('電話番号やメール')
+    expect(CSV_PAGE).toContain('今書き出せるのは基本の5列だけです')
+  })
+
   it('設計Nodeと本物のAPIに接続する', () => {
     expect(UID_PAGE).toContain('data-design-node="vtBCu"')
     expect(CSV_PAGE).toContain('data-design-node="ux7of"')

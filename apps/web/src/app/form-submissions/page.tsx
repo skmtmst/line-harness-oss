@@ -28,7 +28,9 @@ import CopyTextButton from '@/components/ui/copy-text-button'
 import HelpTip from '@/components/shared/help-tip'
 import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import './form-submissions.css'
+import { formatDay, formatNumber } from '@/lib/format'
 
 interface UsedByAccount {
   id: string
@@ -134,7 +136,7 @@ function displayUpdatedAt(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })
+  return formatDay(date)
 }
 
 export default function FormSubmissionsPage() {
@@ -170,6 +172,11 @@ export default function FormSubmissionsPage() {
   const [activeFolderId, setActiveFolderId] = useState('all')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  /**
+   * R602: 掴んだ失敗そのもの。描画側で `ListState error=` に渡し、
+   * 403（権限不足）と 503（通信失敗）の案内を言い分ける。
+   */
+  const [loadFailure, setLoadFailure] = useState<unknown>(null)
   const [query, setQuery] = useState(() => searchParams.get('q') || '')
   /**
    * #1060: 検索は Worker 側で絞る。1打鍵ごとの往復を避けるため、
@@ -218,6 +225,7 @@ export default function FormSubmissionsPage() {
     if (reviewMode && selectedAccountId) {
       setLoading(true)
       setLoadError('')
+      setLoadFailure(null)
       setReviewForbidden(false)
       try {
         const account = `account_id=${encodeURIComponent(selectedAccountId)}`
@@ -239,6 +247,7 @@ export default function FormSubmissionsPage() {
           setFormTotal(0)
           setFolderTotal(0)
         } else {
+          setLoadFailure(error)
           setLoadError('回答フォームを読み込めませんでした。')
           setForms([])
           setFolders([])
@@ -260,6 +269,7 @@ export default function FormSubmissionsPage() {
     }
     setLoading(true)
     setLoadError('')
+    setLoadFailure(null)
     try {
       const account = `account_id=${encodeURIComponent(selectedAccountId)}`
       // N-175 (#805): フォルダ絞りはサーバーが正本。選択をfolder_idで渡す。
@@ -272,32 +282,50 @@ export default function FormSubmissionsPage() {
       const paging = `&with_list_summary=1&page=${page}&limit=${pageSize}`
         + `&filter=${formFilter}&sort=${formSort}`
         + (fetchQuery.trim() ? `&q=${encodeURIComponent(fetchQuery.trim())}` : '')
-      const [res, folderRes] = await Promise.all([
+      /*
+       * R603: フォームと箱は別々に回収する（allSettled）。
+       * 箱だけ 503 のときに Promise.all だとフォーム7件まで消え
+       * 全面エラーになっていた。一覧と件数は残し、箱の場所にだけ
+       * 失敗と再試行を出す。
+       */
+      const [formsResult, foldersResult] = await Promise.allSettled([
         fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}${folder}${paging}`),
         api.folders.list('form', selectedAccountId),
       ])
-      if (!res.success || !folderRes.success) {
-        // 箱だけ取れないときは一覧を落とさない。箱の場所に小さく出す。
-        if (res.success && request === formRequest.current) {
-          const items = Array.isArray(res.data) ? res.data : res.data.items
-          setForms(items)
-          setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
-          setFolderTotal(Array.isArray(res.data) ? items.length : (res.data.all_total ?? res.data.total))
-          setFolders([])
-          setFolderError('フォルダを読み込めませんでした。')
-          return
-        }
-        throw new Error('load_failed')
+      if (request !== formRequest.current) return
+      const formsData = formsResult.status === 'fulfilled' && formsResult.value.success
+        ? formsResult.value.data
+        : null
+      if (formsData === null) {
+        // R602: フォーム自体が取れないときだけ全面エラーにする。
+        // 403 は描画側で権限の案内へ切り替えるため、失敗を残す。
+        setLoadFailure(formsResult.status === 'rejected' ? formsResult.reason : new Error('load_failed'))
+        setLoadError('回答フォームを読み込めませんでした。')
+        setForms([])
+        setFolders([])
+        setFormTotal(0)
+        setFolderTotal(0)
+        return
       }
-      if (request !== formRequest.current) return
-      setFolderError('')
-      const items = Array.isArray(res.data) ? res.data : res.data.items
+      const items = Array.isArray(formsData) ? formsData : formsData.items
       setForms(items)
-      setFolders(folderRes.data)
-      setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
-      setFolderTotal(Array.isArray(res.data) ? items.length : (res.data.all_total ?? res.data.total))
-    } catch {
+      setFormTotal(Array.isArray(formsData) ? items.length : formsData.total)
+      setFolderTotal(Array.isArray(formsData) ? items.length : (formsData.all_total ?? formsData.total))
+      // 箱だけ取れないときは一覧を落とさない。箱の場所に小さく出す。
+      const foldersData = foldersResult.status === 'fulfilled' && foldersResult.value.success
+        ? foldersResult.value.data
+        : null
+      if (foldersData === null) {
+        setFolders([])
+        setFolderError('フォルダを読み込めませんでした。')
+      } else {
+        setFolderError('')
+        setFolders(foldersData)
+      }
+    } catch (error) {
       if (request !== formRequest.current) return
+      // 両方を回収しているため、ここへ来るのは想定外の失敗だけ。
+      setLoadFailure(error)
       setLoadError('回答フォームを読み込めませんでした。')
       setForms([])
       setFolders([])
@@ -696,8 +724,7 @@ export default function FormSubmissionsPage() {
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Bar" className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" onClick={createDraft} disabled={creating}>
-            {creating ? '下書きを作成中' : '＋ フォームを作る'}
+          <Button variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">＋ フォームを作る
           </Button>
         </div>
       </div>
@@ -713,7 +740,9 @@ export default function FormSubmissionsPage() {
           // R25: 箱は選んだアカウントに付けて作る。staff には操作ごと出さない。
           onAddFolder={canManageFolders ? () => setFolderDialogOpen(true) : undefined}
           rows={[
-            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal },
+            // R602補足: まだ取れていない総数は数として出さない（0確定に見せない）。
+            // 正常200の実0・取得済みの数はそのまま出す。null は件数なしの約束。
+            { id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal },
             ...folders.map((folder, index) => ({
               id: folder.id,
               label: folder.name,
@@ -804,7 +833,7 @@ export default function FormSubmissionsPage() {
           />
           </div>
           {reviewMode && (
-            <div className="border-hairline rounded-card border bg-white p-3 text-xs text-ink-secondary">
+            <div className="border-hairline rounded-card border bg-canvas p-3 text-xs text-ink-secondary">
               <p><span className="font-bold text-ink">管理者確認中のフォーム</span> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
               <p className="mt-1">担当の割り当ては後続の対応（#771）で行います。この画面では割り当て操作はできません。</p>
             </div>
@@ -830,8 +859,10 @@ export default function FormSubmissionsPage() {
         ) : loadError ? (
           <ListState
             kind="error"
-            title="表示できませんでした"
-            description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+            // R602/m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ
+            // 切り替える。503などは従来どおり再試行を残す（scenarios と同じ形）。
+            description={isForbiddenOrRateLimited(loadFailure) ? undefined : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
+            error={loadFailure ?? undefined}
             onRetry={() => void loadForms()}
           />
         ) : reviewMode && reviewForbidden ? (
@@ -857,8 +888,7 @@ export default function FormSubmissionsPage() {
               title="まだフォームがありません"
               description="最初の1つを作ると、集まった回答もここから見られます。"
             action={(
-              <Button variant="primary" onClick={createDraft} disabled={creating}>
-                {creating ? '下書きを作成中' : '＋ フォームを作る'}
+              <Button variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">＋ フォームを作る
               </Button>
             )}
             />
@@ -873,7 +903,7 @@ export default function FormSubmissionsPage() {
               />
             </div>
           ) : (
-          <div className="border-hairline rounded-card overflow-hidden border bg-white">
+          <div className="border-hairline rounded-card overflow-hidden border bg-canvas">
             {/*
               ★V7：1440px で右端の「編集」と削除が切れていた（表の最小幅＞実幅）。
               最小幅は1440pxの実幅（約835px）より小さい800pxにし、名前の列を伸び縮みさせる。操作の列は2つのボタンが収まる固定幅。
@@ -945,7 +975,7 @@ export default function FormSubmissionsPage() {
                   <td className="px-3 py-2.5 text-right text-xs tabular-nums">
                     {/* ★V7：回答数そのものを「回答を見る」の入口にし、操作の列を細くして名前を読めるようにする。 */}
                     {reviewMode ? (
-                      <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
+                      <span className="block">{displayCount ? `${formatNumber(displayCount)}件` : '—'}</span>
                     ) : (
                       <Link
                         href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`}
@@ -953,7 +983,7 @@ export default function FormSubmissionsPage() {
                         title="集まった回答を見る"
                         className="text-action block font-medium hover:underline"
                       >
-                        {displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '0件'}
+                        {displayCount ? `${formatNumber(displayCount)}件` : '0件'}
                       </Link>
                     )}
                     {/*
@@ -965,12 +995,12 @@ export default function FormSubmissionsPage() {
                     <span className="text-ink-faint block">
                       {form.monthlySubmitCount == null
                         ? '今月 —'
-                        : `今月 ${form.monthlySubmitCount.toLocaleString('ja-JP')}件`}
+                        : `今月 ${formatNumber(form.monthlySubmitCount)}件`}
                     </span>
                     <span className="text-ink-faint block">
                       {form.monthlyCompletionRate == null
                         ? '完了率 —'
-                        : `完了率 ${form.monthlyCompletionRate.toLocaleString('ja-JP')}%`}
+                        : `完了率 ${formatNumber(form.monthlyCompletionRate)}%`}
                     </span>
                   </td>
                   <td className="cq-hide-below-800 px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
@@ -1026,11 +1056,11 @@ export default function FormSubmissionsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
             type="button"
-            className="absolute inset-0 bg-black/30"
+            className="absolute inset-0 bg-scrim"
             onClick={() => !savingName && setEditingForm(null)}
             aria-label="名前変更を閉じる"
           />
-          <div ref={renamePanelRef} role="dialog" aria-modal="true" aria-labelledby="rename-form-title" className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+          <div ref={renamePanelRef} role="dialog" aria-modal="true" aria-labelledby="rename-form-title" className="relative w-full max-w-md rounded-card bg-canvas p-5 shadow-float">
             <div className="flex items-start justify-between gap-3">
               <h3 id="rename-form-title" className="text-base font-semibold text-ink">フォーム名を変更</h3>
               <button
@@ -1043,20 +1073,20 @@ export default function FormSubmissionsPage() {
                 <X aria-hidden="true" className="h-5 w-5" />
               </button>
             </div>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-ink-faint">
               回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。
             </p>
-            <p className="mt-1 text-xs text-gray-400">推奨：サービス名｜目的（対象・導線）</p>
-            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-gray-500">
-              <span className="rounded bg-gray-100 px-2 py-1">質問 {editingForm.fields.length}項目</span>
+            <p className="mt-1 text-xs text-ink-faint">推奨：サービス名｜目的（対象・導線）</p>
+            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-ink-faint">
+              <span className="rounded-mini bg-shell px-2 py-1">質問 {editingForm.fields.length}項目</span>
               {editingForm.usedByAccounts.map((account) => (
-                <span key={account.id} className="rounded bg-gray-100 px-2 py-1">
+                <span key={account.id} className="rounded-mini bg-shell px-2 py-1">
                   {account.name}
                 </span>
               ))}
             </div>
             <label className="mt-4 block">
-              <span className="mb-1.5 block text-xs font-medium text-gray-600">フォーム名</span>
+              <span className="mb-1.5 block text-xs font-medium text-ink-secondary">フォーム名</span>
               <input
                 autoFocus
                 value={editingName}
@@ -1064,27 +1094,17 @@ export default function FormSubmissionsPage() {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') void saveName()
                 }}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-accent"
+                className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent"
               />
             </label>
-            {renameError && <p className="mt-2 text-xs text-red-500">{renameError}</p>}
+            {renameError && <p className="mt-2 text-xs text-status-danger">{renameError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingForm(null)}
-                disabled={savingName}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-              >
+              <Button variant="secondary" className="px-4 py-2 text-ink-secondary hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={() => setEditingForm(null)} disabled={savingName}>
                 キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => void saveName()}
-                disabled={!editingName.trim() || savingName}
-                className="rounded-lg bg-accent-deep px-4 py-2 text-sm font-medium text-white hover:brightness-92 disabled:opacity-50"
-              >
-                {savingName ? '保存中...' : '保存'}
-              </button>
+              </Button>
+              <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void saveName()} disabled={!editingName.trim() || savingName}>
+                {savingName ? '保存中...' : '保存する'}
+              </Button>
             </div>
           </div>
         </div>
@@ -1119,7 +1139,7 @@ export default function FormSubmissionsPage() {
         description={`削除しても、中のフォームは未分類に残ります。${
           deletingFolderCount === null
             ? 'いまこのフォルダに入っている件数を確認できませんでした。'
-            : `いまこのフォルダに入っているのは${deletingFolderCount.toLocaleString('ja-JP')}件です。`
+            : `いまこのフォルダに入っているのは${formatNumber(deletingFolderCount)}件です。`
         }`}
         confirmLabel="削除する"
         destructive
@@ -1217,9 +1237,9 @@ export default function FormSubmissionsPage() {
           <div className="space-y-3 text-sm">
             <dl className="bg-canvas-sunken grid grid-cols-2 gap-2 rounded-control p-3">
               <div><dt className="text-ink-faint text-xs">公開状態</dt><dd className="text-ink mt-1 font-medium">{deleteImpact.form.isActive ? '公開中' : '受付停止中'}</dd></div>
-              <div><dt className="text-ink-faint text-xs">集まった回答</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.submissionCount.toLocaleString('ja-JP')}件</dd></div>
-              <div><dt className="text-ink-faint text-xs">利用中の場所</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.referenceCount.toLocaleString('ja-JP')}か所</dd></div>
-              <div><dt className="text-ink-faint text-xs">開かれた回数</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.openCount.toLocaleString('ja-JP')}回</dd></div>
+              <div><dt className="text-ink-faint text-xs">集まった回答</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.submissionCount)}件</dd></div>
+              <div><dt className="text-ink-faint text-xs">利用中の場所</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.referenceCount)}か所</dd></div>
+              <div><dt className="text-ink-faint text-xs">開かれた回数</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(deleteImpact.openCount)}回</dd></div>
             </dl>
             {deleteImpact.answerUrl && (
               <div>
@@ -1243,8 +1263,7 @@ export default function FormSubmissionsPage() {
               <div className="border-hairline rounded-control border p-3">
                 <p className="text-ink text-xs font-medium">受付だけ止める（おすすめ）</p>
                 <p className="text-ink-faint mt-1 text-xs">一覧と回答を残したまま、新しい回答だけを止めます。</p>
-                <Button className="mt-3" onClick={() => void stopAccepting()} disabled={stopping || deleting}>
-                  {stopping ? '停止中' : '受付だけ止める'}
+                <Button className="mt-3" onClick={() => void stopAccepting()} disabled={stopping || deleting} busy={stopping} busyLabel="停止中">受付だけ止める
                 </Button>
               </div>
             )}

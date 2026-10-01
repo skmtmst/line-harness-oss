@@ -7,6 +7,7 @@ import {
   getFriendFieldsForScope,
   getFriendFieldValuesForMigration,
 } from '../src/friend-fields.js';
+import { jstNow } from '../src/utils.js';
 import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -67,8 +68,9 @@ describe('198 友だち情報欄のLINEアカウント分離', () => {
   });
 
   it('一覧の人数は項目ごとの合計ではなく、友だちを重複せず数える', async () => {
-    sqlite.prepare(`INSERT INTO friend_field_values VALUES (?, ?, ?, ?, datetime('now'))`).run('friend-1', 'legacy', '値1', 'form');
-    sqlite.prepare(`INSERT INTO friend_field_values VALUES (?, ?, ?, ?, datetime('now'))`).run('friend-1', 'account-field', '値2', 'form');
+    const now = jstNow();
+    sqlite.prepare(`INSERT INTO friend_field_values VALUES (?, ?, ?, ?, ?)`).run('friend-1', 'legacy', '値1', 'form', now);
+    sqlite.prepare(`INSERT INTO friend_field_values VALUES (?, ?, ?, ?, ?)`).run('friend-1', 'account-field', '値2', 'form', now);
     await expect(getFriendFieldListSummary(db, { tenantId: LEGACY_TENANT, lineAccountId: 'account-1' }))
       .resolves.toMatchObject({ total: 2, inUse: 2, registeredFriends: 1, updatedThisMonth: 2, formLinks: null });
   });

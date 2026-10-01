@@ -194,7 +194,7 @@ describe('箱の作成・名前変更・移動が選んだアカウントでつ�
     await act(async () => {
       root.render(<FormSubmissionsPage />)
     })
-    await clickFolder('フォルダを追加')
+    await clickFolder('フォルダを追加する')
     const nameInput = host.querySelector('input[placeholder^="例:"]') as HTMLInputElement | null
     expect(nameInput).toBeTruthy()
     await act(async () => {
@@ -223,7 +223,7 @@ describe('箱の作成・名前変更・移動が選んだアカウントでつ�
     await clickMenuItem('名前を変更')
     expect(host.textContent).toContain('フォーム名を変更')
     await act(async () => {})
-    const saveButton = [...host.querySelectorAll('button')].find((b) => b.textContent === '保存')
+    const saveButton = [...host.querySelectorAll('button')].find((b) => b.textContent === '保存する')
     expect(saveButton).toBeTruthy()
     await act(async () => {
       saveButton!.click()

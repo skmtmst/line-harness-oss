@@ -4373,6 +4373,7 @@ export const MILEAGE_FRIENDS = {
     available: 486200,
     pending: 300,
     expiringMiles30d: 24600,
+    nextExpiringAt: '2026-09-20T00:00:00.000Z',
     monthChange: 960,
     rankCounts: [
       { rewardId: 'rank-bronze', rankName: 'ブロンズ', requiredMiles: 0, friendCount: 886 },

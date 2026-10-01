@@ -46,7 +46,7 @@ describe('V6 knowledge UI', () => {
       { ...article.evidence[0], role: 'condition', quote: '対象フォームの回答後アクション' },
     ] }} onClose={() => {}} onSaved={() => {}} />))
     expect(document.body.textContent).toContain('#MB-0312 実際の問い合わせ件名')
-    expect(document.querySelector('time')?.textContent).toBe('09:40')
+    expect(document.querySelector('time')?.textContent).toBe('9:40')
     expect(document.body.textContent).toContain('適用条件：対象フォームの回答後アクション')
   })
   it('does not invent an applicability condition when the source has none', async () => {
@@ -139,16 +139,16 @@ describe('V6 knowledge UI', () => {
   it('recovers from a rejected save without issuing approval or trapping the dialog', async () => {
     mocks.update.mockRejectedValue(new TypeError('offline'))
     await act(async () => root.render(<KnowledgeEditor article={article} onClose={() => {}} onSaved={() => {}} />))
-    await act(async () => button('下書き保存').click())
+    await act(async () => button('下書きを保存する').click())
     expect(mocks.review).not.toHaveBeenCalled()
-    expect(button('下書き保存').disabled).toBe(false)
+    expect(button('下書きを保存する').disabled).toBe(false)
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('通信できませんでした')
   })
   it('warns that editing an approved article invalidates approval', async () => {
     await act(async () => root.render(<KnowledgeEditor article={{ ...article, reviewState: 'approved', status: 'active' }} onClose={() => {}} onSaved={() => {}} />))
     expect(document.querySelector('[data-design-node="ZAOc7"]')).not.toBeNull()
     expect(document.body.textContent).toContain('再承認するまで')
-    expect(button('承認待ちで保存')).toBeDefined()
+    expect(button('承認待ちで保存する')).toBeDefined()
     expect(button('承認して有効にする')).toBeUndefined()
   })
   it('shows fetch failures rather than a misleading empty list, and can retry', async () => {

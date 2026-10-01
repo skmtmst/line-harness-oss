@@ -25,14 +25,25 @@ export async function previewNenColumnAudience(
   return { count: Number(row?.count ?? 0), targetMode: input.targetMode, targetTagId: input.targetTagId };
 }
 
-export async function duplicateNenColumn(db: D1Database, input: { id: string; lineAccountId: string }) {
+export async function duplicateNenColumn(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    /**
+     * M506: 呼び出し側が振った要求キー。応答消失後の再送・二重押しで
+     * 同じ複製へ戻すため、複製行の主キーとして使う。省略時は採番する。
+     */
+    newId?: string;
+  },
+) {
   const source = await db.prepare(
     `SELECT title, category, excerpt, intro_text, article_url, image_url, published_at,
             target_mode, target_tag_id, completion_event_name, completion_tag_id
        FROM nen_columns WHERE id = ? AND line_account_id = ?`,
   ).bind(input.id, input.lineAccountId).first<Record<string, unknown>>();
   if (!source) throw new NenColumnOperationError('column_not_found', 'コラムが見つかりません', 404);
-  const id = crypto.randomUUID();
+  const id = input.newId ?? crypto.randomUUID();
   const now = jstNow();
   const slug = `copy-${input.id}-${id.slice(0, 8)}`;
   await db.prepare(

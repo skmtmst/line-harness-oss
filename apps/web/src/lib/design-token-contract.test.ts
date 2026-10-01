@@ -27,6 +27,21 @@ const ALLOWED_SAME_VALUE = [
   // 色の上に乗る文字（白）と、面そのもの（白）。地の色が変われば
   // 乗る文字は黒へ変わるので、同じ名前にはできない。
   '--color-on-accent / --color-on-action / --color-canvas',
+  // ★V7 でカードと窓（ダイアログ）は同じ 12px 段に畳まれた。呼び名は
+  // 用途ごとに残す（rounded-card / rounded-panel の大規模な改名は
+  // 値の置き換え段階で行う）。
+  '--radius-card / --radius-panel',
+  // ★V7「見た目の物差し」§1: 題（カードの題16・見出し18・画面名20）の
+  // 行の高さは全部 1.4。大きさが違うので名前は別のままにする。
+  '--text-lead--line-height / --text-heading--line-height / --text-title--line-height',
+  // ★V7「見た目の物差し」§2: font-bold / font-extrabold は意図的に
+  // 600 へ畳む別名。700 が効くのは text-hero（28px の大きな数）だけで、
+  // 既存の font-bold 書き込みを全部書き換えずに済ませるための名残。
+  '--font-weight-bold / --font-weight-extrabold',
+  // ★V8「切り替え（3つ）」（dtJVi）：器は $radius-control（v8 で10へ）、
+  // 中の項目は 8 のまま。v7 ではたまたま同じ 8 だが、v8 では別の値に
+  // なるので名前を畳めない。
+  '--radius-control / --radius-segment',
 ]
 
 /**
@@ -65,7 +80,9 @@ describe('設計の実測値に合わせる', () => {
     expect(token('radius-icon')).toBe('3px')
     expect(token('radius-mini')).toBe('6px')
     expect(token('radius-control')).toBe('8px')
-    expect(token('radius-card')).toBe('10px')
+    // ★V7「見た目の物差し」§1: カード・ダイアログ・知らせは 12px に一本化
+    // （V6 の `$radius-md` 10px は V7 の物差しに無い）
+    expect(token('radius-card')).toBe('12px')
     expect(token('radius-panel')).toBe('12px')
     expect(token('radius-large')).toBe('18px') // 既存の rounded-lg へ波及させない専用名
     expect(token('radius-pill')).toBe('9999px')
@@ -89,8 +106,10 @@ describe('設計の実測値に合わせる', () => {
     expect(token('radius-control')).toBe('8px')
     // Gfsb4「プルダウン開状態」$radius-sm。注記の正本(案内バー)も同値。
     expect(token('radius-control')).toBe('8px')
-    // pRHvc「検索と絞り込み」/ k4Hz0X「友だち一覧カード」/ eHPwj「一括操作バー」= $radius-md
-    expect(token('radius-card')).toBe('10px')
+    // pRHvc「検索と絞り込み」/ k4Hz0X「友だち一覧カード」/ eHPwj「一括操作バー」は
+    // V6 では $radius-md(10)。★V7 でカードは 12px 段に一本化されたので、
+    // 固定先は V7 の値へ書き換える（外見の契約は新しい設計に合わせる）。
+    expect(token('radius-card')).toBe('12px')
     // z7O873「友だち 詳細検索モーダル」w=760 h=936 $radius-panel
     expect(token('radius-panel')).toBe('12px')
   })
@@ -119,8 +138,8 @@ describe('設計の実測値に合わせる', () => {
    * 届かないまま10画面に残っていた。共通側の `--color-ink-faint`
    * (#6e7781) だけが直っていて、V6 名を使う画面には効かなかった。
    *
-   * 比べるのは**同じ役割の系統の中だけ**。`--radius-card`(10px) と
-   * `--text-nano`(10px) は数が同じでも別の物差しで、片方を変えても
+   * 比べるのは**同じ役割の系統の中だけ**。`--radius-card`(12px) と
+   * `--text-caption`(12px) は数が同じでも別の物差しで、片方を変えても
    * もう片方は動かない。
    */
   it('同じ系統の中に、同じ値のトークンを2つ置かない', () => {

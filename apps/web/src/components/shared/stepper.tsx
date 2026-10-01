@@ -50,7 +50,7 @@ export default function Stepper({
   currentKey?: string
 }) {
   return (
-    <nav aria-label={label} className="border-hairline bg-canvas rounded-card mb-4 border p-4">
+    <nav aria-label={label} data-part="stepper" className="border-hairline bg-canvas rounded-card mb-4 border p-4">
       <ol data-design="Steps" aria-label={label} className="flex flex-wrap items-center gap-y-3">
         {steps.map((raw, index) => {
           const step = { ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }
@@ -62,7 +62,7 @@ export default function Stepper({
           const clickable = (filled || needsFix) && !isCurrent && (step.anchor || step.onSelect)
           const circle = (
             <span
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${
                 filled
                   ? isCurrent
                     ? 'bg-accent-deep text-on-accent outline-accent-deep outline-2 outline-offset-2'

@@ -4,7 +4,7 @@ import { createHqSupportRequest, recordBillingEvent } from '@line-crm/db';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { jstMonthStart, opsDashboard, resolvePeriod } from './ops-dashboard.js';
+import { jstIso, jstMonthStart, opsDashboard, resolvePeriod } from './ops-dashboard.js';
 
 /** ★V6 37-2 運営ダッシュボード。Stripe入金実績と定価フォールバック。 */
 
@@ -36,6 +36,11 @@ type Body = { data: {
 function iso(daysFromNow: number): string {
   const t = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000 + 9 * 60 * 60 * 1000);
   return t.toISOString().replace('Z', '+09:00');
+}
+
+/** その月の中に確実に入る時刻（月初+1時間）。月初の日に「昨日」が前月へ逃げるのを防ぐ。 */
+function isoInMonth(period: 'month' | 'prev_month'): string {
+  return jstIso(Date.parse(resolvePeriod(period).from) + 60 * 60 * 1000);
 }
 
 beforeEach(() => {
@@ -114,8 +119,8 @@ describe('集計', () => {
   });
 
   it('Stripe入金・返金・年払いを集計し、請求書の無い契約先だけ定価で補う', async () => {
-    const current = iso(-1);
-    const previous = iso(-35);
+    const current = isoInMonth('month');
+    const previous = isoInMonth('prev_month');
     const insert = testDb.raw.prepare(`INSERT INTO billing_invoices
       (id, tenant_id, status, amount_paid, amount_due, amount_refunded, currency, interval, paid_at, synced_at, created_at)
       VALUES (?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -152,9 +157,9 @@ describe('集計', () => {
   it('使用量は今月の配信通数・バナー生成・メディア容量をプランの上限と比べる', async () => {
     testDb.raw.prepare(`INSERT INTO friends (id, line_user_id, display_name, line_account_id) VALUES ('f1', 'Uf1', '友だち', 'la-1')`).run();
     for (let i = 0; i < 4; i += 1) {
-      testDb.raw.prepare(`INSERT INTO messages_log (id, friend_id, line_account_id, direction, message_type, content, created_at) VALUES (?, 'f1', 'la-1', 'outgoing', 'text', 'hi', ?)`).run(`m${i}`, iso(-1));
+      testDb.raw.prepare(`INSERT INTO messages_log (id, friend_id, line_account_id, direction, message_type, content, created_at) VALUES (?, 'f1', 'la-1', 'outgoing', 'text', 'hi', ?)`).run(`m${i}`, isoInMonth('month'));
     }
-    testDb.raw.prepare(`INSERT INTO banner_usage_ledger (id, tenant_id, units, reason, created_at) VALUES ('b1', 'tenant-a', 30, 'generate', ?)`).run(iso(-1));
+    testDb.raw.prepare(`INSERT INTO banner_usage_ledger (id, tenant_id, units, reason, created_at) VALUES ('b1', 'tenant-a', 30, 'generate', ?)`).run(isoInMonth('month'));
     const body = await (await app(master).request('/api/ops/dashboard')).json() as Body;
     expect(body.data.usage[0]).toMatchObject({ tenantName: '株式会社サンプル', messages: 4, limits: { messages: 30_000 } });
     // バナー 30/150 = 20% が最大

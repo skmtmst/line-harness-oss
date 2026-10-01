@@ -9,7 +9,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
-import { authRequest, emailError } from '@/lib/auth-email'
+import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
@@ -64,7 +64,7 @@ export default function OpsLoginPage() {
       next: 'ops',
     })
     if (!res.ok || !res.data) {
-      setError(res.error || 'ログインできませんでした')
+      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? 'ログインできませんでした')
       setBusy(null)
       return
     }
@@ -80,7 +80,11 @@ export default function OpsLoginPage() {
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
-    else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
+    // M041：保存に投げても（シークレットモードの制限など）固まらない。
+    // Cookie のセッションで足りるので、ここでは進める。
+    else if (res.csrfToken) {
+      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
+    }
 
     // 運営メンバーかどうかをサーバーに確かめてから /ops へ。
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -119,7 +123,7 @@ export default function OpsLoginPage() {
       title="ログイン"
       description={
         <>
-          <span className="mb-1 block text-caption font-bold text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
           メールアドレスとパスワードでログインします。LINE で登録した運営メンバーは LINE でログインしてください。
         </>
       }
@@ -148,8 +152,7 @@ export default function OpsLoginPage() {
             パスワードを忘れた方はこちら
           </Link>
         </div>
-        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full">
-          {busy === 'password' ? 'ログインしています…' : 'ログイン'}
+        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
         </Button>
       </form>
 
@@ -159,9 +162,8 @@ export default function OpsLoginPage() {
         <span className="h-px flex-1 bg-hairline" />
       </div>
 
-      <Button onClick={lineLogin} disabled={busy !== null} className="w-full">
-        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />
-        {busy === 'line' ? 'LINEへ移動中…' : 'LINE でログイン'}
+      <Button onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
+        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン
       </Button>
 
       <p className="text-center text-caption text-ink-faint">

@@ -249,14 +249,14 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
     expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('季節メニュー')
   })
 
-  test('確認で「保存せずに移動」を選ぶと遷移する', async () => {
+  test('確認で「保存せずに移る」を選ぶと遷移する', async () => {
     render(<NewRichMenuPage />)
     await flush()
 
     await type(screen.getByLabelText('メニュー名'), '季節メニュー')
     fireEvent.click(screen.getByText('リッチメニュー'))
     await flush()
-    fireEvent.click(screen.getByText('保存せずに移動'))
+    fireEvent.click(screen.getByText('保存せずに移る'))
     await flush()
     expect(routerPush).toHaveBeenCalledWith('/rich-menus')
   })
@@ -306,7 +306,7 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
     const nameInput = await screen.findByDisplayValue('メインメニュー')
     await type(nameInput, 'メインメニュー改')
     // 保存（update→再読込で署名が更新される）
-    fireEvent.click(screen.getByText('下書きに保存'))
+    fireEvent.click(screen.getByText('下書きを保存する'))
     await act(async () => { await Promise.resolve() })
     await flush()
 
@@ -427,7 +427,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
   })
 
-  test('「保存せずに移動」を選ぶと公開入力は初期値へ戻る', async () => {
+  test('「保存せずに移る」を選ぶと公開入力は初期値へ戻る', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
     const view = render(<RichMenuEditPage />)
     await flush()
@@ -437,7 +437,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
 
     fireEvent.click(screen.getByText('リッチメニュー'))
     await flush()
-    fireEvent.click(screen.getByText('保存せずに移動'))
+    fireEvent.click(screen.getByText('保存せずに移る'))
     await flush()
     expect(routerPush).toHaveBeenCalledWith('/rich-menus')
 
@@ -459,7 +459,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     await fillPublishSchedule()
 
     richMenuUpdate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'x' }))
-    fireEvent.click(screen.getByText('下書きに保存'))
+    fireEvent.click(screen.getByText('下書きを保存する'))
     await flush()
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
@@ -650,7 +650,7 @@ describe('公開前チェックの人数（未保存条件）', () => {
 /*
  * 公開のしかたの入力は、サーバーの下書きpayloadに乗せる欄が無いので
  * メニューIDごとに localStorage へ下書き保存する。再読込・タブ終了で
- * 消えず、別メニューの下書きと混ざらない。「保存せずに移動」・公開予約の
+ * 消えず、別メニューの下書きと混ざらない。「保存せずに移る」・公開予約の
  * 保存成功・LINE登録・メニュー削除で消す。
  */
 describe('公開入力の下書き（localStorage）', () => {
@@ -696,7 +696,7 @@ describe('公開入力の下書き（localStorage）', () => {
     expect(screen.getByLabelText('出しおわり').textContent).toContain('2026年10月7日（水）10:00')
   })
 
-  test('「保存せずに移動」を選ぶと下書きも消える', async () => {
+  test('「保存せずに移る」を選ぶと下書きも消える', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
     render(<RichMenuEditPage />)
     await flush()
@@ -706,7 +706,7 @@ describe('公開入力の下書き（localStorage）', () => {
 
     fireEvent.click(screen.getByText('リッチメニュー'))
     await flush()
-    fireEvent.click(screen.getByText('保存せずに移動'))
+    fireEvent.click(screen.getByText('保存せずに移る'))
     await flush()
 
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull()

@@ -74,8 +74,22 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   /*
    * R512: 同じ作成のやり直しは同じ要求キーで送る。入力を変えたら
    * 新しいキーにする（同じキーに異なる内容はサーバが409で止める）。
+   * キーは保存の直前に内容と比べて決める。useEffect での作り直しは
+   * 描画の後追いになり、一覧の読み直し直後の再送と行き違いで
+   * キーが替わることがあるため、ここでは使わない。
    */
-  const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
+  const idempotencyKeyRef = useRef<{ signature: string; key: string } | null>(null)
+  const attemptSignature = JSON.stringify([
+    name, color, displayOrder, isDefault,
+    createRule, ruleEvent, ruleActive, ruleProtectionMinutes,
+  ])
+  function attemptKey(): string {
+    const current = idempotencyKeyRef.current
+    if (current && current.signature === attemptSignature) return current.key
+    const key = crypto.randomUUID()
+    idempotencyKeyRef.current = { signature: attemptSignature, key }
+    return key
+  }
   /*
    * R513: ほかの担当者が先に変えていたときの最新の内容。
    * 入力は残したまま、最新の名前・色・並び順と版を見せて選ばせる。
@@ -120,16 +134,19 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
    */
   const canManageByRole = useCanManageSupportMark()
   const roleBlocked = canManageByRole === false
-  // 入力の中身が変わったら、次に押す作成は別の要求として新しいキーにする。
-  useEffect(() => {
-    idempotencyKeyRef.current = crypto.randomUUID()
-  }, [name, color, displayOrder, isDefault, createRule, ruleEvent, ruleActive, ruleProtectionMinutes])
   /*
    * R510: 初回の読み込みだけ入力欄を埋める。再読み込みでは入力内容を
    * 失わない（一覧と重複の注意だけを新しくする）。アカウントや対象が
    * 変わったら次の読み込みで埋め直す。
    */
   const initialLoadRef = useRef(true)
+  /*
+   * R540: アカウント切替より前の要求の応答は捨てる。遅れて届いた
+   * 古い一覧で表示・並び順・重複の注意を上書きしない。
+   */
+  const loadSeqRef = useRef(0)
+  /** 受け付けた一覧のアカウント。保存は選択中と一致するときだけ送る。 */
+  const loadedAccountRef = useRef<string | null>(null)
   const load = useCallback(async () => {
     const account = selectedAccountId
     if (!account) {
@@ -138,12 +155,15 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       setLoadState('error')
       return
     }
+    const seq = ++loadSeqRef.current
     setReloading(true)
     setLoadMessage('')
     try {
       const res = await api.supportMarks.list(account)
+      if (loadSeqRef.current !== seq) return
       if (!res.success) throw new Error(res.error)
       const rows = res.data
+      loadedAccountRef.current = account
       setItems(rows)
       const current = rows.find((mark) => mark.id === markId)
       if (current) {
@@ -168,6 +188,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         setLoadState('ready')
       }
     } catch (reason) {
+      // R540: 古い要求の失敗も今の画面には出さない。
+      if (loadSeqRef.current !== seq) return
       const status = (reason as { status?: number } | null)?.status
       if (status === 403) {
         setLoadMessage('')
@@ -177,8 +199,10 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         setLoadState('error')
       }
     } finally {
-      initialLoadRef.current = false
-      setReloading(false)
+      if (loadSeqRef.current === seq) {
+        initialLoadRef.current = false
+        setReloading(false)
+      }
     }
   }, [editing, markId, selectedAccountId])
 
@@ -194,7 +218,9 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
     if (!name.trim()) return setError('マーク名を入力してください')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     // R510: 一覧を読めていない間の保存は送らない（重複の注意も出せないため）。
+    // R540: 受け付けた一覧と選択中が違う（切替中・古い応答だけ）の保存も送らない。
     if (loadState !== 'ready' || roleBlocked || saveForbidden) return
+    if (loadedAccountRef.current !== selectedAccountId) return
     setSaving(true)
     setError('')
     setConflict(null)
@@ -209,7 +235,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         : await api.supportMarks.create(selectedAccountId, {
             name: name.trim(), color, displayOrder, isDefault, autoOnInbound: false,
             automationRules: createRule ? [{ name: `${name.trim()}：${eventLabel(ruleEvent)}`, event: ruleEvent, condition: null, priority: 0, manualProtectionMinutes: ruleProtectionMinutes, isActive: ruleActive } satisfies SaveSupportMarkAutomationRule] : [],
-          }, idempotencyKeyRef.current)
+          }, attemptKey())
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
     } catch (reason) {
@@ -258,6 +284,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       : loadState === 'forbidden' ? '対応マークを見る権限がありません'
         : roleBlocked ? '対応マークを作る権限がありません'
           : saveForbidden ? '対応マークを保存する権限がありません'
+            // R540: 切替中は古い一覧での保存を止め、理由を本文に出す。
+            : loadState === 'ready' && loadedAccountRef.current !== selectedAccountId ? 'アカウントを切り替えています。一覧を読み込むまでお待ちください'
             : !name.trim() ? 'マーク名を入力すると保存できます'
               : editing && !selected ? '編集中のマークを読み込めませんでした'
                 : null
@@ -338,7 +366,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           <fieldset className="mb-4">
             <legend className="mb-2 text-xs font-semibold text-ink-secondary">色</legend>
             <div className="flex flex-wrap gap-2">
-              {COLORS.map((item) => <button key={item.value} type="button" onClick={() => setColor(item.value)} aria-label={item.name} title={item.name} aria-pressed={color === item.value} className={`h-8 w-8 rounded-full ${color === item.value ? 'ring-2 ring-ink ring-offset-2' : ''}`} style={{ backgroundColor: item.value }} />)}
+              {COLORS.map((item) => <button key={item.value} type="button" onClick={() => setColor(item.value)} aria-label={item.name} title={item.name} aria-pressed={color === item.value} className={`h-8 w-8 rounded-pill ${color === item.value ? 'ring-2 ring-ink ring-offset-2' : ''}`} style={{ backgroundColor: item.value }} />)}
             </div>
           </fieldset>
           <label className="mb-4 block">
@@ -440,7 +468,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       <StickyBar
         className="mt-4"
         status={blockedReason ?? (editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください')}
-        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saveDisabled} onClick={() => void save()}>{saving ? '保存中…' : editing ? '変更を保存' : '対応マークを作る'}</Button></>}
+        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saveDisabled} onClick={() => void save()} busy={saving}>{editing ? '保存する' : '対応マークを作る'}</Button></>}
       />
       </>
       )}

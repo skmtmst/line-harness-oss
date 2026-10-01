@@ -18,6 +18,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
@@ -185,6 +186,14 @@ export default function NewInflowLinkPage() {
         }
         return null
       }}
+      /*
+       * M030: 発行の失敗は原文のまま出さない。403は権限の案内、
+       * 400は入力の直し方つき、409は重複の立て直し文、429は待ち案内、
+       * 機械コードだけの失敗は再試行の案内にする。
+       */
+      describeError={(e) => describeApiFailure(e, '発行', {
+        forbidden: '発行するには権限が要ります。オーナーか管理者に依頼してください。',
+      })}
       onSave={async () => {
         if (!selectedAccountId) {
           throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
@@ -277,7 +286,7 @@ export default function NewInflowLinkPage() {
         {previewUrl ? (
           <div className="mt-3">
             {/* #975 U065: 保存前は「未発行の見本」と明記する。 */}
-            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-bold text-ink-secondary">
+            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-medium text-ink-secondary">
               保存前の見本 — まだ発行されていません
             </p>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
@@ -434,7 +443,7 @@ export default function NewInflowLinkPage() {
 function FlowStep({ step, title, description }: { step: string; title: string; description: string }) {
   return (
     <li className="flex gap-2">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{step}</span>
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-accent-deep text-xs font-medium text-on-accent">{step}</span>
       <span><strong className="block text-ink-secondary">{title}</strong>{description}</span>
     </li>
   )

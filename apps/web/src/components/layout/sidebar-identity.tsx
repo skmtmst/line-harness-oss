@@ -42,7 +42,10 @@ export default function SidebarIdentity() {
       <span className={styles.mark} aria-hidden="true">{initial}</span>
       <span className={styles.text}>
         <span className={styles.name} title={name}>{name}</span>
-        {isRealVersion(version) && <span className={styles.version}>Ver. {version.trim()}</span>}
+        {/* V8 では社名の下に製品名を出す（版の情報はメニューの一番下にある）。
+            v7 では今までどおり版を出す。 */}
+        <span className={`${styles.version} v8-only`}>LINE Harness</span>
+        {isRealVersion(version) && <span className={`${styles.version} v7-only`}>Ver. {version.trim()}</span>}
       </span>
     </div>
   )

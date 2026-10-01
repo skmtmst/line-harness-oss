@@ -160,9 +160,9 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
   })
 
   it('編集画面の日時表示は端末の時間帯に依存しない(EVENT-05)', () => {
-    expect(FORM).toMatch(/formatJpDateTime[\s\S]*?timeZone: 'Asia\/Tokyo'/)
+    expect(FORM).toMatch(/function formatJpDateTime[\s\S]*?formatDateTime\(d\)/)
     // 一覧側は既に JST 固定。両方が同じ固定を持つことだけを見る。
-    expect(LIST_PAGE).toContain(`timeZone: 'Asia/Tokyo'`)
+    expect(LIST_PAGE).toContain('formatDay')
   })
 
   it('作成画面は更新した枠を保存後に読み直してから次段階へ進む(EVENT-01)', () => {
@@ -171,6 +171,6 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
   })
 
   it('公開OFFの保存はボタン名も公開と読ませない(EVENT-02)', () => {
-    expect(WIZARD).toContain("draft.is_published === 1 ? '保存して公開' : '下書きとして保存'")
+    expect(WIZARD).toContain("draft.is_published === 1 ? '保存して公開' : '下書きを保存する'")
   })
 })

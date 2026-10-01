@@ -16,7 +16,7 @@
   border: 1px solid;
   border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
   font-size: var(--text-nano); /* fontSize: $size-nano */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 500; /* fontWeight: 500 */
   white-space: nowrap;
 }
 
@@ -57,5 +57,21 @@
   border-color: var(--color-status-danger);
   background: var(--color-status-danger-soft);
   color: var(--color-danger);
+}
+
+/*
+ * ★V8「タグ」（h7Ch3y）：文字 12px・余白 2/8。中立のタグは
+ * 白地・細い枠・ink-secondary（意味の色を持つ札は状態の札の役目）。
+ */
+[data-theme='v8'] .chip {
+  height: auto;
+  padding: 2px 8px;
+  font-size: var(--text-caption);
+  font-weight: 400;
+}
+
+[data-theme='v8'] .neutral {
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
 }
 }

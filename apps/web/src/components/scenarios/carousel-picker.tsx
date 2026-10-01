@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Select from '@/components/shared/select'
 import { scenarioReferenceData } from './scenario-reference-data'
+import Button from '@/components/shared/button'
 
 interface SendableTemplateCandidate {
   accountId?: string | null
@@ -125,12 +126,9 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           パネルを並べて作る画面が別にあります。そこで作ると、ここから選べるようになります。
         </p>
-        <Link
-          href="/templates/carousel"
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control mt-3 inline-flex h-10 items-center border px-4 text-sm"
-        >
+        <Button variant="secondary" className="text-ink-secondary mt-3 h-10 items-center px-4 whitespace-normal" href="/templates/carousel">
           カルーセルを作りに行く
-        </Link>
+        </Button>
       </div>
     )
   }

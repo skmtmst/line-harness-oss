@@ -89,6 +89,6 @@ describe('案件作成の公開切り替え', () => {
     await act(async () => {
       checkbox().click()
     })
-    expect(host.textContent).toContain('下書きに保存')
+    expect(host.textContent).toContain('下書きを保存する')
   })
 })

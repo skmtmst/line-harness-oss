@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { formatDateTime } from '@/lib/format'
 
 const LABELS: Record<BroadcastAssetKind, { title: string; singular: string }> = {
   rich_message: { title: 'リッチメッセージ', singular: 'リッチメッセージ' },
@@ -43,9 +44,9 @@ export default function StaffAssetList({ kind }: { kind: BroadcastAssetKind }) {
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (
         <article key={item.id} className="bg-canvas rounded-card border-hairline border p-5">
-          <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-1 text-xs font-bold">{meta.title}</span>
+          <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-1 text-xs font-medium">{meta.title}</span>
           <h3 className="text-ink mt-3 truncate font-bold">{item.name}</h3>
-          <p className="text-ink-faint mt-1 text-xs">更新 {new Date(item.updatedAt).toLocaleString('ja-JP')}</p>
+          <p className="text-ink-faint mt-1 text-xs">更新 {formatDateTime(item.updatedAt)}</p>
           <div className="mt-4">
             <a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="border-accent text-accent-deep rounded-control inline-block border px-3 py-2 text-sm font-bold">一斉配信で使う</a>
           </div>

@@ -35,7 +35,7 @@ export default function ItemsTab() {
       </div>
       <div data-design="Body" data-design-node="health-items-body" className="grid gap-4 xl:grid-cols-2">
         <section className="rounded-card border border-hairline bg-canvas p-5">
-          <h2 className="text-label font-bold text-ink">お客様が記録する項目</h2>
+          <h2 className="text-label font-semibold text-ink">お客様が記録する項目</h2>
           <dl className="mt-3 flex flex-col gap-3">
             {ITEMS.map((item) => (
               <div key={item.label} className="flex flex-col gap-1 border-t border-hairline pt-3">
@@ -46,7 +46,7 @@ export default function ItemsTab() {
           </dl>
         </section>
         <section className="rounded-card border border-hairline bg-canvas p-5">
-          <h2 className="text-label font-bold text-ink">「気になる変化」の決まり</h2>
+          <h2 className="text-label font-semibold text-ink">「気になる変化」の決まり</h2>
           <dl className="mt-3 flex flex-col gap-3">
             {CHANGES.map((item) => (
               <div key={item.label} className="flex flex-col gap-1 border-t border-hairline pt-3">

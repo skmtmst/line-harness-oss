@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react'
 import { SESSION_LOST_EVENT } from '@/lib/api'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Button from '@/components/shared/button'
 
 const ROLE_KEY = 'lh_staff_role'
 
@@ -45,12 +46,12 @@ export default function SessionLostNotice() {
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+      className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-scrim p-4"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="session-lost-title"
     >
-      <div ref={panelRef} className="rounded-card mt-12 w-full max-w-xl bg-white p-6 shadow-lg">
+      <div ref={panelRef} className="rounded-card mt-12 w-full max-w-xl bg-canvas p-6 shadow-float">
         <h2 id="session-lost-title" className="text-ink text-lg font-bold">
           ログイン情報がサーバーに届いていません
         </h2>
@@ -83,23 +84,15 @@ export default function SessionLostNotice() {
         </p>
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-          >
+          <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={() => window.location.reload()}>
             再読み込み
-          </button>
-          <button
-            type="button"
-            onClick={() => {
+          </Button>
+          <Button variant="primary" className="h-10 px-5 font-bold border-0 whitespace-normal" type="button" onClick={() => {
               window.localStorage.removeItem(ROLE_KEY)
               window.location.href = '/login'
-            }}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-bold"
-          >
+            }}>
             ログインし直す
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { formatDay, formatNumber, formatRange, formatTime } from '@/lib/format'
 
 // BOOKING-01: 9〜18時の固定10マスは「空き枠」ではなく、空き枠APIの実績が
 // まだ届いていないときの表示レンジ。実際に受け付けられる枠が届いたら、
@@ -57,23 +58,8 @@ export function startOfWeek(day: string): string {
   return moveDay(day, -offset)
 }
 
-function dateLabel(day: string, weekday = true): string {
-  return new Date(`${day}T00:00:00+09:00`).toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: weekday ? 'short' : undefined,
-    timeZone: 'Asia/Tokyo',
-  })
-}
-
-function longDateLabel(day: string): string {
-  return new Date(`${day}T00:00:00+09:00`).toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-    timeZone: 'Asia/Tokyo',
-  })
+function dateLabel(day: string): string {
+  return formatDay(`${day}T00:00:00+09:00`)
 }
 
 const sep = '\u0000'
@@ -83,11 +69,7 @@ function bookingHour(booking: BookingRequest): number {
 }
 
 function bookingTime(booking: BookingRequest): string {
-  return new Date(booking.starts_at).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatTime(booking.starts_at)
 }
 
 /**
@@ -119,12 +101,12 @@ const CARD_STATUS_LABEL: Record<string, string> = {
 }
 
 function money(value: number): string {
-  return `¥${value.toLocaleString('ja-JP')}`
+  return `¥${formatNumber(value)}`
 }
 
 function Kpi({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
-    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-sm">
+    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-card">
       <p className="text-ink-secondary text-xs font-medium">{title}</p>
       <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}</p>
       <p className="text-ink-faint mt-1 text-xs">{detail}</p>
@@ -143,7 +125,7 @@ function BookingCard({ booking, compact = false, onOpen }: {
     <button
       type="button"
       onClick={() => onOpen(booking.id)}
-      className={`w-full rounded-md border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
+      className={`w-full rounded-mini border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
         phone
           ? 'border-action bg-action-soft text-action'
           : 'border-success bg-success-bg text-success'
@@ -170,12 +152,7 @@ function BookingCard({ booking, compact = false, onOpen }: {
  * R316: 日の見出し（9月30日(火)）。集計・注意の見出しで選んだ日を名指しする。
  */
 export function slotDateLabel(day: string): string {
-  return new Date(`${day}T00:00:00+09:00`).toLocaleDateString('ja-JP', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDay(`${day}T00:00:00+09:00`)
 }
 
 export function slotAriaLabel(input: { day: string; time: string; staffName?: string }): string {
@@ -237,7 +214,7 @@ function CalendarFrame({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-sm">
+    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-card">
       <div className="border-hairline flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="h-8 w-8">‹</Button>
@@ -648,7 +625,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
    * 今日の情報と読み違える。
    */
   const dayHead = slotDateLabel(anchorDay)
-  const weekHead = `${dateLabel(days[0], false)}〜${dateLabel(days[6], false)} の週`
+  const weekHead = `${formatRange(`${days[0]}T00:00:00+09:00`, `${days[6]}T00:00:00+09:00`)} の週`
   const isToday = anchorDay === todayKey()
   const isThisWeek = days.includes(todayKey())
   const periodHead = mode === 'day' ? dayHead : weekHead
@@ -708,7 +685,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         <div className="min-w-0 flex-1">
           {mode === 'day' ? (
             <CalendarFrame
-              title={longDateLabel(anchorDay)}
+              title={dateLabel(anchorDay)}
               meta={listMissing ? '—' : `${activeItems.length}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -1))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 1))}
@@ -718,7 +695,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
             </CalendarFrame>
           ) : (
             <CalendarFrame
-              title={`${dateLabel(days[0], false)}〜${dateLabel(days[6])}`}
+              title={`${formatRange(`${days[0]}T00:00:00+09:00`, `${days[6]}T00:00:00+09:00`)}`}
               meta={listMissing ? '—' : `${activeItems.length}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -7))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 7))}

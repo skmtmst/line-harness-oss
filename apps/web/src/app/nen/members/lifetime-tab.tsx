@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Chip from '@/components/shared/chip'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { DeleteAction } from '@/components/shared/row-actions'
@@ -17,6 +18,7 @@ import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { LoadStatus } from './page'
 import { yen } from './rank-view'
+import { formatNumber } from '@/lib/format'
 
 type Draft = { id: string | null; threshold: string; title: string; notify: boolean; reachedCount: number }
 
@@ -98,7 +100,10 @@ export default function LifetimeTab({
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
+      // M035: 生のまま出さず、共通の状態別案内へ渡す（403は権限・429は待ち案内）。
+      setError(describeApiFailure(caught, '節目の保存', {
+        forbidden: '節目を保存する権限がありません。権限を確認してください。',
+      }))
     } finally {
       setBusy(false)
     }
@@ -172,7 +177,7 @@ export default function LifetimeTab({
                     <span className="min-w-0 truncate text-label text-ink-faint" title="限定グッズは決まり次第ここで設定します">限定グッズは決まり次第ここで設定します</span>
                   </span>
                 </Td>
-                <Td align="right" className="cq-hide-below-1010 w-28"><span className="text-label font-semibold tabular-nums text-ink">{row.reachedCount.toLocaleString('ja-JP')}人</span></Td>
+                <Td align="right" className="cq-hide-below-1010 w-28"><span className="text-label font-semibold tabular-nums text-ink">{formatNumber(row.reachedCount)}人</span></Td>
                 <Td className="w-44">
                   <Toggle checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
                 </Td>
@@ -195,7 +200,7 @@ export default function LifetimeTab({
             disabled={drafts.length >= 12}
             onClick={() => { setDrafts((current) => [...current, { id: null, threshold: '', title: '', notify: true, reachedCount: 0 }]); setDirty(true) }}
           >
-            ＋ 節目を追加
+            ＋ 節目を追加する
           </button>
         </div>
       </section>
@@ -205,7 +210,7 @@ export default function LifetimeTab({
         actions={(
           <>
             <Button variant="secondary" onClick={() => { setDirty(false); setError(''); setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期する</Button>
           </>
         )}
       />

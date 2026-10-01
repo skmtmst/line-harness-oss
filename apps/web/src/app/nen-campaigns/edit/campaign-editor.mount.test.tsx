@@ -17,6 +17,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 const lineAccountsListApi = vi.hoisted(() => vi.fn())
 const settingsApi = vi.hoisted(() => vi.fn())
@@ -115,7 +116,7 @@ function bodyTextarea(): HTMLTextAreaElement {
 
 function saveButton(): HTMLButtonElement {
   const found = Array.from(container.querySelectorAll('button')).find(
-    (element) => element.textContent === '配信内容を保存',
+    (element) => element.textContent === '配信内容を保存する',
   )
   if (!found) throw new Error('保存ボタンが見つかりません')
   return found as HTMLButtonElement
@@ -198,7 +199,7 @@ describe('NEN配信本文の上限4500字（実mount・Issue #659）', () => {
     await mount()
     await setBody('あ'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH + 1))
 
-    const limitLabel = NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')
+    const limitLabel = formatNumber(NEN_CAMPAIGN_BODY_MAX_LENGTH)
     expect(container.textContent).toContain(`${limitLabel}字を超えています`)
     expect(saveButton().disabled).toBe(true)
 
@@ -262,7 +263,7 @@ describe('文言と実態の一致・書きかけの保護（実mount・#935）'
     expect(navigation.push).not.toHaveBeenCalled()
 
     const leave = Array.from(document.body.querySelectorAll('button'))
-      .find((b) => b.textContent === '保存せずに移動')
+      .find((b) => b.textContent === '保存せずに移る')
     await click(leave!)
     expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns?tab=auto')
   })

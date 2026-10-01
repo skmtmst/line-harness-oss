@@ -26,7 +26,7 @@
 .title {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-display); /* fontSize: $size-display */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .description {
@@ -40,5 +40,19 @@
   align-items: center;
   gap: 8px; /* gap: 8 */
   flex: none;
+}
+
+/*
+ * ★V8「板の頭」：題は 20px/600、説明は1行 13px ink-secondary。
+ * v7 の 30px の題は板の中では大きすぎる。
+ */
+[data-theme='v8'] .title {
+  font-size: var(--text-title);
+}
+
+[data-theme='v8'] .description {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 400;
 }
 }

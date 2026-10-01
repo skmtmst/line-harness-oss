@@ -109,6 +109,6 @@ describe('#707 送信中が見え、二重押し防止の当て先が残る', ()
   */
   test('内向きも送信中だと分かる（実ブラウザの当て先は無い）', () => {
     expect(overviews).toContain('data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined}')
-    expect(overviews).toContain("? (selected.isActive ? '止めています…' : '動かしています…')")
+    expect(overviews).toContain("(selected.isActive ? '止めています…' : '動かしています…')")
   })
 })

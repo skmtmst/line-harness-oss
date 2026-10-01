@@ -20,6 +20,7 @@ import {
   insertNotificationResendDelivery,
   finishNotificationResendDelivery,
   createCustomerTestInstance,
+  failCustomerTestInstance,
   recordCustomerTestDelivery,
   recordCustomerTestAudit,
   jstDateString,
@@ -889,7 +890,23 @@ lineNotifications.post(
       ? await tryReserveQuotaSlot(c.env.DB, lineAccountId, reservationId, 1, quota.used, quota.total)
       : false;
     if (quota.state === 'available' && !reserved) {
-      return c.json({ success: false, code: 'quota_insufficient', error: '同時送信を含めると送信枠が足りないため、再送できません' }, 409);
+      // 枠の予約より先に作った再送行を、未送信のまま(pending)に残さない。
+      // 送らなかった理由つきの失敗で確定し、履歴に残す(m26e R566)。
+      const finalized = await finishNotificationResendDelivery(c.env.DB, {
+        id: created.id,
+        lineAccountId,
+        idempotencyKey: created.idempotencyKey,
+        outcome: 'failed',
+        errorCode: 'quota_insufficient',
+        errorMessageSafe: '同時送信を含めると送信枠が足りないため、再送できません',
+      });
+      if (!finalized) throw new Error('notification resend result was not recorded');
+      return c.json({
+        success: false,
+        code: 'quota_insufficient',
+        error: '同時送信を含めると送信枠が足りないため、再送できません',
+        data: { id: created.id },
+      }, 409);
     }
     try {
       let result: { data: unknown; requestId: string | null };
@@ -1022,7 +1039,27 @@ lineNotifications.post(
             c.env.DB, lineAccountId, reservationId, 1, quota.used, quota.total,
           );
           if (!reserved) {
-            return c.json({ success: false, code: 'quota_insufficient', error: '同時送信を含めると送信枠が足りないため、試し送りできません' }, 409);
+            // 枠の予約より先に作った記録先を、送達のない成功前提のままに
+            // 残さない。失敗で確定し、送れなかった理由を監査に残す(m26e R567)。
+            const finalized = await failCustomerTestInstance(c.env.DB, {
+              lineAccountId, instanceId,
+            });
+            if (!finalized) throw new Error('customer test instance was not recorded');
+            await recordCustomerTestAudit(c.env.DB, {
+              definitionId: found.definition.id,
+              lineAccountId,
+              staffId: c.get('staff').id,
+              sourceEventId,
+              recipientIds: friendIds,
+              outcome: 'quota_insufficient',
+              errorMessage: '同時送信を含めると送信枠が足りないため、試し送りできません',
+            });
+            return c.json({
+              success: false,
+              code: 'quota_insufficient',
+              error: '同時送信を含めると送信枠が足りないため、試し送りできません',
+              data: { instanceId },
+            }, 409);
           }
           reservedIds.push(reservationId);
         }

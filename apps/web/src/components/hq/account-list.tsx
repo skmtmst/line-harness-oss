@@ -4,6 +4,7 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
 export function accountIconUrl(account: AccountWithStats): string | null {
   return account.pictureUrl || account.iconUrl || null
@@ -13,10 +14,10 @@ function AccountIcon({ account }: { account: AccountWithStats }) {
   const src = accountIconUrl(account)
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element -- LINE公式アカウントのCDN画像
-    return <img src={src} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+    return <img src={src} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
   }
   const label = (account.displayName || account.name).trim().slice(0, 1)
-  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-deep">{label}</span>
+  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-sm font-bold text-accent-deep">{label}</span>
 }
 
 function ConnectionStatus({ status }: { status: 'ok' | 'warn' | 'unknown' | undefined }) {
@@ -37,7 +38,7 @@ export default function HqAccountList({
   selectLabel?: string
 }) {
   return (
-    <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+    <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
       {/*
         U042: 768px 未満では表の右端にある操作（ログイン・設定）へ
         横スクロールしないと届かなかった。スマホでは名前＋状態＋操作が
@@ -66,15 +67,15 @@ export default function HqAccountList({
               <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">友だち数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')}</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.friendCount ?? 0))}</dd>
                 </div>
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">今月の配信数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.messagesThisMonth ?? 0).toLocaleString('ja-JP')}</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.messagesThisMonth ?? 0))}</dd>
                 </div>
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">担当者数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.staffCount ?? 0).toLocaleString('ja-JP')}人</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.staffCount ?? 0))}人</dd>
                 </div>
               </dl>
             </details>
@@ -106,10 +107,10 @@ export default function HqAccountList({
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')}</td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{(account.stats?.messagesThisMonth ?? 0).toLocaleString('ja-JP')}</td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.friendCount ?? 0))}</td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.messagesThisMonth ?? 0))}</td>
                 <td className="px-4 py-2"><ConnectionStatus status={account.connection?.status} /></td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{(account.stats?.staffCount ?? 0).toLocaleString('ja-JP')}人</td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.staffCount ?? 0))}人</td>
                 <td className="px-4 py-2"><StatusBadge tone={account.isActive ? 'success' : 'neutral'} size="compact">{account.isActive ? '有効' : '停止中'}</StatusBadge></td>
                 <td className="px-5 py-2 text-right">
                   <div className="flex justify-end gap-2">

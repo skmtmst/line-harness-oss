@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ConversionsPage from './page'
 
@@ -330,6 +331,58 @@ describe('編集も起点に合う金額の決め方にする', () => {
     expect(byLabel('金額の決め方')?.textContent).toContain('連携元の金額を使う')
     expect(amountNotice()).toBeNull()
     expect(await openOptions()).toContain('連携元の金額を使う')
+  })
+})
+
+describe('S4-OR 編集の数えない条件は空のかたまりを黙って落とさない', () => {
+  /** 編集の窓の中の or 追加ボタン。作成と同じ共通部品。 */
+  function orAddButton(): HTMLElement | undefined {
+    return [...document.body.querySelectorAll('button')]
+      .find((node) => node.textContent?.includes('いずれか1つ以上を満たす'))
+  }
+
+  /** 編集の窓の中の条件の足し口。最初は1つ、or 追加で2つ。 */
+  function kindPickers(): HTMLElement[] {
+    return [...document.body.querySelectorAll('[role="combobox"]')]
+      .filter((node) => node.getAttribute('aria-label') === '追加する条件を選ぶ')
+  }
+
+  function pickKind(node: HTMLElement, query: string) {
+    fireEvent.focus(node)
+    fireEvent.change(node, { target: { value: query } })
+    fireEvent.keyDown(node, { key: 'ArrowDown' })
+    fireEvent.keyDown(node, { key: 'Enter' })
+  }
+
+  it('空の or かたまりのまま決めると案内が出て、版上げの口は呼ばれない', async () => {
+    await mount()
+    await openEditDialog()
+    expect(kindPickers()).toHaveLength(1)
+    await click(orAddButton())
+    expect(kindPickers()).toHaveLength(2)
+    await click(byText('この内容にする'))
+
+    expect(document.body.textContent).toContain('空の「いずれか」の条件のかたまりがあります')
+    expect(net.calls.filter((call) => call.path.includes('/revise'))).toHaveLength(0)
+    // 窓は開いたまま。下書きも残る。
+    expect(kindPickers()).toHaveLength(2)
+  })
+
+  it('かたまりに条件を入れると決められ、除外として送られる', async () => {
+    await mount()
+    await openEditDialog()
+    await click(orAddButton())
+    await act(async () => {
+      pickKind(kindPickers()[1], '行動スコア')
+    })
+    await click(byText('この内容にする'))
+
+    const revise = net.calls.find((call) => call.path.includes('/revise'))
+    expect(revise, '編集の口が呼ばれていません').toBeTruthy()
+    const exclusion = (revise!.body as { sourceConfig: { exclusion: {
+      groups: Array<{ rules: Array<{ type: string }> }> } | null } }).sourceConfig.exclusion
+    expect(exclusion?.groups).toHaveLength(1)
+    expect(exclusion?.groups?.[0].rules[0].type).toBe('score_range')
   })
 })
 

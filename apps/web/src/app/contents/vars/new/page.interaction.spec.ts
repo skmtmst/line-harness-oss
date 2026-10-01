@@ -99,7 +99,7 @@ test('社内メモと通常値を登録内容へ含める', async ({ page }) => 
   await page.getByLabel('共通情報名 *').fill('shop hours')
   await page.getByRole('textbox', { name: '値', exact: true }).fill('平日 10:00〜18:00')
   await page.getByLabel('社内メモ 任意').fill('祝日の前日に更新する')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('button', { name: '登録する', exact: true }).click()
 
   await expect.poll(() => posted.length).toBe(1)
   expect(posted[0]).toMatchObject({
@@ -117,7 +117,7 @@ test('秘密値らしい内容は送信せず、入力へ戻って修正でき�
 
   await page.getByLabel('共通情報名 *').fill('shop secret check')
   await page.getByRole('textbox', { name: '値', exact: true }).fill('password: hunter2')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('button', { name: '登録する', exact: true }).click()
 
   const warning = page.getByRole('alertdialog')
   await expect(warning).toContainText('秘密値の可能性がある内容を確認してください')
@@ -128,7 +128,7 @@ test('秘密値らしい内容は送信せず、入力へ戻って修正でき�
   await expect(page.getByRole('textbox', { name: '値', exact: true })).toBeFocused()
 
   await page.getByRole('textbox', { name: '値', exact: true }).fill('通常の案内文')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('button', { name: '登録する', exact: true }).click()
   await expect.poll(() => posted.length).toBe(1)
   expect(posted[0]).toMatchObject({ value: '通常の案内文' })
 })
@@ -141,7 +141,7 @@ test('警告表示中にアカウントを切り替えると、前アカウン�
   await page.getByLabel('共通情報名 *').fill('account-1 の下書き')
   await page.getByRole('textbox', { name: '値', exact: true }).fill('通常値')
   await page.getByLabel('社内メモ 任意').fill('password: hunter2')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('button', { name: '登録する', exact: true }).click()
 
   const warning = page.getByRole('alertdialog')
   await expect(warning).toBeVisible()
@@ -158,7 +158,7 @@ test('警告表示中にアカウントを切り替えると、前アカウン�
   // account-2 用に改めて入力し、account-2 として正しく登録できる。
   await page.getByLabel('共通情報名 *').fill('account-2 の値')
   await page.getByRole('textbox', { name: '値', exact: true }).fill('account-2 の通常値')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('button', { name: '登録する', exact: true }).click()
 
   await expect.poll(() => posted.length).toBe(1)
   expect(posted[0]).toMatchObject({
@@ -179,7 +179,7 @@ test('日本語の秘密値ラベルを社内メモに書くと、送信前に�
   await page.getByLabel('差し込み名 *').fill('ja_label_check')
   await page.getByRole('textbox', { name: '値', exact: true }).fill('通常値')
   await page.getByLabel('社内メモ 任意').fill('パスワード: hunter2')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('button', { name: '登録する', exact: true }).click()
 
   const warning = page.getByRole('alertdialog')
   await expect(warning).toContainText('秘密値の可能性がある内容を確認してください')
@@ -196,7 +196,7 @@ test('保存した社内メモは、編集画面を開き直すと再表示さ�
   await page.getByLabel('差し込み名 *').fill('redisplay_check')
   await page.getByRole('textbox', { name: '値', exact: true }).fill('平日 10:00〜18:00')
   await page.getByLabel('社内メモ 任意').fill('更新は毎月1日に確認する')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('button', { name: '登録する', exact: true }).click()
   await expect.poll(() => posted.length).toBe(1)
   const created = posted[0]
 

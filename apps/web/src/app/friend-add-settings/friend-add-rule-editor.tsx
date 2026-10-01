@@ -9,7 +9,6 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import LinePreview from '@/components/shared/line-preview'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
@@ -42,6 +41,7 @@ import {
 } from './friend-add-flow'
 import { resendSuppressionText } from './friend-add-text'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import './friend-add-rule-editor.css'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
@@ -452,7 +452,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         <Summary step={step} rule={rule} definition={definition} options={options} matchedLast28Days={matchedLast28Days} pendingAction={actionDialogOpen && Boolean(actionTarget)} />
       </div>
 
-      <StickyBar className="friend-add-editor-sticky" status={notice || undefined} actions={<><Button href="/friend-add-settings">キャンセル</Button><Button type="button" onClick={() => void save()} disabled={saving}>下書き保存</Button>{step === 'preview' ? <Button type="button" variant="primary" onClick={() => void runTest()} disabled={saving}>{saving ? 'テスト中…' : 'テスト送信'}</Button> : <Button type="button" variant="primary" onClick={() => moveToStep(STEPS[Math.min(currentIndex + 1, 4)].key)} disabled={saving}>{STEPS[Math.min(currentIndex + 1, 4)].label}へ</Button>}</>} />
+      <StickyBar className="friend-add-editor-sticky" status={notice || undefined} actions={<><Button href="/friend-add-settings">キャンセル</Button><Button type="button" onClick={() => void save()} disabled={saving}>下書きを保存する</Button>{step === 'preview' ? <Button type="button" variant="primary" onClick={() => void runTest()} disabled={saving} busy={saving} busyLabel="テスト中…">テストを送る</Button> : <Button type="button" variant="primary" onClick={() => moveToStep(STEPS[Math.min(currentIndex + 1, 4)].key)} disabled={saving}>{STEPS[Math.min(currentIndex + 1, 4)].label}へ</Button>}</>} />
 
       {actionDialogOpen && (
         <div data-design-node="txMO9">
@@ -462,7 +462,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
             description={`選択した${definition.actions.length + 1}件のアクションを配信フローへ追加します。`}
             titleIcon={<Check size={18} />}
             cancelLabel="初回案内へ戻る"
-            confirmLabel="アクションを追加"
+            confirmLabel="アクションを追加する"
             confirmIcon={<Plus size={16} />}
             designNode="txMO9"
             onCancel={() => router.replace(hrefFor('actions'))}
@@ -471,12 +471,10 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         </div>
       )}
 
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、保存していない変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="追加時の動きへの変更"
+        busy={saving}
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
@@ -556,7 +554,7 @@ function RoutesStep({ rule, definition, options, toggleRoute, setDefinition, rou
             </div>
           ))}
         </div>
-        <div><Button type="button" onClick={() => setDefinition((current) => ({ ...current, timeWindows: addTimeWindow(current.timeWindows) }))}><Plus size={16} />時間帯を追加</Button></div>
+        <div><Button type="button" onClick={() => setDefinition((current) => ({ ...current, timeWindows: addTimeWindow(current.timeWindows) }))}><Plus size={16} />時間帯を追加する</Button></div>
       </div>
       <div className={'friend-add-editor-twoCols'}>
         <Field label="有効期間の開始"><DateTimeField aria-label="有効期間の開始" value={definition.activeFrom ?? ''} onChange={(v) => setDefinition((current) => ({ ...current, activeFrom: v || null }))} /></Field>
@@ -634,7 +632,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, openAct
         <div className={'friend-add-editor-info'}>
           基本設定で「何も配信しない」を選んでいるため、初回メッセージ・送信時刻・配信シナリオは使いません。実行されるのは案内後のアクションだけです。
         </div>
-        <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
+        <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加する</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
       </Section>
     )
   }
@@ -662,7 +660,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, openAct
         <small>初回案内のあとに登録するシナリオです。このアカウントのシナリオだけ選べます。</small>
         {scenarioError && <small className={'friend-add-editor-fieldError'} role="alert">{scenarioError}</small>}
       </Field>
-      <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
+      <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加する</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
       <Field label="流入経路が不明な場合">
         <small>共通案内を送るか、何もしないか選べます。</small>
         <RadioCardGroup legend="流入経路が不明な場合">
@@ -675,7 +673,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, openAct
 }
 
 function ActionsStep({ definition, setDefinition, options, actionType, actionTarget, setActionType, setActionTarget, openDialog }: { definition: FriendAddRuleDefinition; setDefinition: React.Dispatch<React.SetStateAction<FriendAddRuleDefinition>>; options: FriendAddRuleOptions; actionType: FriendAddRuleAction['type']; actionTarget: string; setActionType: (value: FriendAddRuleAction['type']) => void; setActionTarget: (value: string) => void; openDialog: () => void }) {
-  return <Section title="アクションの種類" description="友だち追加後に自動実行する内容を選びます。"><div className={'friend-add-editor-twoCols'}><Field label="アクション"><Select aria-label="アクション" value={actionType} onChange={(value) => { setActionType(value as FriendAddRuleAction['type']); setActionTarget('') }} options={[{ value: 'add_tag', label: 'タグを付与' }, { value: 'remove_tag', label: 'タグを解除' }, { value: 'start_scenario', label: 'シナリオを開始' }]} /></Field><Field label="実行タイミング"><TextField value="登録直後" disabled /></Field></div><Field label="設定内容"><Select aria-label="設定内容" value={actionTarget} onChange={(value) => setActionTarget(value)} options={[{ value: '', label: '選んでください' }, ...(actionType === 'start_scenario' ? options.scenarios : options.tags).map((item) => ({ value: item.id, label: item.name }))]} /></Field><div className={'friend-add-editor-actionList'}>{definition.actions.length === 0 ? <p>追加のアクションはありません。</p> : definition.actions.map((action, index) => <div key={`${action.type}-${index}`}><span>{index + 1}</span><strong>{action.label}</strong><IconButton aria-label={`${action.label}を外す`} onClick={() => setDefinition((current) => ({ ...current, actions: current.actions.filter((_, itemIndex) => itemIndex !== index) }))}><X size={16} /></IconButton></div>)}</div><Button type="button" variant="primary" onClick={openDialog} disabled={!actionTarget}><Plus size={16} />アクションを追加</Button></Section>
+  return <Section title="アクションの種類" description="友だち追加後に自動実行する内容を選びます。"><div className={'friend-add-editor-twoCols'}><Field label="アクション"><Select aria-label="アクション" value={actionType} onChange={(value) => { setActionType(value as FriendAddRuleAction['type']); setActionTarget('') }} options={[{ value: 'add_tag', label: 'タグを付与' }, { value: 'remove_tag', label: 'タグを解除' }, { value: 'start_scenario', label: 'シナリオを開始' }]} /></Field><Field label="実行タイミング"><TextField value="登録直後" disabled /></Field></div><Field label="設定内容"><Select aria-label="設定内容" value={actionTarget} onChange={(value) => setActionTarget(value)} options={[{ value: '', label: '選んでください' }, ...(actionType === 'start_scenario' ? options.scenarios : options.tags).map((item) => ({ value: item.id, label: item.name }))]} /></Field><div className={'friend-add-editor-actionList'}>{definition.actions.length === 0 ? <p>追加のアクションはありません。</p> : definition.actions.map((action, index) => <div key={`${action.type}-${index}`}><span>{index + 1}</span><strong>{action.label}</strong><IconButton aria-label={`${action.label}を外す`} onClick={() => setDefinition((current) => ({ ...current, actions: current.actions.filter((_, itemIndex) => itemIndex !== index) }))}><X size={16} /></IconButton></div>)}</div><Button type="button" variant="primary" onClick={openDialog} disabled={!actionTarget}><Plus size={16} />アクションを追加する</Button></Section>
 }
 
 function PreviewStep({ rule, definition, options, result, resultStale, testInput, setTestInput, accountId }: { rule: EditorRule; definition: FriendAddRuleDefinition; options: FriendAddRuleOptions; result: { matched: boolean; reasons: string[]; stateChanged: false } | null; resultStale: boolean; testInput: TestInput; setTestInput: React.Dispatch<React.SetStateAction<TestInput>>; accountId: string | null }) {
@@ -712,8 +710,16 @@ function Summary({ step, rule, definition, options, matchedLast28Days, pendingAc
   const scenario = options.scenarios.find((item) => item.id === definition.scenarioId)?.name
   // 「何も配信しない」ではメッセージもシナリオも送らない（R261）。
   const noneMode = rule.friendKind === 'returning' && definition.returningMode === 'none'
-  if (step === 'message') return <aside className={'friend-add-editor-summaryColumn'}><LinePreview caption={noneMode ? '再追加では配信しません' : definition.timing === 'immediate' ? '登録直後に届きます' : 'シナリオの時刻に従って届きます'}><p className="rounded-card rounded-tl-sm bg-canvas p-3 text-xs leading-6 whitespace-pre-wrap text-ink">{noneMode ? 'メッセージは届きません。案内後のアクションだけを実行します。' : definition.messageText || scenario || '最初に送る内容が未設定です。'}</p></LinePreview><div className={'friend-add-editor-summary'}><h2>設定サマリー</h2><span>配信</span><strong>{noneMode ? 'なし' : MESSAGE_TYPE_LABEL[definition.messageType]}</strong><span>送信タイミング</span><strong>{noneMode ? '適用外' : definition.timing === 'immediate' ? '登録直後' : 'シナリオ時刻'}</strong><span>アクション</span><strong>{definition.actions.length ? `設定済み ${definition.actions.length}件` : 'なし'}</strong><span>経路不明時</span><strong>{noneMode ? '適用外' : unknownRouteSummary(definition)}</strong></div></aside>
-  return <aside className={'friend-add-editor-summaryColumn'}><div className={'friend-add-editor-summary'}><h2>{step === 'routes' ? '判定サマリー' : '設定サマリー'}</h2>{step === 'preview' ? <><span>所要時間</span><strong>数秒</strong><span>本番影響</span><strong>なし</strong><span>送信数</span><strong>0通（実際には送信しません）</strong><span>アクション</span><strong>{definition.actions.length ? `設定済み${definition.actions.length}件・テストでは実行しません` : 'なし'}</strong></> : step === 'actions' ? <><span>実行数</span><strong>{definition.actions.length + (pendingAction ? 1 : 0)}件</strong><span>対象</span><strong>{rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除' : 'はじめての追加'}</strong><span>失敗時</span><strong>要対応へ追加</strong></> : step === 'routes' ? <><span>流入リンク</span><strong>{definition.routeIds.length ? `${definition.routeIds.length}件を選択` : '未選択'}</strong><span>登録日時</span><strong>{timeWindowsSummary(definition.timeWindows)}</strong><span>友だち条件</span><strong>{friendConditionSummary(definition.friendCondition ?? '')}</strong><span>過去28日の該当</span><strong>{matchedLast28Days === null ? '未取得' : `${matchedLast28Days}人`}</strong></> : <><span>状態</span><strong>{rule.status === 'published' ? '有効' : rule.status === 'stopped' ? '停止中' : '下書き'}</strong><span>設定名</span><strong>{rule.name || '未入力'}</strong><span>対象の流入リンク</span><strong>{definition.routeIds.length ? `${definition.routeIds.length}件を選択` : '未選択'}</strong><span>直近7日の追加</span><strong>{rule.matchedLast7Days === null ? '未取得' : `${rule.matchedLast7Days}人`}</strong><span>二重送信防止</span><strong>{resendSuppressionText(definition.resendSuppressionHours)}</strong><span>テスト</span><strong>{rule.lastTestStatus === 'succeeded' ? '成功' : rule.lastTestStatus === 'failed' ? '失敗' : '未実施'}</strong><span>配信</span><strong>{definition.messageText ? 'テキストメッセージ' : scenario || '未設定'}</strong><span>アクション</span><strong>{definition.actions.length}件</strong></>}</div><LinePreview note="実際のLINE表示に近いプレビューです"><p className="rounded-card rounded-tl-sm bg-canvas p-3 text-xs leading-6 whitespace-pre-wrap text-ink">{definition.messageText || scenario || '最初に送る内容が未設定です。'}</p></LinePreview></aside>
+  if (step === 'message') return <aside className={'friend-add-editor-summaryColumn'}><LinePreview caption={noneMode ? '再追加では配信しません' : definition.timing === 'immediate' ? '登録直後に届きます' : 'シナリオの時刻に従って届きます'}><p className="rounded-card rounded-tl-mini bg-canvas p-3 text-xs leading-6 whitespace-pre-wrap text-ink">{noneMode ? 'メッセージは届きません。案内後のアクションだけを実行します。' : definition.messageText || scenario || '最初に送る内容が未設定です。'}</p></LinePreview><div className={'friend-add-editor-summary'}><h2>設定サマリー</h2><span>配信</span><strong>{noneMode ? 'なし' : MESSAGE_TYPE_LABEL[definition.messageType]}</strong><span>送信タイミング</span><strong>{noneMode ? '適用外' : definition.timing === 'immediate' ? '登録直後' : 'シナリオ時刻'}</strong><span>アクション</span><strong>{definition.actions.length ? `設定済み ${definition.actions.length}件` : 'なし'}</strong><span>経路不明時</span><strong>{noneMode ? '適用外' : unknownRouteSummary(definition)}</strong></div></aside>
+  /*
+   * R261: 再追加で「何も配信しない」とき、保存済みの本文・シナリオ名は
+   * 設定データとして残すが、届くかのような吹き出しでは出さない。
+   * 初回案内の段とそろえ、「再追加では配信しません」と出す。
+   */
+  const linePreview = noneMode
+    ? <LinePreview caption="再追加では配信しません"><p className="rounded-card rounded-tl-mini bg-canvas p-3 text-xs leading-6 whitespace-pre-wrap text-ink">メッセージは届きません。案内後のアクションだけを実行します。</p></LinePreview>
+    : <LinePreview note="実際のLINE表示に近いプレビューです"><p className="rounded-card rounded-tl-mini bg-canvas p-3 text-xs leading-6 whitespace-pre-wrap text-ink">{definition.messageText || scenario || '最初に送る内容が未設定です。'}</p></LinePreview>
+  return <aside className={'friend-add-editor-summaryColumn'}><div className={'friend-add-editor-summary'}><h2>{step === 'routes' ? '判定サマリー' : '設定サマリー'}</h2>{step === 'preview' ? <><span>所要時間</span><strong>数秒</strong><span>本番影響</span><strong>なし</strong><span>送信数</span><strong>0通（実際には送信しません）</strong><span>アクション</span><strong>{definition.actions.length ? `設定済み${definition.actions.length}件・テストでは実行しません` : 'なし'}</strong></> : step === 'actions' ? <><span>実行数</span><strong>{definition.actions.length + (pendingAction ? 1 : 0)}件</strong><span>対象</span><strong>{rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除' : 'はじめての追加'}</strong><span>失敗時</span><strong>要対応へ追加</strong></> : step === 'routes' ? <><span>流入リンク</span><strong>{definition.routeIds.length ? `${definition.routeIds.length}件を選択` : '未選択'}</strong><span>登録日時</span><strong>{timeWindowsSummary(definition.timeWindows)}</strong><span>友だち条件</span><strong>{friendConditionSummary(definition.friendCondition ?? '')}</strong><span>過去28日の該当</span><strong>{matchedLast28Days === null ? '未取得' : `${matchedLast28Days}人`}</strong></> : <><span>状態</span><strong>{rule.status === 'published' ? '有効' : rule.status === 'stopped' ? '停止中' : '下書き'}</strong><span>設定名</span><strong>{rule.name || '未入力'}</strong><span>対象の流入リンク</span><strong>{definition.routeIds.length ? `${definition.routeIds.length}件を選択` : '未選択'}</strong><span>直近7日の追加</span><strong>{rule.matchedLast7Days === null ? '未取得' : `${rule.matchedLast7Days}人`}</strong><span>二重送信防止</span><strong>{resendSuppressionText(definition.resendSuppressionHours)}</strong><span>テスト</span><strong>{rule.lastTestStatus === 'succeeded' ? '成功' : rule.lastTestStatus === 'failed' ? '失敗' : '未実施'}</strong><span>配信</span><strong>{noneMode ? 'なし' : definition.messageText ? 'テキストメッセージ' : scenario || '未設定'}</strong><span>アクション</span><strong>{definition.actions.length}件</strong></>}</div>{linePreview}</aside>
 }
 
 function unknownRouteSummary(definition: FriendAddRuleDefinition) {

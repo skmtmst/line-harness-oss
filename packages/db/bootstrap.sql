@@ -988,6 +988,19 @@ CREATE TABLE auto_reply_action_runs (
   UNIQUE (evaluation_id, action_stable_id)
 );
 
+CREATE TABLE auto_reply_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT REFERENCES line_accounts(id),
+  operation         TEXT NOT NULL,
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  auto_reply_id     TEXT NOT NULL REFERENCES auto_replies(id) ON DELETE CASCADE,
+  version_id        TEXT REFERENCES auto_reply_versions(id) ON DELETE SET NULL,
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(idempotency_key)
+);
+
 CREATE TABLE auto_reply_evaluation_details (
   id                 TEXT PRIMARY KEY,
   evaluation_id      TEXT NOT NULL,
@@ -6615,6 +6628,18 @@ CREATE TABLE support_mark_create_requests (
   UNIQUE(line_account_id, idempotency_key)
 );
 
+CREATE TABLE support_mark_rule_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  mark_id           TEXT NOT NULL REFERENCES support_marks(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  rule_id           TEXT NOT NULL REFERENCES automation_definitions(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
 CREATE TABLE support_mark_scopes (
   mark_id         TEXT PRIMARY KEY REFERENCES support_marks(id),
   tenant_id       TEXT NOT NULL REFERENCES tenants(id),
@@ -6640,6 +6665,17 @@ CREATE TABLE tag_groups (
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE tag_update_requests (
+  id                  TEXT PRIMARY KEY,
+  tag_id              TEXT NOT NULL REFERENCES tags(id),
+  idempotency_key     TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  resulting_version   INTEGER NOT NULL,
+  response_json       TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at          TEXT NOT NULL,
+  UNIQUE(tag_id, idempotency_key)
 );
 
 CREATE TABLE "tags" (
@@ -7502,6 +7538,9 @@ CREATE INDEX idx_auto_replies_template_id ON auto_replies(template_id);
 CREATE INDEX idx_auto_reply_action_runs_evaluation
   ON auto_reply_action_runs (evaluation_id, status);
 
+CREATE INDEX idx_auto_reply_create_requests_rule
+  ON auto_reply_create_requests(auto_reply_id, created_at DESC);
+
 CREATE INDEX idx_auto_reply_evaluation_details_evaluation
   ON auto_reply_evaluation_details (evaluation_id, evaluation_order);
 
@@ -8273,6 +8312,12 @@ CREATE INDEX idx_line_accounts_archived
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
 
+CREATE UNIQUE INDEX idx_line_accounts_liff_id_unique
+  ON line_accounts(liff_id);
+
+CREATE UNIQUE INDEX idx_line_accounts_login_channel_id_unique
+  ON line_accounts(login_channel_id);
+
 CREATE UNIQUE INDEX idx_line_accounts_one_default_per_tenant
   ON line_accounts (COALESCE(tenant_id, '00000000-0000-4000-8000-000000000001'))
   WHERE is_default = 1;
@@ -9035,6 +9080,9 @@ CREATE INDEX idx_support_mark_archive_requests_mark
 CREATE INDEX idx_support_mark_create_requests_mark
   ON support_mark_create_requests(line_account_id, mark_id, created_at DESC);
 
+CREATE INDEX idx_support_mark_rule_create_requests_rule
+  ON support_mark_rule_create_requests(line_account_id, rule_id, created_at DESC);
+
 CREATE INDEX idx_support_mark_scopes_account
   ON support_mark_scopes(tenant_id, line_account_id);
 
@@ -9042,6 +9090,9 @@ CREATE INDEX idx_support_marks_active
   ON support_marks(archived_at, display_order, created_at);
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
+
+CREATE INDEX idx_tag_update_requests_tag
+  ON tag_update_requests(tag_id, created_at DESC);
 
 CREATE UNIQUE INDEX idx_tags_account_exact_name
   ON tags(line_account_id, name) WHERE line_account_id IS NOT NULL;

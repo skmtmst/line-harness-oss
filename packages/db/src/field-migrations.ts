@@ -101,12 +101,24 @@ export async function createFieldMigrationPreview(
     now,
   ).run();
 
-  for (let offset = 0; offset < input.items.length; offset += 80) {
-    await db.batch(input.items.slice(offset, offset + 80).map((item) => db.prepare(
-      `INSERT INTO field_migration_items
-         (run_id, friend_id, source_value, converted_value, status, reason)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).bind(input.runId, item.friendId, item.sourceValue, item.convertedValue, item.status, item.reason)));
+  /*
+   * D038: 項目の書き込みで失敗したら run だけを残さない。
+   * run だけ残ると誰も使わない記録がたまるため、片付けてから投げ直す。
+   */
+  try {
+    for (let offset = 0; offset < input.items.length; offset += 80) {
+      await db.batch(input.items.slice(offset, offset + 80).map((item) => db.prepare(
+        `INSERT INTO field_migration_items
+           (run_id, friend_id, source_value, converted_value, status, reason)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(input.runId, item.friendId, item.sourceValue, item.convertedValue, item.status, item.reason)));
+    }
+  } catch (err) {
+    await db.batch([
+      db.prepare(`DELETE FROM field_migration_items WHERE run_id = ?`).bind(input.runId),
+      db.prepare(`DELETE FROM field_migration_runs WHERE id = ?`).bind(input.runId),
+    ]).catch(() => undefined);
+    throw err;
   }
 }
 
@@ -210,10 +222,7 @@ export async function executeFieldMigration(
     `SELECT COALESCE(type_v6, type) AS resolved_type, options_json
        FROM friend_fields WHERE id = ?`,
   ).bind(run.target_field_id).first<{ resolved_type: string; options_json: string | null }>();
-  let succeeded = 0;
-  let failed = 0;
   const failItem = async (friendId: string, reason: string) => {
-    failed += 1;
     await db.prepare(
       `UPDATE field_migration_items SET status = 'failed', reason = ?
         WHERE run_id = ? AND friend_id = ?`,
@@ -256,27 +265,106 @@ export async function executeFieldMigration(
             WHERE run_id = ? AND friend_id = ?`,
         ).bind(now, runId, item.friend_id),
       ]);
-      succeeded += 1;
     } catch (error) {
-      failed += 1;
       await db.prepare(
         `UPDATE field_migration_items SET status = 'failed', reason = ?
           WHERE run_id = ? AND friend_id = ?`,
       ).bind(error instanceof Error ? error.message.slice(0, 300) : '保存に失敗しました', runId, item.friend_id).run();
     }
   }
+  /*
+   * D036: 件数は手元の数えではなく表から数え直す。止まった実行を
+   * 続けたときも、今ある行の状態で正しく締められる。
+   */
+  const tallied = await db.prepare(
+    `SELECT status, COUNT(*) AS n FROM field_migration_items WHERE run_id = ? GROUP BY status`,
+  ).bind(runId).all<{ status: string; n: number }>();
+  const countOf = (status: string) =>
+    Number(tallied.results.find((row) => row.status === status)?.n ?? 0);
+  const succeeded = countOf('succeeded');
+  const failed = countOf('failed');
+  const remaining = countOf('convertible');
   const completedAt = jstNow();
   const rollbackDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const unresolved = run.review_count + run.invalid_count + failed;
-  const statements = [
+  const unresolved = run.review_count + run.invalid_count + failed + remaining;
+  const statements: D1PreparedStatement[] = [
     db.prepare(
       `UPDATE field_migration_runs SET status = ?, processed_count = ?, succeeded_count = ?,
          failed_count = ?, completed_at = ?, rollback_deadline = ?, updated_at = ? WHERE id = ?`,
     ).bind(unresolved > 0 ? 'partial' : 'succeeded', succeeded + failed, succeeded, unresolved,
       completedAt, rollbackDeadline, completedAt, runId),
   ];
-  if (unresolved === 0) statements.push(db.prepare(
+  if (unresolved === 0) {
+    statements.push(db.prepare(
       `UPDATE friend_fields SET status = 'read_only', version = version + 1, updated_at = ? WHERE id = ?`,
     ).bind(completedAt, run.source_field_id));
+    /*
+     * D037: 事前確認で「移行時に切り替え」と約束した使用先だけを切り替える。
+     * リマインダと下書きフォームは移行先を指す。公開版と手動確認の分は触らない。
+     * 全部移せたときだけ行い、残りがあるときは有効な元の項目に置いたままにする。
+     */
+    const promised = parseUsageTargets(run.usage_targets_json);
+    const reminderIds = promised
+      .filter((target) => target.switchable && target.kind === 'reminder')
+      .map((target) => target.id);
+    if (reminderIds.length > 0) {
+      statements.push(db.prepare(
+        `UPDATE reminders SET trigger_field_id = ?, updated_at = ?
+          WHERE line_account_id = ? AND trigger_field_id = ?
+            AND id IN (${reminderIds.map(() => '?').join(', ')})`,
+      ).bind(run.target_field_id, completedAt, run.line_account_id, run.source_field_id, ...reminderIds));
+    }
+    const formIds = promised
+      .filter((target) => target.switchable && target.kind === 'form')
+      .map((target) => target.id);
+    if (formIds.length > 0) {
+      const drafts = await db.prepare(
+        `SELECT f.id, f.fields FROM forms f WHERE f.id IN (${formIds.map(() => '?').join(', ')})`,
+      ).bind(...formIds).all<{ id: string; fields: string }>();
+      for (const draft of drafts.results) {
+        const switched = switchDraftFormFields(draft.fields, run.source_field_id, run.target_field_id);
+        if (switched) {
+          statements.push(db.prepare(
+            `UPDATE forms SET fields = ?, updated_at = ? WHERE id = ?`,
+          ).bind(switched, completedAt, draft.id));
+        }
+      }
+    }
+  }
   await db.batch(statements);
+}
+
+/** runに残した使用先の一覧を読む。壊れていても空として続ける。 */
+function parseUsageTargets(raw: string | null): FriendFieldUsageTarget[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as FriendFieldUsageTarget[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 下書きフォームの項目の登録先を移行元から移行先へ付け替える。
+ * 変わらなければ null（壊れた定義は触らず残す）。
+ */
+function switchDraftFormFields(raw: string | null, sourceFieldId: string, targetFieldId: string): string | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed)) return null;
+  let changed = false;
+  for (const field of parsed) {
+    if (field && typeof field === 'object'
+      && (field as { friendFieldId?: unknown }).friendFieldId === sourceFieldId) {
+      (field as { friendFieldId?: unknown }).friendFieldId = targetFieldId;
+      changed = true;
+    }
+  }
+  return changed ? JSON.stringify(parsed) : null;
 }

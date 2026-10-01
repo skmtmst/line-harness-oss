@@ -48,16 +48,22 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
      * m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム
      * #m18k と同じ形）。総件数の置き場所は「すべて」の行。絞り込み後の件数は
      * 一覧側の ListRange。旧 assertion（見出しに total）は ★V7 に書き換えた。
+     * m26m/R587: 一覧が読めていない間（初回・失敗・別アカウント切替直後）は
+     * 総数が不明なので出さない（null は数を出さない約束。偽ゼロにしない）。
+     * 出どころは絞り込み前の総数（overallTotal ?? total）のまま変えない。
      */
     expect(src).not.toContain('total={`${total} 件`}')
-    expect(src).toContain("{ id: '', label: 'すべて', count: overallTotal ?? total }")
+    expect(src).toContain("{ id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null }")
     expect(src).not.toContain('total={`${folders.length + 1}`}')
   })
 
   it('フォームはフォーム総件数を出す', () => {
     const src = read('form-submissions/page.tsx')
     // R12: 総数は「すべて」の行に出し、見出しには重ねて出さない。
-    expect(src).toContain("{ id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal }")
+    // R602補足: 未取得・読込中・取得失敗の総数は不明なので出さない
+    // （null は数を出さない約束。偽ゼロにしない）。
+    // 出どころは絞り込み前の総数（folderTotal）のまま変えない。
+    expect(src).toContain("{ id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal }")
     expect(src).not.toContain('`${folderTotal} 件`')
   })
 

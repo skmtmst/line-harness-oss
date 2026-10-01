@@ -506,6 +506,26 @@ export async function markApprovalNotified(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+/**
+ * m22u R354：送信権の解放。送信の途中で落ちたとき、同じ承認世代の
+ * 記録だけを NULL に戻し、再試行で送り直せるようにする（欠落防止）。
+ * 世代が変わっていたら（却下→再承認の新しい世代）何もしない。
+ */
+export async function releaseApprovalNotification(
+  db: D1Database,
+  eventId: string,
+  approvedAt: string,
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE conversion_events
+        SET approval_notified_generation = NULL
+      WHERE id = ?
+        AND approved_at IS ?
+        AND approval_notified_generation IS ?`,
+  ).bind(eventId, approvedAt, approvedAt).run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
 export type ApprovalDecisionStatus = 'pending' | 'approved' | 'rejected';
 
 export interface ApprovalDecisionResult {

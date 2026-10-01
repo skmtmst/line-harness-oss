@@ -4,20 +4,9 @@ import { useState } from 'react'
 import { RowActions } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
+import { formatDateTime, formatDay } from '@/lib/format'
 
-const fmt = new Intl.DateTimeFormat('ja-JP', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-})
 
-const dateTimeFmt = new Intl.DateTimeFormat('ja-JP', {
-  month: 'numeric',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
 
 export interface UserRowData {
   identityKey: string
@@ -45,10 +34,6 @@ interface Props {
   onOpenMergedPerson?: (personId: string) => void
 }
 
-function formatDateTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : dateTimeFmt.format(date)
-}
 
 const UID_STATUS = {
   url_token: {
@@ -111,7 +96,7 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
               <span
                 key={a.accountId}
                 title={a.accountName}
-                className="max-w-full truncate rounded-full bg-canvas-sunken px-2 py-0.5 text-xs font-medium text-ink-secondary"
+                className="max-w-full truncate rounded-pill bg-canvas-sunken px-2 py-0.5 text-xs font-medium text-ink-secondary"
               >
                 {a.accountName}
               </span>
@@ -188,14 +173,14 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
                   {row.accounts.map((a) => (
                     <li key={a.friendId} className="flex flex-wrap items-center gap-2 text-ink-secondary">
                       <span
-                        className={`h-2 w-2 rounded-full ${a.isFollowing ? 'bg-accent' : 'bg-ink-disabled'}`}
+                        className={`h-2 w-2 rounded-pill ${a.isFollowing ? 'bg-accent' : 'bg-ink-disabled'}`}
                       />
                       <span className="font-medium">{a.accountName}</span>
                       <span className="text-xs text-ink-faint">
                         {a.isFollowing ? '友だち' : 'ブロック・削除'}
                       </span>
                       <span className="text-xs text-ink-faint">
-                        登録: {fmt.format(new Date(a.joinedAt))}
+                        登録: {formatDay(new Date(a.joinedAt))}
                       </span>
                     </li>
                   ))}

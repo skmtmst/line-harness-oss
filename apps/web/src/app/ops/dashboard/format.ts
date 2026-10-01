@@ -1,4 +1,5 @@
 import { formatYen } from '@/components/ops/ops-charts'
+import { formatDateTime } from '@/lib/format'
 
 export function deltaLabel(delta: number): string {
   if (delta === 0) return '前月比 ±¥0'
@@ -23,11 +24,7 @@ export function revenueSourceLabel(pricing: 'stripe_actual' | 'list_price', last
   if (!lastSyncedAt) return 'Stripe の入金実績'
   const date = new Date(lastSyncedAt)
   if (!Number.isFinite(date.getTime())) return 'Stripe の入金実績'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(date)
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
-  return `Stripe の入金実績（最終同期 ${value('month')}/${value('day')} ${value('hour')}:${value('minute')}）`
+  return `Stripe の入金実績（最終同期 ${formatDateTime(date)}）`
 }
 
 export function minutesLabel(minutes: number | null): string {

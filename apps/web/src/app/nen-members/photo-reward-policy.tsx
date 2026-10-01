@@ -10,6 +10,7 @@ import VersionHistory, { type HistoryVersion } from '@/components/shared/version
 import { api, type PhotoRewardPolicyVersion } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { formatPhotoReceivedAt } from './photo-review-time'
+import { formatDay } from '@/lib/format'
 
 /*
  * #817: 報酬の決まりの版。一覧の右の棚に置く小箱と、版の履歴の棚。
@@ -30,7 +31,7 @@ function shortStart(value: string | null): string {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
+  return formatDay(date)
 }
 
 export function PhotoRewardPolicyCard({
@@ -311,8 +312,7 @@ function PhotoRewardPolicyDrawer({
                   />
                 </label>
                 {createError && <p className="mt-2 text-xs text-danger">{createError}</p>}
-                <Button variant="primary" disabled={creating} onClick={() => void doCreate()} className="mt-2">
-                  {creating ? '保存中...' : '新しい版を保存する'}
+                <Button variant="primary" disabled={creating} onClick={() => void doCreate()} className="mt-2" busy={creating} busyLabel="保存中...">新しい版を保存する
                 </Button>
               </div>
             )}

@@ -70,7 +70,7 @@
 .current {
   border-bottom-color: var(--color-accent-deep);
   color: var(--color-accent-deep);
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 500; /* fontWeight: 500 */
   cursor: default;
 }
 
@@ -105,6 +105,48 @@
 
   .actions {
     padding-bottom: 0;
+  }
+}
+
+/*
+ * ★V8「タブ」（clV5c）：選んだタブは緑ではなく墨の下線＋墨の600。
+ * 選んでないタブは ink-secondary の 500。下線と文字色は速い動きで
+ * 移る（★V8 動き「切り替え・タブは滑る 120ms」）。
+ */
+[data-theme='v8'] .list {
+  gap: 24px;
+  height: 35px; /* Pencil clV5c：帯の高さ 35（書き出し PNG の実寸） */
+}
+
+[data-theme='v8'] .items {
+  gap: 24px;
+}
+
+[data-theme='v8'] .tab {
+  height: 35px;
+  align-items: flex-end; /* 文字は下付き（pad-bottom 12） */
+  padding-bottom: 12px;
+  font-size: var(--text-label); /* Pencil clV5c：13px */
+  line-height: var(--text-lh, 1.5); /* 変数は v8 行高さ PR で入る。未適用でも 1.5 */
+  transition:
+    color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .current {
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+[data-theme='v8'] .current .count {
+  color: var(--color-ink-faint);
+}
+
+/* 狭い幅ではタブが折り返すので、帯の高さ固定を外す（v8 のみ）。 */
+@media (max-width: 767px) {
+  [data-theme='v8'] .list {
+    height: auto;
   }
 }
 }

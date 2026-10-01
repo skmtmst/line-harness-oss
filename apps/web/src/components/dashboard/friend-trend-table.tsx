@@ -1,6 +1,8 @@
 import HelpTip from '@/components/shared/help-tip'
 import type { DashboardOverview } from '@/lib/api'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 友だち数の推移。
@@ -29,9 +31,16 @@ export default function FriendTrendTable({
   if (loading) {
     return (
       <div className="space-y-2 p-5">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-canvas-sunken h-8 animate-pulse rounded" />
-        ))}
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div className="space-y-2">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="block h-8 w-full" />
+              ))}
+            </div>
+          }
+        />
       </div>
     )
   }
@@ -87,7 +96,7 @@ export default function FriendTrendTable({
                   <Td align="right" className="tabular-nums"><span>{row.added}</span></Td>
                   <Td align="right" className="tabular-nums"><span>{row.blocked}</span></Td>
                   <Td align="right" className="font-medium tabular-nums">
-                    <span>{row.active.toLocaleString('ja-JP')}</span>
+                    <span>{formatNumber(row.active)}</span>
                   </Td>
                 </Tr>
               )

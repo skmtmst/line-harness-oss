@@ -21,6 +21,12 @@ import {
   type HqSupportDetail,
   type HqSupportRequest,
 } from '@/lib/hq-support'
+import {
+  supportReplyNote,
+  supportSenderNote,
+  supportSendStatus,
+  supportSentNotice,
+} from './reply-guidance'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -28,7 +34,7 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
  * お問い合わせの続きを送る。★V6 36-3-A（`Nt0UH`）。
  *
  * 36-3 の「これまでの問い合わせ」から開く。左にやり取り（統括は左・運営は右）と「続きを送る」欄、
- * 右に送信者と一覧。送ると運営のチケットは対応中へ戻り、運営へ通知、控えが登録メールへ届く。
+ * 右に送信者と一覧。送ると運営のチケットは対応中へ戻り、運営へ通知、控えが登録メールへ届く（メール登録があるとき）。
  * 静的書き出しのため動的セグメントは使わず `?id=` で受ける。
  */
 export default function HqSupportDetailPage() {
@@ -62,6 +68,12 @@ export default function HqSupportDetailPage() {
 
   // U099: id が無いことが確定したら、取得には行かず案内へ進む。
   const idMissing = id === null
+  /*
+   * R609: メール到着の案内はメールがあるときだけ出す。
+   * `me` が null の読み込み中はメール無し側（画面での確認）にする。
+   * 画面での受け取りはメールの有無に関わらず成り立つので、誤案内にならない。
+   */
+  const hasSenderEmail = (me?.email ?? '').trim().length > 0
 
   const load = useCallback(async (requestId: string) => {
     setLoadError('')
@@ -132,7 +144,7 @@ export default function HqSupportDetailPage() {
       setBody('')
       attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl))
       setAttachments([])
-      setNotice('続きを送りました。運営に届き、控えが登録メールアドレスにも届きます。')
+      setNotice(supportSentNotice(hasSenderEmail))
       await load(id)
     } catch (caught) {
       setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:') ? caught.message : '送信できませんでした。もう一度お試しください。')
@@ -143,8 +155,8 @@ export default function HqSupportDetailPage() {
 
   const statusChip = (status: HqSupportRequest['status']) => (
     <span className={status === 'open'
-      ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-      : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'}>
+      ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+      : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'}>
       {SUPPORT_STATUS_LABELS[status]}
     </span>
   )
@@ -152,7 +164,7 @@ export default function HqSupportDetailPage() {
   return (
     <div data-design-node="Nt0UH" className="flex flex-col gap-4">
       <div data-design-node="kcTeV">
-        <NoteBar tone="info">運営からの返信はここと登録メールアドレスに届きます。追加で伝えたいことは、下の欄から同じ件の続きとして送れます。</NoteBar>
+        <NoteBar tone="info">{supportReplyNote(hasSenderEmail)}</NoteBar>
       </div>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
@@ -185,7 +197,7 @@ export default function HqSupportDetailPage() {
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-label font-bold text-ink-secondary">{detail.ticketLabel}</span>
+                <span className="text-label font-medium text-ink-secondary">{detail.ticketLabel}</span>
                 <h2 className="text-body font-bold text-ink">{detail.subject}</h2>
                 {statusChip(detail.status)}
                 <span className="text-micro text-ink-faint">{shortDateTime(detail.createdAt)} に送信・{detail.kindLabel}</span>
@@ -207,7 +219,7 @@ export default function HqSupportDetailPage() {
 
               <div className="flex flex-col gap-1.5 border-t border-hairline pt-4">
                 <div className="flex items-center gap-2">
-                  <label htmlFor={`${uid}-body`} className="text-label font-bold text-ink">続きを送る</label>
+                  <label htmlFor={`${uid}-body`} className="text-label font-medium text-ink">続きを送る</label>
                   <span className="text-micro text-ink-faint">運営の返信への返事や、追加で分かったこと</span>
                 </div>
                 <TextArea
@@ -267,7 +279,7 @@ export default function HqSupportDetailPage() {
               <Row label="名前" value={me?.name ?? '—'} />
               <Row label="メール" value={me?.email ?? '—'} />
             </dl>
-            <p className="text-micro text-ink-faint">この内容が続きに添えられます。返信はこのメールアドレスに届きます。</p>
+            <p className="text-micro text-ink-faint">{supportSenderNote(hasSenderEmail)}</p>
           </section>
 
           <section data-design-node="jeBCt" className="flex flex-col rounded-card border border-hairline bg-canvas">
@@ -300,16 +312,15 @@ export default function HqSupportDetailPage() {
 
       <div data-design-node="kgFxH" className="sticky bottom-0 z-10">
         <StickyBar
-          status={blocked && body ? <span className="text-status-warn-deep">{blocked}</span> : '送信すると運営に届き、控えが登録メールアドレスにも届きます'}
+          status={blocked && body ? <span className="text-status-warn-deep">{blocked}</span> : supportSendStatus(hasSenderEmail)}
           actions={
             <>
               <Button onClick={() => router.push('/hq/support')} disabled={sending}>
                 <ChevronLeft aria-hidden="true" className="h-4 w-4" />
                 一覧へ戻る
               </Button>
-              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail}>
-                <Send aria-hidden="true" className="h-4 w-4" />
-                {sending ? '送信中…' : '送信する'}
+              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail} busy={sending} busyLabel="送信中…">
+                <Send aria-hidden="true" className="h-4 w-4" />送る
               </Button>
             </>
           }

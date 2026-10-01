@@ -141,6 +141,9 @@ function makeEventDb(state: {
   reminders?: Array<Record<string, unknown>>;
 }): D1Database {
   state.slots ??= [];
+  // 本番の event_slots.version は DEFAULT 1（migration 324）。版を持たない
+  //  fixture は初版として扱い、m26g の期待版の事前確認が本番と同じになる。
+  for (const s of state.slots) s.version ??= 1;
   state.bookings ??= [];
   state.accounts ??= [];
   state.friends ??= [];
@@ -973,6 +976,7 @@ function makeEventDb(state: {
               id, event_id, starts_at, ends_at, capacity,
               is_active, sort_order, deleted_at: null,
               client_key: client_key ?? null,
+              version: 1,
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -984,13 +988,22 @@ function makeEventDb(state: {
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.startsWith('UPDATE event_slots SET ')) {
-            const id = bound[bound.length - 1] as string;
+            // m26g: 条件付き更新（AND version = ?）を本番どおりに再現する。
+            const conditionalVersion = sql.includes('AND version = ?');
+            const id = bound[bound.length - (conditionalVersion ? 2 : 1)] as string;
             const s = (state.slots ?? []).find((x) => x.id === id);
             if (!s) return { success: true, meta: { changes: 0 } };
+            if (conditionalVersion && (s.version ?? 1) !== bound[bound.length - 1]) {
+              return { success: true, meta: { changes: 0 } };
+            }
             const setPart = sql.substring('UPDATE event_slots SET '.length, sql.indexOf(' WHERE'));
             const cols = setPart.split(',').map((x) => x.trim());
             let valIdx = 0;
             for (const col of cols) {
+              if (/^version\s*=\s*version\s*\+\s*1$/.test(col)) {
+                s.version = ((s.version ?? 1) as number) + 1;
+                continue;
+              }
               const m = /^(\w+)\s*=\s*(\?|strftime)/.exec(col);
               if (!m) continue;
               const colName = m[1];
@@ -2029,7 +2042,7 @@ describe('event_slots admin', () => {
     const res = await app.request('/api/events/admin/events/e1/slots/s1?account_id=la1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ capacity: 10, is_active: 0 }),
+      body: JSON.stringify({ capacity: 10, is_active: 0, expected_version: 1 }),
     });
     expect(res.status).toBe(200);
     expect(state.slots[0].capacity).toBe(10);
@@ -2045,7 +2058,7 @@ describe('event_slots admin', () => {
     const res = await app.request('/api/events/admin/events/e1/slots/s1?account_id=la1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ends_at: '2099-06-01T09:00:00Z' }),
+      body: JSON.stringify({ ends_at: '2099-06-01T09:00:00Z', expected_version: 1 }),
     });
     expect(res.status).toBe(422);
   });
@@ -2063,7 +2076,7 @@ describe('event_slots admin', () => {
     const res = await app.request('/api/events/admin/events/e1/slots/s1?account_id=la1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ capacity: 2 }),
+      body: JSON.stringify({ capacity: 2, expected_version: 1 }),
     });
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: string };
@@ -2083,7 +2096,7 @@ describe('event_slots admin', () => {
     const res = await app.request('/api/events/admin/events/e1/slots/s1?account_id=la1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ capacity: 2 }),
+      body: JSON.stringify({ capacity: 2, expected_version: 1 }),
     });
     expect(res.status).toBe(200);
     expect(state.slots[0].capacity).toBe(2);

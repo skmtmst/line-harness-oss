@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Copy,
   Eye,
-  FlaskConical,
   List,
   MessageCircle,
   PauseCircle,
@@ -39,8 +38,9 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, api, type FriendListItem } from '@/lib/api'
 import { canPublish, conflictTone, publishGates, type PublishStage } from './publish-flow'
 import './publish.css'
+import { formatNumber } from '@/lib/format'
 
-type LoadState = 'loading' | 'ready' | 'error' | 'denied' | 'missing' | 'not-found'
+type LoadState = 'loading' | 'ready' | 'error' | 'denied' | 'missing' | 'not-found' | 'published'
 type FriendLoadState = 'loading' | 'ready' | 'error'
 
 const PAGE_TITLES: Record<PublishStage, string> = {
@@ -260,6 +260,21 @@ function AutoReplyPublishInner() {
   const [stopOpen, setStopOpen] = useState(false)
   const [stopReason, setStopReason] = useState('')
   const [stopError, setStopError] = useState('')
+  /*
+   * m26c R555: 停止の確認キーは確認窓を開くたびに1つ振り、窓を閉じるまで
+   * 変えない。成功の応答を失って同じ窓から送り直しても同じキーになり、
+   * 初回の停止記録を上書きしない。
+   */
+  const [stopKey, setStopKey] = useState('')
+  /*
+   * m26c R552: 試験の実行中に内容が変わった結果は使わない。再試験を求める。
+   */
+  const [staleTest, setStaleTest] = useState(false)
+  /*
+   * m26c R556: 複製の確認キーは最初の押下で振り、成功まで変えない。
+   * 成功の応答を失って送り直しても同じ下書きへ復帰し、二重に作らない。
+   */
+  const duplicateKeyRef = useRef<string | null>(null)
   const [stopped, setStopped] = useState<{
     stoppedAt: string | null
     stoppedByStaffName: string | null
@@ -308,6 +323,11 @@ function AutoReplyPublishInner() {
       }
       setDraft(draftRes.data)
       setConflicts(Array.isArray(conflictRes.data?.conflicts) ? conflictRes.data.conflicts : [])
+      // m26c R558: 下書きが無く公開版の読替のときは、公開済みの表示にする。
+      if (draftRes.data.status === 'published') {
+        setLoadState('published')
+        return
+      }
       setLoadState('ready')
       await loadFriends(draftRes.data.settings.lineAccountId)
     } catch (cause) {
@@ -361,6 +381,36 @@ function AutoReplyPublishInner() {
         backHref="/auto-replies"
         backLabel="自動応答の一覧へ戻る"
       />
+    )
+  }
+  // m26c R558: 公開済みの再読込は公開状態を出し、404 へ誤遷移しない。
+  if (loadState === 'published' && draft) {
+    const publishedName = draft.settings.name || draft.settings.keyword || '名前を確認できません'
+    return (
+      <div className={"arp-page"} data-design-node="e6iJG">
+        <Link href="/auto-replies" className={"arp-backLink"}>
+          <ArrowLeft aria-hidden="true" />
+          自動応答一覧
+        </Link>
+        <section className={"arp-panel"}>
+          <PanelHeading
+            title="この自動応答は公開済みです"
+            description="下書きはありません。内容を変えるときは編集から新しい下書きを作り、公開フローで有効化してください。"
+          />
+          <SummaryRows rows={[
+            { label: 'ルール名', value: publishedName },
+            { label: '状態', value: '公開中' },
+            { label: '返信', value: responseLabel(draft) },
+          ]} />
+          <div className={"arp-doneActions"}>
+            <Button href="/auto-replies"><List aria-hidden="true" />一覧へ戻る</Button>
+            <Button href={`/auto-replies/runs?id=${encodeURIComponent(autoReplyId)}`} variant="primary">
+              <Activity aria-hidden="true" />実行状況を確認
+            </Button>
+            <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}><Pencil aria-hidden="true" />内容を編集する</Button>
+          </div>
+        </section>
+      </div>
     )
   }
   if (loadState === 'not-found' || (!draft && loadState !== 'error')) {
@@ -421,6 +471,14 @@ function AutoReplyPublishInner() {
       incomingText: testMessage,
     })
     if (!res.success) throw new Error('test failed')
+    // m26c R552: 内容が変わった試験結果は公開条件に使わない。再試験を求める。
+    if (res.data.staleTest) {
+      setDryRun(null)
+      setStaleTest(true)
+      setTestDialogOpen(false)
+      return
+    }
+    setStaleTest(false)
     setDryRun(res.data)
     setTestDialogOpen(false)
   })
@@ -428,6 +486,7 @@ function AutoReplyPublishInner() {
   const openStopDialog = () => {
     setStopReason('')
     setStopError('')
+    setStopKey(crypto.randomUUID())
     setStopOpen(true)
   }
 
@@ -444,7 +503,7 @@ function AutoReplyPublishInner() {
       const res = await api.autoReplies.stop(
         autoReplyId,
         { reason: stopReason.trim() === '' ? null : stopReason.trim() },
-        crypto.randomUUID(),
+        stopKey || crypto.randomUUID(),
       )
       if (!res.success) {
         setStopError('自動応答を停止できませんでした。状態を読み直してからお試しください。')
@@ -478,11 +537,13 @@ function AutoReplyPublishInner() {
   const duplicate = () => void run('複製を作成', async () => {
     if (!draft) throw new Error('draft missing')
     const baseName = draft.settings.name || draft.settings.keyword || '自動応答'
+    duplicateKeyRef.current ??= crypto.randomUUID()
     const res = await api.autoReplies.createDraft({
       ...draft.settings,
       name: `${baseName}（複製）`.slice(0, 250),
-    })
+    }, duplicateKeyRef.current)
     if (!res.success || !res.data?.autoReplyId) throw new Error('duplicate failed')
+    duplicateKeyRef.current = null
     router.push(`/auto-replies/edit?id=${encodeURIComponent(res.data.autoReplyId)}`)
   })
 
@@ -582,7 +643,7 @@ function AutoReplyPublishInner() {
           <div className={"arp-stickyBar"}>
             <div />
             <div className={"arp-stickyActions"}>
-              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}&step=response`}>下書き保存</Button>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}&step=response`}>下書きを保存する</Button>
               <Button
                 data-qa-open="g46ja"
                 variant="primary"
@@ -627,7 +688,7 @@ function AutoReplyPublishInner() {
                     />
                     <span className="text-caption text-ink-faint">
                       {friendLoadState === 'ready'
-                        ? `候補 ${friendTotal.toLocaleString('ja-JP')}人中 ${friends.length}人を表示`
+                        ? `候補 ${formatNumber(friendTotal)}人中 ${friends.length}人を表示`
                         : friendLoadState === 'error'
                           ? '送信者を確認できませんでした'
                           : '送信者を読み込み中'}
@@ -663,6 +724,13 @@ function AutoReplyPublishInner() {
                   ここで試しても、選んだ友だちへは何も届きません。動くかどうかの確認だけをします。
                 </p>
               </section>
+
+              {staleTest ? (
+                <div className={"arp-warningNotice"} role="alert">
+                  <AlertTriangle aria-hidden="true" />
+                  テストの実行中に内容が変わりました。この結果は使えません。もう一度テストしてください。
+                </div>
+              ) : null}
 
               <section className={"arp-panel"}>
                 <PanelHeading title="判定結果" description="どのルールが反応するか確認します。" />
@@ -738,7 +806,7 @@ function AutoReplyPublishInner() {
               </section>
               <AutoReplyPreview lead="［テスト］受信から 3秒後に返信" message={previewMessage} actionLabel="空き枠を見る" />
               <div className={"arp-previewActions"}>
-                <Button onClick={() => setTestDialogOpen(true)}><Send aria-hidden="true" />テスト送信</Button>
+                <Button onClick={() => setTestDialogOpen(true)}><Send aria-hidden="true" />テストを送る</Button>
                 <Button onClick={() => setTestDialogOpen(true)}><Eye aria-hidden="true" />応答イメージを見る</Button>
               </div>
             </aside>
@@ -747,7 +815,7 @@ function AutoReplyPublishInner() {
           <div className={"arp-stickyBar"}>
             <div />
             <div className={"arp-stickyActions"}>
-              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存</Button>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存する</Button>
               <Button variant="primary" onClick={() => setTestDialogOpen(true)} disabled={busy || !selectedFriendId}>
                 自動応答をテスト
               </Button>
@@ -828,7 +896,7 @@ function AutoReplyPublishInner() {
             <div />
             <div className={"arp-stickyActions"}>
               <Button onClick={() => setStage('test')}><ArrowLeft aria-hidden="true" />戻って修正</Button>
-              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存</Button>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存する</Button>
               <Button
                 variant="primary"
                 disabled={busy || !ready}
@@ -904,7 +972,13 @@ function AutoReplyPublishInner() {
                     </Button>
                   )}
                   <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}><Pencil aria-hidden="true" />内容を編集する</Button>
-                  <Button onClick={openTestStage}><FlaskConical aria-hidden="true" />テストを再実行</Button>
+                  {/*
+                    m26c R557: 公開後に下書きは無いため、再試験の口は404になる。
+                    押せない操作は出さず、確認の行き先を示す。
+                  */}
+                  <p className="text-caption text-ink-faint">
+                    公開後の再テストはできません。動きの確認は「実行状況を確認」で行います。
+                  </p>
                   <Button onClick={duplicate} disabled={busy}><Copy aria-hidden="true" />自動応答を複製して作成</Button>
                 </div>
               </section>
@@ -936,8 +1010,7 @@ function AutoReplyPublishInner() {
             <p>入力内容に一致するルールと実行予定のアクションを確認します。</p>
             <div className={"arp-dialogActions"}>
               <Button onClick={() => { setTestDialogOpen(false); setStage('conflicts') }}>競合と優先順位へ戻る</Button>
-              <Button data-qa-open="g46ja-run" onClick={runDryTest} disabled={busy || !selectedFriendId || !testMessage.trim()}>
-                {busy ? 'テスト中…' : '自動応答をテスト'}
+              <Button data-qa-open="g46ja-run" onClick={runDryTest} disabled={busy || !selectedFriendId || !testMessage.trim()} busy={busy} busyLabel="テスト中…">自動応答をテスト
               </Button>
               <Button variant="primary" disabled={!dryRun} onClick={() => setTestDialogOpen(false)}>
                 最終確認へ

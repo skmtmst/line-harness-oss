@@ -30,7 +30,7 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(CSS).toMatch(/\.category\s*\{[^}]*height: 40px;/)
     expect(CSS).toMatch(/\.category\s*\{[^}]*border-radius: var\(--radius-control\);/)
     expect(CSS).toMatch(/\.category\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.category\s*\{[^}]*font-weight: 700;/)
+    expect(CSS).toMatch(/\.category\s*\{[^}]*font-weight: 500;/)
     expect(PAGE).toContain('className={`${styles.category}')
     // Tailwind直書きの帯へ戻さない。
     expect(PAGE).not.toContain('rounded-control px-3 py-2.5 text-left text-sm')
@@ -41,7 +41,7 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(CSS).toMatch(/\.action\s*\{[^}]*border-radius: var\(--radius-control\);/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*padding: 0 14px;/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 700;/)
+    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 600;/)
     expect(PAGE).toContain('<Button variant="primary" onClick={onPublish}')
     expect(PAGE).toContain('<Button onClick={onTestSend}')
     // 直書きの主要ボタンへ戻さない。
@@ -139,8 +139,8 @@ describe('V6 顧客へのお知らせの寸法', () => {
   })
 
   it('#988 NEXT-05: テスト送信は「テスト受信者に送信」と名付け、宛先を見せる確認を挟む', () => {
-    expect(CODE).toContain('テスト受信者に送信')
-    expect(CODE).not.toContain('自分にテスト送信')
+    expect(CODE).toContain('テスト受信者に送る')
+    expect(CODE).not.toContain('自分にテストを送る')
     // 宛先は登録済みのテスト受信者。開いただけでは送らず、0人・失敗では送信不可。
     expect(CODE).toContain('api.accountSettings.getTestRecipients(accountId)')
     expect(CODE).toContain("onConfirm={testRecipients.state === 'ready' && testRecipients.items.length > 0 ? confirmTestSend : undefined}")

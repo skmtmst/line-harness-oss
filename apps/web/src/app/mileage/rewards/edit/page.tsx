@@ -28,6 +28,7 @@ import {
   type MileageRewardSummary,
   type MileageRewardTestResult,
 } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 type CommonActionOption = { id: string; label: string }
 
@@ -346,7 +347,7 @@ function MileageRewardEditorInner() {
           className={`rounded-control px-4 py-3 text-sm ${testResult.canDeliver ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}
         >
           {testResult.canDeliver
-            ? `交換テストに合格しました。${testResult.requiredMiles.toLocaleString('ja-JP')}マイルで受け渡せます。残高と在庫は動かしていません。`
+            ? `交換テストに合格しました。${formatNumber(testResult.requiredMiles)}マイルで受け渡せます。残高と在庫は動かしていません。`
             : `交換テストで確認が必要です。${testResult.warning ?? '受け渡す内容を確認してください'}。残高と在庫は動かしていません。`}
         </div>
       ) : null}
@@ -493,11 +494,9 @@ function MileageRewardEditorInner() {
         actions={(
           <>
             <Button href="/mileage?tab=rewards">キャンセル</Button>
-            <Button onClick={() => void testExchange()} disabled={saving || testing}>
-              {testing ? '交換テスト中' : '自分で交換をテスト'}
+            <Button onClick={() => void testExchange()} disabled={saving || testing} busy={testing} busyLabel="交換テスト中">自分で交換をテスト
             </Button>
-            <Button onClick={() => void save(false)} disabled={saving || testing}>
-              {saving ? '保存中' : '下書きを保存'}
+            <Button onClick={() => void save(false)} disabled={saving || testing} busy={saving} busyLabel="保存中">下書きを保存する
             </Button>
             <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
               保存して出す

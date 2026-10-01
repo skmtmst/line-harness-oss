@@ -25,6 +25,8 @@ import {
   type ProxyBookingResult,
 } from '@/lib/api'
 import { canOperateBookings } from '../../lib/booking-permissions'
+import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
+import { formatDateTime, formatDay, formatTime } from '@/lib/format'
 
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
@@ -107,10 +109,7 @@ function slotInstant(slot?: { startUtc?: string | null } | null): string | null 
 
 function dateLabel(startUtc: string, timeZone = 'Asia/Tokyo'): string {
   if (!startUtc) return '—'
-  return new Date(startUtc).toLocaleString('ja-JP', {
-    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
-    hour: '2-digit', minute: '2-digit', timeZone,
-  })
+  return formatDateTime(startUtc, '—', undefined, timeZone)
 }
 
 function timeRangeLabel(
@@ -119,9 +118,7 @@ function timeRangeLabel(
   if (!startUtc) return '—'
   const startsAt = new Date(startUtc)
   const endsAt = endUtc ? new Date(endUtc) : new Date(startsAt.getTime() + minutes * 60_000)
-  return `${dateLabel(startUtc, timeZone)} 〜 ${endsAt.toLocaleTimeString('ja-JP', {
-    hour: '2-digit', minute: '2-digit', timeZone,
-  })}`
+  return `${dateLabel(startUtc, timeZone)} 〜 ${formatTime(endsAt, '—', timeZone)}`
 }
 
 // サーバ側 packages/db/src/booking-customers.ts の normalizeBookingCustomerPhone と
@@ -133,10 +130,7 @@ function phoneDigitsError(phone: string): string | null {
 }
 
 function scheduleLabel(value: string, timeZone = 'Asia/Tokyo'): string {
-  return new Date(value).toLocaleString('ja-JP', {
-    month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit',
-    timeZone,
-  })
+  return formatDateTime(value, '—', undefined, timeZone)
 }
 
 function operationStatusLabel(status: string): string {
@@ -174,6 +168,9 @@ export default function NewProxyBookingPage() {
   const [time, setTime] = useState('')
   const [customerNote, setCustomerNote] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  // R559: 電話客の台帳作成のキー。予約本体のキーから派生させ、確定操作の
+  // 再送では同じ台帳が返るようにする（冪等表の主キーで予約とぶつけない）。
+  const customerIdempotencyKey = useRef('')
   const [result, setResult] = useState<ProxyBookingResult | null>(null)
   const [customerContext, setCustomerContext] = useState<BookingCustomerContext | null>(null)
   const [conflictAlternatives, setConflictAlternatives] = useState<BookingConflictAlternatives | null>(null)
@@ -274,6 +271,7 @@ export default function NewProxyBookingPage() {
     setReminderPreview([])
     setNotification({ send_line_confirmation: true, day_before: true, hours_before: true })
     setIdempotencyKey('')
+    customerIdempotencyKey.current = ''
     setLoading(false)
     setError('')
     pendingSelect.current = {}
@@ -447,21 +445,27 @@ export default function NewProxyBookingPage() {
     return () => { active = false }
   }, [selectedAccountId, friend, customer])
 
-  useEffect(() => {
+  // R534: メニュー取得専用の失敗保持。403は権限案内で再試行なし、
+  // 429は混雑の待ち案内で再試行あり、それ以外は同じ条件で取り直せる。
+  const [menusLoadError, setMenusLoadError] = useState<unknown>(null)
+  const loadMenus = useCallback(async () => {
     if (!selectedAccountId) {
       setMenus([])
       return
     }
-    let active = true
-    void bookingApi.listMenus(selectedAccountId)
-      .then((response) => {
-        if (active) setMenus(response.menus.filter((item) => item.is_active === 1))
-      })
-      .catch(() => {
-        if (active) setError('予約メニューを読み込めませんでした')
-      })
-    return () => { active = false }
+    setMenusLoadError(null)
+    try {
+      const response = await bookingApi.listMenus(selectedAccountId)
+      setMenus(response.menus.filter((item) => item.is_active === 1))
+    } catch (caught) {
+      setMenusLoadError(caught)
+      setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '予約メニュー') : '予約メニューを読み込めませんでした')
+    }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadMenus()
+  }, [loadMenus])
 
   useEffect(() => {
     setStaffId('')
@@ -573,9 +577,11 @@ export default function NewProxyBookingPage() {
         && customerSavedInput.current.pet === petName.trim())
     )) return customer
     if (!selectedAccountId) return null
+    // R559: 応答消失後の再送で台帳を二重作成しないよう、確定操作ごとの
+    // キー（予約本体のキーから派生）で送る。
     const response = await bookingApi.createCustomer(selectedAccountId, {
       display_name: customerName.trim(), phone: customerPhone.trim(), pet_name: petName.trim() || undefined,
-    })
+    }, customerIdempotencyKey.current || undefined)
     customerSavedInput.current = { name: customerName.trim(), phone: customerPhone.trim(), pet: petName.trim() }
     setCustomer(response.customer)
     return response.customer
@@ -638,7 +644,10 @@ export default function NewProxyBookingPage() {
       if (latestSelectionKey.current !== requestKey) return
       setConfirmedSlot(available)
       setReminderPreview(preview.reminders)
-      setIdempotencyKey(crypto.randomUUID())
+      // R559: 確認ごとに予約と台帳のキーを1組だけ発行する。再送時は同じ組で送る。
+      const freshKey = crypto.randomUUID()
+      setIdempotencyKey(freshKey)
+      customerIdempotencyKey.current = `${freshKey}:customer`
       setStep('confirm')
     } catch {
       if (latestSelectionKey.current !== requestKey) return
@@ -674,6 +683,10 @@ export default function NewProxyBookingPage() {
       let bookingCustomer: BookingCustomerSummary | null = null
       if (phoneCustomer) {
         try {
+          // R559: 台帳の作成はこの確定操作のキーで束ねる。再送時は同じ
+          // 顧客が返り、台帳は1件のまま予約はその顧客IDを使う。
+          // 確認を経ずに来たときだけ、ここで組を作る。
+          if (!customerIdempotencyKey.current) customerIdempotencyKey.current = `${key}:customer`
           bookingCustomer = await ensureCustomerForBooking()
         } catch {
           setError('電話客の情報を保存できませんでした。名前と電話番号を確認してください。')
@@ -717,6 +730,8 @@ export default function NewProxyBookingPage() {
         setConflictAlternatives(cause.data as BookingConflictAlternatives | null)
         setStep('conflict')
         setError('選んだ時間は、ほかの予約で埋まりました')
+      } else if (cause instanceof ApiError) {
+        setError(describeApiFailure(cause, '予約の登録', { forbidden: '予約を入れられるのは、予約の操作権限を持つ人だけです。' }))
       } else {
         setError('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
       }
@@ -745,7 +760,16 @@ export default function NewProxyBookingPage() {
       </nav>
 
       {error && step !== 'conflict' && (
-        <Notice tone="danger" message={error} onClose={() => setError('')} />
+        <Notice
+          tone="danger"
+          message={error}
+          onClose={() => setError('')}
+          action={menusLoadError && !isForbidden(menusLoadError) ? (
+            <Button type="button" onClick={() => { setError(''); void loadMenus() }}>
+              もう一度読み込む
+            </Button>
+          ) : undefined}
+        />
       )}
 
       {staffResolved && !canOperate ? (
@@ -807,7 +831,7 @@ export default function NewProxyBookingPage() {
                     onClose={() => setFriendSuggestOpen(false)}
                   >
                     <div
-                      className="border-hairline bg-canvas max-h-64 divide-y overflow-y-auto rounded-control border shadow-lg"
+                      className="border-hairline bg-canvas max-h-64 divide-y overflow-y-auto rounded-control border shadow-float"
                       // 最上層では absolute 指定を無効にする（位置は器が決める）。
                       style={{ position: 'static', width: '100%' }}
                     >
@@ -1024,7 +1048,7 @@ export default function NewProxyBookingPage() {
               <Card title="だれの予約か"><Summary label="お客様" value={customerLabel} /><Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} /></Card>
               <Card title="いつ・何を" note="時間が重なっています。右の空いている時間から選べます。">
                 <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
-                <Summary label="日付" value={dateLabel(slotStartIso, slotTimeZone).split(' ')[0]} />
+                <Summary label="日付" value={formatDay(slotStartIso, '—', undefined, slotTimeZone)} />
                 <Summary label="時刻" value={time} />
                 <Summary label="担当" value={selectedStaff.display_name} />
                 <p className="text-danger mt-3 text-xs">選んだ時間は、ほかの予約で埋まりました。</p>
@@ -1084,7 +1108,7 @@ export default function NewProxyBookingPage() {
                 <Summary label="予約台帳" value="1件追加（電話で受けた予約も同じ台帳へ記録します）" />
               </Card>
               <Card title="次にすること">
-                <div className="flex flex-wrap gap-2"><Button variant="primary" href="/booking/bookings">今日の台帳を見る</Button><Button href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>この予約の詳細を見る</Button><Button onClick={() => { setStep('input'); setResult(null); setTime(''); setIdempotencyKey('') }}>続けてもう1件入れる</Button></div>
+                <div className="flex flex-wrap gap-2"><Button variant="primary" href="/booking/bookings">今日の台帳を見る</Button><Button href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>この予約の詳細を見る</Button><Button onClick={() => { setStep('input'); setResult(null); setTime(''); setIdempotencyKey(''); customerIdempotencyKey.current = '' }}>続けてもう1件入れる</Button></div>
               </Card>
             </div>
             <aside data-design="Right" className="space-y-4">
@@ -1103,12 +1127,10 @@ export default function NewProxyBookingPage() {
             <>
               {(step === 'confirm' || step === 'conflict') && <Button onClick={() => { setStep('input'); setError('') }}>入力に戻る</Button>}
               {step === 'input' ? (
-                <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()}>
-                  {loading ? '空きを再確認しています' : '予約内容を確認する'}
+                <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()} busy={loading} busyLabel="空きを再確認しています">予約内容を確認する
                 </Button>
               ) : step === 'confirm' ? (
-                <Button variant="primary" disabled={loading} data-qa-open="GfceK" onClick={() => void createBooking()}>
-                  {loading ? '登録中です' : 'この内容で予約を入れる'}
+                <Button variant="primary" disabled={loading} data-qa-open="GfceK" onClick={() => void createBooking()} busy={loading} busyLabel="登録中です">この内容で予約を入れる
                 </Button>
               ) : <Button variant="primary" disabled>この内容で予約を入れる</Button>}
             </>

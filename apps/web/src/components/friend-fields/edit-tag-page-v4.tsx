@@ -1,17 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
+import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import TargetMissing from '@/components/shared/target-missing'
 import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 一覧の `DeleteTagDialog` (`tags-page-v4.tsx`) と同じ分け方。
@@ -70,20 +72,18 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
           <Button
             variant="danger"
             onClick={onDelete}
-            disabled={deleting || blocked || confirmation !== tag.name}
-          >
-            {deleting ? '削除中…' : 'タグを削除'}
+            disabled={deleting || blocked || confirmation !== tag.name} busy={deleting} busyLabel="削除中…">タグを削除する
           </Button>
         </div>
       )}
     >
       <div className="overflow-hidden rounded-control border border-hairline">
         <dl className="divide-y divide-hairline text-sm">
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-bold">{(dependencies?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-bold">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-bold">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-bold">停止</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-bold">そのまま残る</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-medium">{formatNumber((dependencies?.friendCount ?? tag.friendCount ?? 0))}人</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-medium">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-medium">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-medium">停止</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-medium">そのまま残る</dd></div>
         </dl>
       </div>
       <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
@@ -113,20 +113,24 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
   const [description, setDescription] = useState(tag.description ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // M956: 応答消失後の再送用。同じ内容の再送は同じ要求キー、成功したら捨てる。
+  const saveKeysRef = useRef(new IdempotencyKeyStore())
 
   const save = async () => {
     if (saving) return
     setSaving(true)
     setError('')
     try {
-      const result = await api.tags.updateArchivedNameAndDescription(tag.id, accountId, tag.version ?? 1, {
-        name, description: description || null,
-      })
+      const payload = { name, description: description || null }
+      const sig = JSON.stringify(payload)
+      const result = await api.tags.updateArchivedNameAndDescription(tag.id, accountId, tag.version ?? 1, payload, saveKeysRef.current.get(sig))
       if (!result.success) throw new Error(result.error)
-      notifyToast('保存しました。')
+      saveKeysRef.current.clear(sig)
+      notifyToast(result.data.replayed ? '保存済みでした。' : '保存しました。')
       onSaved(result.data.tag)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      // 500等は ApiError の内部文（API error: 500）を出さず、既存の保存失敗案内へ。
+      setError(describeSaveFailure(reason))
     } finally {
       setSaving(false)
     }
@@ -143,7 +147,7 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
       <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel}>キャンセル</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()}>{saving ? '保存中…' : '保存'}</Button>
+        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
       </div>
     </div>
   )
@@ -212,13 +216,17 @@ export default function EditTagPageV4() {
 
   useEffect(() => { void load() }, [load])
 
+  // M956: 応答消失後の再送用。同じ内容の再送は同じ要求キー、成功したら捨てる。
+  const saveKeysRef = useRef(new IdempotencyKeyStore())
+
   const save = async (values: TagEditorValues, _andAnother: boolean, applyRetroactive: boolean, previewToken?: string) => {
     if (!tag || !definition || !selectedAccountId || saving) return
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const update = await api.tags.updateDefinition(tag.id, selectedAccountId, tag.version ?? 1, {
+      const actionsForSave = definitionsForSave(values.actions)
+      const payload = {
         name: values.name,
         groupId: values.groupId || null,
         isStarred: values.isStarred,
@@ -226,18 +234,28 @@ export default function EditTagPageV4() {
         reapplyPolicy: values.reapplyPolicy,
         linkedEnabled: values.linked,
         mileage: { self: values.rewardMiles, referrer: values.referralRewardMiles, multiplier: values.multiplierBps, priority: values.multiplierPriority },
-        actions: definitionsForSave(values.actions),
+        actions: actionsForSave,
         applyToExisting: applyRetroactive && values.applyToExisting,
         // 遡及は事前計算（確認窓）の結果と引き換え。ズレたらサーバーが止める。
         ...(previewToken ? { previewToken } : {}),
         automationId: definition.automation?.id ?? null,
         automationDraftVersion: definition.automation?.draftVersion?.id ?? null,
-      })
+      }
+      // 引き換え券は都度変わるので再送の同一性には入れない。
+      const { previewToken: _previewToken, ...sigPayload } = payload
+      const sig = JSON.stringify(sigPayload)
+      const update = await api.tags.updateDefinition(tag.id, selectedAccountId, tag.version ?? 1, payload, saveKeysRef.current.get(sig))
       if (!update.success) throw new Error(update.error)
-      setNotice(update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
+      saveKeysRef.current.clear(sig)
+      if (update.data.replayed) {
+        setNotice('保存済みでした。')
+      } else {
+        setNotice(update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
+      }
       await load()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      // 500等は ApiError の内部文（API error: 500）を出さず、既存の保存失敗案内へ。
+      setError(describeSaveFailure(reason))
     } finally {
       setSaving(false)
     }
