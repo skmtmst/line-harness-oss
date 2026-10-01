@@ -7,6 +7,7 @@ import { ApiError, api } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import TargetMissing from '@/components/shared/target-missing'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -179,12 +180,18 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       />
     )
   }
+  /*
+   * D015: 403・429だけ共通文へ切り替える（権限・混雑の案内。再試行の
+   * 有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま。
+   */
+  const reminderFailure = loadError ? loadFailureCopy(loadError, 'リマインダ') : null
+  const useCommonCopy = loadError ? isForbiddenOrRateLimited(loadError) : false
   if (!settings) {
     return (
       <TargetMissing
         kind="error"
-        title="リマインダを読み込めませんでした"
-        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        title={useCommonCopy && reminderFailure ? reminderFailure.title : 'リマインダを読み込めませんでした'}
+        description={useCommonCopy && reminderFailure ? reminderFailure.description : '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
         error={loadError ?? undefined}
         onRetry={() => void loadDraft()}
       />
