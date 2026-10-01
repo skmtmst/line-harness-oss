@@ -644,6 +644,16 @@ jobs:
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4311 /tmp/v8-guard/base v7
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4310 /tmp/v8-guard/head v7
           node apps/web/scripts/v8-guard/v7-pixel-diff.mjs /tmp/v8-guard/base /tmp/v8-guard/head /tmp/v8-guard/v7-diff
+      # 合格して固定した v8 のページ（v8-locked.json）は、v8 の見た目も変えない（2026-10-01）。
+      # わざと変える PR はラベル v8-look-change を付ける（Pencil を先に直す）。一覧が空のうちは何もしない
+      - name: Approved v8 pages keep their look
+        if: steps.scope.outputs.diff == 'true' && !contains(github.event.pull_request.labels.*.name, 'v8-look-change')
+        run: |
+          LOCKED=$(node -e "console.log(require('./apps/web/scripts/v8-guard/v8-locked.json').routes.join(','))")
+          if [ -z "$LOCKED" ]; then echo "固定した v8 のページはまだありません。"; exit 0; fi
+          node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4311 /tmp/v8-guard/base-v8 v8
+          node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4310 /tmp/v8-guard/head-v8 v8
+          PREFIX=v8- ONLY="$LOCKED" node apps/web/scripts/v8-guard/v7-pixel-diff.mjs /tmp/v8-guard/base-v8 /tmp/v8-guard/head-v8 /tmp/v8-guard/v8-diff
       - name: Upload V8 screen guard results
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
