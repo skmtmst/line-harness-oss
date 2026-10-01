@@ -86,6 +86,7 @@ import {
 } from '../services/booking-confirm.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import {
+  BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES,
   DEFAULT_ACCOUNT_SETTINGS,
   IDEMPOTENCY_TTL_MINUTES,
   MENU_IDEMPOTENCY_TTL_MINUTES,
@@ -1056,6 +1057,41 @@ booking.post(
   async (c) => {
     const accountId = await resolveAccountIdAdmin(c);
     if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+    /*
+     * R559: 応答消失後の再送で同じ電話客を2件作らない。呼び出し側が
+     * 確定操作ごとに付ける一意キーで作成済み応答を返す。検証で落ちた
+     * 要求は保存しないので、入力を直して同じキーで送り直せる。キーの無い
+     * 従来の呼び出しは従来どおり毎回作成する。migration 無しで済ませるため、LIFF用の
+     * 冪等表を借り、subject には friend ではなく staff id を入れる。
+     * 照合は (key, account, staff) の範囲に閉じ、別アカウントの行は
+     * 別物として扱う（=tenant 越しの id 漏れ防止）。
+     */
+    const idemKey = c.req.header('Idempotency-Key')?.trim() || null;
+    const staffSubject = c.get('staff')?.id ?? 'admin';
+    /*
+     * 冪等表の主キーは key 単独のため、素のキーでは別アカウントの確保と
+     * 衝突する。照合は (key, account, staff) に閉じると決めているので、
+     * 保存キー自体にアカウントと口を埋め込み、アカウント越しの衝突を無くす。
+     * 名前空間化前の完了行（24時間窓）は読むだけ残し、取りこぼしで
+     * 作り直さない。migration は要らない（同じ表・同じ列）。
+     */
+    const idemScope = {
+      key: idemKey ? `${accountId}:admin-customer:${idemKey}` : '',
+      lineAccountId: accountId,
+      friendId: staffSubject,
+      now: new Date(),
+    };
+    if (idemKey) {
+      const cached = await findIdempotencyResponse(c.env.DB, idemScope);
+      if (cached && cached.status !== 202) {
+        return c.json(cached.body as Record<string, unknown>, cached.status as 201);
+      }
+      if (cached) return c.json({ error: 'request_in_progress' }, 409);
+      const legacy = await findIdempotencyResponse(c.env.DB, { ...idemScope, key: idemKey });
+      if (legacy && legacy.status !== 202) {
+        return c.json(legacy.body as Record<string, unknown>, legacy.status as 201);
+      }
+    }
     const body = await c.req.json<{
       display_name?: string;
       phone?: string;
@@ -1065,9 +1101,31 @@ booking.post(
     if (!body.display_name || !body.phone) {
       return c.json({ error: 'missing_customer_fields' }, 400);
     }
+    /*
+     * R559残差: 同じキーで同時に届いた2件がどちらも未保存と判断し、
+     * 別の顧客を2件作っていた。完了後の保存だけでは同時到着に負けるので、
+     * 代理予約と同じく先に202の仮応答を1行だけ確保し、確保できた
+     * 呼び出しだけが作成へ進む。検証落ちは確保前に返すので、入力を
+     * 直して同じキーで送り直せるのは従来どおり。
+     */
+    if (idemKey) {
+      const reserved = await reserveIdempotencyResponse(c.env.DB, {
+        ...idemScope,
+        body: { error: 'request_in_progress' },
+        ttlMinutes: BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES,
+      });
+      if (!reserved) {
+        const raced = await findIdempotencyResponse(c.env.DB, idemScope);
+        if (raced && raced.status !== 202) {
+          return c.json(raced.body as Record<string, unknown>, raced.status as 201);
+        }
+        return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
+      }
+    }
+    const customerId = crypto.randomUUID();
     try {
       const customer = await createBookingCustomer(c.env.DB, {
-        id: crypto.randomUUID(),
+        id: customerId,
         lineAccountId: accountId,
         displayName: body.display_name,
         phone: body.phone,
@@ -1075,8 +1133,83 @@ booking.post(
         email: body.email,
         encryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       });
+      // R559: 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
+      if (idemKey) {
+        await completeIdempotencyResponse(c.env.DB, {
+          ...idemScope,
+          status: 201,
+          body: { customer },
+        });
+      }
       return c.json({ customer }, 201);
     } catch (error) {
+      /*
+       * R559再残差: 顧客INSERTの成功後に完了書き込みだけ落ちると、
+       * 仮応答を消すだけでは再送が同じ顧客を作り直して2件になる。
+       * 作られた顧客を読み直し、完了行を修復してから503を返す。
+       * 再送は修復済みの作成済み顧客へ届く。作られていないときだけ
+       * 仮応答を消す（完了行・別呼び出しの行は触らない）。修復自体が
+       * 失敗したときは仮応答を残し、再送を409で止める（作り直さない）。
+       */
+      if (idemKey) {
+        let rescued: {
+          id: string; line_account_id: string; friend_id: string | null;
+          display_name: string; phone_last4: string; pet_name: string | null;
+          created_at: string; updated_at: string;
+        } | null = null;
+        /*
+         * 救出の読み直し自体が落ちたときは「無い」と分からない。
+         * null と例外を混ぜると、作られた顧客がいるのに仮応答を消して
+         * 再送で作り直してしまう。不在が確実なときだけ消す。
+         */
+        let rescueSettled = false;
+        try {
+          rescued = await c.env.DB
+            .prepare(
+              `SELECT id, line_account_id, friend_id, display_name,
+                      phone_last4, pet_name, created_at, updated_at
+                 FROM booking_customers WHERE id = ? AND line_account_id = ?`,
+            )
+            .bind(customerId, accountId)
+            .first<{
+              id: string; line_account_id: string; friend_id: string | null;
+              display_name: string; phone_last4: string; pet_name: string | null;
+              created_at: string; updated_at: string;
+            }>();
+          rescueSettled = true;
+        } catch {
+          rescueSettled = false;
+        }
+        if (rescued) {
+          try {
+            await completeIdempotencyResponse(c.env.DB, {
+              ...idemScope,
+              status: 201,
+              body: {
+                customer: {
+                  ...rescued,
+                  is_line_linked: rescued.friend_id !== null,
+                },
+              },
+            });
+          } catch {
+            // 修復できず仮応答が残る。再送は409で止まり、作り直さない。
+          }
+        } else if (rescueSettled) {
+          try {
+            await c.env.DB
+              .prepare(
+                `DELETE FROM booking_idempotency_keys
+                  WHERE key = ? AND line_account_id = ? AND friend_id = ?
+                    AND response_status = 202`,
+              )
+              .bind(idemScope.key, idemScope.lineAccountId, idemScope.friendId)
+              .run();
+          } catch {
+            // 消せなくても後の分岐で503を返す。残った仮応答はTTLで消える。
+          }
+        }
+      }
       const code = error instanceof Error ? error.message : '';
       if (code.startsWith('booking_customer_') && code.endsWith('_invalid')) {
         return c.json({ error: code }, 422);
@@ -3438,6 +3571,107 @@ booking.get('/api/booking/admin/availability-check', async (c) => {
   return c.json(result);
 });
 
+/**
+ * R560: 予約INSERTの後に履歴・予定処理の書き込みが欠けた保留予約へ、
+ * 同じ要求の再送で不足を埋める。存在するものは作り直さない。
+ * - 履歴: action='created' が無ければ1件だけ足す。
+ * - カレンダー連携の予定行: 同じ一意キーで置く（重ね書きしない）。
+ * - 友だち付きの予約だけ: リマインダが0件なら方針どおり作り直し、
+ *   確認連絡・自動化の予定行も同じ一意キーで置く。
+ * 外への送信そのものは再送では起こさず、予定行を残して背景の再試行に任せる。
+ */
+async function ensureProxyBookingSideEffects(
+  db: D1Database,
+  row: {
+    id: string;
+    staff_id: string;
+    menu_id: string;
+    starts_at: string;
+    price_at_booking: number;
+    source: string;
+    notification_policy_snapshot: string | null;
+  },
+  scope: {
+    lineAccountId: string;
+    friendId: string | null;
+  },
+  actor: { actorType: 'staff'; actorId: string | null; actorName: string | null },
+): Promise<void> {
+  const audit = await db
+    .prepare(
+      `SELECT id FROM booking_audit_logs
+        WHERE booking_id = ? AND line_account_id = ? AND action = 'created'`,
+    )
+    .bind(row.id, scope.lineAccountId)
+    .first<{ id: string }>();
+  if (!audit) {
+    await recordBookingAudit(db, {
+      bookingId: row.id,
+      lineAccountId: scope.lineAccountId,
+      action: 'created',
+      after: {
+        status: 'confirmed',
+        staff_id: row.staff_id,
+        menu_id: row.menu_id,
+        starts_at: row.starts_at,
+        price: Number(row.price_at_booking),
+        source: row.source,
+      },
+      ...actor,
+      occurredAt: new Date().toISOString(),
+    });
+  }
+  await queueBookingOperation(db, {
+    bookingId: row.id,
+    lineAccountId: scope.lineAccountId,
+    kind: 'google_calendar',
+    idempotencyKey: `${row.id}:google-calendar:create`,
+  });
+  if (!scope.friendId) return;
+  let policy: { send_line_confirmation?: unknown; day_before?: unknown; hours_before?: unknown } = {};
+  try {
+    policy = JSON.parse(row.notification_policy_snapshot ?? '{}') as typeof policy;
+  } catch {
+    policy = {};
+  }
+  const sendDayBefore = policy.day_before ?? true;
+  const sendHoursBefore = policy.hours_before ?? true;
+  if (sendDayBefore || sendHoursBefore) {
+    const existing = await db
+      .prepare(`SELECT COUNT(*) AS n FROM booking_reminders WHERE booking_id = ?`)
+      .bind(row.id)
+      .first<{ n: number }>();
+    if (!existing || existing.n === 0) {
+      const timing = await getReminderTiming(db, scope.lineAccountId);
+      await insertConfirmationReminders(db, {
+        bookingId: row.id,
+        startsAt: new Date(row.starts_at),
+        now: new Date(),
+        reminderHoursBefore: timing.reminderHoursBefore,
+        dayBeforeTime: timing.dayBeforeTime,
+        timeZone: timing.timeZone,
+        kinds: { dayBefore: Boolean(sendDayBefore), hoursBefore: Boolean(sendHoursBefore) },
+      });
+    }
+  }
+  if (policy.send_line_confirmation ?? true) {
+    await queueBookingOperation(db, {
+      bookingId: row.id,
+      lineAccountId: scope.lineAccountId,
+      kind: 'confirmation_line',
+      idempotencyKey: `${row.id}:confirmation-line:approved`,
+      result: { notificationKind: 'approved', openTracking: 'inbox' },
+    });
+  }
+  await queueBookingOperation(db, {
+    bookingId: row.id,
+    lineAccountId: scope.lineAccountId,
+    kind: 'automation',
+    idempotencyKey: `${row.id}:automation:calendar-booked`,
+    result: { eventType: BOOKING_CONFIRMED_AUTOMATION_EVENT },
+  });
+}
+
 // Proxy booking: the operator creates a CONFIRMED booking on behalf of a
 // friend, straight from the iOS chat screen. Same shift/slot/conflict
 // validation as the LIFF flow, but NO min-lead-time check (the operator
@@ -3541,7 +3775,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     if (typeof pendingBookingId === 'string') {
       const created = await c.env.DB
         .prepare(
-          `SELECT id, status, external_event_id FROM bookings
+          `SELECT id, status, external_event_id, staff_id, menu_id, starts_at,
+                  price_at_booking, source, notification_policy_snapshot FROM bookings
             WHERE id = ? AND line_account_id = ?
               AND ((? IS NOT NULL AND friend_id = ?)
                 OR (? IS NOT NULL AND booking_customer_id = ?))`,
@@ -3554,8 +3789,29 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
           bookingCustomerId,
           bookingCustomerId,
         )
-        .first<{ id: string; status: string; external_event_id: string | null }>();
+        .first<{
+          id: string; status: string; external_event_id: string | null;
+          staff_id: string; menu_id: string; starts_at: string;
+          price_at_booking: number; source: string;
+          notification_policy_snapshot: string | null;
+        }>();
       if (created) {
+        /*
+         * R560残差: 仮応答のまま取り消された予約へ同じキーで再送したとき、
+         * 補完がカレンダー作成などの副作用を積み直していた。取り消し済みの
+         * 予約に作り直しは要らないので、今の状態をそのまま返し、
+         * 副作用は確定中の予約にだけ足す。
+         */
+        if (created.status === 'confirmed') {
+          // R560: 予約は残っているのに履歴・予定処理が欠けているときは、
+          // 成功を返す前に不足を埋める。あるものは作り直さない。
+          await ensureProxyBookingSideEffects(
+            c.env.DB,
+            created,
+            { lineAccountId: accountId, friendId },
+            staffAuditActor(c),
+          );
+        }
         return c.json({
           booking_id: created.id,
           booking_customer_id: bookingCustomerId,

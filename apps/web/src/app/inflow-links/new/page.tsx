@@ -18,6 +18,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
@@ -185,6 +186,14 @@ export default function NewInflowLinkPage() {
         }
         return null
       }}
+      /*
+       * M030: 発行の失敗は原文のまま出さない。403は権限の案内、
+       * 400は入力の直し方つき、409は重複の立て直し文、429は待ち案内、
+       * 機械コードだけの失敗は再試行の案内にする。
+       */
+      describeError={(e) => describeApiFailure(e, '発行', {
+        forbidden: '発行するには権限が要ります。オーナーか管理者に依頼してください。',
+      })}
       onSave={async () => {
         if (!selectedAccountId) {
           throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
