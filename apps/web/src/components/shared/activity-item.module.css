@@ -67,4 +67,11 @@
   font-size: var(--text-caption);
   color: var(--color-ink-faint);
 }
+
+/* Pencil の文字は行の高さ 1.5（--text-lh）。v7 は書かない（既定のまま）。 */
+[data-theme='v8'] .title,
+[data-theme='v8'] .note,
+[data-theme='v8'] .time {
+  line-height: var(--text-lh);
+}
 }
