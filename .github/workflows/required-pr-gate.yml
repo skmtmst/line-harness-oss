@@ -619,6 +619,25 @@ jobs:
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      # ここから2つは「報告だけ」（止めない）。今の開発用に直っていないずれがあるため、数を Summary に出して見えるようにする。
+      # Devin の直し（夕9〜夕14）が入ったら continue-on-error を外して止める形にする（2026-10-01）
+      - name: "Report only: layout at laptop widths (1229, 1280, 1366, 1536)"
+        if: steps.scope.outputs.run == 'true'
+        continue-on-error: true
+        env:
+          WIDTHS: 1229,1280,1366,1536
+        run: |
+          set -o pipefail
+          node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout-laptop.json | tee /tmp/v8-guard/layout-laptop.txt
+          { echo "## V8 の見張り：ノートPCの幅（報告だけ）"; echo '```'; tail -20 /tmp/v8-guard/layout-laptop.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: "Report only: heights, keyboard and retired words"
+        if: steps.scope.outputs.run == 'true'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node apps/web/scripts/v8-guard/report-checks.mjs http://127.0.0.1:4310 /tmp/v8-guard/report.md "$BASE_SHA"
+          cat /tmp/v8-guard/report.md >> "$GITHUB_STEP_SUMMARY"
       - name: v7 screens are pixel-identical to the base
         if: steps.scope.outputs.diff == 'true'
         run: |
