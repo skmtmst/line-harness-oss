@@ -383,10 +383,19 @@ const server = createServer(async (req, res) => {
       upcoming: [
         {
           id: 'qa-history-1',
-          starts_at: '2026-10-01T10:00:00+09:00',
+          starts_at: '2026-10-02T13:00:00+09:00',
+          status: 'requested',
+          customer_note: null,
+          menu_name: 'トリミング（小型犬）',
+          staff_name: 'QA スタッフ',
+          profile_image_url: null,
+        },
+        {
+          id: 'qa-history-2',
+          starts_at: '2026-10-20T10:00:00+09:00',
           status: 'confirmed',
           customer_note: null,
-          menu_name: 'QA カット',
+          menu_name: 'シャンプーのみ',
           staff_name: 'QA スタッフ',
           profile_image_url: null,
         },
