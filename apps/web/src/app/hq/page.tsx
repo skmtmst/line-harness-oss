@@ -1,5 +1,9 @@
 'use client'
 
+import ReadonlyHeader from './readonly-header-v8'
+import AccountBrowser from './account-browser-v8'
+import './readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, fetchApi } from '@/lib/api'
@@ -18,6 +22,7 @@ import OperatorHistory from '@/components/hq/operator-history'
 import PlatformNotices from '@/components/hq/platform-notices'
 
 export default function HqPage() {
+  const theme = useAdminTheme()
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
   usePageTitle('アカウント')
   const router = useRouter()
@@ -109,8 +114,9 @@ export default function HqPage() {
   const month = new Date().getMonth() + 1
 
   return (
-    <div data-design-node="MjMCg" className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? 'JKjsE' : 'MjMCg'} className="v8-ro-hq-page flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      {theme === 'v8' && <ReadonlyHeader title="統括のアカウント" description="各アカウントの接続状態、友だち、配信の状況を確認できます。" />}
       <PlatformNotices />
       <div data-design="Actions" data-design-node="x5Tkb6" className="flex flex-wrap justify-end gap-2">
         <Button
@@ -119,9 +125,9 @@ export default function HqPage() {
           disabled={checkingConnections || loading || accounts.length === 0}
           onClick={() => { void refreshConnectionInfo() }} busy={checkingConnections} busyLabel="接続情報を更新中">LINE ID・接続状態を更新する
         </Button>
-        <Button href="/accounts/new" variant="primary" className="shrink-0">
+        {theme !== 'v8' && <Button href="/accounts/new" variant="primary" className="shrink-0">
           ＋ LINEアカウントを登録する
-        </Button>
+        </Button>}
       </div>
 
       {connectionProgress ? <p className="mb-4 text-sm text-ink-secondary" role="status">{connectionProgress}</p> : null}
@@ -158,7 +164,7 @@ export default function HqPage() {
       {!loadError && !loading ? (
         <>
           {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-          <KpiCollapse data-design="KPIs" data-design-node="w7yY6" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCollapse data-ro-kpis data-design="KPIs" data-design-node="w7yY6" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard variant="v6" title="アカウント" value={accounts.length} unit="件" detail={`有効 ${totals.active}・停止中 ${accounts.length - totals.active}`} />
             <KpiCard variant="v6" title="友だち合計" value={totals.friends} unit="人" detail="" help="全アカウントの合計です" />
             <KpiCard variant="v6" title="今月の配信" value={totals.messages} unit="通" detail="" help={`${month}/1 から今日までの配信です`} />
@@ -178,7 +184,7 @@ export default function HqPage() {
       ) : null}
 
       {!loadError && !loading && accounts.length > 0 ? (
-        <HqAccountList accounts={accounts} onSelect={login} onSettings={setEditingAccount} />
+        theme === 'v8' ? <AccountBrowser accounts={accounts} onSelect={login} onSettings={setEditingAccount} /> : <HqAccountList accounts={accounts} onSelect={login} onSettings={setEditingAccount} />
       ) : null}
 
       {/* 運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。 */}

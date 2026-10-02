@@ -88,6 +88,7 @@ shared-button-importer app/friends/migrations/page.tsx
 shared-button-importer app/friends/page.tsx
 shared-button-importer app/getting-started/feature-set-card.tsx
 shared-button-importer app/health/page.tsx
+shared-button-importer app/hq/account-browser-v8.tsx
 shared-button-importer app/hq/banners/project/page.tsx
 shared-button-importer app/hq/billing/page.tsx
 shared-button-importer app/hq/members/page.tsx

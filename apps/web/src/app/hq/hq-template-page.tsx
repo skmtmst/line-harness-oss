@@ -1,5 +1,6 @@
 'use client'
 
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Suspense } from 'react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import TargetMissing from '@/components/shared/target-missing'
@@ -9,9 +10,10 @@ import type { TemplateType } from '@/lib/hq-templates-api'
 import TemplateConsole from './templates/template-console'
 
 function Unavailable({ label, target }: { label: string; target: HqOpenTargetKey }) {
+  const theme = useAdminTheme()
   usePageTitle(label)
   return (
-    <section aria-label={`統括の${label}`}>
+    <section aria-label={`統括の${label}`} data-design-node={theme === 'v8' ? 'LRc93' : undefined}>
       <TargetMissing
         kind="unspecified"
         title={`統括からの${label}の作成・配布はまだ使えません`}
