@@ -404,7 +404,8 @@ describe('saveCarousel', () => {
       { create, update } as never,
     )
 
-    expect(result).toEqual({ ok: true })
+    // 成功時も id を返す（「保存して公開」が直後に公開APIへ渡すため）。
+    expect(result).toEqual({ ok: true, id: 'tpl-new' })
     expect(create).not.toHaveBeenCalled()
     expect(update).toHaveBeenCalledTimes(1)
     // id が決まっているので、postback の data は最初から正しい。
@@ -442,7 +443,7 @@ describe('saveCarousel', () => {
       { create, update } as never,
     )
 
-    expect(result).toEqual({ ok: true })
+    expect(result).toEqual({ ok: true, id: 'tpl-new' })
     expect(update).not.toHaveBeenCalled()
   })
 })
