@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
 import { api, ApiError, type FormDeleteImpact } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import FormSubmissionsListV8 from './list-v8'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
@@ -139,7 +141,7 @@ function displayUpdatedAt(value: string | null): string {
   return formatDay(date)
 }
 
-export default function FormSubmissionsPage() {
+function FormSubmissionsPageV7() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -1277,4 +1279,14 @@ export default function FormSubmissionsPage() {
       </ConfirmDialog>
     </div>
   )
+}
+
+/*
+ * ★V8: data-theme="v8" のときだけ新しい一覧（`I3L41O`）を出す。
+ * v7 の本体（FormSubmissionsPageV7）は変えない——フォルダ・絞り込み・
+ * 管理者確認・各種の窓はすべてそのまま残る。
+ */
+export default function FormSubmissionsPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <FormSubmissionsListV8 /> : <FormSubmissionsPageV7 />
 }

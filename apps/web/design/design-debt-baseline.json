@@ -186,6 +186,10 @@
     "unresolved-classname": 4,
     "arbitrary-value": 1
   },
+  "app/form-submissions/list-v8.tsx": {
+    "unresolved-classname": 93,
+    "direct-th": 6
+  },
   "app/form-submissions/page.tsx": {
     "arbitrary-value": 4
   },
