@@ -311,6 +311,9 @@
   "app/tags/searches-v8.tsx": {
     "unresolved-classname": 59
   },
+  "app/tags/tag-editor-v8.tsx": {
+    "unresolved-classname": 113
+  },
   "app/tags/tags-tab-v8.tsx": {
     "unresolved-classname": 67
   },
