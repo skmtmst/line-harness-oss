@@ -573,8 +573,8 @@
       }
     },
     "/booking/menus": {
-      "node": "QSLEH",
-      "name": "V6 28-1 予約設定",
+      "node": "QSLEH owaS3 P6EdLW yRPxl KRgTQ x1OZS6 VLEaj xCoDe",
+      "name": "V8 予約設定（V6 28-1、v7 見た目併存）",
       "sections": [
         "Head",
         "Tabs",
@@ -582,7 +582,13 @@
         "Bar",
         "Table",
         "Crumb",
-        "Actions"
+        "Actions",
+        "Body",
+        "Side",
+        "Savebar",
+        "Week",
+        "Special",
+        "Rules"
       ],
       "parts": [
         "お客様に見える画面を確かめる",

@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする54ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする55ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -69,6 +69,8 @@ describe('共通部品の影響範囲', () => {
       'app/booking/bookings/page.tsx',
       // #370: 予約メニュー8件を設計どおり1ページ6件に区切る。
       'app/booking/menus/page.tsx',
+      // 予約設定V8（owaS3）のメニュー表も1ページ6件で区切る。
+      'app/booking/menus/settings-v8.tsx',
       'app/common-actions/page.tsx',
       // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
       'app/contents/media-picker-dialog.tsx',
