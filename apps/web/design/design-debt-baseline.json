@@ -226,6 +226,10 @@
     "arbitrary-value": 10,
     "direct-secondary-button": 1
   },
+  "app/scenarios/detail/detail-v8.tsx": {
+    "arbitrary-value": 3,
+    "unresolved-classname": 109
+  },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 5
   },
@@ -245,6 +249,9 @@
   },
   "app/scenarios/results/page.tsx": {
     "unresolved-classname": 17
+  },
+  "app/scenarios/results/results-v8.tsx": {
+    "unresolved-classname": 46
   },
   "app/search-console/page.tsx": {
     "arbitrary-value": 2

@@ -1,6 +1,15 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+/*
+ * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
+ *
+ * v7 の results/page.tsx（ResultsInner）と同じ取得口・同じ操作を持つ
+ * 別の描画。違いは置き場と見せ方だけ——上に「届いた・送れなかった・
+ * 進んでいる途中・全部終わった」の数の帯、その下に通ごとの結果、
+ * いちばん下に友だちごとの記録の表。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
@@ -17,16 +26,14 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
+import StatusChip from '@/components/shared/status-chip'
 import StatusBadge from '@/components/shared/status-badge'
-import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import styles from './scenario-results.module.css'
+import styles from './results-v8.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { shortDateTime } from '@/lib/hq-banners'
 import { formatNumber } from '@/lib/format'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import ScenarioResultsV8 from './results-v8'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -53,34 +60,11 @@ function scheduleLabel(step: ScenarioStep): string {
   return parts.length ? `${parts.join('')}後` : '登録直後'
 }
 
-function messagePreview(step: ScenarioStep | undefined): string {
-  if (!step) return '配信内容はまだありません。'
-  if (step.messageType === 'text') return step.messageContent || '本文は未設定です。'
-  const labels: Record<string, string> = {
-    image: '画像メッセージ', flex: 'カードタイプのメッセージ', carousel: 'カルーセル',
-    location: '位置情報', video: '動画', audio: '音声', sticker: 'スタンプ',
-  }
-  return labels[step.messageType] ?? '登録したメッセージ'
-}
-
 function csvCell(value: unknown): string {
   return `"${String(value ?? '').replaceAll('"', '""')}"`
 }
 
-/** この画面のパネル。見出しと説明文の組を毎回同じ構造で置く。 */
-function Panel({ title, lead, children }: { title: string; lead: string; children: ReactNode }) {
-  return (
-    <section className={styles.panel}>
-      <div className={styles.panelHead}>
-        <h2>{title}</h2>
-        <p>{lead}</p>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function ResultsInner() {
+export default function ScenarioResultsV8() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -295,7 +279,7 @@ function ResultsInner() {
         ]
       }),
     ]
-    const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`
+    const csv = `﻿${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
@@ -414,129 +398,244 @@ function ResultsInner() {
     )
   }
 
+  /*
+   * ★V8 `X4STXS` の帯：「送れずに止まった」「いま送っている」。
+   * 失敗は取得できている範囲（実行記録の失敗数＋読み込み済みの購読）で数え、
+   * 取れないときは数を断定しない。
+   */
+  const failedTotal = (runs?.steps ?? []).reduce(
+    (acc, step) => acc + (step.failed.state === 'available' ? (step.failed.value ?? 0) : 0),
+    0,
+  )
+  const deliveringCount = runs?.summary.delivering ?? 0
+  const inProgress = runs ? runs.summary.active + runs.summary.delivering : stats?.activeNow ?? null
+  const completedCount = runs?.summary.completed ?? stats?.completed ?? null
+
   return (
-    <div className={styles.page} data-design-node="M2b2B">
-      <div className={styles.actions}>
-        <Link href="/scenarios" className={styles.crumb}>← シナリオ一覧</Link>
+    <div className={styles.board} data-design-node="X4STXS">
+      <div className={styles.actions} data-design="Head">
+        <Link href="/scenarios" className={styles.crumb}>← シナリオ一覧へ</Link>
         <span className={styles.actionEnd}>
-          <Button href={`/scenarios/detail?id=${id}`}>シナリオ編集へ戻る</Button>
+          <Button variant="secondary" size="compact" href={`/scenarios/detail?id=${id}`}>シナリオ編集へ戻る</Button>
           {/*
             **書き出しは主要ボタンにしない。**
             横断レビュー §7 の #44。この画面でいちばんしたいことは結果を見ることで、
             CSVに落とすことではない。緑にすると、そちらが本筋に見える。
-            ほかの7画面はすべて副次で置いてあり、ここだけ例外だった。
           */}
-          <Button onClick={exportCsv} disabled={!scenario || !stats}>CSVで書き出す</Button>
+          <Button variant="secondary" size="compact" onClick={exportCsv} disabled={!scenario || !stats}>CSVで書き出す</Button>
         </span>
       </div>
+
+      {scenario && (
+        <div className={styles.head}>
+          <div className={styles.titleRow}>
+            <h1 className={styles.title}>{scenario.name}</h1>
+            <StatusChip status={scenario.isActive ? 'running' : 'paused'} />
+            <span className={styles.titleSuffix}>配信結果</span>
+          </div>
+        </div>
+      )}
 
       {loading ? <ListState kind="loading" title="配信結果を読み込んでいます" /> : null}
 
       {!loading && !error && scenario && stats ? (
-        <div className={styles.columns}>
-          <div className={styles.main}>
-            <Panel title="配信結果" lead="開始・完了・どの通まで届いたかを確認します。">
-              <div className={styles.resultSummary}>
-                <KpiCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="" help="このシナリオに参加した人数です" />
-                <KpiCard variant="v6" title="完了" value={stats.completed} unit="人" detail={percentLabel(stats.completed, stats.enrolledTotal)} />
-              </div>
-            </Panel>
+        <>
+          {/* 送れずに止まった人がいるときの警告帯（X4STXS の上の帯）。 */}
+          {failedTotal > 0 && (
+            <div className={styles.bandWarn} role="status">
+              <p>
+                送れずに止まった人が {formatNumber(failedTotal)} 人います。
+                失敗の多い通を確かめて、「失敗を再送」で届け直せます。
+              </p>
+              <button
+                type="button"
+                onClick={() => setSubscriptionStatus('paused')}
+              >
+                止まっている人だけを見る
+              </button>
+            </div>
+          )}
+          {/* 送信中の帯（X4STXS の送信中状態）。 */}
+          {deliveringCount > 0 && (
+            <div className={styles.bandInfo} role="status">
+              <p>いま送っています。送信中の人が {formatNumber(deliveringCount)} 人います。</p>
+            </div>
+          )}
 
-            <Panel title="ステップ別の反応" lead="到達人数と、前の通から減った場所を確認できます。">
-              <NoteBar tone="info">LINEでは通ごとの開封・クリック・失敗をすべて取得できません。取得できない指標は「—」で表示します。</NoteBar>
-              {sortedSteps.length === 0 ? (
-                <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
-              ) : (
-                <ol className={styles.steps}>
-                  {sortedSteps.map((step) => {
-                    const result = statsByOrder.get(step.stepOrder)
-                    const run = runsByOrder.get(step.stepOrder)
-                    return (
-                      <li key={step.id} className={styles.step}>
-                        <div className={styles.stepTitle}>
-                          <span>ステップ{step.stepOrder}：{scheduleLabel(step)}</span>
-                          <span className={styles.reached}>{formatNumber((run?.delivered ?? result?.reachedCount))}人到達</span>
-                        </div>
-                        <p>
-                          到達率 {run ? percentLabel(run.delivered, stats.enrolledTotal) : result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—'}
-                          {'・'}開封率 {run?.opened.value ?? '—'}
-                          {'・'}クリック率 {run?.clicked.value ?? '—'}
-                        </p>
-                      </li>
-                    )
-                  })}
-                </ol>
-              )}
-            </Panel>
+          {/* 数の帯：届いた・送れなかった・進んでいる途中・全部終わった。 */}
+          <div className={styles.kpis} data-design="KPIs">
+            <div className={styles.kpi}>
+              <p className={styles.kpiLabel}>届いた</p>
+              <p className={styles.kpiValue}>
+                {formatNumber(runs?.steps[0]?.delivered ?? stats.steps[0]?.reachedCount)}
+                <span className={styles.kpiUnit}>人</span>
+              </p>
+              <p className={styles.kpiDetail}>
+                {runs?.steps[0]?.opened.state === 'available' && runs.steps[0].opened.value !== null
+                  ? `うち開封 ${runs.steps[0].opened.value}%`
+                  : '開封率は取得できません'}
+              </p>
+            </div>
+            <div className={styles.kpi}>
+              <p className={styles.kpiLabel}>送れなかった</p>
+              <p className={styles.kpiValue}>
+                {(runs?.steps ?? []).some((s) => s.failed.state === 'available')
+                  ? formatNumber(failedTotal)
+                  : '—'}
+                <span className={styles.kpiUnit}>人</span>
+              </p>
+              <p className={styles.kpiDetail}>
+                {(runs?.steps ?? []).some((s) => s.failed.state === 'available')
+                  ? ''
+                  : (runs?.steps[0]?.failed.reason ?? 'この集計からは取得できません')}
+              </p>
+            </div>
+            <div className={styles.kpi}>
+              <p className={styles.kpiLabel}>進んでいる途中</p>
+              <p className={styles.kpiValue}>
+                {inProgress === null ? '—' : formatNumber(inProgress)}
+                <span className={styles.kpiUnit}>人</span>
+              </p>
+              <p className={styles.kpiDetail}>
+                {runs ? `うち一時停止 ${formatNumber(runs.summary.paused)}人` : ''}
+              </p>
+            </div>
+            <div className={styles.kpi}>
+              <p className={styles.kpiLabel}>全部終わった</p>
+              <p className={styles.kpiValue}>
+                {completedCount === null ? '—' : formatNumber(completedCount)}
+                <span className={styles.kpiUnit}>人</span>
+              </p>
+              <p className={styles.kpiDetail}>
+                {stats.enrolledTotal > 0 && completedCount !== null
+                  ? `参加した人の ${percentLabel(completedCount, stats.enrolledTotal)}`
+                  : ''}
+              </p>
+            </div>
+          </div>
 
+          {/* 通ごとの結果。届いた数の太い棒と、開封・失敗の補足。 */}
+          <section className={styles.panel}>
+            <h2 className={styles.panelTitle}>通ごとの結果</h2>
+            <NoteBar tone="info">
+              LINEでは通ごとの開封・クリック・失敗をすべて取得できません。取得できない指標は「—」で表示します。
+            </NoteBar>
+            {sortedSteps.length === 0 ? (
+              <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
+            ) : (
+              <ol className={styles.stepList}>
+                {sortedSteps.map((step) => {
+                  const result = statsByOrder.get(step.stepOrder)
+                  const run = runsByOrder.get(step.stepOrder)
+                  const reached = run?.delivered ?? result?.reachedCount
+                  const reachPct =
+                    reached === undefined || reached === null
+                      ? null
+                      : stats.enrolledTotal > 0
+                        ? Math.min(100, Math.round((reached / stats.enrolledTotal) * 100))
+                        : null
+                  return (
+                    <li key={step.id} className={styles.stepRow}>
+                      <span className={styles.stepNo}>{step.stepOrder}通目</span>
+                      <span className={styles.stepWhen}>{scheduleLabel(step)}</span>
+                      <span className={styles.stepReach}>
+                        <span className={styles.stepBar} aria-hidden>
+                          <span
+                            className={styles.stepBarFill}
+                            style={{ width: `${reachPct ?? 0}%` }}
+                          />
+                        </span>
+                        <span className={styles.stepReachText}>
+                          {reached === undefined || reached === null ? '—' : `${formatNumber(reached)}人到達`}
+                          {reachPct !== null ? `（${percentLabel(reached ?? 0, stats.enrolledTotal)}）` : ''}
+                        </span>
+                      </span>
+                      <span className={styles.stepMeta}>
+                        開封 {run?.opened.value ?? '—'}
+                        {'　クリック '}{run?.clicked.value ?? '—'}
+                        {'　失敗 '}
+                        {run?.failed.state === 'available' && run.failed.value !== null
+                          ? formatNumber(run.failed.value)
+                          : '—'}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
+          </section>
+
+          {/*
+            友だちごとの記録（X4STXS の下の表）。
+            止める・再開・失敗を再送・別のシナリオへ移すは「…」の中。
+            止まり方（pauseReason）で「再開」と「失敗を再送」を出し分ける。
+          */}
+          <section className={styles.panel}>
+            <div className={styles.panelHeadRow}>
+              <h2 className={styles.panelTitle}>友だちごとの記録</h2>
+              <Button
+                type="button"
+                variant="secondary"
+                size="compact"
+                onClick={() => {
+                  setPlanFriend(null)
+                  setPlanOpen(true)
+                }}
+              >
+                友だちを選んで配信予定を見る
+              </Button>
+            </div>
+            {opError ? <NoteBar tone="warn">{opError}</NoteBar> : null}
             {/*
-              友だち単位の購読操作（#949 N-054）。止める・再開・失敗を再送・
-              別のシナリオへ移す。止まり方（pauseReason）で「再開」と
-              「失敗を再送」を出し分ける。
+              SCENARIO-12: 状態の絞り込みはサーバーへ渡して全件へ掛ける。
+              手元の表示中ページだけを絞ると、総件数と食い違う。
             */}
-            <Panel title="参加中の友だち" lead="届いている・止まっている購読を友だちごとに操作します。">
-              {opError ? <NoteBar tone="warn">{opError}</NoteBar> : null}
-              <div className="mb-3">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setPlanFriend(null)
-                    setPlanOpen(true)
-                  }}
-                >
-                  友だちを選んで配信予定を見る
-                </Button>
-              </div>
-              {/*
-                SCENARIO-12: 状態の絞り込みはサーバーへ渡して全件へ掛ける。
-                手元の表示中ページだけを絞ると、総件数と食い違う。
-              */}
-              <div className="mb-3 flex flex-wrap items-center gap-3">
-                <Select
-                  size="page-size"
-                  value={subscriptionStatus}
-                  onChange={(value) => setSubscriptionStatus(value)}
-                  aria-label="購読の状態で絞り込む"
-                  options={[
-                    { value: '', label: 'すべての状態' },
-                    { value: 'active', label: '配信中' },
-                    { value: 'delivering', label: '送信中' },
-                    { value: 'paused', label: '停止中' },
-                    { value: 'completed', label: '完了' },
-                  ]}
-                />
-                {runs ? (
-                  <span className="text-ink-faint text-xs tabular-nums">
-                    {formatNumber(runs.subscriptions.length)} / {formatNumber(runs.pagination.total)}人
-                  </span>
-                ) : null}
-              </div>
-              {/*
-                SCENARIO-10: 取得失敗と「まだ誰もいない」を分ける。
-                失敗は再試行、未取得（アカウント未選択）は案内、
-                正常に0件のときだけ空状態を出す。
-              */}
-              {runsState === 'idle' ? (
-                <p className="text-ink-faint py-6 text-center text-sm">
-                  上部のLINEアカウントを選ぶと、購読している友だちの一覧を表示します。
-                </p>
-              ) : runsState === 'loading' ? (
-                <ListState kind="loading" title="購読一覧を読み込んでいます" />
-              ) : runsState === 'error' ? (
-                <ListState
-                  kind="error"
-                  title="購読一覧を表示できませんでした"
-                  description="登録が消えたわけではありません。もう一度読み込んでください。"
-                  onRetry={() => void loadRuns(loadSeqRef.current)}
-                />
-              ) : !runs || runs.subscriptions.length === 0 ? (
-                <ListState
-                  kind="empty"
-                  title="購読している友だちはまだいません"
-                  description="開始条件に一致した友だちがここに並びます。"
-                />
-              ) : (
-                <>
+            <div className={styles.filterRow}>
+              <Select
+                size="page-size"
+                value={subscriptionStatus}
+                onChange={(value) => setSubscriptionStatus(value)}
+                aria-label="購読の状態で絞り込む"
+                options={[
+                  { value: '', label: 'すべての状態' },
+                  { value: 'active', label: '配信中' },
+                  { value: 'delivering', label: '送信中' },
+                  { value: 'paused', label: '停止中' },
+                  { value: 'completed', label: '完了' },
+                ]}
+              />
+              {runs ? (
+                <span className="text-ink-faint text-xs tabular-nums">
+                  {formatNumber(runs.subscriptions.length)} / {formatNumber(runs.pagination.total)}人
+                </span>
+              ) : null}
+            </div>
+            {/*
+              SCENARIO-10: 取得失敗と「まだ誰もいない」を分ける。
+              失敗は再試行、未取得（アカウント未選択）は案内、
+              正常に0件のときだけ空状態を出す。
+            */}
+            {runsState === 'idle' ? (
+              <p className="text-ink-faint py-6 text-center text-sm">
+                上部のLINEアカウントを選ぶと、購読している友だちの一覧を表示します。
+              </p>
+            ) : runsState === 'loading' ? (
+              <ListState kind="loading" title="購読一覧を読み込んでいます" />
+            ) : runsState === 'error' ? (
+              <ListState
+                kind="error"
+                title="購読一覧を表示できませんでした"
+                description="登録が消えたわけではありません。もう一度読み込んでください。"
+                onRetry={() => void loadRuns(loadSeqRef.current)}
+              />
+            ) : !runs || runs.subscriptions.length === 0 ? (
+              <ListState
+                kind="empty"
+                title="購読している友だちはまだいません"
+                description="開始条件に一致した友だちがここに並びます。"
+              />
+            ) : (
+              <>
                 <DataTable>
                   <thead>
                     <TableHeadRow>
@@ -671,28 +770,9 @@ function ResultsInner() {
                   </div>
                 ) : null}
               </>
-              )}
-            </Panel>
-          </div>
-
-          <aside className={styles.side}>
-            <Panel title="設定サマリー" lead="現在の参加状況です。">
-              <dl className={styles.summaryList}>
-                <div><dt>参加中</dt><dd>{formatNumber((runs ? runs.summary.active + runs.summary.delivering : stats.activeNow))}人</dd></div>
-                <div><dt>完了</dt><dd>{formatNumber((runs?.summary.completed ?? stats.completed))}人</dd></div>
-                <div><dt>一時停止</dt><dd>{formatNumber((runs?.summary.paused ?? stats.paused))}人</dd></div>
-                <div><dt>エラー</dt><dd>—</dd></div>
-              </dl>
-              <p className={styles.unavailable}>
-                {runs?.steps[0]?.failed.reason ?? '配信失敗数は、この集計からは取得できません。'}
-              </p>
-            </Panel>
-
-            <Panel title="メッセージプレビュー" lead="1通目に登録されている内容です。">
-              <div className={styles.preview}>{messagePreview(sortedSteps[0])}</div>
-            </Panel>
-          </aside>
-        </div>
+            )}
+          </section>
+        </>
       ) : null}
 
       {/* IDEA-05: 検証顧客への配信予定。送信・登録は起きない。 */}
@@ -777,23 +857,5 @@ function ResultsInner() {
         )}
       </Dialog>
     </div>
-  )
-}
-
-/*
- * ★V8 への切り替えはテーマで行う。data-theme="v8" のときだけ
- * results-v8.tsx（Pencil `X4STXS`）を描き、それ以外は今までどおりの
- * v7 を出す。検索パラメータ（?id=）を読むので Suspense の中で分ける。
- */
-function ResultsGate() {
-  const theme = useAdminTheme()
-  return theme === 'v8' ? <ScenarioResultsV8 /> : <ResultsInner />
-}
-
-export default function ScenarioResultsPage() {
-  return (
-    <Suspense fallback={<ListState kind="loading" title="配信結果を読み込んでいます" />}>
-      <ResultsGate />
-    </Suspense>
   )
 }
