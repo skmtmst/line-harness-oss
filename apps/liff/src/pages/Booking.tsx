@@ -5,20 +5,20 @@ import StaffList from '../components/StaffList.js';
 import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
 import Done from '../components/Done.js';
-import PageHeader from '../components/ui/PageHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 import Stepper from '../components/ui/Stepper.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
-import { formatMd } from '../lib/datetime.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
 
 const STEPS = ['メニュー', '担当', '日時', '確認'];
 
 /**
- * ご予約 (1-a〜1-e)。手順は4つ。進む操作は下の操作の帯に1つだけ。
- * API・画面の流れ・保存の中身はそのまま。見た目だけ ★V7。
+ * ご予約 (★V8・IruGD→biNP5→M2p63S/k3aJKU→gLReL→VU6Xi)。手順は4つ。
+ * 進む操作は下の操作の帯に1つだけ。API・画面の流れ・保存の中身はそのまま。
+ * 上の帯は ×・題・店名 (LiffHeader)。手順の印は短い緑の棒 (Stepper)。
  */
 export default function Booking() {
   const [params] = useSearchParams();
@@ -61,66 +61,51 @@ export default function Booking() {
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : STEPS.length - 1;
 
   return (
-    <div className="min-h-screen bg-ground">
-      <div
-        className={
-          step === 'done'
-            ? 'mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10'
-            : 'mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-28'
-        }
-      >
-        {step !== 'done' && (
-          <>
-            <PageHeader
-              title={
-                step === 'menu'
-                  ? 'ご予約'
-                  : step === 'staff'
-                    ? '担当を選ぶ'
-                    : step === 'datetime'
-                      ? '日時を選ぶ'
-                      : '内容の確認'
-              }
-              onBack={
-                step === 'menu'
-                  ? undefined
-                  : () =>
-                      setStep(
-                        step === 'staff' ? 'menu' : step === 'datetime' ? 'staff' : 'datetime',
-                      )
-              }
-            />
-            <Stepper steps={STEPS} current={stepIndex} />
-          </>
-        )}
+    <div className="min-h-screen bg-canvas">
+      <LiffHeader title="ご予約" />
+      {step !== 'done' && <Stepper steps={STEPS} current={stepIndex} />}
+      <div className="mx-auto w-full max-w-md px-4 pt-3 pb-40">
         {step === 'menu' && (
-          <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
+          <div data-design-node="IruGD">
+            <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
+          </div>
         )}
         {step === 'staff' && menu && (
-          <StaffList
-            key={menu.id}
-            menuId={menu.id}
-            basePrice={menu.base_price}
-            selectedId={staff?.id ?? null}
-            onSelect={pickStaff}
-            onLoadState={setStepReady}
-          />
+          <div data-design-node="biNP5">
+            <StaffList
+              key={menu.id}
+              menu={menu}
+              selectedId={staff?.id ?? null}
+              onSelect={pickStaff}
+              onLoadState={setStepReady}
+            />
+          </div>
         )}
         {step === 'datetime' && menu && staff && (
           <DateTimePicker
             key={`${menu.id}-${staff.id}`}
-            menuId={menu.id}
-            staffId={staff.id}
+            menu={menu}
+            staff={staff}
             hint={isPeek ? '空き状況の確認モードです' : undefined}
             selected={slot}
             onSelect={setSlot}
-            onLoadState={setStepReady}
+            onConfirm={isPeek ? exitPeekToBooking : () => setStep('confirm')}
+            confirmLabel={isPeek ? 'この時間で予約に進む' : undefined}
+            onBackToStaff={() => setStep('staff')}
           />
         )}
         {step === 'confirm' && menu && staff && slot && (
-          <Confirm menu={menu} staff={staff} slot={slot} onSubmitted={() => setStep('done')} />
+          <Confirm
+            menu={menu}
+            staff={staff}
+            slot={slot}
+            onBack={() => setStep('datetime')}
+            onSubmitted={() => setStep('done')}
+          />
         )}
-        {step === 'done' && menu && slot && <Done menuName={menu.name} slot={slot} />}
+        {step === 'done' && menu && staff && slot && (
+          <Done menuName={menu.name} slot={slot} durationMinutes={staff.duration_minutes} />
+        )}
       </div>
       {step === 'menu' && stepReady && (
         <BottomBar>
@@ -134,23 +119,13 @@ export default function Booking() {
           <Button variant="primary" disabled={!staff} onClick={() => setStep('datetime')}>
             日時を選ぶ
           </Button>
-        </BottomBar>
-      )}
-      {step === 'datetime' && !isPeek && stepReady && (
-        <BottomBar>
-          <Button variant="primary" disabled={!slot} onClick={() => setStep('confirm')}>
-            {slot ? `${formatMd(slot.date)} ${slot.start} で確認へ` : '日時を選んでください'}
-          </Button>
-        </BottomBar>
-      )}
-      {step === 'datetime' && isPeek && slot && (
-        <BottomBar>
-          <p className="mb-2 truncate text-sm text-ink-secondary" title={`${slot.date} ${slot.start}`}>
-            選択中: {formatMd(slot.date)} {slot.start}
-          </p>
-          <Button variant="primary" onClick={exitPeekToBooking}>
-            この時間で予約に進む
-          </Button>
+          <button
+            type="button"
+            onClick={() => setStep('menu')}
+            className="self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+          >
+            ← メニューを選び直す
+          </button>
         </BottomBar>
       )}
     </div>

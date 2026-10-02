@@ -5,14 +5,16 @@ import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import HistoryCard from '../components/HistoryCard.js';
-import PageHeader from '../components/ui/PageHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 import StatusView from '../components/ui/StatusView.js';
+import BottomBar from '../components/ui/BottomBar.js';
+import Button from '../components/ui/Button.js';
 import Icon from '../components/ui/Icon.js';
 
 /**
- * 3-a・3-c 予約の履歴。「これから／これまで」の切り替え。
- * キャンセル・変更の操作は付けない (LIFF では出来ない)。
- * 読み直し・保存の中身はそのまま。見た目と文言だけ ★V7。
+ * 予約の履歴 (★V8・YvTJ3)。「これから／これまで」の切り替え。
+ * カードの「日時を変える／キャンセル」は機能追加 F-6・API待ちのため出さない。
+ * 進む操作は下の帯の「新しく予約する」1つだけ。読み直し・中身はそのまま。
  */
 export default function BookingHistory() {
   const [data, setData] = useState<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] } | null>(
@@ -36,9 +38,13 @@ export default function BookingHistory() {
   }, [reloadKey]);
 
   return (
-    <div className="min-h-screen bg-ground">
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
-        <PageHeader title="予約の履歴" />
+    <div className="min-h-screen bg-canvas">
+      <LiffHeader title="予約の履歴" />
+      <div
+        data-design-node="YvTJ3"
+        className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-3 pb-40"
+      >
+        <h1 className="text-xl font-bold text-ink">予約の履歴</h1>
         {failed ? (
           <LoadErrorView note="予約はなくなっていません。" onRetry={() => setReloadKey((k) => k + 1)} />
         ) : !data ? (
@@ -46,7 +52,7 @@ export default function BookingHistory() {
         ) : (
           <>
             <div
-              className="flex rounded-xl bg-hairline/40 p-1"
+              className="flex rounded-[10px] bg-liff-chip p-[3px]"
               role="tablist"
               aria-label="予約の期間"
             >
@@ -62,10 +68,10 @@ export default function BookingHistory() {
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`min-h-11 flex-1 rounded-lg px-2 text-sm focus-visible:outline-2 focus-visible:outline-ink ${
+                  className={`flex h-8 flex-1 items-center justify-center rounded-lg text-xs focus-visible:outline-2 focus-visible:outline-ink ${
                     tab === t.key
-                      ? 'bg-canvas font-bold text-ink shadow-sm'
-                      : 'text-ink-secondary'
+                      ? 'bg-canvas font-bold text-ink'
+                      : 'font-semibold text-liff-sub'
                   }`}
                 >
                   {t.label}
@@ -78,25 +84,34 @@ export default function BookingHistory() {
                   icon="calendar"
                   title="これからの予約はありません"
                   body="空いている日時から、そのまま予約できます。"
-                  action={{ label: '予約する', onClick: () => navigate({ pathname: '/booking', search }) }}
                 />
               ) : (
                 <StatusView icon="calendar" title="これまでの予約はありません" />
               )
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-3.5">
                 {(tab === 'upcoming' ? data.upcoming : data.past).map((b) => (
                   <HistoryCard key={b.id} booking={b} />
                 ))}
               </ul>
             )}
-            <p className="flex gap-1.5 text-xs leading-5 text-ink-secondary">
-              <Icon name="message-circle" className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="flex gap-1.5 text-[11.5px] leading-[17px] text-liff-sub">
+              <Icon name="message-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>予定の変更・キャンセルは、お店に LINE でご連絡ください。</span>
             </p>
           </>
         )}
       </div>
+      {data && !failed && (
+        <BottomBar>
+          <Button
+            variant="primary"
+            onClick={() => navigate({ pathname: '/booking', search })}
+          >
+            新しく予約する
+          </Button>
+        </BottomBar>
+      )}
     </div>
   );
 }

@@ -2,10 +2,11 @@ import Icon, { type IconName } from './Icon.js';
 import Button from './Button.js';
 
 /**
- * ★V7 の中央寄せの状態 (完了・待ち・空・開けない)。
- * 丸い印＋題＋本文＋ボタン1つ。ボタンは action があるときだけ1つ出す。
- * ウェビナーの暗い地では dark を渡す (白文字になる)。
- * 待ち (キャンセル待ち・承認待ち) は tone="wait" で黄土色の印にする。
+ * ★V8 の中央寄せの状態 (完了・待ち・空・開けない)。
+ * 印＋題＋本文＋ボタン1つ。ボタンは action があるときだけ1つ出す。
+ * 印は success だけ緑の丸。それ以外は灰色の線の印をそのまま置く
+ * (ADutg・zz9R3 と同じ形)。ウェビナーの暗い地では dark を渡す。
+ * 待ち (キャンセル待ち・承認待ち) は tone="wait" で黄土色の丸にする。
  */
 export default function StatusView({
   icon,
@@ -22,26 +23,33 @@ export default function StatusView({
   body?: string;
   action?: { label: string; onClick: () => void };
 }) {
-  return (
-    <div className="flex flex-col items-center px-6 py-10 text-center">
+  const mark =
+    tone === 'success' ? (
       <span
-        className={`flex h-16 w-16 items-center justify-center rounded-full ${
-          tone === 'success'
-            ? 'bg-ok-bg text-ok-ink'
-            : tone === 'wait'
-              ? 'bg-wait-bg text-wait-ink'
-              : dark
-                ? 'bg-night-soft text-night-faint'
-                : 'bg-state-mark text-ink-faint'
-        }`}
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-soft text-liff-primary"
         aria-hidden="true"
       >
-        <Icon name={icon} className="h-7 w-7" />
+        <Icon name={icon} className="h-9 w-9" />
       </span>
-      <p className={`mt-4 text-base font-bold ${dark ? 'text-canvas' : 'text-ink'}`}>{title}</p>
+    ) : tone === 'wait' ? (
+      <span
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-liff-wait-ink"
+        aria-hidden="true"
+      >
+        <Icon name={icon} className="h-8 w-8" />
+      </span>
+    ) : (
+      <span className={dark ? 'text-night-faint' : 'text-liff-idle'} aria-hidden="true">
+        <Icon name={icon} className="h-10 w-10" />
+      </span>
+    );
+  return (
+    <div className="flex flex-col items-center px-6 py-10 text-center">
+      {mark}
+      <p className={`mt-4 text-[17px] font-bold ${dark ? 'text-canvas' : 'text-ink'}`}>{title}</p>
       {body && <BodyText text={body} dark={dark} />}
       {action && (
-        <div className="mt-6 w-full max-w-60">
+        <div className="mt-6 w-full max-w-55">
           <Button variant="primary" onClick={action.onClick}>
             {action.label}
           </Button>
@@ -55,7 +63,7 @@ function BodyText({ text, dark = false }: { text: string; dark?: boolean }) {
   const lines = text.split('\n');
   return (
     <p
-      className={`mt-2 text-sm leading-6 text-pretty ${dark ? 'text-night-faint' : 'text-ink-secondary'}`}
+      className={`mt-2 text-[13px] leading-6 text-pretty ${dark ? 'text-night-faint' : 'text-liff-sub'}`}
     >
       {lines.map((line, i) => (
         <span key={i}>
