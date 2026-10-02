@@ -473,6 +473,11 @@ describe('NEN photo review', () => {
     expect(batches).toHaveLength(0);
   });
 
+  /*
+   * 失敗の理由は、ほかの送信失敗と同じ安全な文言にそろえる（2026-10-02）。
+   * ここだけ生のエラー本文を記録していたため、管理画面の失敗一覧に LINE 側の
+   * 応答本文がそのまま出ていた。原因を追うための生の本文はログにだけ残す。
+   */
   it('keeps the review saved and records a failed LINE notification', async () => {
     mocks.push.mockRejectedValueOnce(new Error('LINE unavailable'));
     const { app, batches, runs } = harness();
@@ -483,7 +488,8 @@ describe('NEN photo review', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { notificationStatus: 'failed' } });
     expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      decisionId: expect.any(String), generation: 1, status: 'failed', error: 'LINE unavailable',
+      decisionId: expect.any(String), generation: 1, status: 'failed',
+      error: '送信に失敗しました。設定とLINE連携を確認してください。',
     }));
     const mirror = runs.find((entry) => entry.query.includes('review_notification_status'));
     expect(mirror?.bindings[0]).toBe('failed');

@@ -3,21 +3,23 @@ import type { EccubeCouponInput } from './eccube-coupon.js';
 
 export const FRIEND_ADD_COUPON_SETTING_KEY = 'nen.friend_add_coupon';
 
+/*
+ * 設定が無いときに使う既定の本文。どの契約先でも使えるように、店名や
+ * ストアのURLは書かない。契約先ごとの本文は設定
+ * （`FRIEND_ADD_COUPON_SETTING_KEY`）に保存され、そちらが優先される。
+ */
 export const DEFAULT_FRIEND_ADD_COUPON_MESSAGE = [
   '友だち追加ありがとうございます🌿',
   '',
-  '然-NEN-公式オンラインストアで使える、会員限定{discount_rate}%OFFクーポンをプレゼントします。',
+  '公式オンラインストアで使える、会員限定{discount_rate}%OFFクーポンをプレゼントします。',
   '',
   'クーポンコード：{coupon_code}',
   '有効期限：{expires_on}まで',
   '※会員ログイン後にご利用ください。',
   '※お一人様1回限りです。',
   '',
-  '然-NEN-公式オンラインストアでは、お買い物金額に応じてポイントが貯まります。',
+  '公式オンラインストアでは、お買い物金額に応じてポイントが貯まります。',
   '今後は、お買い物以外でもポイントが貯まる企画や、貯めたポイントで受け取れる特典をLINEで順次ご案内します🌿',
-  '',
-  '▼オンラインストア',
-  'https://nen-petfood.com/',
 ].join('\n');
 
 const LEGACY_GENERATED_COUPON_MESSAGE = [
