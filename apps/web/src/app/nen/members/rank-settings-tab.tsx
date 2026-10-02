@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Chip from '@/components/shared/chip'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { RowActions } from '@/components/shared/row-actions'
@@ -130,7 +131,10 @@ export default function RankSettingsTab({
         ? 'ランク設定を保存し、ECへ同期しました。友だち属性のタグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
+      // M035: 生のまま出さず、共通の状態別案内へ渡す（403は権限・429は待ち案内）。
+      setError(describeApiFailure(caught, 'ランク設定の保存', {
+        forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
+      }))
     } finally {
       setBusy(false)
     }
@@ -145,7 +149,10 @@ export default function RankSettingsTab({
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '同期できませんでした。')
+      // 保存と同じく、生のまま出さず共通の状態別案内へ渡す。
+      setError(describeApiFailure(caught, 'ECへの同期', {
+        forbidden: 'ECへ同期する権限がありません。権限を確認してください。',
+      }))
     } finally {
       setBusy(false)
     }

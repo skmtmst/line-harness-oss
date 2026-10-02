@@ -3,6 +3,7 @@ import {
   enqueuePendingOperationAlertNotifications,
   failOperationHealthRun,
   reconcileOperationHealthAlerts,
+  reopenFailedOperationHealthRun,
   startOperationHealthRun,
   type OperationHealthResultInput,
   type OperationHealthStatus,
@@ -402,8 +403,19 @@ export async function runOperationHealthChecks(
         lineAccountId: input.lineAccountId, runId: started.run.id, results: started.run.results,
       });
       await enqueuePendingOperationAlertNotifications(db, { lineAccountId: input.lineAccountId });
+      return { duplicate: true, run: started.run };
     }
-    return { duplicate: true, run: started.run };
+    /*
+     * R571: failed の枠は塞がず、同じ5分枠の押し直しで確認からやり直す。
+     * 結果保存の失敗で failed になった行を重複として返すだけだと、
+     * 運用者が押しても新しい確認結果が得られない。running に戻せたときだけ
+     * 下の通常経路へ進み、戻せなかったとき（並列で誰かが先に開け直した等）は
+     * 重複として返す。running の並列実行は従来どおり重複にする。
+     */
+    if (started.run.status !== 'failed'
+      || !(await reopenFailedOperationHealthRun(db, started.run.id))) {
+      return { duplicate: true, run: started.run };
+    }
   }
   let completed = false;
   try {
