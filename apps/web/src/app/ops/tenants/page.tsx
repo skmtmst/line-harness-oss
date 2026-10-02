@@ -8,6 +8,7 @@ import OpsPageHeader from '@/components/ops/ops-page-header'
 import { formatDate, formatDateTime, planLabel, planStatusChip, tenantDetailHref, tenantUseStatusChip, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -18,6 +19,18 @@ import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 
 /** 契約先アカウント（一覧）。★V6 37-3 `X9f5jy`。 */
+
+/*
+ * 一覧の読み込み失敗の説明。403・429 は説明を渡さず、ListState が捕まえた
+ * 失敗から共通の1枚（権限の案内・待ち案内）を作る。それ以外は捕まえた言葉を
+ * そのまま出す（通信断の「通信できませんでした」など）。
+ */
+function loadDescription(err: unknown): string | undefined {
+  if (isForbiddenOrRateLimited(err)) return undefined
+  if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
+  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
+  return undefined
+}
 
 const STATUS_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'trialing', label: 'トライアル' },
@@ -37,6 +50,9 @@ export default function OpsTenantsPage() {
   const [error, setError] = useState('')
   // ★V7：一覧の失敗は一覧の場所の1枚で出す。操作の知らせと混ぜない。
   const [listFailed, setListFailed] = useState(false)
+  // M042：一覧の読み込みで捕まえた失敗そのもの。ListState が 403 は権限の
+  // 案内（再試行なし）・429 は待ち案内に切り替える。
+  const [listLoadError, setListLoadError] = useState<unknown>(null)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newRestaurant, setNewRestaurant] = useState(false)
@@ -45,10 +61,18 @@ export default function OpsTenantsPage() {
   const load = useCallback(async () => {
     setError('')
     setListFailed(false)
-    const res = await opsCall(api.ops.tenants({ q: q.trim() || undefined }))
-    if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
-    setRows(res.data)
-    setSummary(res.summary)
+    setListLoadError(null)
+    try {
+      const res = await api.ops.tenants({ q: q.trim() || undefined })
+      if (!res.success) {
+        const failure = new Error(res.error || '読み込めませんでした')
+        setError(failure.message); setListFailed(true); setListLoadError(failure); return
+      }
+      setRows(res.data)
+      setSummary(res.summary)
+    } catch (caught) {
+      setError('読み込めませんでした'); setListFailed(true); setListLoadError(caught)
+    }
   }, [q])
 
   useEffect(() => {
@@ -169,7 +193,7 @@ export default function OpsTenantsPage() {
         <ListState kind="loading" title="契約先を読み込んでいます" />
       ) : error && visible.length === 0 ? (
         // 「1件も無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
-        <ListState kind="error" title="契約先を表示できませんでした" onRetry={() => void load()} />
+        <ListState kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
       ) : visible.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border">
           <ListState kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />

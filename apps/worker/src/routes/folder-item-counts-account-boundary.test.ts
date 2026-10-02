@@ -118,7 +118,7 @@ describe('GET /api/folders の件数(#631) — 実DB結合', () => {
     expect(body.data.find((f) => f.id === 'folder-1')?.itemCount).toBe(5);
   });
 
-  it('対応表に無い種別(event・friend_field・#730)は itemCount を返さない(0とは書かない)', async () => {
+  it('イベントの分類は未使用でも0件を返す', async () => {
     accountAccess.getVisibleLineAccountScope.mockResolvedValue({
       accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false, ids: ['account-a'], isAccountScoped: true,
     });
@@ -127,8 +127,8 @@ describe('GET /api/folders の件数(#631) — 実DB結合', () => {
 
     const res = await req('/api/folders?kind=event');
     const body = await res.json() as { data: Array<Record<string, unknown>>; unfiledCount?: number };
-    expect(body.data[0]).not.toHaveProperty('itemCount');
-    expect(body.unfiledCount).toBeUndefined();
+    expect(body.data[0]).toHaveProperty('itemCount', 0);
+    expect(body.unfiledCount).toBe(0);
   });
 
   // #730: media / common_var / rich_menu は、選択中の1件に閉じた母集団で数える。

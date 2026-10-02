@@ -105,12 +105,14 @@ describe('V8 移行④ — Pencil にあってコードに無かった部品', (
     expect(tsx).toContain('type="checkbox"')
   })
 
-  it('切り替え（3つ dtJVi）：器shell・余白3・間隔2・白いつまみが滑る（120ms）・左右キー', () => {
+  it('切り替え（3つ dtJVi）：器track・余白2・間隔2・白いつまみが滑る（120ms）・左右キー', () => {
     const source = css('segmented.module.css')
     expect(source).toContain('padding: 2px')
     expect(source).toContain('gap: 2px')
     expect(source).toContain('border-radius: var(--radius-control)')
-    expect(source).toContain('background: var(--color-shell)')
+    // 夕13（TOKENS-20261001）：器の地は shell → track、縁は内側の影 border-soft
+    expect(source).toContain('background: var(--color-track)')
+    expect(source).toContain('box-shadow: var(--shadow-segment-ring)')
     expect(source).toContain('background: var(--color-canvas)')
     expect(source).toContain('border-radius: var(--radius-segment)')
     expect(source).toContain('padding: 6px 12px')

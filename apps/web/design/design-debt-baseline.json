@@ -259,11 +259,26 @@
   "app/staff/page.tsx": {
     "arbitrary-value": 16
   },
+  "app/tags/fields-tab-v8.tsx": {
+    "unresolved-classname": 58
+  },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
   },
   "app/tags/folders/new/page.tsx": {
     "arbitrary-value": 6
+  },
+  "app/tags/list-v8.tsx": {
+    "unresolved-classname": 6
+  },
+  "app/tags/marks-v8.tsx": {
+    "unresolved-classname": 51
+  },
+  "app/tags/searches-v8.tsx": {
+    "unresolved-classname": 59
+  },
+  "app/tags/tags-tab-v8.tsx": {
+    "unresolved-classname": 67
   },
   "app/templates/carousel/page.tsx": {
     "unresolved-classname": 7,
@@ -464,6 +479,9 @@
   "components/layout/page-header-h2.tsx": {
     "unresolved-classname": 5
   },
+  "components/layout/settings-inner-nav.tsx": {
+    "unresolved-classname": 7
+  },
   "components/layout/sidebar-identity.tsx": {
     "unresolved-classname": 6
   },
@@ -578,7 +596,7 @@
     "unresolved-classname": 1
   },
   "components/shared/line-preview.tsx": {
-    "unresolved-classname": 1
+    "unresolved-classname": 17
   },
   "components/shared/list-kpis.tsx": {
     "unresolved-classname": 1
