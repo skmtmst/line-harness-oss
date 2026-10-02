@@ -138,6 +138,10 @@
   "app/form-submissions/page.tsx": {
     "arbitrary-value": 4
   },
+  "app/friend-add-settings/list-v8.tsx": {
+    "unresolved-classname": 77,
+    "direct-th": 6
+  },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
   },
