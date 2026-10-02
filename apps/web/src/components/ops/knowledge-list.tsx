@@ -1,5 +1,8 @@
 'use client'
 
+import KpiCard from '@/components/shared/kpi-card'
+import ro from '@/app/ops/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Search } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
@@ -32,6 +35,7 @@ function loadDescription(err: unknown): string | undefined {
 
 /** Canonical V6 37-11 list, shared with the review/edit feature parts. */
 export default function KnowledgeList() {
+  const theme = useAdminTheme()
   const [rows, setRows] = useState<OpsKnowledgeArticle[]>([])
   const [total, setTotal] = useState(0)
   const [q, setQ] = useState('')
@@ -81,7 +85,12 @@ export default function KnowledgeList() {
     setEditing(res.data)
   }
   return <div className={styles.page} data-design-node="csVox">
-    <div className={styles.heading}><h2>ナレッジ一覧</h2></div>
+    {theme === 'v8' ? <div className={ro.metrics} aria-label="条件に合う記事とこのページの状況">
+      <KpiCard variant="v6" title="条件に合う記事" value={loaded && !error ? total : null} unit="件" detail="" loading={!loaded} />
+      <KpiCard variant="v6" title="このページの承認待ち" value={loaded && !error ? rows.filter(row => row.reviewState === 'pending').length : null} unit="件" detail="" loading={!loaded} />
+      <KpiCard variant="v6" title="このページの承認済み" value={loaded && !error ? rows.filter(row => knowledgeState(row).label === '承認済み').length : null} unit="件" detail="" loading={!loaded} />
+      <KpiCard variant="v6" title="このページの利用回数" value={loaded && !error ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail="" loading={!loaded} />
+    </div> : <div className={styles.heading}><h2>ナレッジ一覧</h2></div>}
     <div className={styles.filters}>
       <div className={styles.search}><Search aria-hidden="true" /><TextField aria-label="タイトル・質問・キーワードで検索"
         placeholder="タイトル・質問・キーワードで検索" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} maxLength={200} /></div>
@@ -121,8 +130,8 @@ export default function KnowledgeList() {
           </Tr>
         })}</tbody>
       </DataTable>}
-    {loaded && !error && total > 50 && <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-      <ListRange total={total} first={offset + 1} last={Math.min(offset + 50, total)} />
+    {loaded && !error && total > 0 && (theme === 'v8' || total > 50) && <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <ListRange total={total} first={offset + 1} last={Math.min(offset + (theme === 'v8' ? rows.length : 50), total)} />
       <Pagination page={Math.floor(offset / 50) + 1} pageCount={Math.ceil(total / 50)} onPageChange={(next) => setOffset((next - 1) * 50)} />
     </div>}
     {editing && <KnowledgeEditor key={editing.id} article={editing} onClose={() => setEditing(null)} onSaved={() => void load()} />}

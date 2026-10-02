@@ -4,7 +4,9 @@ import { ChevronLeft, Eye } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
+import OpsPageHeader from '@/app/ops/readonly-header-v8'
+import ro from '@/app/ops/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import {
   PLAN_STATUS_LABEL,
   ROLE_LABEL,
@@ -54,6 +56,7 @@ export default function OpsTenantDetailPage() {
 }
 
 function OpsTenantDetailContent() {
+  const theme = useAdminTheme()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const [detail, setDetail] = useState<OpsTenantDetail | null>(null)
@@ -105,7 +108,7 @@ function OpsTenantDetailContent() {
    */
   if (!id) {
     return (
-      <div data-design-node="vhwld">
+      <div data-design-node={theme === 'v8' ? 'Oub6x' : 'vhwld'}>
         <TargetMissing
           kind="unspecified"
           title="見る契約先が指定されていません"
@@ -119,7 +122,7 @@ function OpsTenantDetailContent() {
 
   if (!detail) {
     return (
-      <div data-design-node="vhwld">
+      <div data-design-node={theme === 'v8' ? 'Oub6x' : 'vhwld'}>
         <OpsPageHeader title="契約先アカウント" actions={<BackToList />} />
         {error
           ? <ListState kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
@@ -131,7 +134,7 @@ function OpsTenantDetailContent() {
   const { tenant, accounts, members, audit } = detail
 
   return (
-    <div data-design-node="vhwld" className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? 'Oub6x' : 'vhwld'} className={`${ro.page} flex flex-col gap-4`}>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="契約先アカウント" actions={<BackToList />} />
 

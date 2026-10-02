@@ -11,7 +11,9 @@ import {
   type OpsAudiencePreview,
   type OpsTenantRow,
 } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
+import OpsPageHeader from '@/app/ops/readonly-header-v8'
+import ro from '@/app/ops/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDateTime, opsCall } from '@/components/ops/ops-ui'
 import { previewLabel, toLocalInput, toPublishAt } from './format'
 import Button from '@/components/shared/button'
@@ -72,6 +74,7 @@ function loadDescription(err: unknown): string | undefined {
 }
 
 export default function OpsAnnouncementsPage() {
+  const theme = useAdminTheme()
   const [rows, setRows] = useState<OpsAnnouncement[]>([])
   const [loaded, setLoaded] = useState(false)
   const [lineConfigured, setLineConfigured] = useState(true)
@@ -193,7 +196,7 @@ export default function OpsAnnouncementsPage() {
   const scheduled = form.publishAt.trim().length > 0
 
   return (
-    <div data-design-node="q2CokV" className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? 'tQ2MJ' : 'q2CokV'} className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader
         title="お知らせ"
@@ -265,7 +268,7 @@ export default function OpsAnnouncementsPage() {
           {editingId ? <Button onClick={() => { setEditingId(null); setBaseline(EMPTY); setForm(EMPTY); setFormError('') }}>キャンセル</Button> : null}
         </section>
 
-        <section aria-label="配信済みの表" className="rounded-card border border-hairline bg-canvas xl:col-span-3">
+        <section aria-label="配信済みの表" className={`${ro.page} rounded-card border border-hairline bg-canvas xl:col-span-3`}>
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
             <h3 className="text-label font-semibold text-ink">配信済み・予約・下書き</h3>
             <span className="text-micro text-ink-faint">{linked ? `契約者専用LINEの登録 ${linked.linked}人 / ${linked.total}人` : ''}</span>

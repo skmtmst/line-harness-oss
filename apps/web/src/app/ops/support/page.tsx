@@ -15,7 +15,9 @@ import {
 } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
 import knowledgeStyles from '@/components/ops/knowledge.module.css'
-import OpsPageHeader from '@/components/ops/ops-page-header'
+import OpsPageHeader from '@/app/ops/readonly-header-v8'
+import ro from '@/app/ops/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
@@ -76,6 +78,7 @@ function priorityChip(priority: OpsSupportPriority, label: string) {
 }
 
 export default function OpsSupportPage() {
+  const theme = useAdminTheme()
   const [summary, setSummary] = useState<OpsSupportSummary | null>(null)
   const [tickets, setTickets] = useState<OpsSupportTicket[]>([])
   const [total, setTotal] = useState(0)
@@ -301,7 +304,7 @@ export default function OpsSupportPage() {
   const closed = ticket?.stage === 'closed'
 
   return (
-    <div className={knowledgeStyles.supportPage} data-design-node={replyFromAi && references.length > 0 && !aiBusy ? 'F3zoq' : 'IjIFa'}>
+    <div className={knowledgeStyles.supportPage} data-design-node={theme === 'v8' ? 'P0jhqO' : replyFromAi && references.length > 0 && !aiBusy ? 'F3zoq' : 'IjIFa'}>
       <OpsPageHeader title={replyFromAi ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ'} />
 
       <div className="mb-4">
@@ -385,9 +388,9 @@ export default function OpsSupportPage() {
       */}
       {error && !listFailed && !detailFailed ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
-      <div className={knowledgeStyles.supportColumns} data-design-node="WmMDh">
+      <div className={`${knowledgeStyles.supportColumns} ${ro.supportColumns}`} data-design-node="WmMDh">
         {/* 左：チケット一覧 */}
-        <section aria-label={listTitle} className={knowledgeStyles.supportList}>
+        <section aria-label={listTitle} className={`${knowledgeStyles.supportList} ${ro.supportList}`}>
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
             <h2 className="text-label font-semibold text-ink">{listTitle}</h2>
             <ListRange total={total} first={tickets.length === 0 ? 0 : 1} last={tickets.length} />
@@ -437,7 +440,7 @@ export default function OpsSupportPage() {
         </section>
 
         {/* 右：内容と返信 */}
-        <section aria-label="内容と返信" className={knowledgeStyles.supportDetail} data-design-node="UcEaZ">
+        <section aria-label="内容と返信" className={`${knowledgeStyles.supportDetail} ${ro.supportDetail}`} data-design-node="UcEaZ">
           {!ticket ? (
             detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
               // ★V7：詳細だけ落ちても外枠は落とさない。その場所の1枚だけ出す。
