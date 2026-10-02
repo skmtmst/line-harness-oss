@@ -1,15 +1,18 @@
 'use client'
 
 /*
- * ★V8 対応マークを作る・編集（Pencil `eU27O`）。
+ * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。
  *
  * v7（components/friend-fields/support-mark-editor.tsx）と動きは同じで、
  * 置き場だけを V8 の絵へ合わせる。段は「基本」「自動で変えるきまり」。
- * 右の欄に「どこで使われるか」。追従バーは「このマークを止める」＝左端、
+ * 右の欄に「出す場所と数」。追従バーは「保管する」＝左端、
  * キャンセル・保存＝真ん中（オーナー決定 2026-10-01）。
+ * 初期値・共有・使用先ありのマークは「保管する」を押せない形にして理由を出す。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { Archive } from 'lucide-react'
 import { api, describeSaveFailure, type SaveSupportMarkAutomationRule, type SupportMarkArchiveImpact, type SupportMarkAutomationEvent, type SupportMarkListItem } from '@/lib/api'
 import { useCanManageSupportMark } from '@/components/friend-fields/support-mark-permissions'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -36,8 +39,30 @@ const COLORS = [
   { value: '#6B56CF', name: '紫' },
   { value: '#707981', name: 'グレー' },
 ] as const
-const DESTINATIONS = ['受信箱の絞り込み', '友だち一覧の列と絞り込み', 'ダッシュボードの絞り込み', '配信の絞り込み条件', 'オートメーションの動作']
+/* 板 `ulq9Y` の右の欄「出す場所と数」。出す場所は口が返す displayTargets に合わせる。 */
+const PLACE_LABELS: Record<string, string> = {
+  inbox: '受信箱',
+  friend_list: '友だち一覧',
+  friend_detail: '友だち詳細',
+  dashboard: 'ダッシュボード',
+  broadcast: '一斉配信',
+  automation: 'オートメーション',
+}
+const PLACE_ROWS: ReadonlyArray<readonly [key: string, label: string]> = [
+  ['inbox', '受信箱'],
+  ['friend_list', '友だち一覧'],
+  ['friend_detail', '友だち詳細'],
+]
 type MarkRow = SupportMarkListItem
+
+/** 配信・シナリオ・自動応答・保存検索・自動化からの参照数（API の canArchive と同じ母数）。 */
+function referenceCount(mark: MarkRow): number {
+  return (mark.usedIn?.broadcasts ?? 0)
+    + (mark.usedIn?.scenarios ?? 0)
+    + (mark.usedIn?.autoReplies ?? 0)
+    + (mark.usedIn?.savedSearches ?? 0)
+    + (mark.usedIn?.automations ?? 0)
+}
 
 export default function MarkEditorV8({ markId }: { markId?: string }) {
   const router = useRouter()
@@ -97,7 +122,7 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
   } | null>(null)
   /* R176 監査：読み込んだ姿との差を未保存とし、離れる操作では確認を出す。 */
   const [baseline, setBaseline] = useState<{ name: string; color: string; displayOrder: number; isDefault: boolean } | null>(null)
-  /* ★V8: 「このマークを止める」の確認窓（一覧の保管と同じ流れ）。 */
+  /* ★V8: 「保管する」の確認窓（一覧の保管と同じ流れ・小窓の絵は `fy5dz`）。 */
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiveImpact, setArchiveImpact] = useState<SupportMarkArchiveImpact | null>(null)
   const [replacementMarkId, setReplacementMarkId] = useState('')
@@ -124,6 +149,20 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
     selected.usedIn?.savedSearches ? `保存した検索 ${selected.usedIn.savedSearches}件` : null,
     selected.usedIn?.automations ? `オートメーション ${selected.usedIn.automations}件` : null,
   ].filter((value): value is string => Boolean(value)) : []
+
+  /*
+   * 初期値・共有・使用先ありは保管できない（API の canArchive と同じ決まり）。
+   * 押せるのに小窓で止められる形にはせず、ボタンを押せない形にして理由を出す。
+   */
+  const archiveBlockReason = !selected ? null
+    : selected.isDefault
+      ? '初期値のマークは保管できません。先に別のマークを初期値にしてください。'
+      : selected.isInherited
+        ? '共有しているマークは保管できません。'
+        : referenceCount(selected) > 0
+          ? '配信や自動化などの使用先があるため保管できません。先に使用先を外してください。'
+          : null
+  const shownTargets = selected?.displayTargets?.length ? selected.displayTargets : ['inbox', 'friend_list', 'friend_detail']
 
   /*
    * R511: 役割が分かっているstaffには作成・編集を案内しない。
@@ -254,7 +293,7 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
     }
   }
 
-  /* ★V8: 「このマークを止める」＝一覧の保管と同じ影響確認を経る。 */
+  /* ★V8: 「保管する」＝一覧の保管と同じ影響確認を経る。 */
   const openArchive = async () => {
     const account = selectedAccountId
     if (!account || !selected) return
@@ -323,8 +362,13 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
     <div className={styles.board}>
       <div className={styles.head} data-design="Head">
         <div>
-          <h2 className={styles.headTitle}>{editing ? 'マークを編集' : 'マークを作る'}</h2>
-          <p className={styles.headDescription}>対応の状態を、色つきの印で管理します。</p>
+          <Link href="/tags?tab=marks" className={styles.backLink}>← 対応マークへ</Link>
+          <h2 className={styles.headTitle}>{editing ? (selected?.name ?? '対応マークを編集') : '対応マークを作る'}</h2>
+          <p className={styles.headDescription}>
+            {editing && selected
+              ? `${selected.friendCount}人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
+              : '対応の状態を、色つきの印で管理します。'}
+          </p>
         </div>
       </div>
 
@@ -465,33 +509,33 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
               </section>
             </div>
 
-            {/* 右の欄 */}
+            {/* 右の欄（板 `ulq9Y` の「出す場所と数」＋案内の帯） */}
             <div className={styles.side} data-design="Right">
               <section className={styles.section}>
-                <h2 className={styles.sectionTitle}>できあがるマーク</h2>
+                <h2 className={styles.sectionTitle}>出す場所と数</h2>
                 <div className={styles.sectionBody}>
-                  <span className={styles.previewMark}>
-                    <span className={styles.previewDot} style={{ backgroundColor: color }} />
-                    <span className={styles.previewName} title={name || undefined}>{name || 'マーク名'}</span>
-                  </span>
-                  <p className={styles.noteText}>受信箱・友だち一覧・友だち詳細のすべてに同じ順番で表示します。</p>
-                </div>
-              </section>
-
-              <section className={styles.section}>
-                <h2 className={styles.sectionTitle}>どこで使われるか</h2>
-                <div className={styles.sectionBody}>
-                  <ul className={styles.useList}>
-                    {DESTINATIONS.map((label) => <li key={label} className={styles.useItem}><span className={styles.useDot} aria-hidden="true" /><span>{label}</span></li>)}
-                  </ul>
-                  {editing && currentUsages.length > 0 ? <p className={styles.noteText}>現在の使用先：{currentUsages.join('、')}</p> : null}
-                  <p className={styles.noteText}>配信などの使用先がある間は保管できません。使用先を外すと、友だちは最初から付けるマークへ移り、変更履歴は残ります。</p>
+                  <dl className={styles.placeList}>
+                    <div className={styles.placeRow}>
+                      <dt>付いている人</dt>
+                      <dd>{selected ? `${selected.friendCount} 人` : '0 人'}</dd>
+                    </div>
+                    {PLACE_ROWS.map(([key, label]) => (
+                      <div key={key} className={styles.placeRow}>
+                        <dt>{label}</dt>
+                        <dd>{shownTargets.includes(key) ? '出す' : '出さない'}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {editing && currentUsages.length > 0 ? <p className={styles.noteText}>使われている所：{currentUsages.join('、')}</p> : null}
                 </div>
               </section>
 
               {editing ? (
-                <section className={styles.noteBand}>
-                  <strong>止めても、いま付いている人のマークは残ります。</strong>保管すると新しく選べなくなり、いま付いている友だちは選んだマークへ置き換わります。
+                <section className={styles.infoBand}>
+                  <Archive size={14} aria-hidden="true" className={styles.infoBandIcon} />
+                  <p>
+                    保管すると、新しく付けられなくなります。いま付いている人は、保管の小窓で選ぶマークへ置き換わり、履歴に残ります。
+                  </p>
                 </section>
               ) : null}
             </div>
@@ -499,7 +543,18 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
 
           <StickyBar
             destructive={editing && selected ? (
-              <button type="button" onClick={() => void openArchive()} className={styles.dangerButton}>このマークを止める</button>
+              <span className={styles.archiveCluster}>
+                <button
+                  type="button"
+                  onClick={() => void openArchive()}
+                  disabled={archiveBlockReason !== null}
+                  className={styles.archiveButton}
+                >
+                  <Archive size={15} aria-hidden="true" />
+                  保管する
+                </button>
+                {archiveBlockReason ? <span className={styles.archiveReason}>{archiveBlockReason}</span> : null}
+              </span>
             ) : undefined}
             status={blockedReason ?? (editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください')}
             actions={(

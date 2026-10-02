@@ -27,7 +27,10 @@ function EditSupportMarkPageInner() {
       />
     )
   }
-  return theme === 'v8' ? <MarkEditorV8 markId={id} /> : <SupportMarkEditor markId={id} />
+  if (theme === 'v8') {
+    return <MarkEditorV8 markId={id} />
+  }
+  return <SupportMarkEditor markId={id} />
 }
 
 export default function EditSupportMarkPage() {

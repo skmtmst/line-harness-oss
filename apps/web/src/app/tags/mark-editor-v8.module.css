@@ -1,4 +1,4 @@
-/* ★V8 対応マークを作る・編集（`eU27O`）。段・色の選び方・右の欄・追従バー。 */
+/* ★V8 対応マークを作る・編集（`ulq9Y`）。段・色の選び方・右の欄・追従バー。 */
 
 .board {
   display: flex;
@@ -11,6 +11,18 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--color-action);
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
 }
 
 .headTitle {
@@ -174,57 +186,35 @@
   overflow-wrap: break-word;
 }
 
-/* マークの見え方の見本。 */
-.previewMark {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 100%;
-  padding: 6px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.previewDot {
-  width: 10px;
-  height: 10px;
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-}
-
-.previewName {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.useList {
+/* 右の欄「出す場所と数」の行（板 `ulq9Y`）。 */
+.placeList {
   margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  font-size: 13px;
-  list-style: none;
 }
 
-.useItem {
+.placeRow {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: 13px;
+}
+
+.placeRow:last-child {
+  border-bottom: none;
+}
+
+.placeRow dt {
   color: var(--color-ink-secondary);
 }
 
-.useDot {
-  margin-top: 6px;
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-ink-faint);
+.placeRow dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-ink);
 }
 
 .noteText {
@@ -234,31 +224,66 @@
   color: var(--color-ink-faint);
 }
 
-.noteBand {
+/* 右の欄の下の案内の帯（板 `ulq9Y` の青い帯）。 */
+.infoBand {
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
   border-radius: var(--radius-control);
-  background: var(--color-warning-bg);
+  background: var(--color-info-bg);
   font-size: 12px;
   line-height: 1.6;
-  color: var(--color-warning);
+  color: var(--color-info);
 }
 
-/* 追従バーの左（止める）。 */
-.dangerButton {
+.infoBand p {
+  margin: 0;
+}
+
+.infoBandIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* 追従バーの左（保管する）。 */
+.archiveCluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.archiveButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+  border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
-  background: transparent;
+  background: var(--color-canvas);
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-danger);
+  color: var(--color-ink);
   cursor: pointer;
 }
 
-.dangerButton:hover {
-  background: var(--color-danger-bg);
+.archiveButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.archiveButton:disabled {
+  color: var(--color-ink-disabled);
+  background: var(--color-canvas-sunken);
+  cursor: not-allowed;
+}
+
+.archiveReason {
+  max-width: 320px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
 }
 
 @media (max-width: 1180px) {
