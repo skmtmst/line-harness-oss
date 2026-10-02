@@ -345,3 +345,15 @@ describe('印が付く前に当ててしまった作り直し', () => {
     expect(checkMigration(`-- migration-policy: table-rebuild\n${sql354}`, '355_something_else.sql').ok).toBe(false);
   });
 });
+
+
+describe('545の予約媒体の参照退避', () => {
+  const file = '545_restaurant_channels.sql';
+  const sql = readFileSync(new URL('../packages/db/migrations/545_restaurant_channels.sql', import.meta.url), 'utf8');
+  it('この移行の退避・復元だけを許可する', () => {
+    expect(checkMigration(sql, file).ok).toBe(true);
+    expect(checkMigration(sql, '999_unrelated.sql').ok).toBe(false);
+    expect(checkMigration(sql.replace('-- migration-policy: table-rebuild', ''), file).ok).toBe(false);
+    expect(checkMigration(`${sql}\nCREATE TABLE unrelated_backup(id TEXT);\nDROP TABLE unrelated_backup;`, file).ok).toBe(false);
+  });
+});

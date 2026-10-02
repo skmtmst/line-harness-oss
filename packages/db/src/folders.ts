@@ -233,10 +233,6 @@ export async function countFoldersByKind(db: D1Database): Promise<Record<string,
  * 数えると母集団を誤るため、意図して対応表に入れていない。**
  *
  * 対応表に無い理由:
- * - `event`: 正しい数え方は `account_ids` JSON 基準で確定しているが（#730 調査）、
- *   現時点では events 画面にフォルダ UI も `folders.list('event')` の利用先も無い。
- *   使われない集計は増やさない。将来フォルダ UI を接続する票で、B視点の数え漏らし
- *   試験と一緒に実装する（#730 裁定）。
  * - `friend_field`: scope 表（`friend_field_scopes`）基準が正しいことは確定しているが
  *   （#730 調査）、現時点では件数の利用先が無い。利用画面を作る時に接続する。
  *   テナント全体の無条件集計は採らない（他テナント混入のため）（#730 裁定）。
@@ -304,6 +300,22 @@ export async function getFolderItemCounts(
   kind: FolderKind,
   scope: FolderItemCountScope,
 ): Promise<FolderItemCounts | undefined> {
+  if (kind === 'event') {
+    // 複数アカウント向けは sentinel ではなく account_ids を読む。EXISTS で重複を数えない。
+    const ids = scope.allowedAccountIds;
+    const slots = ids.map(() => '?').join(',');
+    const visible = ids.length ? `((target_type = 'single' AND line_account_id IN (${slots}))
+      OR (target_type = 'multi-account-dedup' AND EXISTS (
+        SELECT 1 FROM json_each(events.account_ids) WHERE value IN (${slots})
+      )))` : '0';
+    const { results } = await db.prepare(`SELECT folder_id, COUNT(*) AS item_count FROM events
+      WHERE deleted_at IS NULL AND ${visible} GROUP BY folder_id`).bind(...ids, ...ids)
+      .all<{ folder_id: string | null; item_count: number }>();
+    return {
+      byFolderId: Object.fromEntries(results.filter(row => row.folder_id !== null).map(row => [row.folder_id, Number(row.item_count)])),
+      unfiled: Number(results.find(row => row.folder_id === null)?.item_count ?? 0),
+    };
+  }
   const target = FOLDER_ITEM_COUNT_TABLES[kind];
   if (!target) return undefined;
   const { table, accountColumn, listFilter } = target;
