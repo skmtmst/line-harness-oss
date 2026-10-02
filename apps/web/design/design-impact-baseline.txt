@@ -31,9 +31,11 @@ shared-button-importer app/booking/menus/page.tsx
 shared-button-importer app/booking/menus/settings-v8.tsx
 shared-button-importer app/booking/menus/staff/assign-v8.tsx
 shared-button-importer app/booking/menus/staff/page.tsx
+shared-button-importer app/booking/staff/new/staff-new-v8.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/liff-preview.tsx
 shared-button-importer app/booking/staff/shifts/page.tsx
+shared-button-importer app/booking/staff/shifts/staff-detail-v8.tsx
 shared-button-importer app/booking/staff/shifts/staff-detail.tsx
 shared-button-importer app/booking/staff/staff-edit-dialog.tsx
 shared-button-importer app/broadcasts/detail-v8.tsx

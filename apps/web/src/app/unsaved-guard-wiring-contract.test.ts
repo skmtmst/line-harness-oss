@@ -28,6 +28,7 @@ const GUARDED = [
   'app/booking/menus/staff/assign-v8.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',
+  'app/booking/staff/new/staff-new-v8.tsx',
   'app/booking/staff/shifts/page.tsx',
   'app/contents/vars/edit/page.tsx',
   'app/contents/vars/new/page.tsx',
@@ -153,6 +154,8 @@ const EXEMPTIONS: Record<string, string> = {
     '予約メニュー編集窓（Dialog）内の dirty。×・Esc・背景・キャンセルは窓内の破棄確認に集め、閉じると入力は戻る仕様で画面離脱ガードの対象外',
   'app/booking/menus/edit-menu-dialog.tsx':
     'app/booking/menus/page.tsx から切り出したメニュー編集窓。dirty は窓の中だけで、閉じると入力は戻る仕様で画面離脱ガードの対象外',
+  'app/booking/staff/shifts/staff-detail-v8.tsx':
+    '★V8 の勤務とシフト（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定し、画面に残る下書きを持たない。v7 の staff-detail.tsx と同じ構造（番兵は shifts/page.tsx 側の GUARDED 行が担保）',
   'components/inflow-links/site-script.tsx':
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
 }

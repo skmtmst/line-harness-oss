@@ -1,0 +1,434 @@
+/* ★V8「勤務とシフト」（板 d5fmnM）・「自分の勤務」（板 E3YDK）専用。
+   外枠（shell/boardHead/body/main/side/section*）は
+   ../../menus/settings-v8.module.css の共有を使う。 */
+
+/* ===== 担当者を切り替える ===== */
+
+.switcherRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 0;
+}
+
+.switcherField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 320px;
+}
+
+.switcherLabel {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.switcherNote {
+  margin: 0;
+  padding-bottom: 8px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ===== いつもの勤務時間 ===== */
+
+.dayList {
+  display: flex;
+  flex-direction: column;
+}
+
+.dayRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.dayRow:first-child {
+  border-top: 1px solid var(--color-divider);
+}
+
+.dayName {
+  width: 20px;
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dayState {
+  width: 44px;
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.dayStateOff {
+  width: 44px;
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: 13px;
+}
+
+.dayTilde {
+  color: var(--color-ink-faint);
+  font-size: 13px;
+}
+
+.dayOffNote {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* ===== 行の並び（休憩・この日だけ） ===== */
+
+.rowList {
+  display: flex;
+  flex-direction: column;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.listRow:first-child {
+  border-top: 1px solid var(--color-divider);
+}
+
+.trashButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.trashButton:hover {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+
+.trashButton:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+/* ===== 「＋〜を足す」 ===== */
+
+.addRowButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addRowButton:hover {
+  background: var(--color-status-info-soft);
+}
+
+.addRowButton:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+/* ===== 「この日だけ」の行 ===== */
+
+.dayEntry {
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.dayEntry:first-child {
+  border-top: 1px solid var(--color-divider);
+}
+
+.dayEntryRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 0;
+}
+
+.dayEntryDate {
+  width: 92px;
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dayBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dayBadgeOff {
+  background: #f1f2f4;
+  color: var(--color-ink-secondary);
+}
+
+.dayBadgeShift {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.dayBadgeShift::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.dayBadgeBreak {
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+}
+
+.dayBadgeButton {
+  cursor: pointer;
+}
+
+.dayBadgeButton:hover {
+  filter: brightness(0.96);
+}
+
+.dayBadgeButton:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.dayEntryMemo {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dayEntryEdit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 10px 104px;
+}
+
+/* ===== 「この日を足す」の内側 ===== */
+
+.dayAddForm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+
+/* ===== 入力 ===== */
+
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+  border-color: var(--color-action);
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fieldError {
+  margin: 8px 0 0;
+  color: var(--color-status-danger);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.footNote {
+  margin-top: 8px;
+  min-height: 0;
+}
+
+.savedNote {
+  color: var(--color-success);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ===== 何週分かのシフトを作る ===== */
+
+.genRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.genRow .fieldLabel {
+  width: 200px;
+}
+
+.genAction {
+  flex-shrink: 0;
+}
+
+/* ===== Google カレンダー ===== */
+
+.calendarRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.calendarField {
+  flex: 1;
+  min-width: 0;
+}
+
+.connectedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.calendarMeta {
+  margin: 8px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.calendarActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* ===== 右欄 ===== */
+
+.sideNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.previewCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border-radius: 6px;
+  background: var(--color-canvas-sunken);
+}
+
+.previewDay {
+  color: var(--color-ink-faint);
+  font-size: 10px;
+}
+
+.previewOk {
+  color: var(--color-success);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.previewNg {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.previewOff {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* ===== 狭い画面 ===== */
+
+@container (max-width: 1080px) {
+  .switcherField {
+    width: 100%;
+  }
+
+  .switcherRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .switcherNote {
+    padding-bottom: 0;
+  }
+
+  .genRow {
+    flex-wrap: wrap;
+  }
+
+  .dayEntryEdit {
+    padding-left: 0;
+    flex-wrap: wrap;
+  }
+}

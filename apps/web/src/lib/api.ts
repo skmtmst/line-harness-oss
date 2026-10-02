@@ -14201,6 +14201,11 @@ export const bookingApi = {
       withAccount(`/api/booking/admin/resources/${id}`, accountId),
       { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
     ),
+  /** 例外日の一覧（store/staff/resource すべて）。 */
+  listExceptions: (accountId: string) =>
+    fetchApi<{ success: true; data: { items: BookingException[] } }>(
+      withAccount('/api/booking/admin/exceptions', accountId),
+    ),
   createException: (
     accountId: string,
     body: {

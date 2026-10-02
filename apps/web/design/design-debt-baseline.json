@@ -61,7 +61,7 @@
     "unresolved-classname": 207
   },
   "app/booking/menus/staff/assign-v8.tsx": {
-    "unresolved-classname": 63,
+    "unresolved-classname": 61,
     "direct-th": 3
   },
   "app/booking/menus/staff/page.tsx": {
@@ -72,10 +72,16 @@
     "arbitrary-value": 1,
     "unresolved-classname": 5
   },
+  "app/booking/staff/new/staff-new-v8.tsx": {
+    "unresolved-classname": 68
+  },
   "app/booking/staff/shifts/liff-preview.tsx": {
     "direct-primary-button": 2,
     "direct-secondary-button": 2,
     "arbitrary-value": 2
+  },
+  "app/booking/staff/shifts/staff-detail-v8.tsx": {
+    "unresolved-classname": 153
   },
   "app/booking/staff/staff-edit-dialog.tsx": {
     "arbitrary-value": 1
