@@ -232,6 +232,10 @@
   "app/reminders/detail/page.tsx": {
     "unresolved-classname": 29
   },
+  "app/reminders/list-v8.tsx": {
+    "unresolved-classname": 71,
+    "direct-th": 7
+  },
   "app/reminders/new/page.tsx": {
     "unresolved-classname": 7
   },
