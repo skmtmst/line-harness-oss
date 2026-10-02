@@ -20,6 +20,13 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(fixture.search),
 }))
 
+/*
+ * v8 では /affiliates が専用画面（affiliates-v8）を出す。ここで確かめるのは
+ * v7 のリダイレクトだけなので、v8 画面（@/lib/api を読み込み時点で要求する）
+ * は器だけに差し替える。
+ */
+vi.mock('./affiliates-v8', () => ({ default: () => null }))
+
 const { default: AffiliatesPage } = await import('./page')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
