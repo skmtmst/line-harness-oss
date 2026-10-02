@@ -76,6 +76,58 @@ function errorKindOf(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
 }
 
+/**
+ * 認可を切らさないための先回り更新。6時間レーンから呼ぶ。
+ *
+ * Googleのリフレッシュトークンは「使われないまま一定期間（約6か月）放置される」と
+ * 無効化される。口コミ・指標の再同期は status='connected' かつ場所選択済み、さらに
+ * 機能スイッチonの店舗しか回らないため、場所未選択のまま置かれた接続や、機能を一時的に
+ * offにしている店舗のトークンは誰も使わず静かに死ぬ。ここだけは機能スイッチで止めず、
+ * リフレッシュトークンを持つ接続を全部定期的に使って生かし続ける。
+ *
+ * 併せて、失効していれば顧客向けの呼び出しより先にここで気付き、画面の状態を
+ * `expired` に落として「再接続してください」を出せる（落とすのは
+ * accessTokenForConnection 側の既存処理）。
+ *
+ * ログは店舗IDと種別名だけ。トークンは出さない。
+ */
+export async function processGoogleBusinessTokenKeepalive(
+  env: Env['Bindings'],
+  input: ResyncInput,
+): Promise<{ refreshed: number; failed: number }> {
+  const rows = await env.DB.prepare(
+    `SELECT c.*, s.line_account_id AS store_line_account_id
+       FROM rt_google_connections c
+       JOIN rt_stores s ON s.id = c.store_id
+      WHERE c.refresh_token_enc IS NOT NULL
+        AND c.status IN ('connected', 'pending_location')
+        AND s.status = 'active'
+      ORDER BY s.line_account_id`,
+  ).all<ResyncConnectionRow>();
+
+  let refreshed = 0;
+  let failed = 0;
+
+  for (const connection of rows.results) {
+    try {
+      // access_token_enc を外して渡し、キャッシュ分岐を通さず必ずリフレッシュを実行させる。
+      // 「トークンを使う」こと自体が目的なので、有効期限が残っていても更新する。
+      await accessTokenForConnection(env, { ...connection, access_token_enc: null });
+      refreshed += 1;
+    } catch (error) {
+      failed += 1;
+      console.error(
+        JSON.stringify({
+          event: 'google_business_token_keepalive_failed',
+          storeId: connection.store_id,
+          error: errorKindOf(error),
+        }),
+      );
+    }
+  }
+  return { refreshed, failed };
+}
+
 /** 口コミ・投稿の1時間ごとの再同期。5分レーンから呼ばれ、接続ごとの55分ゲートで間引く。 */
 export async function processGoogleBusinessHourlyResync(
   env: Env['Bindings'],
