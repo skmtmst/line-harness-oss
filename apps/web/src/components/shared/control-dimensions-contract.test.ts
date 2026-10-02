@@ -60,6 +60,27 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(offenders).toEqual([])
   })
 
+  it('部品の CSS Module は先頭で層の順番を宣言する', () => {
+    /*
+     * Tailwind v4 の出力は層の順番を先頭で宣言しない。部品の CSS が
+     * globals.css より先に読まれると、最初に現れた `@layer components` が
+     * 1番目の層になり、後から来る base（preflight）が部品に勝つ。
+     * ボタンの地・枠・余白、入力欄の枠が全部消えた（検証環境 2026-10-02）。
+     * どの順で読まれても同じになるよう、各ファイルの1行目で順番を宣言する。
+     *
+     * ★V8 移行が済んで不要になったら、次の1行で全部消せる（この試験も消す）:
+     *   grep -rl 'layer-order: V8 移行後に消す' apps/web/src | xargs sed -i '' '/layer-order: V8 移行後に消す/d'
+     */
+    const line = '@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */'
+    const dir = new URL('.', import.meta.url)
+    const modules = readdirSync(dir).filter((name) => name.endsWith('.module.css'))
+    const offenders = modules.filter((name) => {
+      const css = read(`./${name}`)
+      return css.includes('@layer components') && !css.startsWith(`${line}\n@layer components {`)
+    })
+    expect(offenders).toEqual([])
+  })
+
   it('代表的な画面側上書きも規定値に戻す', () => {
     const folderSelect = read('../chats/template-folder-select.tsx')
     const users = read('../users/users-filters.tsx')
