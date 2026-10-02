@@ -516,6 +516,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/templates/examples',
   'GET /api/broadcast-message-assets/{id}/versions',
   'POST /api/broadcast-message-assets/{id}/publish',
+  'GET /api/broadcast-message-assets/folders',
+  'POST /api/broadcast-message-assets/folders',
   'GET /api/postal-code/search',
   'POST /api/rich-menu-groups/{groupId}/schedule',
   'GET /api/rich-menu-groups/{groupId}/schedules',

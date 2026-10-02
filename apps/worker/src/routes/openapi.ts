@@ -4806,6 +4806,38 @@ const spec = {
         },
       },
     },
+    '/api/broadcast-message-assets/folders': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '配信素材の置き場一覧を取得（F4）',
+        description: '素材専用の置き場（独立表）。既存foldersは触らない。アカウント可視範囲で絞る。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '置き場の一覧 { id・lineAccountId・name }' },
+          '403': { description: 'LINEアカウントの表示権限なし' },
+        },
+      },
+      post: {
+        tags: ['Broadcasts'],
+        summary: '配信素材の置き場を作る（F4）',
+        description: '素材専用の置き場（独立表）。名前は必須。',
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            lineAccountId: { type: 'string', description: 'LINEアカウント。空は未割当。' },
+            name: { type: 'string', description: '置き場の名前。必須。' },
+          },
+        } } } },
+        responses: {
+          '201': { description: '置き場を作成 { id・lineAccountId・name }' },
+          '400': { description: '名前不足' },
+          '403': { description: 'LINEアカウントの操作権限なし' },
+        },
+      },
+    },
     '/api/postal-code/search': {
       get: {
         tags: ['Forms'],
