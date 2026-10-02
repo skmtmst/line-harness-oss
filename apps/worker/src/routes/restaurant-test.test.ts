@@ -180,6 +180,88 @@ beforeEach(() => {
   };
 });
 
+describe('電話予約のLINE確認通知', () => {
+  const path = '/api/restaurant-test/reservations/manual?account_id=account-1';
+  const body = { storeId: 'store-ginza', customerName: '試験用のお客さま', guestCount: 2,
+    startsAt: '2026-11-10T10:00:00.000Z', endsAt: '2026-11-10T12:00:00.000Z', lineUid: 'U' + '1'.repeat(32), notifyLine: true };
+  function seedFriend(following = 1, accountId = 'account-2') {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+      VALUES ('account-2', '試験店舗', 'fixture-channel', 'unused', 'unused-token');`);
+    testDb.raw.prepare('INSERT INTO friends (id, line_user_id, line_account_id, is_following) VALUES (?, ?, ?, ?)')
+      .run('friend-fixture', body.lineUid, accountId, following);
+  }
+  async function notice(input: unknown = body) {
+    const res = await request(path, input);
+    expect(res.status).toBe(201);
+    const result = await res.json() as { data: { id: string; tableId: string; syncDirection: string; lineNotice: { sent: boolean; reason: string | null } } };
+    expect(result.data.syncDirection).toBe('inbound_only');
+    expect(testDb.raw.prepare('SELECT id FROM rt_reservations WHERE id = ?').get(result.data.id)).toBeDefined();
+    return result.data;
+  }
+  it('友だちへの送信に既存の確認文面を使い、自動通知として履歴を残す', async () => {
+    seedFriend();
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await notice({ ...body, courseId: 'menu-ginza' });
+    expect(result.lineNotice).toEqual({ sent: true, reason: null });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.line.me/v2/bot/message/push');
+    const headers = new Headers(init.headers);
+    expect(headers.has('X-Line-Harness-Source')).toBe(false);
+    expect(headers.get('X-Line-Retry-Key')).toBe(result.id);
+    expect(JSON.parse(init.body as string)).toMatchObject({ to: body.lineUid,
+      messages: [{ type: 'text', text: expect.stringContaining('予約が確定しました。') }] });
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('テストコース');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('2026-11-10 19:00');
+    expect(testDb.raw.prepare("SELECT source FROM messages_log WHERE friend_id = 'friend-fixture'").get()).toEqual({ source: 'external' });
+  });
+  it.each([undefined, false])('notifyLine=%sでは送らず、従来の予約結果を返す', async notifyLine => {
+    seedFriend();
+    const { notifyLine: _notifyLine, ...oldBody } = body;
+    expect((await notice({ ...oldBody, notifyLine })).lineNotice).toEqual({ sent: false, reason: 'not_requested' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('ブロック中は送らず、予約は保存する', async () => {
+    seedFriend(0);
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'blocked' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it.each([body.lineUid, null])('別アカウントの友だち・UID未入力には送らない (%s)', async lineUid => {
+    seedFriend(1, 'account-3');
+    expect((await notice({ ...body, lineUid })).lineNotice).toEqual({ sent: false, reason: 'not_friend' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it.each(['account-2', '*'])('送信停止を守る (%s)', async scope => {
+    seedFriend();
+    testDb.raw.prepare("INSERT INTO operation_control_sets (scope_key, line_account_id, states_json, updated_at) VALUES (?, ?, ?, '2026-10-02')")
+      .run(scope, scope === '*' ? null : scope, '{"broadcast_dispatch":"stopped"}');
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'sending_disabled' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('送信失敗でも予約と在庫を保存し、例外の本文は返さない', async () => {
+    seedFriend();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('試験用の非公開本文', { status: 500 })));
+    const result = await notice();
+    expect(result.lineNotice).toEqual({ sent: false, reason: 'send_failed' });
+    expect(JSON.stringify(result)).not.toContain('非公開本文');
+    expect(testDb.raw.prepare("SELECT status FROM rt_reservations WHERE id = ?").get(result.id)).toEqual({ status: 'confirmed' });
+  });
+  it('停止中・アーカイブ済みアカウントには送らない', async () => {
+    seedFriend();
+    testDb.raw.prepare("UPDATE line_accounts SET archived_at = '2026-10-02' WHERE id = 'account-2'").run();
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'account_unavailable' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('未確定の予約に確定文面を送らず、notifyLineの型を検証する', async () => {
+    seedFriend();
+    expect((await notice({ ...body, status: 'pending' })).lineNotice).toEqual({ sent: false, reason: 'not_confirmed' });
+    expect((await request(path, { ...body, notifyLine: 'true' })).status).toBe(400);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+});
+
 describe('飲食店向けテストAPI', () => {
   it('無効な環境では専用APIを404にする', async () => {
     env.RESTAURANT_TEST_ENABLED = 'false';

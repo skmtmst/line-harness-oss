@@ -14,6 +14,7 @@ import {
   canAccessLineAccount,
   getVisibleLineAccountScope,
 } from '../services/account-access.js';
+import { sendRestaurantLineConfirmation, type RestaurantLineNotice } from '../services/restaurant-line-confirmation.js';
 import { dbFor } from '../services/db-router.js';
 import {
   issueRestaurantIntakeAddress,
@@ -41,9 +42,8 @@ import {
 /**
  * 飲食店向け（テスト）の専用API。
  *
- * `/api/restaurant-test` 以外の既存機能には依存せず、外部サービスへの
- * fetch/send は意図的に実装しない。媒体連携は管理者が投入した受信データを
- * 検証する一方向だけである。
+ * 媒体連携は管理者が投入した受信データを検証する一方向である。
+ * 手動予約の確認通知は、明示的に選んだときだけ既存のHarness経路で送る。
  */
 export const restaurantTest = new Hono<Env>();
 
@@ -1130,6 +1130,9 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<Record<string, unknown>>();
+  if (body.notifyLine !== undefined && typeof body.notifyLine !== 'boolean') {
+    return c.json({ success: false, error: 'notifyLine は true または false を指定してください' }, 400);
+  }
   const storeId = typeof body.storeId === 'string' ? body.storeId : '';
   if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   const checked = validateInboundReservation({ ...body, externalId: `manual-${crypto.randomUUID()}` });
@@ -1137,6 +1140,7 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
   const lockKey = `reservation:${storeId}:${checked.value.startsAt}`;
   const lockOwner = crypto.randomUUID();
   if (!await acquireLock(dbFor(c.env, storeId), lockKey, lockOwner)) return c.json({ success: false, error: '同じ時間帯を別の担当者が更新中です' }, 409);
+  let saved: { id: string; tableId: string | null };
   try {
     const tables = await dbFor(c.env, storeId).prepare('SELECT id, min_capacity, max_capacity, is_active FROM rt_tables WHERE store_id = ?').bind(storeId).all<{ id: string; min_capacity: number; max_capacity: number; is_active: number }>();
     if (checked.value.tableId && !tables.results.some((table) => table.id === checked.value.tableId && table.is_active === 1)) {
@@ -1161,10 +1165,18 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
     if (reservationSlotActive(checked.value.status)) {
       await adjustInventoryReservedCount(dbFor(c.env, storeId), storeId, checked.value.startsAt, checked.value.guestCount);
     }
-    return c.json({ success: true, data: { id, tableId, syncDirection: 'inbound_only' } }, 201);
+    saved = { id, tableId };
   } finally {
     await releaseLock(dbFor(c.env, storeId), lockKey, lockOwner);
   }
+  const lineNotice: RestaurantLineNotice = body.notifyLine === true
+    ? await sendRestaurantLineConfirmation(c, {
+      reservationId: saved.id, storeId, tenantId: organization.tenant_id ?? DEFAULT_TENANT_ID,
+      lineUid: checked.value.lineUid ?? null, startsAt: checked.value.startsAt,
+      courseId: checked.value.courseId ?? null, status: checked.value.status ?? 'confirmed',
+    })
+    : { sent: false, reason: 'not_requested' };
+  return c.json({ success: true, data: { ...saved, syncDirection: 'inbound_only', lineNotice } }, 201);
 });
 
 /**
