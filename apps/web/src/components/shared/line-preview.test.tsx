@@ -11,7 +11,10 @@ import LinePreview from './line-preview'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  delete document.documentElement.dataset.theme
+})
 
 /**
  * LINEプレビュー共通部品（B-6、★V7）。
@@ -67,6 +70,30 @@ describe('LINEプレビュー共通部品', () => {
     const html = renderToStaticMarkup(<LinePreview empty="本文を書くと、ここに出ます" />)
     expect(html).toContain('本文を書くと、ここに出ます')
     expect(html).not.toContain('こんにちは')
+  })
+
+  it('v7 と v8 の枠を両方は描かない（<html data-theme> で1つに決める）', () => {
+    // v7（未設定）ではパネルだけ。スマホの帯（9:41・メニュー）は出ない。
+    const v7 = render(
+      <LinePreview>
+        <p>こんにちは</p>
+      </LinePreview>,
+    )
+    expect(v7.container.querySelectorAll('section[aria-label="LINEプレビュー"]')).toHaveLength(1)
+    expect(screen.queryByText('9:41')).toBeNull()
+    v7.unmount()
+
+    // v8 ではスマホの枠だけ。中身はトークの中へ入る。
+    document.documentElement.dataset.theme = 'v8'
+    const v8 = render(
+      <LinePreview>
+        <p>こんにちは</p>
+      </LinePreview>,
+    )
+    expect(v8.container.querySelectorAll('section[aria-label="LINEプレビュー"]')).toHaveLength(1)
+    expect(screen.getByText('9:41')).toBeTruthy()
+    expect(screen.getByText('メニュー')).toBeTruthy()
+    expect(screen.getByText('こんにちは')).toBeTruthy()
   })
 
   it('枠の色は生の色値ではなくトークンで読む', () => {

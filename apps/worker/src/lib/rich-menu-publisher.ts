@@ -1065,9 +1065,12 @@ export type UnpublishResult = {
  *   2. 各 page の richmenu を delete (404 無視)
  *   3. 現 default が own group の richmenu なら default unlink
  *
- * 削除は 404 を許容することで複数回呼ばれても安全 (idempotent)。alias / richmenu の
- * 削除そのものが失敗 (5xx 等) した場合は warnings に記録するが処理を続行する。
- * 完全失敗時は最後に throw。
+ * 削除は 404 を許容することで複数回呼ばれても安全 (idempotent)。
+ * M953: alias / richmenu の削除が1件でも失敗 (5xx 等) したら、処理を
+ * 続けたうえで最後に throw する。失敗を warnings に退避して成功扱いに
+ * すると、DB は draft 確定なのに LINE 上にメニューが残り、画面は
+ * 「取り下げ済み」に見えてしまう。route 側は throw を受けて 500・run 失敗・
+ * lease 解放にし、group は published のまま残して再試行できるようにする。
  */
 export async function unpublishRichMenuGroup(
   group: GroupInput,
@@ -1076,6 +1079,7 @@ export async function unpublishRichMenuGroup(
 ): Promise<UnpublishResult> {
   const warnings: string[] = [];
   const pages: UnpublishResult['pages'] = [];
+  const failures: string[] = [];
 
   for (const page of group.pages) {
     // 外部呼び出しの前に担当を確かめる。失権していたら投げて止める
@@ -1086,16 +1090,18 @@ export async function unpublishRichMenuGroup(
     try {
       await line.deleteRichMenuAlias(aliasId);
     } catch (e) {
-      warnings.push(`delete alias ${aliasId} failed: ${e instanceof Error ? e.message : String(e)}`);
+      const detail = `delete alias ${aliasId} failed: ${e instanceof Error ? e.message : String(e)}`;
+      warnings.push(detail);
+      failures.push(detail);
     }
     // richmenu 削除
     if (page.lineRichMenuId) {
       try {
         await line.deleteRichMenu(page.lineRichMenuId);
       } catch (e) {
-        warnings.push(
-          `delete richmenu ${page.lineRichMenuId} failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        const detail = `delete richmenu ${page.lineRichMenuId} failed: ${e instanceof Error ? e.message : String(e)}`;
+        warnings.push(detail);
+        failures.push(detail);
       }
     }
     pages.push({ pageId: page.id, clearedRichMenuId: page.lineRichMenuId });
@@ -1120,5 +1126,11 @@ export async function unpublishRichMenuGroup(
     );
   }
 
+  if (failures.length > 0) {
+    throw new Error(
+      'LINE上のメニューの削除に失敗しました。メニューがLINE上に残っています。'
+      + '最新の状態を確認して、もう一度取り下げてください。',
+    );
+  }
   return { pages, warnings };
 }
