@@ -217,7 +217,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [{ name: 'p1', orderIndex: 0, areas: [VALID_AREA] }] }),
+      body: JSON.stringify({ expectedVersion: 1, pages: [{ name: 'p1', orderIndex: 0, areas: [VALID_AREA] }] }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -233,7 +233,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chatBarText: 'かえたい' }),
+      body: JSON.stringify({ expectedVersion: 1, chatBarText: 'かえたい' }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -249,7 +249,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isDefaultForAll: true }),
+      body: JSON.stringify({ expectedVersion: 1, isDefaultForAll: true }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -263,7 +263,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '新しい名前', targetingEnabled: true }),
+      body: JSON.stringify({ expectedVersion: 1, name: '新しい名前', targetingPriority: 5 }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -279,7 +279,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [{ name: 'p1', orderIndex: 0, areas: [VALID_AREA, { ...VALID_AREA, boundsY: 100 }] }] }),
+      body: JSON.stringify({ expectedVersion: 1, pages: [{ name: 'p1', orderIndex: 0, areas: [VALID_AREA, { ...VALID_AREA, boundsY: 100 }] }] }),
     });
     const res = await setupApp(db, r2).request(path, init);
 

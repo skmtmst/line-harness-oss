@@ -31,7 +31,7 @@ export const FIELD_TYPE_LABELS: Record<FriendFieldType, string> = {
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-function destinationLabel(field: FriendField): string {
+export function destinationLabel(field: FriendField): string {
   if (field.displayTargets?.length) return field.displayTargets.join('・')
   const places = ['友だち詳細', 'テンプレート差し込み']
   if (field.isStarred) places.push('友だち一覧')
@@ -39,13 +39,13 @@ function destinationLabel(field: FriendField): string {
   return places.join('・')
 }
 
-function knownUsageCount(field: FriendField): number | null {
+export function knownUsageCount(field: FriendField): number | null {
   return typeof field.usageCount === 'number' && Number.isFinite(field.usageCount) && field.usageCount >= 0
     ? field.usageCount
     : null
 }
 
-function fieldDeletionBlockedReason(field: FriendField): string | null {
+export function fieldDeletionBlockedReason(field: FriendField): string | null {
   const usageCount = knownUsageCount(field)
   if (usageCount === null) return '使用人数を確認できないため削除できません。再読み込みしてください。'
   if (usageCount > 0) return '値が入っているため、先に項目を移行してください'

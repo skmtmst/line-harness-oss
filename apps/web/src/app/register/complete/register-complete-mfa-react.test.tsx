@@ -119,4 +119,25 @@ describe('N-426: 登録完了直後の二段階設定への分岐', () => {
     expect(window.location.pathname).toBe('/hq')
     expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBe('sess-9')
   })
+
+  it('M045: csrf保存に失敗しても登録は進む（止まらない）', async () => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        if (key === 'lh_csrf') throw new Error('QuotaExceededError')
+        store.set(key, String(value))
+      },
+      removeItem: (key: string) => void store.delete(key),
+      clear: () => store.clear(),
+    })
+    fixture.completeResponse = {
+      ok: true,
+      data: { tenantId: 't1', deviceMarker: 'dm-1' },
+      csrfToken: 'csrf-2',
+    }
+    await render()
+    await fillAndSubmit()
+    expect(window.location.pathname).toBe('/hq')
+  })
 })

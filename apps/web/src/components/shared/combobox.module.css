@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 候補つき入力（1つ選ぶ）。Pencil ★V7 `WUVcz` §1。
