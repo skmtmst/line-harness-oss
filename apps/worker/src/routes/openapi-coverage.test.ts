@@ -559,6 +559,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/analytics/exports/{id}',
   'GET /api/analytics/exports/{id}/download',
   'GET /api/analytics/ref/{refCode}/orders',
+  'GET /api/booking/admin/channels',
+  'GET /api/booking/admin/conflicts',
   'POST /api/analytics/exports',
   'GET /api/booking/admin/staff/me',
   'PUT /api/booking/admin/staff-menus',
@@ -587,7 +589,9 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/nen/rank-settings',
   'GET /api/webinars/{id}/sessions/{startAt}',
   'GET /api/webinars/{id}/video-asset',
+  'POST /api/booking/admin/bookings/{id}/reassign',
   'POST /api/webinars/{id}/video-asset/advance',
+  'PUT /api/booking/admin/channels/settings',
   'PUT /api/webinars/{id}/sessions/{startAt}',
 ]);
 

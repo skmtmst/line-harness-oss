@@ -5421,6 +5421,87 @@ const spec = {
         },
       },
     },
+    // ── Booking channels (V8-B) ──────────────────────────────────────────────
+    '/api/booking/admin/channels': {
+      get: {
+        tags: ['Booking'],
+        summary: '予約の受付経路・担当カレンダー接続・自動割り当ての状態を取得',
+        description: '接続済みの担当カレンダーは今週分を読み、自社から書き出した予約を除いた外の予定件数と最終読込日時を返す（最終読込日時は保存する）。今日の件数は店舗の暦日、週は月曜開始。Cache-Control: no-store。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: '受付経路ごとの今日の件数と担当ごとのカレンダー状態',
+            content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: {
+              type: 'object',
+              required: ['timeZone', 'todayFrom', 'todayTo', 'weekFrom', 'weekTo', 'staff', 'autoAssign', 'channels'],
+              properties: {
+                timeZone: { type: 'string' },
+                todayFrom: { type: 'string', format: 'date-time' },
+                todayTo: { type: 'string', format: 'date-time' },
+                weekFrom: { type: 'string', format: 'date-time' },
+                weekTo: { type: 'string', format: 'date-time' },
+                autoAssign: { type: 'boolean' },
+                staff: { type: 'array', items: { type: 'object', required: ['staffId', 'displayName', 'status', 'externalEventsThisWeek', 'lastReadAt', 'readError'], properties: {
+                  staffId: { type: 'string' },
+                  displayName: { type: 'string' },
+                  status: { type: 'string', enum: ['connected', 'disconnected', 'expired'] },
+                  externalEventsThisWeek: { type: ['integer', 'null'] },
+                  lastReadAt: { type: ['string', 'null'] },
+                  readError: { type: ['string', 'null'], enum: ['calendar_auth_expired', 'calendar_read_unavailable', null] },
+                } } },
+                channels: { type: 'array', items: { type: 'object', required: ['key', 'status', 'todayCount'], properties: {
+                  key: { type: 'string', enum: ['line', 'manual', 'hot_pepper_beauty', 'google_reserve', 'epark'] },
+                  status: { type: 'string', enum: ['active', 'preparing'] },
+                  todayCount: { type: ['integer', 'null'] },
+                } } },
+              },
+            } } } } },
+          },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+    },
+    '/api/booking/admin/channels/settings': {
+      put: {
+        tags: ['Booking'],
+        summary: '指名なし予約の担当自動割り当てを切り替え',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['autoAssign'], properties: { autoAssign: { type: 'boolean' } } } } } },
+        responses: {
+          '200': { description: '保存した設定', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['autoAssign'], properties: { autoAssign: { type: 'boolean' } } } } } } } },
+          '400': { description: 'account_id 未指定または autoAssign が真偽値でない' },
+          '403': { description: '予約設定の権限がない' },
+        },
+      },
+    },
+    '/api/booking/admin/conflicts': {
+      get: {
+        tags: ['Booking'],
+        summary: '同じ担当で時間が重なっている予約の組を取得',
+        description: '受付中・確定の予約だけを対象に、同じ担当で時間が重なる2件の組を開始日時順に返す。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: '重なっている予約の組',
+            content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['conflicts'], properties: {
+              conflicts: { type: 'array', items: { type: 'object', required: ['staffId', 'staffName', 'bookingId', 'otherBookingId', 'startsAt', 'endsAt', 'otherStartsAt', 'otherEndsAt', 'version', 'otherVersion'], properties: {
+                staffId: { type: 'string' },
+                staffName: { type: 'string' },
+                bookingId: { type: 'string' },
+                otherBookingId: { type: 'string' },
+                startsAt: { type: 'string' },
+                endsAt: { type: 'string' },
+                otherStartsAt: { type: 'string' },
+                otherEndsAt: { type: 'string' },
+                version: { type: 'integer', minimum: 0 },
+                otherVersion: { type: 'integer', minimum: 0 },
+              } } },
+            } } } } } },
+          },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+    },
     // ── Booking settings (N-406 #754) ────────────────────────────────────────
     '/api/booking/admin/settings': {
       get: {
@@ -5774,6 +5855,30 @@ const spec = {
           '404': { description: '予約または担当が対象アカウントに存在しない' },
           '409': { description: '版競合・変更不可の状態・枠の衝突' },
           '422': { description: 'メニュー未提供・過去日時・料金不備・方針不備・未連携への送信指定' },
+        },
+      },
+    },
+    '/api/booking/admin/bookings/{id}/reassign': {
+      post: {
+        tags: ['Booking'], summary: '予約を別の担当へ移す',
+        description: '今の版で担当だけを変える。これからの予約で、今と違う担当のときだけ受け付け、必ず今の空き判定を通す。結果は PATCH /api/booking/admin/bookings/{id} と同じ形。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['staffId', 'notifyCustomer'],
+          properties: {
+            staffId: { type: 'string', minLength: 1, description: '移し先の担当ID' },
+            notifyCustomer: { type: 'boolean', description: 'false でお客さまへの変更案内を送らない' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '変更後の版・カレンダー同期・通知・リマインダの実績' },
+          '400': { description: 'account_id 未指定または staffId・notifyCustomer の不備' },
+          '404': { description: '予約または担当が対象アカウントに存在しない' },
+          '409': { description: '過去の予約・同じ担当・枠の衝突・版競合' },
+          '422': { description: 'メニュー未提供など変更できない内容' },
         },
       },
     },
