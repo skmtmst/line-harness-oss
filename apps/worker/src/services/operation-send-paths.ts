@@ -70,6 +70,17 @@ export interface OperationSendPath {
 export const OPERATION_PROXY_CAPABILITY_HEADER = 'X-Line-Harness-Capability';
 
 export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
+  {
+    id: 'restaurant-phone-confirmation',
+    label: '電話予約のLINE確認通知',
+    kind: 'auto',
+    capability: 'broadcast_dispatch',
+    enforcement: [
+      { file: 'apps/worker/src/services/restaurant-line-confirmation.ts', marker: "'broadcast_dispatch'" },
+      { file: 'apps/worker/src/routes/line-proxy.ts', marker: 'isOperationCapabilityStopped' },
+    ],
+    note: '担当者が登録した予約の自動通知。停止中は送らず理由を返し、予約そのものは保存する。',
+  },
   // ----------------------------------------------------------
   // 一斉配信 (broadcast_dispatch)
   // ----------------------------------------------------------
