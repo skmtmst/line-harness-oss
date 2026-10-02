@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
   /*
    * ★V7 `Xn1Mz`「一覧の上の道具の並び」。どの一覧も同じ2行。
