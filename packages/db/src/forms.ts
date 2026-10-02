@@ -1,4 +1,11 @@
-import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT } from './utils.js';
+import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT, toJstString } from './utils.js';
+
+/**
+ * 回答の後処理がこの長さ以上動きが無ければ「途中で止まった」とみなす。
+ * 一覧の「後処理の未完」の札・絞り込みと、予約の横取り判定で同じ目安を
+ * 使うためここに置く(worker 側は二重に定義しない)。
+ */
+export const FORM_SUBMIT_CLAIM_STALE_MS = 60 * 1000;
 // =============================================================================
 // Forms — Survey / questionnaire system (L社 回答フォーム equivalent)
 // =============================================================================
@@ -95,6 +102,14 @@ export interface FormWithStats extends Form {
   monthly_submit_count: number;
   monthly_open_count: number;
   monthly_completion_rate: number | null;
+  /**
+   * ★V8 一覧の「後処理の未完」の札：後処理が失敗したか、進行中のまま
+   * 止まった回答の数。工程ごとの未完は回答1件ごとの組み立てが要るので、
+   * 一覧では「止まった予約を持つ回答の数」で近似する(再実行の可否は
+   * 回答一覧が行ごとに正確に判定する)。回答の保存前に止まった予約は
+   * 数えない(回答一覧に行が無く、運用者が手を出せないため)。
+   */
+  pending_post_action_count: number;
 }
 
 export interface FormAccountScope {
@@ -141,6 +156,8 @@ export async function getFormsWithStats(
   // P：試し（is_test=1）は最後の回答・利用先の数・今月の数のどこにも入れない。
   // 今月は日本時間の1日から。DBの時刻はJST文字列なので頭7文字（YYYY-MM）で切る。
   const monthPrefix = jstDateString().slice(0, 7);
+  // 後処理の未完の目安と同じ「止まった」とみなす基準時刻(JST 文字列比較)。
+  const staleBefore = toJstString(new Date(Date.now() - FORM_SUBMIT_CLAIM_STALE_MS));
   const result = await db
     .prepare(
       `SELECT
@@ -152,6 +169,10 @@ export async function getFormsWithStats(
          (SELECT COUNT(DISTINCT friend_id) FROM form_opens
            WHERE form_id = f.id AND is_test = 0 AND friend_id IS NOT NULL
              AND substr(opened_at, 1, 7) = ?) AS monthly_open_count,
+         (SELECT COUNT(*) FROM form_submit_claims c
+           WHERE c.form_id = f.id AND c.submission_id IS NOT NULL
+             AND (c.status = 'failed'
+               OR (c.status = 'in_progress' AND c.updated_at < ?))) AS pending_post_action_count,
          NOT EXISTS (
            SELECT 1 FROM form_accounts assigned WHERE assigned.form_id = f.id
          ) AS account_scope_review_required,
@@ -181,17 +202,24 @@ export async function getFormsWithStats(
          last_submitted_at DESC,
          f.created_at DESC`,
     )
-    .bind(monthPrefix, monthPrefix, ...accountIds, ...folderBinds)
+    .bind(monthPrefix, monthPrefix, staleBefore, ...accountIds, ...folderBinds)
     .all<Form & {
       last_submitted_at: string | null;
       account_scope_review_required: number;
       used_by_accounts_json: string | null;
       monthly_submit_count: number;
       monthly_open_count: number;
+      pending_post_action_count: number;
     }>();
 
   return result.results.map((row) => {
-    const { used_by_accounts_json, monthly_submit_count, monthly_open_count, ...rest } = row;
+    const {
+      used_by_accounts_json,
+      monthly_submit_count,
+      monthly_open_count,
+      pending_post_action_count,
+      ...rest
+    } = row;
     let parsed: FormUsedByAccount[] = [];
     if (used_by_accounts_json) {
       try {
@@ -213,6 +241,7 @@ export async function getFormsWithStats(
       monthly_completion_rate: monthlyOpens === 0
         ? null
         : Math.round((monthlySubmits / monthlyOpens) * 1000) / 10,
+      pending_post_action_count: Number(pending_post_action_count ?? 0),
     };
   });
 }
