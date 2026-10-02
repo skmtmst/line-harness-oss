@@ -726,10 +726,23 @@ function InflowLinksPageInner({
   useEffect(() => {
     onRouteCountChange?.(routeCountAvailable ? accountFilteredRows.length : null)
   }, [onRouteCountChange, routeCountAvailable, accountFilteredRows.length])
-  const totalClicks = summary?.totalClicks ?? sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
-  const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  /*
+    帯は画面全体の要約なので、クリックと平均の追加率もフォルダの選択・
+    検索文字・友だち有無の絞り込みで変わってはいけない。実 Worker の
+    ref-summary は routeTotal / totalClicks / averageAddRate を返さないので、
+    通常はここで選択アカウント範囲（絞り込みの前）から数える。
+    summary が全体値を返しているときはそちらを優先する。
+  */
+  /*
+    実 Worker の ref-summary は routeTotal / totalClicks / averageAddRate を
+    返さないので、通常は選択アカウント範囲（絞り込みの前）から数える。
+    summary が全体値を返しているときはそちらを優先する。
+  */
+  const accountClicks = accountFilteredRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
+  const accountFriendsForRate = accountFilteredRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  const totalClicks = summary?.totalClicks ?? accountClicks
   const addRate = summaryAvailable && totalClicks > 0
-    ? summary?.averageAddRate ?? Math.round((totalFriends / totalClicks) * 100)
+    ? summary?.averageAddRate ?? Math.round((accountFriendsForRate / totalClicks) * 100)
     : null
 
   const exportCurrentRows = () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/header'
@@ -125,6 +125,34 @@ export default function CreatePage({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /*
+   * エラーが入力の検証文か、保存の失敗文かを分ける。
+   * 検証文は入力を直した時点で古くなるので、直したら消す（R610）。
+   * 保存の失敗文（重複・権限・通信）は送り直すまで直ったか分からないので、
+   * 次の保存操作まで残す。
+   */
+  const [errorKind, setErrorKind] = useState<'validate' | 'save' | null>(null)
+
+  /*
+   * R610: 不正な入力で保存を押した後、正しく直しても古い検証文が残ると、
+   * まだ不正なのか判断できない。検証文だけは今の入力と突き合わせ、
+   * 直っていれば消す。理由が変わっていれば今の文に寄せる。
+   */
+  useEffect(() => {
+    if (!error || errorKind !== 'validate') return
+    let current: string | null = null
+    try {
+      current = validate?.() ?? null
+    } catch {
+      return
+    }
+    if (current == null) {
+      setError('')
+      setErrorKind(null)
+    } else if (current !== error) {
+      setError(current)
+    }
+  }, [error, errorKind, validate])
 
   const run = async (andAnother: boolean) => {
     if (saving) return
@@ -138,6 +166,7 @@ export default function CreatePage({
     const fieldProblems = fields?.submit() ?? []
     if (validationError) {
       setError(validationError)
+      setErrorKind('validate')
       return
     }
     if (fieldProblems.length > 0) {
@@ -146,6 +175,7 @@ export default function CreatePage({
     }
     setSaving(true)
     setError('')
+    setErrorKind(null)
     setNotice('')
     try {
       const id = await onSave()
@@ -158,6 +188,7 @@ export default function CreatePage({
       router.push(successHref ? successHref(id) : createPageReturnHref(parent[1], id))
     } catch (e) {
       setError(describeError ? describeError(e) : createPageErrorMessage(e))
+      setErrorKind('save')
     } finally {
       setSaving(false)
     }
