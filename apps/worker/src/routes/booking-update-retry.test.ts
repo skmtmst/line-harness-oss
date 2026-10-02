@@ -275,7 +275,7 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     sqlite.prepare('INSERT INTO operation_control_sets (scope_key,version,states_json,updated_at) VALUES (?,?,?,?)').run('*',1,JSON.stringify({ broadcast_dispatch:'stopped' }),new Date().toISOString());
     const stopped = await move('s1');
     expect(stopped.status).toBe(200);
-    expect((await stopped.json<{ change_notification:string }>()).change_notification).toBe('stopped');
+    expect(await stopped.json()).toMatchObject({ change_notification:'not_applicable',change_notification_reason:'sending_stopped' });
     expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
   });
 

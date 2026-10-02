@@ -3315,7 +3315,8 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch)
     calendar_sync: googleSync === 'succeeded' ? 'synced'
       : googleSync === 'retry_wait' ? 'failed'
       : googleSync === 'skipped' ? 'not_configured' : 'not_applicable',
-    change_notification: wantsChangeNotice ? 'queued' : changeNoticeRequested ? 'stopped' : 'not_applicable',
+    change_notification: wantsChangeNotice ? 'queued' : 'not_applicable',
+    change_notification_reason: !wantsChangeNotice && changeNoticeRequested ? 'sending_stopped' : null,
     // R336: V6 通知同期の結果。failed のときは監査 (v6_sync_failed) にも残し、
     // 日時差分の無い再保存でも reconcile で回復する。
     v6_sync: v6Sync,
