@@ -29,7 +29,7 @@ Googleスプレッドシート「TikTok利益計算（自動集計）」
 - スプレッドシートは workerが雛形から自動作成する（settingsに spreadsheet_id が
   無く、連携が connected のとき）。
 
-## データ（migration 514）
+## データ（migration `packages/db/migrations/535_tiktok_pnl.sql`）
 
 - `tiktok_pnl_order_lines` — 1行=1注文内の1商品。line_key = `<TikTok注文ID>:<行番号>`。
   sheet_dirty=1 の行だけシートへ書き、成功で0に戻す（差分同期）。
@@ -76,15 +76,25 @@ Googleスプレッドシート「TikTok利益計算（自動集計）」
   TikTok側の設定率（設定タブ）と食い違うと⚠️「TikTok側の％引き上げが必要」
   を表示。＊商品の当月点数と80%枠上限の残りも表示。
 
-## EC-CUBE側エンドポイント仕様（未実装・承認待ち）
+## EC-CUBE側エンドポイント仕様（実装済み）
 
-親リポジトリ nen-petfood-eccube は本依頼では変更しない（報告→指示のルール）。
-worker側は404を 'ec_endpoint_missing' として扱い、配備順序に依存しない。
+EC側は nen-petfood-eccube リポジトリに実装済み。
+
+- 実装: `eccube/app/Customize/Controller/LineHarnessTikTokOrderExportController.php`
+  （route名 `nen_line_harness_tiktok_order_export`。`services.yaml` で
+  `$secret: '%env(string:LINE_HARNESS_EVENT_SECRET)%'` を明示注入している）
+- worker側は404を `'ec_endpoint_missing'` として扱うため、EC配備が後でも
+  シート作成・書き出しは進む（段階配備の経路は残してある）。
 
 - `POST /line-harness/tiktok-order-export`
 - 認証: 既存line-harness系と同じ HMAC。ヘッダ `X-Nen-Timestamp`（epoch秒）、
-  `X-Nen-Signature: sha256=<hex HMAC-SHA256(ECCUBE_WEBHOOK_SECRET, timestamp + "." + body)>`。
-- リクエスト: `{"since": "<前回のnext_since|null>", "limit": 200}`（limit上限200）
+  `X-Nen-Signature: sha256=<小文字hex HMAC-SHA256(secret, timestamp + "." + body)>`。
+  この契約は `apps/worker/src/services/tiktok-pnl-ec-contract.test.ts` で固定している。
+- 秘密設定名の対応: worker側 `ECCUBE_WEBHOOK_SECRET` ＝ EC側 `LINE_HARNESS_EVENT_SECRET`
+  （同じ値を別名で読む）。EC側は32文字未満、`X-Nen-Timestamp` が数字以外、
+  現在時刻との差が±300秒超のいずれかで401を返す。
+- リクエスト: `{"since": "<前回のnext_since|null>", "limit": 200}`
+  （EC側で `min(limit, 200)`。0以下は400）
 - レスポンス:
 
 ```json
@@ -115,13 +125,21 @@ worker側は404を 'ec_endpoint_missing' として扱い、配備順序に依存
 }
 ```
 
-- 並び: updated_at 昇順（同時刻は注文IDでタイブレーク）。カーソルはworker側では
-  解釈せずそのまま返す。
+- 並び: `ORDER BY t.update_date ASC, t.id ASC`（同時刻はDB内部IDでタイブレーク）。
+  `limit + 1` 件取って `has_more` を判定する。カーソルはworker側では解釈せず
+  そのまま返す。
+- `buyer_key`: 購入者メール、無ければ電話番号を小文字化し、同じ秘密値で
+  HMAC-SHA256して先頭16文字に切った値。どちらも無い注文は `order-<TikTok注文ID>`。
+  個人情報そのものはworker・D1・シートへ渡さない。
 - データ源: `dtb_nen_tiktok_order.payload_json`。読み取り専用でEC側の状態は変えない。
+  このエンドポイント用のDB変更は無い（EC側migration追加なし）。
 
 ## 運用メモ
 
-- 環境変数は既存の `NEN_EC_BASE_URL` / `ECCUBE_WEBHOOK_SECRET` を使い、新規追加なし。
-  未設定のときは取り込みをスキップ（シート作成・書き出しは動く）。
+- worker側の環境変数は既存の `NEN_EC_BASE_URL` / `ECCUBE_WEBHOOK_SECRET` を使い、
+  新規追加なし。未設定のときは取り込みをスキップ（シート作成・書き出しは動く）。
+- EC側は `NEN_TIKTOK_PNL_SHEET_URL` を1件追加した。管理画面ホームに利益計算シートへの
+  リンクを出す `Customize\EventSubscriber\AdminHomeTikTokPnlSubscriber` が読む。
+  取り込み自体には関係しないため、未設定でもエクスポートは動く。
 - 返品・キャンセルの扱い: キャンセルは自動除外、返金は明細Y列に手動で記入。
 - 80%枠の上限（現在102点/月）は設定タブで変更できる。

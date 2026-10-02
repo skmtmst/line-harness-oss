@@ -47,6 +47,12 @@ export interface TopBarProps {
    * 押しても何も起きない偽の操作になる。
    */
   v8Chrome?: boolean
+  /**
+   * ★V8：パンくずの手前の段。「ホーム」「一斉配信」など。
+   * 渡されなければ従来どおり選んでいるアカウント名を出す。
+   * v7 では描かない。
+   */
+  crumbs?: { label: string; href?: string }[] | null
   className?: string
 }
 
@@ -70,6 +76,7 @@ export default function TopBar({
   onLogout,
   notificationUnreadCount = 0,
   v8Chrome = false,
+  crumbs,
   className,
 }: TopBarProps) {
   const classes = [styles.root, className].filter(Boolean).join(' ')
@@ -117,9 +124,24 @@ export default function TopBar({
             <PanelLeftIcon />
           </button>
           <nav className={styles.crumbs} aria-label="パンくず">
-            {/* 手前の段は選んでいるアカウント。未選択（統括の一覧など）では
-                「店舗を選択」と出さず、画面名だけにする。 */}
-            {current ? (
+            {/*
+              手前の段。ページが crumbs を渡したらそれを出す
+              （一覧からの詳細で「一斉配信 › 配信名」）。渡さない画面は
+              従来どおり選んでいるアカウント名。未選択（統括の一覧など）
+              では「店舗を選択」と出さず、画面名だけにする。
+            */}
+            {crumbs && crumbs.length > 0 ? (
+              crumbs.map((crumb) => (
+                <span key={crumb.label} className={styles.crumbFromWrap}>
+                  {crumb.href ? (
+                    <Link href={crumb.href} className={styles.crumbFromLink}>{crumb.label}</Link>
+                  ) : (
+                    <span className={styles.crumbFrom}>{crumb.label}</span>
+                  )}
+                  <span className={styles.crumbSep} aria-hidden="true">›</span>
+                </span>
+              ))
+            ) : current ? (
               <>
                 <span className={styles.crumbFrom}>{current.label}</span>
                 <span className={styles.crumbSep} aria-hidden="true">›</span>

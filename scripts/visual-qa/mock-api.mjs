@@ -1095,52 +1095,52 @@ const SHAPES = {
   '/api/analytics/friends': {
     lineAccountId: 'visual-qa-account',
     timeZone: 'Asia/Tokyo',
-    period: { from: '2026-08-04', to: '2026-09-02' },
-    dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    period: { from: '2026-09-01', to: '2026-09-30' },
+    dataCutoffAt: '2026-09-30T00:00:00+09:00',
     data: {
       state: 'available',
       stateReason: null,
       metrics: {
         added: METRIC(58), removed: METRIC(11), net: METRIC(47),
-        currentFriends: METRIC(1842), firstTime: METRIC(52), returning: METRIC(6),
+        currentFriends: METRIC(1284), firstTime: METRIC(52), returning: METRIC(6),
       },
       days: [
-      { date: '2026-08-04', added: 3, removed: 0, net: 3 },
-      { date: '2026-08-05', added: 1, removed: 1, net: 0 },
-      { date: '2026-08-06', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-07', added: 2, removed: 0, net: 2 },
-      { date: '2026-08-08', added: 5, removed: 1, net: 4 },
-      { date: '2026-08-09', added: 4, removed: 0, net: 4 },
-      { date: '2026-08-10', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-11', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-12', added: 2, removed: 1, net: 1 },
-      { date: '2026-08-13', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-14', added: 6, removed: 2, net: 4 },
-      { date: '2026-08-15', added: 3, removed: 0, net: 3 },
-      { date: '2026-08-16', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-17', added: 0, removed: 1, net: -1 },
-      { date: '2026-08-18', added: 2, removed: 0, net: 2 },
-      { date: '2026-08-19', added: 4, removed: 1, net: 3 },
-      { date: '2026-08-20', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-21', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-22', added: 3, removed: 1, net: 2 },
-      { date: '2026-08-23', added: 2, removed: 0, net: 2 },
-      { date: '2026-08-24', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-25', added: 5, removed: 1, net: 4 },
-      { date: '2026-08-26', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-27', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-28', added: 2, removed: 0, net: 2 },
-      { date: '2026-08-29', added: 3, removed: 1, net: 2 },
-      { date: '2026-08-30', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-31', added: 0, removed: 0, net: 0 },
-      { date: '2026-09-01', added: 4, removed: 1, net: 3 },
-      { date: '2026-09-02', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-01', added: 3, removed: 0, net: 3 },
+      { date: '2026-09-02', added: 1, removed: 1, net: 0 },
+      { date: '2026-09-03', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-04', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-05', added: 5, removed: 1, net: 4 },
+      { date: '2026-09-06', added: 4, removed: 0, net: 4 },
+      { date: '2026-09-07', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-08', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-09', added: 2, removed: 1, net: 1 },
+      { date: '2026-09-10', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-11', added: 6, removed: 2, net: 4 },
+      { date: '2026-09-12', added: 3, removed: 0, net: 3 },
+      { date: '2026-09-13', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-14', added: 0, removed: 1, net: -1 },
+      { date: '2026-09-15', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-16', added: 4, removed: 1, net: 3 },
+      { date: '2026-09-17', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-18', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-19', added: 3, removed: 1, net: 2 },
+      { date: '2026-09-20', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-21', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-22', added: 5, removed: 1, net: 4 },
+      { date: '2026-09-23', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-24', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-25', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-26', added: 3, removed: 1, net: 2 },
+      { date: '2026-09-27', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-28', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-29', added: 4, removed: 1, net: 3 },
+      { date: '2026-09-30', added: 2, removed: 0, net: 2 },
       ],
       campaigns: [
-        { id: 'bc-1', name: '8月キャンペーンのお知らせ', kind: 'broadcast', occurredAt: '2026-08-24T10:00:00+09:00', date: '2026-08-24' },
-        { id: 'sc-1', name: '新しいシナリオ 8/18', kind: 'scenario', occurredAt: '2026-08-18T18:30:00+09:00', date: '2026-08-18' },
+        { id: 'bc-1', name: '秋の新商品のお知らせ', kind: 'broadcast', occurredAt: '2026-09-21T10:00:00+09:00', date: '2026-09-21' },
+        { id: 'sc-1', name: '新しいシナリオ 9/15', kind: 'scenario', occurredAt: '2026-09-15T18:30:00+09:00', date: '2026-09-15' },
       ],
-      historyAvailableFrom: '2026-08-04',
+      historyAvailableFrom: '2026-09-01',
     },
   },
   /* 分析・配信の反応。`AnalyticsReactionsOverview`。 */
@@ -1392,6 +1392,14 @@ function visualQaWriteBody(method, pathname) {
     }
     return FRIEND_ADD_RULE_VALIDATE
   }
+  if (method === 'PATCH' && pathname === '/api/friend-add-rules/reorder') {
+    // 本物は受け皿以外の全ID一致しか受け付けない (409 ORDER_CHANGED)。
+    // 画面確認では固定で成功を返す。失敗系は visualState=error。
+    if (query.get('visualState') === 'error') {
+      return { success: false, code: 'ORDER_CHANGED', error: 'ほかの画面で並び順が変わりました。' }
+    }
+    return { success: true }
+  }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/publish$/.test(pathname)) {
     if (query.get('visualState') === 'error') {
       return { success: false, error: '公開前にテストを成功させてください' }
@@ -1610,6 +1618,8 @@ const RAW_PATTERNS = [
   })],
   /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
   [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
+  /* スタッフロール本人の予約スタッフ（本人勤務 E3YDK）。器は `{staff}`。包むと `.find` で落ちる。 */
+  [/^\/api\/booking\/admin\/staff\/me$/, { staff: [BOOKING_STAFF[0]] }],
   /* `tksPc` の通常・読込中・失敗を分けるため、通常だけ本番と同じ器で返す。 */
   [/^\/api\/booking\/admin\/staff\/[^/]+\/shifts$/, { shifts: BOOKING_STAFF_SHIFTS }],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/availability-rules$/, { rules: BOOKING_AVAILABILITY_RULES }],
@@ -2205,10 +2215,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 検索とフォルダ絞りはサーバ側で全件に効かせる (本物と同じ契約)。
     const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
     const folder = query.get('folder') ?? ''
+    const status = query.get('status') ?? ''
     const items = FRIEND_ADD_RULES.items
-      .filter((item) => !q || item.name.toLocaleLowerCase('ja-JP').includes(q))
+      // 本物は設定名と流入リンク名の両方を検索する（V8 一覧の検索欄と同じ）。
+      .filter((item) => !q
+        || item.name.toLocaleLowerCase('ja-JP').includes(q)
+        || (item.routeNames ?? []).some((name) => name.toLocaleLowerCase('ja-JP').includes(q)))
       .filter((item) => !folder
         || (folder === '__uncategorized' ? item.folderName == null : item.folderName === folder))
+      .filter((item) => !status || item.status === status)
     const counts = new Map()
     for (const item of FRIEND_ADD_RULES.items) {
       counts.set(item.folderName ?? null, (counts.get(item.folderName ?? null) ?? 0) + 1)

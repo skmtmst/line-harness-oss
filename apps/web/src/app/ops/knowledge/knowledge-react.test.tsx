@@ -161,3 +161,20 @@ describe('V6 knowledge UI', () => {
     expect(host.textContent).toContain(article.title)
   })
 })
+
+
+describe('V8 ナレッジの集計範囲', () => {
+  it('全件の総数とこのページの数を区別し、開いただけでは承認しない', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    try {
+      mocks.list.mockResolvedValue({ success: true, data: [{ ...article, usedCount: 7 }], total: 104 })
+      await act(async () => root.render(<OpsKnowledgePage />)); await flush()
+      expect(host.querySelector('[data-design-node="h114s"]')).not.toBeNull()
+      expect(host.textContent).toContain('条件に合う記事104')
+      expect(host.textContent).toContain('このページの承認待ち1')
+      expect(host.textContent).toContain('このページの利用回数7')
+      expect(host.textContent).toContain('104件中 1〜1件')
+      expect(mocks.review).not.toHaveBeenCalled()
+    } finally { delete document.documentElement.dataset.theme }
+  })
+})

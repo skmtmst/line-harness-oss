@@ -3,8 +3,11 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+// 画面が使う正本は page＋core（組み立て・保存を出した共有モジュール）の両方。
 const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+  + fs.readFileSync(path.join(__dirname, 'edit/edit-core.tsx'), 'utf8')
 const CAROUSEL = fs.readFileSync(path.join(__dirname, 'carousel/page.tsx'), 'utf8')
+  + fs.readFileSync(path.join(__dirname, 'carousel/carousel-core.ts'), 'utf8')
 const QUESTION_NEW = fs.readFileSync(
   path.join(__dirname, 'questions/new/page.tsx'),
   'utf8',

@@ -1,5 +1,9 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8, { ReadonlyDesignNode } from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
@@ -38,6 +42,7 @@ type AccountWithStats = LineAccount & {
  * LINE公式アカウントの設定は別のもの（要件 §5-3）。転送をやめて画面にする。
  */
 export default function AccountsPage() {
+  const theme = useAdminTheme()
   const searchParams = useSearchParams()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -88,11 +93,11 @@ export default function AccountsPage() {
   if (searchParams.get('tab') === 'migration') return <AccountMigration />
 
   return (
-    <div data-design-node="QT91v" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="V7vn3"><div data-design-node="QT91v" className="flex flex-col gap-4 v8-ro-notifications-page">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         {/* ★V7：上の帯の画面名と同じ1段だけのパンくずは出さない。 */}
-        <div />
+        {theme === 'v8' ? <ReadonlyHeaderV8 title="LINEアカウント" description="統括内の全アカウントの接続・Webhook・友だち数を確認できます。" /> : <div />}
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
             {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
@@ -103,7 +108,7 @@ export default function AccountsPage() {
 
       {orderingOpen && <AccountOrdering />}
 
-      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div data-design="KPIs" data-ro-kpis="true" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {/* ★V7：「100%」の札は何の割合でもない固定の文字だったので外す。 */}
         {/* R520: 未取得は null で「—」。成功した空一覧だけ 0。 */}
         <KpiCard title="稼働中" value={activeCount} unit="" variant="v6"
@@ -298,6 +303,6 @@ export default function AccountsPage() {
           合っていないと、友だちからのメッセージが届きません。アーカイブしたアカウントは記録が残り、送受信だけを止めます。
         </p>
       </div>
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }
