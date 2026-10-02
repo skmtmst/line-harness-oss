@@ -393,3 +393,5 @@ table-header-migration-target app/webhooks/webhook-interactions.tsx
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx
 shared-button-importer app/analytics/conversion-report-v8.tsx
+# ★V8 共通情報の一覧（FM94M）。表の下にページ送りは共通Pagination、操作は共通Button。
+shared-button-importer app/contents/vars/list-v8.tsx
