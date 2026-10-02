@@ -13,7 +13,7 @@ import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FriendListRow, { FriendListCard } from './friend-list-row'
 import { formatNumber } from '@/lib/format'
-import styles from './friend-list-table.module.css'
+import './friend-list-table.css'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
@@ -197,7 +197,7 @@ export default function FriendListTable({
       </div>
 
       {/* FRIEND-17: 列見出しは表と対になるため、カード表示の幅では出さない。 */}
-      <div className={`hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid ${styles.cols}`}>
+      <div data-friend-cols className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid">
         <div>
           {/* ★V7 共通 チェックボックス（gvjpx）。一部だけ選んでいるときは「―」。 */}
           <Checkbox

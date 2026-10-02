@@ -10,7 +10,6 @@ import type { FriendListColumn } from './friend-list-table'
 import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
 import { formatDay } from '@/lib/format'
-import styles from './friend-list-table.module.css'
 
 interface Props {
   friend: FriendListItem
@@ -77,7 +76,8 @@ export default function FriendListRow({
           openDetail()
         }
       }}
-      className={`grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none ${styles.cols}`}
+      data-friend-cols
+      className="grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none"
     >
       <div onClick={(event) => event.stopPropagation()}>
         {/* ★V7 共通 チェックボックス（gvjpx）。 */}
