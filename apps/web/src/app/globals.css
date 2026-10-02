@@ -512,6 +512,30 @@
 }
 
 /*
+ * ★V8 LINEプレビューのスマホ（夕15・cfVyj）：LINE アプリの画面の写しの値。
+ * 管理画面のテーマ色とは別物なので `--v8-line-*` で分ける。値は Pencil の
+ * 実寸の写しで、直値はここだけに置く。部品側（line-preview.module.css）は
+ * var() で読む（色・丸み・影の直書きを数える試験が通る形）。
+ */
+[data-theme="v8"] {
+  --v8-line-shell: #111214;           /* 器の地 */
+  --v8-line-shell-edge: #3a3b3f;      /* 器の縁 */
+  --v8-line-shell-shadow: 0 12px 28px #1d1d1f29; /* 器が下へ落とす影 */
+  --v8-line-screen: #8cabd9;          /* トークの地（--color-line-talk と同色・別物） */
+  --v8-line-chrome: #ffffff;          /* 帯の地・帯の中の白い字 */
+  --v8-line-ink: #000000;             /* 時刻・島・電波の印 */
+  --v8-line-name: #1d1d1f;            /* トーク頭の名前 */
+  --v8-line-hairline: #e5e5ea;        /* 帯の区切り線 */
+  --v8-line-datechip: #00000026;      /* 日付の札の地 */
+  --v8-line-empty: #ffffffa6;         /* 空のときの薄い文 */
+  --v8-line-menu: #444444;            /* メニュー帯の字 */
+  --v8-line-homebar: #111111;         /* ホームの線 */
+  --v8-line-shell-radius: 52px;       /* 器の角丸 */
+  --v8-line-screen-radius: 42px;      /* 画面の角丸 */
+  --v8-line-homebar-radius: 3px;      /* ホームの線の角丸 */
+}
+
+/*
  * ★V8 移行③: 外側（灰色の地・白い板1枚・上の帯）。
  *
  * 構造は v7 と同じ HTML のまま、v8 のときだけ見た目を切り替える。

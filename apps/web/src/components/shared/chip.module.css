@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 印（チップ）。Pencil V5 の一覧・カードの中で、状態や区分を1語で示す小さな札。
