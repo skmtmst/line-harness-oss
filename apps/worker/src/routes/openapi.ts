@@ -2416,6 +2416,38 @@ const spec = {
         },
       },
     },
+    '/api/friend-add-rules/reorder': {
+      patch: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信の優先順位を一括更新（一覧のつまみ並び替え）',
+        description:
+          '動かせる行（受け皿以外）の新しい順を ids で受け取り、1回のバッチで書く。そのアカウント・区分の受け皿以外の全件をちょうど含む並びだけを受け付け、足りなければ 409 で読み直しを促す。',
+        parameters: [{ name: 'account_id', in: 'query', required: false, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['friendKind', 'ids'],
+                properties: {
+                  accountId: { type: 'string', description: '対象のLINEアカウント（query の account_id でも可）' },
+                  friendKind: { type: 'string', enum: ['first_time', 'returning'] },
+                  ids: { type: 'array', items: { type: 'string' }, maxItems: 500, description: '受け皿以外の全設定の新しい順' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated' },
+          '400': { description: 'account_id / friendKind / ids missing or invalid' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not in visible scope' },
+          '409': { description: 'ORDER_CHANGED: list changed elsewhere; reload and retry' },
+        },
+      },
+    },
     '/api/mileage/rules': {
       get: {
         tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',

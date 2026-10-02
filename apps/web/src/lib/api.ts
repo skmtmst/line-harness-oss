@@ -11103,6 +11103,15 @@ export const api = {
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}?account_id=${encodeURIComponent(accountId)}`,
         { method: 'DELETE' },
       ),
+    /**
+     * 一覧のつまみで動かした順を優先順位としてまとめて書く（★V8 MRhef）。
+     * 受け皿を除く全件を順に渡す。件数が違えば 409（読み直し）。
+     */
+    reorder: (accountId: string, friendKind: FriendAddRuleKind, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/friend-add-rules/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ accountId, friendKind, ids }),
+      }),
   },
   nenCampaigns: {
     /** 期間は日数か、★V6 37-6 の「今月・先月」のための from/to（ISO 8601）。 */
