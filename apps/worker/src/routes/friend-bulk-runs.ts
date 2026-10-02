@@ -14,6 +14,8 @@ import {
   startFriendBulkRun,
 } from '../services/friend-bulk-runs.js';
 
+import { approveBulkMessage, getBulkMessageApproval } from '../services/friend-bulk-message-approval.js';
+
 export const friendBulkRuns = new Hono<Env>();
 
 function errorResponse(c: Context<Env>, error: unknown) {
@@ -80,7 +82,7 @@ friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), asy
         executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
       }));
     }
-    return c.json({ success: true, data: result.run }, result.created ? 202 : 200);
+    return c.json({ success: true, data: { ...result.run, approval: await getBulkMessageApproval(c.env.DB, result.run.id) } }, result.created ? 202 : 200);
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -100,7 +102,7 @@ friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin'), 
       },
     );
     if (!detail) return c.json({ success: false, error: '一括操作が見つかりません' }, 404);
-    return c.json({ success: true, data: detail });
+    return c.json({ success: true, data: { ...detail, approval: await getBulkMessageApproval(c.env.DB, detail.id) } });
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -133,6 +135,19 @@ friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'adm
     );
     if (result.created) keepRunning(c, processFriendBulkRun(c.env.DB, result.run.id));
     return c.json({ success: true, data: result.run }, result.created ? 202 : 200);
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+friendBulkRuns.post('/api/friends/bulk-runs/:id/approve', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await parseJsonBody<{ confirmedRecipientCount?: unknown }>(c);
+    const approval = await approveBulkMessage(c.env.DB, c.get('staff')!, c.req.param('id'), body.confirmedRecipientCount);
+    keepRunning(c, processFriendBulkRun(c.env.DB, c.req.param('id'), {
+      executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+    }));
+    return c.json({ success: true, data: { approval } }, 202);
   } catch (error) {
     return errorResponse(c, error);
   }

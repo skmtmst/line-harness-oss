@@ -623,6 +623,37 @@ const spec = {
         responses: { '200': { description: 'Saved settings with sync result' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
       },
     },
+    '/api/nen/rank-settings/{id}': {
+      delete: {
+        tags: ['NEN Members'], summary: 'ランクを削除し、会員を移し先へ変更する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'expectedVersion'],
+          properties: { accountId: { type: 'string' }, replacementRankId: { type: 'string', nullable: true }, expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+        responses: { '200': { description: '移し替え件数、操作ID、ECの成功・失敗・同期待ち件数と会員別の理由。未設定ならECへ送らずpending' },
+          '400': { description: '入力不備' }, '403': { description: 'オーナーまたは管理者権限が必要' },
+          '404': { description: 'ランクが見つからない' }, '409': { description: '版の競合または削除不可' } },
+      },
+    },
+    '/api/nen/rank-settings/member-sync/{operationId}': {
+      get: {
+        tags: ['NEN Members'], summary: '保存した会員別EC送信の結果と失敗理由を取得する',
+        parameters: [{ name: 'operationId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'afterId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: '操作全体の件数、会員別の結果（100人まで）、次のページのnextCursor' },
+          '403': { description: 'オーナーまたは管理者権限が必要' }, '404': { description: '記録が見つからない' } },
+      },
+    },
+    '/api/nen/rank-settings/member-sync/{operationId}/retry': {
+      post: {
+        tags: ['NEN Members'], summary: '未成功の会員を最初の版・担当者・鍵でECへ送り直す（1回100人まで）',
+        parameters: [{ name: 'operationId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId'],
+          properties: { accountId: { type: 'string' } } } } } },
+        responses: { '200': { description: '成功・失敗・同期待ちの件数と理由。成功済みは再送しない。送信停止中はpending' },
+          '403': { description: 'オーナーまたは管理者権限が必要' }, '404': { description: '記録が見つからない' } },
+      },
+    },
     '/api/nen/rank-settings/resync': {
       post: {
         tags: ['NEN Members'], summary: 'ランク設定をECへ送り直す',
@@ -1256,6 +1287,23 @@ const spec = {
     },
     '/api/friends/count': {
       get: { tags: ['Friends'], summary: '友だち数取得', responses: { '200': { description: 'Count' } } },
+    },
+    '/api/friends/bulk-runs/{id}/approve': {
+      post: {
+        tags: ['Friends'],
+        summary: '人数基準を超えた一括送信の実行承認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { confirmedRecipientCount: { anyOf: [{ type: 'integer' }, { type: 'string' }], description: '1人運用の人数確認（整数または空でない数値文字列。対象人数と一致する場合のみ）' } } } } } },
+        responses: {
+          '202': { description: '承認を受け付けた（approval を返す。送信の完了は実行の取得で確認）' },
+          '400': { description: '指定を読み取れません' },
+          '403': { description: '承認する権限がありません' },
+          '404': { description: '一括操作が見つかりません' },
+          '409': { description: '承認待ちなし・期限切れ・人数不一致・本人の承認' },
+          '413': { description: '一括操作の指定が大きすぎます' },
+          '500': { description: '一括操作を処理できませんでした' },
+        },
+      },
     },
     '/api/friends/{id}': {
       get: {

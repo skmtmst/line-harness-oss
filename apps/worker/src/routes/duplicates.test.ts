@@ -43,6 +43,7 @@ describe('GET /api/duplicates/stats (#496-14)', () => {
       per_account: [],
       pairwise_overlap: [],
       computed_at: new Date().toISOString(),
+      overlapping_delivery_count: null,
     });
   });
 
@@ -60,6 +61,7 @@ describe('GET /api/duplicates/stats (#496-14)', () => {
     const res = await setupApp('staff').request('/api/duplicates/stats');
 
     expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: { totalFollowing: 0, uniquePeople: 0, friendDups: 0, duplicateGroups: 0, overlappingDeliveryCount: null } });
     expect(mocks.computeStats).toHaveBeenCalledWith({}, { forceRefresh: false, accountIds: ['account-a'] });
   });
 
