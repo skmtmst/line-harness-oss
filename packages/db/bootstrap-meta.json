@@ -491,6 +491,7 @@
     "541_tag_update_idempotency.sql",
     "542_line_account_login_liff_unique.sql",
     "543_auto_reply_create_idempotency.sql",
+    "544_line_account_tags.sql",
     "545_restaurant_channels.sql",
     "546_restaurant_menu_approval.sql",
     "548_friend_bulk_message_approval.sql"

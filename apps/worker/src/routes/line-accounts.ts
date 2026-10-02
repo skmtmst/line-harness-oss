@@ -4,6 +4,7 @@ import {
   getLineAccountsByIds,
   getLineAccountScopeEntries,
   getLineAccountListStats,
+  getLineAccountTagsByAccountIds,
   getLineAccountById,
   getLineAccountCredentialHealth,
   createLineAccount,
@@ -201,11 +202,13 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       visibleScope.allowedAccountIds,
       c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
     );
+    const tagsByAccount = await getLineAccountTagsByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
     const statsByAccount = await getLineAccountListStats(db, items.map((item) => item.id));
     const serializeWithStats = (item: DbLineAccount) => {
       const overview = statsByAccount[item.id];
       return {
         ...serializeLineAccount(item),
+        tags: tagsByAccount[item.id] ?? [],
         stats: {
           friendCount: overview?.friendCount ?? 0,
           activeScenarios: overview?.activeScenarios ?? 0,

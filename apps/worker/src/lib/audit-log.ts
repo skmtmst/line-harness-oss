@@ -16,6 +16,10 @@ import type { Env } from '../index.js';
  */
 
 export type AuditAction =
+  | 'line_account_tag.create'
+  | 'line_account_tag.update'
+  | 'line_account_tag.delete'
+  | 'line_account_tag.replace'
   | 'line_account.deactivate'
   | 'line_account.activate'
   | 'line_account.pool_switch'
