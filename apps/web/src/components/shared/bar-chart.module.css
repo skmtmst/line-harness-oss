@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .chart {
   display: flex;
@@ -23,7 +24,7 @@
 .swatch {
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: var(--radius-mini);
 }
 
 .swatchAdded {
@@ -112,7 +113,7 @@
   width: 100%;
   max-width: 14px;
   min-width: 2px;
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--radius-mini) var(--radius-mini) 0 0;
 }
 
 .addedBar {
@@ -151,7 +152,7 @@
 }
 
 .tooltipTitle {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* 横軸の日付は1つおき。短い語なので折らない。 */
@@ -194,7 +195,7 @@
 .emptyTitle {
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .emptyDetail {

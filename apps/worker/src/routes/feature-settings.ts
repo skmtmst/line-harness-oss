@@ -19,10 +19,10 @@ import {
   type FeatureId,
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { accountFeatureAvailabilityMap } from '../services/feature-enforcement.js';
+import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
 
 /**
  * 機能のオン／オフ。
@@ -962,7 +962,7 @@ featureSettings.get('/api/settings/features/visibility', async (c) => {
       data: await loadFeatureVisibility(
         c.env.DB,
         accountId,
-        restaurantTestEnabled(c.env),
+        await restaurantEffectivelyEnabledForTenant(c),
       ),
     });
   } catch (err) {
@@ -988,12 +988,13 @@ featureSettings.get('/api/settings/features', requireRole('owner', 'admin'), asy
         code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
       }, 403);
     }
+    const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
     // 親子モード・専用カタログは設定束と独立して読めるため並列で投げる(#633)。
     const [state, parentChildRaw, specializedRaw] = await Promise.all([
       loadFeatureSettings(
         c.env.DB,
         accountId,
-        restaurantTestEnabled(c.env),
+        restaurantEnabled,
       ),
       getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
       getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
@@ -1068,7 +1069,7 @@ featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admi
       }, 400);
     }
 
-    const restaurantEnabled = restaurantTestEnabled(c.env);
+    const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
     const current = await loadFeatureSettings(c.env.DB, accountId, restaurantEnabled);
     if (body.expectedVersion !== undefined && Number(body.expectedVersion) !== current.version) {
       return c.json({
@@ -1129,6 +1130,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
+    const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
 
     const body = await c.req.json<{
       features?: Record<string, unknown>;
@@ -1238,7 +1240,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       const current = await loadFeatureSettings(
         c.env.DB,
         accountId,
-        restaurantTestEnabled(c.env),
+        restaurantEnabled,
       );
       return c.json({
         success: false,
@@ -1266,7 +1268,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
      * あるのに、有効な確認トークンが無ければ保存しない。直接PUTでの
      * 迂回もここで止める。影響が無ければ通常保存する。
      */
-    const restaurantEnabledForImpact = restaurantTestEnabled(c.env);
+    const restaurantEnabledForImpact = restaurantEnabled;
     let presentedToken: string | null = null;
     /** 監査へ残す影響確認の結果。確認が要らない変更は要らなかったと記録する。 */
     let impactAudit: { offCount: number; blocking: boolean; confirmed: boolean } | null = null;
@@ -1325,7 +1327,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       const current = await loadFeatureSettings(
         c.env.DB,
         accountId,
-        restaurantTestEnabled(c.env),
+        restaurantEnabled,
       );
       if (Number(body.expectedVersion) !== current.version) {
         return c.json({
@@ -1335,7 +1337,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         }, 409);
       }
       const incomingFeatures = { ...(body.features ?? {}) } as Record<string, boolean>;
-      if (!restaurantTestEnabled(c.env) && 'restaurant_test' in incomingFeatures) {
+      if (!restaurantEnabled && 'restaurant_test' in incomingFeatures) {
         incomingFeatures.restaurant_test = false;
       }
       const nextVersion = current.version + 1;
@@ -1479,7 +1481,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         const reread = await loadFeatureSettings(
           c.env.DB,
           accountId,
-          restaurantTestEnabled(c.env),
+          restaurantEnabled,
         );
         return c.json({
           success: false,

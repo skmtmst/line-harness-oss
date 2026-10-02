@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * ラジオカード（監査 DEEP-02／共通仕様「入力欄と選択カード」§2）。
@@ -20,7 +21,7 @@
   padding: 0;
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .items {
@@ -110,8 +111,8 @@
 .title {
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
-  line-height: 1.4;
+  font-weight: 600;
+  line-height: var(--text-lh, 1.4);
 }
 
 .note,
@@ -120,5 +121,37 @@
   font-size: var(--text-caption);
   font-weight: 400;
   line-height: 1.5;
+}
+
+/*
+ * ★V8「選ぶカード」：余白 14・選ぶと枠 1.5px の濃い緑＋地 accent-soft。
+ * 形と動き（120ms ease-out）は v7 のまま。
+ */
+[data-theme='v8'] .card {
+  padding: 14px;
+}
+
+[data-theme='v8'] .checked,
+[data-theme='v8'] .checked:hover {
+  border-width: 1.5px;
+  border-color: var(--color-accent-deep);
+}
+
+/* ★V8「枠線の色」：未選択の ○ の輪郭は control-border。
+   選択中の緑・無効の灰・誤りの赤はそれぞれの色を保つ。 */
+[data-theme='v8'] .radio {
+  border-color: var(--color-control-border);
+}
+
+[data-theme='v8'] .radio:checked {
+  border-color: var(--color-accent-deep);
+}
+
+[data-theme='v8'] .disabled .radio {
+  border-color: var(--color-ink-disabled);
+}
+
+[data-theme='v8'] .invalid .radio {
+  border-color: var(--color-status-danger);
 }
 }

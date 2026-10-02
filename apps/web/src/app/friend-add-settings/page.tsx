@@ -19,7 +19,9 @@ import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/com
 import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/lib/api'
 import { api } from '@/lib/api'
 import FriendAddRuleEditor from './friend-add-rule-editor'
+import { describeFriendAddFailure } from './friend-add-failure'
 import { useCursorStack } from './use-cursor-stack'
+import { formatNumber } from '@/lib/format'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -27,7 +29,7 @@ const KIND_LABELS: Record<FriendAddRuleKind, string> = {
 }
 
 function countText(value: number | null, unit: string) {
-  return value === null ? '—' : `${value.toLocaleString()}${unit}`
+  return value === null ? '—' : `${formatNumber(value)}${unit}`
 }
 
 function successRate(delivered: number | null, failed: number | null) {
@@ -85,6 +87,8 @@ function FriendAddSettingsList() {
   const [data, setData] = useState<FriendAddRuleListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // M006: 403 は共通部品の forbidden で出す。HTTP の状態をそのまま渡す。
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [deleting, setDeleting] = useState<FriendAddRule | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -107,6 +111,7 @@ function FriendAddSettingsList() {
     }
     setLoading(true)
     setError('')
+    setErrorStatus(null)
     try {
       // 検索とフォルダ絞りはサーバ側へ送る。取得済みページ内だけに効かせると
       // 21件目以降が検索に出ない。
@@ -119,13 +124,17 @@ function FriendAddSettingsList() {
       if (requestId !== requestSequence.current) return
       if (!response.success) {
         setError(response.error)
+        setErrorStatus(null)
         setData(null)
         return
       }
       setData(response.data)
-    } catch {
+    } catch (caught) {
       if (requestId !== requestSequence.current) return
-      setError('友だち追加時の配信を読み込めませんでした。')
+      // M006: 権限・対象なし・重複を「通信を確認して」にまとめない。
+      const failure = describeFriendAddFailure(caught, '友だち追加時の配信', 'load')
+      setError(failure.message)
+      setErrorStatus(failure.status)
       setData(null)
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
@@ -189,8 +198,9 @@ function FriendAddSettingsList() {
       setFolderName('')
       setFolderDialogOpen(false)
       await load()
-    } catch {
-      setError('フォルダを追加できませんでした。通信を確認して、もう一度お試しください。')
+    } catch (caught) {
+      // M006: 重複（409）は名前の変更、403 は権限の確認を案内する。
+      setError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
     } finally {
       setFolderBusy(false)
     }
@@ -217,8 +227,9 @@ function FriendAddSettingsList() {
       }
       closeDelete()
       await load()
-    } catch {
-      setDeleteError('削除できませんでした。通信を確認して、もう一度お試しください。')
+    } catch (caught) {
+      // M006: 権限・対象なしを「通信を確認して」にまとめない。
+      setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message)
     } finally {
       setDeleteBusy(false)
     }
@@ -228,7 +239,7 @@ function FriendAddSettingsList() {
   if (!selectedAccountId) {
     return <ListState kind="empty" title="LINE公式アカウントを選んでください" description={accounts.length ? '上のバーで対象を選ぶと設定を表示します。' : '先にLINE公式アカウントを登録してください。'} />
   }
-  if (error) return <ListState kind="error" title="友だち追加時の配信を表示できませんでした" description={error} onRetry={() => void load()} />
+  if (error) return <ListState kind={errorStatus === 403 ? 'forbidden' : 'error'} title="友だち追加時の配信を表示できませんでした" description={error} onRetry={() => void load()} />
 
   return (
     <div data-design-node="uLQQc" className="flex min-w-0 flex-col gap-4 text-ink">
@@ -417,7 +428,7 @@ function FriendAddSettingsList() {
         }}
         onConfirm={folderName.trim() ? () => void createFolder() : undefined}
       >
-        <label className="grid gap-2 text-sm font-bold">
+        <label className="grid gap-2 text-sm font-medium">
           フォルダ名
           <input
             autoFocus

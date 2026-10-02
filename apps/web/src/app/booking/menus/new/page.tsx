@@ -18,7 +18,11 @@ import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { canEditFeature } from '@/lib/staff-capability'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { bookingMenuError } from '../menu-validation'
+import { formatNumber } from '@/lib/format'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
@@ -53,6 +57,14 @@ export default function NewBookingMenuPage() {
    * 取得が終わるまで作成できない（DEEP-17: 候補の無いIDを送らないため）。
    */
   const [staffLoadState, setStaffLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** R536: 担当候補の取得失敗。そのまま捨てず、再試行と権限案内に使う。 */
+  const [staffError, setStaffError] = useState<unknown>(null)
+  /**
+   * R535: この作成試行の一意キー。サーバーで保存された直後に応答だけを
+   * 失っても、同じキーでの再送は作り直さず作成済みIDを返す。アカウント
+   * 切替・入力の破棄では新しい試行になるので新しいキーに替える。
+   */
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
   const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
   const [bookingMileage, setBookingMileage] = useState<number | null>(null)
   /**
@@ -80,10 +92,28 @@ export default function NewBookingMenuPage() {
 
   // 担当一覧と店舗設定は別々に取る。片方の失敗・遅延でもう片方を巻き込まない
   // （担当が読めているのに設定待ちで作れない、という止まり方をしない）。
+  // R536: 担当候補だけを取り直す再試行。入力は state に残るので、
+  // 通信復旧後に同じ画面から続けられる。初回取得は下の効果のまま。
+  async function reloadStaff(accountId: string) {
+    setStaffLoadState('loading')
+    setStaffError(null)
+    try {
+      const staffResult = await bookingApi.listStaff(accountId)
+      setStaff(staffResult.staff)
+      setStaffLoadState('ready')
+    } catch (e) {
+      // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
+      setStaff([])
+      setStaffError(e)
+      setStaffLoadState('error')
+    }
+  }
+
   useEffect(() => {
     setStaff([])
     setStoreSettings(null)
     setStaffLoadState('loading')
+    setStaffError(null)
     if (!selectedAccountId) return
     let alive = true
     bookingApi.listStaff(selectedAccountId)
@@ -92,10 +122,11 @@ export default function NewBookingMenuPage() {
         setStaff(staffResult.staff)
         setStaffLoadState('ready')
       })
-      .catch(() => {
+      .catch((e) => {
         // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
         if (alive) {
           setStaff([])
+          setStaffError(e)
           setStaffLoadState('error')
         }
       })
@@ -148,6 +179,9 @@ export default function NewBookingMenuPage() {
     // ものではなくなるので一緒に閉じる。
     setAssigned(new Set())
     setCreatedMenuNeedingStaff(null)
+    // R535: アカウントが変わったら別の作成試行。古いキーを使い回すと、
+    // 別アカウントの再送が前の応答に結び付くので新しいキーに替える。
+    setIdempotencyKey(crypto.randomUUID())
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -211,7 +245,21 @@ export default function NewBookingMenuPage() {
     ? 'お問い合わせ'
     : priceMode === 'free'
       ? '無料'
-      : `¥${Number(basePrice).toLocaleString()}`
+      : `¥${formatNumber(Number(basePrice))}`
+
+  /*
+   * 作成途中の離脱確認。名前・時間・料金・担当・タグのどれかに手を付けて
+   * いたら、キャンセルや左メニューで確認窓を出す。タグの検索欄は絞り込み
+   * のため数えない。作成が終わると一覧へ router.push するので、成功後に
+   * 警告は出ない。
+   */
+  const dirty = Boolean(
+    name || categoryLabel || description || durationMinutes !== '60' ||
+    bufferAfterMinutes !== '0' || basePrice || concurrentCapacity !== '1' ||
+    windowDays || cutoffHours || cancelDeadlineHours || intakeQuestion ||
+    !isActive || assigned.size > 0 || autoTagId
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   if (!canEditMenus) {
     return (
@@ -226,6 +274,7 @@ export default function NewBookingMenuPage() {
   }
 
   return (
+    <>
     <CreatePage
       designNode="GhOb3"
       title="予約メニューをつくる"
@@ -236,7 +285,7 @@ export default function NewBookingMenuPage() {
           ? '担当の設定をやり直す'
           : isActive
             ? 'つくって出す'
-            : '下書きに保存'
+            : '下書きを保存する'
       }
       showHeader={false}
       variant="v6"
@@ -255,7 +304,7 @@ export default function NewBookingMenuPage() {
           return '担当スタッフを読み込んでいます。読み込みが終わってから作成してください'
         }
         if (staffLoadState === 'error') {
-          return '担当スタッフを読み込めませんでした。開き直してから作成してください'
+          return '担当スタッフを読み込めませんでした。下の「担当をもう一度読み込む」で読み込んでから作成してください'
         }
         const validationError = bookingMenuError({
           name,
@@ -285,6 +334,9 @@ export default function NewBookingMenuPage() {
         setAutoTagId(null)
         setTagQuery('')
         setCreatedMenuNeedingStaff(null)
+        // R535: 入力を捨てて作り直すときは別の作成試行。古いキーを使い回すと、
+        // 前に作ったメニューの応答が返って新しいメニューが作られない。
+        setIdempotencyKey(crypto.randomUUID())
       }}
       onSave={async () => {
         // DEEP-16: メニューが作成済みなら createMenu は二度と呼ばない。
@@ -310,7 +362,8 @@ export default function NewBookingMenuPage() {
             intake_question: intakeQuestion.trim() || null,
             is_active: isActive ? 1 : 0,
             auto_tag_id: autoTagId,
-            })
+            // R535: 同じ試行の再送は同じキー。応答消失後の再操作で作り直さない。
+            }, idempotencyKey)
           } catch (e) {
             // 選んだ後にタグが消えた場合は Worker が tag_not_found で落とす。
             // 入力は残る(CreatePage が失敗時に初期化しない)ので選び直せる。
@@ -598,9 +651,28 @@ export default function NewBookingMenuPage() {
             担当を読み込んでいます…
           </p>
         ) : staffLoadState === 'error' ? (
-          <p className="text-ink-faint text-sm">
-            担当を読み込めませんでした。開き直してください。
-          </p>
+          <div className="space-y-2">
+            {/*
+             * R536: 403は権限不足で、押しても直らない再試行は出さない。
+             * それ以外は入力を保ったまま同じ画面から取り直せる。
+             * DEEP-17（#1043更新）: 取得失敗は「未登録」と混ぜず、入力保持と
+             * 取り直しの口を出す。空（0人）は下の別の言葉で登録へ誘導する。
+             */}
+            <p className="text-ink-faint text-sm">
+              {classifyApiFailure(staffError) === 'forbidden'
+                ? '担当スタッフを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                : '担当を読み込めませんでした。入力はそのまま残っています。'}
+            </p>
+            {classifyApiFailure(staffError) !== 'forbidden' && selectedAccountId && (
+              <Button
+                variant="secondary"
+                size="compact"
+                onClick={() => void reloadStaff(selectedAccountId)}
+              >
+                担当をもう一度読み込む
+              </Button>
+            )}
+          </div>
         ) : staff.length === 0 ? (
           <p className="text-ink-faint text-sm">
             まだスタッフが登録されていません。先に予約設定の「担当スタッフ」から登録してください。
@@ -612,7 +684,7 @@ export default function NewBookingMenuPage() {
                 <Checkbox
                   checked={assigned.has(s.id)}
                   onCheckedChange={() => toggle(s.id)}
-                  className="border-hairline hover:bg-canvas-sunken rounded-md border p-2.5"
+                  className="border-hairline hover:bg-canvas-sunken rounded-mini border p-2.5"
                 >
                   <span className="text-ink text-sm">{s.display_name || s.name}</span>
                   {s.role && <span className="text-ink-faint text-xs">{s.role}</span>}
@@ -649,7 +721,7 @@ export default function NewBookingMenuPage() {
            * ルールではない。R306: 未設定と取得失敗は別の言葉で出す。
            */}
           <ActionSummary
-            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${bookingMileage.toLocaleString()} 付ける`}
+            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${formatNumber(bookingMileage)} 付ける`}
             detail={
               mileageLoadState === 'loading'
                 ? 'マイル設定を読み込んでいます…'
@@ -666,7 +738,7 @@ export default function NewBookingMenuPage() {
                   ? '未取得'
                   : bookingMileage === null
                     ? '未設定'
-                    : `予約で ${bookingMileage.toLocaleString()}`
+                    : `予約で ${formatNumber(bookingMileage)}`
             }
             href="/mileage?tab=earning-rules"
           />
@@ -733,6 +805,8 @@ export default function NewBookingMenuPage() {
         </Checkbox>
       </FormSection>
     </CreatePage>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したメニュー" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </>
   )
 }
 

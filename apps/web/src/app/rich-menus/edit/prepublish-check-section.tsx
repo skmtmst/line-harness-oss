@@ -158,16 +158,13 @@ export function PrepublishCheckSection({ groupId }: { groupId: string }) {
             ))}
           </ul>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" onClick={() => void validateWithLine()} disabled={validating}>
-              {validating ? '確認中…' : 'LINEの検査を通す'}
+            <Button type="button" onClick={() => void validateWithLine()} disabled={validating} busy={validating} busyLabel="確認中…">LINEの検査を通す
             </Button>
             <Button
               type="button"
               variant="primary"
               onClick={() => void recordSeen()}
-              disabled={recording}
-            >
-              {recording ? '記録中…' : '実機で見た'}
+              disabled={recording} busy={recording} busyLabel="記録中…">実機で見た
             </Button>
           </div>
           {actionError ? <p role="alert" className="text-danger mt-2 text-xs">{actionError}</p> : null}

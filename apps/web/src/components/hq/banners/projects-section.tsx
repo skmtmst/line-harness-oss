@@ -4,10 +4,12 @@ import { Archive, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import ListRange from '@/components/ui/list-range'
 import { api, ApiError } from '@/lib/api'
 import type { BannerImage, BannerProject, BannerUsage } from '@/lib/hq-banners'
 import LimitState from './limit-state'
@@ -100,7 +102,13 @@ export default function ProjectsSection({
       onChanged()
       router.push(`/hq/banners/project?id=${encodeURIComponent(res.data.id)}`)
     } catch (caught) {
-      setFormError(caught instanceof Error && caught.message ? caught.message : 'プロジェクトを作れませんでした')
+      /*
+       * M022：原文のまま出さず、共通の状態別案内へ渡す。
+       * 送り直しは開いたままの窓からできる（再試行の言葉つき）。
+       */
+      setFormError(japaneseDetailOf(caught) || describeApiFailure(caught, 'プロジェクトの作成', {
+        forbidden: 'この操作はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+      }))
     } finally {
       setFormBusy(false)
     }
@@ -119,6 +127,12 @@ export default function ProjectsSection({
       setBusyId(null)
     }
   }
+
+  /** R605: 検索0件の空状態から、検索語と絞り込みを外す。 */
+  const clearConditions = useCallback(() => {
+    setQuery('')
+    setFilter('all')
+  }, [])
 
   useEffect(() => {
     headerActions(
@@ -180,13 +194,17 @@ export default function ProjectsSection({
             />
           </label>
           <span className="flex-1" />
+          {/*
+            R605: 件数は結果の件数だけを共通の ListRange で出す。
+            手書きの「N件中 1〜0件」を出さない（0件のとき ListRange は「0件」）。
+          */}
           {status === 'ready' ? (
-            <span className="text-micro text-ink-faint">
-              {archivedMode ? 'アーカイブ ' : ''}
-              {visible.length === projects.length
-                ? `${projects.length}件`
-                : `${projects.length}件中 1〜${visible.length}件を表示`}
-            </span>
+            <ListRange
+              label={archivedMode ? 'アーカイブ' : undefined}
+              total={visible.length}
+              first={visible.length === 0 ? 0 : 1}
+              last={visible.length}
+            />
           ) : null}
         </div>
         <div className="border-t border-hairline" />
@@ -224,7 +242,17 @@ export default function ProjectsSection({
               />
             )
           ) : visible.length === 0 ? (
-            <ListState kind="empty" />
+            <>
+              {/*
+                R605: 検索・絞り込みの結果が0件。件数「0件」と一致する
+                絞り込み0件の文言にし、条件を外す口を付ける（作る口は出さない）。
+              */}
+              <ListState
+                kind="empty"
+                emptyPreset="filtered"
+                action={<Button onClick={clearConditions}>条件を外す</Button>}
+              />
+            </>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {visible.map((project) => (

@@ -55,10 +55,10 @@ const bind = vi.fn((..._values: unknown[]) => ({
 const prepare = vi.fn((_sql: string) => ({ bind }));
 const env = { DB: { prepare } as unknown as D1Database };
 
-function makeApp() {
+function makeApp(role: 'owner' | 'staff' = 'owner') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role: 'owner', readOnly: false });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
     return next();
   });
   app.route('/', accountHandovers);
@@ -450,5 +450,43 @@ describe('見える範囲', () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe('見るだけの担当者の変更拒否（R522）', () => {
+  // 口側の境目 requireRole('owner', 'admin') を役割×操作の表で固定する。
+  // 画面の出し分け（canManageRole）と同じ表。直しを戻すと赤くなる。
+  it.each([
+    ['発行', 'POST', '/api/account-handovers', { fromAccountId: 'acc-from' }],
+    ['連結', 'POST', '/api/account-handovers/link', { code: 'ABCD-EFGH-JKMN', toAccountId: 'acc-to' }],
+    ['事前確認', 'POST', '/api/account-handovers/ho-1/preview', {
+      sourceFriendTotal: 2,
+      counts: { auto: 1, review: 1, unmatched: 0, lookalike: 0 },
+    }],
+    ['判断の保存', 'PUT', '/api/account-handovers/ho-1/decisions', { decisions: [] }],
+    ['本実行', 'POST', '/api/account-handovers/ho-1/execute', {}],
+    ['取り消し', 'POST', '/api/account-handovers/ho-1/cancel', {}],
+    ['切り戻し', 'POST', '/api/account-handovers/ho-1/rollback', {}],
+  ])('%sはstaffに403を返す', async (_label, method, path, body) => {
+    const res = await makeApp('staff').fetch(
+      new Request(`https://example.com${path}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it.each([
+    ['詳細の読み取り', '/api/account-handovers/ho-1'],
+    ['一覧の読み取り', '/api/line-accounts/acc-from/handovers'],
+  ])('%sはstaffにも許す', async (_label, path) => {
+    const res = await makeApp('staff').fetch(
+      new Request(`https://example.com${path}`),
+      env,
+    );
+    expect(res.status).not.toBe(403);
   });
 });

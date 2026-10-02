@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .button {
   display: inline-flex;
@@ -23,12 +24,12 @@
 }
 
 /*
- * 押したら少し沈む（★V7 修正方針 §4・ボタン板「押した」）。0.96 は better-ui の値。
+ * 押したら少し沈む（★V7 仕上げ §2「押した」: 0.98倍・motion-instant 80ms）。
  * 動きを減らす設定では大きさを変えない（色の変化だけ残る）。
  */
 @media (prefers-reduced-motion: no-preference) {
   .button:active:not(:disabled) {
-    scale: 0.96;
+    scale: 0.98;
   }
 }
 
@@ -129,5 +130,45 @@
 
 .danger:hover:not(:disabled) {
   filter: brightness(0.92);
+}
+
+/*
+ * ★V7 仕上げ §2「保存中」の回る印。文字の切り替えと幅の固定は
+ * 部品側（button.tsx）が持つ——DOM に出す文字は今のラベル1つだけで、
+ * 平常時の幅を min-width に留めてぶれを防ぐ。
+ * 減らす設定では globals.css が動きを止める。
+ */
+.spin {
+  flex: none;
+  animation: button-spin var(--motion-slow) linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+ * ★V8「ボタン」（doYdE・u101P・LrB2L）。
+ * 高さ36・余白 0 14・文字13px。主は緑の影＋内側の照り、副は白地に
+ * 細い枠と薄い影。compact（行内の操作）はV8に別寸法が無いので32のまま。
+ */
+[data-theme='v8'] .button {
+  padding: 0 14px;
+  font-size: var(--text-label);
+}
+
+[data-theme='v8'] .standard,
+[data-theme='v8'] .field {
+  height: 36px;
+}
+
+[data-theme='v8'] .primary {
+  box-shadow: var(--shadow-primary-action);
+}
+
+[data-theme='v8'] .secondary {
+  box-shadow: var(--shadow-board);
 }
 }

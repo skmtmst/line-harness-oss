@@ -55,7 +55,7 @@ describe('NEN配信の表示', () => {
   })
 
   it('UTCの予定時刻を日本時間へ変換し、壊れた日時を生表示しない', () => {
-    expect(formatNenJobDateTime('2026-08-25T11:00:00.000Z')).toBe('2026/08/25 20:00')
+    expect(formatNenJobDateTime('2026-08-25T11:00:00.000Z')).toBe('8月25日（火）20:00')
     expect(formatNenJobDateTime('broken')).toBe('日時を確認できません')
   })
 })

@@ -1,0 +1,212 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * LINE プレビューの枠（Pencil ★V8 `cfVyj`）。
+ *
+ * V7 はトーク背景色のパネルだけ。V8 は白い板の中に置かれるので、
+ * 板の決まり（細い枠・radius-panel・board の薄い影）にそろえる。
+ * 吹き出し・カードなど中身の改修は各画面側で別途行う。
+ */
+
+.frame {
+  display: block;
+}
+}
+
+/*
+ * TSX 側の Tailwind クラス（rounded-card）が utilities 層にいるので、
+ * V8 の上書きは層なしに置いて勝たせる（globals の骨格と同じやり方）。
+ * テーマ切り替えの一瞬に v7 の枠が見える間だけ効く（描き分けは部品側）。
+ */
+[data-theme='v8'] .frame {
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-board);
+}
+
+/* ------------------------------------------------------------------
+ * ★V8（夕15・cfVyj / specs/line-preview-real-phone.md）：本物のスマホ。
+ * LINE アプリの画面なのでテーマトークンではなく globals.css の
+ * `[data-theme="v8"]` に置いた `--v8-line-*` を読む（直値は globals に
+ * だけ書き、ここでは var() で読む）。v7 では部品がこの枠を描かない。
+ * ------------------------------------------------------------------ */
+
+.phoneRoot {
+  width: 330px;
+  max-width: none;
+  margin-inline: auto;
+}
+
+/* 題「LINEプレビュー」はスマホの外の上。? は題の横。 */
+.phoneTitle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--text-lh, 1.4);
+  color: var(--color-ink);
+}
+
+/* 器 330×690・黒・縁 2px・内側 10・角丸 52・下への影。 */
+.phone {
+  display: flex;
+  flex-direction: column;
+  width: 330px;
+  height: 690px;
+  padding: 10px;
+  border-radius: var(--v8-line-shell-radius);
+  background: var(--v8-line-shell);
+  outline: 2px solid var(--v8-line-shell-edge);
+  outline-offset: -1px;
+  box-shadow: var(--v8-line-shell-shadow);
+}
+
+/* 画面：LINE のトークの青い地・角丸 42・中身は画面の中に収める。 */
+.screen {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--v8-line-screen-radius);
+  background: var(--v8-line-screen);
+}
+
+/* 上の帯 44：時刻・黒い島・電波/Wi-Fi/電池。 */
+.statusBar {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  height: 44px;
+  padding: 14px 26px 0 30px;
+  background: var(--v8-line-chrome);
+}
+
+.clock {
+  font-family: var(--font-inter);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--v8-line-ink);
+}
+
+.island {
+  position: absolute;
+  top: 8px;
+  left: 97px;
+  width: 96px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--v8-line-ink);
+}
+
+.statusIcons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--v8-line-ink);
+}
+
+/* トークの頭 44：戻る・名・検索・電話・メニュー。 */
+.talkHead {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--v8-line-hairline);
+  background: var(--v8-line-chrome);
+  color: var(--v8-line-name);
+}
+
+.talkName {
+  flex: 1 1 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 21px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* トーク：中身はここだけが縦に送れる（スマホの大きさは変えない）。 */
+.talk {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+/* 日付の札。届く日時など caption はこの位置に出す。 */
+.dateChip {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  margin: 0;
+}
+
+.dateChip > span {
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--v8-line-datechip);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  color: var(--v8-line-chrome);
+  white-space: nowrap;
+}
+
+/* 空のとき：トークの真ん中に薄い文。 */
+.emptyNote {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 12px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--v8-line-empty);
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+/* メニューの帯 30。 */
+.menuBar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 30px;
+  border-top: 1px solid var(--v8-line-hairline);
+  background: var(--v8-line-chrome);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 17px;
+  color: var(--v8-line-menu);
+}
+
+/* ホームの線：帯 14・線 120×5。 */
+.homeBar {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  height: 14px;
+  background: var(--v8-line-chrome);
+}
+
+.homeLine {
+  width: 120px;
+  height: 5px;
+  border-radius: var(--v8-line-homebar-radius);
+  background: var(--v8-line-homebar);
+}

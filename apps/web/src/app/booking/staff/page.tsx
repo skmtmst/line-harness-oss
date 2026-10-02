@@ -12,6 +12,7 @@ import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
+import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -39,6 +40,8 @@ export default function BookingStaffPage() {
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [removeTarget, setRemoveTarget] = useState<BookingStaff | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [removeError, setRemoveError] = useState('')
@@ -57,6 +60,7 @@ export default function BookingStaffPage() {
       return
     }
     setLoadStatus('loading')
+    setLoadError(null)
     // アカウント切替時の stale state 防止（cross-account 表示/操作の事故防止）。
     setItems([])
     try {
@@ -64,9 +68,10 @@ export default function BookingStaffPage() {
       if (requestId !== loadRequestRef.current) return
       setItems(r.staff)
       setLoadStatus('ready')
-    } catch {
+    } catch (caught) {
       if (requestId !== loadRequestRef.current) return
       setItems([])
+      setLoadError(caught)
       setLoadStatus('error')
     }
   }, [selectedAccountId])
@@ -149,8 +154,12 @@ export default function BookingStaffPage() {
         <ListState
           kind="error"
           title="予約スタッフを表示できませんでした"
-          description="登録したスタッフは消えていません。再読み込みしても直らない場合はエラー報告へ。"
-          action={<Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は画面の文のまま。R539: 429は待ち直せば直るので再試行の口を
+          // 残す。403だけが押しても直らないので再試行の口を出さない。
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '登録したスタッフは消えていません。再読み込みしても直らない場合はエラー報告へ。'}
+          error={loadError ?? undefined}
+          action={isForbidden(loadError) ? undefined : <Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
         />
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline">
@@ -182,10 +191,10 @@ export default function BookingStaffPage() {
                           <img
                             src={s.profile_image_url}
                             alt={s.display_name}
-                            className="w-9 h-9 rounded-full object-cover"
+                            className="w-9 h-9 rounded-pill object-cover"
                           />
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-ink-faint text-xs">
+                          <div className="w-9 h-9 rounded-pill bg-shell-gray flex items-center justify-center text-ink-faint text-xs">
                             {s.display_name.slice(0, 1)}
                           </div>
                         )}
@@ -200,17 +209,17 @@ export default function BookingStaffPage() {
                     <Td className="text-ink-secondary">{s.role ?? '-'}</Td>
                     <Td align="center">
                       {s.is_designation_optional ? (
-                        <span className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs">指名なし</span>
+                        <span className="inline-block px-2 py-0.5 rounded-mini bg-chip-alt-soft text-chip-alt text-xs">指名なし</span>
                       ) : (
-                        <span className="text-xs text-gray-300">-</span>
+                        <span className="text-xs text-ink-disabled">-</span>
                       )}
                     </Td>
                     <Td align="right" className="tabular-nums text-ink-faint">{s.sort_order}</Td>
                     <Td align="center">
                       {s.is_active ? (
-                        <span className="inline-block px-2 py-0.5 rounded bg-success-bg text-success text-xs">ON</span>
+                        <span className="inline-block px-2 py-0.5 rounded-mini bg-success-bg text-success text-xs">ON</span>
                       ) : (
-                        <span className="inline-block px-2 py-0.5 rounded bg-canvas-sunken text-ink-faint text-xs">OFF</span>
+                        <span className="inline-block px-2 py-0.5 rounded-mini bg-canvas-sunken text-ink-faint text-xs">OFF</span>
                       )}
                     </Td>
                     <ActionCell>
@@ -326,8 +335,8 @@ function Modal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-canvas rounded-card shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
           <h2 id="booking-staff-modal-title" className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -341,7 +350,7 @@ function Modal({
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.name}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="例: yamada-taro"
             />
           </Field>
@@ -351,7 +360,7 @@ function Modal({
               value={form.display_name ?? ''}
               onChange={(e) => set('display_name', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.displayName}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="顧客に表示される名前"
             />
           </Field>
@@ -361,7 +370,7 @@ function Modal({
               value={form.role ?? ''}
               onChange={(e) => set('role', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.role}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="例: トップスタイリスト"
             />
           </Field>
@@ -379,7 +388,7 @@ function Modal({
               value={form.bio ?? ''}
               onChange={(e) => set('bio', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.bio}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-y"
               rows={2}
             />
           </Field>
@@ -391,7 +400,7 @@ function Modal({
               min={BOOKING_STAFF_LIMITS.sortOrderMin}
               max={BOOKING_STAFF_LIMITS.sortOrderMax}
               step={1}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent tabular-nums"
             />
           </Field>
           <Checkbox
@@ -417,22 +426,18 @@ function Modal({
               紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。
             </span>
           </Field>
-          {err && <p className="text-xs text-red-600">{err}</p>}
+          {err && <p className="text-xs text-danger">{err}</p>}
         </div>
         <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
+            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-shell-gray rounded-control"
           >
             キャンセル
           </button>
-          <button
-            onClick={submit}
-            disabled={saving}
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
-          >
-            {saving ? '保存中…' : '保存'}
-          </button>
+          <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={submit} disabled={saving}>
+            {saving ? '保存中…' : '保存する'}
+          </Button>
         </div>
       </div>
     </div>
@@ -444,7 +449,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="block text-xs font-medium text-ink-secondary mb-1">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="text-status-danger ml-0.5">*</span>}
       </span>
       {children}
     </label>

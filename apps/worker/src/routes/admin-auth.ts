@@ -22,6 +22,7 @@ import { recordAuditEvent, recordLoginAudit } from '@line-crm/db';
 import {
   activatePlatformAdminIfAwaitingTotp,
   claimStaffTotpStep,
+  claimTotpPendingSecret,
   clearStepUpAttempts,
   createStepUpGrant,
   deleteAdminSession,
@@ -268,10 +269,19 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     // LINE ユーザーだけを通す。契約先の権限者や、契約者専用 LINE の友だちでは入れない。
     // platform_admins が空の間だけ、既定の統括のオーナーを互換で通す（初期登録のため）。
     if (next === 'ops') {
-      const admin = await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff));
-      // 2要素認証待ちの人は通す（画面が設定へ案内する）。招待中のままの人はメールのリンクから
-      const pending = admin ? null : await getPlatformAdminRecord(c.env.DB, staff.id);
-      if (!admin && !(pending?.is_active === 1 && pending.activation_state === 'awaiting_totp')) {
+      /*
+       * 自分自身の招待が保留中なら、互換判定で入れる立場（既定の統括のオーナー）
+       * でも止める。メールのリンクから登録を完了させる（auth-email.ts と同じ）。
+       * 他人の招待が保留中なだけの場合は互換判定を残す（誰も入れなくなるのを防ぐ）。
+       */
+      const pending = await getPlatformAdminRecord(c.env.DB, staff.id);
+      const invited = pending?.is_active === 1 && pending.activation_state === 'invited';
+      // 2要素認証待ちの人は通す（画面が設定へ案内する）。
+      const awaitingTotp = pending?.is_active === 1 && pending.activation_state === 'awaiting_totp';
+      if (invited) {
+        return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+      }
+      if (!awaitingTotp && !(await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff)))) {
         return c.redirect(adminLoginUrl(c, 'not_authorized', next));
       }
     }
@@ -415,10 +425,12 @@ adminAuth.post('/api/auth/two-factor/setup', async (c) => {
     return c.json({ success: false, error: '二段階認証はすでに設定されています' }, 409);
   }
 
-  const secret = generateTotpSecret();
-  await updateStaffMember(c.env.DB, staff.id, {
-    totp_pending_secret_enc: await encryptTotpSecret(secret, masterKey),
-  });
+  /*
+   * R509: 同じ合言葉への同時取得でも画面のQRと保存がずれないよう冪等にする。
+   * 期限内は既発行の仮秘密を使い回す。競合で先に置かれた場合も、
+   * 条件付き更新に負けた側は置かれた値を読み直して同じQRを返す。
+   */
+  const secret = await setupPendingTotpSecret(c.env.DB, staff.id, staff.totp_pending_secret_enc, masterKey);
   return c.json({
     success: true,
     data: {
@@ -427,6 +439,37 @@ adminAuth.post('/api/auth/two-factor/setup', async (c) => {
     },
   });
 });
+
+/** R509: 置ける仮秘密を1つに決める。既発行があればそれを、無ければ条件付きで置く。 */
+async function setupPendingTotpSecret(
+  db: Env['Bindings']['DB'],
+  staffId: string,
+  existingEnc: string | null | undefined,
+  masterKey: string,
+): Promise<string> {
+  const existing = await readPendingTotpSecret(existingEnc, masterKey);
+  if (existing) return existing;
+  const secret = generateTotpSecret();
+  const enc = await encryptTotpSecret(secret, masterKey);
+  if (await claimTotpPendingSecret(db, staffId, enc)) return secret;
+  const reread = await getStaffById(db, staffId);
+  const winner = await readPendingTotpSecret(reread?.totp_pending_secret_enc, masterKey);
+  if (winner) return winner;
+  await updateStaffMember(db, staffId, { totp_pending_secret_enc: enc });
+  return secret;
+}
+
+async function readPendingTotpSecret(
+  enc: string | null | undefined,
+  masterKey: string,
+): Promise<string | null> {
+  if (!enc) return null;
+  try {
+    return await decryptTotpSecret(enc, masterKey);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/auth/two-factor/setup/confirm — 初回設定の確認。

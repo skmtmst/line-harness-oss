@@ -12,9 +12,12 @@ import CreatePage, {
 } from '@/components/shared/create-page'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 /* R309: メニュー候補の料金は一覧・割当表と同じ共通表示にする。 */
 import { menuPriceLabel } from '../../lib/menu-price'
 import Select from '@/components/shared/select'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -55,35 +58,76 @@ export default function NewBookingStaffPage() {
     setCreatedStaffId(null)
   }, [selectedAccountId])
 
+  /*
+   * R578: 担当メニューの取得失敗と本当の0件を言い分ける。
+   * 失敗しても入力済みのスタッフ情報は state に残る。再取得だけ送り直す。
+   */
+  const [menusLoading, setMenusLoading] = useState(true)
+  const [menusError, setMenusError] = useState<unknown>(null)
+  const [menusReloadKey, setMenusReloadKey] = useState(0)
+
   useEffect(() => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setMenusLoading(false)
+      return
+    }
     let alive = true
+    setMenusLoading(true)
+    setMenusError(null)
     bookingApi
       .listMenus(selectedAccountId)
       .then((r) => {
-        if (alive) setMenus(r.menus)
+        if (alive) {
+          setMenus(r.menus)
+          setMenusError(null)
+          setMenusLoading(false)
+        }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         // メニューが引けなくても、スタッフの登録自体はできる。
+        // 失敗を空と混ぜない。「まだ無い」とは出さず再取得の口を出す。
+        if (alive) {
+          setMenusError(error)
+          setMenusLoading(false)
+        }
       })
     return () => {
       alive = false
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, menusReloadKey])
+
+  /*
+   * 追加発見: ログインユーザー一覧の取得失敗と「誰もいない」を言い分ける。
+   * 失敗しても入力済みの内容は state に残る。再取得だけ送り直す。
+   */
+  const [membersLoading, setMembersLoading] = useState(true)
+  const [membersError, setMembersError] = useState<unknown>(null)
+  const [membersReloadKey, setMembersReloadKey] = useState(0)
 
   useEffect(() => {
     let alive = true
+    setMembersLoading(true)
+    setMembersError(null)
     api.staff.list()
       .then((res) => {
-        if (alive && res.success) setMembers(res.data.filter((m) => m.isActive))
+        if (alive) {
+          if (res.success) setMembers(res.data.filter((m) => m.isActive))
+          setMembersError(null)
+          setMembersLoading(false)
+        }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         // ログインユーザー一覧が引けなくても登録自体はできる。
+        // 失敗を「紐づけない」と混ぜない。再取得の口を出す。
+        if (alive) {
+          setMembersError(error)
+          setMembersLoading(false)
+        }
       })
     return () => {
       alive = false
     }
-  }, [])
+  }, [membersReloadKey])
 
   function toggle(id: string) {
     setOffered((cur) => {
@@ -97,6 +141,17 @@ export default function NewBookingStaffPage() {
   // N-411: 予約スタッフ登録は 'booking.settings' の実効permission必須。
   const [canManageStaff] = useState(() =>
     typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+
+  /*
+   * 登録途中の離脱確認。名前・表示名・肩書き・写真・紹介文・メニュー割当・
+   * 受付設定のどれかに手を付けていたら、キャンセルや左メニューで確認窓を出す。
+   * 登録が終わると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || displayName || role || imageUrl || bio || staffMemberId ||
+    isDesignationOptional || !isActive || offered.size > 0
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   const shownName = displayName.trim() || name.trim() || 'スタッフ'
   const staffInput = () => ({
@@ -123,12 +178,13 @@ export default function NewBookingStaffPage() {
   }
 
   return (
+    <>
     <CreatePage
       title="予約スタッフを登録する"
       description="お客様が予約するときに指名できる担当者を登録します。"
       showHeader={false}
       parent={['予約設定', '/booking/menus?tab=staff']}
-      saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを登録'}
+      saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
       variant="v6"
       statusLabel={
         createdStaffId
@@ -186,7 +242,7 @@ export default function NewBookingStaffPage() {
           <AsideCard title="予約画面での見え方" note="お客様のLINEでの表示です。">
             <div className="border-hairline rounded-card border p-3">
               <div className="flex items-center gap-2">
-                <span className="bg-canvas-sunken h-9 w-9 shrink-0 rounded-full" />
+                <span className="bg-canvas-sunken h-9 w-9 shrink-0 rounded-pill" />
                 <div className="min-w-0">
                   <p className="text-ink truncate text-sm font-medium">{shownName}</p>
                   {role && <p className="text-ink-faint truncate text-xs">{role}</p>}
@@ -298,7 +354,19 @@ export default function NewBookingStaffPage() {
         label="予約を受けられるメニュー"
         note="チェックしたメニューだけ、このスタッフを指名できます。"
       >
-        {menus.length === 0 ? (
+        {menusLoading ? (
+          <ListState kind="loading" title="メニューを読み込んでいます" />
+        ) : menusError !== null ? (
+          <ListState
+            kind="error"
+            title="メニューを読み込めませんでした"
+            // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+            // それ以外は画面の文のまま。入力は残っているので再取得だけ案内する。
+            description={isForbiddenOrRateLimited(menusError) ? undefined : '通信の不具合などでメニュー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
+            error={menusError}
+            onRetry={() => setMenusReloadKey((value) => value + 1)}
+          />
+        ) : menus.length === 0 ? (
           <p className="text-ink-faint text-sm">
             まだメニューがありません。先に予約設定の「メニュー」から登録してください。
           </p>
@@ -309,7 +377,7 @@ export default function NewBookingStaffPage() {
                 <Checkbox
                   checked={offered.has(m.id)}
                   onCheckedChange={() => toggle(m.id)}
-                  className="border-hairline hover:bg-canvas-sunken w-full rounded-md border p-2.5"
+                  className="border-hairline hover:bg-canvas-sunken w-full rounded-mini border p-2.5"
                 ><span className="flex w-full items-center gap-2"><span className="text-ink text-sm">{m.name}</span>
                   <span className="text-ink-faint ml-auto text-xs tabular-nums">
                     {m.duration_minutes}分 / {menuPriceLabel(m)}
@@ -322,7 +390,7 @@ export default function NewBookingStaffPage() {
       </FormSection>
 
       <FormSection step={3} label="受付と表示">
-        <div className="border-hairline rounded-md border p-3">
+        <div className="border-hairline rounded-mini border p-3">
           <p className="text-ink text-sm">店舗の営業時間に合わせる</p>
           <p className="text-ink-faint mt-0.5 text-xs">
             個別に設定したい場合は、登録後に受付時間の画面で調整できます。
@@ -353,19 +421,35 @@ export default function NewBookingStaffPage() {
           htmlFor="bs-member"
           note="紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。"
         >
-          <Select
-            aria-label="ログインユーザーとの紐づけ"
-            id="bs-member"
-            size="full"
-            value={staffMemberId}
-            onChange={setStaffMemberId}
-            options={[
-              { value: '', label: '紐づけない' },
-              ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
-            ]}
-          />
+          {membersLoading ? (
+            <ListState kind="loading" title="ログインユーザーを読み込んでいます" />
+          ) : membersError !== null ? (
+            <ListState
+              kind="error"
+              title="ログインユーザーを読み込めませんでした"
+              // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+              // それ以外は画面の文のまま。入力は残っているので再取得だけ案内する。
+              description={isForbiddenOrRateLimited(membersError) ? undefined : '通信の不具合などでログインユーザー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
+              error={membersError}
+              onRetry={() => setMembersReloadKey((value) => value + 1)}
+            />
+          ) : (
+            <Select
+              aria-label="ログインユーザーとの紐づけ"
+              id="bs-member"
+              size="full"
+              value={staffMemberId}
+              onChange={setStaffMemberId}
+              options={[
+                { value: '', label: '紐づけない' },
+                ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
+              ]}
+            />
+          )}
         </Field>
       </FormSection>
     </CreatePage>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </>
   )
 }

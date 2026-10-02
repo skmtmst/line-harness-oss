@@ -263,15 +263,112 @@ export async function createFriendField(
   return (await getFriendFieldById(db, id))!;
 }
 
+export class FriendFieldCreateError extends Error {
+  constructor(public readonly code: 'idempotency_conflict', message: string) {
+    super(message);
+    this.name = 'FriendFieldCreateError';
+  }
+}
+
+/**
+ * R515: 同じ要求キーの再送で二重に作らないための指紋。
+ *
+ * 名前・差し込み名・種類・所属・選択肢・既定値・各種の印が
+ * 1つでも違えば別の要求とみなし、作らず止める。
+ */
+function friendFieldCreateFingerprint(input: CreateFriendFieldInput): string {
+  return JSON.stringify({
+    name: input.name,
+    fieldKey: input.fieldKey,
+    type: input.type,
+    folderId: input.folderId ?? null,
+    optionsJson: input.optionsJson ?? null,
+    defaultValue: input.defaultValue ?? null,
+    source: input.source ?? 'manual',
+    ecFieldPath: input.ecFieldPath ?? null,
+    ecIsMaster: input.ecIsMaster === true,
+    isPersonal: input.isPersonal === true,
+    isStarred: input.isStarred === true,
+    displayOrder: input.displayOrder ?? 0,
+  });
+}
+
+export interface FriendFieldCreateResult {
+  field: ScopedFriendField;
+  /** 同じ要求キーの再送で、保存済みの項目を返した。 */
+  replayed: boolean;
+}
+
+/**
+ * R515: 要求キー付きで友だち情報欄を作る。
+ *
+ * 応答だけ失った再試行は、同じキー・同じ内容なら保存済みの項目を
+ * 返す（作り直さない）。同じキーに異なる内容が来たら作らず止める。
+ * 要求キーの行は本体と同じD1バッチで確定するため、同時に同じキーが
+ * 送られても1件だけ残る（負けた側のバッチは巻き戻る）。
+ * 対応マークの createSupportMarkIdempotent と同じ約束。
+ */
+export async function createFriendFieldIdempotent(
+  db: D1Database,
+  scope: FriendFieldScope,
+  input: CreateFriendFieldInput,
+  idempotencyKey: string,
+): Promise<FriendFieldCreateResult> {
+  const fingerprint = friendFieldCreateFingerprint(input);
+  const findRequest = () => db.prepare(
+    `SELECT field_id, request_fingerprint
+       FROM friend_field_create_requests
+      WHERE line_account_id = ? AND idempotency_key = ?`,
+  ).bind(scope.lineAccountId, idempotencyKey).first<{
+    field_id: string;
+    request_fingerprint: string;
+  }>();
+  const previous = await findRequest();
+  if (previous) {
+    if (previous.request_fingerprint !== fingerprint) {
+      throw new FriendFieldCreateError(
+        'idempotency_conflict',
+        '同じ要求キーに異なる内容が指定されました。一覧を確認してください',
+      );
+    }
+    const field = await getFriendFieldByIdForScope(db, previous.field_id, scope);
+    if (field) return { field, replayed: true };
+    // 保存済みのはずの項目が無い。古い予約を消して作り直す。
+    await db.prepare(
+      `DELETE FROM friend_field_create_requests
+        WHERE line_account_id = ? AND idempotency_key = ?`,
+    ).bind(scope.lineAccountId, idempotencyKey).run();
+  }
+  const fieldId = crypto.randomUUID();
+  try {
+    const field = await createFriendFieldForScope(db, scope, input, fieldId, {
+      key: idempotencyKey,
+      fingerprint,
+    });
+    return { field, replayed: false };
+  } catch (err) {
+    // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
+    // 勝者がいなければ元の失敗をそのまま返す（握りつぶさない）。
+    const raced = await findRequest().catch(() => null);
+    if (raced?.request_fingerprint === fingerprint) {
+      const field = await getFriendFieldByIdForScope(db, raced.field_id, scope).catch(() => null);
+      if (field) return { field, replayed: true };
+    }
+    throw err;
+  }
+}
+
 /** 新規項目と所属を同じD1バッチで作る。 */
 export async function createFriendFieldForScope(
   db: D1Database,
   scope: FriendFieldScope,
   input: CreateFriendFieldInput,
+  fieldId: string = crypto.randomUUID(),
+  idempotency?: { key: string; fingerprint: string },
 ): Promise<ScopedFriendField> {
-  const id = crypto.randomUUID();
+  const id = fieldId;
   const now = jstNow();
-  await db.batch([
+  const statements: D1PreparedStatement[] = [
     db
       .prepare(
         `INSERT INTO friend_fields
@@ -305,7 +402,27 @@ export async function createFriendFieldForScope(
          VALUES (?, ?, ?, ?)`,
       )
       .bind(id, scope.tenantId, scope.lineAccountId, now),
-  ]);
+  ];
+  if (idempotency) {
+    // R515: 要求キーの行も同じバッチで確定する。本体より後に積むため、
+    // 外部キーのある環境でも制約に当たらない。同じキーの同時実行は
+    // UNIQUE 制約で負けた側だけ巻き戻り、二重に残らない。
+    statements.push(db.prepare(
+      `INSERT INTO friend_field_create_requests
+         (id, line_account_id, idempotency_key, request_fingerprint,
+          field_id, response_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      scope.lineAccountId,
+      idempotency.key,
+      idempotency.fingerprint,
+      id,
+      JSON.stringify({ fieldId: id }),
+      now,
+    ));
+  }
+  await db.batch(statements);
   return (await getFriendFieldByIdForScope(db, id, scope))!;
 }
 
@@ -871,6 +988,40 @@ export async function setFriendFieldValuesBulk(
                            updated_at = excluded.updated_at`,
           )
           .bind(entry.friendId, input.fieldId, entry.value, input.updatedBy, input.now),
+  );
+  await db.batch(statements);
+  return statements.length;
+}
+
+/**
+ * M046: 1人の複数項目を1回のD1 batchで書く。
+ *
+ * 値は呼び出し側で validate済みの正規化ずみを渡すこと。batchは原子的で、
+ * 途中の1文が失敗したら永続変更は0件になる。空配列は呼ばないこと。
+ */
+export async function setFriendFieldValuesForFriend(
+  db: D1Database,
+  input: {
+    friendId: string;
+    entries: Array<{ fieldId: string; value: string | null }>;
+    updatedBy: string;
+    now: string;
+  },
+): Promise<number> {
+  const statements = input.entries.map((entry) =>
+    entry.value === null || entry.value === ''
+      ? db
+          .prepare('DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?')
+          .bind(input.friendId, entry.fieldId)
+      : db
+          .prepare(
+            `INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(friend_id, field_id)
+             DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by,
+                           updated_at = excluded.updated_at`,
+          )
+          .bind(input.friendId, entry.fieldId, entry.value, input.updatedBy, input.now),
   );
   await db.batch(statements);
   return statements.length;

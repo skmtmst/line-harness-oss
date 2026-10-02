@@ -26,7 +26,9 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
 
@@ -157,34 +159,15 @@ function decideDescription(
 }
 
 function jpDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function jpTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatTime(iso)
 }
 
 function jpStamp(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function jstDate(iso: string): string {
@@ -333,6 +316,9 @@ function BookingDetailInner() {
   const [acting, setActing] = useState(false)
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
+  // R533: 捕まえた取得失敗そのもの。TargetMissingのerrorへ渡す
+  // （403は権限案内で再試行なし・429は待ち案内）。
+  const [loadError, setLoadError] = useState<unknown>(null)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [bookingMissing, setBookingMissing] = useState(false)
   /**
@@ -436,6 +422,7 @@ function BookingDetailInner() {
     }
     setLoading(true)
     setError('')
+    setLoadError(null)
     setBookingMissing(false)
     try {
       const res = await bookingApi.getBooking(accountId, bookingId)
@@ -451,6 +438,7 @@ function BookingDetailInner() {
       if (caught instanceof ApiError && caught.status === 404) {
         setBookingMissing(true)
       } else {
+        setLoadError(caught)
         setError('読み込みに失敗しました。もう一度読み込んでください。')
       }
       return null
@@ -874,12 +862,20 @@ function BookingDetailInner() {
     )
   }
 
+  /*
+   * R533: 403・429だけ共通文へ切り替える（権限・混雑の案内。再試行の
+   * 有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま
+   * （`isForbiddenOrRateLimited` の目安どおり。DEEP-18の画面固有見出しを保つ）。
+   */
+  const detailFailure = loadError ? loadFailureCopy(loadError, '予約') : null
+  const useCommonCopy = loadError ? isForbiddenOrRateLimited(loadError) : false
   if (!loading && error && !detail) {
     return (
       <TargetMissing
         kind="error"
-        title="予約を読み込めませんでした"
-        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        title={useCommonCopy && detailFailure ? detailFailure.title : '予約を読み込めませんでした'}
+        description={useCommonCopy && detailFailure ? detailFailure.description : '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+        error={loadError ?? undefined}
         onRetry={() => void load()}
       />
     )
@@ -925,7 +921,7 @@ function BookingDetailInner() {
               <Row label="担当">{detail.staffName}</Row>
               <Row label="料金">
                 <span className="tabular-nums">
-                  ¥{detail.price.toLocaleString()}（税込）
+                  ¥{formatNumber(detail.price)}（税込）
                 </span>
               </Row>
               <Row label="申込日時">{jpStamp(detail.requestedAt)}</Row>
@@ -978,7 +974,7 @@ function BookingDetailInner() {
                         ? '無料'
                         : snapshot.priceMode === 'inquiry'
                           ? 'お問い合わせ'
-                          : `¥${snapshot.basePrice.toLocaleString()}（税込）`}
+                          : `¥${formatNumber(snapshot.basePrice)}（税込）`}
                     </span>
                   </Row>
                 </section>
@@ -1063,16 +1059,14 @@ function BookingDetailInner() {
                     variant="primary"
                     type="button"
                     onClick={() => void saveEdit()}
-                    disabled={saving}
-                  >
-                    {saving ? '保存しています' : 'この内容で変更する'}
+                    disabled={saving} busy={saving} busyLabel="保存しています">この内容で変更する
                   </Button>
                   <Button
                     type="button"
                     onClick={() => { setEditing(false); setError('') }}
                     disabled={saving}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                 </div>
               </section>
@@ -1143,7 +1137,7 @@ function BookingDetailInner() {
               {detail.customer.mileageBalance !== null
               && detail.customer.mileageBalance !== undefined ? (
                 <Row label="マイル">
-                  <span className="tabular-nums">{detail.customer.mileageBalance.toLocaleString()}</span>
+                  <span className="tabular-nums">{formatNumber(detail.customer.mileageBalance)}</span>
                 </Row>
               ) : null}
               {detail.previousHandover?.trim() ? (
@@ -1383,7 +1377,7 @@ function BookingDetailInner() {
                 <p className="text-ink-faint mb-3 text-xs">お客様に届く内容</p>
                 <div className="bg-canvas-sunken rounded-card p-3">
                   <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-                  <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                  <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                     {approvedText({ menu_name: detail.menuName, staff_name: detail.staffName, starts_at: detail.startsAt })}
                   </p>
                 </div>

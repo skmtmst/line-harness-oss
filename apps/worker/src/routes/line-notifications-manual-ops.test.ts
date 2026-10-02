@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../index';
 import type { AuthenticatedStaff } from '../middleware/auth';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { tryReserveQuotaSlot } from '../services/broadcast-quota-guard.js';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
 const lineFetch = vi.hoisted(() => vi.fn());
@@ -283,6 +284,70 @@ describe('LINE通知の手動操作（再送・テスト・単体・枠）', () 
     expect(audit).toMatchObject({
       action: 'line_notification.definition.test', actor_id: 'owner-1',
       target_kind: 'customer_notification', target_id: 'definition-1',
+    });
+  });
+
+  it('m26e R566: 枠競合の再送は未送信のまま残さず、失敗理由を履歴に残す', async () => {
+    seedDefinition(testDb);
+    seedDelivery(testDb, 'delivery-quota-race', 'failed', { retryable: 1 });
+    // 照会時点は残り90通で通るが、予約の直前にほかの処理が90通を先取りする。
+    // 照会の見本は使用10/上限100。再送の1通が入らなくなる。
+    expect(await tryReserveQuotaSlot(testDb.db, 'account-1', 'other-job', 90, 10, 100)).toBe(true);
+    const response = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-quota-race/resend',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1, reason: '枠いっぱいの確認' }),
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false, code: 'quota_insufficient',
+    });
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    const rows = testDb.raw.prepare(`
+      SELECT execution_mode, status, error_code, error_message_safe FROM notification_deliveries
+       WHERE line_account_id = 'account-1' AND execution_mode = 'resend'
+    `).all() as Array<{
+      execution_mode: string; status: string; error_code: string | null;
+      error_message_safe: string | null;
+    }>;
+    // 未送信のまま（pending）は残らない。送らなかった理由が履歴に残る。
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ execution_mode: 'resend', status: 'failed', error_code: 'quota_insufficient' });
+    expect(String(rows[0]?.error_message_safe ?? '')).toContain('送信枠');
+  });
+
+  it('m26e R567: 枠競合の試し送りは空の成功記録を残さず、失敗理由を区別できる', async () => {
+    seedDefinition(testDb);
+    // 照会時点は残り90通で通るが、予約の直前にほかの処理が90通を先取りする。
+    expect(await tryReserveQuotaSlot(testDb.db, 'account-1', 'other-job', 90, 10, 100)).toBe(true);
+    const response = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions/definition-1/test',
+      json('POST', { lineAccountId: 'account-1', friendIds: ['friend-2'] }),
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false, code: 'quota_insufficient',
+    });
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    // 送達のない成功前提の記録は残らない。instance は失敗で確定する。
+    const instances = testDb.raw.prepare(`
+      SELECT status FROM notification_instances WHERE line_account_id = 'account-1'
+    `).all() as Array<{ status: string }>;
+    expect(instances).toHaveLength(1);
+    expect(instances[0]).toMatchObject({ status: 'failed' });
+    const deliveryCount = testDb.raw.prepare(`
+      SELECT COUNT(*) AS count FROM notification_deliveries WHERE line_account_id = 'account-1'
+    `).get() as { count: number };
+    expect(deliveryCount).toEqual({ count: 0 });
+    // 誰が何を試して送れなかったかが監査に残り、理由を区別できる。
+    const audit = testDb.raw.prepare(`
+      SELECT target_kind, target_id, detail_json FROM operation_audit
+       WHERE action = 'line_notification.definition.test'
+    `).get() as { target_kind: string; target_id: string; detail_json: string };
+    expect(audit).toMatchObject({ target_kind: 'customer_notification', target_id: 'definition-1' });
+    expect(JSON.parse(audit.detail_json)).toMatchObject({
+      sourceEventId: expect.any(String),
+      recipientIds: ['friend-2'],
+      outcome: 'quota_insufficient',
     });
   });
 

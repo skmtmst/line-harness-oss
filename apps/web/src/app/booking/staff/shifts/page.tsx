@@ -22,14 +22,16 @@ import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
-import { shortDate } from '../../lib/format-time'
+import { formatDay, formatRange } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -209,11 +211,11 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
                         同時受付数
                         <input aria-label={`${day.label} ${index + 1}件目の同時受付数`} type="number" min={1} max={1000} value={interval.capacity ?? 1} onChange={(event) => updateInterval(day.weekday, index, { capacity: Number(event.target.value) })} className="border-hairline rounded-control mt-1 block w-24 border bg-canvas px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
                       </label>
-                      <button type="button" className="text-danger mb-1.5 px-2 py-1 text-xs underline" onClick={() => updateDay(day.weekday, (current) => current.filter((_, currentIndex) => currentIndex !== index))}>この時間を削除</button>
+                      <button type="button" className="text-danger mb-1.5 px-2 py-1 text-xs underline" onClick={() => updateDay(day.weekday, (current) => current.filter((_, currentIndex) => currentIndex !== index))}>この時間を削除する</button>
                     </div>
                   ))}
                   {intervals.length < 8 ? (
-                    <button type="button" className="text-action text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加</button>
+                    <button type="button" className="text-action text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加する</button>
                   ) : null}
                 </div>
               )}
@@ -234,13 +236,13 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
         ) : null}
         {canEdit ? (
           <div className="mt-3 flex justify-end">
-            <Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? '保存中…' : '営業時間を保存'}</Button>
+            <Button variant="primary" onClick={() => void submit()} disabled={saving} busy={saving}>営業時間を保存する</Button>
           </div>
         ) : <p className="text-ink-faint mt-3 text-xs">閲覧のみです。変更には予約設定の権限が必要です。</p>}
       </div>
       </fieldset>
       {/* R161 監査：営業時間の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、営業時間への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="営業時間への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </section>
   )
 }
@@ -280,24 +282,43 @@ function StaffShiftsPageContent() {
 // 自分に紐づく予約スタッフを /staff/me で解決し、自分の勤務画面へ送る。
 // 紐づけが無い場合: 店舗の受付枠を見られる権限があれば従来どおり店舗ビュー、
 // なければ「紐づけ待ち」の案内を出す（真っ白な403画面にしない）。
+// R579: 2経路とも通信失敗したら「紐づけ無し」と断定しない。同画面での
+// 再試行の口を出し、復旧後は本人勤務へ進める。
 function OwnShiftEntry() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
-  const [resolved, setResolved] = useState<'loading' | 'store' | 'missing'>('loading')
+  const [resolved, setResolved] = useState<'loading' | 'store' | 'missing' | 'error'>('loading')
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       // 選択中アカウント優先。見つからなければ紐づく全件の先頭を使う。
+      // どちらか一方が成功すれば「取得できた」扱い。両方失敗のときだけ
+      // 通信失敗として、空（紐づけ無し）とは別の案内にする。
+      let firstError: unknown = null
       const scoped = selectedAccountId
-        ? await bookingApi.listMyStaff(selectedAccountId).catch(() => null)
+        ? await bookingApi.listMyStaff(selectedAccountId).catch((error: unknown) => {
+          firstError = error
+          return null
+        })
         : null
       const rows = scoped?.staff?.length
         ? scoped.staff
-        : (await bookingApi.listMyStaff().catch(() => null))?.staff ?? []
+        : await bookingApi.listMyStaff().catch((error: unknown) => {
+          // 選択中の取得が成功済み（空）なら、全体の失敗は通信失敗にしない。
+          if (!scoped) firstError = error
+          return null
+        }).then((res) => res?.staff ?? [])
       if (cancelled) return
       if (rows.length > 0) {
         router.replace(`/booking/staff/shifts?staff_id=${rows[0].id}`)
+        return
+      }
+      if (firstError !== null) {
+        setLoadError(firstError)
+        setResolved('error')
         return
       }
       const canSeeStore = canViewFeature('/booking/bookings')
@@ -306,9 +327,30 @@ function OwnShiftEntry() {
       setResolved(canSeeStore ? 'store' : 'missing')
     })()
     return () => { cancelled = true }
-  }, [router, selectedAccountId])
+  }, [router, selectedAccountId, attempt])
+
+  function retry() {
+    setLoadError(null)
+    setResolved('loading')
+    setAttempt((value) => value + 1)
+  }
 
   if (resolved === 'store') return <StoreShiftsView />
+  if (resolved === 'error') {
+    return (
+      <div className="space-y-4 pb-8">
+        <ListState
+          kind="error"
+          title="自分の勤務を読み込めませんでした"
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は画面の文のまま。紐づけが無いとは限らないので断定しない。
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の不具合などで担当者の情報を読み込めませんでした。紐づけが無いとは限りません。「もう一度読み込む」を押してください。'}
+          error={loadError ?? undefined}
+          onRetry={retry}
+        />
+      </div>
+    )
+  }
   if (resolved === 'missing') {
     return (
       <div className="space-y-4 pb-8">
@@ -454,12 +496,12 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       {canManage ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => void update()} disabled={saving || deleting}>{saving ? '保存中…' : '設備を保存'}</Button>
+          <Button variant="primary" onClick={() => void update()} disabled={saving || deleting} busy={saving}>設備を保存する</Button>
           <Button onClick={() => {
             if (resourceDirty) { setError(null); setConfirmStop(true); return }
             void setActive(!resource.isActive)
-          }} disabled={saving || deleting}>{saving ? '保存中…' : resource.isActive ? '受付を停止' : '受付を再開'}</Button>
-          {!resource.usage?.referenced ? <Button onClick={() => { setError(null); setConfirmDelete(true) }} disabled={saving || deleting}>設備を削除</Button> : null}
+          }} disabled={saving || deleting} busy={saving}>{resource.isActive ? '受付を停止' : '受付を再開'}</Button>
+          {!resource.usage?.referenced ? <Button onClick={() => { setError(null); setConfirmDelete(true) }} disabled={saving || deleting}>設備を削除する</Button> : null}
         </div>
       ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
       <ConfirmDialog
@@ -474,7 +516,7 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
         onConfirm={() => { setConfirmStop(false); void setActive(!resource.isActive) }}
       />
       {/* R161 監査：設備の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、設備への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="設備への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       {/*
        * R313: 削除は共通の確認窓を挟む。消さずに受付だけ止める道も添える。
        * 休業日の削除（#953 E-09）と同じ形。
@@ -484,7 +526,7 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
         title={`「${resource.name}」を削除しますか？`}
         description="削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。"
         confirmLabel="削除する"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         destructive
         busy={deleting}
         onCancel={() => { if (!deleting) setConfirmDelete(false) }}
@@ -553,9 +595,9 @@ function NewResourceEditor({ accountId, onCreated }: {
         </label>
       </div>
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
-      <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving}>{saving ? '追加中…' : '設備を追加'}</Button>
+      <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving} busy={saving} busyLabel="追加中…">設備を追加する</Button>
       {/* R161 監査：追加欄の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、入力した設備は保存されません。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した設備" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -666,7 +708,7 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
         ) : null}
       </div>
       <div className="mt-3 flex justify-end">
-        <Button onClick={() => void run()} disabled={!canRun}>{checking ? '確認中…' : 'この日時を確かめる'}</Button>
+        <Button onClick={() => void run()} disabled={!canRun} busy={checking} busyLabel="確認中…">この日時を確かめる</Button>
       </div>
       {checkError ? <p className="text-danger mt-3 text-sm" role="alert">{checkError}</p> : null}
       {result ? (
@@ -955,10 +997,10 @@ function StoreShiftsView() {
       </div>
 
       <div data-design="Tabs" className="border-hairline flex flex-wrap gap-1 border-b">
-        <Link href="/booking/menus" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">メニュー {settings?.menuCount ?? '—'}</Link>
-        <span className="border-accent text-ink rounded-t-md border-b-2 px-4 py-2 text-sm font-medium">受付枠</span>
-        <a href="#special" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">休業日</a>
-        <a href="#rules" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
+        <Link href="/booking/menus" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">メニュー {settings?.menuCount ?? '—'}</Link>
+        <span className="border-accent text-ink rounded-t-mini border-b-2 px-4 py-2 text-sm font-medium">受付枠</span>
+        <a href="#special" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">休業日</a>
+        <a href="#rules" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
       </div>
 
       <Notice data-design="Info" tone="info" message="何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出る日時の選び方がそのまま出ます。" />
@@ -1014,7 +1056,7 @@ function StoreShiftsView() {
                     <input aria-label="休業の理由" value={closedReason} onChange={(event) => setClosedReason(event.target.value)} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
                   </label>
                   {saveError ? <p className="text-danger text-xs sm:col-span-2">{saveError}</p> : <span className="sm:col-span-2" />}
-                  <Button variant="primary" onClick={() => void saveClosedDay()} disabled={savingClosed}>{savingClosed ? '保存中…' : '休業日を保存'}</Button>
+                  <Button variant="primary" onClick={() => void saveClosedDay()} disabled={savingClosed} busy={savingClosed}>休業日を保存する</Button>
                 </div>
               ) : null}
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -1041,13 +1083,13 @@ function StoreShiftsView() {
                           </label>
                           {exceptionError ? <p className="text-danger text-xs" role="alert">{exceptionError}</p> : null}
                           <div className="flex flex-wrap gap-2">
-                            <Button variant="primary" onClick={() => void saveExceptionEdit(item)} disabled={exceptionBusy}>{exceptionBusy ? '保存中…' : '休業日を保存'}</Button>
-                            <Button onClick={() => { setEditingExceptionId(null); setExceptionError(null) }} disabled={exceptionBusy}>やめる</Button>
+                            <Button variant="primary" onClick={() => void saveExceptionEdit(item)} disabled={exceptionBusy} busy={exceptionBusy}>休業日を保存する</Button>
+                            <Button onClick={() => { setEditingExceptionId(null); setExceptionError(null) }} disabled={exceptionBusy}>キャンセル</Button>
                           </div>
                         </div>
                       ) : (
                         <>
-                          <p className="text-ink font-semibold tabular-nums">{shortDate(from)}{from !== to ? `〜${shortDate(to)}` : ''}</p>
+                          <p className="text-ink font-semibold tabular-nums">{from !== to ? formatRange(from, to) : formatDay(from)}</p>
                           <p className="text-ink-secondary mt-1 text-sm">{item.reason || item.note || '休業日'}</p>
                           {canEditSettings ? (
                             <div className="mt-2 flex gap-3 text-xs">
@@ -1152,7 +1194,7 @@ function StoreShiftsView() {
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
         description="消すと、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
-        confirmLabel="休業日を消す"
+        confirmLabel="休業日を削除する"
         destructive
         busy={exceptionBusy}
         error={exceptionError ?? undefined}
@@ -1164,7 +1206,7 @@ function StoreShiftsView() {
         onConfirm={() => void removeException()}
       />
       {/* R161 監査：休業日の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、休業日への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="休業日への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

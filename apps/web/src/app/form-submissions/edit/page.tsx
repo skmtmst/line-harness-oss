@@ -46,7 +46,10 @@ import StickyBar from '@/components/shared/sticky-bar'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import { conflictMessage } from './form-conflict-message'
+import { formSavedContentMatches, type FormSavedContent } from './form-save-reconcile'
+import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ActionMenu from '@/components/shared/action-menu'
@@ -57,6 +60,7 @@ import {
   takenFormAnswerNames as takenAnswerNames,
   uniqueFormCopyName as uniqueCopyName,
 } from '@/components/forms/form-definition-operations'
+import { formatDateTime } from '@/lib/format'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
@@ -117,8 +121,8 @@ function FormEditInner() {
   const [notice, setNotice] = useState('')
   /** 本体が読めたかどうか。読めていないときの保存・入力の失敗と分ける。 */
   const [formLoaded, setFormLoaded] = useState(false)
-  /** 取得の失敗の内訳（保存・入力の失敗とは分ける）。 */
-  const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'error' | null>(null)
+  /** 取得の失敗の内訳（保存・入力の失敗とは分ける）。403は権限不足で再試行しない（M002）。 */
+  const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
   // 保存済み・読み直し直後の姿。タブ移動やタブを閉じる前の確認に使う。
@@ -272,6 +276,9 @@ function FormEditInner() {
       } catch (caught) {
         if (caught instanceof ApiError && caught.status === 404) {
           setFormLoadFailed('missing')
+        } else if (classifyApiFailure(caught) === 'forbidden') {
+          // M002：権限不足は通信障害ではない。再試行を出さず理由を示す。
+          setFormLoadFailed('forbidden')
         } else {
           setError('読み込みに失敗しました。もう一度読み込んでください。')
           setFormLoadFailed('error')
@@ -455,7 +462,7 @@ function FormEditInner() {
   const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
 
   /*
-   * 「保存せずに移動」を選んだとき、保存済み・読み直し直後の姿へ戻す。
+   * 「保存せずに移る」を選んだとき、保存済み・読み直し直後の姿へ戻す。
    *
    * `?tab=` だけ変わる移動や、移動先から同じ画面へ戻ったときに「消えます」と
    * 言ったはずの変更が残っていると困る。画面がアンマウントされない
@@ -578,19 +585,73 @@ function FormEditInner() {
     setSaving(true)
     setError('')
     setNotice('')
+    /*
+     * M003：送った中身。409のときに「自分の再送か」を確かめるために残す。
+     * 版・時刻は比べない（利用者の入力だけを比べる）。下の保存の送り値と
+     * 同じ決めごとにすること（isActive の扱いを含む）。
+     */
+    const sentContent: FormSavedContent = {
+      name: name.trim(),
+      description: description.trim() || null,
+      layout,
+      onSubmitTagId: onSubmitTagId || null,
+      // 未公開の下書きは publish API が成功するまで受付中にしない。
+      isActive: publishedVersionId ? isActive : false,
+      ogTitle: ogTitle.trim() || null,
+      ogDescription: ogDescription.trim() || null,
+      ogImageUrl: ogImageUrl.trim() || null,
+    }
+    /*
+     * M003：保存されている中身を読み直し、送った中身と同じなら
+     * 自分の再送（応答消失後の再送）とみなして版を返す。違えば null
+     * （ほかの人の編集）。読み直しに失敗しても null に倒す。
+     * サーバ側の要求キー永続化は migration 番号待ちのため、
+     * ここでは内容照合で区別する。
+     */
+    const confirmOwnSave = async (): Promise<number | null> => {
+      try {
+        const current = await api.forms.get(id, selectedAccountId)
+        if (!current.success) return null
+        const actual: FormSavedContent = {
+          name: current.data.name,
+          description: current.data.description,
+          layout: current.data.layout,
+          onSubmitTagId: current.data.onSubmitTagId,
+          isActive: current.data.isActive,
+          ogTitle: current.data.ogTitle,
+          ogDescription: current.data.ogDescription,
+          ogImageUrl: current.data.ogImageUrl,
+        }
+        return formSavedContentMatches(sentContent, actual) ? current.data.contentRevision : null
+      } catch {
+        return null
+      }
+    }
+    let reconciledOwnSave = false
     try {
-      const res = await api.forms.update(id, selectedAccountId, {
-        name: name.trim(),
-        description: description.trim() || null,
-        layout,
-        onSubmitTagId: onSubmitTagId || null,
-        // 未公開の下書きは publish API が成功するまで受付中にしない。
-        isActive: publishedVersionId ? isActive : false,
-        ogTitle: ogTitle.trim() || null,
-        ogDescription: ogDescription.trim() || null,
-        ogImageUrl: ogImageUrl.trim() || null,
-        expectedContentRevision: contentRevision,
-      })
+      let res: Awaited<ReturnType<typeof api.forms.update>>
+      try {
+        res = await api.forms.update(id, selectedAccountId, {
+          name: sentContent.name,
+          description: sentContent.description,
+          layout: sentContent.layout,
+          onSubmitTagId: sentContent.onSubmitTagId,
+          // 未公開の下書きは publish API が成功するまで受付中にしない。
+          isActive: publishedVersionId ? isActive : false,
+          ogTitle: sentContent.ogTitle,
+          ogDescription: sentContent.ogDescription,
+          ogImageUrl: sentContent.ogImageUrl,
+          expectedContentRevision: contentRevision,
+        })
+      } catch (updateError) {
+        // M003：409でも送った中身と同じものが保存されていたら、応答消失後の
+        // 自分の再送であり、ほかの人ではない。保存済みとして下の通常処理へ。
+        if (!(updateError instanceof ApiError) || updateError.status !== 409) throw updateError
+        const ownRevision = await confirmOwnSave()
+        if (ownRevision === null) throw updateError
+        reconciledOwnSave = true
+        res = { success: true, data: { id, contentRevision: ownRevision, updatedAt: '' } }
+      }
       if (!res.success) {
         setError(res.error)
         return false
@@ -616,6 +677,18 @@ function FormEditInner() {
             name, description, isActive: true, onSubmitTagId,
             ogTitle, ogDescription, ogImageUrl, layout,
           })
+      } else if (reconciledOwnSave) {
+        // 再送で保存済みだったときは、送った姿を基準にする（前後の空白の差を残さない）。
+        savedSnapshot.current = JSON.stringify({
+            name: sentContent.name,
+            description: sentContent.description ?? '',
+            isActive: sentContent.isActive,
+            onSubmitTagId: sentContent.onSubmitTagId ?? '',
+            ogTitle: sentContent.ogTitle ?? '',
+            ogDescription: sentContent.ogDescription ?? '',
+            ogImageUrl: sentContent.ogImageUrl ?? '',
+            layout: sentContent.layout,
+          })
       } else {
         savedSnapshot.current = currentSnapshot
       }
@@ -636,7 +709,10 @@ function FormEditInner() {
         setError(conflictMessage(updatedAt))
         return false
       }
-      setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      // M001：保存の失敗理由は共通部品に任せる。内部文・英語文をそのまま出さない。
+      setError(describeApiFailure(e, '保存', {
+        forbidden: 'このLINEアカウントや権限では保存できません。選んでいるアカウントと権限を確認してください。',
+      }))
       return false
     } finally {
       setSaving(false)
@@ -712,6 +788,22 @@ function FormEditInner() {
           setLoading(true)
           setReloadKey((k) => k + 1)
         }}
+      />
+    )
+  }
+  /*
+   * M002：権限不足は通信障害ではない。再試行ボタンは出さず、
+   * アカウントの選び直しと管理者への確認を案内する。
+   */
+  if (!loading && formLoadFailed === 'forbidden' && !formLoaded) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このフォームを開く権限がありません"
+        description="選んでいるアカウントでは開けません。アカウントを選び直すか、管理者に権限を確認してください。"
+        accountName={selectedAccount?.name}
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
       />
     )
   }
@@ -817,17 +909,14 @@ function FormEditInner() {
                     onFocus={(e) => e.currentTarget.select()}
                     className={`${inputClass} text-xs`}
                   />
-                  <button
-                    onClick={() => {
+                  <Button variant="secondary" className="text-ink-secondary shrink-0 px-2 py-2 text-xs whitespace-nowrap h-auto" onClick={() => {
                       void navigator.clipboard
                         .writeText(answerUrl)
                         .then(() => setNotice('URLをコピーしました'))
                         .catch(() => window.prompt('コピーしてください:', answerUrl))
-                    }}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-2 py-2 text-xs whitespace-nowrap"
-                  >
+                    }}>
                     コピー
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <p className="text-ink-faint rounded-control border-hairline border px-3 py-2 text-sm">
@@ -861,9 +950,7 @@ function FormEditInner() {
               <Button
                 onClick={() => void startTest()}
                 disabled={testBusy || !answerUrl}
-                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'}
-              >
-                {testBusy ? '用意しています...' : 'テスト回答を始める'}
+                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'} busy={testBusy} busyLabel="用意しています...">テスト回答を始める
               </Button>
             </div>
             {testError && <p role="alert" className="text-danger mt-2 text-xs">{testError}</p>}
@@ -888,7 +975,7 @@ function FormEditInner() {
                   </Button>
                 </div>
                 <p className="text-ink-faint mt-1 text-xs">
-                  {testExpiresAt ? `このURLは${new Date(testExpiresAt).toLocaleString('ja-JP', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで使えます。` : ''}
+                  {testExpiresAt ? `このURLは${formatDateTime(testExpiresAt)}まで使えます。` : ''}
                   試しは友だち登録済みのLINEで開いてください。
                 </p>
               </div>
@@ -898,7 +985,7 @@ function FormEditInner() {
           <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">
             {/* ---- 出来上がり ---- */}
             <section data-design="Preview" className="min-w-0 xl:sticky xl:top-4 xl:self-start">
-              <h2 className="text-ink-secondary mb-1 text-xs font-medium">お客さまに見える形</h2>
+              <h2 className="text-ink-secondary mb-1 text-xs font-semibold">お客さまに見える形</h2>
               <p className="mb-2 text-xs text-ink-faint">実際にお客さまが見る画面です</p>
               <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
               <p className="mt-2 text-center text-xs text-ink-faint">
@@ -967,7 +1054,7 @@ function FormEditInner() {
                             className="text-danger px-1 text-xs"
                             title="このページを削除"
                           >
-                            削除
+                            削除する
                           </button>
                         )}
                       </span>
@@ -1029,19 +1116,13 @@ function FormEditInner() {
                     disabled={selectedIndex < 0}
                     className="text-danger hover:bg-danger-bg rounded-control px-2 py-1 text-xs disabled:opacity-40"
                   >
-                    削除
+                    削除する
                   </button>
 
                   <div className="relative">
-                    <button
-                      ref={addMenuButtonRef}
-                      onClick={() => setShowAddMenu((v) => !v)}
-                      aria-expanded={showAddMenu}
-                      aria-haspopup="menu"
-                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
-                    >
-                      ＋ ブロックを追加（12種）
-                    </button>
+                    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" ref={addMenuButtonRef} onClick={() => setShowAddMenu((v) => !v)} aria-expanded={showAddMenu} aria-haspopup="menu">
+                      ＋ ブロックを追加する（12種）
+                    </Button>
                     <ActionMenu
                       open={showAddMenu}
                       ariaLabel="追加するブロック"
@@ -1156,21 +1237,12 @@ function FormEditInner() {
       <StickyBar
         actions={(
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => void save(false)}
-              disabled={saving}
-              title="フォームを保存（公開中の内容は変わりません）"
-              className="border-hairline text-ink bg-canvas hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '下書きを保存'}
-            </button>
-            <button
-              onClick={() => void save(true)}
-              disabled={saving}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
+            <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
+              {saving ? '保存中...' : '下書きを保存する'}
+            </Button>
+            <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void save(true)} disabled={saving}>
               {saving ? '処理中...' : 'この版を公開'}
-            </button>
+            </Button>
           </div>
         )}
       />
@@ -1214,12 +1286,9 @@ function FormEditInner() {
         未保存のまま画面を離れようとしたときの確認。保存済みのフォームと
         集まった回答は変わらないが、画面上の下書きは消えるので聞く。
       */}
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、保存していない変更は消えます。先に保存しますか。"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="フォームへの変更"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />

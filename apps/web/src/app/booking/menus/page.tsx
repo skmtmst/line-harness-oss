@@ -13,6 +13,8 @@ import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { RowActions } from '@/components/shared/row-actions'
@@ -468,7 +470,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       <span>{m.name}{m.is_active ? '' : '（休止中）'}</span>
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
-                        <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
+                        <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded-mini px-2 py-0.5 text-xs">
                           {m.category_label}
                         </span>
                       )}
@@ -543,7 +545,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       </>)}
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <ListRange label="メニュー" total={settings?.menuCount ?? items.length} first={visible.length === 0 ? 0 : 1} last={visible.length} />
+        <ListRange label="メニュー" total={settings?.menuCount ?? items.length} first={visible.length === 0 ? 0 : (page - 1) * MENU_PAGE_SIZE + 1} last={(page - 1) * MENU_PAGE_SIZE + visible.length} />
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
       </div>
       </>}
@@ -621,10 +623,15 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, canMa
     return <ListState kind="error" description={error ?? '予約の基本ルールを読み込めませんでした。'} onRetry={onRetry} />
   }
 
+  /*
+   * R92: 空欄のメニューは店舗の予約ルールを使う（Worker の
+   * effectiveBookingRules と同じ）。「制限なし」「直前まで」は動きと
+   * 違うため、上書き表では店舗設定を使うと出す。新規作成画面と同じ案内。
+   */
   const rows = [
-    { label: '先の予約が取れる範囲', key: 'booking_window_days' as const, unit: '日先まで', none: '制限なし' },
-    { label: '受付の締め切り', key: 'cutoff_hours_before' as const, unit: '時間前', none: '直前まで' },
-    { label: 'キャンセル期限', key: 'cancel_deadline_hours_before' as const, unit: '時間前', none: '制限なし' },
+    { label: '先の予約が取れる範囲', key: 'booking_window_days' as const, unit: '日先まで', none: '店舗設定を使う' },
+    { label: '受付の締め切り', key: 'cutoff_hours_before' as const, unit: '時間前', none: '店舗設定を使う' },
+    { label: 'キャンセルの期限', key: 'cancel_deadline_hours_before' as const, unit: '時間前', none: '店舗設定を使う' },
   ]
   return (
     <section data-booking-rules className="space-y-4">
@@ -719,6 +726,14 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   // 店舗切替でこの画面は作り直される（key=accountId）。外れた応答は何も残さない。
   const mountedRef = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
+  /*
+   * R161: メニュータブへ移ると編集窓が外れて入力が消えるため、
+   * 未保存の変更がある間はタブ移動・画面移動の前に確認窓を挟む。
+   * 空欄フラグも dirty に含める（draft には載らないため）。
+   * 新規作成画面・担当割当画面と同じ共通ガードを使う。
+   */
+  const rulesDirty = JSON.stringify(draft) !== JSON.stringify(initial) || cutoffEmpty || cancelEmpty
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: rulesDirty, busy: saving })
 
   function set<K extends keyof BookingSettings>(key: K, value: BookingSettings[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
@@ -872,9 +887,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           <Button
             onClick={() => void submit()}
             disabled={saving}
-            variant="primary"
-          >
-            {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作成' : '変更を保存'}
+            variant="primary" busy={saving}>
+            {initial.version === 0 ? '基本ルールを作る' : '保存する'}
           </Button>
         </div>
       ) : (
@@ -882,6 +896,7 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           予約設定の変更権限がないため、閲覧のみです。
         </p>
       )}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="予約の基本ルールへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -905,10 +920,17 @@ function RuleNumberField({ label, unit, min, max, value, onChange, trackEmpty, h
   const [text, setText] = useState<string | null>(null)
   const trackEmptyRef = useRef(trackEmpty)
   trackEmptyRef.current = trackEmpty
+  // 直前に親から受け取った値。変わったときだけ編集中の文字を捨てる。
+  const lastValueRef = useRef(value)
   // 保存が通ると親の値が変わる。そのときだけ編集中の文字を捨てる。
+  // マウント直後・同じ値の再描画では捨てない。描画の反映が遅れて
+  // 入力のあとに回ってきても、入力中の文字を残す（R311の揺れ対策）。
   useEffect(() => {
-    setText(null)
-    trackEmptyRef.current?.(false)
+    if (lastValueRef.current !== value) {
+      lastValueRef.current = value
+      setText(null)
+      trackEmptyRef.current?.(false)
+    }
   }, [value])
   const shown = text ?? value
   // 古い行には無い項目が undefined で来ることがある。旧表示と同じく空欄で出す。
@@ -1198,9 +1220,7 @@ function EditMenuModal({
               variant="primary"
               onClick={() => void submit()}
               disabled={saving || !canEdit}
-              title={canEdit ? undefined : '予約メニューの変更権限がありません'}
-            >
-              {saving ? '保存中…' : '保存'}
+              title={canEdit ? undefined : '予約メニューの変更権限がありません'} busy={saving}>保存する
             </Button>
           </div>
         }
@@ -1311,7 +1331,7 @@ function EditMenuModal({
             </p>
           </Field>
 
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <div>
               <p className="text-ink-secondary text-sm font-semibold">このメニューで使う設備</p>
               <p className="text-ink-faint mt-1 text-xs">部屋・席・機材を複数選び、1件の予約に必要な数を指定します。</p>
@@ -1372,7 +1392,7 @@ function EditMenuModal({
                 disabled={resourceSaving || resourceLoadError !== null}
                 className="border-accent text-accent-deep rounded-control border px-3 py-2 text-sm font-semibold disabled:opacity-50"
               >
-                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存'}
+                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存する'}
               </button>
             ) : (
               <p className="text-ink-faint text-xs">設備の割当は閲覧のみです。変更は管理者へ依頼してください。</p>
@@ -1380,8 +1400,8 @@ function EditMenuModal({
             {resourceMessage && <p role="status" className="text-xs text-ink-secondary">{resourceMessage}</p>}
           </div>
 
-          {/* 受付条件。空欄は「制限しない」で、これまでと同じ動きになる。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          {/* 受付条件。空欄は店舗の予約ルールを使う（新規作成画面と同じ）。 */}
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink-secondary text-sm font-semibold">受付条件</p>
             <div className="grid grid-cols-2 gap-3">
               <NumField
@@ -1409,7 +1429,7 @@ function EditMenuModal({
               />
             </div>
             <p className="text-ink-faint text-xs leading-relaxed">
-              空欄は「制限しない」です。<br />
+              空欄は店舗の予約ルールを使います。<br />
               「同時に受ける件数」を2以上にすると、<strong>このメニュー同士だけ</strong>が同じ枠に入ります。
               別のメニューの予約が入っている時間には、件数にかかわらず入りません。<br />
               キャンセルの期限はお客様の画面に表示されます。管理画面からはいつでもキャンセルできます。
@@ -1476,10 +1496,10 @@ function Field({ label, required, children }: { label: string; required?: boolea
 }
 
 /**
- * 空欄を「制限しない」として扱う数値欄。
+ * 空欄を「店舗の予約ルールを使う」として扱う数値欄（R92）。
  *
- * 0 を「制限しない」に使わないのは、0時間前・0日先という読み方も
- * できてしまい、どちらの意味か画面から判断できないため。
+ * 空欄のメニューは Worker が店舗値で埋める（effectiveBookingRules）ため、
+ * 「制限しない」とは案内しない。新規作成画面の placeholder とそろえる。
  */
 function NullableNumField({
   label,
@@ -1499,7 +1519,7 @@ function NullableNumField({
           type="number"
           min={1}
           value={value ?? ''}
-          placeholder="なし"
+          placeholder="店舗設定"
           onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
           className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
         />
@@ -1561,7 +1581,7 @@ function MenusPageHost() {
       <div data-design="Tabs" className="border-hairline flex flex-wrap gap-1 border-b">
         <Link
           href="/booking/menus?tab=menus"
-          className={`rounded-t-md px-4 py-2 text-sm ${
+          className={`rounded-t-mini px-4 py-2 text-sm ${
             tab === 'menus'
               ? 'border-accent text-accent-deep border-b-2 font-medium'
               : 'text-ink-faint hover:text-ink-secondary'
@@ -1571,7 +1591,7 @@ function MenusPageHost() {
         </Link>
         <Link
           href="/booking/staff/shifts"
-          className={`rounded-t-md px-4 py-2 text-sm ${
+          className={`rounded-t-mini px-4 py-2 text-sm ${
             'text-ink-faint hover:text-ink-secondary'
           }`}
         >
@@ -1579,13 +1599,13 @@ function MenusPageHost() {
         </Link>
         <Link
           href="/booking/staff/shifts#special"
-          className="text-ink-faint hover:text-ink-secondary rounded-t-md px-4 py-2 text-sm"
+          className="text-ink-faint hover:text-ink-secondary rounded-t-mini px-4 py-2 text-sm"
         >
           休業日
         </Link>
         <Link
           href="/booking/menus?tab=rules"
-          className={`rounded-t-md px-4 py-2 text-sm ${tab === 'rules' ? 'border-accent text-ink border-b-2 font-medium' : 'text-ink-faint hover:text-ink-secondary'}`}
+          className={`rounded-t-mini px-4 py-2 text-sm ${tab === 'rules' ? 'border-accent text-ink border-b-2 font-medium' : 'text-ink-faint hover:text-ink-secondary'}`}
         >
           予約のルール
         </Link>

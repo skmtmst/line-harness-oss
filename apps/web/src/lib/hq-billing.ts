@@ -1,3 +1,4 @@
+import { formatNumber } from '@/lib/format'
 /**
  * 統括の課金（★V6 36-2）の型と小さな計算。API の形は `apps/worker/src/routes/hq-billing.ts` が正本。
  */
@@ -116,7 +117,7 @@ export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' 
 }
 
 export function yen(amount: number): string {
-  return `¥${amount.toLocaleString('ja-JP')}`
+  return `¥${formatNumber(amount)}`
 }
 
 /** 表示も申込み可否も、選んだ周期だけを見る。月払いへの暗黙の代替はしない。 */
@@ -124,6 +125,35 @@ export function billingPlanPrice(plan: BillingPlanView, interval: BillingInterva
   return interval === 'year'
     ? { monthlyYen: Math.floor(plan.yearlyYen / 12), yearlyYen: plan.yearlyYen, fromStripe: plan.yearlyPriceFromStripe, available: plan.yearlyAvailable }
     : { monthlyYen: plan.monthlyYen, yearlyYen: null, fromStripe: plan.priceFromStripe, available: plan.available }
+}
+
+/**
+ * R607：選んだ周期の料金の出所。Stripe取得済みだけ・混在・代替だけの3つ。
+ * 月と年は別々に取得するため、必ず `interval` で選んだ側だけを見る。
+ */
+export type BillingPriceSource = 'stripe' | 'mixed' | 'fallback'
+
+export function billingPriceSource(plans: BillingPlanView[], interval: BillingInterval): BillingPriceSource {
+  if (plans.length === 0) return 'fallback'
+  const fromStripe = plans.map((plan) => billingPlanPrice(plan, interval).fromStripe)
+  if (fromStripe.every(Boolean)) return 'stripe'
+  if (fromStripe.some(Boolean)) return 'mixed'
+  return 'fallback'
+}
+
+/**
+ * R607：料金とプラン内容の確定度を分けた注記のうち、料金と内容の部分。
+ * Stripe取得済みの料金まで「仮置き」にしない。代替の料金だけ仮表示にする。
+ */
+export function billingPriceNote(plans: BillingPlanView[], interval: BillingInterval): string {
+  switch (billingPriceSource(plans, interval)) {
+    case 'stripe':
+      return '料金は Stripe の価格です。プランの内容は仮置きです。'
+    case 'mixed':
+      return 'Stripe から取得できた料金はそのまま表示し、取得できなかった料金には「仮の料金」と表示しています。プランの内容は仮置きです。'
+    case 'fallback':
+      return '料金と内容は仮置きです。'
+  }
 }
 
 export const INVOICE_STATUS_LABELS: Record<string, string> = {

@@ -12,10 +12,12 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { shortDateTime } from '@/lib/hq-banners'
+import { billingFailureMessage } from './failure-message'
 import {
   INVOICE_STATUS_LABELS,
   billingBanner,
   billingPlanPrice,
+  billingPriceNote,
   yen,
   type BillingInvoice,
   type BillingInterval,
@@ -55,6 +57,8 @@ function BillingInner() {
    * `null` は読み込み前の初期値なので、失敗は別の旗で見る。
    */
   const [invoiceFailed, setInvoiceFailed] = useState(false)
+  // M023：履歴の 502（決済サービス不通）も決済サービスの案内にするための目安。
+  const [invoiceError, setInvoiceError] = useState<unknown>(null)
   const [role, setRole] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -63,8 +67,16 @@ function BillingInner() {
   const load = useCallback(async () => {
     setStatus('loading')
     setInvoiceFailed(false)
+    setInvoiceError(null)
     try {
-      const [summaryRes, invoiceRes] = await Promise.all([api.hqBilling.summary(), api.hqBilling.invoices().catch(() => null)])
+      const [summaryRes, invoiceRes] = await Promise.all([
+        api.hqBilling.summary(),
+        // M023：履歴の失敗理由を残す（502 は決済サービスの案内にする）。
+        api.hqBilling.invoices().catch((caught: unknown) => {
+          setInvoiceError(caught)
+          return null
+        }),
+      ])
       if (!summaryRes.success) throw new Error(summaryRes.error)
       setSummary(summaryRes.data)
       // R118: 履歴の失敗は空配列にしない。概要は出して履歴欄だけ失敗表示にする。
@@ -100,7 +112,8 @@ function BillingInner() {
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '申込画面へ進めませんでした。もう一度お試しください。')
+      // M023/M024：原文のまま出さず、共通の案内へ渡す（502 は決済サービスの案内）。
+      setError(billingFailureMessage(caught, '申込画面の表示', 'プランの申込はオーナーだけができます。オーナーの方に操作してもらってください。'))
       setBusy(null)
     }
   }
@@ -113,10 +126,14 @@ function BillingInner() {
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '支払い方法の管理画面へ進めませんでした。')
+      // M023/M024：原文のまま出さず、共通の案内へ渡す（502 は決済サービスの案内）。
+      setError(billingFailureMessage(caught, '支払い方法の管理画面の表示', '支払い方法の管理はオーナーか管理者だけができます。オーナーか管理者の方に操作してもらってください。'))
       setBusy(null)
     }
   }
+
+  // M023：履歴の 502 は決済サービスの案内にする（それ以外は共通の失敗面のまま）。
+  const invoiceUnreachable = invoiceError instanceof ApiError && invoiceError.status === 502
 
   if (status === 'loading') return <ListState kind="loading" title="契約状況を読み込んでいます" />
   // 担当者は見られない（権限表: 課金プランは担当者 不可。閲覧のみは閲覧できる）。
@@ -143,9 +160,8 @@ function BillingInner() {
           tone={banner.tone}
           action={
             summary.portalAvailable ? (
-              <Button onClick={() => void portal()} disabled={busy !== null}>
-                <CreditCard aria-hidden="true" className="h-4 w-4" />
-                {busy === 'portal' ? '開いています…' : '支払い方法を管理'}
+              <Button onClick={() => void portal()} disabled={busy !== null} busy={busy === 'portal'} busyLabel="開いています…">
+                <CreditCard aria-hidden="true" className="h-4 w-4" />支払い方法を管理
               </Button>
             ) : undefined
           }
@@ -156,9 +172,9 @@ function BillingInner() {
       </div>
 
       <div data-design="Interval" data-design-node={interval === 'year' ? 'k8DFrR' : 'T4S2Qb'} className="flex flex-wrap items-center justify-end gap-3">
-        <span className={interval === 'month' ? 'text-label font-bold text-ink' : 'text-label font-semibold text-ink-faint'}>月払い</span>
+        <span className={interval === 'month' ? 'text-label font-medium text-ink' : 'text-label font-semibold text-ink-faint'}>月払い</span>
         <Toggle label="年払い" checked={interval === 'year'} onChange={(yearly) => setInterval(yearly ? 'year' : 'month')} className={styles.intervalToggle} />
-        <span className={interval === 'year' ? 'text-label font-bold text-ink' : 'text-label font-semibold text-ink-faint'}>年払い</span>
+        <span className={interval === 'year' ? 'text-label font-medium text-ink' : 'text-label font-semibold text-ink-faint'}>年払い</span>
         <span className="text-nano text-ink-faint">年払いは約15% OFF</span>
       </div>
 
@@ -180,23 +196,24 @@ function BillingInner() {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-heading font-bold text-ink">{plan.name}</h2>
                 {plan.recommended ? (
-                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">おすすめ</span>
+                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">おすすめ</span>
                 ) : null}
                 {interval === 'year' ? (
-                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">約15% OFF</span>
+                  <span className="inline-flex h-5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">約15% OFF</span>
                 ) : null}
                 {plan.current ? (
-                  <span className="inline-flex h-5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info">利用中</span>
+                  <span className="inline-flex h-5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info">利用中</span>
                 ) : null}
               </div>
               <p className="text-caption text-ink-faint">{plan.description}</p>
             </div>
             <div className="flex flex-col gap-2" data-price-source={price.fromStripe ? 'stripe' : 'fallback'}>
               <div className="flex items-baseline gap-2">
-                <span className="text-display font-bold text-ink">{yen(price.monthlyYen)}</span>
+                <span className="text-hero text-ink">{yen(price.monthlyYen)}</span>
                 <span className="text-caption text-ink-faint">/月（税込）</span>
               </div>
               {price.yearlyYen !== null ? <p className="text-caption text-ink-faint">年額 {yen(price.yearlyYen)}（税込）</p> : null}
+              {!price.fromStripe ? <p className="text-caption text-ink-faint">仮の料金です</p> : null}
             </div>
             <div className="border-t border-hairline" />
             <ul className="flex flex-1 flex-col gap-2">
@@ -216,9 +233,7 @@ function BillingInner() {
                 variant={plan.recommended ? 'primary' : 'secondary'}
                 onClick={() => void checkout(plan, interval)}
                 disabled={busy !== null || !canChoose || !price.available}
-                className="w-full"
-              >
-                {busy === plan.key ? '申込画面へ移動中…' : 'このプランにする'}
+                className="w-full" busy={busy === plan.key} busyLabel="申込画面へ移動中…">このプランにする
               </Button>
             )}
             {!price.available && !plan.current ? <p className="text-caption text-ink-faint">価格がまだ設定されていません</p> : null}
@@ -229,11 +244,12 @@ function BillingInner() {
 
       <p data-design="Note" data-design-node={interval === 'year' ? 'CqhfL' : 'MAzqO'} className="flex items-center gap-1.5 text-caption text-ink-faint">
         <Info aria-hidden="true" className="h-3.5 w-3.5" />
+        {/* R607：料金の出所は選んだ周期で変わる。料金とプラン内容の確定度は分けて案内する。 */}
         {!summary.stripeReady
-          ? '決済の接続設定がまだのため、申込ボタンは押せません。料金と内容は仮置きです。'
+          ? `決済の接続設定がまだのため、申込ボタンは押せません。${billingPriceNote(summary.plans, interval)}`
           : !isOwner
-            ? 'プランの申込と変更はオーナーだけができます。料金と内容は仮置きです。'
-            : '料金と内容は仮置きです。決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。'}
+            ? `プランの申込と変更はオーナーだけができます。${billingPriceNote(summary.plans, interval)}`
+            : `${billingPriceNote(summary.plans, interval)}決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。`}
       </p>
 
       <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className="flex flex-col rounded-card border border-hairline bg-canvas">
@@ -241,7 +257,13 @@ function BillingInner() {
         <div className="border-t border-hairline" />
         {invoiceFailed ? (
           <div className="px-4 py-5">
-            <ListState kind="error" title="支払い履歴を読み込めませんでした" onRetry={() => void load()} />
+            <ListState
+              kind="error"
+              title={invoiceUnreachable ? '決済サービスにつながりませんでした' : '支払い履歴を読み込めませんでした'}
+              description={invoiceUnreachable ? '少し待って、もう一度読み込んでください。' : undefined}
+              error={invoiceError ?? undefined}
+              onRetry={() => void load()}
+            />
           </div>
         ) : invoices === null || invoices.length === 0 ? (
           <p className="px-4 py-5 text-caption text-ink-faint">まだ支払いはありません。プランを選ぶと、ここに請求と支払いの記録が並びます。</p>

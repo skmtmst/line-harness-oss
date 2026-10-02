@@ -156,10 +156,10 @@ describe('日時', () => {
 
   it('「9/12 21:40」と、日で丸めた相対表示', () => {
     const now = new Date('2026-09-12T13:00:00Z') // 日本時間 22:00
-    expect(shortDateTime('2026-09-12T21:40:00.000', now)).toBe('9/12 21:40')
+    expect(shortDateTime('2026-09-12T21:40:00.000', now)).toBe('9月12日（土）21:40')
     expect(relativeUpdated('2026-09-12T21:57:00.000', now)).toBe('3分前')
-    expect(relativeUpdated('2026-09-11T21:40:00.000', now)).toBe('昨日')
-    expect(relativeUpdated('2026-09-05T10:00:00.000', now)).toBe('9/5')
+    expect(relativeUpdated('2026-09-11T21:40:00.000', now)).toBe('昨日 21:40')
+    expect(relativeUpdated('2026-09-05T10:00:00.000', now)).toBe('9月5日（土）')
   })
 })
 

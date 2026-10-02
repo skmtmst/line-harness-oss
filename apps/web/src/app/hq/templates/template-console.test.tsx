@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import TemplateConsole, { resolvedItems } from './template-console'
 import type { Preflight, TemplateDefinition, TemplateType } from '@/lib/hq-templates-api'
 
-const calls = vi.hoisted(() => Object.fromEntries(['uploadImage','context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
+const calls = vi.hoisted(() => Object.fromEntries(['uploadImage','deleteImage','context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
 vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag','template','rich_menu','form'], hqTemplatesApi: calls }))
 vi.mock('./template-definition-editor', () => {
   const freshDefinition = (type: TemplateType): TemplateDefinition => type === 'tag'
@@ -70,7 +70,7 @@ async function chooseStores() {
   expect((screen.getByRole('button', { name: '0アカウントの重複を確認' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('checkbox', { name: '表示中をすべて選択' })); fireEvent.click(screen.getByRole('button', { name: '2アカウントの重複を確認' })); await screen.findByText('重複する項目が2件あります')
 }
-async function distribute() { await chooseStores(); fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配布' })); await screen.findByText('配布が完了しました') }
+async function distribute() { await chooseStores(); fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作る' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配布' })); await screen.findByText('配布が完了しました') }
 
 describe('HQひな形の配布フロー', () => {
   it('参照再利用は上書きと区別し、既存を使用する選択と結果内訳を表示する', async () => {
@@ -81,7 +81,7 @@ describe('HQひな形の配布フロー', () => {
     await chooseStores()
     expect(screen.getAllByRole('button', { name: '既存を使用' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: '上書き', exact: true })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' }))
+    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作る' }))
     expect((screen.getByRole('button', { name: 'この内容で2アカウントへ配布' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: '上書き・再利用を一括指定' }))
     fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配布' }))
@@ -93,14 +93,14 @@ describe('HQひな形の配布フロー', () => {
     let finish!: (value: unknown) => void
     calls.uploadImage.mockImplementation(() => new Promise(resolve => { finish = resolve }))
     render(<TemplateConsole type="template" useCanonicalEditors={false} />); await screen.findByText('テンプレート')
-    fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '画像付き案内' } })
     fireEvent.change(screen.getByLabelText('配信する本文'), { target: { value: '本文' } })
     fireEvent.change(screen.getByLabelText('メッセージ画像を選ぶ'), { target: { files: [new File(['fixture'], 'a.png', { type: 'image/png' })] } })
-    expect((screen.getByRole('button', { name: '下書き保存' }) as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); expect(calls.create).not.toHaveBeenCalled()
+    expect((screen.getByRole('button', { name: '下書きを保存する' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' })); expect(calls.create).not.toHaveBeenCalled()
     finish({ id:'image',kind:'image',filename:'a.png',mimeType:'image/png',sizeBytes:32,width:2500,height:1686,durationMs:null,r2Key:'hq-templates/tenant-a/uploads/a.png',publicUrl:null,versionId:'image',versionNo:1,contentHash:'a'.repeat(64) })
-    await waitFor(() => expect((screen.getByRole('button', { name: '下書き保存' }) as HTMLButtonElement).disabled).toBe(false))
+    await waitFor(() => expect((screen.getByRole('button', { name: '下書きを保存する' }) as HTMLButtonElement).disabled).toBe(false))
   })
 
   it('作成・編集で期待版と参照先を保ち、保存結果から次へ進む', async () => {
@@ -111,22 +111,22 @@ describe('HQひな形の配布フロー', () => {
     expect(calls.distribute).not.toHaveBeenCalled()
   })
   it('新規作成は必須名が必要で、作成したひな形を表示する', async () => {
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
-    expect((screen.getByRole('button', { name: '下書き保存' }) as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '来店済み' } }); fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
+    expect((screen.getByRole('button', { name: '下書きを保存する' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '来店済み' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await screen.findByText('ひな形を保存しました。'); expect(calls.create).toHaveBeenCalledOnce(); expect(calls.update).not.toHaveBeenCalled()
     expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ name: '来店済み' }), expect.any(String))
   })
   it('新規保存の応答不明は同じrequestIdと同じpayloadでだけ再送する', async () => {
     calls.create.mockRejectedValueOnce(new Error('network'))
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
-    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '最初の内容' } }); fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '最初の内容' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await screen.findByRole('button', { name: '前回の保存を再確認' })
     expect((screen.getByLabelText('名前') as HTMLInputElement).value).toBe('最初の内容')
     expect((screen.getByLabelText('名前') as HTMLInputElement).disabled).toBe(true)
     expect((screen.getByLabelText('説明') as HTMLTextAreaElement).disabled).toBe(true)
     expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.queryByRole('button', { name: '下書き保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '下書きを保存する' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' }))
     await screen.findByText('ひな形を保存しました。')
     expect(calls.create).toHaveBeenCalledTimes(2)
@@ -135,7 +135,7 @@ describe('HQひな形の配布フロー', () => {
   })
   it.each([408, 500, 502, 504])('作成成功後にHTTP %sが届いても同じキーを再送し元の次段階へ進む', async status => {
     calls.create.mockRejectedValueOnce(Object.assign(new Error('結果不明'), { status, responseReceived: true, requestNotApplied: false }))
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '一度だけ作成' } })
     fireEvent.click(screen.getByRole('button', { name: '保存して配布先を選ぶ' }))
     await screen.findByRole('button', { name: '前回の保存を再確認' })
@@ -148,8 +148,8 @@ describe('HQひな形の配布フロー', () => {
   it('結果不明後の拒否応答だけでは保存済みの可能性を解除しない', async () => {
     calls.create.mockRejectedValueOnce(Object.assign(new Error('gateway'), { status: 504, responseReceived: true, requestNotApplied: false }))
       .mockRejectedValueOnce(Object.assign(new Error('権限の再確認'), { status: 403, responseReceived: true, requestNotApplied: true }))
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
-    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '同じ依頼' } }); fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '同じ依頼' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await screen.findByRole('button', { name: '前回の保存を再確認' }); fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' }))
     await screen.findByText('権限の再確認')
     expect((screen.getByLabelText('名前') as HTMLInputElement).disabled).toBe(true)
@@ -159,10 +159,10 @@ describe('HQひな形の配布フロー', () => {
   })
   it('最初の入力拒否が確定した場合は入力を直して新しいキーで保存できる', async () => {
     calls.create.mockRejectedValueOnce(Object.assign(new Error('入力を修正'), { status: 422, responseReceived: true, requestNotApplied: true }))
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
-    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '最初の名前' } }); fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '最初の名前' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await screen.findByRole('alert'); expect((screen.getByLabelText('名前') as HTMLInputElement).disabled).toBe(false)
-    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '修正した名前' } }); fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '修正した名前' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await screen.findByText('ひな形を保存しました。')
     expect(calls.create.mock.calls[1][1]).not.toBe(calls.create.mock.calls[0][1])
     expect(calls.create.mock.calls[1][0].name).toBe('修正した名前')
@@ -170,9 +170,9 @@ describe('HQひな形の配布フロー', () => {
   it('新規保存の二重操作を1回のPOSTに抑える', async () => {
     let finish!: (value: typeof detail) => void
     calls.create.mockReturnValue(new Promise(resolve => { finish = resolve }))
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '一回だけ' } })
-    const save = screen.getByRole('button', { name: '下書き保存' }); fireEvent.click(save); fireEvent.click(save)
+    const save = screen.getByRole('button', { name: '下書きを保存する' }); fireEvent.click(save); fireEvent.click(save)
     await waitFor(() => expect(calls.create).toHaveBeenCalledOnce())
     finish(structuredClone(detail)); await screen.findByText('ひな形を保存しました。')
   })
@@ -187,7 +187,7 @@ describe('HQひな形の配布フロー', () => {
   })
   it('有効期限切れの確認では実行できない', async () => {
     calls.preflight.mockResolvedValue({ ...checked(), expiresAt: '2020-01-01T00:00:00Z' }); await chooseStores()
-    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' })); expect((screen.getByRole('button', { name: 'この内容で2アカウントへ配布' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作る' })); expect((screen.getByRole('button', { name: 'この内容で2アカウントへ配布' }) as HTMLButtonElement).disabled).toBe(true)
     expect(calls.distribute).not.toHaveBeenCalled(); expect(screen.getByRole('button', { name: '現在版を再確認' })).toBeTruthy()
   })
   it('配布先が差し替わった事前確認を拒否する', async () => {
@@ -207,7 +207,7 @@ describe('HQひな形の配布フロー', () => {
   })
   it('復元も不達なら成功・失敗を断定せず、GET再確認だけを提供する', async () => {
     calls.distribute.mockRejectedValue(new Error('network')); calls.result.mockRejectedValue(new Error('network')); await chooseStores()
-    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配布' })); await screen.findByRole('alert')
+    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作る' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配布' })); await screen.findByRole('alert')
     expect(screen.queryByText('配布が完了しました')).toBeNull(); expect(screen.queryByText('失敗1アカウントを再確認')).toBeNull()
     calls.result.mockResolvedValue(completed); fireEvent.click(screen.getByRole('button', { name: '結果を再確認' })); await screen.findByText('配布が完了しました'); expect(calls.distribute).toHaveBeenCalledOnce()
   })
@@ -224,21 +224,21 @@ describe('HQひな形の配布フロー', () => {
     calls.list.mockResolvedValue([])
     calls.create.mockResolvedValue({ template: { ...template, id: `${type}-1`, name, template_type: type }, definition })
     render(<TemplateConsole type={type} useCanonicalEditors={false} />)
-    fireEvent.click(await screen.findByRole('button', { name: '＋ひな形を作成' }))
+    fireEvent.click(await screen.findByRole('button', { name: '＋ひな形を作る' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: name } })
     if (fieldLabel && fieldValue) fireEvent.change(screen.getByLabelText(fieldLabel), { target: { value: fieldValue } })
-    fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await screen.findByText('ひな形を保存しました。')
     expect(calls.list).toHaveBeenCalledWith(type)
     expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ type, name, definition }), expect.any(String))
   })
   it('権限不足のAPI応答後に作成・配布を許可しない', async () => {
     calls.accounts.mockRejectedValue(new Error('操作する権限がありません。')); render(<TemplateConsole type="tag" useCanonicalEditors={false} />); await screen.findByRole('alert')
-    expect((screen.getByRole('button', { name: '＋ひな形を作成' }) as HTMLButtonElement).disabled).toBe(true); expect(calls.create).not.toHaveBeenCalled()
+    expect((screen.getByRole('button', { name: '＋ひな形を作る' }) as HTMLButtonElement).disabled).toBe(true); expect(calls.create).not.toHaveBeenCalled()
   })
   it('競合した編集は入力を保持し、自動で期待版を更新・再送しない', async () => {
     calls.update.mockRejectedValueOnce(Object.assign(new Error('別の担当者が更新しました。'), { status: 409, responseReceived: true })); await list(); fireEvent.click(screen.getByRole('button', { name: '来店済みを編集' })); await screen.findByLabelText('名前')
-    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '手元の編集' } }); fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); await screen.findByRole('alert')
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '手元の編集' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' })); await screen.findByRole('alert')
     expect((screen.getByLabelText('名前') as HTMLInputElement).value).toBe('手元の編集'); expect(calls.update).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: '最新の内容を読み込む' }))
     await screen.findByDisplayValue('来店済み'); expect(calls.get).toHaveBeenCalledTimes(2); expect(calls.update).toHaveBeenCalledOnce()
@@ -255,7 +255,7 @@ describe('HQひな形の配布フロー', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: '表示中をすべて選択' })); fireEvent.click(screen.getByRole('button', { name: '2アカウントの重複を確認' }))
     await screen.findByText('重複する項目が2件あります'); expect(screen.getByText('4 重複確認').getAttribute('aria-current')).toBe('step')
     expect(screen.getAllByText('銀座本店').find(node => node.closest('td'))?.closest('td')?.getAttribute('data-label')).toBe('アカウント')
-    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作成' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配布' }))
+    fireEvent.click(screen.getByRole('button', { name: 'すべて別名で作る' })); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配布' }))
     await screen.findByText('配布が完了しました'); expect(screen.getByText('5 結果').getAttribute('aria-current')).toBe('step')
   })
   it('空の確認や許可されない新規作成を実行対象にしない', () => {
@@ -264,7 +264,7 @@ describe('HQひな形の配布フロー', () => {
   })
   it('通信不明の新規依頼は再読込と認証画面往復後も固定payloadと同じキーで回収する', async () => {
     calls.create.mockRejectedValueOnce(new Error('network'))
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '再読込する依頼' } })
     fireEvent.click(screen.getByRole('button', { name: '保存して配布先を選ぶ' }))
     await screen.findByRole('button', { name: '前回の保存を再確認' })
@@ -285,8 +285,8 @@ describe('HQひな形の配布フロー', () => {
   })
   it('POSTの応答待ちにページを離れても依頼が残り、別tenantや利用者では復元しない', async () => {
     calls.create.mockReturnValue(new Promise(() => {}))
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
-    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '元の組織' } }); fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
+    fireEvent.change(screen.getByLabelText('名前'), { target: { value: '元の組織' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalledOnce())
     cleanup(); calls.context.mockResolvedValue({ tenantId: 'tenant-b', actorId: 'owner' })
     render(<TemplateConsole type="tag" useCanonicalEditors={false} />); await screen.findByLabelText('来店済みの操作')
@@ -299,15 +299,15 @@ describe('HQひな形の配布フロー', () => {
     expect(calls.create).toHaveBeenCalledOnce()
   })
   it('表示後に所属先が変われば新規POSTを停止する', async () => {
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '保存しない' } })
     calls.context.mockResolvedValue({ tenantId: 'tenant-b', actorId: 'owner' })
-    fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); await screen.findByRole('alert')
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' })); await screen.findByRole('alert')
     expect(calls.create).not.toHaveBeenCalled()
   })
   it.each(['success', 'definite-rejection'] as const)('記録消去が失敗すれば入力を固定し、安全な消去だけ再確認する: %s', async outcome => {
     if (outcome === 'definite-rejection') calls.create.mockRejectedValueOnce(Object.assign(new Error('入力を修正'), { requestNotApplied: true, status: 422 }))
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '消去待ちの内容' } })
     // #743: removeItem の spyOn 上書きは Proxy に飲まれて効かないため、
     // 最初の2回だけ投げて3回目から本物へ通す委譲品に差し替える。
@@ -329,7 +329,7 @@ describe('HQひな形の配布フロー', () => {
       expect((screen.getByLabelText('名前') as HTMLInputElement).disabled).toBe(true)
       expect((screen.getByLabelText('説明') as HTMLTextAreaElement).disabled).toBe(true)
       expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
-      expect(screen.queryByRole('button', { name: '下書き保存' })).toBeNull()
+      expect(screen.queryByRole('button', { name: '下書きを保存する' })).toBeNull()
       expect(screen.queryByText('ひな形を保存しました。')).toBeNull()
       expect(window.sessionStorage.length).toBe(1)
       fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' }))
@@ -346,7 +346,7 @@ describe('HQひな形の配布フロー', () => {
       if (outcome === 'definite-rejection') {
         expect((screen.getByLabelText('名前') as HTMLInputElement).disabled).toBe(false)
         fireEvent.change(screen.getByLabelText('名前'), { target: { value: '修正した新しい内容' } })
-        fireEvent.click(screen.getByRole('button', { name: '下書き保存' }))
+        fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
         await screen.findByText('ひな形を保存しました。')
         expect(calls.create.mock.calls[1][0].name).toBe('修正した新しい内容')
         expect(calls.create.mock.calls[1][1]).not.toBe(original[1])
@@ -354,12 +354,12 @@ describe('HQひな形の配布フロー', () => {
     } finally { restoreStorage() }
   })
   it('保存場所が使えなければ新規POSTを開始しない', async () => {
-    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作成' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '＋ひな形を作る' }))
     fireEvent.change(screen.getByLabelText('名前'), { target: { value: '保存しない' } })
     // #743: setItem の spyOn 上書きは Proxy に飲まれて効かないため差し替える。
     const restoreStorage = replaceSessionStorage({ setItem: () => { throw new Error('quota') } })
     try {
-      fireEvent.click(screen.getByRole('button', { name: '下書き保存' })); await screen.findByRole('alert')
+      fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' })); await screen.findByRole('alert')
       expect(calls.create).not.toHaveBeenCalled()
     } finally { restoreStorage() }
   })

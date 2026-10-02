@@ -84,7 +84,7 @@ export default function ImpersonationBar({
           ? 'flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent'
           : 'flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent'}
       >
-        <span className="flex min-w-0 items-center gap-2.5 text-label font-bold">
+        <span className="flex min-w-0 items-center gap-2.5 text-label font-medium">
           {writing ? <PencilLine aria-hidden="true" className="h-4.5 w-4.5" /> : <Eye aria-hidden="true" className="h-4.5 w-4.5" />}
           <span className="truncate">
             {name} として{writing ? '書き込み中' : '閲覧中（書き込みはできません）'}
@@ -127,8 +127,8 @@ function BarButton({ onClick, disabled, solid, children }: { onClick: () => void
       onClick={onClick}
       disabled={disabled}
       className={solid
-        ? 'h-8 rounded-control bg-canvas px-3.5 text-caption font-bold text-danger disabled:opacity-60'
-        : 'h-8 rounded-control border border-on-accent/60 bg-on-accent/15 px-3.5 text-caption font-bold text-on-accent hover:bg-on-accent/25 disabled:opacity-60'}
+        ? 'h-8 rounded-control bg-canvas px-3.5 text-caption font-medium text-danger disabled:opacity-60'
+        : 'h-8 rounded-control border border-on-accent/60 bg-on-accent/15 px-3.5 text-caption font-medium text-on-accent hover:bg-on-accent/25 disabled:opacity-60'}
     >
       {children}
     </button>
@@ -169,7 +169,7 @@ function ReasonDialog({
     >
       <div className="flex flex-col gap-3">
         <label className="block">
-          <span className="mb-1.5 block text-caption font-bold text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
+          <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
           <TextArea
             value={reason}
             onChange={(event) => setReason(event.target.value)}

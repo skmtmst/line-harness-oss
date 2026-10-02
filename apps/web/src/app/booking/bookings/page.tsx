@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -26,6 +27,7 @@ import BookingCalendar, {
   type CalendarAvailability,
   type CalendarSlot,
 } from './booking-calendar'
+import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -94,35 +96,18 @@ const PAGE_SIZE = 20
 function formatJpDateTime(iso: string): string {
   // 不正な日時が来たら Invalid Date を出さず「—」に逃がす(点検#516軽6)。
   if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 /** 表の日時。設計は年を出していない（08/18 14:00）。 */
 function formatShort(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function formatJpTime(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return new Date(iso).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatTime(iso)
 }
 
 /**
@@ -131,12 +116,7 @@ function formatJpTime(iso: string): string {
  */
 function formatJpDay(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return new Date(iso).toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDay(iso)
 }
 
 function jstDay(iso: string): string {
@@ -308,6 +288,8 @@ export default function BookingsPage() {
   const [calendarSeq, setCalendarSeq] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
   // 自動で「コピー済」が消えるので、A の URL をコピーしたまま B 画面で
   // 「B フォームと思い込んで送信」する事故を防ぐ。
@@ -411,6 +393,7 @@ export default function BookingsPage() {
     const requestId = ++listRequestRef.current
     setLoading(true)
     setError(null)
+    setLoadError(null)
     // タブ/アカウント切り替えで先に list をクリア。fetch 失敗時に前タブの行が
     // 残ってしまい、誤って別ステータスの予約を操作してしまう事故を防ぐ。
     setItems([])
@@ -429,6 +412,7 @@ export default function BookingsPage() {
       setTotal(r.total)
     } catch (e) {
       if (requestId !== listRequestRef.current || listAccountRef.current !== requestedAccountId) return
+      setLoadError(e)
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       if (requestId === listRequestRef.current && listAccountRef.current === requestedAccountId) setLoading(false)
@@ -889,7 +873,10 @@ export default function BookingsPage() {
           <ListState
             kind="error"
             title="予約を読み込めませんでした"
-            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+            // それ以外は画面の文のまま。
+            description={isForbiddenOrRateLimited(loadError) ? undefined : '通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。'}
+            error={loadError ?? undefined}
             onRetry={() => void load()}
           />
         ) : (
@@ -1010,43 +997,29 @@ export default function BookingsPage() {
               <>
                 <span className="text-ink-faint text-xs">よく使う</span>
                 {STATUS_TABS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setTab(key)}
-                    /* R315: 選んでいる絞り込みを色だけでなく意味でも伝える。 */
-                    aria-pressed={tab === key}
-                    className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
+                  <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
                       tab === key
                         ? 'bg-accent-deep text-on-accent'
                         : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                    }`}
-                  >
+                    }`) + ' border-0 h-auto whitespace-normal'} key={key} onClick={() => setTab(key)} aria-pressed={tab === key}>
                     {label}
-                  </button>
+                  </Button>
                 ))}
                 <span className="border-hairline mx-1 h-4 border-l" />
-                <button
-                  onClick={() => setRange(range === 'today' ? 'all' : 'today')}
-                  aria-pressed={range === 'today'}
-                  className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium ${
                     range === 'today'
                       ? 'bg-accent-deep text-on-accent'
                       : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                  }`}
-                >
+                  }`) + ' border-0 h-auto whitespace-normal'} onClick={() => setRange(range === 'today' ? 'all' : 'today')} aria-pressed={range === 'today'}>
                   今日
-                </button>
-                <button
-                  onClick={() => setRange(range === 'week' ? 'all' : 'week')}
-                  aria-pressed={range === 'week'}
-                  className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                </Button>
+                <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium ${
                     range === 'week'
                       ? 'bg-accent-deep text-on-accent'
                       : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                  }`}
-                >
+                  }`) + ' border-0 h-auto whitespace-normal'} onClick={() => setRange(range === 'week' ? 'all' : 'week')} aria-pressed={range === 'week'}>
                   今週
-                </button>
+                </Button>
                 {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
                 <Select
                   aria-label="担当者で絞り込む"
@@ -1068,8 +1041,7 @@ export default function BookingsPage() {
             trailing={
               /* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */
               selectedAccountId ? (
-                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
-                  {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す
                 </Button>
               ) : null
             }
@@ -1092,7 +1064,10 @@ export default function BookingsPage() {
               <ListState
                 kind="error"
                 title="予約を読み込めませんでした"
-                description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+                // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+                // それ以外は画面の文のまま。
+                description={isForbiddenOrRateLimited(loadError) ? undefined : '通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。'}
+                error={loadError ?? undefined}
                 onRetry={() => void load()}
               />
             </div>
@@ -1153,11 +1128,11 @@ export default function BookingsPage() {
                           </span>
                         </Td>
                         <Td align="right" className="tabular-nums">
-                          ¥{b.price_at_booking.toLocaleString()}
+                          ¥{formatNumber(b.price_at_booking)}
                         </Td>
                         <Td>
                           <span
-                            className={`inline-block rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
+                            className={`inline-block rounded-mini px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
                           >
                             {statusLabel[b.status] ?? b.status}
                           </span>
@@ -1166,7 +1141,7 @@ export default function BookingsPage() {
                           <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => setDetailId(b.id)}
-                              className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+                              className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
                             >
                               詳細
                             </button>
@@ -1175,7 +1150,7 @@ export default function BookingsPage() {
                               <Link
                                 href={`/chats?friend=${b.friend_id}`}
                                 aria-label={`${b.friend_name ?? 'お客さま'}さんとの会話を受信箱で開く`}
-                                className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+                                className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
                               >
                                 会話
                               </Link>
@@ -1209,13 +1184,9 @@ export default function BookingsPage() {
                     onFocus={(e) => e.currentTarget.select()}
                     className="border-hairline bg-canvas rounded-control min-w-0 flex-1 border px-3 py-2 font-mono text-xs"
                   />
-                  <button
-                    type="button"
-                    onClick={() => copyUrl(shareUrl)}
-                    className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-                  >
+                  <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" type="button" onClick={() => copyUrl(shareUrl)}>
                     {isCopied(shareUrl) ? 'コピー済' : 'コピー'}
-                  </button>
+                  </Button>
                   <span className="text-ink-faint text-xs">お客さまが新しく予約を入れるURL</span>
                 </div>
                 {/* N-396: 履歴URLは別画面を開く。両方発行できることを注記と揃える。 */}
@@ -1228,13 +1199,9 @@ export default function BookingsPage() {
                       onFocus={(e) => e.currentTarget.select()}
                       className="border-hairline bg-canvas rounded-control min-w-0 flex-1 border px-3 py-2 font-mono text-xs"
                     />
-                    <button
-                      type="button"
-                      onClick={() => copyUrl(historyUrl)}
-                      className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-                    >
+                    <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" type="button" onClick={() => copyUrl(historyUrl)}>
                       {isCopied(historyUrl) ? 'コピー済' : 'コピー'}
-                    </button>
+                    </Button>
                     <span className="text-ink-faint text-xs">お客さまが自分の予約履歴を見るURL</span>
                   </div>
                 ) : null}
@@ -1292,7 +1259,7 @@ function Kpi({
     <div className="bg-canvas rounded-card border-hairline border p-4">
       <p className="text-ink-faint text-xs">{title}</p>
       <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}
+        {value === null ? '—' : formatNumber(value)}
         {value === null ? null : (
           <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
         )}
@@ -1347,9 +1314,9 @@ function BookingDetailPanel({
         type="button"
         aria-label="閉じる"
         onClick={onClose}
-        className="absolute inset-0 bg-black/30"
+        className="absolute inset-0 bg-scrim"
       />
-      <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-xl">
+      <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-float">
         <div className="border-hairline sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b bg-canvas px-6 py-3">
           <div className="min-w-0">
             <p className="text-ink-faint text-xs font-semibold">予約管理　›　{formatJpDay(b.starts_at)}　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
@@ -1391,7 +1358,7 @@ function BookingDetailPanel({
             </DetailRow>
             <DetailRow label="担当">{b.staff_name}</DetailRow>
             <DetailRow label="料金">
-              <span className="tabular-nums">¥{b.price_at_booking.toLocaleString()}</span>
+              <span className="tabular-nums">¥{formatNumber(b.price_at_booking)}</span>
             </DetailRow>
             <DetailRow label="予約番号">
               <span className="text-ink-secondary font-mono text-xs">{b.id}</span>
@@ -1405,7 +1372,7 @@ function BookingDetailPanel({
             <p className="text-ink-faint mt-1 text-xs">顧客カルテの履歴は、友だち詳細で確認できます。前回のことを覚えていると、話が早くなります。</p>
             <div className="border-hairline mt-4 grid grid-cols-4 gap-3 border-b pb-2 text-xs text-ink-faint"><span>いつ・何を</span><span>担当</span><span>金額</span><span>メモ</span></div>
             {(detail?.history.length ? detail.history : [{ id: b.id, startsAt: b.starts_at, menuName: b.menu_name, staffName: b.staff_name, price: b.price_at_booking, customerNote: b.customer_note, handoverNote: null, status: b.status }]).slice(0, 3).map((item) => (
-              <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{item.price.toLocaleString()}</span><span>{item.customerNote ?? '記入なし'}</span></div>
+              <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{formatNumber(item.price)}</span><span>{item.customerNote ?? '記入なし'}</span></div>
             ))}
             {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-action text-xs font-semibold hover:underline focus-visible:underline">顧客カルテで以前の予約を見る →</Link> : null}
           </section>
@@ -1425,11 +1392,11 @@ function BookingDetailPanel({
           <aside className="space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">お客様とペット</h3>
-            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-bold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
+            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-pill font-semibold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
             <DetailRow label="ペット">{detail?.customer.petName ?? '登録なし'}</DetailRow>
             <DetailRow label="連絡先">{detail?.customer.phone ?? '登録なし'}</DetailRow>
             {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}
-            {detail?.customer.mileageBalance !== null && detail?.customer.mileageBalance !== undefined ? <DetailRow label="マイル">{detail.customer.mileageBalance.toLocaleString()}</DetailRow> : null}
+            {detail?.customer.mileageBalance !== null && detail?.customer.mileageBalance !== undefined ? <DetailRow label="マイル">{formatNumber(detail.customer.mileageBalance)}</DetailRow> : null}
           </section>
           <section className="border-warning bg-warning-bg rounded-card border p-5">
             <h3 className="text-warning text-sm font-semibold">当日 気をつけること</h3>
@@ -1475,15 +1442,12 @@ function ActionButtons({
   if (status === 'requested') {
     return (
       <div className="inline-flex gap-1">
-        <button
-          onClick={() => onAction('approve')}
-          className="rounded-control bg-accent-deep text-on-accent hover:brightness-92 px-3 py-1 text-xs font-medium transition-colors"
-        >
+        <Button variant="primary" className="px-3 py-1 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => onAction('approve')}>
           承認
-        </button>
+        </Button>
         <button
           onClick={() => onAction('reject')}
-          className="text-danger bg-danger-bg rounded-md px-3 py-1 text-xs font-medium hover:bg-red-100"
+          className="text-danger bg-danger-bg rounded-mini px-3 py-1 text-xs font-medium hover:bg-status-danger-selected"
         >
           拒否
         </button>
@@ -1495,19 +1459,19 @@ function ActionButtons({
       <div className="inline-flex gap-1">
         <button
           onClick={() => onAction('complete')}
-          className="bg-info-bg text-info rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+          className="bg-info-bg text-info rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
-          完了
+          閉じる
         </button>
         <button
           onClick={() => onAction('no_show')}
-          className="bg-warning-bg text-warning rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+          className="bg-warning-bg text-warning rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           無断
         </button>
         <button
           onClick={() => onAction('cancel')}
-          className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+          className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           取消
         </button>

@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
@@ -25,6 +24,7 @@ import {
 } from './account-list-view'
 import AccountMigration from './migration'
 import ListRange from '@/components/ui/list-range'
+import { formatNumber } from '@/lib/format'
 
 type AccountWithStats = LineAccount & {
   stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
@@ -65,16 +65,25 @@ export default function AccountsPage() {
   )
 
   // アーカイブは停止と重ねて数えず、4枚の帯を互いに読み違えないようにする。
-  const activeCount = accounts.filter((a) => a.isActive && !a.archivedAt).length
-  const inactiveCount = accounts.filter((a) => !a.isActive && !a.archivedAt).length
-  const archivedCount = accounts.filter((a) => Boolean(a.archivedAt)).length
-  const problemCount = accounts.filter(hasConnectionProblem).length
+  // R520: 未取得（読み込み中・取得失敗）を 0 件と出さない。成功した空一覧だけ 0。
+  const ready = status === 'ready'
+  const activeCount = ready ? accounts.filter((a) => a.isActive && !a.archivedAt).length : null
+  const inactiveCount = ready ? accounts.filter((a) => !a.isActive && !a.archivedAt).length : null
+  const archivedCount = ready ? accounts.filter((a) => Boolean(a.archivedAt)).length : null
+  const problemCount = ready ? accounts.filter(hasConnectionProblem).length : null
   const activeFriendCounts = accounts
     .filter((account) => account.isActive && !account.archivedAt)
     .map((account) => account.stats?.friendCount)
-  const activeFriendDetail = activeFriendCounts.every((count): count is number => typeof count === 'number')
-    ? `友だち ${activeFriendCounts.join('・')}人`
-    : '友だち数は未取得'
+  const activeFriendDetail = status === 'loading'
+    ? '読み込んでいます'
+    : status === 'error'
+      ? '読み込めませんでした'
+      : activeFriendCounts.every((count): count is number => typeof count === 'number')
+        ? `友だち ${activeFriendCounts.join('・')}人`
+        : '友だち数は未取得'
+  // 集計のカードは読み込み中・取得失敗でも「—」のまま置き、再読み込みを近くに置く。
+  const kpiDetail = (fallback: string) => (status === 'loading' ? '読み込んでいます' : status === 'error' ? '読み込めませんでした' : fallback)
+  const kpiRetry = status === 'error' ? () => void load() : undefined
 
   if (searchParams.get('tab') === 'migration') return <AccountMigration />
 
@@ -88,7 +97,7 @@ export default function AccountsPage() {
           <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
             {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
           </Button>
-          <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>
+          <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録する</Button>
         </div>
       </div>
 
@@ -96,15 +105,20 @@ export default function AccountsPage() {
 
       <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {/* ★V7：「100%」の札は何の割合でもない固定の文字だったので外す。 */}
+        {/* R520: 未取得は null で「—」。成功した空一覧だけ 0。 */}
         <KpiCard title="稼働中" value={activeCount} unit="" variant="v6"
-          detail={activeFriendDetail} />
+          loading={status === 'loading'} onRetry={kpiRetry}
+          detail={kpiDetail(activeFriendDetail)} />
         <KpiCard title="停止中" value={inactiveCount} unit="" variant="v6"
-          detail="送受信を止めています" />
+          loading={status === 'loading'} onRetry={kpiRetry}
+          detail={kpiDetail('送受信を止めています')} />
         <KpiCard title="アーカイブ" value={archivedCount} unit="" variant="v6"
-          detail="記録は残っています" />
+          loading={status === 'loading'} onRetry={kpiRetry}
+          detail={kpiDetail('記録は残っています')} />
         <KpiCard title="接続に問題" value={problemCount} unit="" variant="v6"
-          badge={problemCount > 0 ? '要対応' : undefined} badgeTone="danger"
-          detail="Webhookが合っていません" />
+          loading={status === 'loading'} onRetry={kpiRetry}
+          badge={problemCount !== null && problemCount > 0 ? '要対応' : undefined} badgeTone="danger"
+          detail={kpiDetail('Webhookが合っていません')} />
       </div>
 
       <div className="bg-canvas rounded-card border-hairline border p-3">
@@ -130,7 +144,17 @@ export default function AccountsPage() {
             </FilterChip>
           ))}
           {/* 件数は結果の件数だけ。選べない件数の文字は置かない（★V7）。 */}
-          <ListRange className="ml-auto whitespace-nowrap" total={shown.length} first={shown.length === 0 ? 0 : 1} last={shown.length} />
+          {/* R520: 読み込み中・取得失敗の合計は 0 件と出さず「—」。 */}
+          {status === 'ready' ? (
+            <ListRange className="ml-auto whitespace-nowrap" total={shown.length} first={shown.length === 0 ? 0 : 1} last={shown.length} />
+          ) : (
+            <span
+              className="text-ink-faint ml-auto text-xs whitespace-nowrap"
+              title={status === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
+            >
+              —
+            </span>
+          )}
         </div>
       </div>
 
@@ -194,7 +218,7 @@ export default function AccountsPage() {
                   <details className="mt-3">
                     <summary className="text-ink-secondary cursor-pointer text-xs font-semibold">詳しい情報を見る</summary>
                     <dl className="mt-2 space-y-1 text-xs">
-                      <div className="flex justify-between gap-3"><dt className="text-ink-faint">友だち</dt><dd className="text-ink-secondary tabular-nums">{account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : '—'}</dd></div>
+                      <div className="flex justify-between gap-3"><dt className="text-ink-faint">友だち</dt><dd className="text-ink-secondary tabular-nums">{account.stats ? `${formatNumber(account.stats.friendCount)}人` : '—'}</dd></div>
                       <div className="flex justify-between gap-3"><dt className="text-ink-faint">親アカウント</dt><dd className="text-ink-secondary truncate" title={parentName(account, accounts)}>{parentName(account, accounts)}</dd></div>
                     </dl>
                   </details>
@@ -226,7 +250,7 @@ export default function AccountsPage() {
                 return (
                   <tr key={account.id} className="border-hairline hover:bg-canvas-sunken border-t align-middle">
                     <td className="py-3 pr-4 pl-5">
-                      <p className="text-ink text-sm font-medium">{account.name}</p>
+                      <p className="text-ink text-sm font-semibold">{account.name}</p>
                       <p className="text-ink-faint mt-0.5 text-xs">
                         チャネル {account.channelId}
                         {` ・ ${account.timezone ?? 'Asia/Tokyo'}`}
@@ -239,7 +263,7 @@ export default function AccountsPage() {
                       <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
                     </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
-                      {account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : '—'}
+                      {account.stats ? `${formatNumber(account.stats.friendCount)}人` : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {account.isDefault

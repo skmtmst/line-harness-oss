@@ -58,7 +58,7 @@ describe('V6 EC integration screens', () => {
       expect(identity).toContain(wording)
     }
     expect(page).toContain('order.orderLines.map')
-    expect(page).toContain('order.totalAmount.toLocaleString')
+    expect(page).toContain('formatNumber(order.totalAmount')
     expect(identity).toContain('operations?.summary.linked')
     expect(identity).toContain('operations?.summary.potentialRevenue')
     expect(identity).toContain('過去のLINE送信は再送しません')
@@ -166,7 +166,16 @@ describe('V6 EC integration screens', () => {
     expect(page).toContain("'ec.order.refunded': '反映完了'")
     expect(page).toContain('actionStatusLabel(action)')
     // 集計タブも送信を含まない完了数なので「送信完了」とは名付けない。
-    expect(page).toContain("['succeeded', '処理完了', actionSummary?.succeeded]")
+    expect(page).toContain("['succeeded', '処理完了', listedSummary?.succeeded]")
+    /*
+     * R599: 一覧由来の状態別件数は、取れるまで出さない。`?? 0` の足し算は
+     * 未取得を「0件」に見せるので、ready・empty のときだけ数を渡す。
+     * （実際の見え方は ec-commerce-events-panel-mount.test.tsx の R599 が守る）
+     */
+    expect(page).toContain('const listedSummary =')
+    expect(page).toContain('listedSummary ? listedSummary.pending + listedSummary.processing : undefined')
+    expect(page).toContain('listedSummary ? listedSummary.retryable_failed + listedSummary.permanent_failed : undefined')
+    expect(page).not.toContain('actionSummary?.pending ?? 0')
   })
 
   it('filters subscriptions with the shared Tabs and types impact metrics (#580)', () => {

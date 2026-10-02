@@ -6,6 +6,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
+import Button from '@/components/shared/button'
 
 /**
  * 受信箱の絞り込みパネル（設計 Pencil `bXyEA` 受信箱 絞り込みパネル）。
@@ -93,7 +94,7 @@ export default function InboxFilterPanel({
         role="dialog"
         aria-modal="true"
         aria-label="絞り込み"
-        className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-2xl sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
+        className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-overlay sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
       >
         <header className="border-hairline flex h-14 shrink-0 items-center gap-2 border-b px-5">
           <Filter aria-hidden="true" size={18} className="text-ink" />
@@ -205,20 +206,12 @@ export default function InboxFilterPanel({
         <footer className="border-hairline shrink-0 border-t px-5 py-3">
           <p className="text-ink-faint mb-2 text-micro">条件は選ぶとすぐ一覧に反映されます</p>
           <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={onReset}
-              className="border-hairline rounded-control text-ink-secondary hover:bg-canvas-sunken border px-4 py-2 text-sm"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" type="button" onClick={onReset}>
               リセット
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-control bg-accent-deep text-on-accent hover:brightness-92 px-5 py-2 text-sm font-bold"
-            >
+            </Button>
+            <Button variant="primary" className="px-5 py-2 font-bold border-0 h-auto whitespace-normal" type="button" onClick={onClose}>
               閉じる
-            </button>
+            </Button>
           </div>
         </footer>
       </section>

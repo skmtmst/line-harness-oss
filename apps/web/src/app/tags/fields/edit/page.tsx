@@ -1,10 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { FriendField, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
+import { isSameFieldContent, type SentFieldContent } from './field-edit-conflict'
 import { useAccount } from '@/contexts/account-context'
 import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -12,7 +13,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import Select from '@/components/shared/select'
@@ -78,6 +79,18 @@ function EditFriendFieldForm() {
   const [field, setField] = useState<FriendField | null>(null)
   const [siblings, setSiblings] = useState<FriendField[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
+  /*
+   * R516: フォルダが取れない間は「未分類」だけの選択欄を見せない。
+   * 所属IDは入力に残るため、表示と保存内容が食い違う誤認を防ぐ。
+   */
+  const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [foldersReloading, setFoldersReloading] = useState(false)
+  /*
+   * R517: 版の衝突で返ってきた最新の内容。入力は残したまま、
+   * 保存済みか他人の変更かを見せて選ばせる。
+   */
+  const [conflictName, setConflictName] = useState<string | null>(null)
+  const [justSaved, setJustSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
@@ -95,6 +108,22 @@ function EditFriendFieldForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  const loadFolders = useCallback(async () => {
+    if (!selectedAccountId) return
+    setFoldersReloading(true)
+    try {
+      const res = await api.folders.list('friend_field')
+      if (!res.success) throw new Error(res.error)
+      setFolders(res.data)
+      setFoldersState('ready')
+    } catch {
+      // R516: 失敗を隠さず、所属の選択欄の場所で再試行する。
+      setFoldersState('error')
+    } finally {
+      setFoldersReloading(false)
+    }
+  }, [selectedAccountId])
+
   useEffect(() => {
     let cancelled = false
     if (!selectedAccountId) { setLoading(false); return }
@@ -102,12 +131,19 @@ function EditFriendFieldForm() {
     setError('')
     setField(null)
     setNotFound(false)
+    setConflictName(null)
+    setJustSaved(false)
     void Promise.all([
       api.friendFields.list(selectedAccountId, { withUsage: true }),
       api.folders.list('friend_field').catch(() => null),
     ]).then(([list, folderResult]) => {
       if (cancelled) return
-      if (folderResult?.success) setFolders(folderResult.data)
+      if (folderResult?.success) {
+        setFolders(folderResult.data)
+        setFoldersState('ready')
+      } else {
+        setFoldersState('error')
+      }
       if (!list.success) throw new Error(list.error)
       /* IDEA-04: 同名の項目がほかにあるかは、読んだ一覧そのもので確かめる。 */
       setSiblings(list.data)
@@ -164,45 +200,119 @@ function EditFriendFieldForm() {
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
-  const save = async () => {
-    if (saving || !field || !selectedAccountId) return
-    if (!name.trim()) return setError('項目名を入力してください')
-    if (NEEDS_OPTIONS.has(field.type) && optionList.length === 0) return setError('選択肢を1つ以上入力してください')
-    if (ecIsMaster && !ecFieldPath.trim()) return setError('EC側の項目名を入力してください')
+  /*
+   * R517: 送る内容を1か所で組み立てる。409のときに送った内容と
+   * 最新を比べるため、送ったものをそのまま比べに使える形で返す。
+   */
+  const buildSentPayload = (): SentFieldContent | null => {
+    if (!field) return null
+    if (!name.trim()) { setError('項目名を入力してください'); return null }
+    if (NEEDS_OPTIONS.has(field.type) && optionList.length === 0) { setError('選択肢を1つ以上入力してください'); return null }
+    if (ecIsMaster && !ecFieldPath.trim()) { setError('EC側の項目名を入力してください'); return null }
     /* R139: 選択肢から外れた既定値は送る前に止める（新規作成と同じ文）。 */
     if (field.type === 'multi_select') {
       const missing = defaultOptions.filter((item) => !optionList.includes(item))
-      if (missing.length > 0) return setError(`既定値の「${missing[0]}」は選択肢にありません。選択肢か既定値を直してください`)
+      if (missing.length > 0) { setError(`既定値の「${missing[0]}」は選択肢にありません。選択肢か既定値を直してください`); return null }
     }
     if (field.type === 'select' && defaultValue && !optionList.includes(defaultValue)) {
-      return setError(`既定値の「${defaultValue}」は選択肢にありません。選択肢か既定値を直してください`)
+      setError(`既定値の「${defaultValue}」は選択肢にありません。選択肢か既定値を直してください`); return null
     }
+    return {
+      name: name.trim(),
+      folderId: folderId || null,
+      options: NEEDS_OPTIONS.has(field.type) ? optionList : null,
+      /* R139: 複数選択は選択肢名の配列で渡す。文字列では422になる。 */
+      defaultValue: FILE_TYPES.has(field.type)
+        ? null
+        : field.type === 'multi_select'
+          ? (defaultOptions.length > 0 ? defaultOptions : null)
+          : field.type === 'select'
+            ? (defaultValue || null)
+            : defaultValue.trim() || null,
+      isPersonal,
+      isStarred,
+      ecIsMaster,
+      ecFieldPath: ecIsMaster ? ecFieldPath.trim() : null,
+    }
+  }
+
+  /*
+   * R517: 版の衝突で返ってきたとき、最新を取り直して送った内容と比べる。
+   * 同じなら応答消失前の保存が成功しているので保存済みと案内し、
+   * 違うなら他人の変更として差分と取り込み口を示す。入力は残す。
+   */
+  const handleVersionConflict = async (sent: SentFieldContent) => {
+    const account = selectedAccountId
+    if (!account || !field) return
+    try {
+      const res = await api.friendFields.list(account, { withUsage: true })
+      if (!res.success) throw new Error(res.error)
+      const latest = res.data.find((item) => item.id === field.id) ?? null
+      if (!latest) {
+        setError('項目が見つかりません。一覧から選び直してください。')
+        setNotFound(true)
+        return
+      }
+      setSiblings(res.data)
+      if (isSameFieldContent(sent, latest)) {
+        setField(latest)
+        setConflictName(null)
+        setJustSaved(true)
+        setError('')
+      } else {
+        // 版だけ進め、入力は残す。保存し直すと新しい版で送られる。
+        setField(latest)
+        setConflictName(latest.name)
+        setJustSaved(false)
+        setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
+      }
+    } catch {
+      setError('最新の内容を確認できませんでした。接続を確かめて、もう一度保存してください。')
+    }
+  }
+
+  const save = async () => {
+    if (saving || !field || !selectedAccountId) return
+    const sent = buildSentPayload()
+    if (!sent) return
     setSaving(true); setError('')
+    setConflictName(null)
+    setJustSaved(false)
     try {
       const res = await api.friendFields.update(field.id, selectedAccountId, {
-        name: name.trim(),
-        folderId: folderId || null,
-        options: NEEDS_OPTIONS.has(field.type) ? optionList : null,
-        /* R139: 複数選択は選択肢名の配列で渡す。文字列では422になる。 */
-        defaultValue: FILE_TYPES.has(field.type)
-          ? null
-          : field.type === 'multi_select'
-            ? (defaultOptions.length > 0 ? defaultOptions : null)
-            : field.type === 'select'
-              ? (defaultValue || null)
-              : defaultValue.trim() || null,
-        isPersonal,
-        isStarred,
-        ecIsMaster,
-        ecFieldPath: ecIsMaster ? ecFieldPath.trim() : null,
+        ...sent,
         // 読んだ版と違えばサーバーが409で止める。他の人の先勝ちを黙って潰さない。
         version: field.version,
       })
       if (!res.success) throw new Error(res.error)
       router.push(`/tags?tab=fields&highlight=${res.data.id}`)
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした')
+      if (reason instanceof ApiError && reason.status === 409
+        && (reason as { code?: string }).code === 'VERSION_CONFLICT') {
+        await handleVersionConflict(sent)
+      } else {
+        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした')
+      }
     } finally { setSaving(false) }
+  }
+
+  /*
+   * R517: 最新の内容を入力へ取り込む。取り込んだ分は未保存になるので、
+   * そのまま保存し直すと最新の版で送られる。
+   */
+  const applyLatest = () => {
+    if (!field) return
+    setName(field.name)
+    setOptions((field.options ?? []).join('\n'))
+    const stored = storedDefaultLabels(field)
+    setDefaultOptions(stored.multi)
+    setDefaultValue(stored.single)
+    setIsPersonal(field.isPersonal)
+    setIsStarred(field.isStarred)
+    setEcIsMaster(field.ecIsMaster)
+    setEcFieldPath(field.ecFieldPath ?? '')
+    setFolderId(field.folderId ?? '')
+    setConflictName(null)
   }
 
   if (loading) return <ListState kind="loading" />
@@ -257,6 +367,27 @@ function EditFriendFieldForm() {
       </div>
 
       {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
+      {/* R517: 応答消失後の再試行で、送った内容が保存済みと分かった。 */}
+      {justSaved && field ? (
+        <Notice
+          tone="success"
+          className="mb-4"
+          action={<Button type="button" onClick={() => router.push(`/tags?tab=fields&highlight=${field.id}`)}>一覧で確認する</Button>}
+        >
+          保存されています。入力した内容は最新の保存内容と同じです。
+        </Notice>
+      ) : null}
+      {/* R517: ほかの担当者の変更と入力を比べて決める。入力は残す。 */}
+      {conflictName !== null && field ? (
+        <Notice
+          tone="warn"
+          className="mb-4"
+          action={<Button type="button" onClick={applyLatest}>最新の内容を取り込む</Button>}
+        >
+          最新の保存内容は「{conflictName}」です。入力内容はそのまま残しています。
+          入力のまま保存し直すか、最新の内容を取り込んでください。
+        </Notice>
+      ) : null}
       {locked ? (
         <Notice tone="warn" className="mb-4">
           共通項目はこのアカウントから直接変更できません。新しい項目へ移行してから編集してください。
@@ -290,7 +421,20 @@ function EditFriendFieldForm() {
               </Field>
             ) : null}
             <Field label="フォルダ" htmlFor="ff-folder" note="フォルダは友だち詳細のタブになります。">
-              <Select id="ff-folder" value={folderId} onChange={(value) => setFolderId(value)} disabled={locked} aria-label="友だち情報欄のフォルダ" size="full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              {/*
+                R516: フォルダが取れない間は「未分類」だけの選択欄を出さない。
+                入力に残っている所属IDと表示が食い違う誤認を防ぐ。
+              */}
+              {foldersState === 'error' ? (
+                <p className="text-xs leading-5 text-ink-secondary">
+                  所属を読み込めませんでした。今の所属は変わらず保存されます。
+                  <button type="button" onClick={() => void loadFolders()} disabled={foldersReloading} className="ml-1 font-semibold text-status-info hover:underline disabled:opacity-40">
+                    {foldersReloading ? '読み込んでいます' : 'もう一度読み込む'}
+                  </button>
+                </p>
+              ) : (
+                <Select id="ff-folder" value={folderId} onChange={(value) => setFolderId(value)} disabled={locked} aria-label="友だち情報欄のフォルダ" size="full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              )}
             </Field>
             {/* IDEA-04: 印だけならタグ・対応状態なら対応マークという分類の違いを、編集の場所でも確認できるようにする。 */}
             <AttributeKindGuide current="field" />
@@ -348,10 +492,10 @@ function EditFriendFieldForm() {
 
       <StickyBar
         status={locked ? '共通項目は編集できません' : saving ? '保存しています' : '変更内容を確認して保存してください'}
-        actions={<><Button href="/tags?tab=fields">キャンセル</Button><Button type="button" variant="primary" disabled={saving || locked} onClick={() => void save()}>{saving ? '保存中…' : '変更を保存'}</Button></>}
+        actions={<><Button href="/tags?tab=fields">キャンセル</Button><Button type="button" variant="primary" disabled={saving || locked} onClick={() => void save()} busy={saving}>保存する</Button></>}
       />
       {/* R176 監査：名称・既定値などの書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、項目への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="項目への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

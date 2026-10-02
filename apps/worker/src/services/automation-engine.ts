@@ -13,6 +13,15 @@ const DEFAULT_LEASE_MINUTES = 5;
 const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
 const MAX_ATTEMPTS = RETRY_DELAYS_MINUTES.length + 1;
 
+/*
+ * 監査 R478: 共通アクション参照の展開上限。公開前の検査
+ * （common-actions.ts の assertPublishableExpansion）と実行時の計画
+ * （buildExecutionPlan）で同じ値を使う。片方だけ変えない。
+ */
+export const COMMON_ACTION_MAX_DEPTH = 20;
+export const COMMON_ACTION_MAX_BRANCH_DEPTH = 3;
+export const COMMON_ACTION_MAX_STEPS = 1000;
+
 export type RunStatus =
   | 'queued'
   | 'running'
@@ -235,7 +244,7 @@ async function getStep(db: D1Database, runId: string, stepKey: string): Promise<
   ).bind(runId, stepKey).first<StepRow>();
 }
 
-async function resolveCommonActionVersion(
+export async function resolveCommonActionVersion(
   db: D1Database,
   input: { lineAccountId: string; automationId: string; action: ActionDefinition },
 ): Promise<string | null> {
@@ -285,18 +294,18 @@ async function buildExecutionPlan(
   const depth = input.depth ?? 0;
   const branchDepth = input.branchDepth ?? 0;
   const budget = input.budget ?? { count: 0 };
-  if (depth > 20) {
+  if (depth > COMMON_ACTION_MAX_DEPTH) {
     throw new AutomationActionError('common_action_too_deep', '共通アクションの呼び出しが深すぎます', false);
   }
   const plan: ActionDefinition[] = [];
   for (const action of input.actions) {
     budget.count += 1;
-    if (budget.count > 1_000) {
+    if (budget.count > COMMON_ACTION_MAX_STEPS) {
       throw new AutomationActionError('execution_plan_too_large', '実行する処理が多すぎます', false);
     }
     const stepKey = input.prefix ? `${input.prefix}/${action.id}` : action.id;
     if (action.type === 'branch') {
-      if (branchDepth >= 3) {
+      if (branchDepth >= COMMON_ACTION_MAX_BRANCH_DEPTH) {
         throw new AutomationActionError('branch_too_deep', '条件分岐の入れ子は3段までです', false);
       }
       const condition = action.params.condition as SegmentCondition;

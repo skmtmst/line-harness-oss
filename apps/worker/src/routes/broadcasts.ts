@@ -2261,6 +2261,18 @@ broadcasts.post(
 );
 
 // DELETE /api/broadcasts/:id - delete
+//
+// D026: 下書き・予約だけ消す。送信中は 409（止めるには停止を使う）、
+// 送信済みは 409（配信の記録は残す）。画面は draft/scheduled にしか
+// 削除を出さないが、API 直接の削除も status で断つ。
+// 読み取りの直後に送信が始まっても消さないよう、状態の確認と削除を
+// 条件付き DELETE の1文にまとめる（cancel の UPDATE 側再確認と同じ）。
+function broadcastDeleteConflictMessage(status: string): string {
+  return status === 'sending'
+    ? '送信中の配信は削除できません。配信を止めるには停止を使ってください'
+    : '送信済みの配信は削除できません。配信の記録は残ります';
+}
+
 broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_EDIT_KEY), async (c) => {
   try {
     const id = c.req.param('id');
@@ -2268,7 +2280,17 @@ broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_
     if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
-    await deleteBroadcast(c.env.DB, id);
+    if (existing.status !== 'draft' && existing.status !== 'scheduled') {
+      return c.json({ success: false, error: broadcastDeleteConflictMessage(existing.status) }, 409);
+    }
+    const deleted = await deleteBroadcast(c.env.DB, id);
+    if (!deleted) {
+      const current = await getBroadcastById(c.env.DB, id);
+      if (!current || !await canAccessBroadcast(c.env.DB, c.get('staff'), current)) {
+        return c.json({ success: false, error: 'Broadcast not found' }, 404);
+      }
+      return c.json({ success: false, error: broadcastDeleteConflictMessage(current.status) }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/broadcasts/:id error:', err);
@@ -3134,30 +3156,34 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
     }
 
     const staffId = c.get('staff')!.id;
-    const recentAttempt = await c.env.DB.prepare(
-      `SELECT 1 AS found
-         FROM operation_audit
-        WHERE target_kind = 'broadcast' AND target_id = ?
-          AND action = 'test_send' AND actor_id = ?
-          AND datetime(created_at) >= datetime('now', '+9 hours', '-10 seconds')
-        LIMIT 1`,
-    ).bind(id, staffId).first<{ found: number }>();
-    if (recentAttempt) {
-      return c.json(
-        { success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' },
-        { status: 429, headers: { 'Retry-After': '10' } },
-      );
-    }
-    // 外部送信より先に試行を記録し、二度押しや並行リクエストを早い段階で止める。
-    await c.env.DB.prepare(
+    // D027: 10秒制限の確認と記録を1文の原子書き込みにまとめる。
+    // SELECT→INSERT の確認後書き込みだと、並行2件が両方確認を通り
+    // 両方LINE送信する（check-then-act の窓）。記録できた件数で判定し、
+    // 記録できなかった側は 429 で止める。外部送信より先に試行を記録し、
+    // 二度押しも早い段階で止める点は変えない。
+    const claim = await c.env.DB.prepare(
       `INSERT INTO operation_audit (id, target_kind, target_id, action, actor_id, detail_json)
-       VALUES (?, 'broadcast', ?, 'test_send', ?, ?)`,
+       SELECT ?, 'broadcast', ?, 'test_send', ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM operation_audit
+          WHERE target_kind = 'broadcast' AND target_id = ?
+            AND action = 'test_send' AND actor_id = ?
+            AND datetime(created_at) >= datetime('now', '+9 hours', '-10 seconds')
+       )`,
     ).bind(
       crypto.randomUUID(),
       id,
       staffId,
       JSON.stringify({ recipientCount: friendIds.length }),
+      id,
+      staffId,
     ).run();
+    if ((claim.meta.changes ?? 0) !== 1) {
+      return c.json(
+        { success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' },
+        { status: 429, headers: { 'Retry-After': '10' } },
+      );
+    }
 
     const placeholders = friendIds.map(() => '?').join(',');
     const friends = await c.env.DB.prepare(

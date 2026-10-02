@@ -4,12 +4,18 @@ import Link from 'next/link'
 import React from 'react'
 import type { ReactNode } from 'react'
 import HelpTip from './help-tip'
+import { isCountableValue } from './not-connected'
 import styles from './kpi-card.module.css'
+import { formatNumber } from '@/lib/format'
 
 export type KpiCardProps = {
   title: string
-  /** 取得できない場合は null を渡すと「—」を表示する。 */
-  value: number | null
+  /**
+   * 取れないときは「—」を表示する（D021）。
+   * null だけでなく undefined・NaN も「—」にする。呼び出し側が
+   * `x?.y` をそのまま渡しても画面ごと落ちない。**0 は 0 のまま出す。**
+   */
+  value: number | null | undefined
   unit: string
   /**
    * 数では表せない値（「1時間24分」「96.7%」など）をそのまま出す。
@@ -157,7 +163,7 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          {valueText !== undefined ? valueText : value === null ? '—' : value.toLocaleString('ja-JP')}
+          {valueText !== undefined ? valueText : isCountableValue(value) ? formatNumber(value) : '—'}
           {valueText !== undefined ? null : unit}
         </p>
       )}

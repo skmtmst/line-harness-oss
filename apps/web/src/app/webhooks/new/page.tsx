@@ -12,6 +12,9 @@ import CreatePage, { AsideCard, Field, inputClass } from '@/components/shared/cr
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
 
 /**
@@ -107,11 +110,44 @@ function NewWebhookForm() {
     return () => { cancelled = true }
   }, [])
 
+  /*
+   * 欄の検査（★V7 sTJsh §6）。欄から離れた時点で1回だけ理由を出し、
+   * 直すとその場で消える。保存時にも全部を見て、まとめを上に出す。
+   * 定義の順がまとめの並びになる。
+   */
+  const fields = useFormErrors()
+  fields.define('name', '名前', () => (name.trim() ? null : '名前を入力してください'))
+  fields.define('url', '送り先のURL', () =>
+    /^https:\/\//.test(url.trim()) ? null : 'URLは https:// で始めてください')
+  fields.define('secret', 'シークレット', () =>
+    secret.length >= MIN_SECRET_LENGTH ? null : `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`)
+  fields.define('events', '送るイベント', () =>
+    sendAllEvents || selectedEvents.length > 0 || incomingSources.trim()
+      ? null
+      : '送るイベントを選ぶか、「すべてのイベントを送る」を選んでください')
+
   const toggleEvent = (value: string) => {
+    // 欄群は blur が取れないので、触れた時点をここで記録する。
+    fields.touch('events')
     setSelectedEvents((current) =>
       current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
     )
   }
+  /* 自動で振った署名は初期値。入れ直し・作り直しだけを未保存と数える。 */
+  const initialSecretRef = useRef(secret)
+
+  /*
+   * 追加途中の離脱確認。名前・URL・送る出来事・署名・送り直しのどれかに
+   * 手を付けていたら、キャンセルや左メニューで確認窓を出す。
+   * 追加が終わると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || url || incomingSources || maxRetries !== '0' ||
+    secret !== initialSecretRef.current ||
+    sendAllEvents !== !presetValid ||
+    selectedEvents.join(',') !== (presetValid ? presetEvent! : '')
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   if (staffRole !== null && staffRole !== 'owner') {
     return (
@@ -140,18 +176,9 @@ function NewWebhookForm() {
           </ul>
         </AsideCard>
       }
-      validate={() => {
-        if (!selectedAccountId) return 'LINEアカウントを選択してください'
-        if (!name.trim()) return '名前を入力してください'
-        if (!/^https:\/\//.test(url.trim())) return 'URLは https:// で始めてください'
-        if (secret.length < MIN_SECRET_LENGTH) {
-          return `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`
-        }
-        if (!sendAllEvents && selectedEvents.length === 0 && !incomingSources.trim()) {
-          return '送るイベントを選ぶか、「すべてのイベントを送る」を選んでください'
-        }
-        return null
-      }}
+      fields={fields}
+      // LINEアカウントは共通バー側の選択なので欄の検査には載せない。
+      validate={() => (selectedAccountId ? null : 'LINEアカウントを選択してください')}
       onSave={async () => {
         // d23b R420: 保存を始めた時点のアカウントを固定する。本人確認の
         // 窓をまたぐあいだに切り替えられたら、別アカウントへ登録しない。
@@ -203,31 +230,35 @@ function NewWebhookForm() {
     >
       <p className="text-ink text-sm font-semibold">基本の設定</p>
 
-      <Field label="名前" htmlFor="wh-name" required>
+      <Field label="名前" htmlFor="wh-name" required error={fields.error('name')}>
         <input
+          {...fields.bind('name')}
           id="wh-name"
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="例: 外部CRM連携"
           className={inputClass}
+          aria-invalid={fields.invalid('name') || undefined}
         />
       </Field>
 
-      <Field label="送り先のURL" htmlFor="wh-url" required note="https:// のみです。">
+      <Field label="送り先のURL" htmlFor="wh-url" required note="https:// のみです。" error={fields.error('url')}>
         <input
+          {...fields.bind('url')}
           id="wh-url"
           type="url"
           value={url}
           onChange={(event) => setUrl(event.target.value)}
           placeholder="https://example.com/webhook"
           className={inputClass}
+          aria-invalid={fields.invalid('url') || undefined}
         />
       </Field>
 
       {/* #975 U067: イベントコードのCSV手入力をやめ、チェックで選ぶ。 */}
       <fieldset className="space-y-3">
-        <legend className="text-ink-secondary text-xs font-bold">
+        <legend className="text-ink-secondary text-xs font-medium">
           送るイベント<RequiredBadge />
         </legend>
         <div className="flex flex-wrap gap-2">
@@ -235,17 +266,20 @@ function NewWebhookForm() {
             name="wh-event-mode"
             value="all"
             checked={sendAllEvents}
-            onChange={() => setSendAllEvents(true)}
+            onChange={() => { fields.touch('events'); setSendAllEvents(true) }}
             title="すべてのイベントを送る"
           />
           <RadioCard
             name="wh-event-mode"
             value="selected"
             checked={!sendAllEvents}
-            onChange={() => setSendAllEvents(false)}
+            onChange={() => { fields.touch('events'); setSendAllEvents(false) }}
             title="送るイベントを選ぶ"
           />
         </div>
+        {fields.error('events') ? (
+          <p className="text-danger mt-2 text-xs" role="alert">{fields.error('events')}</p>
+        ) : null}
         {presetLabel ? (
           <p className="text-ink-secondary mt-2 text-xs">
             見本「{presetLabel}」の条件を選んだ状態で開いています。すべてのイベントへ変えるときは上の選択を押してください。
@@ -255,7 +289,7 @@ function NewWebhookForm() {
           <div className="space-y-3">
             {WEBHOOK_EVENT_GROUPS.map((group) => (
               <div key={group.id}>
-                <p className="text-ink-faint text-xs font-bold">{group.label}</p>
+                <p className="text-ink-faint text-xs font-medium">{group.label}</p>
                 <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
                   {group.events.map((event) => (
                     <li key={event.value}>
@@ -298,23 +332,22 @@ function NewWebhookForm() {
         label="シークレット"
         htmlFor="wh-secret"
         required
+        error={fields.error('secret')}
         note="送信時に X-Harness-Signature ヘッダで署名します（値は v1=署名。入力は「タイムスタンプ.イベントID.本文」の HMAC-SHA256。X-Harness-Event-Id・X-Harness-Timestamp とあわせて送ります）。受け取る側で同じ値を使って確かめてください。"
       >
         <div className="flex gap-2">
           <input
+            {...fields.bind('secret')}
             id="wh-secret"
             type="text"
             value={secret}
             onChange={(event) => setSecret(event.target.value)}
             className={`${inputClass} font-mono`}
+            aria-invalid={fields.invalid('secret') || undefined}
           />
-          <button
-            type="button"
-            onClick={() => setSecret(generateSecret())}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm whitespace-nowrap"
-          >
+          <Button variant="secondary" className="text-ink-secondary px-3 py-2 whitespace-nowrap h-auto" type="button" onClick={() => setSecret(generateSecret())}>
             作り直す
-          </button>
+          </Button>
         </div>
       </Field>
 
@@ -337,6 +370,7 @@ function NewWebhookForm() {
         </div>
       </Field>
       {stepUpPrompt}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した送り先" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )
 }

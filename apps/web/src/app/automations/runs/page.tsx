@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { api, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
+import { api, ApiError, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
@@ -15,6 +15,7 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import Notice from '@/components/shared/notice'
 import ListRange from '@/components/ui/list-range'
 import { useAutomationRunPermissions } from '@/components/automations/use-can-manage'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
@@ -89,9 +90,7 @@ const STEP_STATUS_LABEL: Record<AutomationRunDetail['steps'][number]['status'], 
 function formatOccurredAt(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時不明'
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function formatDuration(value: number | null): string {
@@ -133,6 +132,23 @@ export default function AutomationRunsPage() {
   const [selectedRun, setSelectedRun] = useState<AutomationRun | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<AutomationRunDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  /**
+   * R493: 詳細の取得失敗は「記録なし」と別に持つ。`forbidden` は権限不足
+   * （再読み込みを出さない）、`error` は通信などの失敗（再読み込みを出す）。
+   */
+  const [detailError, setDetailError] = useState<null | 'error' | 'forbidden'>(null)
+  /** 詳細の「もう一度読む」で取り直すための番号。 */
+  const [detailReloadKey, setDetailReloadKey] = useState(0)
+  /*
+   * R493: 直リンク（?run=）の詳細取得の失敗も黙って捨てない。
+   * 一覧はそのまま使える状態にし、詳細の場所で失敗と再試行を出す。
+   * `forbidden` は権限不足（再読み込みを出さない）。
+   */
+  const [deepLinkRunId, setDeepLinkRunId] = useState<string | null>(null)
+  const [deepLinkLoading, setDeepLinkLoading] = useState(false)
+  const [deepLinkError, setDeepLinkError] = useState<null | 'error' | 'forbidden'>(null)
+  /** 直リンクの「もう一度読む」で取り直すための番号。 */
+  const [deepLinkReloadKey, setDeepLinkReloadKey] = useState(0)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryNotice, setRetryNotice] = useState('')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -154,6 +170,13 @@ export default function AutomationRunsPage() {
 
   // 検索の連打で古い応答が新しい表示を上書きしないよう世代で守る（#519 軽）。
   const loadGeneration = useRef(0)
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
+  /*
+   * R492: 店切替の effect と詳細読みの effect は同じ描画で走ることがある。
+   * 先に走る切替側が世代を進め、遅れた詳細の応答を捨てる。
+   */
+  const detailGeneration = useRef(0)
 
   /*
    * 一覧から来た検索語と、ブラウザの戻る・進むで変わったURLを入力欄へ戻す。
@@ -182,6 +205,24 @@ export default function AutomationRunsPage() {
   /* 店が替わったら先頭のページから読み直す。 */
   useEffect(() => {
     setPage(1)
+  }, [selectedAccountId])
+
+  /*
+   * R492: 店が替わったら、前の店の詳細・取消確認・操作案内を残さない。
+   * 読みかけの一覧も世代を進めて無効にする。残った確認で前の店の
+   * 実行を取りやめる道をここで塞ぐ（取りやめ自体も開始時の店と照合する）。
+   */
+  useEffect(() => {
+    loadGeneration.current += 1
+    detailGeneration.current += 1
+    setSelectedRun(null)
+    setSelectedDetail(null)
+    setDetailError(null)
+    setDeepLinkRunId(null)
+    setDeepLinkError(null)
+    setDeepLinkLoading(false)
+    setConfirmCancel(false)
+    setRetryNotice('')
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
@@ -223,24 +264,39 @@ export default function AutomationRunsPage() {
   useEffect(() => {
     if (!selectedRun) {
       setSelectedDetail(null)
+      setDetailError(null)
       setConfirmCancel(false)
       return
     }
+    // R492: 読み始めた店と違う店が出ていたら、遅れて返っても書かない。
+    const accountAtStart = selectedAccountId
+    const generationAtStart = detailGeneration.current
+    const runId = selectedRun.id
+    const stale = () => generationAtStart !== detailGeneration.current
+      || selectedAccountRef.current !== accountAtStart
     let cancelled = false
     setDetailLoading(true)
-    api.automations.getRun(selectedRun.id)
+    setDetailError(null)
+    api.automations.getRun(runId)
       .then((response) => {
-        if (cancelled) return
-        setSelectedDetail(response.success ? response.data : null)
+        if (cancelled || stale()) return
+        if (response.success) {
+          setSelectedDetail(response.data)
+        } else {
+          setSelectedDetail(null)
+          setDetailError('error')
+        }
       })
-      .catch(() => {
-        if (!cancelled) setSelectedDetail(null)
+      .catch((caught: unknown) => {
+        if (cancelled || stale()) return
+        setSelectedDetail(null)
+        setDetailError(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
       })
       .finally(() => {
-        if (!cancelled) setDetailLoading(false)
+        if (!cancelled && !stale()) setDetailLoading(false)
       })
     return () => { cancelled = true }
-  }, [selectedRun])
+  }, [selectedRun, selectedAccountId, detailReloadKey])
 
   /**
    * #942 N-353: まだ終わっていない実行の取りやめ。
@@ -250,16 +306,21 @@ export default function AutomationRunsPage() {
    */
   const cancelRun = async (run: AutomationRun) => {
     if (!run.canCancel || cancellingId) return
+    // R492: 始めた店と違う店が出ていたら書かない。Bの画面からAへの
+    // 取消POSTを作らない（サーバ側も所属で見るが、画面で先に塞ぐ）。
+    const accountAtStart = selectedAccountId
     setCancellingId(run.id)
     setRetryNotice('')
     try {
       const response = await api.automations.cancelRun(run.id)
       if (!response.success) throw new Error(response.error)
+      if (selectedAccountRef.current !== accountAtStart) return
       setRetryNotice('実行を取りやめました。記録は残っています。')
       setSelectedRun(null)
       setConfirmCancel(false)
       await load()
     } catch (caught) {
+      if (selectedAccountRef.current !== accountAtStart) return
       setRetryNotice(caught instanceof Error ? caught.message : '実行を取りやめられませんでした')
     } finally {
       setCancellingId(null)
@@ -268,6 +329,7 @@ export default function AutomationRunsPage() {
 
   const retryRun = async (run: AutomationRun) => {
     if (!run.canRetry || retryingId) return
+    const accountAtStart = selectedAccountId
     setRetryingId(run.id)
     setRetryNotice('')
     try {
@@ -276,13 +338,45 @@ export default function AutomationRunsPage() {
         { method: 'POST' },
       )
       if (!response.success) throw new Error(response.error)
+      if (selectedAccountRef.current !== accountAtStart) return
       // #736: 実行完了を待たず受け付けだけ返すため、結果は実行記録の再取得で確認する。
       // 無期限ポーリングはしない。
       setRetryNotice('再実行を受け付けました。結果は実行記録で確認してください')
       setSelectedRun(null)
       await load()
     } catch (caught) {
-      setRetryNotice(caught instanceof Error ? caught.message : '再実行できませんでした')
+      if (selectedAccountRef.current !== accountAtStart) return
+      /*
+       * R494: 応答が失われた・競合で返ったときは古い失敗表示のままにしない。
+       * 一覧と詳細を取り直し、いまの状態に合わせて案内する。受付済みなら
+       * 古い再試行ボタンは残さない（取り直した行がボタンを決める）。
+       */
+      const failureMessage = caught instanceof Error ? caught.message : '再実行できませんでした'
+      await load()
+      try {
+        const detail = await api.automations.getRun(run.id)
+        if (!detail.success || selectedAccountRef.current !== accountAtStart) {
+          setRetryNotice(failureMessage)
+          return
+        }
+        setSelectedDetail(detail.data)
+        setSelectedRun((current) => current && current.id === run.id
+          ? {
+            ...current,
+            status: detail.data.status,
+            canRetry: detail.data.canRetry,
+            canCancel: detail.data.canCancel,
+          }
+          : current)
+        const accepted = !detail.data.canRetry
+          && (detail.data.status === 'queued' || detail.data.status === 'claimed'
+            || detail.data.status === 'waiting' || detail.data.status === 'retry_wait')
+        setRetryNotice(accepted
+          ? '再試行を受け付けています。結果はこの記録で確認できます。'
+          : failureMessage)
+      } catch {
+        setRetryNotice(failureMessage)
+      }
     } finally {
       setRetryingId(null)
     }
@@ -304,9 +398,68 @@ export default function AutomationRunsPage() {
       status: resultFilter !== 'all' ? resultFilter : undefined,
       includeTest,
     }), 'automation-runs.csv')
+      .then((result) => {
+        // R495: 上限で切れたら件数と分け方を知らせる。全部出たときは黙る。
+        if (result.truncated && result.totalCount !== null) {
+          const rest = result.totalCount - (result.returnedCount ?? 0)
+          setRetryNotice(
+            `5,000件までしか出ませんでした（対象${formatNumber(result.totalCount)}件・残り${formatNumber(rest)}件）。期間や絞り込みで分けて出してください。`,
+          )
+        }
+      })
       .catch(() => setRetryNotice('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
       .finally(() => setCsvBusy(false))
   }
+
+  /*
+   * R488: 1人テストの結果から `?run=<実行ID>` でこの記録へ飛べる。
+   * 一覧に無い実行（テスト実行など）でも、詳細だけ開く。
+   * R493: 取得の失敗は黙って捨てない。一覧はそのまま使える状態にし、
+   * 詳細の場所で失敗と「もう一度読む」を出す（403は権限不足で再試行なし）。
+   */
+  useEffect(() => {
+    const runId = new URLSearchParams(window.location.search).get('run')
+    if (!runId) return
+    setDeepLinkRunId(runId)
+    const accountAtStart = selectedAccountRef.current
+    let cancelled = false
+    setDeepLinkLoading(true)
+    setDeepLinkError(null)
+    api.automations.getRun(runId)
+      .then((response) => {
+        if (cancelled || selectedAccountRef.current !== accountAtStart) return
+        if (!response.success) {
+          setDeepLinkError('error')
+          return
+        }
+        const detail = response.data
+        setSelectedRun({
+          id: detail.id,
+          occurredAt: detail.occurredAt,
+          subject: detail.friendName,
+          accountLabel: detail.accountLabel,
+          triggerLabel: detail.triggerLabel,
+          status: detail.status,
+          detail: detail.detail,
+          durationMs: detail.durationMs,
+          automationName: detail.automationName,
+          canRetry: detail.canRetry,
+          versionNumber: detail.versionNumber,
+          isTest: detail.isTest,
+          canCancel: detail.canCancel,
+        })
+        setSelectedDetail(detail)
+        setDeepLinkError(null)
+      })
+      .catch((caught: unknown) => {
+        if (cancelled || selectedAccountRef.current !== accountAtStart) return
+        setDeepLinkError(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
+      })
+      .finally(() => {
+        if (!cancelled && selectedAccountRef.current === accountAtStart) setDeepLinkLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [deepLinkReloadKey])
 
   return (
     <div data-design-node="DkPY0" className="flex flex-col gap-4">
@@ -315,8 +468,12 @@ export default function AutomationRunsPage() {
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 動いた記録</p>
         {runPermissions?.canExport ? (
           <div className="text-right">
-            <Button disabled={csvBusy} onClick={downloadRunsCsv}>{csvBusy ? '書き出しています…' : 'CSVで書き出す'}</Button>
-            <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます</p>
+            <Button disabled={csvBusy} onClick={downloadRunsCsv} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button>
+            {data && data.pagination.total > 5000 ? (
+              <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みは{formatNumber(data.pagination.total)}件あり、5,000件までしか出ません。期間や絞り込みで分けて出してください。</p>
+            ) : (
+              <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます（5,000件まで）</p>
+            )}
           </div>
         ) : null}
       </div>
@@ -324,10 +481,10 @@ export default function AutomationRunsPage() {
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="この30日に動いた" value={data ? `${data.summary.executed.toLocaleString('ja-JP')}回` : '—'} note={data ? '実行結果を集計' : '未取得'} />
-        <Metric label="失敗した" value={data ? `${data.summary.failed.toLocaleString('ja-JP')}回` : '—'} note="処理結果を確認してください" />
-        <Metric label="いちばん動いた" value={data?.summary.mostRunName ?? '—'} note={data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined ? `${data.summary.mostRunCount.toLocaleString('ja-JP')}回` : '未取得'} />
-        <Metric label="条件に外れて動かなかった" value={data ? `${data.summary.skipped.toLocaleString('ja-JP')}回` : '—'} note="条件が厳しすぎないか見てください" />
+        <Metric label="この30日に動いた" value={data ? `${formatNumber(data.summary.executed)}回` : '—'} note={data ? '実行結果を集計' : '未取得'} />
+        <Metric label="失敗した" value={data ? `${formatNumber(data.summary.failed)}回` : '—'} note="処理結果を確認してください" />
+        <Metric label="いちばん動いた" value={data?.summary.mostRunName ?? '—'} note={data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined ? `${formatNumber(data.summary.mostRunCount)}回` : '未取得'} />
+        <Metric label="条件に外れて動かなかった" value={data ? `${formatNumber(data.summary.skipped)}回` : '—'} note="条件が厳しすぎないか見てください" />
       </KpiCollapse>
 
       <Notice tone="info" message="オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。" className="mb-4" />
@@ -346,10 +503,10 @@ export default function AutomationRunsPage() {
 
       <div className="flex flex-wrap gap-2" aria-label="結果で絞り込む">
         {([
-          ['all', 'すべて', data?.summary.total.toLocaleString('ja-JP') ?? '—'],
-          ['executed', '動いた', data?.summary.executed.toLocaleString('ja-JP') ?? '—'],
-          ['skipped', '条件に外れた', data?.summary.skipped.toLocaleString('ja-JP') ?? '—'],
-          ['problems', '失敗', data?.summary.failed.toLocaleString('ja-JP') ?? '—'],
+          ['all', 'すべて', formatNumber(data?.summary.total) ?? '—'],
+          ['executed', '動いた', formatNumber(data?.summary.executed) ?? '—'],
+          ['skipped', '条件に外れた', formatNumber(data?.summary.skipped) ?? '—'],
+          ['problems', '失敗', formatNumber(data?.summary.failed) ?? '—'],
         ] as const).map(([value, label, total]) => (
           <FilterChip key={value} selected={resultFilter === value} onChange={() => changeResultFilter(value)} count={total}>{label}</FilterChip>
         ))}
@@ -364,14 +521,14 @@ export default function AutomationRunsPage() {
           <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>いつ・だれに</span><span>オートメーション</span><span>結果</span><span>したこと</span><span>かかった時間</span><span aria-hidden />
           </div>
           {data.items.map((run) => (
             <div key={run.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
               <div className="min-w-0"><p className="truncate font-semibold text-ink">{formatOccurredAt(run.occurredAt)} ／ {run.subject ?? '友だち名なし'}</p><p className="truncate text-xs text-ink-faint">{run.accountLabel ?? 'アカウント名なし'}</p></div>
-              <div className="min-w-0"><p className="truncate text-ink" title={run.automationName}>{run.automationName}<span className="ml-1 text-xs font-normal text-ink-faint">v{run.versionNumber}</span>{run.isTest ? <span className="ml-1 rounded-full border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト</span> : null}</p><p className="truncate text-xs text-ink-faint" title={run.triggerLabel}>{run.triggerLabel}</p></div>
+              <div className="min-w-0"><p className="truncate text-ink" title={run.automationName}>{run.automationName}<span className="ml-1 text-xs font-normal text-ink-faint">v{run.versionNumber}</span>{run.isTest ? <span className="ml-1 rounded-pill border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト</span> : null}</p><p className="truncate text-xs text-ink-faint" title={run.triggerLabel}>{run.triggerLabel}</p></div>
               <span className={run.status === 'permanent_failed' || run.status === 'partial' || run.status === 'retry_wait' ? 'font-semibold text-danger' : run.status === 'succeeded' ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{STATUS_LABEL[run.status]}</span>
               <p className="truncate text-ink-secondary" title={run.detail ?? '何もしていません'}>{run.detail ?? '何もしていません'}</p>
               <span className="tabular-nums text-ink-secondary">{formatDuration(run.durationMs)}</span>
@@ -381,9 +538,7 @@ export default function AutomationRunsPage() {
                   <Button
                     onClick={() => void retryRun(run)}
                     disabled={retryingId !== null}
-                    title="失敗した処理だけを再実行します"
-                  >
-                    {retryingId === run.id ? '実行中' : 'もう一度やる'}
+                    title="失敗した処理だけを再実行します" busy={retryingId === run.id} busyLabel="実行中">もう一度やる
                   </Button>
                 ) : null}
               </div>
@@ -407,8 +562,27 @@ export default function AutomationRunsPage() {
         </div>
       )}
 
+      {!selectedRun && deepLinkRunId ? (
+        deepLinkLoading ? (
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+            <p className="text-sm text-ink-faint">読み込んでいます</p>
+          </section>
+        ) : deepLinkError === 'forbidden' ? (
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+            <p className="text-sm text-ink-secondary">この実行を見る権限がありません。</p>
+          </section>
+        ) : deepLinkError === 'error' ? (
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-ink-secondary">詳細を読み込めませんでした。記録は消えていません。</p>
+              <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読む</Button>
+            </div>
+          </section>
+        ) : null
+      ) : null}
+
       {selectedRun ? (
-        <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-label="実行記録の中身">
+        <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-info">実行記録の中身</p>
@@ -416,7 +590,7 @@ export default function AutomationRunsPage() {
                 {selectedRun.automationName}
                 <span className="ml-2 text-sm font-normal text-ink-faint">版 v{(selectedDetail ?? selectedRun).versionNumber}</span>
                 {(selectedDetail ?? selectedRun).isTest ? (
-                  <span className="ml-2 rounded-full border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト実行</span>
+                  <span className="ml-2 rounded-pill border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト実行</span>
                 ) : null}
                 {/* #1043: 実行した版といまの公開版を区別する。 */}
                 {selectedDetail ? (
@@ -447,6 +621,13 @@ export default function AutomationRunsPage() {
             <p className="text-xs font-semibold text-ink-faint">処理ごとの結果</p>
             {detailLoading ? (
               <p className="mt-2 text-sm text-ink-faint">読み込んでいます</p>
+            ) : detailError === 'forbidden' ? (
+              <p className="mt-2 text-sm text-ink-secondary">この実行を見る権限がありません。</p>
+            ) : detailError === 'error' ? (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <p className="text-sm text-ink-secondary">詳細を読み込めませんでした。記録は消えていません。</p>
+                <Button onClick={() => setDetailReloadKey((key) => key + 1)}>もう一度読む</Button>
+              </div>
             ) : selectedDetail && selectedDetail.steps.length > 0 ? (
               <ul className="mt-2 divide-y divide-hairline rounded-control border border-hairline">
                 {selectedDetail.steps.map((step) => (
@@ -479,18 +660,16 @@ export default function AutomationRunsPage() {
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {selectedRun.canRetry && runPermissions?.canOperate ? (
-              <Button onClick={() => void retryRun(selectedRun)} disabled={retryingId !== null}>
-                {retryingId === selectedRun.id ? '実行中' : '失敗した処理をもう一度やる'}
+              <Button onClick={() => void retryRun(selectedRun)} disabled={retryingId !== null} busy={retryingId === selectedRun.id} busyLabel="実行中">失敗した処理をもう一度やる
               </Button>
             ) : null}
             {selectedRun.canCancel && runPermissions?.canOperate ? (
               confirmCancel ? (
                 <>
-                  <span className="text-xs font-semibold text-danger">この実行を取りやめますか？記録は残りますが、実行は戻せません。</span>
-                  <Button onClick={() => void cancelRun(selectedRun)} disabled={cancellingId !== null}>
-                    {cancellingId === selectedRun.id ? '取りやめ中' : '取りやめる'}
+                  <span className="text-xs font-semibold text-danger">「{selectedRun.accountLabel ?? '選択中のアカウント'}」の実行を取りやめますか？記録は残りますが、実行は戻せません。</span>
+                  <Button onClick={() => void cancelRun(selectedRun)} disabled={cancellingId !== null} busy={cancellingId === selectedRun.id} busyLabel="取りやめ中">取りやめる
                   </Button>
-                  <Button onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>やめる</Button>
+                  <Button onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>キャンセル</Button>
                 </>
               ) : (
                 <Button onClick={() => setConfirmCancel(true)} disabled={cancellingId !== null}>この実行を取りやめる</Button>
@@ -514,7 +693,7 @@ function RunDetail({ label, value }: { label: string; value: string }) {
 
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
+    <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
       <p className="text-xs font-semibold text-ink-faint">{label}</p>
       <p className="mt-1 truncate text-xl font-bold text-ink" title={value}>{value}</p>
       <p className="mt-1 truncate text-xs text-ink-faint" title={note}>{note}</p>

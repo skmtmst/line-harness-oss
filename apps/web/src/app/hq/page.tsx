@@ -6,6 +6,7 @@ import { api, fetchApi } from '@/lib/api'
 import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -23,7 +24,8 @@ export default function HqPage() {
   const { setSelectedAccountId, refreshAccounts } = useAccount()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  // M021：捕まえた失敗を持ち、共通部品へ渡す（403 は権限の案内になる）。
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
   const [checkingConnections, setCheckingConnections] = useState(false)
   const [connectionProgress, setConnectionProgress] = useState('')
@@ -31,7 +33,7 @@ export default function HqPage() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const load = useCallback(async () => {
-    setError('')
+    setLoadError(null)
     const accountResponse = await api.lineAccounts.list()
     if (!accountResponse.success) throw new Error(accountResponse.error)
     setAccounts(accountResponse.data as AccountWithStats[])
@@ -40,8 +42,8 @@ export default function HqPage() {
   useEffect(() => {
     let cancelled = false
     void load()
-      .catch(() => {
-        if (!cancelled) setError('統括のアカウント情報を読み込めませんでした。時間をおいてもう一度お試しください。')
+      .catch((caught: unknown) => {
+        if (!cancelled) setLoadError(caught)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -115,41 +117,45 @@ export default function HqPage() {
           type="button"
           variant="secondary"
           disabled={checkingConnections || loading || accounts.length === 0}
-          onClick={() => { void refreshConnectionInfo() }}
-        >
-          {checkingConnections ? '接続情報を更新中' : 'LINE ID・接続状態を更新'}
+          onClick={() => { void refreshConnectionInfo() }} busy={checkingConnections} busyLabel="接続情報を更新中">LINE ID・接続状態を更新する
         </Button>
         <Button href="/accounts/new" variant="primary" className="shrink-0">
-          ＋ LINEアカウントを新規登録
+          ＋ LINEアカウントを登録する
         </Button>
       </div>
 
       {connectionProgress ? <p className="mb-4 text-sm text-ink-secondary" role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone="info" message={connectionResult} className="mb-4" /> : null}
 
-      {error ? (
+      {/*
+        M021：読み込み 403 は権限不足として区別する。再試行口は残すが、
+        403（押しても直らない）には出さない。
+      */}
+      {loadError ? (
         <Notice
           tone="danger"
-          message={error}
+          message={loadFailureNotice(loadError, '統括のアカウント情報')}
           action={
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}
-            >
-              再読み込み
-            </Button>
+            classifyApiFailure(loadError) === 'forbidden' ? undefined : (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}
+              >
+                再読み込み
+              </Button>
+            )
           }
         />
       ) : null}
 
-      {!error && loading ? (
+      {!loadError && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
+          <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
 
-      {!error && !loading ? (
+      {!loadError && !loading ? (
         <>
           {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
           <KpiCollapse data-design="KPIs" data-design-node="w7yY6" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -161,17 +167,17 @@ export default function HqPage() {
         </>
       ) : null}
 
-      {!error && !loading && accounts.length === 0 ? (
+      {!loadError && !loading && accounts.length === 0 ? (
         <ListState
           kind="empty"
           data-design="Empty"
           title="まだアカウントがありません"
           description="最初のLINE公式アカウントを登録すると、ここからアカウントへログインできます。"
-          action={<Button href="/accounts/new" variant="primary">＋ LINEアカウントを新規登録</Button>}
+          action={<Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録する</Button>}
         />
       ) : null}
 
-      {!error && !loading && accounts.length > 0 ? (
+      {!loadError && !loading && accounts.length > 0 ? (
         <HqAccountList accounts={accounts} onSelect={login} onSettings={setEditingAccount} />
       ) : null}
 

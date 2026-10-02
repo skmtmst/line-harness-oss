@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { CloudOff, FileSearch, List, RotateCw, SearchX } from 'lucide-react'
 import Button from './button'
+import { loadFailureCopy } from './api-error-message'
 import styles from './target-missing.module.css'
 
 /**
@@ -44,6 +45,12 @@ export type TargetMissingProps = {
   backLabel?: string
   /** もう一度読み込む（`error`）。 */
   onRetry?: () => void
+  /**
+   * 捕まえた取得失敗（m23m）。`error` のときだけ見る。
+   * 403 は権限の案内にし、押しても直らない再試行の口は出さない。
+   * 429 は待ち秒数（`Retry-After` があれば使う）を添える。
+   */
+  error?: unknown
   /** 読み直している間。二度押しを止める。 */
   retrying?: boolean
   /**
@@ -61,12 +68,16 @@ export default function TargetMissing({
   backHref,
   backLabel,
   onRetry,
+  error,
   retrying = false,
   accountName,
 }: TargetMissingProps) {
   const Icon = ICONS[kind]
   const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
-  const showRetry = kind === 'error' && onRetry
+  // 403 は押しても直らないので、再試行の口は出さない。
+  // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
+  const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面') : null
+  const showRetry = kind === 'error' && (failure && !failure.retryable ? undefined : onRetry)
   const accountLine =
     kind === 'not-found' && accountName ? `いまの LINE アカウントは「${accountName}」です。` : null
 
@@ -81,9 +92,8 @@ export default function TargetMissing({
     )
   } else if (showRetry) {
     action = (
-      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying}>
-        <RotateCw aria-hidden="true" size={16} />
-        {retrying ? '読み込んでいます' : 'もう一度読み込む'}
+      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
+        <RotateCw aria-hidden="true" size={16} />もう一度読み込む
       </Button>
     )
   }

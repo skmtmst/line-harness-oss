@@ -13,11 +13,14 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import TemplateAssetEditor from '../template-asset-editor'
+import type { TemplateDetailData } from '../template-detail-data'
+import { isTemplateDetailData } from '../template-detail-data'
 import {
   EMPTY_TEMPLATE_REFERENCES,
   MessageTemplateEditor,
   TemplateInsertControls,
   buildTemplatePreview,
+  extractMessageUrls,
   previewDateValue,
   type TemplateReferences,
   type TemplateReferenceState,
@@ -257,11 +260,13 @@ function TemplateAccountNotice({
   )
 }
 
+/**
+ * D007/D008: 詳細口の応答の形の番人は `../template-detail-data` に1つだけ
+ * （先頭で読み込んでいる）。編集と詳細の両方で同じものを使う。
+ * 形が違う応答はここでは受け取らず、「読み込めませんでした」へ回す。
+ */
+
 /** 詳細口（GET /api/templates/:id）が返す利用先の形。 */
-type TemplateDetailData = Extract<
-  Awaited<ReturnType<typeof api.templates.get>>,
-  { success: true }
->['data']
 type TemplateUsedBy = TemplateDetailData['usedBy']
 
 /**
@@ -546,7 +551,8 @@ function TemplateEditInner() {
     void api.templates
       .get(id)
       .then((res) => {
-        if (!res.success) {
+        // D007: success:true でも形が違う応答は「読み込めませんでした」へ。
+        if (!res.success || !isTemplateDetailData(res.data)) {
           accept((prev) => ({ ...prev, status: 'failed' }))
           return
         }
@@ -688,8 +694,7 @@ function TemplateEditInner() {
           actions={(
             <>
               <Button href="/templates">キャンセル</Button>
-              <Button type="button" variant="primary" onClick={save} disabled={saving || loadFailed || saveGuard !== null} title={saveGuard ?? undefined}>
-                {saving ? '保存中...' : '保存'}
+              <Button type="button" variant="primary" onClick={save} disabled={saving || loadFailed || saveGuard !== null} title={saveGuard ?? undefined} busy={saving} busyLabel="保存中...">保存する
               </Button>
             </>
           )}
@@ -724,6 +729,8 @@ const TemplateEditPageWithTestSupport = Object.assign(TemplateEditPage, {
     TemplateUsageNotice,
     templateUsageEntries,
     buildTemplatePreview,
+    extractMessageUrls,
+    isTemplateDetailData,
     loadTemplateReferences,
     previewDateValue,
     requestTemplateReferences,

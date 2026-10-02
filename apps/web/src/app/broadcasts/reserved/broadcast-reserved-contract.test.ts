@@ -44,12 +44,22 @@ describe('V6 一斉配信の予約完了', () => {
       `—` にし、理由を副文で言う。0人（本当に誰にも届かない）とは別物。
     */
     expect(PAGE).toContain('対象人数は現在確認できません。')
-    expect(PAGE).toContain('estimate.hiddenExcluded.toLocaleString')
+    expect(PAGE).toContain('formatNumber(estimate.hiddenExcluded')
   })
 
   it('選択中アカウントと所属先が違う配信を表示しない', () => {
     expect(PAGE).toContain('belongsToAccount(broadcast, selectedAccountId)')
     expect(PAGE).toContain('選択中のアカウントの配信ではありません')
+  })
+
+  it('対象なしと通信失敗を混ぜず、戻り口と再試行を分ける（R582）', () => {
+    expect(PAGE).toContain('err instanceof ApiError && err.status === 404')
+    expect(PAGE).toContain('予約した配信が見つかりません')
+    expect(PAGE).toContain('kind="not-found"')
+    expect(PAGE).toContain('配信予定へ戻る')
+    // 通信失敗は同画面の再試行。存在しない旨とは別の1枚。
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('onRetry={() => void load()}')
   })
 
   it('遲れて返った別の予約の結果で画面を上書きしない', () => {

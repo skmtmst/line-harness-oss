@@ -38,10 +38,14 @@ describe('V6共通情報一覧', () => {
   })
 
   it('独立した詳細・フォルダ・予約の読み込みは並列に行う', () => {
-    expect(EDIT_PAGE).toContain('const [detail, folderList, scheduleList] = await Promise.all([')
+    // R591: 並列のまま、結果は欄ごとに扱う。フォルダ・予定の失敗で
+    // 詳細の結果まで捨てない（直列の滝に戻さない）。
+    expect(EDIT_PAGE).toContain('await Promise.all([')
     expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
     expect(EDIT_PAGE).toContain("api.folders.list('common_var')")
     expect(EDIT_PAGE).toContain('api.commonVars.schedules(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain('setFoldersError(true)')
+    expect(EDIT_PAGE).toContain('setSchedulesError(true)')
   })
 
   it('一覧は種別を出さず、Qで「状態」列を足した7列を固定する', () => {
@@ -68,6 +72,16 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).not.toContain('placeholderText(item.name)')
     expect(EDIT_PAGE).toContain('placeholderText(item.varKey)')
     expect(EDIT_PAGE).not.toContain('placeholderText(item.name)')
+  })
+
+  it('操作列は「編集」「削除する」の2個分の幅を持ち、隣の列へはみ出さない', () => {
+    // #1057で「削除」→「削除する」に延び、w-36（144px）では行のボタンが
+    // 隣の「使われている場所」へ被った（1152pxで再現）。2個と間隔で約148px
+    // 要るため、列幅176px（w-44）・内余白8px（px-2）・表の最小幅696pxにする。
+    expect(PAGE).toContain('min-w-[696px]')
+    expect(PAGE).toContain('sticky right-0 w-44 px-2 py-3')
+    expect(PAGE).toContain('sticky right-0 px-2 py-3 text-right')
+    expect(PAGE).not.toContain('sticky right-0 w-36 px-4 py-3')
   })
 
   it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
@@ -103,13 +117,12 @@ describe('V6共通情報一覧', () => {
   })
 
   it('新規・編集は未保存の入力を持ったまま出る操作を確認で止める（VAR-01 監査）', () => {
-    // リッチメニュー・ウェビナーと同じ useUnsavedGuard＋確認ダイアログの形。
+    // 文言は共通窓 UnsavedLeaveDialog が1つに持つ。画面側は subject の名詞だけを渡す。
     // 「戻る」で確認なしに入力が捨てられないよう、両画面で同じ契約を固定する。
     for (const [name, src] of [['新規', NEW_PAGE], ['編集', EDIT_PAGE]] as const) {
       expect(src, name).toContain('useUnsavedGuard')
-      expect(src, name).toContain('保存していない変更があります')
-      expect(src, name).toContain('保存せずに移動')
-      expect(src, name).toContain('編集を続ける')
+      expect(src, name).toContain('UnsavedLeaveDialog')
+      expect(src, name).toContain('leaveTarget !== null')
     }
     // 編集画面は影響確認（ImpactReview）へ切り替えた表示でも離脱確認が出る。
     expect(EDIT_PAGE).toContain('{leaveConfirmDialog}')

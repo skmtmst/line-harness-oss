@@ -3,7 +3,8 @@ import {
   getFriendFields,
   getFriendFieldsForScope,
   getFriendFieldByIdForScope,
-  createFriendFieldForScope,
+  createFriendFieldIdempotent,
+  FriendFieldCreateError,
   updateFriendField,
   reorderFriendFields,
   deleteFriendField,
@@ -22,8 +23,8 @@ import {
   executeFieldMigration,
   getFriendFieldsWithValues,
   getFriendById,
-  setFriendFieldValue,
   setFriendFieldValuesBulk,
+  setFriendFieldValuesForFriend,
   jstNow,
   validateFieldKey,
   validateFriendFieldValue,
@@ -250,8 +251,13 @@ function convertMigrationValue(value: string, targetType: FriendFieldType): Omit
   const trimmed = value.trim();
   if (!trimmed) return { convertedValue: null, status: 'invalid', reason: '空欄です' };
   if (targetType === 'number') {
+    /*
+     * R549: 保存側（validateFriendFieldValue）と同じ物差しで判定する。
+     * 以前は Number() で見ていたため 0x10・1e5 などを「移せる」と数え、
+     * 保存では拒否されて件数が合わなかった。カンマ区切りは両側で外す。
+     */
     const normalized = trimmed.replace(/,/g, '');
-    return Number.isFinite(Number(normalized))
+    return /^[-+]?(\d+(\.\d+)?|\.\d+)$/.test(normalized) && Number.isFinite(Number(normalized))
       ? { convertedValue: normalized, status: 'convertible', reason: null }
       : { convertedValue: null, status: 'review', reason: '数値として確認できません' };
   }
@@ -476,6 +482,17 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
       return c.json({ success: false, code: 'PREVIEW_STALE', error: '事前確認後に値または使用先が変わりました。やり直してください' }, 409);
     }
     if (!await queueFieldMigration(c.env.DB, run.id, idempotencyKey)) {
+      /*
+       * D036: 前の試しが途中で止まった分は続けられる。実行は「まだの行だけ」を
+       * 拾い直し、件数は表から数え直すため、値を二重に書かない。
+       * 終わった分・止めた分は今までどおり409で断る。
+       */
+      const current = await getFieldMigrationRun(c.env.DB, run.id, scope);
+      if (current && (current.status === 'queued' || current.status === 'running')) {
+        const resume = executeFieldMigration(c.env.DB, run.id, target.type as FriendFieldType, c.get('staff').id);
+        try { c.executionCtx.waitUntil(resume); } catch { await resume; }
+        return c.json({ success: true, data: { runId: run.id } }, 202);
+      }
       return c.json({ success: false, code: 'RUN_STATE_CHANGED', error: '移行状態が変わりました。実行状況を確認してください' }, 409);
     }
     const execution = executeFieldMigration(c.env.DB, run.id, target.type as FriendFieldType, c.get('staff').id);
@@ -510,6 +527,15 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
   try {
     const scope = await friendFieldAccess(c);
     if (scope instanceof Response) return scope;
+    /*
+     * R515: 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
+     * 同じキー・同じ内容の再送は保存済みの項目を返し、同じキーに
+     * 異なる内容が来たら作らず409で止める（対応マークと同じ約束）。
+     */
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+    if (!idempotencyKey || idempotencyKey.length > 128) {
+      return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+    }
     const body = await c.req.json<Record<string, unknown>>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -547,7 +573,7 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
     const defaultValue = validateDefaultValue(body.defaultValue, type, options.items);
     if (!defaultValue.ok) return c.json({ success: false, error: defaultValue.error }, 422);
 
-    const field = await createFriendFieldForScope(c.env.DB, scope, {
+    const { field, replayed } = await createFriendFieldIdempotent(c.env.DB, scope, {
       name,
       fieldKey: String(body.fieldKey),
       type,
@@ -560,9 +586,13 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
       isPersonal: body.isPersonal === true,
       isStarred: body.isStarred === true,
       displayOrder: Number(body.displayOrder ?? 0),
-    });
-    return c.json({ success: true, data: serialize(field) }, 201);
+    }, idempotencyKey);
+    // 再送で保存済みを返したときは200、新しく作ったときは201。
+    return c.json({ success: true, data: serialize(field) }, replayed ? 200 : 201);
   } catch (err) {
+    if (err instanceof FriendFieldCreateError) {
+      return c.json({ success: false, code: err.code, error: err.message }, 409);
+    }
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
@@ -694,7 +724,19 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), asyn
 
     const field = await updateFriendField(c.env.DB, id, patch);
     if (!field) {
-      return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの変更が先に保存されました。再読み込みしてください' }, 409);
+      /*
+       * R517: 版が合わない再試行は、最新の内容を付けて409で返す。
+       * 画面は送った内容と比べ、保存済みか他人の変更かを案内する
+       * （対応マークの SUPPORT_MARK_VERSION_CONFLICT と同じ約束）。
+       */
+      const latest = await getFriendFieldByIdForScope(c.env.DB, id, scope);
+      if (!latest) return c.json({ success: false, error: '項目が見つかりません' }, 404);
+      return c.json({
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: 'ほかの変更が先に保存されました。最新の内容を確認してください',
+        data: { latest: serialize(latest) },
+      }, 409);
     }
     return c.json({ success: true, data: serialize(field!) });
   } catch (err) {
@@ -853,13 +895,18 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
       );
     }
 
-    for (const item of pending) {
-      await setFriendFieldValue(c.env.DB, {
+    /*
+     * M046: 複数項目の保存は同じ取引（1回のbatch）で確定する。
+     * 1件ずつ書くと、途中失敗で500なのに先に書けた分が残る部分保存になる。
+     * batchは原子的で、1文でも失敗したら永続変更は0件になる。
+     * 値は上で validate済みの正規化ずみが pending に入っている。
+     */
+    if (pending.length > 0) {
+      await setFriendFieldValuesForFriend(c.env.DB, {
         friendId,
-        fieldId: item.fieldId,
-        value: item.value,
+        entries: pending.map((item) => ({ fieldId: item.fieldId, value: item.value })),
         updatedBy: staff?.id ?? 'unknown',
-        field: item.field,
+        now: jstNow(),
       });
     }
 

@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 一覧の「中身が出せないとき」の1枚。
@@ -35,7 +36,7 @@
 .title {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -75,5 +76,15 @@
   .spin {
     animation: none;
   }
+}
+
+/*
+ * ★V8：空・読み込み中の1枚は白い板の中に出るので、真珠地のカードを
+ * 重ねず平らにする（入れ子のカードを置かない決まり）。高さ・中央寄せ・
+ * 文言の大きさは変えない。
+ */
+[data-theme='v8'] .root {
+  border-radius: 0;
+  background: transparent;
 }
 }

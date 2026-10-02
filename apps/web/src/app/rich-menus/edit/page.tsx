@@ -17,6 +17,7 @@ import { AreaProperties, intentOf } from '@/components/rich-menus/area-propertie
 import type { RichMenuAreaTapCount, RichMenuTargetPreview, RichMenuScheduleInput } from '@/lib/api'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -37,6 +38,7 @@ import { PublishHistorySection } from './publish-history'
 import { PublishProgressSection } from './publish-progress-section'
 import { PrepublishCheckSection } from './prepublish-check-section'
 import { TestApplySection } from './test-apply-section'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
  * 保存されている条件を読む。
@@ -131,6 +133,8 @@ type Group = {
   targetingEnabled: boolean
   /** 159: フォルダ。分けていなければ null。 */
   folderId: string | null
+  /** M951: 読んだときの版。保存時に送り返し、古ければ 409 で止まる。 */
+  version: number
   pages: Page[]
 }
 
@@ -237,7 +241,7 @@ export default function RichMenuEditPage() {
     <Suspense
       fallback={
         <div>
-          <p className="text-sm text-gray-500">読み込み中...</p>
+          <p className="text-sm text-ink-faint">読み込み中...</p>
         </div>
       }
     >
@@ -308,7 +312,7 @@ function Editor({
    * 公開のしかた（STEP3）の入力。工程の行き来（STEP1/2/3）で工程の部品が
    * 付け替わっても消えないよう、工程をまたぐここで持つ。予約の保存が
    * 成功した時点の入力を publishBaseline に写し、そこから変えた間だけ
-   * 未保存として扱う。「保存せずに移動」を選んだときだけ初期値へ戻す。
+   * 未保存として扱う。「保存せずに移る」を選んだときだけ初期値へ戻す。
    *
    * 入力はメニューIDごとに localStorage へ下書きとして残す
    * （publish-plan-draft.ts）。サーバーの下書きpayloadに公開予定の欄が
@@ -473,7 +477,7 @@ function Editor({
     busy: saving || publishing || unpublishing || deleting || busy,
   })
   /*
-   * 「保存せずに移動」を選んだときだけ、公開入力を初期値へ戻す。
+   * 「保存せずに移る」を選んだときだけ、公開入力を初期値へ戻す。
    * 取消・Escape（cancelLeave）では触らず、入力はそのまま残る。
    * 実際の遷移では画面ごと外れるが、確認の選択として明示しておく。
    */
@@ -485,18 +489,10 @@ function Editor({
    * N-162: 離脱確認の窓は step 1/2/3 のどこにいても出す。
    * targeting/publish は早期 return で別ツリーになるため、ここで要素化して
    * 全経路へ差し込む。step 1 だけに置くと、dirty 中のリンクが黙って止まり
-   * 「保存せずに移動」を選ぶ手段がなくなる。
+   * 「保存せずに移る」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
-    <ConfirmDialog primaryAction="cancel"
-      open={leaveTarget !== null}
-      title="保存していない変更があります"
-      description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
-      confirmLabel="保存せずに移動"
-      cancelLabel="編集を続ける"
-      onConfirm={confirmLeaveAndDiscard}
-      onCancel={cancelLeave}
-    ></ConfirmDialog>
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューへの変更" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
   )
 
   const closeConfirm = () => {
@@ -740,7 +736,14 @@ function Editor({
   }
 
   async function persistDraft(): Promise<void> {
+    // M951: 読んだときの版を付けて保存する。別画面・別タブで先に保存
+    // されていたら 409 になり、上書きせず読み直しを促す。
+    const version = group?.version
+    if (version === undefined) {
+      throw new Error('メニューを読み込めていません。一覧から開き直してください。')
+    }
     const res = await api.richMenuGroups.update(groupId, {
+      expectedVersion: version,
       name,
       chatBarText,
       isDefaultForAll,
@@ -859,7 +862,10 @@ function Editor({
       )
       await reload()
     } catch {
-      setConfirmError('取り下げできませんでした。しばらくおいてから、もう一度お試しください。')
+      // M953: LINE 側の削除に失敗したときは draft 確定にならず published の
+      // まま残る。メニューが LINE 上に残っていることを明示し、この窓のまま
+      // もう一度取り下げられるようにする（窓は閉じない）。
+      setConfirmError('LINE上のメニューを取り下げできませんでした。メニューはLINE上に残っています。最新の状態を確認して、もう一度お試しください。')
     } finally {
       setUnpublishing(false)
     }
@@ -990,7 +996,7 @@ function Editor({
   if (loading) {
     return (
       <div>
-        <p className="text-sm text-gray-500">読み込み中...</p>
+        <p className="text-sm text-ink-faint">読み込み中...</p>
       </div>
     )
   }
@@ -1158,32 +1164,25 @@ function Editor({
         {pages.map((p) => {
           const active = p.id === activePageId
           return (
-            <button
-              key={p.id}
-              onClick={() => {
+            <Button variant="primary" className={(`px-3 py-1.5 rounded-control text-sm font-medium transition-colors ${
+                active
+                  ? 'bg-accent-deep text-on-accent'
+                  : 'bg-shell text-ink-secondary hover:bg-shell-gray'
+              }`) + ' border-0 h-auto whitespace-normal'} key={p.id} onClick={() => {
                 setActivePageId(p.id)
                 setSelectedAreaId(null)
-              }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-accent-deep text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
+              }}>
               {p.name}
               {active && <span className="ml-1 text-xs opacity-80">編集中</span>}
               {p.id.startsWith('tmp-') && (
                 <span className="ml-1 text-xs opacity-70">(未保存)</span>
               )}
-            </button>
+            </Button>
           )
         })}
-        <button
-          onClick={addPage}
-          className="px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          + ページ追加
-        </button>
+        <Button variant="secondary" className="px-3 py-1.5 font-medium hover:bg-surface-pearl h-auto whitespace-normal" onClick={addPage}>
+          ＋ ページを追加する
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
@@ -1258,7 +1257,7 @@ function Editor({
               }}
             />
           ) : (
-            <p className="text-sm text-gray-500">ページがありません</p>
+            <p className="text-sm text-ink-faint">ページがありません</p>
           )}
 
           {/*
@@ -1278,7 +1277,7 @@ function Editor({
               </p>
             )}
           {/* メニュー設定 */}
-          <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
+          <section className="bg-canvas border border-hairline rounded-control shadow-card p-5 space-y-4">
             <h2 className="text-ink text-sm font-semibold">基本設定</h2>
             <p className="text-ink-faint text-xs">
               サイズ {SIZE_LABEL[group.size]} ・{' '}
@@ -1289,9 +1288,9 @@ function Editor({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="mt-1 block w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="mt-1 text-[11px] text-gray-500">管理画面でだけ使う名前 (友だちには見えない)</p>
+              <p className="mt-1 text-[11px] text-ink-faint">管理画面でだけ使う名前 (友だちには見えない)</p>
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
@@ -1308,35 +1307,35 @@ function Editor({
                 value={chatBarText}
                 onChange={(e) => setChatBarText(e.target.value)}
                 maxLength={14}
-                className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="mt-1 block w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="mt-1 text-[11px] text-gray-500">14 文字以内 (友だちのトーク画面でメニューを開く前に表示)</p>
+              <p className="mt-1 text-[11px] text-ink-faint">14 文字以内 (友だちのトーク画面でメニューを開く前に表示)</p>
             </label>
           </section>
 
           {/* ページ設定 (画像 upload 含む、常時表示) */}
           {activePage && (
-            <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
+            <section className="bg-canvas border border-hairline rounded-control shadow-card p-5 space-y-4">
               <h2 className="text-ink text-sm font-semibold">タブ（メニューの切り替え）</h2>
               <p className="text-ink-faint text-xs leading-relaxed">
                 1つのメニューの中でタブを分けられます。タブのボタンを押すと別の面に切り替わります。タブは2〜3つまでを推奨します。多いと押されなくなります。
               </p>
               <label className="block">
-                <span className="text-xs font-medium text-gray-600">ページ名</span>
+                <span className="text-xs font-medium text-ink-secondary">ページ名</span>
                 <input
                   value={activePage.name}
                   onChange={(e) =>
                     updatePage(activePage.id, { name: e.target.value })
                   }
-                  className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="mt-1 block w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </label>
               <div>
-                <span className="text-xs font-medium text-gray-600">画像</span>
+                <span className="text-xs font-medium text-ink-secondary">画像</span>
                 {activePage.imageR2Key ? (
-                  <p className="mt-1 text-xs text-gray-700">✓ アップロード済み</p>
+                  <p className="mt-1 text-xs text-ink-secondary">✓ アップロード済み</p>
                 ) : (
-                  <p className="mt-1 text-xs text-gray-400">未設定</p>
+                  <p className="mt-1 text-xs text-ink-faint">未設定</p>
                 )}
                 <input
                   ref={fileInput}
@@ -1350,13 +1349,9 @@ function Editor({
                   }}
                 />
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => fileInput.current?.click()}
-                    disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                  <Button variant="secondary" className="px-3 py-1.5 text-xs font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={() => fileInput.current?.click()} disabled={busy || activePage.id.startsWith('tmp-')}>
                     {activePage.imageR2Key ? '画像を差し替え' : '画像を選択'}
-                  </button>
+                  </Button>
                   {/*
                     隣の「画像を選択」と同じ見た目。ただし hover の色だけは
                     生の gray-50 ではなく既存トークン canvas-sunken（同じ
@@ -1365,31 +1360,27 @@ function Editor({
                     素の button に書くと direct-secondary-button の借金に
                     数えられる）。
                   */}
-                  <button
-                    onClick={() => setMediaPickerOpen(true)}
-                    disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-canvas-sunken disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                  <Button variant="secondary" className="px-3 py-1.5 text-xs font-medium disabled:opacity-50 h-auto whitespace-normal" onClick={() => setMediaPickerOpen(true)} disabled={busy || activePage.id.startsWith('tmp-')}>
                     登録メディアから選ぶ
-                  </button>
+                  </Button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-gray-500">
+                <p className="mt-1.5 text-[11px] text-ink-faint">
                   PNG / JPEG, {SIZE_LABEL[group.size]}, 1MB 以下
                 </p>
                 {activePage.id.startsWith('tmp-') && (
-                  <p className="mt-1 text-[11px] text-amber-600">
+                  <p className="mt-1 text-[11px] text-status-warn-deep">
                     新規ページは「下書き保存」してから画像をアップロードしてください
                   </p>
                 )}
               </div>
-              <p className="text-[11px] text-gray-400 pt-3 border-t border-gray-100">
+              <p className="text-[11px] text-ink-faint pt-3 border-t border-divider-soft">
                 中央のキャンバスでドラッグして tap 領域 (areas) を追加・編集できます。
               </p>
             </section>
           )}
 
           {/* 誰に出すか（149） */}
-          <section className="bg-white border border-hairline rounded-lg shadow-sm p-5 space-y-4">
+          <section className="bg-canvas border border-hairline rounded-control shadow-card p-5 space-y-4">
             <div>
               <h2 className="text-ink text-sm font-semibold">誰に出すか</h2>
               <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
@@ -1439,7 +1430,7 @@ function Editor({
                 />
 
                 {!targetingCondition && (
-                  <p className="text-[11px] text-amber-600">
+                  <p className="text-[11px] text-status-warn-deep">
                     条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。
                   </p>
                 )}
@@ -1449,7 +1440,7 @@ function Editor({
 
           {/* 選択中エリア (area が選択されている時のみ追加表示) */}
           {selectedArea && activePage && (
-            <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
+            <section className="bg-canvas border border-hairline rounded-control shadow-card p-5">
               <AreaProperties
                 area={selectedArea}
                 pages={pagesForSelect}
@@ -1477,7 +1468,7 @@ function Editor({
 
       {/* N-154: 複製は消える操作ではないので、危険な操作とは分けて置く。 */}
       {canOperate ? (
-        <section className="mt-10 bg-canvas border border-hairline rounded-lg shadow-sm p-5">
+        <section className="mt-10 bg-canvas border border-hairline rounded-control shadow-card p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="text-sm font-medium text-ink">このメニューを複製</div>
@@ -1501,17 +1492,17 @@ function Editor({
       ) : null}
 
       {/* ─────────── 危険な操作 (画面最下部に分離) ─────────── */}
-      <section className="mt-10 bg-red-50 border border-red-200 rounded-lg shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-red-700 mb-1">危険な操作</h2>
-        <p className="text-xs text-red-600 mb-4">
+      <section className="mt-10 bg-danger-bg border border-status-danger-border rounded-control shadow-card p-5">
+        <h2 className="text-sm font-semibold text-danger mb-1">危険な操作</h2>
+        <p className="text-xs text-danger mb-4">
           以下の操作は元に戻せません。誤操作を避けるため、別セクションにまとめています。
         </p>
         <div className="space-y-3">
           {group.status === 'published' && (
-            <div className="flex items-start justify-between gap-4 bg-white border border-red-200 rounded-lg p-4">
+            <div className="flex items-start justify-between gap-4 bg-canvas border border-status-danger-border rounded-control p-4">
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">LINE から取り下げ</div>
-                <div className="text-xs text-gray-600 mt-0.5">
+                <div className="text-sm font-medium text-ink">LINE から取り下げ</div>
+                <div className="text-xs text-ink-secondary mt-0.5">
                   LINE 公式アカウント上のメニュー登録 (alias / richmenu / 全員のデフォルト設定) を解除します。
                   友だちのトーク画面からメニューが消えます。下書きに戻すので、再登録すれば復旧できます。
                 </div>
@@ -1522,36 +1513,36 @@ function Editor({
                   setConfirmKind('unpublish')
                 }}
                 disabled={saving || publishing || unpublishing || busy}
-                className="shrink-0 px-3 py-2 text-sm font-medium border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+                className="shrink-0 px-3 py-2 text-sm font-medium border border-status-danger-border text-danger bg-canvas rounded-control hover:bg-danger-bg disabled:opacity-50 transition-colors"
               >
                 {unpublishing ? '取り下げ中...' : 'LINE から取り下げ'}
               </button>
             </div>
           )}
           {activePage && pages.length > 1 && (
-            <div className="flex items-start justify-between gap-4 bg-white border border-red-200 rounded-lg p-4">
+            <div className="flex items-start justify-between gap-4 bg-canvas border border-status-danger-border rounded-control p-4">
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">
+                <div className="text-sm font-medium text-ink">
                   ページ「{activePage.name}」を削除
                 </div>
-                <div className="text-xs text-gray-600 mt-0.5">
+                <div className="text-xs text-ink-secondary mt-0.5">
                   現在表示中のページを削除します。他のページから「タブ切替」でこのページを参照している場合は事前に解除が必要です。
                 </div>
               </div>
               <button
                 onClick={() => askRemovePage(activePage)}
-                className="shrink-0 px-3 py-2 text-sm font-medium border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-50 transition-colors"
+                className="shrink-0 px-3 py-2 text-sm font-medium border border-status-danger-border text-danger bg-canvas rounded-control hover:bg-danger-bg transition-colors"
               >
-                ページ削除
+                ページを削除する
               </button>
             </div>
           )}
-          <div className="flex items-start justify-between gap-4 bg-white border border-red-300 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-4 bg-canvas border border-status-danger-border rounded-control p-4">
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900">
+              <div className="text-sm font-medium text-ink">
                 このリッチメニュー全体を削除
               </div>
-              <div className="text-xs text-gray-600 mt-0.5">
+              <div className="text-xs text-ink-secondary mt-0.5">
                 {group.status === 'published'
                   ? '⚠ 先に「LINE から取り下げ」を実行してください。LINE 上のメニューが残ったままだと友だちに表示され続けます。'
                   : '管理画面と DB から完全に削除します。元には戻せません。'}
@@ -1559,10 +1550,10 @@ function Editor({
             </div>
             <button
               onClick={handleDelete}
-              className="shrink-0 px-3 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#dc2626' }}
+              className="shrink-0 px-3 py-2 text-sm font-medium text-on-accent rounded-control transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'var(--color-danger)' }}
             >
-              削除
+              削除する
             </button>
           </div>
         </div>
@@ -1657,9 +1648,19 @@ function Editor({
         onConfirm={() => void handlePublish()}
         onCancel={closeConfirm}
       >
-        <ul className="text-ink-secondary space-y-1 text-xs leading-5">
-          <li>・まだ起きないこと: この操作だけでは、友だちのトーク画面には出ません。</li>
-          <li>・次にすること: 友だちに見せるには、登録後に一覧の「友だちに表示」を実行してください。</li>
+        {/*
+        R204: aside と公開成功案内と同じく、確認窓でも設定別に出る人を言う。
+        全設定共通の「出ません／友だちに表示を実行」では、全員既定・条件ありの
+        場合と矛盾する。言い回しは成功案内とそろえる。
+      */}
+      <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+          <li>・出る人: {isDefaultForAll
+            ? '個別に指定した人を除く、すべての友だちの既定メニューになります。'
+            : targetingEnabled
+              ? (targetingCondition
+                ? '条件に当てはまる人の画面に、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+                : 'いまの条件では誰にも出ません（今0人）。条件を決めるか、「条件で出し分ける」をオフにしてください。')
+              : 'この操作だけでは、友だちのトーク画面には出ません。出すには登録後に一覧の「表示先」から操作してください。'}</li>
           <li>・戻せます: 登録したあとでも「LINEから取り下げ」で下書きに戻せます。</li>
         </ul>
       </ConfirmDialog>
@@ -1727,13 +1728,9 @@ function Editor({
           >
             プレビュー
           </Checkbox>
-          <button
-            onClick={handleSave}
-            disabled={saving || publishing || unpublishing || busy}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
-          >
-            {saving ? '保存中...' : '下書きに保存'}
-          </button>
+          <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={handleSave} disabled={saving || publishing || unpublishing || busy}>
+            {saving ? '保存中...' : '下書きを保存する'}
+          </Button>
           {/* #702: 共有Buttonのprimaryはaccent-deep＋白文字(5.44:1)。生のLINE緑だと2.78:1で落ちる。 */}
           <Button
             variant="primary"
@@ -1741,13 +1738,10 @@ function Editor({
               setConfirmError('')
               setConfirmKind('publish')
             }}
-            disabled={saving || publishing || unpublishing || busy}
-          >
-            {publishing
-              ? 'LINE 登録中...'
-              : group.status === 'published'
-                ? 'LINE に再登録'
-                : 'LINE に登録'}
+            disabled={saving || publishing || unpublishing || busy} busy={publishing} busyLabel="LINE 登録中...">
+            {group.status === 'published'
+                ? 'LINE に再登録する'
+                : 'LINE に登録する'}
           </Button>
         </div>
       )} />
@@ -1778,11 +1772,11 @@ function StepHeader({ active, groupId }: { active: 1 | 2 | 3; groupId: string })
             step.number === active ? 'bg-accent/5 text-accent-deep' : 'text-ink-secondary'
           }`}
         >
-          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${
             step.number === active ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-faint'
           }`}>{step.number}</span>
           <span className="min-w-0">
-            <span className="block text-xs font-bold tracking-wider">STEP {step.number}</span>
+            <span className="block text-xs font-medium tracking-wider">STEP {step.number}</span>
             <span className="block truncate text-sm font-semibold">{step.label}</span>
           </span>
         </button>
@@ -1795,7 +1789,7 @@ function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | un
   if (!metric || metric.state === 'unavailable' || metric.value === null) {
     return <span title={metric?.reason ?? '未取得'}>— <small className="text-ink-faint text-xs">（未取得）</small></span>
   }
-  return <>{metric.value.toLocaleString('ja-JP')}人</>
+  return <>{formatNumber(metric.value)}人</>
 }
 
 function TargetingStep({
@@ -1879,7 +1873,7 @@ function TargetingStep({
       {saveError ? <Notice tone="danger" message={saveError} className="mb-4" /> : null}
 
       <div className="grid gap-5 xl:grid-cols-3">
-        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card xl:col-span-2">
           <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
           <div className="mt-4">
             <RadioCardGroup legend="出す相手の選択" className="grid gap-3 sm:grid-cols-2">
@@ -1906,27 +1900,27 @@ function TargetingStep({
 
           {targetingEnabled ? (
             <div className="border-hairline mt-5 rounded-card border p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{conditionSummary}{conditionUnsaved ? '（未保存）' : ''}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
+              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-semibold">条件</p><p className="text-ink-secondary mt-1 text-xs">{conditionSummary}{conditionUnsaved ? '（未保存）' : ''}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
               {conditionEditorOpen && !readOnly ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
             </div>
           ) : null}
 
           <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-3">
-            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
+            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-semibold">{conditionEmpty ? '0人' : previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
             <div>
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
               <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} step={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
               {/* R205: 小数はサーバで弾かれる。欄の近くに制限を書く。 */}
               <p className="text-ink-faint mt-1 text-[11px]">1以上の整数（小数は使えません）</p>
             </div>
-            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
+            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
           {previewUnsaved && !conditionEmpty ? (
             <p className="text-ink-faint mt-2 text-xs">人数はまだ保存していない条件で数えています</p>
           ) : null}
           {conditionEmpty ? (
             <Notice tone="warn" className="mt-4">条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。</Notice>
-          ) : preview?.overlap.value ? <Notice tone="warn" className="mt-4">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</Notice> : null}
+          ) : preview?.overlap.value ? <Notice tone="warn" className="mt-4">このうち {formatNumber(preview.overlap.value)}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</Notice> : null}
           {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
           <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
         </section>
@@ -1935,16 +1929,16 @@ function TargetingStep({
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="text-ink text-sm font-bold">利用できる条件軸</h2>
             <p className="text-ink-faint mt-1 text-xs">友だち一覧の詳細検索と同じ条件を使います</p>
-            <p className="text-ink-secondary mt-4 text-xs font-bold">標準互換（15軸）</p>
-            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['名前','個別メモ','ステータスメッセージ','友だち登録日','タグ','友だち情報','シナリオ','イベント予約','カレンダー予約','共通情報','リマインダ','回答フォーム','最終反応日','その他','対応マーク'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
-            <p className="text-ink-secondary mt-4 text-xs font-bold">この画面だけの軸（6軸）</p>
-            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当者','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
+            <p className="text-ink-secondary mt-4 text-xs font-medium">標準互換（15軸）</p>
+            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['名前','個別メモ','ステータスメッセージ','友だち登録日','タグ','友だち情報','シナリオ','イベント予約','カレンダー予約','共通情報','リマインダ','回答フォーム','最終反応日','その他','対応マーク'].map((label) => <span key={label} className="bg-canvas-sunken rounded-mini px-2 py-1">{label}</span>)}</div>
+            <p className="text-ink-secondary mt-4 text-xs font-medium">この画面だけの軸（6軸）</p>
+            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当者','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded-mini px-2 py-1">{label}</span>)}</div>
           </section>
           <Notice tone="info"><strong className="block text-xs">条件はここだけの話ではありません</strong><span className="text-xs">一度作った条件は保存した検索として、配信や自動応答でも呼び出せます。</span></Notice>
         </aside>
       </div>
 
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button>{readOnly ? null : <Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button>}<Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button>{readOnly ? null : <Button onClick={onSave} disabled={saving} busy={saving}>下書きを保存する</Button>}<Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
     </div>
   )
 }
@@ -2089,6 +2083,20 @@ function PublishStep({
     }).then(() => refreshSchedules()).catch(() => refreshSchedules())
   }
 
+  /*
+   * R204残差: 「いますぐ出す」の注記も aside・確認窓・完了文と同じく設定別にする。
+   * 全枝共通の「保存したらすぐ、条件に当てはまる人のトーク画面に出ます」では、
+   * 条件あり（順次）・条件空（今0人）・登録のみ（登録だけ）と矛盾する。
+   * 実現されていない即時は言わない。「すぐ」は全員の既定のときだけ。
+   */
+  const nowNote = isDefaultForAll
+    ? '保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります'
+    : targetingEnabled && conditionEmpty
+      ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください'
+      : targetingEnabled
+        ? '保存するとLINEに登録され、条件に当てはまる人の画面に出来事のタイミングで順次出ます'
+        : 'LINEへの登録だけで、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください'
+
   return (
     <div data-design-node="UMiJ9" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
@@ -2097,14 +2105,14 @@ function PublishStep({
       {saveNotice ? <Notice tone="success" message={saveNotice} className="mb-4" /> : null}
       {saveError ? <Notice tone="danger" message={saveError} className="mb-4" /> : null}
       <div className="grid gap-5 xl:grid-cols-3">
-        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card xl:col-span-2">
           <h2 className="text-ink text-base font-bold">いつ出すか</h2>
           <div className="mt-4">
             <RadioCardGroup legend="公開時期の選択" className="grid gap-3">
               {[
-                ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
-                ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
-                ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
+                ['now', 'いますぐ出す', nowNote],
+                ['scheduled', '日時を決めて出す', '指定した時刻にLINEへ登録する予約です。誰の画面に出るかは「公開すると何が変わるか」で確認してください'],
+                ['period', '期間を決める', '指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください'],
               ].map(([value, label, note]) => (
                 <RadioCard
                   key={value}
@@ -2136,13 +2144,13 @@ function PublishStep({
               )}
               <li className={imageReady ? 'text-success' : 'text-warning'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
               <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-warning'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
-              {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
+              {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {formatNumber(preview.overlap.value)}人 が重なっています</li> : null}
             </ul>
           </div>
         </section>
 
         <aside className="space-y-4">
-          <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
+          <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-semibold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
           {/*
             R204: 「公開」は LINE への登録。全員の画面が変わるのは
             isDefaultForAll（全員の既定）のときだけ。条件で出し分ける設定は、
@@ -2176,10 +2184,10 @@ function PublishStep({
         ) : (
           <ul className="mt-3 space-y-2">
             {schedules.map((item) => (
-              <li key={item.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
+              <li key={item.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded-mini border px-3 py-2 text-xs">
                 <span className="text-ink">
-                  {new Date(item.startsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })} 開始
-                  {item.mode === 'period' && item.endsAt ? ` 〜 ${new Date(item.endsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {formatDateTime(item.startsAt)} 開始
+                  {item.mode === 'period' && item.endsAt ? ` 〜 ${formatDateTime(item.endsAt)}` : ''}
                   {' ・ '}
                   {item.status === 'scheduled' ? '予約中'
                     : item.status === 'publishing' ? '公開処理中'
@@ -2189,15 +2197,13 @@ function PublishStep({
                     : item.status === 'cancelled' ? '取消済み'
                     : item.status === 'failed' ? '失敗・要対応' : item.status}
                   {item.status === 'failed' && item.lastErrorCode ? `（${item.lastErrorCode.slice(0, 40)}）` : ''}
-                  {item.nextRetryAt ? ` ・ 次回 ${new Date(item.nextRetryAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {item.nextRetryAt ? ` ・ 次回 ${formatDateTime(item.nextRetryAt)}` : ''}
                   {item.mode === 'period' ? (item.restoreGroupId ? ` ・ 戻し先 ${restoreMenus.find((menu) => menu.id === item.restoreGroupId)?.name ?? item.restoreGroupId}` : item.restoreDefaultState === 'captured' ? ' ・ 戻し先確定済み（切替前の表示へ戻す）' : item.restoreDefaultState === 'no_default' ? ' ・ 戻し先なし（終了時に表示を外す）' : ' ・ 戻し先は実行開始時に確定') : ''}
                 </span>
                 {item.status === 'scheduled' ? (
                   <Button
                     onClick={() => void cancelSchedule(item.id)}
-                    disabled={cancellingId === item.id}
-                  >
-                    {cancellingId === item.id ? '取消中…' : '予約を取り消す'}
+                    disabled={cancellingId === item.id} busy={cancellingId === item.id} busyLabel="取消中…">予約を取り消す
                   </Button>
                 ) : null}
               </li>
@@ -2210,7 +2216,7 @@ function PublishStep({
       {/* N-151: 公開の履歴・失敗だけの再試行・LINEとの照合修復。 */}
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きを保存する</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)} busy={publishing} busyLabel="公開中…">{mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
     </div>
   )
 }

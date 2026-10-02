@@ -11,7 +11,10 @@ import LinePreview from './line-preview'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  delete document.documentElement.dataset.theme
+})
 
 /**
  * LINEプレビュー共通部品（B-6、★V7）。
@@ -69,12 +72,41 @@ describe('LINEプレビュー共通部品', () => {
     expect(html).not.toContain('こんにちは')
   })
 
+  it('v7 と v8 の枠を両方は描かない（<html data-theme> で1つに決める）', () => {
+    // v7（未設定）ではパネルだけ。スマホの帯（9:41・メニュー）は出ない。
+    const v7 = render(
+      <LinePreview>
+        <p>こんにちは</p>
+      </LinePreview>,
+    )
+    expect(v7.container.querySelectorAll('section[aria-label="LINEプレビュー"]')).toHaveLength(1)
+    expect(screen.queryByText('9:41')).toBeNull()
+    v7.unmount()
+
+    // v8 ではスマホの枠だけ。中身はトークの中へ入る。
+    document.documentElement.dataset.theme = 'v8'
+    const v8 = render(
+      <LinePreview>
+        <p>こんにちは</p>
+      </LinePreview>,
+    )
+    expect(v8.container.querySelectorAll('section[aria-label="LINEプレビュー"]')).toHaveLength(1)
+    expect(screen.getByText('9:41')).toBeTruthy()
+    expect(screen.getByText('メニュー')).toBeTruthy()
+    expect(screen.getByText('こんにちは')).toBeTruthy()
+  })
+
   it('枠の色は生の色値ではなくトークンで読む', () => {
     const tsx = read('line-preview.tsx')
     // トーク背景色のトークンを使い、#16進も素の Tailwind 色も書かない。
     expect(tsx).toContain('bg-line-talk')
     expect(tsx).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(tsx).not.toMatch(/bg-(white|black|gray|slate|blue|green|red)-/)
-    expect(tsx).not.toContain('.module.css')
+    // ★V8 の枠だけモジュール CSS に切り出した（`cfVyj` の板の決まり）。
+    // モジュール内も値はトークンだけ。生の #16進・rgb() を置かない。
+    const css = read('line-preview.module.css')
+    expect(css).toContain("[data-theme='v8']")
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+    expect(css).not.toMatch(/\brgba?\(/)
   })
 })

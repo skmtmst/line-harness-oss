@@ -202,7 +202,7 @@ describe('権限変更の直前再認証 (N-427)', () => {
     await openEditModal()
     // 役割を「管理者」へ変えて保存
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '管理者' })) })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /変更を保存/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '✓ 保存する' })) })
 
     // 1回目は grant 無しで止められ、本人確認の窓が立つ
     await screen.findByText('認証アプリで本人確認')
@@ -224,7 +224,7 @@ describe('権限変更の直前再認証 (N-427)', () => {
     fixture.staffUpdate.mockResolvedValue({ success: true, data: member({}) })
     await openEditModal()
     fireEvent.change(screen.getByDisplayValue('member@example.test'), { target: { value: 'new@example.test' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /変更を保存/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '✓ 保存する' })) })
     await waitFor(() => expect(fixture.staffUpdate).toHaveBeenCalledTimes(1))
     expect(fixture.staffStepUp).not.toHaveBeenCalled()
     expect(screen.queryByText('認証アプリで本人確認')).toBeNull()

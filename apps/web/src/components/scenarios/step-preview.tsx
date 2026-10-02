@@ -44,6 +44,12 @@ export interface StepPreviewProps {
    * 2通目以降の編集で 1通目と案内すると、前後の流れを取り違える。
    */
   stepOrder?: number
+  /**
+   * R236: 送ったあとどうするか。右の設定サマリーの「配信後」に出す。
+   * 省略時は次へ進む（送ったあとの既定）。一時停止の編集欄がある画面は
+   * その値を渡す。渡さないと、一時停止中も「次へ進む」のまま残る。
+   */
+  afterSend?: 'continue' | 'pause'
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
@@ -210,6 +216,7 @@ export default function StepPreview({
   kindState,
   audienceLabel,
   stepOrder = 1,
+  afterSend = 'continue',
 }: StepPreviewProps) {
   const stepLabel = `${stepOrder}通目`
   const start = nowJst()
@@ -243,7 +250,7 @@ export default function StepPreview({
           {templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">テンプレート</span>
-              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
             </Bubble>
           ) : body.trim() ? (
             <Bubble>{renderPreviewBody(body)}</Bubble>
@@ -275,7 +282,7 @@ export default function StepPreview({
         {templateName ? (
           <Bubble>
             <span className="text-ink-faint text-micro">テンプレート</span>
-            <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+            <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
           </Bubble>
         ) : kind === 'image' ? (
           imageUrl ? (
@@ -293,14 +300,14 @@ export default function StepPreview({
           <>
             {question.intro?.trim() ? <Bubble>{question.intro}</Bubble> : null}
             <Bubble>
-              <span className="text-ink block text-label font-bold">
+              <span className="text-ink block text-label font-medium">
                 {question.text.trim() || '（質問文がまだ空です）'}
               </span>
               <span className="mt-2 block space-y-1.5">
                 {question.choices.map((choice, i) => (
                   <span
                     key={i}
-                    className={`rounded-control block px-3 py-2 text-center text-label font-bold ${
+                    className={`rounded-control block px-3 py-2 text-center text-label font-medium ${
                       i === 0
                         ? 'bg-accent-deep text-on-accent'
                         : 'border-hairline text-ink-secondary border'
@@ -316,7 +323,7 @@ export default function StepPreview({
           templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">カルーセル</span>
-              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
               <span className="text-ink-faint mt-1 block text-micro">
                 実際の見た目は、カルーセルの編集画面で確かめられます。
               </span>
@@ -327,7 +334,7 @@ export default function StepPreview({
         ) : kind === 'location' ? (
           kindState?.location.latitude && kindState.location.longitude ? (
             <Bubble>
-              <span className="text-ink block text-label font-bold">
+              <span className="text-ink block text-label font-medium">
                 {kindState.location.title.trim() || '場所'}
               </span>
               {kindState.location.address.trim() && (
@@ -433,7 +440,14 @@ export default function StepPreview({
             label="送信数"
             value={templateName ? 'テンプレート 1通' : `${kind === 'text' ? 'テキスト' : 'メッセージ'} 1通`}
           />
-          <SummaryRow label="配信後" value="次のステップへ進む" />
+          {/*
+            R236: 送信後を「ここで一時停止する」にしても、ここだけ
+            「次のステップへ進む」のまま残っていた。隣の設定内容の札
+            （scenario-step-audience.ts の describeAfterSend）と同じ
+            言い方にそろえる。部品から画面側の関数を読まないので、
+            同じ2つの値をここで出す。
+          */}
+          <SummaryRow label="配信後" value={afterSend === 'pause' ? '送信後に一時停止' : '次へ進む'} />
         </dl>
       </section>
     </aside>

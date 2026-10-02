@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * ★V7 `xifuV`（Pencil「★V7 メニュー」）。V5 `hGpFq` から移行。
@@ -18,7 +19,7 @@
   gap: 2px;
   overflow-y: auto;
   border: 1px solid var(--color-hairline);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   box-shadow: var(--shadow-float);
   padding: 6px;
@@ -182,5 +183,10 @@
   height: 0;
   overflow: hidden;
   vertical-align: top;
+}
+
+/* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
+[data-theme="v8"] .menu {
+  border-color: var(--color-border-soft);
 }
 }

@@ -66,6 +66,26 @@ const spec = {
           },
         },
       },
+      LineAccountTag: {
+        type: 'object',
+        required: ['id', 'name', 'color', 'displayOrder', 'createdAt', 'updatedAt'],
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string', maxLength: 100 },
+          color: { type: ['string', 'null'], pattern: '^#[0-9a-fA-F]{6}$' },
+          displayOrder: { type: 'integer', minimum: 0 },
+          createdAt: { type: 'string' },
+          updatedAt: { type: 'string' },
+        },
+      },
+      LineAccountTagInput: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 100, description: '前後の空白は除く' },
+          color: { type: ['string', 'null'], pattern: '^#[0-9a-fA-F]{6}$' },
+          displayOrder: { type: 'integer', minimum: 0 },
+        },
+      },
       TagDeleteImpact: {
         type: 'object',
         required: ['tag', 'friendCount', 'references', 'blockingReferenceCount', 'canDelete'],
@@ -798,6 +818,9 @@ const spec = {
     '/api/ops/tenants/{id}/status': {
       patch: { tags: ['Ops Console'], summary: '契約先の状態を変更（停止・アーカイブ・再開）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['status', 'reason'], properties: { status: { type: 'string', enum: ['active', 'suspended', 'archived'] }, reason: { type: 'string', minLength: 4, maxLength: 500 }, confirmName: { type: 'string' } } } } } }, responses: { '200': { description: 'Status changed; audit recorded (visible to tenant)' }, '400': { description: 'Missing reason or name confirmation' }, '403': { description: 'Read-only or not a platform admin' } } },
     },
+    '/api/ops/tenants/{id}/feature-packs': {
+      patch: { tags: ['Ops Console'], summary: '契約先の機能パック（飲食店機能）を切り替える', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['featurePacks'], properties: { featurePacks: { type: 'array', items: { type: 'string', enum: ['restaurant'] } } } } } } }, responses: { '200': { description: 'Feature packs changed; audit recorded (visible to tenant)' }, '400': { description: 'Unknown feature pack' }, '403': { description: 'Read-only or not a platform admin' }, '404': { description: 'Tenant not found' } } },
+    },
     '/api/ops/impersonation/current': {
       get: { tags: ['Ops Console'], summary: '有効な代理ログイン', responses: { '200': { description: 'Active impersonation or null' } } },
     },
@@ -929,9 +952,18 @@ const spec = {
         parameters: [
           { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu'] } },
           { name: 'filename', in: 'query', required: true, schema: { type: 'string', minLength: 1, maxLength: 200 } },
+          { name: 'width', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる幅。画像が違う寸法なら登録せず422' },
+          { name: 'height', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる高さ。画像が違う寸法なら登録せず422' },
         ],
         requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } } } },
         responses: { '201': { description: 'Immutable tenant-scoped image receipt; identical retries reuse it' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
+      },
+      delete: {
+        tags: ['HQ Templates'], summary: '採用されなかった統括ひな形の画像を回収（所有確認つき）',
+        parameters: [
+          { name: 'r2Key', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Deleted flag; missing objects are a no-op' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '404': { description: 'Outside the caller tenant ownership' }, '422': { description: 'Invalid image key' } },
       },
     },
     '/api/hq/templates/accounts': {
@@ -1355,7 +1387,10 @@ const spec = {
       patch: {
         tags: ['Tags'],
         summary: 'タグ設定と同じ共通アクション下書きを連動更新',
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '応答消失後の再送用。同じ版・同じ内容の再送は保存済みを返す（M956）。省略可' },
+        ],
         requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['lineAccountId', 'expectedVersion'], properties: { lineAccountId: { type: 'string' }, expectedVersion: { type: 'integer', minimum: 1 }, automationId: { type: ['string', 'null'] }, automationDraftVersion: { type: ['string', 'null'] }, actions: { type: 'array' }, applyToExisting: { type: 'boolean', default: false }, previewToken: { type: 'string', description: 'applyToExisting の実行に必須。POST /api/tags/{id}/retroactive-preview が返す引き換え券（N-047）' } } } } } },
         responses: { '200': { description: 'Updated' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Tag or action draft version conflict / stale retroactive preview' }, '422': { description: 'Retroactive preview token required' } },
       },
@@ -2770,7 +2805,7 @@ const spec = {
         responses: { '200': { description: 'Broadcast' } },
       },
       put: { tags: ['Broadcasts'], summary: '配信更新', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' } } },
-      delete: { tags: ['Broadcasts'], summary: '配信削除', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' } } },
+      delete: { tags: ['Broadcasts'], summary: '配信削除', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' }, '409': { description: '送信中・送信済みは削除不可' } } },
     },
     '/api/broadcasts/{id}/send': {
       post: {
@@ -3402,6 +3437,68 @@ const spec = {
         summary: 'UUID紐付き友だち一覧',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Linked friends/accounts' } },
+      },
+    },
+    // ── LINE Account Tags ───────────────────────────────────────────────────
+    '/api/line-account-tags': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: '統括内のアカウントタグ一覧',
+        responses: {
+          '200': { description: 'アカウントタグの一覧（並び順・名前順）', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'array', items: { $ref: '#/components/schemas/LineAccountTag' } } } } } } },
+          '403': { description: 'Owner or admin role required' },
+        },
+      },
+      post: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LineAccountTagInput', required: ['name'] } } } },
+        responses: {
+          '201': { description: '作成したアカウントタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/LineAccountTag' } } } } } },
+          '400': { description: 'Invalid name, color or displayOrder' },
+          '403': { description: 'Owner or admin role required' },
+          '409': { description: 'Same tag name already exists in the tenant' },
+        },
+      },
+    },
+    '/api/line-account-tags/{id}': {
+      patch: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグの名前・色・並び順を変更',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LineAccountTagInput', minProperties: 1 } } } },
+        responses: {
+          '200': { description: '変更後のアカウントタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/LineAccountTag' } } } } } },
+          '400': { description: 'Invalid name, color or displayOrder' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Tag not found' },
+          '409': { description: 'Same tag name already exists in the tenant' },
+        },
+      },
+      delete: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグを削除（付与も外す）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '削除したタグID', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } } } } } } },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Tag not found' },
+        },
+      },
+    },
+    '/api/line-accounts/{id}/tags': {
+      put: {
+        tags: ['LINE Accounts'],
+        summary: 'LINEアカウントのタグをまとめて置き換え',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tagIds'], properties: { tagIds: { type: 'array', maxItems: 100, items: { type: 'string', minLength: 1 }, description: '同じ統括のアカウントタグID。重複は1つにまとめる' } } } } } },
+        responses: {
+          '200': { description: '置き換え後のタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['id', 'tags'], properties: { id: { type: 'string' }, tags: { type: 'array', items: { $ref: '#/components/schemas/LineAccountTag' } } } } } } } } },
+          '400': { description: 'tagIds is not an array or contains tags outside the tenant' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not found or not accessible' },
+          '409': { description: 'ACCOUNT_ARCHIVED' },
+        },
       },
     },
     // ── LINE Accounts ───────────────────────────────────────────────────────
@@ -4549,7 +4646,7 @@ const spec = {
       post: {
         tags: ['Affiliates'],
         summary: 'アフィリエイト作成',
-        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, code: { type: 'string' }, commissionRate: { type: 'number' } }, required: ['name', 'code'] } } } },
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, code: { type: 'string' }, commissionRate: { type: 'number' }, isActive: { type: 'boolean' } }, required: ['name', 'code'] } } } },
         responses: { '201': { description: 'Created' } },
       },
     },
@@ -5014,9 +5111,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['lineAccountId'],
+                required: ['lineAccountId', 'expectedVersion'],
                 properties: {
                   lineAccountId: { type: 'string' },
+                  expectedVersion: { type: 'integer', minimum: 1 },
                   name: { type: 'string' },
                   eventType: { type: 'string' },
                   conditions: { type: 'object' },
@@ -5031,7 +5129,7 @@ const spec = {
           '400': { description: '必須項目または通知方法の指定が不正' },
           '403': { description: 'このLINEアカウントを変更する権限がない' },
           '404': { description: 'お知らせが見つからない' },
-          '409': { description: 'isActive が指定された（公開・停止は別の操作で行う）' },
+          '409': { description: 'isActive が指定された（公開・停止は別の操作で行う）、または読んだ版が古い（現在値を返して開き直しを案内する）' },
         },
       },
     },

@@ -104,6 +104,12 @@ export function buildTemplatePreview(
   references: TemplateReferences,
   deliveredAt = new Date(),
 ): TemplatePreviewResult {
+  /*
+   * D007: 本文が無い応答でも落ちない。**形の違う詳細応答が来ると
+   * 文字列でない中身がここへ届く。** `content.replace` の前に確かめ、
+   * 違えば空の見本を返す（「本文がまだありません」の表示になる）。
+   */
+  if (typeof content !== 'string') return { content: '', unresolved: [] }
   const fields = new Map(references.friendFields.map((field) => [field.fieldKey, field]))
   const commonVars = new Map(references.commonVars.map((item) => [item.varKey, item]))
   const unresolved = new Set<string>()
@@ -147,6 +153,7 @@ export function buildTemplatePreview(
 }
 
 export function extractMessageUrls(content: string): string[] {
+  if (typeof content !== 'string') return []
   return [...new Set(content.match(/https?:\/\/[^\s<>"'）)]+/g) ?? [])]
 }
 
@@ -209,7 +216,7 @@ export function TemplateInsertControls({
 export function TemplatePreviewMessage({ preview }: { preview: TemplatePreviewResult }) {
   return (
     <>
-      <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{preview.content || '（本文がまだありません）'}</p>
+      <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{preview.content || '（本文がまだありません）'}</p>
       {preview.unresolved.length > 0 && (
         <div role="alert" className="mt-2 rounded-control bg-canvas px-3 py-2 text-xs text-danger">
           <p className="font-semibold">値を確認できない差し込みがあります</p>
@@ -265,27 +272,32 @@ export function MessageTemplateEditor({
   footer?: ReactNode
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
+  /*
+   * D007: 形の違う詳細応答が来ると、文字列でない中身がここへ届く。
+   * 描画の途中で落ちないよう、文字列以外は空として扱う。
+   */
+  const messageContent = typeof value.messageContent === 'string' ? value.messageContent : ''
   const insert = (token: string) => {
     const element = contentRef.current
-    const start = element?.selectionStart ?? value.messageContent.length
+    const start = element?.selectionStart ?? messageContent.length
     const end = element?.selectionEnd ?? start
-    const messageContent = value.messageContent.slice(0, start) + token + value.messageContent.slice(end)
-    onChange({ ...value, messageContent })
+    const nextContent = messageContent.slice(0, start) + token + messageContent.slice(end)
+    onChange({ ...value, messageContent: nextContent })
     if (element) requestAnimationFrame(() => {
       element.focus()
       element.setSelectionRange(start + token.length, start + token.length)
     })
   }
   const splitAt = 4500
-  const preview = buildTemplatePreview(value.messageContent, references)
-  const messageUrls = extractMessageUrls(value.messageContent)
+  const preview = buildTemplatePreview(messageContent, references)
+  const messageUrls = extractMessageUrls(messageContent)
   /*
    * R249: カード型は通常文のまま保存できない。入力の最中に
    * 形式の誤りをその場で知らせる（保存口も同じ判定で断る）。
    * 空のときはここでは何も言わない（必須チェックが受け持つ）。
    */
   const flexError = value.messageType === 'flex'
-    ? validateFlexContent('flex', value.messageContent)
+    ? validateFlexContent('flex', messageContent)
     : null
   const contentLabel = bodyLabel ?? (value.messageType === 'text' ? '本文' : 'メッセージ内容')
 
@@ -314,17 +326,17 @@ export function MessageTemplateEditor({
         >
           {value.messageType === 'flex' ? (
             <>
-              <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={14} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y font-mono text-xs" />
+              <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={14} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y font-mono text-xs" />
               {flexError ? (
                 <p role="alert" className="text-danger mt-1 text-xs">{flexError}このままでは保存できません。</p>
-              ) : !value.messageContent.trim() ? (
+              ) : !messageContent.trim() ? (
                 <p className="text-ink-faint mt-1 text-xs">バブルかカルーセルの形のJSONで書きます（例：{'{"type":"bubble", …}'}）。通常文のままでは保存できません。</p>
               ) : null}
             </>
           ) : (
-            <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />
+            <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />
           )}
-          <p className="text-ink-faint mt-1 text-xs tabular-nums">{value.messageContent.length} 文字{value.messageContent.length > splitAt ? ` ・ 約${splitAt}文字を超えると複数のメッセージに分割されます` : ' ・ 分割なし'}</p>
+          <p className="text-ink-faint mt-1 text-xs tabular-nums">{messageContent.length} 文字{messageContent.length > splitAt ? ` ・ 約${splitAt}文字を超えると複数のメッセージに分割されます` : ' ・ 分割なし'}</p>
         </Field>
         <div>
           <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
@@ -356,12 +368,12 @@ export function MessageTemplateEditor({
                 <p className="text-danger text-xs font-semibold">{flexError}</p>
                 <p className="text-ink-secondary mt-1 text-xs">直すとここにカードが表示されます。このままでは保存できません。</p>
               </div>
-            ) : !value.messageContent.trim() ? (
+            ) : !messageContent.trim() ? (
               <div className="bg-canvas-sunken rounded-card p-3">
                 <p className="text-ink-faint text-xs">カードの内容を入力すると、ここに表示されます。</p>
               </div>
             ) : (
-              <div className="bg-canvas-sunken rounded-card p-3"><FlexPreviewComponent content={value.messageContent} /></div>
+              <div className="bg-canvas-sunken rounded-card p-3"><FlexPreviewComponent content={messageContent} /></div>
             )
           ) : (
             <>

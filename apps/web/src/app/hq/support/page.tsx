@@ -4,6 +4,7 @@ import { CheckCircle2, ImagePlus, Send, X } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Dialog from '@/components/shared/dialog'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import NoteBar from '@/components/shared/note-bar'
@@ -146,7 +147,15 @@ export default function HqSupportPage() {
       setAttachments([])
       void loadHistory()
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '送信できませんでした。もう一度お試しください。')
+      // M027：原文のまま出さず、共通の状態別案内へ渡す。
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '送信', {
+        forbidden: 'お問い合わせの送信はオーナー・管理者・担当者だけができます。',
+      }))
+      /*
+       * 確定応答を失った再送でも履歴で確かめられるよう、履歴を読み直す。
+       * 送り直し自体は口側の重複防止（M028）で二重にならない。
+       */
+      void loadHistory()
     } finally {
       setSending(false)
     }
@@ -189,7 +198,7 @@ export default function HqSupportPage() {
         onCancel={() => setSent(null)}
         designNode="X6LZP"
       >
-        {sent?.ticketLabel ? <p className="text-label text-ink">受付番号：<span className="font-bold">{sent.ticketLabel}</span>　件名：{sent.subject}</p> : null}
+        {sent?.ticketLabel ? <p className="text-label text-ink">受付番号：<span className="font-semibold">{sent.ticketLabel}</span>　件名：{sent.subject}</p> : null}
       </Dialog>
 
       <div data-design-node="VKxoO" className="flex flex-col gap-4 xl:flex-row xl:items-start">
@@ -253,7 +262,7 @@ export default function HqSupportPage() {
           </Field>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-label font-bold text-ink">画面の画像（任意・{SUPPORT_ATTACHMENT_MAX}枚まで）</span>
+            <span className="text-label font-medium text-ink">画面の画像（任意・{SUPPORT_ATTACHMENT_MAX}枚まで）</span>
             {/*
               本物の file input は出さない（display:none）。
               開くのは下の「クリックして画像を選ぶ」ボタンから。
@@ -323,7 +332,20 @@ export default function HqSupportPage() {
             {history === null ? (
               <p className="px-4 py-4 text-caption text-ink-faint">読み込んでいます…</p>
             ) : historyError ? (
-              <p className="px-4 py-4 text-caption text-danger">読み込めませんでした。</p>
+              <div className="flex items-center gap-3 px-4 py-4">
+                {/*
+                  M027：履歴の読込失敗に再試行口を付ける。
+                  読み込めなかった表示に赤は使わない（★V7）。
+                */}
+                <p className="text-caption text-ink-secondary">履歴を読み込めませんでした。</p>
+                <button
+                  type="button"
+                  onClick={() => void loadHistory()}
+                  className="shrink-0 text-caption font-semibold text-action underline underline-offset-2"
+                >
+                  もう一度読み込む
+                </button>
+              </div>
             ) : history.length === 0 ? (
               <p className="px-4 py-4 text-caption text-ink-faint">まだ問い合わせはありません。</p>
             ) : (
@@ -339,8 +361,8 @@ export default function HqSupportPage() {
                         <span
                           className={
                             item.status === 'open'
-                              ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                              : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                              ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                              : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                           }
                         >
                           {SUPPORT_STATUS_LABELS[item.status]}
@@ -364,9 +386,8 @@ export default function HqSupportPage() {
           actions={
             <>
               <Button onClick={clear} disabled={sending}>内容をクリア</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)}>
-                <Send aria-hidden="true" className="h-4 w-4" />
-                {sending ? '送信中…' : '送信する'}
+              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)} busy={sending} busyLabel="送信中…">
+                <Send aria-hidden="true" className="h-4 w-4" />送る
               </Button>
             </>
           }
@@ -380,7 +401,7 @@ function Field({ label, required, note, htmlFor, children }: { label: string; re
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <label htmlFor={htmlFor} className="text-label font-bold text-ink">{label}</label>
+        <label htmlFor={htmlFor} className="text-label font-medium text-ink">{label}</label>
         {/* #976 U086: 必須の印は共通の「必須」札 */}
         {required ? <RequiredBadge /> : null}
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}

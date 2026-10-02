@@ -283,7 +283,7 @@ async function renderEditor(viewOnly = false) {
   // N-411: 閲覧のみの人には保存ボタンを出さない。代わりに閲覧注記を待つ。
   await (viewOnly
     ? screen.findByText('閲覧のみです。変更には予約設定の権限が必要です。')
-    : screen.findByRole('button', { name: '営業時間を保存' }))
+    : screen.findByRole('button', { name: '営業時間を保存する' }))
   await waitFor(() => expect(fixture.getAvailability.mock.calls.length).toBeGreaterThan(availabilityCallsBeforeRender))
   await act(async () => { await Promise.resolve() })
 }
@@ -303,7 +303,7 @@ describe('店舗営業時間の編集', () => {
     await pickTimeByLabel('月曜日 1件目の開始', '10:00')
     await pickTimeByLabel('月曜日 1件目の終了', '18:00')
     fireEvent.change(screen.getByLabelText('月曜日 1件目の同時受付数'), { target: { value: '3' } })
-    const save = screen.getByRole('button', { name: '営業時間を保存' })
+    const save = screen.getByRole('button', { name: '営業時間を保存する' })
     fireEvent.click(save)
     fireEvent.click(save)
 
@@ -323,8 +323,8 @@ describe('店舗営業時間の編集', () => {
   test('同じ曜日の重複区間はAPIへ送らず画面内で止める', async () => {
     await renderEditor()
     fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を受け付ける' }))
-    fireEvent.click(screen.getByRole('button', { name: '時間帯を追加' }))
-    fireEvent.click(screen.getByRole('button', { name: '営業時間を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '時間帯を追加する' }))
+    fireEvent.click(screen.getByRole('button', { name: '営業時間を保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('重ならないように入力してください')
     expect(fixture.saveSettings).not.toHaveBeenCalled()
   })
@@ -335,7 +335,7 @@ describe('店舗営業時間の編集', () => {
     await screen.findByLabelText('月曜日 1件目の開始')
     await pickTimeByLabel('月曜日 1件目の開始', '22:00')
     await pickTimeByLabel('月曜日 1件目の終了', '02:00')
-    fireEvent.click(screen.getByRole('button', { name: '営業時間を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '営業時間を保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('日ごとに分けて入力してください')
     expect(fixture.saveSettings).not.toHaveBeenCalled()
   })
@@ -343,7 +343,7 @@ describe('店舗営業時間の編集', () => {
   test('409は上書きせず最新内容の再読込を案内する', async () => {
     fixture.saveSettings.mockRejectedValueOnce(new ApiError(409, 'version_conflict', 'version_conflict'))
     await renderEditor()
-    fireEvent.click(screen.getByRole('button', { name: '営業時間を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '営業時間を保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先に保存しました')
     fireEvent.click(screen.getByRole('button', { name: '最新の内容を読み直す' }))
     await waitFor(() => expect(fixture.getSettings.mock.calls.length).toBeGreaterThanOrEqual(2))
@@ -371,12 +371,12 @@ describe('店舗営業時間の編集', () => {
     let resolveSave!: (value: unknown) => void
     fixture.saveSettings.mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve }))
     await renderEditor()
-    fireEvent.click(screen.getByRole('button', { name: '営業時間を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '営業時間を保存する' }))
     await waitFor(() => expect(fixture.saveSettings).toHaveBeenCalledTimes(1))
 
     switchAccount('account-b')
     await waitFor(() => expect(fixture.getSettings).toHaveBeenCalledWith('account-b'))
-    await screen.findByRole('button', { name: '営業時間を保存' })
+    await screen.findByRole('button', { name: '営業時間を保存する' })
     await act(async () => {
       resolveSave({ success: true, data: settings('account-a', { version: 1, businessHoursConfigured: true }) })
       await Promise.resolve()
@@ -412,7 +412,7 @@ describe('予約設備の編集', () => {
     await renderEditor()
     const name = await screen.findByLabelText('個室Aの設備名') as HTMLInputElement
     fireEvent.change(name, { target: { value: '個室B' } })
-    const save = screen.getByRole('button', { name: '設備を保存' })
+    const save = screen.getByRole('button', { name: '設備を保存する' })
     act(() => {
       save.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       save.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -422,7 +422,7 @@ describe('予約設備の編集', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('入力内容は残っています')
     expect(name.value).toBe('個室B')
 
-    fireEvent.click(screen.getByRole('button', { name: '設備を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '設備を保存する' }))
     await waitFor(() => expect(fixture.updateResource).toHaveBeenCalledTimes(2))
     expect(fixture.updateResource).toHaveBeenLastCalledWith('account-a', 'resource-a', expect.objectContaining({
       expectedVersion: 1, name: '個室B', capacity: 2,
@@ -446,7 +446,7 @@ describe('予約設備の編集', () => {
     fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
     await renderEditor(true)
     expect((await screen.findByLabelText('個室Aの設備名') as HTMLInputElement).disabled).toBe(true)
-    expect(screen.queryByRole('button', { name: '設備を保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '設備を保存する' })).toBeNull()
     expect(screen.getAllByText(/閲覧のみです/).length).toBeGreaterThan(0)
   })
 
@@ -518,18 +518,18 @@ describe('予約設備の編集', () => {
     await screen.findByLabelText('個室Aの設備名')
 
     // 押しただけでは送らない。対象と取り消しの道を確認できる。
-    fireEvent.click(screen.getByRole('button', { name: '設備を削除' }))
+    fireEvent.click(screen.getByRole('button', { name: '設備を削除する' }))
     await screen.findByText('削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。')
     expect(fixture.deleteResource).not.toHaveBeenCalled()
 
     // やめるでは残る。
-    fireEvent.click(screen.getByRole('button', { name: 'やめる' }))
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(screen.queryByText('削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。')).toBeNull())
     expect(fixture.deleteResource).not.toHaveBeenCalled()
     expect(screen.getByLabelText('個室Aの設備名')).toBeTruthy()
 
     // 確定して初めて送る。
-    fireEvent.click(screen.getByRole('button', { name: '設備を削除' }))
+    fireEvent.click(screen.getByRole('button', { name: '設備を削除する' }))
     await screen.findByText('削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。')
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
     await waitFor(() => expect(fixture.deleteResource).toHaveBeenCalledTimes(1))
@@ -543,7 +543,7 @@ describe('予約設備の編集', () => {
     let resolveSave!: (value: unknown) => void
     fixture.updateResource.mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve }))
     await renderEditor()
-    fireEvent.click(await screen.findByRole('button', { name: '設備を保存' }))
+    fireEvent.click(await screen.findByRole('button', { name: '設備を保存する' }))
     await waitFor(() => expect(fixture.updateResource).toHaveBeenCalledTimes(1))
 
     switchAccount('account-b')
@@ -578,7 +578,7 @@ describe('予約設備の編集', () => {
     await renderEditor()
     fireEvent.change(await screen.findByLabelText('新しい設備名'), { target: { value: '新個室' } })
     fireEvent.change(screen.getByLabelText('新しい設備の種類'), { target: { value: 'room' } })
-    const add = screen.getByRole('button', { name: '設備を追加' })
+    const add = screen.getByRole('button', { name: '設備を追加する' })
     act(() => {
       add.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       add.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -608,7 +608,7 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
 
     await pickDateByLabel('休業日の終了日', new Date(2027, 0, 3))
     fireEvent.change(screen.getByLabelText('休業日の理由'), { target: { value: '年末年始' } })
-    fireEvent.click(screen.getByRole('button', { name: '休業日を保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '休業日を保存する' }))
 
     await waitFor(() => expect(fixture.updateException).toHaveBeenCalledWith('account-a', 'exception-a', expect.objectContaining({
       expectedVersion: 2,
@@ -627,7 +627,7 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     expect(await screen.findByText('この休業日を消しますか？')).toBeTruthy()
     expect(fixture.deleteException).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: '休業日を消す' }))
+    fireEvent.click(screen.getByRole('button', { name: '休業日を削除する' }))
     await waitFor(() => expect(fixture.deleteException).toHaveBeenCalledWith('account-a', 'exception-a', 2))
     await waitFor(() => expect(screen.queryByText('年末休業')).toBeNull())
   })
@@ -636,7 +636,7 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     fixture.deleteException.mockRejectedValueOnce(new ApiError(409, 'version_conflict', 'version_conflict'))
     await renderWithException()
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
-    fireEvent.click(screen.getByRole('button', { name: '休業日を消す' }))
+    fireEvent.click(screen.getByRole('button', { name: '休業日を削除する' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先にこの休業日を変更しました')
     // 一覧は消さず、確認をやり直せる状態のままにする。
@@ -662,7 +662,7 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     await screen.findByLabelText('休業日の理由')
     fireEvent.click(screen.getByRole('link', { name: /予約管理/ }))
     await screen.findByText('保存していない変更があります')
-    expect(screen.getByRole('button', { name: '保存せずに移動' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存せずに移る' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '編集を続ける' })).toBeTruthy()
   })
 })

@@ -1,4 +1,5 @@
 import type { BookingAvailabilitySlot } from '@/lib/api'
+import Button from '@/components/shared/button'
 
 const WEEKDAY_JP = '日月火水木金土'
 
@@ -121,7 +122,7 @@ export default function LiffDateTimePreview({
               {/* 実LIFFの LoadErrorView と同じ「もう一度読み込む」ボタンの見え方。
                   「← 戻る」と同じく、押せない見本なのでボタン要素ではなく
                   見た目だけ再現する（直書きボタンの負債も増やさない）。 */}
-              <p className="border-hairline text-ink mt-4 w-full rounded-lg py-3 text-center text-sm font-semibold">
+              <p className="border-hairline text-ink mt-4 w-full rounded-control py-3 text-center text-sm font-semibold">
                 もう一度読み込む
               </p>
             </div>
@@ -149,7 +150,7 @@ export default function LiffDateTimePreview({
                         type="button"
                         disabled={!open}
                         aria-pressed={active}
-                        className={`flex min-h-16 w-15 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 ${
+                        className={`flex min-h-16 w-15 shrink-0 flex-col items-center justify-center gap-1 rounded-card border px-1 py-2 ${
                           active
                             ? 'border-accent-deep bg-accent-deep text-on-accent'
                             : open
@@ -190,13 +191,9 @@ export default function LiffDateTimePreview({
  */
 function PreviewTimeButton({ time }: { time: string }) {
   return (
-    <button
-      type="button"
-      disabled
-      className="border-hairline rounded py-2 text-sm"
-    >
+    <Button variant="secondary" className="rounded-mini px-0 py-2 border-0 h-auto whitespace-normal" type="button" disabled>
       {time}
-    </button>
+    </Button>
   )
 }
 
@@ -256,7 +253,7 @@ function CalendarPreview({
                 type="button"
                 disabled
                 aria-pressed={active}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg border py-1 text-sm ${
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-control border py-1 text-sm ${
                   active
                     ? 'border-accent-deep bg-accent-deep text-on-accent'
                     : open

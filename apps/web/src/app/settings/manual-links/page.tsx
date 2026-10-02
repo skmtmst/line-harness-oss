@@ -198,8 +198,7 @@ export default function ManualLinksPage() {
           />
         }
         trailing={
-          <Button disabled={checking} onClick={() => void checkAll()}>
-            {checking ? '確かめています…' : 'いま全部を確かめる'}
+          <Button disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…">いま全部を確かめる
           </Button>
         }
       />
@@ -276,8 +275,8 @@ export default function ManualLinksPage() {
                 <Td align="right">
                   {editing ? (
                     <>
-                      <Button disabled={saving} onClick={() => void saveEdit()}>保存</Button>
-                      <Button disabled={saving} onClick={() => setEditingKey(null)}>やめる</Button>
+                      <Button disabled={saving} onClick={() => setEditingKey(null)}>キャンセル</Button>
+                      <Button disabled={saving} onClick={() => void saveEdit()}>保存する</Button>
                     </>
                   ) : (
                     <Button onClick={() => startEdit(key)}>直す</Button>

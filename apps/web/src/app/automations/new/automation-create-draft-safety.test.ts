@@ -282,7 +282,7 @@ async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTe
     if (/^\/api\/automations\/[^/]+\/test$/.test(url.pathname)) {
       state.testCalls.push(call)
       if (options.slowTest) await testBarrier
-      await json(route, { success: true, data: { runId: 'run-1', versionId: 'version', status: 'accepted' } })
+      await json(route, { success: true, data: { runId: 'run-1', versionId: 'version', status: 'queued' } })
       return
     }
 
@@ -475,7 +475,7 @@ async function settle(page: Page, describe: () => string, path = '/automations/n
   )
   // 再開（?draft=）の読み込み中は保存できないので、押せるようになるまで待つ。
   await waitUntil(
-    () => page.getByRole('button', { name: '下書きに保存' }).isEnabled({ timeout: 200 }).catch(() => false),
+    () => page.getByRole('button', { name: '下書きを保存する' }).isEnabled({ timeout: 200 }).catch(() => false),
     () => `保存ボタンが使える状態になりませんでした（URL: ${page.url()}、${describe()}）`,
   )
   if (path.includes('?draft=')) {
@@ -550,7 +550,7 @@ async function fillMessageRule(page: Page, name: string, message: string) {
 }
 
 async function saveDraft(page: Page) {
-  await page.getByRole('button', { name: '下書きに保存' }).click()
+  await page.getByRole('button', { name: '下書きを保存する' }).click()
   await page.getByText('下書きに保存しました。見込み人数を確認して、1人で試せます。').waitFor()
 }
 
@@ -571,7 +571,7 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     const { page, api } = await openPage({ slowCreate: true })
     await fillTagRule(page, '来店後フォロー')
 
-    const save = page.getByRole('button', { name: '下書きに保存' })
+    const save = page.getByRole('button', { name: '下書きを保存する' })
     await save.evaluate((element) => {
       const button = element as HTMLButtonElement
       button.click()
@@ -663,14 +663,14 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     await page.getByLabel('LINEアカウント').selectOption(ACCOUNT_B)
     await page.waitForTimeout(50)
     await fillTagRule(page, '遅延中の新規B')
-    await page.getByRole('button', { name: '下書きに保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する' }).click()
     await waitUntil(() => api.createCalls.length === 1, '店舗Bの新規下書きAPIが呼ばれませんでした')
 
     // Bの保存応答を待たずAへ戻す。遅いBの応答をAの状態へ混ぜてはいけない。
     await page.getByLabel('LINEアカウント').selectOption(ACCOUNT_A)
     api.releaseCreate()
     await waitUntil(() => api.updateCalls.some((call) => call.pathname === '/api/automation-drafts/draft-account-b-1'), '店舗Bの保存が終わりませんでした')
-    await waitUntil(() => page.getByRole('button', { name: '下書きに保存' }).isEnabled({ timeout: 200 }).catch(() => false), '保存中の状態が終わりませんでした')
+    await waitUntil(() => page.getByRole('button', { name: '下書きを保存する' }).isEnabled({ timeout: 200 }).catch(() => false), '保存中の状態が終わりませんでした')
 
     await page.getByLabel('1人テストの友だちID').fill('friend-a')
     expect(await page.getByRole('button', { name: '1人で試す' }).isEnabled()).toBe(true)
@@ -718,9 +718,13 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     // 送るのは「確認に使った札」そのもの。保存でできた新しい札である。
     const storedRevision = (await storedDraftsOf(page))[ACCOUNT_A]?.draftVersionId
     expect(storedRevision).toBe('draft-account-a-1-r1')
-    expect(api.testCalls[0]?.body).toEqual({ versionId: storedRevision, friendId: 'friend-001' })
+    expect(api.testCalls[0]?.body).toEqual({
+      versionId: storedRevision,
+      friendId: 'friend-001',
+      operationKey: expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
+    })
     api.releaseTest()
-    await page.getByText('1人テストを受け付けました（状態: accepted）').waitFor()
+    await page.getByText('1人テストを受け付けました（受け付け済み）。結果は下の実行から確認できます。').waitFor()
     expect(api.testCalls).toHaveLength(1)
   }, 60_000)
 
@@ -774,11 +778,15 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     const retried = await openTestConfirmation(page, FRIEND_A)
     expect(await retried.innerText()).toContain('メッセージ「別タブが書き換えた文面です。」')
     await retried.getByRole('button', { name: 'この内容で送る' }).click()
-    await page.getByText('1人テストを受け付けました（状態:', { exact: false }).waitFor()
+    await page.getByText('1人テストを受け付けました（', { exact: false }).waitFor()
     expect(worker.testCalls).toHaveLength(1)
     const retriedRevision = (await storedDraftsOf(page))[ACCOUNT_A]?.draftVersionId
     expect(versionRowId(retriedRevision as string)).toBe(afterOther.versionId)
-    expect(worker.testCalls[0]?.body).toEqual({ versionId: retriedRevision, friendId: FRIEND_A })
+    expect(worker.testCalls[0]?.body).toEqual({
+      versionId: retriedRevision,
+      friendId: FRIEND_A,
+      operationKey: expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
+    })
   }, 90_000)
 
   /*

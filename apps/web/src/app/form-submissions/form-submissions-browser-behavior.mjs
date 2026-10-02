@@ -507,19 +507,19 @@ try {
     const { context, page, state } = await openHarness(browser, { role: 'staff', formsByAccount: { 'account-a': [form(1)] } })
     await openList(page)
     await page.getByRole('button', { name: /^すべて\s*\d/ }).waitFor()
-    assert.equal(await page.getByRole('button', { name: 'フォルダを追加' }).count(), 0, 'staff にフォルダ追加を出さない')
+    assert.equal(await page.getByRole('button', { name: 'フォルダを追加する', exact: true }).count(), 0, 'staff にフォルダ追加を出さない')
     assert.equal(state.folderWrites.length, 0, 'フォルダ作成の要求を出さない')
     await context.close()
   }
   for (const role of ['owner', 'admin']) {
     const { context, page, state } = await openHarness(browser, { role, formsByAccount: { 'account-a': [form(1)] } })
     await openList(page)
-    const addFolder = page.getByRole('button', { name: 'フォルダを追加' })
+    const addFolder = page.getByRole('button', { name: 'フォルダを追加する', exact: true })
     await addFolder.waitFor()
     assert.equal(await addFolder.isDisabled(), false, `${role} は箱を作れる`)
     await addFolder.click()
     await page.getByRole('textbox', { name: /フォルダ名/ }).fill('来店・予約')
-    await page.getByRole('button', { name: '追加する' }).click()
+    await page.getByRole('button', { name: '追加する', exact: true }).click()
     // 行ボタンだけを待つ。先頭一致にしないと「フォルダ「来店・予約」の操作」
     // （…ボタン）にも当たって strict mode violation になる。
     await page.getByRole('button', { name: /^来店・予約/ }).waitFor()
@@ -611,7 +611,7 @@ try {
     )
 
     await nameInput.fill('わたしが直した名前')
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
 
     const conflictButton = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
     await conflictButton.waitFor({ timeout: 15_000 })
@@ -660,11 +660,18 @@ try {
       () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
       undefined, { timeout: 15_000 },
     )
+    /*
+     * M003：送った中身と保存されている中身が同じだと自分の再送とみなして
+     * 競合を出さない。何も変えずに保存すると再送扱いになるため、ほかの人の
+     * 編集として競合を見るには覆いの中の1欄を変えておく。基本タブの名前欄を
+     * 先に変えると未保存ガードの確認が割り込み、覆いが開かない。
+     */
     await page.getByRole('link', { name: 'オプション設定' }).click()
     const dialog = page.locator('[aria-modal="true"]')
     await dialog.waitFor({ timeout: 15_000 })
+    await dialog.locator('input[aria-label="送信ボタンの文字"]').fill('わたしが直した送信文')
 
-    await page.getByRole('button', { name: '保存する' }).click()
+    await dialog.getByRole('button', { name: '保存する', exact: true }).click()
 
     const message = page.getByText(/ほかの人が.*に先に保存しました/)
     const reload = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
@@ -751,7 +758,7 @@ try {
     // 直接URLで開くと1件取得が走らずフォーム名が空のままなので、保存の
     // 前提条件だけ満たす（#725 の対象外。上の但し書きを参照）。
     await page.locator('#fm-name').fill('ごはんの相談')
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     for (let i = 0; i < 100 && state.formWrites.length === 0; i += 1) await page.waitForTimeout(50)
     assert.equal(state.formWrites.length, 1, '保存が1回だけ飛ぶ')
     assert.equal(state.formWrites[0].ogTitle, 'ごはんの相談フォーム', '打った見出しが保存へ乗る')

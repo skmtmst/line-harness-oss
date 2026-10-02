@@ -27,6 +27,7 @@ import {
   parentLabel,
   toTab,
 } from './account-detail-view'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 type AccountDetailView = LineAccount & {
   timezone?: string
@@ -46,6 +47,8 @@ function AccountDetail() {
 
   const [account, setAccount] = useState<AccountDetailView | null>(null)
   const [all, setAll] = useState<LineAccount[]>([])
+  // R521: 親名称用の一覧は補助データ。本人の取得と切り離し、取れなくても詳細は出す。
+  const [allState, setAllState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
@@ -72,15 +75,27 @@ function AccountDetail() {
     id: string; kind: string; title: string | null; skippedAt: string
   }> | null>(null)
 
+  // R521: 親名称の一覧だけ失敗しても詳細全体を読めなくしない。ここだけ取り直せる。
+  const loadAll = useCallback(async () => {
+    setAllState('loading')
+    try {
+      const list = await api.lineAccounts.list()
+      if (!list.success) { setAllState('error'); return }
+      setAll(list.data)
+      setAllState('ready')
+    } catch {
+      setAllState('error')
+    }
+  }, [])
+
   const load = useCallback(async () => {
     if (!id) return
     setStatus('loading')
     setMissing(false)
     try {
-      const [one, list] = await Promise.all([api.lineAccounts.get(id), api.lineAccounts.list()])
+      const one = await api.lineAccounts.get(id)
       if (!one.success) { setStatus('error'); return }
       setAccount(one.data)
-      if (list.success) setAll(list.data)
       // 止まっているアカウントでは「送らなかった」一覧も読む（X-1）。
       if (!one.data.isActive && !one.data.archivedAt) {
         api.lineAccounts.skippedDeliveries(id)
@@ -101,6 +116,7 @@ function AccountDetail() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { void loadAll() }, [loadAll])
   useEffect(() => {
     let active = true
     void api.staff.me().then((response) => {
@@ -276,11 +292,38 @@ function AccountDetail() {
                 <InlineRow label="タイムゾーン" value={account.timezone ?? 'Asia/Tokyo'} />
                 <InlineRow label="国・地域" value={account.country ?? '未設定'} />
                 <InlineRow label="役割メモ" value={account.role ?? '未設定'} />
-                <InlineRow label="親アカウント" value={parentLabel(account, all)} />
+                {/*
+                  R521: 親名称の一覧だけ取れないときはこの欄だけ未取得にし、
+                  詳細のほかの欄はそのまま出す。ここだけ取り直せる。
+                */}
+                {!account.parentLineAccountId ? (
+                  <InlineRow label="親アカウント" value="なし（このアカウントが親）" />
+                ) : allState === 'ready' ? (
+                  <InlineRow label="親アカウント" value={parentLabel(account, all)} />
+                ) : allState === 'loading' ? (
+                  <InlineRow label="親アカウント" value="読み込んでいます" />
+                ) : (
+                  <div
+                    className="grid min-w-0 gap-3 border-b border-hairline py-1 last:border-b-0"
+                    style={{ gridTemplateColumns: '9rem minmax(0, 1fr)' }}
+                  >
+                    <dt className="text-ink-faint text-xs">親アカウント</dt>
+                    <dd className="text-ink-secondary min-w-0 break-words text-right text-sm">
+                      読み込めませんでした
+                      <button
+                        type="button"
+                        onClick={() => void loadAll()}
+                        className="text-action ml-2 text-xs font-medium underline"
+                      >
+                        もう一度読み込む
+                      </button>
+                    </dd>
+                  </div>
+                )}
                 <InlineRow
                   label="友だち数"
                   value={account.stats
-                    ? `${account.stats.friendCount.toLocaleString('ja-JP')}人（${capacityLabel(account)}）`
+                    ? `${formatNumber(account.stats.friendCount)}人（${capacityLabel(account)}）`
                     : `—（${capacityLabel(account)}）`}
                 />
                 <InlineRow label="状態" value={connection.label} tone={account.isActive ? 'success' : 'muted'} />
@@ -325,7 +368,7 @@ function AccountDetail() {
                 />
               </dl>
               <div className="bg-canvas-sunken rounded-control mt-3 px-3 py-2">
-                <p className="text-ink text-xs font-bold">値そのものは、ここにも出しません</p>
+                <p className="text-ink text-xs font-medium">値そのものは、ここにも出しません</p>
                 <p className="text-ink-secondary mt-1 text-xs">差し替えるときは、新しい値を入れて保存し直します。今の値を見たり直したりはできません。</p>
               </div>
             </Card>
@@ -430,7 +473,7 @@ function AccountDetail() {
                 <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link><p className="mt-1">友だち追加URLとQRはここに出ます。</p></li>
                 <li><Link className="text-action hover:underline" href="/staff">ログインユーザー</Link><p className="mt-1">人ごとの既定のアカウントはここで決めます。</p></li>
                 <li><Link className="text-action hover:underline" href="/emergency">運用状態</Link><p className="mt-1">接続の異常や停止は、ここで見張ります。</p></li>
-                <li><Link className="text-action hover:underline" href="/friends">友だち</Link><p className="mt-1">このアカウントの友だち{account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : 'は未取得'}はここに並びます。</p></li>
+                <li><Link className="text-action hover:underline" href="/friends">友だち</Link><p className="mt-1">このアカウントの友だち{account.stats ? `${formatNumber(account.stats.friendCount)}人` : 'は未取得'}はここに並びます。</p></li>
               </ul>
             </Card>
 
@@ -641,15 +684,11 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function formatMonthDay(value: string): string {
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo',
-  }).format(new Date(value))
+  return formatDay(new Date(value))
 }
 
 function formatMonthDayTime(value: string): string {
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
-  }).format(new Date(value))
+  return formatDateTime(new Date(value))
 }
 
 function InlineRow({

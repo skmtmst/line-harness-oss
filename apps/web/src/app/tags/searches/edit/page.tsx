@@ -33,9 +33,11 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import { formatDateTime } from '@/lib/format'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -445,7 +447,7 @@ function ConditionEditor({
         <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className="min-w-44 flex-1" />
       )}
 
-      <Button type="button" onClick={onDelete}>削除</Button>
+      <Button type="button" onClick={onDelete}>削除する</Button>
     </div>
   )
 }
@@ -501,7 +503,7 @@ function ConditionGroup({
           />
         ))}
       </div>
-      <Button type="button" onClick={() => onChange([...items, defaultCondition(tags)])} className="mt-3">＋ {operator}条件を追加</Button>
+      <Button type="button" onClick={() => onChange([...items, defaultCondition(tags)])} className="mt-3">＋ {operator}条件を追加する</Button>
     </section>
   )
 }
@@ -551,10 +553,12 @@ function SavedSearchEditInner() {
   const gateRef = useRef(createResponseGate())
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
-
-  useEffect(() => {
-    gateRef.current.invalidate()
-  }, [selectedAccountId])
+  /*
+   * R518: アカウントまたは検索IDの切替で飛んだ読み直しの世代。
+   * 古い応答が届いても今の対象のものでなければ捨て、前のアカウントの
+   * 内容を表示しない。
+   */
+  const loadGenerationRef = useRef(0)
 
   /*
    * R179: 保存直後の再計算は、保存応答の新しい版と正規化済み条件を
@@ -589,7 +593,33 @@ function SavedSearchEditInner() {
   }, [conditions, id, original?.revision, selectedAccountId])
 
   useEffect(() => {
+    const generation = loadGenerationRef.current + 1
+    loadGenerationRef.current = generation
     let cancelled = false
+    /*
+     * R518: アカウントまたは検索IDの切替時点で、前対象の表示・操作を
+     * 無効にする。読み直しが終わるまで `original` を空にし、取得に失敗
+     * しても前の名前・条件と複製・保存・削除が残らないようにする。
+     * 飛んでいる人数の再計算も今の対象のものではないので無効にする。
+     */
+    gateRef.current.invalidate()
+    setOriginal(null)
+    setName('')
+    setConditions({ all: [], any: [] })
+    setIsShared(false)
+    setTags([])
+    setMarks([])
+    setScenarios([])
+    setFields([])
+    setForms([])
+    setOperators([])
+    setReferenceErrors({ marks: false, scenarios: false, fields: false, forms: false, operators: false })
+    setSavedCount(null)
+    setSiblingSearches([])
+    setPreviewCount(null)
+    setPreview(null)
+    setPreviewStale(false)
+    setPreviewError('')
     setLoading(true)
     setError('')
     setSearchMissing(false)
@@ -608,7 +638,8 @@ function SavedSearchEditInner() {
       api.forms.list(selectedAccountId).catch(() => null),
       api.operators.list().catch(() => null),
     ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult, formResult, operatorResult]) => {
-      if (cancelled) return
+      // R518: 切替後に届いた古い応答は捨てる。今の対象の再試行だけを描く。
+      if (cancelled || generation !== loadGenerationRef.current) return
       if (tagResult.success) setTags(tagResult.data)
       setMarks(markResult?.success ? markResult.data : [])
       setScenarios(scenarioResult?.success ? scenarioResult.data : [])
@@ -647,7 +678,8 @@ function SavedSearchEditInner() {
       /* IDEA-04: 計算に失敗している保存値を「計算済み」の時点付きで見せない。 */
       setPreviewError(found.match.error ?? '')
     }).catch((caught: unknown) => {
-      if (cancelled) return
+      // R518: 古い対象の失敗で今の画面を上書きしない。前の内容は既に消してある。
+      if (cancelled || generation !== loadGenerationRef.current) return
       if (caught instanceof ApiError && caught.status === 404) {
         setError('保存した検索が見つかりません')
         setSearchMissing(true)
@@ -655,7 +687,7 @@ function SavedSearchEditInner() {
         setError('保存した検索を読み込めませんでした')
       }
     }).finally(() => {
-      if (!cancelled) setLoading(false)
+      if (!cancelled && generation === loadGenerationRef.current) setLoading(false)
     })
     return () => { cancelled = true }
   }, [id, reloadKey, selectedAccountId])
@@ -872,7 +904,7 @@ function SavedSearchEditInner() {
               {previewError || preview?.error
                 ? '未計算'
                 : preview?.calculatedAt
-                  ? `${new Date(preview.calculatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}に計算`
+                  ? `${formatDateTime(preview.calculatedAt)}に計算`
                   : '未計算'}
             </p>
             {previewError ? (
@@ -930,22 +962,20 @@ function SavedSearchEditInner() {
       </div>
 
       <StickyBar
-        destructive={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-control bg-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
+        destructive={<Button variant="danger" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'}>この条件を削除する</Button>}
         actions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
-            <Button type="button" disabled={saving} onClick={() => void duplicate()}>複製して保存</Button>
-            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()}>{saving ? '保存中…' : '変更を保存'}</Button>
+            <Button type="button" disabled={saving} onClick={() => void duplicate()}>複製して保存する</Button>
+            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}>保存する</Button>
           </>
         )}
       />
       <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、検索条件への変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="検索条件への変更"
+        busy={saving}
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />

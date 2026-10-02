@@ -103,16 +103,20 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
     // ★V7 1920px見直し: 予約スタッフの保存口は共通 Button primary へ寄せた。
     // 塗りのままなのでホバー変化は要るが、持ち主は共通 Button（brightness で沈む）。
     expect(readApp('booking/menus/staff/page.tsx')).toContain('variant="primary"')
-    expect(readApp('emergency/page.tsx')).toContain('min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent hover:brightness-90')
+    // V8 移行 ①: 緊急停止の操作は共通 Button へ。塗りとホバー（brightness）の
+    // 持ち主は共通部品で、画面側は寸法の指定だけを持つ。
+    expect(readApp('emergency/page.tsx')).toContain('variant="primary"')
+    expect(readApp('emergency/page.tsx')).toContain('min-h-9')
     // 流入経路モーダル・プールは brightness で沈む（生の色を増やさない）。
     // 2026-09-25: 白字 3.77:1 の bg-emerald-600 を bg-success（5.61:1）へ。
     // 見張りはホバー変化の有無（意図は変えない）。
     expect(readApp('inflow-links/_components/create-genre-modal.tsx')).toContain('bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90')
     // ★V7 C5: 流入リンク編集窓は共通 Dialog＋Button primary へ寄せた。ホバー変化は共通 Button が持つ。
     expect(readApp('inflow-links/_components/edit-route-modal.tsx')).toContain('variant="primary"')
-    expect(readApp('pools/page.tsx')).toContain('bg-blue-600 text-white hover:brightness-90')
+    expect(readApp('pools/page.tsx')).toContain('bg-action text-on-accent hover:brightness-90')
     // 白地の枠付き口は沈み色へ、淡色ピルは brightness で応答する。
-    expect(readApp('tags/folders/new/page.tsx')).toContain('bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium hover:bg-canvas-sunken')
+    // V8 移行 ①: 白地の枠付き口は共通 Button secondary へ。沈み色は部品が持つ。
+    expect(readApp('tags/folders/new/page.tsx')).toContain('variant="secondary"')
     expect(readApp('booking/bookings/booking-calendar.tsx')).toContain('bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep hover:brightness-95')
   })
 })

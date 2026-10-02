@@ -103,7 +103,7 @@ describe('UpcomingCard（今後の予定）', () => {
   it('旧Workerでは予約だけの表示へ戻る', async () => {
     apiMocks.upcoming.mockRejectedValue(new Error('not found'))
     const bookings = [
-      { id: 'bk-9', menu_name: '相談', friend_name: 'あおい', starts_at: '2026-09-30T01:00:00.000Z', status: 'confirmed' },
+      { id: 'bk-9', menu_name: '相談', friend_name: 'あおい', starts_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), status: 'confirmed' },
     ]
     const el = mount(<UpcomingCard accountId="acc-1" bookings={bookings as never} loading={false} />)
     await flush()
@@ -155,10 +155,12 @@ describe('DeliveryFailuresCard（今日の配信の失敗）', () => {
     expect(el.textContent).toContain('読み込めませんでした')
   })
 
-  it('読込中は骨組みを出す', () => {
+  it('読込中は骨組みを出す', async () => {
     apiMocks.deliveryFailureOrigins.mockReturnValue(new Promise(() => {}))
     const el = mount(<DeliveryFailuresCard accountId="acc-1" />)
-    expect(el.querySelector('.animate-pulse')).not.toBeNull()
+    /* ★V7 仕上げ §3: 骨組みは 0.3 秒待ってから出る。 */
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    expect(el.querySelector('[data-skeleton]')).not.toBeNull()
     expect(el.textContent).not.toContain('読み込めませんでした')
   })
 })

@@ -30,6 +30,7 @@ import { sha256Hex } from '../middleware/auth.js';
 import { OPS_INVITE_TTL_MS, sendOpsInviteMail } from '../services/ops-invite-mail.js';
 import { dbFor } from '../services/db-router.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { parseFeaturePacks } from './tenants.js';
 
 /**
  * 運営コンソール（★V6 37 マスター）の API。すべて運営マスターだけが呼べる。
@@ -229,6 +230,39 @@ ops.patch('/api/ops/tenants/:id/status', requirePlatformAdminWrite(), async (c) 
     visibleToTenant: true,
   });
   return c.json({ success: true, data: { status } });
+});
+
+/**
+ * 統括の機能パック（現在は「飲食店機能」= restaurant のみ）を切り替える。
+ *
+ * 停止・アーカイブと違い破壊的ではないため、確認ダイアログや理由入力は
+ * 求めない（member.activate と同じ即時トグル）。監査だけは自動で残す。
+ */
+ops.patch('/api/ops/tenants/:id/feature-packs', requirePlatformAdminWrite(), async (c) => {
+  const staff = c.get('staff');
+  const db = dbFor(c.env);
+  const tenant = await tenantById(c, c.req.param('id'));
+  if (!tenant) return c.json({ success: false, error: '契約先が見つかりません' }, 404);
+  const body = await c.req.json<{ featurePacks?: unknown }>().catch(() => null);
+  const featurePacks = parseFeaturePacks(body?.featurePacks);
+  if (!featurePacks) {
+    return c.json({ success: false, error: '利用できない機能パックが含まれています' }, 400);
+  }
+  await db
+    .prepare(`UPDATE tenants SET feature_packs = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE id = ?`)
+    .bind(JSON.stringify(featurePacks), tenant.id)
+    .run();
+  await recordPlatformAudit(db, {
+    staffId: staff.id,
+    staffName: staff.name,
+    tenantId: tenant.id,
+    tenantName: tenant.name,
+    action: 'tenant.feature_packs.change',
+    detail: { from: safeParse(tenant.feature_packs), to: featurePacks },
+    ip: clientIp(c),
+    visibleToTenant: true,
+  });
+  return c.json({ success: true, data: { featurePacks } });
 });
 
 // ---------------------------------------------------------------------------

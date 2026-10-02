@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
 import Notice from '@/components/shared/notice'
@@ -10,6 +9,8 @@ import ListState from '@/components/shared/list-state'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
+import { formatDateTime } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 type Channel = 'all' | 'line' | 'email'
 type ThreadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
@@ -98,7 +99,7 @@ function isStaleUnresolved(item: Pick<InboxItem, 'status' | 'lastIncomingAt'>): 
 }
 
 function dateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return formatDateTime(iso)
 }
 
 /**
@@ -112,6 +113,17 @@ function dateTime(iso: string): string {
  * page.tsx の既定エクスポートに PageProps を求めるため、引数を取れない。
  * 中身は SupportInbox に置き、page.tsx はそれを呼ぶだけにする。
  */
+/**
+ * D015: 一覧の取得失敗の文。回復したら消す目印にする。
+ * 送信・詳細の失敗文とは別物なので、成功時に消すのはこの文だけ。
+ */
+const INBOX_LIST_ERROR = 'お問い合わせ一覧を読み込めませんでした'
+
+/** D014: 取得の走らせようがないお問い合わせ（channel 欠落・想定外）。 */
+function isUnknownChannel(item: Pick<InboxItem, 'channel'>): boolean {
+  return (item.channel as string) !== 'line' && (item.channel as string) !== 'email'
+}
+
 export default function SupportInbox({ channel = 'email' }: { channel?: Channel }) {
   const sendKeysRef = useRef(new IdempotencyKeyStore())
   const [status, setStatus] = useState<'open' | ThreadStatus | 'all'>('open')
@@ -146,6 +158,8 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       if (isStale()) return true
       if (response.success) {
         setItems(response.data.items)
+        // D015: 回復したら一覧の失敗文を消す。送信・詳細の文は残す。
+        setError((previous) => (previous === INBOX_LIST_ERROR ? '' : previous))
         const current = selectedRef.current
         if (current) {
           const refreshed = response.data.items.find((item) => item.id === current.id)
@@ -156,7 +170,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       return false
     } catch {
       if (isStale()) return true
-      if (!quiet) setError('お問い合わせ一覧を読み込めませんでした')
+      if (!quiet) setError(INBOX_LIST_ERROR)
       return false
     } finally {
       if (!quiet && !isStale()) setLoading(false)
@@ -315,7 +329,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
         <aside className="border-b border-hairline lg:border-b-0 lg:border-r">
           <div className="space-y-3 border-b border-hairline bg-canvas-sunken/70 p-4">
             <div className="flex gap-2">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm" />
               <Select
                 aria-label="対応状況で絞り込む"
                 value={status}
@@ -338,7 +352,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-bold text-ink">{item.customerName}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-micro font-bold ${item.channel === 'line' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-secondary'}`}>{item.channel === 'line' ? 'LINE' : 'メール'}</span>
+                      <span className={`rounded-pill px-2 py-0.5 text-micro font-medium ${item.channel === 'line' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-secondary'}`}>{item.channel === 'line' ? 'LINE' : 'メール'}</span>
                     </div>
                     <p className="mt-1 truncate text-xs font-medium text-ink-secondary">{item.subject}</p>
                     <p className="mt-1 truncate text-xs text-ink-faint">{item.preview}</p>
@@ -371,11 +385,11 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
             </div>
           ) : selected.channel === 'line' ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent-deep text-2xl font-bold text-white">LINE</div>
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-pill bg-accent-deep text-2xl font-bold text-on-accent">LINE</div>
               <h2 className="text-lg font-bold text-ink">{selected.customerName}</h2>
               <p className="mt-2 max-w-md text-sm leading-6 text-ink-secondary">LINEの会話履歴と送信機能は、既存の個別チャット画面でそのまま使えます。</p>
-              <p className="mt-4 rounded-xl bg-canvas px-4 py-3 text-sm text-ink shadow-sm">{selected.preview}</p>
-              <Link href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`} className="mt-6 rounded-xl bg-accent-deep px-6 py-3 text-sm font-bold text-white shadow-sm hover:brightness-90">LINEで返信する →</Link>
+              <p className="mt-4 rounded-card bg-canvas px-4 py-3 text-sm text-ink shadow-card">{selected.preview}</p>
+              <Button variant="primary" className="mt-6 rounded-card px-6 py-3 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`}>LINEで返信する →</Button>
             </div>
           ) : detail ? (
             <>
@@ -390,16 +404,16 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   <p className="mt-1 truncate text-xs text-ink-faint">{detail.thread.customer_name || selected.customerName} · {detail.thread.customer_email}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => void updateStatus('in_progress')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
-                  <button onClick={() => void updateStatus('on_hold')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
-                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
-                  {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-lg bg-canvas-sunken px-3 py-2 text-xs font-bold text-ink-secondary">再オープン</button>}
+                  <button onClick={() => void updateStatus('in_progress')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
+                  <button onClick={() => void updateStatus('on_hold')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
+                  <button onClick={() => void updateStatus('resolved')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
+                  {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs font-semibold text-ink-secondary">再オープン</button>}
                 </div>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
                 {detail.messages.map((message) => (
                   <div key={message.id} className={`flex ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${message.direction === 'outgoing' ? 'rounded-br-md bg-success-bg text-ink' : 'rounded-bl-md bg-canvas text-ink'}`}>
+                    <div className={`max-w-[86%] rounded-card px-4 py-3 shadow-card sm:max-w-[72%] ${message.direction === 'outgoing' ? 'rounded-br-mini bg-success-bg text-ink' : 'rounded-bl-mini bg-canvas text-ink'}`}>
                       <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body_text}</p>
                       <p className="mt-2 text-right text-[10px] text-ink-faint">{dateTime(message.created_at)}{message.direction === 'outgoing' ? ' · 送信済み' : ''}</p>
                     </div>
@@ -408,13 +422,29 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <div ref={bottomRef} />
               </div>
               <div className="border-t border-hairline bg-canvas p-4">
-                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-xl border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
+                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-card border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-[11px] text-ink-faint">From: contact-shed@nen-petfood.com</p>
-                  <button onClick={() => void sendReply()} disabled={!reply.trim() || sending} className="rounded-xl bg-accent-deep px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40">{sending ? '送信中…' : 'メールで返信'}</button>
+                  <Button variant="primary" className="rounded-card px-6 py-2.5 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" onClick={() => void sendReply()} disabled={!reply.trim() || sending}>{sending ? '送信中…' : 'メールで返信'}</Button>
                 </div>
               </div>
             </>
+          ) : isUnknownChannel(selected) ? (
+            /*
+             * D014: channel が欠落・想定外だと詳細の取得自体が走らない。
+             * 読み込み中のまま固めず、理由と取り直しを出す。
+             */
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+              <p className="text-sm font-bold text-ink">この会話を表示できません</p>
+              <p className="text-xs text-ink-secondary">お問い合わせの形式が読み取れませんでした。一覧を読み直してください。</p>
+              <button
+                type="button"
+                onClick={() => void loadInbox()}
+                className="text-sm font-bold text-action underline"
+              >
+                もう一度読み込む
+              </button>
+            </div>
           ) : <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">会話を読み込み中...</div>}
         </div>
       </div>

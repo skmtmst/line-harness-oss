@@ -249,3 +249,23 @@ describe('2画面が同じ部品で組まれている', () => {
     }
   })
 })
+
+describe('R600 運用集計の失敗でも会員候補を残す（ECのみ）', () => {
+  const ec = read(EC_SCREEN)
+
+  it('候補の有無は候補の読み口で決め、集計の失敗で画面を隠さない', () => {
+    // 全面の成否は候補の読み口が持つ。集計の失敗は集計欄だけに出す。
+    expect(ec).toContain('reviewReady')
+    expect(ec).toContain('operationsReady')
+  })
+
+  it('集計欄に取得失敗と再試行を示し、読めていない数を0件と書かない', () => {
+    expect(ec).toContain('読み込めませんでした')
+    expect(ec).toContain('onRetry={operationsRetry}')
+    expect(ec).toContain('結びついていない —')
+  })
+
+  it('集計の権限不足は再試行を出さず、候補は残す', () => {
+    expect(ec).toContain('表示する権限がありません')
+  })
+})

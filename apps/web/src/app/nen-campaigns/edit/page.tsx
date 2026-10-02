@@ -4,11 +4,13 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api, type NenColumn } from '@/lib/api'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
+import { formatDay } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /*
  * 一覧は `api.nenCampaigns.columns`（`NenColumn`・ラクダ語）を読む。
@@ -138,7 +140,7 @@ function NenColumnEditInner() {
                 <p className="text-ink text-sm font-medium">{column.title}</p>
                 <p className="text-ink-faint text-xs">
                   {column.publishedAt
-                    ? new Date(column.publishedAt).toLocaleDateString('ja-JP')
+                    ? formatDay(column.publishedAt)
                     : '未公開'}
                 </p>
               </div>
@@ -177,28 +179,16 @@ function NenColumnEditInner() {
                           ? '変更があります。保存するまで反映されません。'
                           : ''}
                 </p>
-                <button
-                  onClick={() => save(column)}
-                  disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}
-                  className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken shrink-0 border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
-                >
-                  {savingId === column.id ? '保存中...' : '保存'}
-                </button>
+                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}>
+                  {savingId === column.id ? '保存中...' : '保存する'}
+                </Button>
               </div>
             </div>
           ))}
         </div>
       )}
       {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="入力した紹介文が保存されていません"
-        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="書き続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した紹介文" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

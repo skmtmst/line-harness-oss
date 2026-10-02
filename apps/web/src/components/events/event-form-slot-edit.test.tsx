@@ -189,7 +189,7 @@ async function pickTime(trigger: Element, value: string) {
 
 /** 窓の中の「保存」。ページ側の「保存して次へ」と取り違えないよう窓の中だけ探す。 */
 function dialogSaveButton(): HTMLButtonElement {
-  const found = [...(dialog()?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '保存')
+  const found = [...(dialog()?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '保存する')
   expect(found, '窓の「保存」がある').toBeTruthy()
   return found!
 }
@@ -221,7 +221,7 @@ describe('予約枠の編集（入口29）', () => {
       starts_at: '2026-10-01T05:00:00.000Z',
       ends_at: '2026-10-01T06:30:00.000Z',
       capacity: 10,
-    })
+    }, 1)
     // 窓が閉じて、一覧を取り直している。
     expect(listSlots).toHaveBeenCalledTimes(2)
   })
@@ -234,7 +234,7 @@ describe('予約枠の編集（入口29）', () => {
       starts_at: '2026-10-01T04:00:00.000Z',
       ends_at: '2026-10-01T06:30:00.000Z',
       capacity: 8,
-    })
+    }, 1)
   })
 
   it('予約数より小さい定員には下げられない', async () => {
@@ -251,5 +251,20 @@ describe('予約枠の編集（入口29）', () => {
     await click(dialogSaveButton())
     expect(updateSlot).not.toHaveBeenCalled()
     expect(host.textContent).toContain('開始時刻 < 終了時刻')
+  })
+
+  it('競合（409）では窓に最新の差分を出し、一覧を読み直す（m26g R577）', async () => {
+    const { ApiError } = await import('@/lib/api')
+    await openEdit()
+    updateSlot.mockRejectedValueOnce(
+      new ApiError(409, 'version_conflict', 'version_conflict', {
+        current: { ...bookedSlot, capacity: 12, is_active: 0 },
+      }),
+    )
+    await click(dialogSaveButton())
+    // 敗者に差分（最新の枠）を見せる。窓は開いたまま、一覧は裏で読み直す。
+    expect(host.textContent).toContain('ほかの画面でこの枠が更新されました')
+    expect(host.textContent).toContain('定員12')
+    expect(listSlots).toHaveBeenCalledTimes(2)
   })
 })

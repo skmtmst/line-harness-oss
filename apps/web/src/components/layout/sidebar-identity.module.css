@@ -19,7 +19,7 @@
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .text {
@@ -32,7 +32,7 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -43,4 +43,21 @@
   font-size: var(--text-nano);
   font-weight: 600;
   line-height: 1.4;
+}
+
+/* ★V8 外側：印のタイルは濃い緑＋白文字（Pencil `y3gx8R`）。
+   メニューを畳んだときは名前の列を隠して印だけ残す。 */
+[data-theme="v8"] .mark {
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+}
+
+[data-theme="v8"] [data-collapsed] .text {
+  display: none;
+}
+
+[data-theme="v8"] [data-collapsed] .root {
+  justify-content: center;
+  padding-right: 0;
+  padding-left: 0;
 }

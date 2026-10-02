@@ -5,6 +5,7 @@ import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import KpiCard from '@/components/shared/kpi-card'
@@ -198,7 +199,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
             <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <Checkbox key={value} checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)} description={note}>{`順番${index + 1}：${label}`}</Checkbox>)}</div>
             <div className={styles.actions}>
               {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })}>{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
-              <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave}>{saving ? '保存しています…' : '設定を保存'}</Button>
+              <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button>
             </div>
             {saveBlockReason ? <p className="mt-1 text-caption leading-relaxed text-ink-faint" role="note">{saveBlockReason}</p> : null}
           </section>
@@ -269,15 +270,13 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
         }}
       />
       {/* #948 N-322: 止める変更を保存せずに離れるときの確認。 */}
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
         description={pendingStatusChange
           ? (form.status === 'paused'
-            ? '「取り込みを止める」はまだ保存されていません。このまま移動すると、取り込みは止まりません。移動しますか？'
-            : '「取り込みを再開する」はまだ保存されていません。このまま移動すると、取り込みは再開しません。移動しますか？')
-          : 'このまま移動すると、入力した内容は保存されません。移動しますか？'}
-        confirmLabel="保存せずに移動"
+            ? '「取り込みを止める」はまだ保存されていません。このまま移ると、取り込みは止まりません。移りますか？'
+            : '「取り込みを再開する」はまだ保存されていません。このまま移ると、取り込みは再開しません。移りますか？')
+          : 'このまま移ると、入力した内容は保存されません。移りますか？'}
         cancelLabel="設定に戻る"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}

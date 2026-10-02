@@ -4,7 +4,9 @@ import { RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Chip from '@/components/shared/chip'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { RowActions } from '@/components/shared/row-actions'
@@ -15,6 +17,7 @@ import { formatJstDateTime } from '@/lib/presentation'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { LoadStatus } from './page'
+import { formatNumber } from '@/lib/format'
 
 type Draft = { id: string | null; name: string; threshold: string; rate: string; tagName: string | null; memberCount: number }
 
@@ -128,7 +131,10 @@ export default function RankSettingsTab({
         ? 'ランク設定を保存し、ECへ同期しました。友だち属性のタグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
+      // M035: 生のまま出さず、共通の状態別案内へ渡す（403は権限・429は待ち案内）。
+      setError(describeApiFailure(caught, 'ランク設定の保存', {
+        forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
+      }))
     } finally {
       setBusy(false)
     }
@@ -143,7 +149,10 @@ export default function RankSettingsTab({
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '同期できませんでした。')
+      // 保存と同じく、生のまま出さず共通の状態別案内へ渡す。
+      setError(describeApiFailure(caught, 'ECへの同期', {
+        forbidden: 'ECへ同期する権限がありません。権限を確認してください。',
+      }))
     } finally {
       setBusy(false)
     }
@@ -221,7 +230,7 @@ export default function RankSettingsTab({
                         {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : '—')}
                       </span>
                     </Td>
-                    <Td align="right" className="cq-hide-below-800 w-24"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
+                    <Td align="right" className="cq-hide-below-800 w-24"><span className="text-label font-semibold tabular-nums text-ink">{formatNumber(row.memberCount)}人</span></Td>
                     <Td align="right" className="w-14">
                       {isBase ? null : row.id === null ? (
                         /* まだ保存していない行の取り消しは、確認なしの文字ボタン。 */
@@ -238,7 +247,7 @@ export default function RankSettingsTab({
                           subjectName={row.name.trim() || `ランク ${index + 1}`}
                           destructiveItem={{
                             id: `rank-delete-${row.id}`,
-                            label: 'ランクを削除',
+                            label: 'ランクを削除する',
                             onSelect: () => setRemoveTarget(index),
                           }}
                         />
@@ -258,13 +267,13 @@ export default function RankSettingsTab({
           */}
           <div className="mt-3">
             <button type="button" className="text-label font-semibold text-action" onClick={add} disabled={drafts.length >= 8}>
-              ＋ ランクを追加
+              ＋ ランクを追加する
             </button>
           </div>
         </section>
 
         <div data-design="Side" data-design-node="RgQEL" className="flex flex-col gap-4">
-          <section data-design-node="luziY" className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
+          <section data-design-node="luziY" className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-body font-bold text-ink">ランクの決まり方</h2>
             <dl className="mt-3 flex flex-col gap-3">
               <RuleRow label="通年の区切り" value={RULE_LABELS.yearStartMonth(rules?.yearStartMonth ?? 1)} />
@@ -273,7 +282,7 @@ export default function RankSettingsTab({
               <RuleRow label="集計に含める注文" value={RULE_LABELS.countOrders} />
             </dl>
           </section>
-          <section data-design-node="vMRJs" className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
+          <section data-design-node="vMRJs" className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-body font-bold text-ink">ECとの同期</h2>
             <div className="mt-2 flex items-center gap-2">
               {rules?.syncStatus === 'synced' ? <Chip tone="ok">同期済み</Chip> : rules?.syncStatus === 'failed' ? <Chip tone="danger">失敗</Chip> : <Chip tone="warn">未同期</Chip>}
@@ -297,27 +306,19 @@ export default function RankSettingsTab({
         actions={(
           <>
             <Button variant="secondary" onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期する</Button>
           </>
         )}
       />
 
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、ランク設定への変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="ランク設定への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       {/* 行の削除は確認つき（ほかの一覧と同じ形）。外すだけでは消えず、保存で確定する。 */}
       <ConfirmDialog
         open={removeTarget !== null}
         title={`「${removeTarget !== null ? drafts[removeTarget]?.name.trim() || `ランク ${removeTarget + 1}` : ''}」を削除しますか？`}
         description="行を外すと、保存したときにこのランクは消えます。保存する前なら下のキャンセルで元に戻せます。"
         confirmLabel="削除する"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         destructive
         onConfirm={() => {
           if (removeTarget !== null) remove(removeTarget)

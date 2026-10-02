@@ -78,7 +78,8 @@ describe('一覧の状態とページ送り', () => {
 
   it('取れなかった数を 0 と出さない', () => {
     // 数の無いところに 0 を入れると、「数えて0だった」と読めてしまう。
+    // D021: null だけでなく undefined・NaN も「—」にする。
     const kpis = read('kpi-card.tsx')
-    expect(kpis).toMatch(/value === null \? '—'/)
+    expect(kpis).toMatch(/isCountableValue\(value\) \? formatNumber\(value\)/)
   })
 })

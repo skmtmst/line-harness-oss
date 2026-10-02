@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ApiError, api, fetchApi } from '@/lib/api'
@@ -31,10 +31,12 @@ import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import { loadFailureCopy } from '@/components/shared/api-error-message'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
+import { formatDay, formatNumber } from '@/lib/format'
 
 interface MessageTemplate {
   id: string
@@ -185,6 +187,12 @@ function InflowLinksPageInner({
   const [loading, setLoading] = useState(true)
   // 一覧そのものを引けなかったとき。空（1件も無い）と言い分けるために持つ。
   const [loadFailed, setLoadFailed] = useState(false)
+  /*
+   * M029: 引けなかった原因そのもの。403は権限の案内にし、押しても
+   * 直らない再試行の口は出さない。429は待ち秒数を添えて再試行を残す。
+   * `ListState kind="error"` に `error` ごと渡す（m23mの共通文）。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [sort, setSort] = useState<RouteSort>('friends-desc')
   const [filter, setFilter] = useState<RouteFilter>('all')
   const [pageSize, setPageSize] = useState(20)
@@ -234,6 +242,7 @@ function InflowLinksPageInner({
       requestGeneration === loadRequestRef.current && accountAtRequest === latestAccountRef.current
     setLoading(true)
     setLoadFailed(false)
+    setLoadError(null)
     // ref-summary は selectedAccountId を渡すと「そのアカで実流入があった
     // ref_code のみ」に絞れる。pool_id NULL のリンクが多い現状ではアカ別の
     // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
@@ -291,10 +300,12 @@ function InflowLinksPageInner({
           })),
         )
       }
-    } catch {
+    } catch (e) {
       if (!isCurrent()) return
       // 一覧そのものが引けない。空と言い分けるため、失敗として覚える。
+      // M029: 原因も残し、403・429を言い分けた1枚にする。
       setLoadFailed(true)
+      setLoadError(e)
       setSummary(null)
       setSummaryAvailable(false)
     } finally {
@@ -675,13 +686,8 @@ function InflowLinksPageInner({
   }, [page, pageCount])
   const genreOptions = availableGenres.map((genre) => genre.name)
 
-  const formatDate = (iso: string | null) => {
-    if (!iso) return '—'
-    // ★V7：他の一覧と同じ「8月25日」。今年でないときだけ年を付ける。
-    const date = new Date(iso)
-    const sameYear = date.getFullYear() === new Date().getFullYear()
-    return date.toLocaleDateString('ja-JP', sameYear ? { month: 'long', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' })
-  }
+  // ★V7：他の一覧と同じ「8月25日（月）」。今年でないときだけ年を付ける。
+  const formatDate = (iso: string | null) => formatDay(iso)
 
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
   // R273: 「受付中」は isActive が真の登録済み行だけを数える。orphan（外部が
@@ -706,6 +712,12 @@ function InflowLinksPageInner({
   */
   const routeCountAvailable = !loading && !loadFailed
   /*
+   * M029: 取得失敗の1枚の中身。403は権限の案内で再試行なし、
+   * 429は待ち秒数つきで再試行あり、それ以外は今までどおりの1枚。
+   * 原因が無い（成功応答の失敗）は共通の1枚に倒す。
+   */
+  const loadFailure = loadError ? loadFailureCopy(loadError, '流入経路') : null
+  /*
     #980: 「流入経路」タブの件数は一覧と同じ集合から数えてホストへ渡す。
     フォルダ選択・検索・絞り込みで変わる数ではなく、「このアカウントに
     見えている流入経路の総数」= accountFilteredRows（FolderPanel の
@@ -714,10 +726,23 @@ function InflowLinksPageInner({
   useEffect(() => {
     onRouteCountChange?.(routeCountAvailable ? accountFilteredRows.length : null)
   }, [onRouteCountChange, routeCountAvailable, accountFilteredRows.length])
-  const totalClicks = summary?.totalClicks ?? sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
-  const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  /*
+    帯は画面全体の要約なので、クリックと平均の追加率もフォルダの選択・
+    検索文字・友だち有無の絞り込みで変わってはいけない。実 Worker の
+    ref-summary は routeTotal / totalClicks / averageAddRate を返さないので、
+    通常はここで選択アカウント範囲（絞り込みの前）から数える。
+    summary が全体値を返しているときはそちらを優先する。
+  */
+  /*
+    実 Worker の ref-summary は routeTotal / totalClicks / averageAddRate を
+    返さないので、通常は選択アカウント範囲（絞り込みの前）から数える。
+    summary が全体値を返しているときはそちらを優先する。
+  */
+  const accountClicks = accountFilteredRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
+  const accountFriendsForRate = accountFilteredRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  const totalClicks = summary?.totalClicks ?? accountClicks
   const addRate = summaryAvailable && totalClicks > 0
-    ? summary?.averageAddRate ?? Math.round((totalFriends / totalClicks) * 100)
+    ? summary?.averageAddRate ?? Math.round((accountFriendsForRate / totalClicks) * 100)
     : null
 
   const exportCurrentRows = () => {
@@ -775,7 +800,7 @@ function InflowLinksPageInner({
           unit="人"
           detail={
             summaryAvailable && summary
-              ? `累計。そのうち経路が分かる人 ${summary.friendsWithRef.toLocaleString('ja-JP')}人`
+              ? `累計。そのうち経路が分かる人 ${formatNumber(summary.friendsWithRef)}人`
               : loading
                 ? '読み込んでいます'
                 : '取得できません'
@@ -808,7 +833,7 @@ function InflowLinksPageInner({
           <p>        集計は累計（全期間）です。購入・返金は、LINEの友だちと結びついた注文だけを、
         その人がはじめて来た経路に数えます（同じ人・同じ注文は二重に数えません）。
         {summary?.orders
-          ? `いまの範囲では注文${summary.orders.total.toLocaleString('ja-JP')}件のうち、経路が分かるのは${summary.orders.attributed.toLocaleString('ja-JP')}件、経路が分からないのは${(summary.orders.total - summary.orders.attributed).toLocaleString('ja-JP')}件（うち友だち未連携${(summary.orders.total - summary.orders.linked).toLocaleString('ja-JP')}件）です。`
+          ? `いまの範囲では注文${formatNumber(summary.orders.total)}件のうち、経路が分かるのは${formatNumber(summary.orders.attributed)}件、経路が分からないのは${formatNumber((summary.orders.total - summary.orders.attributed))}件（うち友だち未連携${formatNumber((summary.orders.total - summary.orders.linked))}件）です。`
           : '注文の集計を取得できたら、経路が分かる件数と分からない件数をここに出します。'}
       </p>
         </div>
@@ -835,7 +860,7 @@ function InflowLinksPageInner({
         />
 
         <section className="flex min-w-0 flex-col gap-4">
-          <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-card lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
               <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'フォルダを選んでください'}</h2>
@@ -920,28 +945,53 @@ function InflowLinksPageInner({
       {loading ? (
         <ListState kind="loading" title="流入経路を読み込んでいます" />
       ) : loadFailed ? (
+        /*
+         * M029: 原因をそのまま渡す。403は権限の案内になり再試行の口は
+         * 出ない（押しても直らない）。429とそれ以外は同じ画面から
+         * 取り直せる（`onRetry` が再取得する）。
+         */
         <ListState
           kind="error"
-          title="流入経路を読み込めませんでした"
-          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          action={
-            <Button variant="secondary" onClick={() => void load()}>
-              流入経路を再読み込み
-            </Button>
-          }
+          title={loadFailure?.title}
+          description={loadFailure?.description}
+          error={loadError ?? undefined}
+          onRetry={loadFailure?.retryable ? () => void load() : undefined}
         />
       ) : sortedRows.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
-          description={
-            selectedGenre
-              ? '上の「＋ 流入リンクを作る」から作ると、ここに出ます。'
-              : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
-          }
-        />
+        /*
+         * R173: 絞り込み・検索で0件のときは「まだ無い」と言わない。
+         * 登録があるのに未登録向けの案内（最初のフォルダ作り）を出すと、
+         * あるはずの経路が消えたように見える。条件を変える案内にする。
+         */
+        accountFilteredRows.length > 0 && (normalizedSearch !== '' || filter !== 'all' || selectedGenre !== '') ? (
+          <ListState
+            kind="empty"
+            title="条件に合う流入経路がありません"
+            description="検索や絞り込みの条件を変えてください。"
+          />
+        ) : (
+          <ListState
+            kind="empty"
+            title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
+            description={
+              selectedGenre
+                ? '上の「＋ 流入リンクを作る」から作ると、ここに出ます。'
+                : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
+            }
+          />
+        )
       ) : (
-        <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
+        <div
+          className="overflow-hidden rounded-control border border-hairline bg-canvas"
+          data-scroll-x
+          style={{ '--scroll-min': '1060px' } as CSSProperties}
+        >
+          {/*
+            ★V8（夕21・STATES-ALL）：1152 幅で見出しと日付の列があふれる。
+            全列が要る表なので列は消さず、1366px 未満では横送りにする
+            （globals.css の [data-scroll-x]。最小幅は表ごとに --scroll-min
+            で渡す）。v7・広い幅では従来どおり。
+          */}
           <table className="w-full table-fixed text-xs">
             <colgroup>
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
@@ -1063,7 +1113,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
+                            className="shrink-0 rounded-mini border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
                             title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
@@ -1073,7 +1123,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
+                            className="shrink-0 rounded-mini border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
                             title="外部で発行されたREFです。流入実績だけを集計しています。"
                           >
                             未登録
@@ -1109,7 +1159,7 @@ function InflowLinksPageInner({
                     <td className="px-2 py-3 text-ink-secondary">
                       {tag ? (
                         <span
-                          className="block truncate whitespace-nowrap rounded-full px-2 py-0.5 text-center text-[11px] font-medium"
+                          className="block truncate whitespace-nowrap rounded-pill px-2 py-0.5 text-center text-[11px] font-medium"
                           style={{
                             backgroundColor: `${tag.color}22`,
                             color: tagTextColor(tag.color),
@@ -1135,10 +1185,10 @@ function InflowLinksPageInner({
                           : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-ink">
-                      {summaryAvailable ? (r.stats?.friendCount ?? 0).toLocaleString('ja-JP') : '—'}
+                      {summaryAvailable ? formatNumber((r.stats?.friendCount ?? 0)) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right text-ink-secondary">
-                      {summaryAvailable ? (r.stats?.clickCount ?? 0).toLocaleString('ja-JP') : '—'}
+                      {summaryAvailable ? formatNumber((r.stats?.clickCount ?? 0)) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
                       {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}
@@ -1197,7 +1247,7 @@ function InflowLinksPageInner({
                           onClick={() => setEditing({ register: r.refCode })}
                           title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
                         >
-                          登録
+                          登録する
                         </Button>
                       )}
                     </td>
@@ -1331,18 +1381,14 @@ function FragmentRow({
                     <Link
                       key={f.id}
                       href={`/chats?friend=${f.id}`}
-                      className="flex items-center justify-between bg-canvas rounded-lg px-3 py-2 border border-hairline hover:border-action"
+                      className="flex items-center justify-between bg-canvas rounded-control px-3 py-2 border border-hairline hover:border-action"
                     >
                       <span className="text-sm text-ink font-medium truncate">
                         {f.displayName}
                       </span>
                       <span className="text-xs text-ink-faint ml-2 shrink-0">
                         {f.trackedAt
-                          ? new Date(f.trackedAt).toLocaleDateString('ja-JP', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                            })
+                          ? formatDay(f.trackedAt)
                           : '—'}
                       </span>
                     </Link>
@@ -1359,9 +1405,9 @@ function FragmentRow({
             <div className="mt-4 border-t border-hairline pt-3" onClick={(e) => e.stopPropagation()}>
               {orderStats?.orderCount !== undefined ? (
                 <p className="mb-2 text-xs text-ink-faint">
-                  集計では、この経路からの購入は {orderStats.orderCount.toLocaleString('ja-JP')}件
-                  （返金 {(orderStats.refundedOrderCount ?? 0).toLocaleString('ja-JP')}件・
-                  取消 {(orderStats.cancelledOrderCount ?? 0).toLocaleString('ja-JP')}件）です。
+                  集計では、この経路からの購入は {formatNumber(orderStats.orderCount)}件
+                  （返金 {formatNumber((orderStats.refundedOrderCount ?? 0))}件・
+                  取消 {formatNumber((orderStats.cancelledOrderCount ?? 0))}件）です。
                 </p>
               ) : null}
               <RefOrdersPanel refCode={refCode} accountId={accountId} pageSize={10} />
@@ -1460,8 +1506,8 @@ function BulkRoutesDialog({
             キャンセル
           </Button>
           {action && affected.length > 0 ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }}>
-              {busy ? '実行中…' : `${affected.length.toLocaleString('ja-JP')}件に実行する`}
+            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
+              {`${formatNumber(affected.length)}件に実行する`}
             </Button>
           ) : null}
         </div>
@@ -1470,12 +1516,12 @@ function BulkRoutesDialog({
       {result ? (
         <div className="space-y-3">
           <p className="text-ink text-sm">
-            {result.succeeded.length.toLocaleString('ja-JP')}件に反映しました。
+            {formatNumber(result.succeeded.length)}件に反映しました。
           </p>
           {result.failed.length > 0 ? (
             <div className="space-y-2">
               <p className="text-danger text-sm font-semibold">
-                {result.failed.length.toLocaleString('ja-JP')}件は実行できませんでした。
+                {formatNumber(result.failed.length)}件は実行できませんでした。
               </p>
               <ul className="divide-hairline divide-y rounded-control border border-hairline text-sm">
                 {result.failed.map(({ route, error }) => (
@@ -1506,11 +1552,11 @@ function BulkRoutesDialog({
         <div className="space-y-4">
           <div>
             <p className="text-ink text-sm font-semibold">
-              対象 {remaining.length.toLocaleString('ja-JP')}件
+              対象 {formatNumber(remaining.length)}件
             </p>
             <p className="text-ink-faint mt-1 text-xs leading-5">
               {remaining.slice(0, 8).map((route) => route.name).join('、')}
-              {remaining.length > 8 ? ` ほか${(remaining.length - 8).toLocaleString('ja-JP')}件` : ''}
+              {remaining.length > 8 ? ` ほか${formatNumber((remaining.length - 8))}件` : ''}
             </p>
           </div>
           <RadioCardGroup legend="どの操作をしますか？">
@@ -1518,19 +1564,19 @@ function BulkRoutesDialog({
               {
                 value: 'pause' as const,
                 label: 'まとめて停止する',
-                note: `選んだ中の受付中 ${pauseTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                note: `選んだ中の受付中 ${formatNumber(pauseTargets.length)}件が対象です。`,
                 count: pauseTargets.length,
               },
               {
                 value: 'resume' as const,
                 label: 'まとめて再開する',
-                note: `選んだ中の停止中 ${resumeTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                note: `選んだ中の停止中 ${formatNumber(resumeTargets.length)}件が対象です。`,
                 count: resumeTargets.length,
               },
               {
                 value: 'move' as const,
                 label: 'フォルダをまとめて移動する',
-                note: `選んだ中の ${moveTargets.length.toLocaleString('ja-JP')}件が変わります。`,
+                note: `選んだ中の ${formatNumber(moveTargets.length)}件が変わります。`,
                 count: -1,
               },
             ]).map((option) => {

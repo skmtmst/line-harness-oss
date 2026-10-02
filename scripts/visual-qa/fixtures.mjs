@@ -1970,6 +1970,7 @@ const RICH_MENU_BASE = {
   targetingEnabled: true,
   folderId: 'rich-menu-folder-members',
   displayOrder: 1,
+  version: 1,
   thumbnailR2Key: null,
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-20T00:00:00.000Z',
@@ -4372,6 +4373,7 @@ export const MILEAGE_FRIENDS = {
     available: 486200,
     pending: 300,
     expiringMiles30d: 24600,
+    nextExpiringAt: '2026-09-20T00:00:00.000Z',
     monthChange: 960,
     rankCounts: [
       { rewardId: 'rank-bronze', rankName: 'ブロンズ', requiredMiles: 0, friendCount: 886 },

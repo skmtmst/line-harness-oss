@@ -62,4 +62,12 @@ describe('流入と計測の帯は、選択中のフォルダだけを数えな�
   it('フォルダ列の件数は元のままで、意味が重ならない', () => {
     expect(PAGE).toContain("accountFilteredRows.filter((row) => row.genre === genre.name).length")
   })
+
+  it('クリックと平均の追加率もフォルダと検索の前から数える', () => {
+    expect(PAGE).toContain('summary?.totalClicks ?? accountClicks')
+    expect(PAGE).toContain('accountFilteredRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)')
+    expect(PAGE).toContain('accountFilteredRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)')
+    expect(PAGE, 'クリック・平均の分子分母がまだ絞り込み後の行から数えている')
+      .not.toContain('sortedRows.reduce')
+  })
 })

@@ -12,7 +12,7 @@ function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
   if (enrolled === 0) return '—'
   const rate = Math.round((completed / enrolled) * 100)
-  return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
+  return `登録合計 ${formatNumber(enrolled)}人のうち ${rate}%`
 }
 import type { Folder } from '@line-crm/shared'
 import FilterChip from '@/components/shared/filter-chip'
@@ -26,6 +26,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
@@ -34,6 +36,7 @@ import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/s
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import type { ScenarioTriggerItem } from '@/lib/api'
 import { startChecklist } from './start-checklist'
+import { formatNumber } from '@/lib/format'
 
 type ScenarioWithCount = Scenario & {
   stepCount?: number
@@ -209,7 +212,7 @@ function StartScenarioDialog({
           ? '送信数の上限はありません'
           : runs.quota.remaining === null
             ? runs.quota.reason ?? '送信枠を取得できませんでした'
-            : `残り${runs.quota.remaining.toLocaleString('ja-JP')}通です`,
+            : `残り${formatNumber(runs.quota.remaining)}通です`,
       }
     }
     return item
@@ -252,7 +255,7 @@ function StartScenarioDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }} role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
-      <div ref={panelRef} className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
+      <div ref={panelRef} className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-float" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
         <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
           <div>
             <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
@@ -269,7 +272,7 @@ function StartScenarioDialog({
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">シナリオ</dt><dd className="text-ink text-right font-medium">{scenario.name}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">LINEアカウント</dt><dd className="text-ink text-right font-medium">{accountLabel}</dd></div>
-              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `予約中 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `予約中 ${formatNumber(simulation.audience.newStartPlanned)}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerSummary}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">配信ステップ</dt><dd className="text-ink text-right font-medium">{simulation ? `${simulation.steps.length}通` : scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">{completeSummary}</dd></div>
@@ -294,7 +297,7 @@ function StartScenarioDialog({
               ) : null}
               {checks.map((item) => (
                 <li key={item.label} className="flex items-start gap-3">
-                  <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
+                  <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
                     {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
                   </span>
                   <span><span className="text-ink block font-medium">{item.label}</span><span className="text-ink-faint block text-xs">{item.detail}</span></span>
@@ -306,13 +309,13 @@ function StartScenarioDialog({
 
         <Notice tone="warn" className="mx-6 mb-5">
           <p className="text-sm font-bold">開始後に起きること</p>
-          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・稼働中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
+          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{formatNumber(simulation?.audience.newStartPlanned) ?? '—'}人が購読を開始します</li><li>・稼働中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
         </Notice>
         <Checkbox checked={confirmed} disabled={preflightState !== 'ready'} onCheckedChange={setConfirmed} className="mx-6 mb-4">対象人数・内容・送信枠を確認しました</Checkbox>
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'}>{busy ? '開始中…' : '配信を開始'}</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'} busy={busy} busyLabel="開始中…">配信を開始</Button>
         </div>
       </div>
     </div>
@@ -385,11 +388,15 @@ export default function ScenariosPage() {
    * 数えていたため「KPI12件・すべて11・未分類12」が混在していた。
    */
   const loadFolders = useCallback(async () => {
-    const accountId = selectedAccountId
-    const res = await api.folders.list('scenario', accountId ?? undefined)
-    if (activeAccountRef.current !== accountId) return
-    if (res.success) setFolders(res.data)
-    setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
+    try {
+      const accountId = selectedAccountId
+      const res = await api.folders.list('scenario', accountId ?? undefined)
+      if (activeAccountRef.current !== accountId) return
+      if (res.success) setFolders(res.data)
+      setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
+    } catch {
+      // m23m: 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
+    }
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -855,7 +862,7 @@ export default function ScenariosPage() {
       */}
       {(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter) && scenarioList.loaded && (
         <p className="text-ink-faint text-xs tabular-nums">
-          条件に一致したシナリオ：{scenarioList.total.toLocaleString('ja-JP')}件
+          条件に一致したシナリオ：{formatNumber(scenarioList.total)}件
         </p>
       )}
 
@@ -869,10 +876,18 @@ export default function ScenariosPage() {
         <ListState
           kind="error"
           title="表示できませんでした"
-          description="登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。"
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は「登録したものは消えていない」と言い続ける。
+          description={isForbiddenOrRateLimited(scenarioList.error) ? undefined : '登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。'}
+          error={scenarioList.error ?? undefined}
           onRetry={() => void loadScenarios()}
         />
       ) : (
+        /*
+         * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。読み直し中は
+         * 行を消さず、表を薄めて上に 2px の線の帯を出す。
+         */
+        <RefreshCover refreshing={scenarioList.refreshing}>
         <ScenarioList
           scenarios={scenarios}
           isFiltered={scenarioFilterActive}
@@ -884,7 +899,6 @@ export default function ScenariosPage() {
           onDelete={handleDelete}
           onCreate={() => void handleCreate()}
         />
-      )}
       {scenarioList.pageCount > 1 ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <ListRange
@@ -895,6 +909,8 @@ export default function ScenariosPage() {
           <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
         </div>
       ) : null}
+        </RefreshCover>
+      )}
         </div>
       </div>
       </div>

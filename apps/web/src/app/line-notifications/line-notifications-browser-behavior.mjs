@@ -268,7 +268,7 @@ async function openEditor(page) {
   const editRow = page.getByRole('button', { name: '内容を編集' })
   await editRow.first().waitFor({ timeout: 15_000 })
   await editRow.first().click()
-  await page.getByRole('button', { name: '下書きを保存' }).waitFor({ timeout: 15_000 })
+  await page.getByRole('button', { name: '下書きを保存する', exact: true }).waitFor({ timeout: 15_000 })
 }
 
 const introBox = (page) => page.locator('label', { hasText: 'ご案内文' }).locator('textarea')
@@ -296,7 +296,14 @@ try {
           const style = getComputedStyle(button)
           const probe = document.createElement('span')
           probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;left:-9999px;'
-          probe.style.font = style.font
+          // `style.font` は font-variant-numeric などが入ると空文字になり、本文の書体で
+          // 測ってしまう（ボタンの余白が戻った 2026-10-02 に、収まっている文字を誤検知）。
+          // 書体の値は1つずつ写す。
+          probe.style.fontFamily = style.fontFamily
+          probe.style.fontSize = style.fontSize
+          probe.style.fontWeight = style.fontWeight
+          probe.style.fontStyle = style.fontStyle
+          probe.style.fontVariantNumeric = style.fontVariantNumeric
           probe.style.letterSpacing = style.letterSpacing
           probe.textContent = button.textContent
           document.body.appendChild(probe)
@@ -304,7 +311,8 @@ try {
             + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
             + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
           probe.remove()
-          return { text: button.textContent.trim(), right: rect.right, width: rect.width, needs }
+          const overflows = button.scrollWidth > button.clientWidth
+          return { text: button.textContent.trim(), right: rect.right, width: rect.width, needs, overflows }
         })
         return {
           viewport: window.innerWidth,
@@ -314,7 +322,7 @@ try {
           mainPaddingBottom: parseFloat(getComputedStyle(main).paddingBottom),
           rows: new Set(buttons.map((button) => Math.round(button.right - button.width))).size,
           rightmost: Math.max(...buttons.map((button) => button.right)),
-          squeezed: buttons.filter((button) => button.needs > button.width + 1).map((button) => button.text),
+          squeezed: buttons.filter((button) => button.overflows || button.needs > button.width + 1).map((button) => button.text),
         }
       })
       console.log(`  ${width}px 操作列 ${Math.round(measured.actionsWidth)}px / 右端 ${Math.round(measured.rightmost)}px / フッタ ${Math.round(measured.footerHeight)}px / 下余白 ${measured.mainPaddingBottom}px`)
@@ -344,7 +352,7 @@ try {
 
     let releaseSave = () => {}
     state.holdSave = new Promise((resolve) => { releaseSave = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // 保存の応答を止めたまま書き足す。
@@ -388,7 +396,7 @@ try {
 
     let releaseSave = () => {}
     state.holdSave = new Promise((resolve) => { releaseSave = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // 編集画面は開いたまま、見ているアカウントだけが替わる。
@@ -451,7 +459,7 @@ try {
 
     let releaseA = () => {}
     state.holdSave = new Promise((resolve) => { releaseA = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // Bの一覧読み込みを足止めする。切り替えても、Bの中身はまだ何も出ない。

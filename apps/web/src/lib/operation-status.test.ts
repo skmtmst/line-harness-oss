@@ -73,28 +73,28 @@ describe('operation status', () => {
  */
 describe('formatOperationDate(#738)', () => {
   test('素の壁時計は書いたとおりの時刻が出る', () => {
-    expect(formatOperationDate('2026-09-11 07:31')).toBe('2026/09/11 07:31')
+    expect(formatOperationDate('2026-09-11 07:31')).toBe('9月11日（金）7:31')
   })
 
   test('T区切りでも空白区切りでも同じに読む', () => {
-    expect(formatOperationDate('2026-09-02T21:04')).toBe('2026/09/02 21:04')
-    expect(formatOperationDate('2026-09-02 21:04')).toBe('2026/09/02 21:04')
+    expect(formatOperationDate('2026-09-02T21:04')).toBe('9月2日（水）21:04')
+    expect(formatOperationDate('2026-09-02 21:04')).toBe('9月2日（水）21:04')
   })
 
   test('オフセット付きISOは絶対時刻として読む', () => {
-    expect(formatOperationDate('2026-09-11T07:31:00+09:00')).toBe('2026/09/11 07:31')
+    expect(formatOperationDate('2026-09-11T07:31:00+09:00')).toBe('9月11日（金）7:31')
   })
 
   test('Zulu時刻はJSTに直して出す', () => {
-    expect(formatOperationDate('2026-09-10T22:31:00Z')).toBe('2026/09/11 07:31')
+    expect(formatOperationDate('2026-09-10T22:31:00Z')).toBe('9月11日（金）7:31')
   })
 
   test('日をまたぐ時刻でも日付がずれない', () => {
-    expect(formatOperationDate('2026-08-20 00:30')).toBe('2026/08/20 00:30')
+    expect(formatOperationDate('2026-08-20 00:30')).toBe('8月20日（木）0:30')
   })
 
   test('日付だけなら00:00で出す', () => {
-    expect(formatOperationDate('2026-08-19')).toBe('2026/08/19 00:00')
+    expect(formatOperationDate('2026-08-19')).toBe('8月19日（水）0:00')
   })
 
   test('空なら控えの文字を出す', () => {

@@ -7,8 +7,9 @@ import Disclosure from '@/components/shared/disclosure'
 import NoteBar from '@/components/shared/note-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import StatusBadge from '@/components/shared/status-badge'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import type {
   SearchConsoleMetric,
@@ -18,6 +19,7 @@ import type {
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ANALYTICS_TABS } from './analytics-tabs'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
  * Google検索の分析画面。要件 v6-20 §2: Search Console を「Google Analytics」と呼ばない。
@@ -29,8 +31,6 @@ import { ANALYTICS_TABS } from './analytics-tabs'
 const ranges = [7, 28, 90] as const
 type RangeDays = typeof ranges[number]
 
-const number = new Intl.NumberFormat('ja-JP')
-const oneDecimal = new Intl.NumberFormat('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 /** プロパティのURLから、見出しに出すホスト名だけを取り出す。 */
 function siteLabel(siteUrl: string): string {
@@ -68,11 +68,11 @@ function MetricCard({
     <div className="rounded-card border-hairline border bg-canvas p-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-ink-secondary whitespace-nowrap text-sm font-medium">{label}</p>
-        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+        <span className="h-2.5 w-2.5 rounded-pill" style={{ backgroundColor: color }} />
       </div>
       <p className="text-ink mt-3 whitespace-nowrap text-3xl font-bold tabular-nums tracking-[-0.02em]">{value}</p>
       <p className={`mt-2 whitespace-nowrap text-xs font-semibold ${delta === null ? 'text-ink-faint' : positive ? 'text-success' : 'text-danger'}`}>
-        {delta === null ? '前期間との比較なし' : `${positive ? '↑' : '↓'} ${oneDecimal.format(Math.abs(delta))}% 前期間比`}
+        {delta === null ? '前期間との比較なし' : `${positive ? '↑' : '↓'} ${formatNumber(Math.abs(delta), { digits: 1 })}% 前期間比`}
       </p>
     </div>
   )
@@ -146,10 +146,10 @@ function RankingTable({ title, rows, kind }: { title: string; rows: SearchConsol
             {rows.map((row) => (
               <Tr key={row.key} interactive>
                 <Td><span className="text-ink block truncate whitespace-nowrap font-medium" title={row.key}>{displayKey(row.key)}</span></Td>
-                <Td align="right" className="text-ink-secondary whitespace-nowrap">{number.format(row.impressions)}</Td>
-                <Td align="right" className="text-ink whitespace-nowrap font-semibold">{number.format(row.clicks)}</Td>
-                <Td align="right" className="text-ink-secondary whitespace-nowrap">{oneDecimal.format(row.ctr * 100)}%</Td>
-                <Td align="right" className="text-ink-secondary whitespace-nowrap">{oneDecimal.format(row.position)}</Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{formatNumber(row.impressions)}</Td>
+                <Td align="right" className="text-ink whitespace-nowrap font-semibold">{formatNumber(row.clicks)}</Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{formatNumber(row.ctr * 100, { digits: 1 })}%</Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{formatNumber(row.position, { digits: 1 })}</Td>
               </Tr>
             ))}
           </tbody>
@@ -163,15 +163,15 @@ function SetupCard({ setup, denied = false }: { setup: SearchConsoleSetup | null
   return (
     <div className="rounded-card border-hairline bg-canvas border p-6">
       <div className="flex items-start gap-4">
-        <div className="border-hairline flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-canvas text-xl">G</div>
+        <div className="border-hairline flex h-11 w-11 shrink-0 items-center justify-center rounded-card border bg-canvas text-xl">G</div>
         <div>
           <h2 className="text-ink text-lg font-bold">{denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'}</h2>
           <p className="text-ink-secondary mt-1 text-sm leading-6">
             Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。
           </p>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="border-hairline rounded-xl border bg-canvas p-3"><dt className="text-ink-faint text-xs">対象プロパティ</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? '未設定'}</dd></div>
-            <div className="border-hairline rounded-xl border bg-canvas p-3"><dt className="text-ink-faint text-xs">追加するアカウント</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? '未設定'}</dd></div>
+            <div className="border-hairline rounded-card border bg-canvas p-3"><dt className="text-ink-faint text-xs">対象プロパティ</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? '未設定'}</dd></div>
+            <div className="border-hairline rounded-card border bg-canvas p-3"><dt className="text-ink-faint text-xs">追加するアカウント</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? '未設定'}</dd></div>
           </dl>
         </div>
       </div>
@@ -186,14 +186,28 @@ export default function SearchConsolePage() {
   const [setup, setSetup] = useState<SearchConsoleSetup | null>(null)
   const [loading, setLoading] = useState(true)
   const [denied, setDenied] = useState(false)
+  /*
+   * 監査 D020: 403（Google側の閲覧権限なし）だけ権限の案内カードにし、
+   * 通信断・500・429・success:false は失敗の理由と再読み込みを出す。
+   * 以前は catch が一律 denied にしていたため、原因と案内が食い違っていた。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
     setLoading(true)
     setDenied(false)
+    setLoadError(null)
     api.searchConsole.performance(days)
       .then((response) => {
-        if (!active || !response.success) return
+        if (!active) return
+        if (!response.success) {
+          setData(null)
+          setSetup(null)
+          setLoadError(new Error('search console load failed'))
+          return
+        }
         if (response.data.status === 'connected') {
           setData(response.data)
           setSetup(null)
@@ -202,16 +216,25 @@ export default function SearchConsolePage() {
           setSetup(response.data)
         }
       })
-      .catch(() => { if (active) { setData(null); setDenied(true) } })
+      .catch((caught: unknown) => {
+        if (!active) return
+        setData(null)
+        setSetup(null)
+        if (caught instanceof ApiError && caught.status === 403) {
+          setDenied(true)
+        } else {
+          setLoadError(caught)
+        }
+      })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [days])
+  }, [days, attempt])
 
   const metrics: Array<{ label: string; value: string; key: keyof SearchConsoleMetric; color: string; lower?: boolean }> = [
-    { label: '合計クリック数', value: number.format(data?.summary.clicks ?? 0), key: 'clicks', color: 'var(--color-action)' },
-    { label: '合計表示回数', value: number.format(data?.summary.impressions ?? 0), key: 'impressions', color: 'var(--color-info)' },
-    { label: '平均CTR', value: `${oneDecimal.format((data?.summary.ctr ?? 0) * 100)}%`, key: 'ctr', color: 'var(--color-success)' },
-    { label: '平均掲載順位', value: oneDecimal.format(data?.summary.position ?? 0), key: 'position', color: 'var(--color-status-warn-deep)', lower: true },
+    { label: '合計クリック数', value: formatNumber(data?.summary.clicks ?? 0), key: 'clicks', color: 'var(--color-action)' },
+    { label: '合計表示回数', value: formatNumber(data?.summary.impressions ?? 0), key: 'impressions', color: 'var(--color-info)' },
+    { label: '平均CTR', value: `${formatNumber((data?.summary.ctr ?? 0) * 100, { digits: 1 })}%`, key: 'ctr', color: 'var(--color-success)' },
+    { label: '平均掲載順位', value: formatNumber(data?.summary.position ?? 0, { digits: 1 }), key: 'position', color: 'var(--color-status-warn-deep)', lower: true },
   ]
 
   /*
@@ -223,11 +246,11 @@ export default function SearchConsolePage() {
     if (!data) return
     const lines: string[][] = [
       ['区分', '項目', '表示回数', 'クリック数', 'CTR(%)', '掲載順位'],
-      ['集計', `合計（${data.startDate}〜${data.endDate}）`, String(data.summary.impressions), String(data.summary.clicks), oneDecimal.format(data.summary.ctr * 100), oneDecimal.format(data.summary.position)],
+      ['集計', `合計（${data.startDate}〜${data.endDate}）`, String(data.summary.impressions), String(data.summary.clicks), formatNumber(data.summary.ctr * 100, { digits: 1 }), formatNumber(data.summary.position, { digits: 1 })],
       ...data.daily.map((row) => ['日別', row.key, '', String(row.clicks), '', '']),
       ...data.devices.map((device) => ['デバイス', { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key, '', String(device.clicks), '', '']),
-      ...data.queries.map((row) => ['キーワード', row.key || '（検索語句なし）', String(row.impressions), String(row.clicks), oneDecimal.format(row.ctr * 100), oneDecimal.format(row.position)]),
-      ...data.pages.map((row) => ['ページ', row.key, String(row.impressions), String(row.clicks), oneDecimal.format(row.ctr * 100), oneDecimal.format(row.position)]),
+      ...data.queries.map((row) => ['キーワード', row.key || '（検索語句なし）', String(row.impressions), String(row.clicks), formatNumber(row.ctr * 100, { digits: 1 }), formatNumber(row.position, { digits: 1 })]),
+      ...data.pages.map((row) => ['ページ', row.key, String(row.impressions), String(row.clicks), formatNumber(row.ctr * 100, { digits: 1 }), formatNumber(row.position, { digits: 1 })]),
     ]
     const csv = lines.map((row) => row.map((value) => csvCell(value)).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
@@ -249,12 +272,12 @@ export default function SearchConsolePage() {
       <div data-design="Head" className="flex flex-wrap items-center justify-end gap-2">
         {data ? <Button onClick={exportCsv}>CSVで書き出す</Button> : null}
         {settingsHref ? <Button href={settingsHref} target="_blank" rel="noreferrer">連携を設定</Button> : null}
-        <div className="border-hairline flex rounded-xl border bg-canvas p-1">
+        <div className="border-hairline flex rounded-card border bg-canvas p-1">
           {ranges.map((range) => (
             <button
               key={range}
               onClick={() => setDays(range)}
-              className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-ink text-canvas' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+              className={`whitespace-nowrap rounded-control px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-ink text-canvas' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
             >
               {range}日
             </button>
@@ -263,7 +286,20 @@ export default function SearchConsolePage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="rounded-card bg-canvas-sunken h-36 animate-pulse" />)}</div>
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {metrics.map((item) => <Skeleton key={item.label} className="block h-36 w-full rounded-card" />)}
+            </div>
+          }
+        />
+      ) : loadError ? (
+        <ListState
+          kind="error"
+          error={loadError}
+          onRetry={() => setAttempt((current) => current + 1)}
+        />
       ) : !data ? (
         <>
           <div><NoteBar>Search Console をつなぐと、検索からの流入が見られます。</NoteBar></div>
@@ -295,7 +331,7 @@ export default function SearchConsolePage() {
                 今の横棒の並びのまま、目盛りの字（text-micro）・等幅数字・1色の棒にそろえる。
                 3項目に3色は付けない（h99Gb の決まり「色は2つまで」）。
               */}
-              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap tabular-nums">{number.format(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full"><div className="bg-action h-full rounded-full" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint text-micro mt-1 text-right tabular-nums">{oneDecimal.format(ratio)}%</p></div> })}</div>
+              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap tabular-nums">{formatNumber(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-pill"><div className="bg-action h-full rounded-pill" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint text-micro mt-1 text-right tabular-nums">{formatNumber(ratio, { digits: 1 })}%</p></div> })}</div>
             </section>
           </div>
           <div className="grid gap-5 xl:grid-cols-2">
@@ -309,7 +345,7 @@ export default function SearchConsolePage() {
               <li>・「検索から友だち追加」は、サイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません</li>
             </ul>
           </Disclosure>
-          <p className="text-ink-faint text-micro text-right">Search Console APIから読み取り専用で取得・最終更新 {new Date(data.fetchedAt).toLocaleString('ja-JP')}</p>
+          <p className="text-ink-faint text-micro text-right">Search Console APIから読み取り専用で取得・最終更新 {formatDateTime(data.fetchedAt)}</p>
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import type {
 } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
+import { describeFriendAddFailure } from '../friend-add-failure'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { csvCell } from './csv'
 import { formatJstDateTime, routingAction, routingLabel } from './run-status'
@@ -24,6 +25,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListRange from '@/components/ui/list-range'
+import { formatNumber } from '@/lib/format'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -72,6 +74,8 @@ function FriendAddRunsInner() {
   const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // M009: 403 は共通部品の forbidden で出す。HTTP の状態をそのまま渡す。
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvNote, setCsvNote] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
@@ -92,6 +96,7 @@ function FriendAddRunsInner() {
     }
     setLoading(true)
     setError('')
+    setErrorStatus(null)
     try {
       // 種類・経路の絞り込みはサーバ側へ送る。取得済み20件への表示絞りでは
       // 2ページ目以降が漏れる。
@@ -106,14 +111,18 @@ function FriendAddRunsInner() {
       if (requestId !== requestSequence.current) return
       if (!response.success) {
         setData(null)
-        setError('実行結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+        setError(response.error || '実行結果を表示できませんでした。もう一度お試しください。')
+        setErrorStatus(null)
         return
       }
       setData(response.data)
-    } catch {
+    } catch (caught) {
       if (requestId !== requestSequence.current) return
+      // M009: 403 は権限、404 は選び直し。「通信を確認」は通信断だけ。
+      const failure = describeFriendAddFailure(caught, '実行結果', 'load')
       setData(null)
-      setError('実行結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+      setError(failure.message)
+      setErrorStatus(failure.status)
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
@@ -319,8 +328,8 @@ function FriendAddRunsInner() {
       anchor.click()
       URL.revokeObjectURL(url)
       setCsvNote(truncated
-        ? `新しい順に${items.length.toLocaleString('ja-JP')}件まで書き出しました。それより古い記録は含まれていません。`
-        : `${items.length.toLocaleString('ja-JP')}件を書き出しました。`)
+        ? `新しい順に${formatNumber(items.length)}件まで書き出しました。それより古い記録は含まれていません。`
+        : `${formatNumber(items.length)}件を書き出しました。`)
     } catch {
       setCsvNote('書き出す記録を取得できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
@@ -388,11 +397,11 @@ function FriendAddRunsInner() {
                   { value: 'partial_failed', label: '再送待ち' },
                 ]}
               />
-              <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
+              <Button onClick={() => void load()} disabled={loading}>一覧を更新する</Button>
             </div>
             </MenuPortal>
           </span>
-          <Button onClick={() => void exportCsv()} disabled={!data?.items.length || csvBusy}>{csvBusy ? '書き出し中…' : '実行結果をCSVで書き出す'}</Button>
+          <Button onClick={() => void exportCsv()} disabled={!data?.items.length || csvBusy} busy={csvBusy} busyLabel="書き出し中…">実行結果をCSVで書き出す</Button>
         </div>
       </div>
 
@@ -433,7 +442,7 @@ function FriendAddRunsInner() {
         />
       ) : error ? (
         <ListState
-          kind="error"
+          kind={errorStatus === 403 ? 'forbidden' : 'error'}
           title="実行結果を表示できませんでした"
           description={error}
           action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
@@ -449,7 +458,7 @@ function FriendAddRunsInner() {
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <div className="border-b border-hairline px-4 py-3">
               <h2 className="font-bold">最近の友だち追加</h2>
-              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効き、CSVは絞り込みに合う記録を新しい順にすべて書き出します（上限{(CSV_EXPORT_MAX_PAGES * CSV_EXPORT_PAGE_SIZE).toLocaleString('ja-JP')}件）。</p>
+              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効き、CSVは絞り込みに合う記録を新しい順にすべて書き出します（上限{formatNumber((CSV_EXPORT_MAX_PAGES * CSV_EXPORT_PAGE_SIZE))}件）。</p>
               {csvNote ? <p className="mt-1 text-xs text-ink-faint">{csvNote}</p> : null}
             </div>
             <div className="divide-y divide-hairline px-4">
@@ -478,7 +487,7 @@ function FriendAddRunsInner() {
                   // すべて並べると狭い幅で右端が切れる。
                   <div key={item.id} className="min-w-0 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-pill bg-status-success-soft text-xs font-medium text-status-success-deep" aria-hidden="true">
                         {displayName.slice(0, 1)}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -496,7 +505,7 @@ function FriendAddRunsInner() {
                     <div className="mt-1.5 flex items-center justify-between gap-3 pl-12">
                       <time className="min-w-0 text-xs text-ink-secondary" dateTime={item.receivedAt}>{formatJstDateTime(item.receivedAt)}</time>
                       <Link
-                        className="shrink-0 text-xs font-bold text-action hover:underline"
+                        className="shrink-0 text-xs font-medium text-action hover:underline"
                         href={detailHref(item.id)}
                       >
                         詳細
@@ -550,10 +559,10 @@ function FriendAddRunsInner() {
             <h2 className="font-bold">稼働状況</h2>
             <p className="mt-1 text-xs text-ink-faint">現在取得できる初回案内の状態です。</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{ruleStatusLabel}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">{suppressionLabel}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{summary === null ? '—' : summary.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : 'まだありません'}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-medium">{ruleStatusLabel}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-medium">{suppressionLabel}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-medium">{summary === null ? '—' : summary.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : 'まだありません'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-medium">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
             </dl>
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
@@ -566,21 +575,21 @@ function FriendAddRunsInner() {
             {(() => {
               const href = editHref('preview')
               return href
-                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテスト</Button>
-                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテスト</Button>
+                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテストする</Button>
+                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテストする</Button>
             })()}
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">担当者シナリオ開始</h2>
             <p className="mt-1 text-xs text-ink-faint">{summary?.staffHandoffs.reason ?? '担当者への引き継ぎ結果を集計します。'}</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>実行結果</dt><dd className="font-bold">{summary?.staffHandoffs.value ?? '未取得'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>実行結果</dt><dd className="font-medium">{summary?.staffHandoffs.value ?? '未取得'}</dd></div>
             </dl>
           </section>
         </aside>
       </div>
 
-      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)}>{stopBusy ? '停止中…' : '配信を一時停止'}</Button>{(() => {
+      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)} busy={stopBusy} busyLabel="停止中…">配信を一時停止</Button>{(() => {
         const href = editHref('basic')
         return href
           ? <Button href={href} variant="primary">友だち追加時の設定を編集</Button>

@@ -988,6 +988,19 @@ CREATE TABLE auto_reply_action_runs (
   UNIQUE (evaluation_id, action_stable_id)
 );
 
+CREATE TABLE auto_reply_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT REFERENCES line_accounts(id),
+  operation         TEXT NOT NULL,
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  auto_reply_id     TEXT NOT NULL REFERENCES auto_replies(id) ON DELETE CASCADE,
+  version_id        TEXT REFERENCES auto_reply_versions(id) ON DELETE SET NULL,
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(idempotency_key)
+);
+
 CREATE TABLE auto_reply_evaluation_details (
   id                 TEXT PRIMARY KEY,
   evaluation_id      TEXT NOT NULL,
@@ -2845,6 +2858,17 @@ CREATE TABLE friend_export_jobs (
   failure_reason TEXT
 );
 
+CREATE TABLE friend_field_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  field_id          TEXT NOT NULL REFERENCES friend_fields(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
 CREATE TABLE friend_field_reminder_scan_states (
   reminder_id TEXT PRIMARY KEY REFERENCES reminders(id) ON DELETE CASCADE,
   cursor      TEXT,
@@ -3537,6 +3561,26 @@ CREATE TABLE line_account_connection_checks (
   idempotency_key   TEXT NOT NULL,
   account_revision  INTEGER NOT NULL,
   UNIQUE (line_account_id, idempotency_key, check_kind)
+);
+
+CREATE TABLE line_account_tag_links (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  tag_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, tag_id),
+  FOREIGN KEY (tag_id, tenant_id) REFERENCES line_account_tags(id, tenant_id) ON DELETE CASCADE
+);
+
+CREATE TABLE line_account_tags (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+  color TEXT CHECK (color IS NULL OR (length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
+  display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (id, tenant_id),
+  UNIQUE (tenant_id, name)
 );
 
 CREATE TABLE line_accounts (
@@ -5530,7 +5574,7 @@ CREATE TABLE rich_menu_groups (
   display_order       INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0);
+, publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE rich_menu_manual_publish_requests (
   id                    TEXT PRIMARY KEY,
@@ -5962,7 +6006,7 @@ CREATE TABLE rt_inbound_emails (
     CHECK (status IN ('storing', 'stored', 'received', 'quarantined', 'storage_failed', 'raw_deleted')),
   size_bytes INTEGER NOT NULL DEFAULT 0 CHECK (size_bytes >= 0),
   quarantine_reason TEXT
-);
+, media_id TEXT REFERENCES rt_media(id));
 
 CREATE TABLE rt_intake_addresses (
   id TEXT PRIMARY KEY,
@@ -6001,9 +6045,9 @@ CREATE TABLE rt_line_flows (
   UNIQUE(organization_id, store_id, flow_type)
 );
 
-CREATE TABLE rt_media (
+CREATE TABLE "rt_media" (
   id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper')),
+  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper', 'google_reservation', 'ikyu', 'tablecheck')),
   name TEXT NOT NULL,
   sender_addresses TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(sender_addresses)),
   parser_key TEXT NOT NULL UNIQUE,
@@ -6024,6 +6068,21 @@ CREATE TABLE rt_memberships (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE rt_menu_change_requests (
+  id TEXT PRIMARY KEY,
+  approval_id TEXT NOT NULL UNIQUE REFERENCES rt_approval_requests(id),
+  menu_id TEXT NOT NULL REFERENCES rt_menu_items(id),
+  store_id TEXT NOT NULL REFERENCES rt_stores(id),
+  before_price INTEGER NOT NULL CHECK (before_price >= 0),
+  after_price INTEGER NOT NULL CHECK (after_price >= 0),
+  requested_by TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'returned', 'applied', 'failed')),
+  return_reason TEXT,
+  failure_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE rt_menu_items (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -6037,7 +6096,7 @@ CREATE TABLE rt_menu_items (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, published_once INTEGER NOT NULL DEFAULT 0 CHECK (published_once IN (0, 1)), publication_history_unknown INTEGER NOT NULL DEFAULT 0 CHECK (publication_history_unknown IN (0, 1)));
 
 CREATE TABLE rt_organization_agreements (
   id TEXT PRIMARY KEY,
@@ -6593,6 +6652,29 @@ CREATE TABLE support_mark_archive_requests (
   UNIQUE(line_account_id, idempotency_key)
 );
 
+CREATE TABLE support_mark_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  mark_id           TEXT NOT NULL REFERENCES support_marks(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
+CREATE TABLE support_mark_rule_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  mark_id           TEXT NOT NULL REFERENCES support_marks(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  rule_id           TEXT NOT NULL REFERENCES automation_definitions(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
 CREATE TABLE support_mark_scopes (
   mark_id         TEXT PRIMARY KEY REFERENCES support_marks(id),
   tenant_id       TEXT NOT NULL REFERENCES tenants(id),
@@ -6618,6 +6700,17 @@ CREATE TABLE tag_groups (
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE tag_update_requests (
+  id                  TEXT PRIMARY KEY,
+  tag_id              TEXT NOT NULL REFERENCES tags(id),
+  idempotency_key     TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  resulting_version   INTEGER NOT NULL,
+  response_json       TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at          TEXT NOT NULL,
+  UNIQUE(tag_id, idempotency_key)
 );
 
 CREATE TABLE "tags" (
@@ -7480,6 +7573,9 @@ CREATE INDEX idx_auto_replies_template_id ON auto_replies(template_id);
 CREATE INDEX idx_auto_reply_action_runs_evaluation
   ON auto_reply_action_runs (evaluation_id, status);
 
+CREATE INDEX idx_auto_reply_create_requests_rule
+  ON auto_reply_create_requests(auto_reply_id, created_at DESC);
+
 CREATE INDEX idx_auto_reply_evaluation_details_evaluation
   ON auto_reply_evaluation_details (evaluation_id, evaluation_order);
 
@@ -8056,6 +8152,9 @@ CREATE INDEX idx_friend_daily_snapshots_date
 CREATE INDEX idx_friend_export_jobs_account
   ON friend_export_jobs(line_account_id, created_at DESC);
 
+CREATE INDEX idx_friend_field_create_requests_field
+  ON friend_field_create_requests(line_account_id, field_id, created_at DESC);
+
 CREATE INDEX idx_friend_field_scopes_account
   ON friend_field_scopes(tenant_id, line_account_id);
 
@@ -8242,11 +8341,21 @@ CREATE INDEX idx_line_account_connection_checks_correlation
 CREATE INDEX idx_line_account_connection_checks_latest
   ON line_account_connection_checks(line_account_id, checked_at DESC);
 
+CREATE INDEX idx_line_account_tag_links_tag ON line_account_tag_links(tag_id, line_account_id);
+
+CREATE INDEX idx_line_account_tags_order ON line_account_tags(tenant_id, display_order, name);
+
 CREATE INDEX idx_line_accounts_archived
   ON line_accounts (archived_at, display_order, created_at);
 
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
+
+CREATE UNIQUE INDEX idx_line_accounts_liff_id_unique
+  ON line_accounts(liff_id);
+
+CREATE UNIQUE INDEX idx_line_accounts_login_channel_id_unique
+  ON line_accounts(login_channel_id);
 
 CREATE UNIQUE INDEX idx_line_accounts_one_default_per_tenant
   ON line_accounts (COALESCE(tenant_id, '00000000-0000-4000-8000-000000000001'))
@@ -8830,7 +8939,11 @@ CREATE INDEX idx_rt_intake_addresses_store
 
 CREATE INDEX idx_rt_inventory_store_time ON rt_inventory_slots(store_id, starts_at);
 
+CREATE UNIQUE INDEX idx_rt_manual_email_import ON rt_reservations(inbound_email_id) WHERE parser_key = 'manual_import';
+
 CREATE INDEX idx_rt_memberships_org ON rt_memberships(organization_id, store_id, role);
+
+CREATE UNIQUE INDEX idx_rt_menu_change_pending ON rt_menu_change_requests(menu_id) WHERE status IN ('pending', 'approved');
 
 CREATE INDEX idx_rt_menu_store ON rt_menu_items(store_id, status, kind);
 
@@ -8973,6 +9086,9 @@ CREATE INDEX idx_staff_members_role ON staff_members(role);
 CREATE INDEX idx_staff_members_tenant
   ON staff_members(tenant_id);
 
+CREATE UNIQUE INDEX idx_staff_members_tenant_email_unique
+  ON staff_members(COALESCE(tenant_id, ''), lower(email)) WHERE email IS NOT NULL;
+
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
 
@@ -9004,6 +9120,12 @@ CREATE INDEX idx_support_email_threads_status_last
 CREATE INDEX idx_support_mark_archive_requests_mark
   ON support_mark_archive_requests(line_account_id, mark_id, created_at DESC);
 
+CREATE INDEX idx_support_mark_create_requests_mark
+  ON support_mark_create_requests(line_account_id, mark_id, created_at DESC);
+
+CREATE INDEX idx_support_mark_rule_create_requests_rule
+  ON support_mark_rule_create_requests(line_account_id, rule_id, created_at DESC);
+
 CREATE INDEX idx_support_mark_scopes_account
   ON support_mark_scopes(tenant_id, line_account_id);
 
@@ -9011,6 +9133,9 @@ CREATE INDEX idx_support_marks_active
   ON support_marks(archived_at, display_order, created_at);
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
+
+CREATE INDEX idx_tag_update_requests_tag
+  ON tag_update_requests(tag_id, created_at DESC);
 
 CREATE UNIQUE INDEX idx_tags_account_exact_name
   ON tags(line_account_id, name) WHERE line_account_id IS NOT NULL;
@@ -9335,6 +9460,23 @@ WHEN NEW.id != OLD.id
   OR NEW.tenant_id != OLD.tenant_id
   OR NEW.version != OLD.version
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER line_account_tag_links_scope
+BEFORE INSERT ON line_account_tag_links
+WHEN NOT EXISTS (
+  SELECT 1 FROM line_accounts WHERE id = NEW.line_account_id
+    AND COALESCE(tenant_id, '00000000-0000-4000-8000-000000000001') = NEW.tenant_id
+    AND archived_at IS NULL
+)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
+
+CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status = 'pending' AND NEW.status = 'approved' BEGIN UPDATE rt_menu_items SET price = NEW.after_price, updated_at = datetime('now') WHERE id = NEW.menu_id AND store_id = NEW.store_id AND price = NEW.before_price; UPDATE rt_menu_change_requests SET status = CASE WHEN changes() = 1 THEN 'applied' ELSE 'failed' END, failure_reason = CASE WHEN changes() = 1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END, updated_at = datetime('now') WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_menu_change_review AFTER UPDATE OF status ON rt_approval_requests WHEN NEW.kind = 'menu_change' AND OLD.status = 'pending' AND NEW.status IN ('approved', 'returned') BEGIN UPDATE rt_menu_change_requests SET status = NEW.status, return_reason = CASE WHEN NEW.status = 'returned' THEN NEW.review_comment ELSE NULL END, updated_at = datetime('now') WHERE approval_id = NEW.id AND status = 'pending'; END;
+
+CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions

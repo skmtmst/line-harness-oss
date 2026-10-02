@@ -7,15 +7,24 @@ import MenuPortal from '@/components/shared/menu-portal'
 import Pagination from '@/components/shared/pagination'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FriendListRow, { FriendListCard } from './friend-list-row'
+import { formatNumber } from '@/lib/format'
+import './friend-list-table.css'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
 interface Props {
   friends: FriendListItem[]
   status?: 'loading' | 'ready' | 'error'
+  /*
+   * 読み直し中（★V7 sTJsh §2）。行が残っている再取得では一覧を
+   * 消さず、表を 0.55 に薄めて上に 2px の線の帯を出す。
+   */
+  refreshing?: boolean
   emptyTitle?: string
   emptyDescription?: string
   onRetry?: () => void
@@ -46,6 +55,7 @@ const COLUMN_LABELS: Array<{ key: FriendListColumn; label: string }> = [
 export default function FriendListTable({
   friends,
   status = 'ready',
+  refreshing = false,
   emptyTitle = '条件に合う友だちが見つかりません',
   emptyDescription = '検索条件を外すか、別のキーワードでお試しください。',
   onRetry,
@@ -91,23 +101,36 @@ export default function FriendListTable({
     }
   }, [preferencesReady, visible])
 
-  const gridTemplateColumns = useMemo(() => [
-    '36px',
-    '36px',
-    'minmax(180px,1.3fr)',
-    visible.has('support') ? 'minmax(125px,.9fr)' : null,
-    visible.has('scenario') ? 'minmax(85px,.65fr)' : null,
-    visible.has('latest') ? 'minmax(150px,1.45fr)' : null,
-    visible.has('tags') ? 'minmax(150px,1.35fr)' : null,
-    visible.has('source') ? 'minmax(110px,.8fr)' : null,
-    visible.has('last') ? '90px' : null,
-  ].filter(Boolean).join(' '), [visible])
+  const columnTracks = useMemo(() => ([
+    { key: 'check', track: '36px' },
+    { key: 'star', track: '36px' },
+    { key: 'friend', track: 'minmax(180px,1.3fr)' },
+    { key: 'support', track: 'minmax(125px,.9fr)' },
+    { key: 'scenario', track: 'minmax(85px,.65fr)' },
+    { key: 'latest', track: 'minmax(150px,1.45fr)' },
+    { key: 'tags', track: 'minmax(150px,1.35fr)' },
+    { key: 'source', track: 'minmax(110px,.8fr)' },
+    { key: 'last', track: '90px' },
+  ].filter((column) => column.key === 'check' || column.key === 'star' || column.key === 'friend' || visible.has(column.key as FriendListColumn))), [visible])
+
+  const gridTemplateColumns = columnTracks.map((column) => column.track).join(' ')
+  /*
+   * ★V8（夕14・WIDTHS-20261001）：1280px 幅で右の列が板の外に切れる。
+   * AGENTS.md の順番（横送りより先に「大事でない列を隠す」）に従い、
+   * v8 の 1366px 未満では流入元列を隠す。流入元は追加時の計測値で、
+   * 詳細の「友だち情報」にあるので一覧から消しても辿れる。
+   */
+  const narrowGridTemplateColumns = columnTracks.filter((column) => column.key !== 'source').map((column) => column.track).join(' ')
 
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = Math.min(page * pageSize, total)
 
   return (
-    <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
+    <section
+      className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card"
+      style={{ '--friend-cols': gridTemplateColumns, '--friend-cols-narrow': narrowGridTemplateColumns } as React.CSSProperties}
+      data-design="V6FriendTable" data-design-node="k4Hz0X" aria-busy={status === 'loading' || undefined}
+    >
       {/*
         FRIEND-17: 狭い幅ではツールバーの右側（件数・表示項目）を折り返して
         隠さない。h-14 の固定高は lg 以上にだけ掛ける。
@@ -118,7 +141,7 @@ export default function FriendListTable({
             未取得の件数は0件に見せない（絞り込みの行の件数を消した後は、
             この見出しがその役目を持つ）。取れるまでは「—」。
           */}
-          友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
+          友だち一覧 <span className="ml-1 text-xs font-medium text-ink-faint">{status === 'ready' ? `${formatNumber(total)}件` : '—'}</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
@@ -174,7 +197,7 @@ export default function FriendListTable({
       </div>
 
       {/* FRIEND-17: 列見出しは表と対になるため、カード表示の幅では出さない。 */}
-      <div className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid" style={{ gridTemplateColumns }}>
+      <div data-friend-cols className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid">
         <div>
           {/* ★V7 共通 チェックボックス（gvjpx）。一部だけ選んでいるときは「―」。 */}
           <Checkbox
@@ -194,11 +217,30 @@ export default function FriendListTable({
         {visible.has('last') ? <div className="truncate text-center">最終接触</div> : null}
       </div>
 
+      <RefreshCover refreshing={refreshing}>
       <div>
         {status === 'loading' ? (
-          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
-            <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
-          </div>
+          /*
+           * ★V7 仕上げ §3: 表は中身の代わりに同じ形の骨組みを出す。
+           * 列の見出しは上にそのまま出ているので、ここは行だけ。
+           * 0.3 秒より早く来たら出さない（DelayedSkeleton）。
+           */
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div aria-hidden="true">
+                {[0, 1, 2, 3, 4, 5].map((row) => (
+                  <div key={row} className="flex items-center gap-3 border-b border-hairline px-3 py-3">
+                    <Skeleton className="h-5 w-5 shrink-0" />
+                    <Skeleton circle className="h-9 w-9 shrink-0" />
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                ))}
+              </div>
+            }
+          />
         ) : status === 'error' ? (
           <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
             <ListState
@@ -234,17 +276,31 @@ export default function FriendListTable({
                 onToggleSelect={() => onToggleSelect?.(friend.id)}
                 onToggleAttention={() => onToggleAttention?.(friend)}
                 visibleColumns={visible}
-                gridTemplateColumns={gridTemplateColumns}
               />
             </div>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
-        <ListRange total={total} first={rangeStart} last={rangeEnd} />
-        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
+      {/*
+        ★V8（jX2Uw）：ページ送りの帯が「件数＋ボタン」を持つ形。
+        v7 は帯の外に件数を出す（data-pagebar-out が v8 で隠す）、
+        v8 は帯の中の summary に出す。
+      */}
+      <div data-pagebar className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
+        <span data-pagebar-out>
+          <ListRange total={total} first={rangeStart} last={rangeEnd} />
+        </span>
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          onPageChange={onPageChange}
+          disabled={status !== 'ready'}
+          ariaLabel="友だち一覧のページ"
+          summary={<ListRange bare total={total} first={rangeStart} last={rangeEnd} />}
+        />
       </div>
+      </RefreshCover>
     </section>
   )
 }

@@ -323,6 +323,56 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     // セッションは s1 のもの
     expect(sessionRows().map((row) => row.staff_id)).toEqual(['s1']);
   });
+
+  it('R509: 同じ合言葉で2回取っても同じQRを返し、保存は最初のまま', async () => {
+    await seedOwnerWithPassword();
+    const token = await setupTokenFor('s1');
+
+    const first = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(first.status).toBe(200);
+    const uri1 = (await first.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    const pending1 = (testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string }).totp_pending_secret_enc;
+
+    const second = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(second.status).toBe(200);
+    const uri2 = (await second.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    // 2回目は新しい秘密を作らず、最初のQRをそのまま返す。
+    expect(uri2).toBe(uri1);
+    const pending2 = (testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string }).totp_pending_secret_enc;
+    expect(pending2).toBe(pending1);
+
+    // 最終応答のQRから作るコードで登録できる。
+    const secret = new URL(uri2).searchParams.get('secret')!;
+    const confirm = await call('POST', '/api/auth/two-factor/setup/confirm', { challengeToken: token, code: await currentCode(secret) });
+    expect(confirm.status).toBe(200);
+  });
+
+  it('R509: 先に置かれた仮秘密があるとそれを返し、そのQRで登録できる', async () => {
+    await seedOwnerWithPassword();
+    const token = await setupTokenFor('s1');
+    // 同時要求のBが先に置いたことにする。
+    const secretB = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+    testDb.raw.prepare('UPDATE staff_members SET totp_pending_secret_enc = ? WHERE id = ?')
+      .run(await encryptTotpSecret(secretB, MASTER_KEY), 's1');
+
+    const res = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(res.status).toBe(200);
+    const uri = (await res.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    // 負けた側（後から来た要求）は置かれた側のQRを返す。保存と一致する。
+    expect(new URL(uri).searchParams.get('secret')).toBe(secretB);
+
+    const confirm = await call('POST', '/api/auth/two-factor/setup/confirm', { challengeToken: token, code: await currentCode(secretB) });
+    expect(confirm.status).toBe(200);
+  });
+
+  it('R509: 仮秘密の条件付き確保は空のときだけ置く', async () => {
+    const { claimTotpPendingSecret } = await import('@line-crm/db');
+    await seedOwnerWithPassword();
+    expect(await claimTotpPendingSecret(testDb.db, 's1', 'enc-a')).toBe(true);
+    expect(await claimTotpPendingSecret(testDb.db, 's1', 'enc-b')).toBe(false);
+    const row = testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string };
+    expect(row.totp_pending_secret_enc).toBe('enc-a');
+  });
 });
 
 describe('N-434: セッション期限（既定8時間・明示選択で7日・cookieとサーバー一致）', () => {
@@ -505,6 +555,34 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(new URLSearchParams(location.hash.slice(1)).get('lh_2fa')).toBeTruthy();
     expect(challengeRows()).toMatchObject([{ staff_id: 'awaiting', purpose: 'setup' }]);
     expect(sessionRows()).toEqual([]);
+  });
+
+  /*
+   * 招待の扱いはメール＋パスワードのログイン（auth-email.ts）とそろえる。
+   * 自分の招待が保留中なら、互換判定で入れる立場でも止めて登録を完了させる。
+   */
+  it('自分の招待が保留中なら、既定の統括のオーナーでもnext=opsで止める', async () => {
+    seedStaff('invited-owner', { role: 'owner' });
+    seedPlatformAdmin('invited-owner', 'invited');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-invited' WHERE id = 'invited-owner'`).run();
+    lineFetchMock('U-invited');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).toBe('https://admin.example.com/ops/login?error=not_authorized');
+    expect(sessionRows()).toEqual([]);
+  });
+
+  /*
+   * 他人の招待が保留中なだけで互換判定まで閉じると、運営マスターが0人のまま
+   * 誰も入れなくなる（画面から復旧できない）。
+   */
+  it('他人の招待が保留中でも、既定の統括のオーナーはnext=opsで進める', async () => {
+    seedStaff('compat-owner', { role: 'owner' });
+    seedStaff('someone-else', { role: 'staff' });
+    seedPlatformAdmin('someone-else', 'invited');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-compat' WHERE id = 'compat-owner'`).run();
+    lineFetchMock('U-compat');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).not.toBe('https://admin.example.com/ops/login?error=not_authorized');
   });
 
   it('invite Cookie無しでは既存staffのLINE連携を変更しない', async () => {

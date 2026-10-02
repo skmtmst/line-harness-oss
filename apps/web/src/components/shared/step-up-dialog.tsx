@@ -99,7 +99,7 @@ export default function StepUpDialog({ open, action, method = 'totp', busy = fal
               autoFocus
               autoComplete="current-password"
               aria-invalid={Boolean(error)}
-              className="w-full rounded-control border border-surface-chrome bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-action"
+              className="w-full rounded-control border border-shell-gray bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-action"
             />
           </div>
         </>

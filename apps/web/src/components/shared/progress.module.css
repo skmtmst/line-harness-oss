@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 処理の進み。Pencil ★V7 `xiHO8`。
@@ -32,14 +33,14 @@
 .title {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .percent {
   margin-left: auto;
   color: var(--color-accent-deep); /* fill: $accent-deep（進み具合＝うまくいっている途中） */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -67,15 +68,20 @@
 .track {
   height: 8px; /* height: 8 */
   overflow: hidden;
-  border-radius: 4px; /* cornerRadius: 4 */
+  border-radius: var(--radius-mini); /* cornerRadius: 4 */
   background: var(--color-shell); /* fill: $shell */
   position: relative;
+}
+
+/* ★V8（夕13）：進みの棒の溝は track の色（TOKENS-20261001）。 */
+[data-theme="v8"] .track {
+  background: var(--color-track);
 }
 
 .fill {
   position: absolute;
   inset: 0;
-  border-radius: 4px; /* cornerRadius: 4 */
+  border-radius: var(--radius-mini); /* cornerRadius: 4 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   transform: scaleX(0);
   transform-origin: left center;
@@ -99,7 +105,7 @@
   bottom: 0;
   left: 0;
   width: 29%; /* width: 110（380 の帯のとき） */
-  border-radius: 4px; /* cornerRadius: 4 */
+  border-radius: var(--radius-mini); /* cornerRadius: 4 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   opacity: 0.6; /* opacity: 0.6 */
   animation: progress-slide var(--motion-slow) var(--motion-ease-in-out) infinite alternate;

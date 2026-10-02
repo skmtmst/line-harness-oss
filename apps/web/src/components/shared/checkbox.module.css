@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * チェックボックス。Pencil ★V7 `gvjpx`。
@@ -140,5 +141,18 @@
 .error {
   color: var(--color-status-danger); /* fill: $status-danger */
   font-size: 12px; /* fontSize: 12 */
+}
+
+/*
+ * ★V8「チェック」（dQCCN・S9U7v）：箱・印・色は v7 と同じ。
+ * 違うのは文字（13px）と、オフの箱の枠色（control-border）。
+ * 選んだ・誤りの枠色は details 度が高い規則が勝つので変わらない。
+ */
+[data-theme='v8'] .label {
+  font-size: var(--text-label);
+}
+
+[data-theme='v8'] .box {
+  border-color: var(--color-control-border);
 }
 }

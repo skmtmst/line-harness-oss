@@ -1,4 +1,5 @@
 import React from 'react'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 一覧の件数表示（監査6 #667）。
@@ -21,6 +22,7 @@ export default function ListRange({
   last,
   label,
   className,
+  bare,
 }: {
   /** 絞り込み後の総件数（サーバが数えた値）。 */
   total: number
@@ -31,14 +33,20 @@ export default function ListRange({
   /** 件名の前置き。「記録」「成果地点」など。不要な画面は省略する。 */
   label?: string
   className?: string
+  /**
+   * 文字指定を持たない素の span で返す。帯の中など、置き場所の部品が
+   * 文字の大きさ・色を決めるときに使う（utilities 層の text-xs が
+   * 部品側の指定より強いため、ここで外す）。
+   */
+  bare?: boolean
 }) {
   const t = Math.max(0, Math.floor(total))
   return (
-    <span className={['text-ink-faint text-xs', className].filter(Boolean).join(' ')}>
+    <span className={bare ? className : ['text-ink-faint text-xs', className].filter(Boolean).join(' ')}>
       {label ? `${label} ` : null}
       {t === 0
         ? '0件'
-        : `${t.toLocaleString('ja-JP')}件中 ${Math.max(0, first).toLocaleString('ja-JP')}〜${Math.max(0, last).toLocaleString('ja-JP')}件を表示`}
+        : `${formatNumber(t)}件中 ${formatNumber(Math.max(0, first))}〜${formatNumber(Math.max(0, last))}件を表示`}
     </span>
   )
 }

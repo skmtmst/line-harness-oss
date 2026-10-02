@@ -3,16 +3,18 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import QuestionEditor, {
   emptyQuestion,
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -93,10 +95,11 @@ function QuestionTemplatePageInner() {
     setFolders([])
     if (!folderAccountId) return
     let cancelled = false
+    // m23m: 置き場が取れなくても質問は作れる。取れない失敗で画面を落とさない。
     void api.folders.list('template', folderAccountId).then((res) => {
       if (cancelled || !res.success) return
       setFolders(res.data)
-    })
+    }).catch(() => {})
     return () => { cancelled = true }
   }, [folderAccountId])
 
@@ -131,8 +134,12 @@ function QuestionTemplatePageInner() {
         }))
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
-      .catch(() => {
-        if (!cancelled) setError('質問テンプレートを読み込めませんでした。')
+      // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+      // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '質問テンプレート') : '質問テンプレートを読み込めませんでした。')
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -195,8 +202,13 @@ function QuestionTemplatePageInner() {
         return
       }
       router.push('/templates')
-    } catch {
-      setError('保存できませんでした。通信状態を確認してもう一度お試しください。')
+    } catch (caught) {
+      // 実行時のAPI失敗（500を含む）は原因どおりの文で出す。実送はしない。
+      if (caught instanceof ApiError && caught.status === 500) {
+        setError(`${describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' })}`)
+      } else {
+        setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      }
     } finally {
       setSaving(false)
     }
@@ -326,16 +338,15 @@ function QuestionTemplatePageInner() {
               キャンセル
             </Button>
             <Button type="button" variant="secondary" disabled={saving} onClick={() => void save('draft')}>
-              下書きに保存
+              下書きを保存する
             </Button>
-            <Button type="button" variant="primary" disabled={saving} onClick={() => void save('published')}>
-              {saving ? '保存中…' : 'テンプレートを保存'}
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save('published')} busy={saving}>テンプレートを保存する
             </Button>
           </>
         )}
       />
       {/* R136 監査：質問文などの書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、質問への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="質問への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

@@ -14,6 +14,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
@@ -72,6 +73,8 @@ export default function CommonActionsPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [automationCounts, setAutomationCounts] = useState<{ active: number; stopped: number } | null>(null)
   const [templateCount, setTemplateCount] = useState<number | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
@@ -95,6 +98,7 @@ export default function CommonActionsPage() {
     }
     setLoading(true)
     setError('')
+    setLoadError(null)
     try {
       // 件数表示のための全件取得はしない。札・KPIの数字は口の集計で受け取る。
       const [response, automationsResponse, templatesResponse] = await Promise.all([
@@ -122,6 +126,7 @@ export default function CommonActionsPage() {
       setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
     } catch (caught) {
       if (requestSeq.current !== my) return
+      setLoadError(caught)
       setError(caught instanceof Error ? caught.message : '共通アクションを読み込めませんでした')
     } finally {
       if (requestSeq.current === my) setLoading(false)
@@ -333,7 +338,7 @@ export default function CommonActionsPage() {
             onClick={() => void load()}
           >
             <RefreshCw size={16} aria-hidden />
-            一覧を更新
+            一覧を更新する
           </Button>
         }
       />
@@ -341,7 +346,15 @@ export default function CommonActionsPage() {
       {error ? (
         // ★V7 `x63W5x`：口の文言（英語の `Failed to fetch` など）をそのまま
         // 出さない。日本語の決まった文で出す。
-        <ListState kind="error" title="共通アクションを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => void load()} />
+        <ListState
+          kind="error"
+          title="共通アクションを読み込めませんでした"
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は画面の文のまま。
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。'}
+          error={loadError ?? undefined}
+          onRetry={() => void load()}
+        />
       ) : loading ? (
         <ListState kind="loading" title="共通アクションを読み込んでいます" />
       ) : items.length === 0 ? (

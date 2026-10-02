@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 保存の知らせ（Toast）。★V7 共通部品その2 §2。
@@ -26,7 +27,11 @@
   display: none;
 }
 
-/* 知らせ1件。黒地に白字（成功・失敗の色分けはしない）。 */
+/*
+ * 知らせ1件。★V7 §2 の決まり「知らせは黒にしない（2026-09-30 オーナー）」に
+ * そろえ、白地・細い線・段2（浮く）の影にする。文字は ink。
+ * 成功・失敗は印の色だけで分ける（緑=成功、赤=失敗）。
+ */
 .toast {
   /*
    * 消えるまでの時間。`notifyToast` の規定値（4000ms）と合わせる。
@@ -37,9 +42,11 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-float);
   font-size: var(--text-caption);
   font-weight: 600;
   line-height: 1.6;
@@ -51,14 +58,14 @@
   flex: none;
 }
 
-/* うまくいった印。黒地に載せる薄い緑（飾りなので読み上げない）。 */
+/* うまくいった印。白地に載せる濃い緑（飾りなので読み上げない）。 */
 .iconSuccess {
-  color: var(--color-success-bg);
+  color: var(--color-success);
 }
 
-/* できなかった印。黒地に載せる薄い赤（飾りなので読み上げない）。 */
+/* できなかった印。白地に載せる赤（飾りなので読み上げない）。 */
 .iconError {
-  color: var(--color-status-danger-soft);
+  color: var(--color-danger);
 }
 
 .message {
@@ -66,13 +73,13 @@
   flex: 1;
 }
 
-/* 「元に戻す」。知らせ1件に1つまで。 */
+/* 「元に戻す」。知らせ1件に1つまで。白地では濃い緑で示す。 */
 .undo {
   flex: none;
   border: 0;
   padding: 4px 8px;
   background: transparent;
-  color: var(--color-canvas);
+  color: var(--color-accent-deep);
   font: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -94,11 +101,41 @@
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
-  color: var(--color-canvas);
+  color: var(--color-ink-faint);
   cursor: pointer;
+}
+
+.close:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
 }
 
 .close:focus-visible {
   outline: revert;
+}
+
+/*
+ * ★V8 の動き（MOTION.md「知らせ」）：下から 8px 浮き出しながら入る
+ * （200ms ease-out）。出る側は今の仕組みが即時に外すため入りだけ。
+ * 「動きを減らす」設定では globals の規定で一瞬になる。
+ */
+[data-theme='v8'] .toast {
+  animation: toast-v8-enter var(--motion-base) var(--motion-ease-out);
+}
+
+@keyframes toast-v8-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
+[data-theme="v8"] .toast {
+  border-color: var(--color-border-soft);
 }
 }

@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Stepper from '@/components/shared/stepper'
@@ -15,11 +15,15 @@ import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { webinarApi, type WebinarFolder } from '@/lib/api'
+import { webinarApi, describeSaveFailure, type WebinarFolder } from '@/lib/api'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 /* 段の並びは編集画面と同じ定義を使う。作る画面と直す画面で段がずれないようにする。 */
 import { STEPS } from '@/app/webinars/edit/edit-steps'
 
 type DeliveryKind = 'on-demand' | 'scheduled'
+
+/* D003: フォルダ未取得のまま保存しようとしたときの止め文。 */
+const FOLDERS_BLOCKED_MESSAGE = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
 
 export default function NewWebinarPage() {
   usePageTitle('ウェビナーを作成')
@@ -31,6 +35,18 @@ export default function NewWebinarPage() {
   const [folderId, setFolderId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /*
+   * D003: フォルダ一覧が読めていない間（取得失敗）は、存在しないはずの
+   * 「未分類」だけを見て保存させない。失敗は欄の下に出し、再読み込みで
+   * 直せるようにする。
+   */
+  const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
+  /*
+   * D001（new）: 作成の口は owner/admin だけ（POST /api/webinars の
+   * requireRole とそろえる）。閲覧だけの担当者の保存は理由付きで止める。
+   */
+  const [canCreateWebinar] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
 
   /*
    * R18: 名前・開催形式・フォルダのいずれかを触っていたら未保存とみなす。
@@ -40,20 +56,41 @@ export default function NewWebinarPage() {
   const dirty = title.trim() !== '' || deliveryKind !== 'on-demand' || folderId !== ''
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
-  useEffect(() => {
+  const loadFolders = useCallback(async () => {
     if (!selectedAccountId) {
       setFolders([])
       setFolderId('')
+      setFoldersState('ready')
       return
     }
-    webinarApi.folders(selectedAccountId)
-      .then((response) => setFolders(response.success && Array.isArray(response.data) ? response.data : []))
-      .catch(() => setFolders([]))
+    setFoldersState('loading')
+    try {
+      const response = await webinarApi.folders(selectedAccountId)
+      setFolders(response.success && Array.isArray(response.data) ? response.data : [])
+      setFoldersState('ready')
+      /* 再読み込みで直ったら、保存止めの文は消す（入力は残る）。 */
+      setError((previous) => (previous === FOLDERS_BLOCKED_MESSAGE ? null : previous))
+    } catch {
+      setFolders([])
+      setFoldersState('error')
+    }
   }, [selectedAccountId])
 
+  useEffect(() => {
+    void loadFolders()
+  }, [loadFolders])
+
   async function save(next: 'list' | 'video') {
+    if (!canCreateWebinar) {
+      setError('ウェビナーを作る権限がありません。オーナーか管理者に依頼してください。')
+      return
+    }
     if (!selectedAccountId) {
       setError('上のバーでLINE公式アカウントを選んでください')
+      return
+    }
+    if (foldersState === 'error') {
+      setError(FOLDERS_BLOCKED_MESSAGE)
       return
     }
     if (!title.trim()) {
@@ -83,7 +120,8 @@ export default function NewWebinarPage() {
       */
       router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '下書きを保存できませんでした。もう一度お試しください。')
+      /* D002: `API error: 405` のような内部文をそのまま出さない。 */
+      setError(describeSaveFailure(cause))
       setSaving(false)
     }
   }
@@ -132,12 +170,25 @@ export default function NewWebinarPage() {
                   id="webinar-folder"
                   aria-label="フォルダ"
                   value={folderId}
+                  disabled={foldersState === 'error'}
                   onChange={(value) => setFolderId(value)}
                   options={[
                     { value: '', label: '未分類' },
                     ...folders.map((folder) => ({ value: folder.id, label: `${folder.name}（${folder.count}件）` })),
                   ]}
                 />
+                {foldersState === 'error' ? (
+                  <p className="mt-1 text-xs">
+                    <span className="text-danger">フォルダを読み込めませんでした。</span>{' '}
+                    <button
+                      type="button"
+                      onClick={() => void loadFolders()}
+                      className="text-action text-xs font-semibold underline"
+                    >
+                      もう一度読み込む
+                    </button>
+                  </p>
+                ) : null}
               </div>
             </div>
           </section>
@@ -188,30 +239,48 @@ export default function NewWebinarPage() {
           </LinePreview>
           </div>
           <div className="flex gap-2">
-            <Button disabled title="下書き保存後に使えます">テスト送信</Button>
+            <Button disabled title="下書き保存後に使えます">テストを送る</Button>
             <Button disabled title="公開後に使えます">公開ページを見る</Button>
           </div>
         </aside>
       </div>
 
+      {!canCreateWebinar ? (
+        <p className="text-ink-secondary text-xs">ウェビナーの作成はオーナーか管理者が行います。必要なときは依頼してください。</p>
+      ) : null}
       <StickyBar
         status="下書き（まだ誰にも公開されません）"
         actions={(
           <>
-            <Button disabled={saving} onClick={() => void save('list')}>{saving ? '保存中…' : '下書き保存'}</Button>
-            <Button variant="primary" disabled={saving} onClick={() => void save('video')}>動画設定へ</Button>
+            <Button
+              disabled={saving || !canCreateWebinar || foldersState === 'error'}
+              title={
+                !canCreateWebinar
+                  ? 'ウェビナーの作成はオーナーか管理者が行います'
+                  : foldersState === 'error'
+                    ? 'フォルダを読み込めていないため保存できません'
+                    : undefined
+              }
+              onClick={() => void save('list')} busy={saving}>下書きを保存する
+            </Button>
+            <Button
+              variant="primary"
+              disabled={saving || !canCreateWebinar || foldersState === 'error'}
+              title={
+                !canCreateWebinar
+                  ? 'ウェビナーの作成はオーナーか管理者が行います'
+                  : foldersState === 'error'
+                    ? 'フォルダを読み込めていないため保存できません'
+                    : undefined
+              }
+              onClick={() => void save('video')}
+            >
+              動画設定へ
+            </Button>
           </>
         )}
       />
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="入力を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

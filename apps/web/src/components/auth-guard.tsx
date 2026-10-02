@@ -26,6 +26,15 @@ import { TenantAccessProvider, type TenantStatus } from './tenant-access-context
  */
 const SESSION_REUSE_MS = 30_000
 let lastSessionCheck: { at: number; fingerprint: string; tenantStatus: TenantStatus } | null = null
+/*
+ * R505: 確認の要求世代。確認を始めるたびに1ずつ進む。
+ *
+ * 古いログインの確認応答が、新しいログインの名前・権限・CSRF・確認結果を
+ * 上書きしないように、応答を当てはめる前にこの世代と開始時の指紋を照合する。
+ * 進んでいたら（新しい画面の確認が始まっている）古い応答は捨て、
+ * 新しい確認に任せる。
+ */
+let authSessionCheckSeq = 0
 
 function sessionFingerprint(handoffToken: string): string {
   let csrf = ''
@@ -92,7 +101,20 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     // staff identity and refreshes the CSRF token if it was lost (e.g. reload).
     // 一覧の取得は確認の結果を要らないので、確認と並べて先に始める（直列にしない）。
     prefetchLineAccounts()
-    const checkSession = async () => {
+    /*
+     * R505: この確認の世代と開始時の指紋。応答を当てはめる前に今と照合し、
+     * 古ければ捨てる。成功応答の書き戻しも、失敗時のログインへの送りもしない。
+     */
+    const checkSeq = ++authSessionCheckSeq
+    const startFingerprint = fingerprint
+    // 古い応答を捨てたあと、誰も確認していなければ確認し直す。
+    // 新しい画面の確認が走っているときはそれに任せて何もしない。
+    const recheckAfterStale = () => {
+      if (cancelled || checkSeq !== authSessionCheckSeq) return
+      const freshSeq = ++authSessionCheckSeq
+      void runSessionCheck(freshSeq, sessionFingerprint(handoffToken))
+    }
+    const runSessionCheck = async (mySeq: number, myFingerprint: string) => {
       try {
         try { localStorage.removeItem('lh_api_key') } catch { /* HttpOnly / bearer session is still usable */ }
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -103,6 +125,13 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         if (!res.ok) throw new Error('unauthenticated')
         const data = await res.json()
         if (!data?.success || !data?.data) throw new Error('unauthenticated')
+        // 新しい画面の確認が始まっていたら、この古い応答は捨てる。
+        if (cancelled || mySeq !== authSessionCheckSeq) return
+        // 別タブでログインし直していたら、この古い応答は捨てて確認し直す。
+        if (sessionFingerprint(handoffToken) !== myFingerprint) {
+          recheckAfterStale()
+          return
+        }
         if (data.data.name) localStorage.setItem('lh_staff_name', data.data.name)
         if (data.data.role) localStorage.setItem('lh_staff_role', data.data.role)
         const nextTenantStatus: TenantStatus = data.data.tenantStatus === 'suspended' || data.data.tenantStatus === 'archived'
@@ -129,13 +158,19 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         lastSessionCheck = { at: Date.now(), fingerprint: sessionFingerprint(handoffToken), tenantStatus: nextTenantStatus }
         if (!cancelled) setChecked(true)
       } catch {
+        // 古い確認の失敗で新しいログインの状態を消さない。送りもしない。
+        if (cancelled || mySeq !== authSessionCheckSeq) return
+        if (sessionFingerprint(handoffToken) !== myFingerprint) {
+          recheckAfterStale()
+          return
+        }
         lastSessionCheck = null
         forgetSessionSnapshot()
         if (!cancelled) router.replace('/login')
       }
     }
 
-    checkSession()
+    runSessionCheck(checkSeq, startFingerprint)
     return () => {
       cancelled = true
       window.removeEventListener(SESSION_LOST_EVENT, invalidate)
@@ -146,7 +181,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
   if (!checked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-[3px] border-gray-200 border-t-green-500 rounded-full" />
+        <div className="animate-spin w-8 h-8 border-[3px] border-hairline border-t-green-500 rounded-pill" />
       </div>
     )
   }

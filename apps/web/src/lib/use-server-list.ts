@@ -64,7 +64,9 @@ export function serverListStateView({
   retry,
 }: StateViewInput): ReactElement | null {
   if (loading && itemCount === 0) return createElement(ListState, { kind: 'loading' })
-  if (error) return createElement(ListState, { kind: 'error', onRetry: retry })
+  // m23m: 捕まえた失敗をそのまま渡す。403 は権限の案内・再試行なし、
+  // 429 は待ち案内になる（ListState の `error` が言い分ける）。
+  if (error) return createElement(ListState, { kind: 'error', error, onRetry: retry })
   if (loaded && itemCount === 0) return createElement(ListState, { kind: 'empty' })
   return null
 }
@@ -99,21 +101,34 @@ export function useOffsetServerList<T>({
   useEffect(() => {
     if (navigation.requestKey !== requestKey) {
       setNavigation({ requestKey, page: 1 })
-      setState(initialState(initialLimit))
+      /*
+       * ★V7 sTJsh §2: 条件の切り替えでも前の一覧を消さない。
+       * 新しい答えが来るまで、いま出ている行・件数・ページ番号を
+       * 残したまま読み直す（画面側は薄め＋上の線で伝える）。
+       */
+      setState((current) => ({ ...current, loading: true, error: null }))
       return
     }
 
     const controller = new AbortController()
-    setState((current) => ({ ...current, items: [], loaded: false, loading: true, error: null }))
+    /*
+     * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。行が出ているときは
+     * 消さず、画面側が `refreshing` で薄め＋線の帯を出す。行が無いときは
+     * ListState の読み込み表示が従来どおり出る。
+     */
+    setState((current) => ({ ...current, loading: true, error: null }))
     /*
      * #625: 応答なしで「読み込んでいます」が残り続けないよう、時間切れで
      * 失敗状態へ落とす。abort で通信も止める。時間切れ後に遅れて成功しても
      * aborted 判定で捨てるので、失敗表示のまま再試行へ進める。
+     * 前の行を残した読み直しでも時間切れは失敗表示へ落とす（残った行の
+     * まま「読み込み中」のままにしない）。失敗時は行も消し、画面側の
+     * 失敗の1枚が見えるようにする。
      */
     const timeout = setTimeout(() => {
       controller.abort()
-      setState((current) => (current.loading && current.items.length === 0
-        ? { ...current, loaded: false, loading: false, error: new Error('一覧の読み込みが時間切れになりました') }
+      setState((current) => (current.loading
+        ? { ...current, items: [], loaded: false, loading: false, error: new Error('一覧の読み込みが時間切れになりました') }
         : current))
     }, requestTimeoutMs)
     void load({ page, limit: initialLimit }, controller.signal).then(
@@ -132,7 +147,8 @@ export function useOffsetServerList<T>({
       },
       (error: unknown) => {
         if (controller.signal.aborted) return
-        setState((current) => ({ ...current, loaded: false, loading: false, error: asError(error) }))
+        // 失敗したときは行も消す。残ったままだと画面側の失敗表示が出ない。
+        setState((current) => ({ ...current, items: [], loaded: false, loading: false, error: asError(error) }))
       },
     ).finally(() => clearTimeout(timeout))
     return () => {
@@ -154,6 +170,11 @@ export function useOffsetServerList<T>({
     pageCount,
     setPage,
     retry,
+    /*
+     * 前の表示を残した読み直し中（★V7 sTJsh §2）。一覧を薄めて
+     * 上に線の帯を出す合図。初回・0件からの読み込みでは立たない。
+     */
+    refreshing: state.loading && state.items.length > 0,
     stateView: serverListStateView({
       loaded: state.loaded,
       loading: state.loading,

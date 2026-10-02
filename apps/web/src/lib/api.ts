@@ -2537,15 +2537,63 @@ export class ApiError extends Error {
    * 画面は「（追跡番号 …）」として添える（要件 v6-34 §9-1）。
    */
   readonly trackingId: string | undefined
+  /**
+   * 429などでサーバーが返す待ち秒数（`Retry-After` 応答ヘッダ由来）。
+   * 無い応答では `undefined`——画面は秒数なしの待ち案内にするだけ。
+   */
+  readonly retryAfterSeconds: number | undefined
 
-  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string) {
+  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string, retryAfterSeconds?: number) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.data = data
     this.trackingId = trackingId
+    this.retryAfterSeconds = retryAfterSeconds
   }
+}
+
+/**
+ * `Retry-After` 応答ヘッダを待ち秒数にする（m23m）。
+ *
+ * 秒数と日時の両方を受け、1〜3600秒に丸める。0以下・読めない値・
+ * 過ぎた日時は `undefined`（画面は秒数なしの待ち案内にする）。
+ */
+/**
+ * 通信断の1行（R506系）。
+ *
+ * fetch が通信の失敗で投げるのは英語の TypeError（`Failed to fetch` など）で、
+ * そのまま画面へ出すと運用者に意味が通じない。ここで日本語にして投げ直す。
+ * 画面は `err.message` をそのまま出せる（英語の検証文と違い、運用者の言葉）。
+ */
+export const NETWORK_FAILURE_MESSAGE = '通信できませんでした。接続を確かめて、もう一度お試しください。'
+
+async function fetchWithNetworkMessage(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch (error) {
+    // 中断（AbortError・DOMException）は打ち切り合図なので、そのまま通す。
+    // 時間切れの打ち切りを失敗と数えないため（`use-server-list` の約束）。
+    if (error instanceof TypeError) throw new Error(NETWORK_FAILURE_MESSAGE)
+    throw error
+  }
+}
+
+export function parseRetryAfterSeconds(value: string | null): number | undefined {
+  if (value === null) return undefined
+  const text = value.trim()
+  if (!text) return undefined
+  if (/^\d+$/.test(text)) {
+    const seconds = Number(text)
+    if (!Number.isSafeInteger(seconds) || seconds <= 0) return undefined
+    return Math.min(seconds, 3600)
+  }
+  const at = Date.parse(text)
+  if (Number.isNaN(at)) return undefined
+  const seconds = Math.ceil((at - Date.now()) / 1000)
+  if (seconds <= 0) return undefined
+  return Math.min(seconds, 3600)
 }
 
 /**
@@ -2593,8 +2641,16 @@ export function describeSaveFailure(err: unknown): string {
 /*
  * R503: 429（入力上限など）の本文も表示対象にする。サーバーが返すのは
  * 利用者向けの回復案内だけ（内部情報は safeOperatorMessage が弾く）。
+ *
+ * D016: 410（招待の期限切れなど）・404（正しくないURLなど）も同じ扱いに
+ * する。サーバーはこの2つに日本語の次の行動まで書いた案内を返している
+ * （招待 `この招待は無効または期限切れです…`、メール変更
+ * `この確認リンクは無効または期限切れです…`、URL `この URL は…`）。
+ * 通さないと `API error: 410` だけになり、次に何をすればよいか分からない。
+ * 403・5xx は入れない。403 の本文は機械コード中心で画面は状態別の案内を
+ * 持ち、5xx の本文は内部の失敗の中身を持ちうるため。
  */
-const BODY_MESSAGE_STATUSES = new Set([400, 409, 422, 428, 429])
+const BODY_MESSAGE_STATUSES = new Set([400, 404, 409, 410, 422, 428, 429])
 
 const INTERNAL_ERROR_MARKERS = [
   /D1_ERROR/i,
@@ -2786,7 +2842,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
    * 付ける（削っても往復は減らない）。
    */
   const isBodylessMethod = method === 'GET' || method === 'HEAD'
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     ...options,
     // Send the HttpOnly session cookie with every request.
     credentials: 'include',
@@ -2824,6 +2880,8 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
         ? extractApiErrorData(raw)
         : undefined,
       extractApiErrorTrackingId(raw),
+      // m23m: 429の待ち秒数（Retry-After）。画面は待つ案内に使う。
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
     )
   }
   if (res.status === 204) return undefined as T
@@ -2831,7 +2889,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
 }
 
 async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',
     headers: adminSessionHeaders(),
@@ -2851,6 +2909,7 @@ async function fetchApiBlob(path: string, init?: { method?: string }): Promise<B
       code,
       undefined,
       extractApiErrorTrackingId(raw),
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
     )
   }
   return res.blob()
@@ -2867,8 +2926,16 @@ async function fetchApiBlob(path: string, init?: { method?: string }): Promise<B
  * ファイル名はサーバーの Content-Disposition を優先し、無いときだけ
  * fallbackFilename を使う。
  */
-export async function downloadApiFile(path: string, fallbackFilename: string): Promise<void> {
-  const res = await fetch(`${API_URL}${path}`, {
+/**
+ * R495: 上限で切れたCSVを見分けるため、応答の頭の件数も返す。
+ * 既存の呼び出しは戻り値を使わないので、そのまま動く。
+ */
+export async function downloadApiFile(path: string, fallbackFilename: string): Promise<{
+  totalCount: number | null
+  returnedCount: number | null
+  truncated: boolean
+}> {
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     credentials: 'include',
     headers: adminSessionHeaders(),
   })
@@ -2886,10 +2953,21 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
       code,
       undefined,
       extractApiErrorTrackingId(raw),
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
     )
   }
   const disposition = res.headers.get('Content-Disposition') ?? ''
   const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1]
+  const numericHeader = (name: string): number | null => {
+    const raw = res.headers.get(name)
+    if (raw === null) return null
+    const value = Number(raw)
+    return Number.isInteger(value) && value >= 0 ? value : null
+  }
+  const totalCount = numericHeader('X-Csv-Total-Count')
+  const returnedCount = numericHeader('X-Csv-Returned-Count')
+  const truncated = res.headers.get('X-Csv-Truncated') === '1'
+    || (totalCount !== null && returnedCount !== null && totalCount > returnedCount)
   const blob = await res.blob()
   const href = URL.createObjectURL(blob)
   try {
@@ -2900,6 +2978,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   } finally {
     URL.revokeObjectURL(href)
   }
+  return { totalCount, returnedCount, truncated }
 }
 
 export type FriendListParams = {
@@ -3469,6 +3548,36 @@ export type AutomationDraftDetail = {
   triggerConfig: Record<string, unknown>
   conditions: Record<string, unknown>
   actions: AutomationDraftAction[]
+  /**
+   * 監査 R486/R487: 下書きの各「共通アクションを実行」が確認時点で指す
+   * 公開版。版が解決できない処理は versionId が null で、画面は送信へ
+   * 進めない扱いにする。
+   */
+  commonActionRefs: AutomationDraftCommonActionRef[]
+  /** key=版id。確認画面が中身を展開するための版データ（入れ子の先も含む）。 */
+  commonActionVersions: Record<string, AutomationDraftCommonActionVersionDetail>
+}
+
+/** 下書きの処理1件が指す共通アクションの固定版（見つからないときは null）。 */
+export type AutomationDraftCommonActionRef = {
+  stepId: string
+  commonActionId: string
+  name: string | null
+  versionId: string | null
+  versionNumber: number | null
+}
+
+/** 確認画面へ出すための、共通アクションの版の中身。 */
+export type AutomationDraftCommonActionVersionDetail = {
+  commonActionId: string
+  name: string
+  versionNumber: number
+  actions: Array<{
+    id: string
+    type: string
+    params: Record<string, unknown>
+    onFailure: 'stop' | 'continue'
+  }>
 }
 
 /** #942 N-354: 実行記録1件の詳細。処理ごとの結果と試行数を持つ。 */
@@ -6290,6 +6399,12 @@ export const api = {
     createDefinition: (accountId: string, data: SaveTagDefinition) =>
       fetchApi<ApiResponse<TagDefinition>>('/api/tags', {
         method: 'POST',
+        /*
+         * D012: 作る要求ごとの見分け札。二度押し・通信の再送で同じタグが
+         * 2つできないよう、呼び出し側は毎回新しい札を付ける（公開系の
+         * publish・revert と同じ渡し方）。
+         */
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
         body: JSON.stringify({
           lineAccountId: accountId,
           ...data,
@@ -6306,8 +6421,11 @@ export const api = {
         /** 遡及実行の前に /retroactive-preview で受け取った引き換え券（N-047）。 */
         previewToken?: string
       },
-    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      /** M956: 応答消失後の再送用。同じ内容の再送では同じ値を送り、成功したら捨てる。 */
+      idempotencyKey?: string,
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number; replayed: boolean }>>(`/api/tags/${id}`, {
       method: 'PATCH',
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     /**
@@ -6322,8 +6440,11 @@ export const api = {
       accountId: string,
       expectedVersion: number,
       data: { name?: string; description?: string | null },
-    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      /** M956: 応答消失後の再送用。同じ内容の再送では同じ値を送り、成功したら捨てる。 */
+      idempotencyKey?: string,
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number; replayed: boolean }>>(`/api/tags/${id}`, {
       method: 'PATCH',
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
@@ -6449,6 +6570,10 @@ export const api = {
       fetchApi<ApiResponse<FriendFieldMigrationRun>>(
         `/api/field-migrations/${runId}?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
+    /**
+     * R515: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。
+     * 同じ作成のやり直しは同じキーを送り、内容を変えたら新しいキーにする。
+     */
     create: (accountId: string, data: {
       name: string
       fieldKey: string
@@ -6462,11 +6587,12 @@ export const api = {
       isPersonal?: boolean
       isStarred?: boolean
       displayOrder?: number
-    }) =>
+    }, idempotencyKey?: string) =>
       fetchApi<ApiResponse<FriendField>>(
         `/api/friend-fields?lineAccountId=${encodeURIComponent(accountId)}`,
         {
         method: 'POST',
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
         body: JSON.stringify(data),
         },
       ),
@@ -6539,6 +6665,10 @@ export const api = {
         `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
         options,
       ),
+    /**
+     * R512: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。
+     * 同じ作成のやり直しは同じキーを送り、内容を変えたら新しいキーにする。
+     */
     create: (accountId: string, data: {
       name: string
       color?: string
@@ -6546,18 +6676,25 @@ export const api = {
       autoOnInbound?: boolean
       displayOrder?: number
       automationRules?: SaveSupportMarkAutomationRule[]
-    }) =>
+    }, idempotencyKey?: string) =>
       fetchApi<ApiResponse<SupportMark>>(
         `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
         {
         method: 'POST',
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
         body: JSON.stringify(data),
         },
       ),
+    /**
+     * R513: 読んだときの版（expectedVersion）を送り、ほかの担当者が
+     * 先に変えていたら409で止める。版が無い呼び出しは従来どおり上書きする。
+     */
     update: (
       id: string,
       accountId: string,
-      data: Partial<Pick<SupportMark, 'name' | 'color' | 'isDefault' | 'autoOnInbound' | 'displayOrder'>>,
+      data: Partial<Pick<SupportMark, 'name' | 'color' | 'isDefault' | 'autoOnInbound' | 'displayOrder'>> & {
+        expectedVersion?: number
+      },
     ) =>
       fetchApi<ApiResponse<SupportMark>>(
         `/api/support-marks/${id}?lineAccountId=${encodeURIComponent(accountId)}`,
@@ -6620,9 +6757,14 @@ export const api = {
       markId: string,
       accountId: string,
       data: SaveSupportMarkAutomationRule,
+      idempotencyKey: string,
     ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
       `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
-      { method: 'POST', body: JSON.stringify(data) },
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
     ),
     updateAutomationRule: (
       ruleId: string,
@@ -6811,12 +6953,21 @@ export const api = {
         fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; recentOneTime?: RecentOneTimeReport[]; options: AnalyticsReportScheduleOptions }>>(
           `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         ),
+      /*
+       * R526: 応答消失後の再送で二重予約にしない要求キー。同じ試行の
+       * やり直しは同じキー、別の新規作成は別のキーで呼ぶ。サーバは
+       * 同じキー＋同じ内容なら既にある予約を返す（`replayed`）。
+       */
       create: (accountId: string, data: Omit<
         AnalyticsReportSchedule,
         'id' | 'lineAccountId' | 'status' | 'isOneTime' | 'nextRunAt' | 'createdBy' | 'createdAt' | 'updatedAt'
-      > & { sendOnce?: boolean }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+      > & { sendOnce?: boolean }, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<AnalyticsReportSchedule> & { replayed?: boolean }>(
         `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify(data) },
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+          ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
+        },
       ),
       update: (accountId: string, id: string, data: Omit<
         AnalyticsReportSchedule,
@@ -8608,10 +8759,12 @@ export const api = {
       return fetchApi<ApiResponse<OpsTenantRow[]> & { summary: OpsTenantSummary }>(`/api/ops/tenants${qs ? `?${qs}` : ''}`)
     },
     tenant: (id: string) => fetchApi<ApiResponse<OpsTenantDetail>>(`/api/ops/tenants/${encodeURIComponent(id)}`),
-    createTenant: (name: string) =>
-      fetchApi<ApiResponse<{ id: string; name: string }>>('/api/tenants', { method: 'POST', body: JSON.stringify({ name }) }),
+    createTenant: (name: string, featurePacks?: string[]) =>
+      fetchApi<ApiResponse<{ id: string; name: string }>>('/api/tenants', { method: 'POST', body: JSON.stringify(featurePacks === undefined ? { name } : { name, featurePacks }) }),
     changeTenantStatus: (id: string, input: { status: 'active' | 'suspended' | 'archived'; reason: string; confirmName?: string }) =>
       fetchApi<ApiResponse<{ status: string }>>(`/api/ops/tenants/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify(input) }),
+    setTenantFeaturePacks: (id: string, featurePacks: string[]) =>
+      fetchApi<ApiResponse<{ featurePacks: string[] }>>(`/api/ops/tenants/${encodeURIComponent(id)}/feature-packs`, { method: 'PATCH', body: JSON.stringify({ featurePacks }) }),
     impersonation: {
       current: () => fetchApi<ApiResponse<OpsImpersonation | null>>('/api/ops/impersonation/current'),
       start: (tenantId: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/start', { method: 'POST', body: JSON.stringify({ tenantId }) }),
@@ -9496,6 +9649,8 @@ export const api = {
       lineAccountId?: string
       /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
       operationId?: string
+      /** R525: オフで登録したら最初の行から停止で作る。省略時は稼働。 */
+      isActive?: boolean
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -9975,9 +10130,17 @@ export const api = {
       公開は `Idempotency-Key` を付ける——二度押しで2回公開すると、
       同じ変更が2つの版として台帳に残る。
     */
-    createDraft: (body: AutoReplyDraftInput) =>
+    createDraft: (
+      body: AutoReplyDraftInput,
+      /**
+       * m26c R556: 応答を失った再送を同じ下書きへ復帰させる確認キー。
+       * 省略時は従来どおり作る。
+       */
+      idempotencyKey?: string,
+    ) =>
       fetchApi<ApiResponse<AutoReplyDraftVersion>>('/api/auto-replies/drafts', {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(body),
       }),
     getDraft: (id: string) =>
@@ -9992,7 +10155,7 @@ export const api = {
         method: 'POST',
       }),
     conflicts: (id: string) =>
-      fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[] }>>(`/api/auto-replies/${id}/conflicts`),
+      fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[]; source?: 'draft' | 'published' }>>(`/api/auto-replies/${id}/conflicts`),
     summary: (accountId: string) =>
       fetchApi<ApiResponse<{
         conflicts: AutoReplyConflictPair[];
@@ -10176,9 +10339,15 @@ export const api = {
       folderId?: string | null;
       /** 運用者だけが読むメモ。友だちへは出ない。1000字まで。 */
       internalMemo?: string | null;
-    }) =>
+    },
+    /**
+     * m26c R570: 応答を失った再送を同じ行へ復帰させる確認キー。
+     * 省略時は従来どおり作る。
+     */
+    idempotencyKey?: string) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(body),
       }),
     update: (id: string, body: {
@@ -10219,7 +10388,15 @@ export const api = {
       /** 運用者だけが読むメモ。省略は変更なし、null/'' で消す。 */
       internalMemo?: string | null;
     }) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
+      fetchApi<ApiResponse<{
+        id: string;
+        /**
+         * m26c R569: 公開中ルールの内容変更は稼働定義を変えず下書きへ保存する。
+         * true のとき稼働中は無変更で、下書き版に載った。公開フローへ案内する。
+         */
+        draftSaved?: boolean;
+        draftVersionNumber?: number;
+      }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',
         body: JSON.stringify(body),
       }),
@@ -10260,10 +10437,24 @@ export const api = {
         `/api/automations/${encodeURIComponent(id)}/audience-preview?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify({ versionId }) },
       ),
-    test: (id: string, accountId: string, friendId: string, versionId?: string) =>
+    // R484: `operationKey` は確認画面ごとの要求キー。同じ確認の再試行は
+    // 同じ鍵で呼び、Worker は2件目の実行を作らず初回を返す。
+    // R487: `expectedCommonActions` は確認画面で出した共通アクションの版。
+    // 別担当が利用版を切り替えた直後に実行しても、Worker が409で止める。
+    test: (
+      id: string, accountId: string, friendId: string, versionId?: string, operationKey?: string,
+      expectedCommonActions?: Array<{ stepId: string; commonActionId: string; versionId: string }>,
+    ) =>
       fetchApi<ApiResponse<{ runId: string; versionId: string; status: string }>>(
         `/api/automations/${encodeURIComponent(id)}/test?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ versionId, friendId }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            versionId, friendId, operationKey,
+            // 共通アクションを呼ばない下書きでは項目自体を送らない。
+            expectedCommonActions: expectedCommonActions?.length ? expectedCommonActions : undefined,
+          }),
+        },
       ),
     templates: (accountId: string) =>
       fetchApi<ApiResponse<AutomationTemplateSummary[]>>(
@@ -10300,14 +10491,16 @@ export const api = {
       triggerConfig: Record<string, unknown>
       conditions?: Record<string, unknown>
       actions: AutomationDraftAction[]
-    }) => fetchApi<ApiResponse<{ updated: true }>>(
+    }) => fetchApi<ApiResponse<{ updated: true; draftVersionId: string }>>(
       `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
       { method: 'PUT', body: JSON.stringify(data) },
     ),
-    publishDraft: (id: string, accountId: string, expectedDraftVersionId: string, activate = true) =>
+    // R483: `expectedStatus` は確認時に見た稼働状態。読み取り後の停止・再開を
+    // 読んだ時点の状態で上書きしないよう、書き込み条件に入れる。
+    publishDraft: (id: string, accountId: string, expectedDraftVersionId: string, activate = true, expectedStatus?: string) =>
       fetchApi<ApiResponse<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }>>(
         `/api/automation-drafts/${encodeURIComponent(id)}/publish?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ expectedDraftVersionId, activate }) },
+        { method: 'POST', body: JSON.stringify({ expectedDraftVersionId, activate, expectedStatus }) },
       ),
     // #942 N-352: 一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。
     // すでに下書きがあればそれを返す（何度押しても1件）。
@@ -10582,16 +10775,16 @@ export const api = {
           `/api/line-notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       get: (id: string, lineAccountId: string) =>
-        fetchApi<ApiResponse<NotificationRule>>(
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>(
           `/api/line-notifications/operator-rules/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       create: (data: { lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
-        fetchApi<ApiResponse<NotificationRule>>('/api/line-notifications/operator-rules', {
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>('/api/line-notifications/operator-rules', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      updateDraft: (id: string, lineAccountId: string, data: { name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
-        fetchApi<ApiResponse<NotificationRule>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
+      updateDraft: (id: string, lineAccountId: string, data: { expectedVersion: number; name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+        fetchApi<ApiResponse<NotificationRule & { version?: number }>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
           method: 'PATCH',
           body: JSON.stringify({ ...data, lineAccountId }),
         }),
@@ -10986,9 +11179,17 @@ export const api = {
       `/api/nen-campaigns/columns/import?lineAccountId=${encodeURIComponent(accountId)}`,
       { method: 'POST' },
     ),
-    duplicateColumn: (id: string, accountId: string) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }>>(
+    /*
+     * M506: 複製の要求キー。同じコラムのやり直しは同じキーで送り、
+     * サーバは同じ複製を返す（`replayed`）。別の複製は別のキーで呼ぶ。
+     */
+    duplicateColumn: (id: string, accountId: string, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }> & { replayed?: boolean }>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/duplicate`,
-      { method: 'POST', body: JSON.stringify({ accountId }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+        ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
+      },
     ),
     testColumn: (id: string, accountId: string, friendId: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/test-send`,
@@ -11845,13 +12046,18 @@ export const api = {
       fetchApi<ApiResponse<ActionScoreBands>>(
         `/api/action-scores/bands?accountId=${encodeURIComponent(accountId)}`,
       ),
+    /*
+     * M505: 応答消失後の再送の要求キー。同じ内容のやり直しは同じキーで送り、
+     * サーバは保存済みの結果を返す（`replayed`）。内容を変えたら別のキーにする。
+     */
     saveDraft: (data: {
       accountId: string
       expectedDraftVersionId: string | null
       configuration: ActionScoreRuleBundle
-    }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/draft', {
+    }, options?: { idempotencyKey?: string }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration> & { replayed?: boolean }>('/api/action-scores/rules/draft', {
       method: 'PATCH',
       body: JSON.stringify(data),
+      ...(options?.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
     }),
     testRules: (data: {
       accountId: string
@@ -12400,6 +12606,8 @@ export const api = {
         targetingPriority: number;
         targetingEnabled: boolean;
         folderId: string | null;
+        /** M951: 保存時に送り返す版。古い版での保存は 409 で止まる。 */
+        version: number;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -12491,6 +12699,8 @@ export const api = {
       }),
 
     update: (groupId: string, input: {
+      /** M951: 読んだときの版。必須。古ければ 409。 */
+      expectedVersion: number;
       name?: string;
       chatBarText?: string;
       isDefaultForAll?: boolean;
@@ -12744,9 +12954,10 @@ export const api = {
       }),
 
     // 画像 upload は Content-Type を image/* で送るので fetchApi を使わず直接 fetch。
+    // 通信断の日本語化だけ fetchApi とそろえる。
     uploadImage: async (groupId: string, pageId: string, file: File) => {
       const csrf = getCsrfToken();
-      const res = await fetch(
+      const res = await fetchWithNetworkMessage(
         `${API_URL}/api/rich-menu-groups/${groupId}/pages/${pageId}/image`,
         {
           method: 'POST',
@@ -13944,9 +14155,16 @@ export const bookingApi = {
     if (query?.trim()) params.set('q', query.trim());
     return fetchApi<{ customers: BookingCustomerSummary[] }>(`/api/booking/admin/customers?${params}`);
   },
-  createCustomer: (accountId: string, body: { display_name: string; phone: string; pet_name?: string }) =>
+  createCustomer: (
+    accountId: string,
+    body: { display_name: string; phone: string; pet_name?: string },
+    idempotencyKey?: string,
+  ) =>
     fetchApi<{ customer: BookingCustomerSummary }>(withAccount('/api/booking/admin/customers', accountId), {
-      method: 'POST', body: JSON.stringify(body),
+      method: 'POST',
+      // R559: 確定操作ごとに1つのキーで送り、応答消失後の再送で台帳を二重作成しない。
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+      body: JSON.stringify(body),
     }),
   getSettings: (accountId: string) =>
     fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),
@@ -14112,9 +14330,15 @@ export const bookingApi = {
     fetchApi<{ audit_logs: BookingAuditLog[] }>(
       withAccount(`/api/booking/admin/bookings/${id}/audit-logs`, accountId) + `&limit=${limit}`,
     ),
-  createMenu: (accountId: string, body: Partial<BookingMenu>) =>
+  /**
+   * R535: 作成試行ごとの一意キーを送る。サーバーで保存された直後に
+   * 応答だけを失っても、同じキーでの再送は作り直さず作成済みIDを返す。
+   * キーが無い呼び出しは従来どおり毎回作成する。
+   */
+  createMenu: (accountId: string, body: Partial<BookingMenu>, idempotencyKey?: string) =>
     fetchApi<{ id: string }>(withAccount('/api/booking/admin/menus', accountId), {
       method: 'POST',
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       body: JSON.stringify(body),
     }),
   updateMenu: (accountId: string, id: string, expectedVersion: number, body: Partial<BookingMenu>) =>
@@ -14529,6 +14753,8 @@ export interface EventSlot {
   client_key?: string | null;
   /** 再送で既存枠に解決された場合 true。新規作成分は false。 */
   deduplicated?: boolean;
+  /** 枠の版。更新時はこの版を期待版として送り、古ければ409になる(m26g)。 */
+  version?: number;
 }
 
 /** createSlots に渡す1枠分の入力。client_key は再送を吸収するための任意キー。 */
@@ -14878,10 +15104,14 @@ export const eventsApi = {
     }
     return { items }
   })(),
-  updateSlot: (accountId: string, eventId: string, slotId: string, body: Partial<EventSlot>) =>
+  /**
+   * m26g: 枠の更新は期待版が必須。古い画面からの更新は409になり、
+   * 応答の data.current に最新の枠が入る。画面は読み直して差分を見せる。
+   */
+  updateSlot: (accountId: string, eventId: string, slotId: string, body: Partial<EventSlot>, expectedVersion: number) =>
     fetchApi<EventSlot>(
       withAccount(`/api/events/admin/events/${eventId}/slots/${slotId}`, accountId),
-      { method: 'PUT', body: JSON.stringify(body) },
+      { method: 'PUT', body: JSON.stringify({ ...body, expected_version: expectedVersion }) },
     ),
   deleteSlot: (accountId: string, eventId: string, slotId: string) =>
     fetchApi<void>(

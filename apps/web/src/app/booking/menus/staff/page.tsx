@@ -9,8 +9,12 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
+import ListState from '@/components/shared/list-state'
+import { describeSaveFailure } from '@/lib/api'
+import { canEditFeature } from '@/lib/staff-capability'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
@@ -47,12 +51,27 @@ function MenuStaffMatrixContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** R537: 捕まえた読み込み失敗。403・429の出し分けと再試行の有無に使う。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
+  /*
+   * R538: 担当割当の変更は '/booking/menus' の実効permission。閲覧のみの
+   * 担当者は読めるが変えられない。Worker の一括PUTも同じ鍵で守られている。
+   */
+  const [canEditMenus] = useState(() =>
+    typeof window === 'undefined' ? true : canEditFeature('/booking/menus'))
+  /*
+   * R538: スタッフ追加の行き先は予約設定の権限。鍵の無い人には入口を
+   * 出さず、行き先の画面で権限不足にぶつかる手間を省く。
+   */
+  const [canAddStaff] = useState(() =>
+    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
 
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
     setLoading(true)
     setError(null)
+    setLoadError(null)
     // 前アカウントの内容が残ったまま保存すると、別アカウントの設定を
     // 上書きする事故になる。先に空にする。
     setMenus([])
@@ -102,7 +121,16 @@ function MenuStaffMatrixContent() {
       setGrid(next)
       setSavedGrid(next)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+      // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+      // R537: 失敗をそのまま残し、再試行の有無と空状態の出し分けに使う。
+      setLoadError(e)
+      if (isForbiddenOrRateLimited(e)) {
+        setError(loadFailureNotice(e, '担当スタッフの割り当て'))
+      } else {
+        const message = e instanceof Error ? e.message : ''
+        setError(message && !/^API error: /.test(message) ? message : '読み込めませんでした。画面を再読み込みして確認してください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -145,8 +173,9 @@ function MenuStaffMatrixContent() {
     } catch (e) {
       // 全件不適用のはずだが、画面の表示とDBの状態が食い違う可能性を
       // 残さないため再読み込みを促す。
+      // m23m: 生の内部文は出さず、共通の保存失敗文にする。
       setError(
-        `${e instanceof Error ? e.message : String(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
+        `${describeSaveFailure(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
       )
     } finally {
       setSaving(false)
@@ -201,6 +230,13 @@ function MenuStaffMatrixContent() {
    * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
    */
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  /*
+   * R537: 読み込みに失敗して表が無いときの出し分け。失敗を「未登録」と
+   * 混ぜない。403は押しても直らないので再試行なし、429と通信失敗は
+   * 同じ画面から取り直せる。
+   */
+  const loadFailed = error !== null && savedGrid === null
+  const loadFailure = loadError ? loadFailureCopy(loadError, '担当スタッフの割り当て') : null
   const saveStateLabel = loading
     ? '読み込み中…'
     : error
@@ -225,25 +261,38 @@ function MenuStaffMatrixContent() {
       </nav>
 
       <div data-design="Actions" className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/booking/staff/new"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
-          >
-            スタッフを追加
-          </Link>
+          {/*
+            * R538: スタッフ追加の行き先は予約設定の権限。鍵の無い人には押せない
+            * 姿で置き、理由を行き先ではなくこの場で言う。
+            */}
+          {canAddStaff ? (
+            <Button variant="secondary" className="text-ink-secondary px-3 py-2 h-auto whitespace-normal" href="/booking/staff/new">
+              スタッフを追加する
+            </Button>
+          ) : (
+            <span
+              aria-disabled="true"
+              title="予約設定の変更権限がありません"
+              className="border-hairline text-ink-faint rounded-control cursor-not-allowed border px-3 py-2 text-sm opacity-50"
+            >
+              スタッフを追加する
+            </span>
+          )}
           {/*
             * #975 U075: 差分がないときは保存の押し口自体を出さず、中立の札で
             * 状態だけ言う。押せない緑の塗りボタンは主役に見えてしまう。
             * error が出ている間は押させない。読み込みに失敗した状態で
             * 保存すると、空の割り当てで上書きしてしまう。
             */}
-          {saving || dirty ? (
+          {/*
+            * R538: 閲覧のみの担当者には保存の押し口を出さない。入力欄も
+            * 押せないので dirty にはならないが、ここでも鍵を見る。
+            */}
+          {canEditMenus && (saving || dirty) ? (
             <Button
               variant="primary"
               onClick={saveAll}
-              disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty}
-            >
-              {saving ? '保存中…' : '変更を保存'}
+              disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty} busy={saving}>保存する
             </Button>
           ) : (
             <StatusBadge tone="neutral" size="compact">変更なし</StatusBadge>
@@ -252,26 +301,35 @@ function MenuStaffMatrixContent() {
           <span className="text-ink-faint self-center text-xs" role="status" aria-live="polite">
             {saveStateLabel}
           </span>
+          {!canEditMenus && (
+            <span className="text-ink-faint self-center text-xs">
+              担当割当の変更権限がありません。変更は予約メニューの権限を持つログインユーザーが行ってください。
+            </span>
+          )}
       </div>
 
+      {/*
+        * R537: 読み込みに失敗したときは0ではなく「—」。取れていない数を
+        * 0件・0人と出すと、未登録と誤読される。
+        */}
       <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="メニュー"
-          value={String(menus.length)}
+          value={loadFailed ? '—' : String(menus.length)}
           unit="件"
-          detail={`公開中 ${menus.filter((m) => m.is_active).length}`}
+          detail={loadFailed ? '—' : `公開中 ${menus.filter((m) => m.is_active).length}`}
         />
         <Kpi
           title="担当スタッフ"
-          value={String(staff.length)}
+          value={loadFailed ? '—' : String(staff.length)}
           unit="人"
-          detail={`稼働中 ${staff.filter((s) => s.is_active).length}`}
+          detail={loadFailed ? '—' : `稼働中 ${staff.filter((s) => s.is_active).length}`}
         />
         <Kpi
           title="割り当て済み"
-          value={String(assigned)}
+          value={loadFailed ? '—' : String(assigned)}
           unit="組"
-          detail={`全${pairs}組のうち`}
+          detail={loadFailed ? '—' : `全${pairs}組のうち`}
         />
         {/*
          * R308: 非公開しかいない場合もここに入るため、「誰も担当していない」
@@ -279,13 +337,17 @@ function MenuStaffMatrixContent() {
          */}
         <Kpi
           title="受付できる担当がいない"
-          value={String(orphans.length)}
+          value={loadFailed ? '—' : String(orphans.length)}
           unit="件"
-          detail={orphans.length === 0 ? 'なし' : orphans.map((m) => m.name).join('・')}
+          detail={loadFailed ? '—' : orphans.length === 0 ? 'なし' : orphans.map((m) => m.name).join('・')}
         />
       </div>
 
-      {error && (
+      {/*
+        * R537: 読み込み自体に失敗したときは、下の表の場所に共通の失敗の1枚を
+        * 出すので、ここでは帯を重ねない。保存の失敗（表あり）のときだけ帯を出す。
+        */}
+      {error && !loadFailed && (
         <Notice tone="danger" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
@@ -326,6 +388,18 @@ function MenuStaffMatrixContent() {
       ) : loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
           読み込み中…
+        </div>
+      ) : loadFailed ? (
+        // R537: 取得の失敗は「未登録」と別の1枚にする。共通の失敗表示が
+        // 403（再試行なし）と429・通信失敗（再試行あり）を言い分ける。
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="error"
+            title={loadFailure?.title}
+            description={loadFailure?.description}
+            error={loadError ?? undefined}
+            onRetry={loadFailure?.retryable ? () => void load() : undefined}
+          />
         </div>
       ) : staff.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
@@ -398,6 +472,7 @@ function MenuStaffMatrixContent() {
                         <Td key={s.id} className="align-top">
                           <Checkbox
                             checked={offered}
+                            disabled={!canEditMenus}
                             onCheckedChange={(checked) =>
                               update(s.id, m.id, { is_offered: checked ? 1 : 0 })
                             }
@@ -408,6 +483,7 @@ function MenuStaffMatrixContent() {
                                 <input
                                   type="number"
                                   min={1}
+                                  disabled={!canEditMenus}
                                   value={row?.override_duration_minutes ?? ''}
                                   onChange={(e) =>
                                     update(s.id, m.id, {
@@ -424,6 +500,7 @@ function MenuStaffMatrixContent() {
                                 <input
                                   type="number"
                                   min={0}
+                                  disabled={!canEditMenus}
                                   value={row?.override_price ?? ''}
                                   onChange={(e) =>
                                     update(s.id, m.id, {
@@ -473,7 +550,7 @@ function MenuStaffMatrixContent() {
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-ink-faint text-xs">全 {menus.length} 件</span>
+        <span className="text-ink-faint text-xs">{loadFailed ? '—' : `全 ${menus.length} 件`}</span>
         <span className="text-ink-faint text-xs">
           チェックを外すと、そのスタッフはこのメニューの予約枠に出なくなります。
         </span>
@@ -492,15 +569,7 @@ function MenuStaffMatrixContent() {
         </ul>
       </div>
 
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、担当割り当てへの変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="担当割り当てへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

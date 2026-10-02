@@ -203,18 +203,15 @@ export default function UsersPage() {
       */}
       <div className="flex flex-wrap items-center gap-2" data-users-actions="true">
         <Button href="/friends/identity-candidates" variant="primary">
-          ＋ 統合ユーザーを作成
+          ＋ 統合ユーザーを作る
         </Button>
-        <Button type="button" onClick={() => void exportCsv()} disabled={exporting} className="ml-auto">
-          {exporting ? '書き出し中…' : 'CSVで書き出す'}
+        <Button type="button" onClick={() => void exportCsv()} disabled={exporting} className="ml-auto" busy={exporting} busyLabel="書き出し中…">CSVで書き出す
         </Button>
         <Button
           type="button"
           onClick={() => setPendingForceRefresh(true)}
           disabled={refreshing}
-          title="最新の状態を取得して一覧を更新"
-        >
-          {refreshing ? '再計算中…' : '再計算'}
+          title="最新の状態を取得して一覧を更新" busy={refreshing} busyLabel="再計算中…">再計算
         </Button>
       </div>
       <div data-users-filters>

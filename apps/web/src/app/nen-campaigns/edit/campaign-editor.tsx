@@ -13,7 +13,7 @@ import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import Combobox from '@/components/shared/combobox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -21,6 +21,7 @@ import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { formatCampaignTiming } from '../campaign-display'
 import styles from './campaign-editor.module.css'
+import { formatNumber } from '@/lib/format'
 
 const TRIGGER_LABEL: Record<string, string> = {
   'ec.order.confirmed': '注文を受け付けたとき',
@@ -220,7 +221,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   }
 
   const bodyCheck = checkNenCampaignBodyLength(merged.bodyText ?? '')
-  const bodyLimitLabel = NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')
+  const bodyLimitLabel = formatNumber(NEN_CAMPAIGN_BODY_MAX_LENGTH)
 
   const save = async () => {
     if (!setting || !selectedAccountId) return
@@ -229,7 +230,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       return
     }
     if (!bodyCheck.fits) {
-      setError(`本文が長すぎます（現在${bodyCheck.length.toLocaleString('ja-JP')}字・上限${bodyLimitLabel}字）。短くしてから保存してください。入力内容はそのまま残っています。`)
+      setError(`本文が長すぎます（現在${formatNumber(bodyCheck.length)}字・上限${bodyLimitLabel}字）。短くしてから保存してください。入力内容はそのまま残っています。`)
       return
     }
     // NEN-07: 使えないフォームがつながったまま保存させない(サーバでも同じ検査)。
@@ -285,7 +286,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           {/* #935 N-305: 以前は実在しないタブ名を指していた。設計の語「配信フロー」は残し、行き先を実在するタブへ直す。 */}
           <Link href="/nen-campaigns?tab=auto" className="text-action hover:underline">配信フロー</Link><span>›</span><span>{setting.label}</span>
         </nav>
-        <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテスト送信</Button>
+        <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテストを送る</Button>
       </div>
 
       {error && <Notice tone="danger" message={error} />}
@@ -325,13 +326,13 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
                 複数吹き出しの追加・差し替え・削除はWorker側に口がない。
                 押せる見た目のまま置くと「増やせる」と誤解するので出さない。
               */}
-              <div className="mb-3"><p className="text-ink-secondary text-xs font-bold">リッチメッセージ</p></div>
+              <div className="mb-3"><p className="text-ink-secondary text-xs font-medium">リッチメッセージ</p></div>
               <div className="bg-canvas rounded-card border-hairline border p-3">
                 <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
                 {bodyCheck.fits ? (
-                  <p className="text-ink-faint mt-2 text-right text-xs tabular-nums">あと{(NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length).toLocaleString('ja-JP')}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
+                  <p className="text-ink-faint mt-2 text-right text-xs tabular-nums">あと{formatNumber((NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length))}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
                 ) : (
-                  <p role="alert" className="text-danger mt-2 text-right text-xs font-bold tabular-nums">{bodyLimitLabel}字を超えています（現在{bodyCheck.length.toLocaleString('ja-JP')}字）。短くしてください。</p>
+                  <p role="alert" className="text-danger mt-2 text-right text-xs font-medium tabular-nums">{bodyLimitLabel}字を超えています（現在{formatNumber(bodyCheck.length)}字）。短くしてください。</p>
                 )}
                 {bodyCheck.fits && !bodyCheck.expandedFits && (
                   <p className="text-ink-faint mt-1 text-right text-xs">差し込む名前が長いと、送るときに長すぎる場合があります。</p>
@@ -345,10 +346,10 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           <section className="bg-canvas rounded-card border-hairline border p-4">
             <h2 className="text-ink text-base font-bold">押されたあとにすること</h2><p className="text-ink-faint mt-1 text-xs">リッチメッセージの面を押した人に何をするかです。</p>
             <div className="mt-3 space-y-2">
-              {formAction?.kind === 'open_form' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><span className="text-ink-faint text-lg">▣</span><div className="min-w-0 flex-1"><p className="text-sm font-bold">回答フォーム「{formAction.formName}」を開く</p><p className="text-ink-faint text-xs">星の評価と、ひとことだけの短いフォームです</p></div><Button aria-label="回答フォームを外す" onClick={() => setActions(actions.filter((action) => action !== formAction))}><X aria-hidden size={16} /></Button></div>}
-              {mileageAction?.kind === 'award_mileage' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><Gift aria-hidden className="text-ink-faint" size={18} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">書いてくれたらマイルを {mileageAction.amount.toLocaleString('ja-JP')} 付ける</p><p className="text-ink-faint text-xs">回答フォームへの送信をきっかけにしています</p></div><Button aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}><X aria-hidden size={16} /></Button></div>}
-              {formIssueMessage && <p role="alert" className="text-danger text-xs font-bold">{formIssueMessage}。フォームを外して選び直してください。</p>}
-              {!formAction && <label className="block text-xs font-bold">回答フォームを開かせる（任意）<Combobox aria-label="回答フォームを開かせる（任意）" placeholder="回答フォームを選ぶ" value="" onChange={(formId) => addFormAction(formId)} options={forms.map((form) => ({ value: form.id, label: form.name, dot: form.isActive ? 'green' : 'gray', disabled: !form.isActive, hint: form.isActive ? undefined : '公開されていないため選べません' }))} className="mt-1 font-normal" /></label>}
+              {formAction?.kind === 'open_form' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><span className="text-ink-faint text-lg">▣</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold">回答フォーム「{formAction.formName}」を開く</p><p className="text-ink-faint text-xs">星の評価と、ひとことだけの短いフォームです</p></div><Button aria-label="回答フォームを外す" onClick={() => setActions(actions.filter((action) => action !== formAction))}><X aria-hidden size={16} /></Button></div>}
+              {mileageAction?.kind === 'award_mileage' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><Gift aria-hidden className="text-ink-faint" size={18} /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">書いてくれたらマイルを {formatNumber(mileageAction.amount)} 付ける</p><p className="text-ink-faint text-xs">回答フォームへの送信をきっかけにしています</p></div><Button aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}><X aria-hidden size={16} /></Button></div>}
+              {formIssueMessage && <p role="alert" className="text-danger text-xs font-medium">{formIssueMessage}。フォームを外して選び直してください。</p>}
+              {!formAction && <label className="block text-xs font-medium">回答フォームを開かせる（任意）<Combobox aria-label="回答フォームを開かせる（任意）" placeholder="回答フォームを選ぶ" value="" onChange={(formId) => addFormAction(formId)} options={forms.map((form) => ({ value: form.id, label: form.name, dot: form.isActive ? 'green' : 'gray', disabled: !form.isActive, hint: form.isActive ? undefined : '公開されていないため選べません' }))} className="mt-1 font-normal" /></label>}
               {!mileageAction && <Button onClick={addMileageAction} className="w-full"><Gift aria-hidden size={16} />回答後に200マイル付ける</Button>}
             </div>
           </section>
@@ -356,11 +357,11 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
 
         <aside data-design="Right" className="space-y-3">
           <section className="bg-canvas rounded-card border-hairline border p-4">
-            <p className="text-ink-secondary mb-3 flex items-center gap-2 text-xs font-bold"><Eye aria-hidden size={15} />高橋 直人さん（ももちゃん）にはこう届きます</p>
+            <p className="text-ink-secondary mb-3 flex items-center gap-2 text-xs font-medium"><Eye aria-hidden size={15} />高橋 直人さん（ももちゃん）にはこう届きます</p>
             {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
-            <LinePreview caption={`◷ ${timing}`}><div className="bg-canvas rounded-card p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-bold">★ {merged.buttonLabel}</p>}</div></LinePreview>
+            <LinePreview caption={`◷ ${timing}`}><div className="bg-canvas rounded-card p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-medium">★ {merged.buttonLabel}</p>}</div></LinePreview>
           </section>
-          <section className="bg-canvas rounded-card border-hairline border p-4"><h2 className="text-sm font-bold">つながる先</h2><dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ EC連携</dt><dd className="text-ink-secondary">注文と到着の記録</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 共通情報</dt><dd className="text-ink-secondary">差し込んでいる「商品名」</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 友だち属性</dt><dd className="text-ink-secondary">友だち情報欄「ペットの名前」</dd></div>{mileageAction?.kind === 'award_mileage' && <div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ マイル</dt><dd className="text-ink-secondary">書いてくれたら {mileageAction.amount}</dd></div>}{formAction?.kind === 'open_form' && <div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 回答フォーム</dt><dd className="text-ink-secondary">{formAction.formName}{selectedForm ? (selectedForm.isActive ? '（公開中）' : '（公開されていません）') : '（見つかりません）'}</dd></div>}</dl></section>
+          <section className="bg-canvas rounded-card border-hairline border p-4"><h2 className="text-sm font-medium">つながる先</h2><dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-ink font-medium">→ EC連携</dt><dd className="text-ink-secondary">注文と到着の記録</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-medium">→ 共通情報</dt><dd className="text-ink-secondary">差し込んでいる「商品名」</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-medium">→ 友だち属性</dt><dd className="text-ink-secondary">友だち情報欄「ペットの名前」</dd></div>{mileageAction?.kind === 'award_mileage' && <div className="flex justify-between gap-3"><dt className="text-ink font-medium">→ マイル</dt><dd className="text-ink-secondary">書いてくれたら {mileageAction.amount}</dd></div>}{formAction?.kind === 'open_form' && <div className="flex justify-between gap-3"><dt className="text-ink font-medium">→ 回答フォーム</dt><dd className="text-ink-secondary">{formAction.formName}{selectedForm ? (selectedForm.isActive ? '（公開中）' : '（公開されていません）') : '（見つかりません）'}</dd></div>}</dl></section>
           {/* 監査 R63: このアカウントの実績ではなく一般的な目安。実績の断定文（「3倍でした」等）は事実に見えるため、目安だと分かる言い方にする。 */}
           <section className="border-warning bg-warning-bg text-warning rounded-card border p-4"><h2 className="text-sm font-bold">気をつけること（一般的な目安）</h2><div className="mt-3 space-y-3 text-xs"><p><strong className="block">◷ 届く時間は実績で確かめられます</strong>このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます</p><p><strong className="block">▣ 吹き出しは少なめが安心です</strong>1回にたくさんの吹き出しを送るとブロックされやすい傾向があります</p></div></section>
         </aside>
@@ -373,19 +374,11 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       */}
       <StickyBar status={merged.isEnabled
         ? pendingCount !== null && pendingCount > 0
-          ? `動いています。配信待ちの${pendingCount.toLocaleString('ja-JP')}通は予約したときの中身のまま届きます。保存した新しい中身は、次のきっかけからの配信に使われます。`
+          ? `動いています。配信待ちの${formatNumber(pendingCount)}通は予約したときの中身のまま届きます。保存した新しい中身は、次のきっかけからの配信に使われます。`
           : '動いています。保存した新しい中身は、次のきっかけからの配信に使われます。すでに配信待ちの分は、予約したときの中身のまま届きます。'
-        : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
+        : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテストを送る</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving}>配信内容を保存する</Button></>} />
       {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="入力中の内容があります"
-        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

@@ -19,6 +19,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
+import { isTemplateDetailData } from '../template-detail-data'
+import { formatDateTime } from '@/lib/format'
 
 interface Usage {
   autoReplies: Array<{ id: string; keyword: string; templateVersion: number | null }>
@@ -114,11 +116,18 @@ function TemplateDetailInner() {
     setLoading(true)
     try {
       const detail = await api.templates.get(id)
-      if (detail.success) {
+      if (detail.success && isTemplateDetailData(detail.data)) {
         setTemplate(detail.data)
-        setUsage(detail.data.usedBy)
-      } else {
+        setUsage(detail.data.usedBy ?? null)
+      } else if (!detail.success) {
         setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+      } else {
+        /*
+         * D008: success:true だが形が違う応答（存在しないIDへの一覧形など）。
+         * 無いものを「ある」ように描くと編集・削除の口まで出るので、
+         * 見つからないものとして扱う。
+         */
+        setMissing(true)
       }
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 404) {
@@ -389,7 +398,7 @@ function TemplateDetailInner() {
                   </span>
                 )}
               </div>
-              <pre className="bg-canvas-sunken text-ink-secondary mt-3 overflow-x-auto rounded p-3 text-xs whitespace-pre-wrap">
+              <pre className="bg-canvas-sunken text-ink-secondary mt-3 overflow-x-auto rounded-mini p-3 text-xs whitespace-pre-wrap">
                 {body}
               </pre>
             </section>
@@ -501,7 +510,7 @@ function TemplateDetailInner() {
                   title={usageCount > 0 ? '使用先を差し替えると削除できます' : undefined}
                   className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {usageCount > 0 ? '使用中のため削除できません' : 'テンプレートを削除'}
+                  {usageCount > 0 ? '使用中のため削除できません' : 'テンプレートを削除する'}
                 </button>
               </section>
             )}
@@ -541,7 +550,7 @@ function TemplateDetailInner() {
               ) : (
                 <div className="bg-canvas-sunken rounded-card p-3">
                   <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-                  <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                  <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                     {body}
                   </p>
                 </div>
@@ -684,17 +693,6 @@ function TemplateDetailInner() {
  * 日時の表示（一覧と同じく日本時間）。来ない・壊れているときは
  * 「—」にし、取れていないのを空欄や変な日付にしない。
  */
-function formatDateTime(iso: string): string {
-  const time = new Date(iso).getTime()
-  if (!Number.isFinite(time)) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function Row({ label, value }: { label: string; value: string }) {
   return (

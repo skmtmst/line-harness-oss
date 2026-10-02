@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 開閉する欄。Pencil ★V7「開閉する欄」（V7 文書 `v9M8P8`）。
@@ -24,7 +25,7 @@
   padding: 0 16px;
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
   list-style: none;
   cursor: pointer;
   transition: background-color var(--motion-fast) var(--motion-ease-out);

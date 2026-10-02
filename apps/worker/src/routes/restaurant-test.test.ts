@@ -51,6 +51,11 @@ function seedRestaurantFixture({
   tenantId?: string;
   name?: string;
 } = {}): void {
+  // 統括ゲート（飲食店機能パック）。このAPI群はゲートの内側を検証する
+  // フィクスチャなので、対象の統括には常にパックを付けておく。
+  // ゲート自体の検証（無し→404）は別のdescribeで明示的に行う。
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`)
+    .run(tenantId);
   testDb.raw.prepare(
     'INSERT INTO rt_organizations (id, account_id, tenant_id, name) VALUES (?, ?, ?, ?)',
   ).run('org-fixture', accountId, tenantId, name);
@@ -151,6 +156,10 @@ beforeEach(() => {
   testDb = createTestD1();
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/175_restaurant_terms_agreement.sql'), 'utf8'));
+  // 統括ゲート（飲食店機能パック）。このAPI群自体を検証するファイルなので
+  // 既定の統括には常にパックを付けておく。ゲート自体の検証（無し→404）は
+  // 別のdescribeで明示的に上書きする。
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = '00000000-0000-4000-8000-000000000001'`).run();
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
     endpoint: 'https://worker.example.test/webhook',
     active: true,
@@ -171,9 +180,101 @@ beforeEach(() => {
   };
 });
 
+describe('電話予約のLINE確認通知', () => {
+  const path = '/api/restaurant-test/reservations/manual?account_id=account-1';
+  const body = { storeId: 'store-ginza', customerName: '試験用のお客さま', guestCount: 2,
+    startsAt: '2026-11-10T10:00:00.000Z', endsAt: '2026-11-10T12:00:00.000Z', lineUid: 'U' + '1'.repeat(32), notifyLine: true };
+  function seedFriend(following = 1, accountId = 'account-2') {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+      VALUES ('account-2', '試験店舗', 'fixture-channel', 'unused', 'unused-token');`);
+    testDb.raw.prepare('INSERT INTO friends (id, line_user_id, line_account_id, is_following) VALUES (?, ?, ?, ?)')
+      .run('friend-fixture', body.lineUid, accountId, following);
+  }
+  async function notice(input: unknown = body) {
+    const res = await request(path, input);
+    expect(res.status).toBe(201);
+    const result = await res.json() as { data: { id: string; tableId: string; syncDirection: string; lineNotice: { sent: boolean; reason: string | null } } };
+    expect(result.data.syncDirection).toBe('inbound_only');
+    expect(testDb.raw.prepare('SELECT id FROM rt_reservations WHERE id = ?').get(result.data.id)).toBeDefined();
+    return result.data;
+  }
+  it('友だちへの送信に既存の確認文面を使い、自動通知として履歴を残す', async () => {
+    seedFriend();
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await notice({ ...body, courseId: 'menu-ginza' });
+    expect(result.lineNotice).toEqual({ sent: true, reason: null });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.line.me/v2/bot/message/push');
+    const headers = new Headers(init.headers);
+    expect(headers.has('X-Line-Harness-Source')).toBe(false);
+    expect(headers.get('X-Line-Retry-Key')).toBe(result.id);
+    expect(JSON.parse(init.body as string)).toMatchObject({ to: body.lineUid,
+      messages: [{ type: 'text', text: expect.stringContaining('予約が確定しました。') }] });
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('テストコース');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('2026-11-10 19:00');
+    expect(testDb.raw.prepare("SELECT source FROM messages_log WHERE friend_id = 'friend-fixture'").get()).toEqual({ source: 'external' });
+  });
+  it.each([undefined, false])('notifyLine=%sでは送らず、従来の予約結果を返す', async notifyLine => {
+    seedFriend();
+    const { notifyLine: _notifyLine, ...oldBody } = body;
+    expect((await notice({ ...oldBody, notifyLine })).lineNotice).toEqual({ sent: false, reason: 'not_requested' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('ブロック中は送らず、予約は保存する', async () => {
+    seedFriend(0);
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'blocked' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it.each([body.lineUid, null])('別アカウントの友だち・UID未入力には送らない (%s)', async lineUid => {
+    seedFriend(1, 'account-3');
+    expect((await notice({ ...body, lineUid })).lineNotice).toEqual({ sent: false, reason: 'not_friend' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it.each(['account-2', '*'])('送信停止を守る (%s)', async scope => {
+    seedFriend();
+    testDb.raw.prepare("INSERT INTO operation_control_sets (scope_key, line_account_id, states_json, updated_at) VALUES (?, ?, ?, '2026-10-02')")
+      .run(scope, scope === '*' ? null : scope, '{"broadcast_dispatch":"stopped"}');
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'sending_disabled' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('送信失敗でも予約と在庫を保存し、例外の本文は返さない', async () => {
+    seedFriend();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('試験用の非公開本文', { status: 500 })));
+    const result = await notice();
+    expect(result.lineNotice).toEqual({ sent: false, reason: 'send_failed' });
+    expect(JSON.stringify(result)).not.toContain('非公開本文');
+    expect(testDb.raw.prepare("SELECT status FROM rt_reservations WHERE id = ?").get(result.id)).toEqual({ status: 'confirmed' });
+  });
+  it('停止中・アーカイブ済みアカウントには送らない', async () => {
+    seedFriend();
+    testDb.raw.prepare("UPDATE line_accounts SET archived_at = '2026-10-02' WHERE id = 'account-2'").run();
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'account_unavailable' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('未確定の予約に確定文面を送らず、notifyLineの型を検証する', async () => {
+    seedFriend();
+    expect((await notice({ ...body, status: 'pending' })).lineNotice).toEqual({ sent: false, reason: 'not_confirmed' });
+    expect((await request(path, { ...body, notifyLine: 'true' })).status).toBe(400);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+});
+
 describe('飲食店向けテストAPI', () => {
   it('無効な環境では専用APIを404にする', async () => {
     env.RESTAURANT_TEST_ENABLED = 'false';
+    const response = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect(response.status).toBe(404);
+  });
+
+  it('統括に飲食店機能パックが無いと、環境が有効でも専用APIを404にする', async () => {
+    // beforeEach で既定の統括へ付けたパックを外す。
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = '[]' WHERE id = '00000000-0000-4000-8000-000000000001'`).run();
+    seedRestaurantFixture();
+    // seedRestaurantFixture は毎回パックを付け直すので、fixture後にも外す。
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = '[]' WHERE id = '00000000-0000-4000-8000-000000000001'`).run();
     const response = await request('/api/restaurant-test/snapshot?account_id=account-1');
     expect(response.status).toBe(404);
   });
@@ -290,7 +391,7 @@ describe('飲食店向けテストAPI', () => {
 
   it('最初の規約同意時に認証スタッフの統括組織を1件だけ作る', async () => {
     const tenant = '00000000-0000-4000-8000-000000000099';
-    testDb.raw.prepare('INSERT INTO tenants (id, name) VALUES (?, ?)')
+    testDb.raw.prepare(`INSERT INTO tenants (id, name, feature_packs) VALUES (?, ?, '["restaurant"]')`)
       .run(tenant, '新しい統括');
     authMocks.getStaffByApiKey.mockResolvedValue({
       id: 'new-owner', name: 'New Owner', role: 'owner', access_level: 'full',
@@ -967,6 +1068,20 @@ describe('飲食店向けテストAPI', () => {
     expect(conflict.status).toBe(409);
   });
 
+  it('卓の位置と結合を保存し、省略時は保持・nullで結合を解除する', async () => {
+    seedRestaurantFixture();
+    const path = '/api/restaurant-test/tables/table-ginza?account_id=account-1';
+    expect((await requestWithMethod(path, 'PATCH', { floorX: 0, floorY: 120, joinGroup: '組1' })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { label: '配置済み' })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT floor_x, floor_y, join_group FROM rt_tables WHERE id = ?').get('table-ginza'))
+      .toEqual({ floor_x: 0, floor_y: 120, join_group: '組1' });
+    expect((await requestWithMethod(path, 'PATCH', { joinGroup: null })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT join_group FROM rt_tables WHERE id = ?').get('table-ginza')).toEqual({ join_group: null });
+    for (const body of [{ floorX: 1.5 }, { floorY: null }, { joinGroup: 3 }]) {
+      expect((await requestWithMethod(path, 'PATCH', body)).status).toBe(400);
+    }
+  });
+
   it('R107: 卓を変更・停止・再開しても予約の参照を残し、別組織の卓は変更しない', async () => {
     seedRestaurantFixture();
     const path = '/api/restaurant-test/tables/table-ginza?account_id=account-1';
@@ -989,7 +1104,7 @@ describe('飲食店向けテストAPI', () => {
     const path = '/api/restaurant-test/menu/menu-ginza?account_id=account-1';
     expect((await requestWithMethod(path, 'PATCH', { name: '新コース', kind: 'course', price: 9900, allergens: ['卵'], servicePeriods: ['lunch'] })).status).toBe(200);
     expect((await requestWithMethod(path, 'PATCH', { status: 'archived' })).status).toBe(200);
-    expect(testDb.raw.prepare('SELECT name, price, status, allergens_json FROM rt_menu_items WHERE id = ?').get('menu-ginza')).toEqual({ name: '新コース', price: 9900, status: 'archived', allergens_json: '["卵"]' });
+    expect(testDb.raw.prepare('SELECT name, price, status, allergens_json FROM rt_menu_items WHERE id = ?').get('menu-ginza')).toEqual({ name: '新コース', price: 8800, status: 'archived', allergens_json: '["卵"]' });
     expect(testDb.raw.prepare('SELECT course_id FROM rt_reservations WHERE id = ?').get('reservation-ginza')).toEqual({ course_id: 'menu-ginza' });
     const stoppedBooking = await request('/api/restaurant-test/reservations/manual?account_id=account-1', { storeId: 'store-ginza', customerName: '停止確認', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z', courseId: 'menu-ginza' });
     expect(stoppedBooking.status).toBe(400);
@@ -1049,5 +1164,128 @@ describe('飲食店向けテストAPI', () => {
     expect(newer.status).toBe(201);
     const row = testDb.raw.prepare("SELECT guest_count FROM rt_reservations WHERE external_id = 'RB-FRESH'").get() as { guest_count: number };
     expect(row.guest_count).toBe(4);
+  });
+});
+
+
+describe('V8-B メニューの価格承認', () => {
+  const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
+  it('価格は申請中に保ち、承認時に一度だけ反映する', async () => {
+    seedRestaurantFixture();
+    const response = await requestWithMethod(menuPath, 'PATCH', { price: 9900 });
+    expect(response.status).toBe(200);
+    const { data } = await response.json() as any;
+    expect(data.pendingPrice).toBe(9900);
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 8800 });
+    const list = await request('/api/restaurant-test/menus?account_id=account-1&storeId=store-ginza');
+    expect((await list.json() as any).data[0].pendingPrice).toBe(9900);
+    const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect((await snapshot.json() as any).data.menuItems[0].pendingPrice).toBe(9900);
+    expect((await requestWithMethod(menuPath, 'PATCH', { name: '二重申請', price: 10000 })).status).toBe(409);
+    expect(testDb.raw.prepare("SELECT name FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ name: 'テストコース' });
+    const approval = `/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`;
+    const approved = await requestWithMethod(approval, 'PATCH', { action: 'approve' });
+    expect((await approved.json() as any).data.menuChangeStatus).toBe('applied');
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 9900 });
+    expect((await requestWithMethod(approval, 'PATCH', { action: 'approve' })).status).toBe(409);
+    expect((await requestWithMethod(approval, 'PATCH', { action: 'return', comment: '戻す' })).status).toBe(409);
+    expect(testDb.raw.prepare("SELECT before_price, after_price, requested_by, status FROM rt_menu_change_requests").get()).toMatchObject({ before_price: 8800, after_price: 9900, status: 'applied' });
+  });
+  it('差し戻しには理由が必要で、価格を変えず再申請できる', async () => {
+    seedRestaurantFixture();
+    const { data } = await (await requestWithMethod(menuPath, 'PATCH', { price: 9900 })).json() as any;
+    const path = `/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`;
+    expect((await requestWithMethod(path, 'PATCH', { action: 'return' })).status).toBe(400);
+    expect((await requestWithMethod(path, 'PATCH', { action: 'return', comment: '金額を再確認してください' })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT status, return_reason FROM rt_menu_change_requests').get()).toEqual({ status: 'returned', return_reason: '金額を再確認してください' });
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 8800 });
+    expect((await requestWithMethod(menuPath, 'PATCH', { price: 9500 })).status).toBe(200);
+  });
+  it('申請後に価格が変わっていたら上書きせず失敗を記録する', async () => {
+    seedRestaurantFixture();
+    const { data } = await (await requestWithMethod(menuPath, 'PATCH', { price: 9900 })).json() as any;
+    testDb.raw.prepare("UPDATE rt_menu_items SET price = 9000 WHERE id = 'menu-ginza'").run();
+    const res = await requestWithMethod(`/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`, 'PATCH', { action: 'approve' });
+    expect((await res.json() as any).data).toMatchObject({ status: 'approved', menuChangeStatus: 'failed' });
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 9000 });
+  });
+  it('未公開の下書きだけ削除でき、公開後に下書きへ戻しても削除できない', async () => {
+    seedRestaurantFixture();
+    const create = () => request('/api/restaurant-test/menu?account_id=account-1', { storeId: 'store-ginza', kind: 'course', name: '下書き', price: 1000, status: 'draft' });
+    const first = (await (await create()).json() as any).data.id;
+    expect((await requestWithMethod(`/api/restaurant-test/menus/${first}?account_id=account-1`, 'DELETE')).status).toBe(200);
+    const id = (await (await create()).json() as any).data.id;
+    const path = `/api/restaurant-test/menus/${id}?account_id=account-1`;
+    await requestWithMethod(path, 'PATCH', { status: 'active' });
+    await requestWithMethod(path, 'PATCH', { status: 'draft' });
+    expect((await requestWithMethod(path, 'DELETE')).status).toBe(409);
+    expect((await requestWithMethod(menuPath, 'DELETE')).status).toBe(409);
+  });
+  it('他店舗からの申請・削除を拒否する', async () => {
+    seedRestaurantFixture();
+    const token = await createAdminSession();
+    expect((await requestAs('/api/restaurant-test/stores/store-yokohama/select?account_id=account-1', token, {})).status).toBe(200);
+    expect((await requestWithMethod(menuPath, 'PATCH', { price: 9999 }, token)).status).toBe(404);
+    expect((await requestWithMethod(menuPath, 'DELETE', undefined, token)).status).toBe(404);
+  });
+});
+
+describe('V8-B 予約経路と隔離メール', () => {
+  function seedEmails() {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO rt_media (id, code, name, parser_key) VALUES ('hp', 'hotpepper', 'ホットペッパー', 'hotpepper');
+      INSERT INTO rt_media (id, code, name, parser_key, is_active) VALUES ('tc', 'tablecheck', 'TableCheck', 'tablecheck', 0);
+      INSERT INTO rt_inbound_emails (id, message_id, store_id, media_id, status, quarantine_reason) VALUES
+        ('email-1', 'message-1', 'store-ginza', 'hp', 'quarantined', 'unprocessed:kind_unknown');
+      INSERT INTO rt_inbound_emails (id, message_id, store_id, media_id, status, received_at) VALUES
+        ('email-2', 'message-2', 'store-ginza', 'hp', 'received', datetime('now', '-3 days')),
+        ('email-other', 'message-other', 'store-yokohama', 'hp', 'quarantined', datetime('now'));
+      INSERT INTO rt_inventory_slots (id, store_id, starts_at, total_capacity) VALUES ('slot', 'store-ginza', '2026-10-15T10:00:00.000Z', 4);`);
+  }
+  it('店舗別の今日の受信件数・隔離件数と準備中の媒体を返す', async () => {
+    seedEmails();
+    const res = await request('/api/restaurant-test/channels?account_id=account-1&storeId=store-ginza');
+    expect(res.status).toBe(200);
+    const data = (await res.json() as any).data;
+    expect(data.find((row: any) => row.code === 'hotpepper')).toMatchObject({ receiveMethod: 'email_forward', todayCount: 1, unreadableCount: 1, status: 'receiving' });
+    expect(data.find((row: any) => row.code === 'tablecheck')).toMatchObject({ status: 'preparing', todayCount: 0 });
+    expect(data.find((row: any) => row.code === 'restaurant_board')).toMatchObject({ receiveMethod: 'direct' });
+    const list = await request('/api/restaurant-test/inbound-emails?account_id=account-1&storeId=store-ginza&status=quarantined');
+    const result = await list.json() as any;
+    expect(result.total).toBe(1);
+    expect(result.data[0]).toMatchObject({ id: 'email-1', reason: 'unprocessed:kind_unknown' });
+    expect(result.data[0]).not.toHaveProperty('r2_key');
+    expect((await request('/api/restaurant-test/channels?account_id=account-2&storeId=store-yokohama')).status).toBe(400);
+    expect((await request('/api/restaurant-test/inbound-emails?account_id=account-2&storeId=store-yokohama')).status).toBe(400);
+  });
+  it('隔離メールを予約と在庫へ一度だけ取り込む', async () => {
+    seedEmails();
+    const path = '/api/restaurant-test/inbound-emails/email-1/manual-import?account_id=account-1';
+    const body = { customerName: '取り込み確認', guestCount: 2, startsAt: '2026-10-15T19:00:00+09:00' };
+    expect((await request(path, { ...body, guestCount: 0 })).status).toBe(400);
+    const first = await request(path, body);
+    expect(first.status).toBe(201);
+    const id = (await first.json() as any).data.id;
+    expect(testDb.raw.prepare('SELECT ends_at FROM rt_reservations WHERE id = ?').get(id)).toEqual({ ends_at: '2026-10-15T12:00:00.000Z' });
+    const repeated = await request(path, body);
+    expect((await repeated.json() as any).data).toMatchObject({ id, duplicate: true });
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM rt_reservations WHERE inbound_email_id = 'email-1'").get()).toEqual({ n: 1 });
+    expect(testDb.raw.prepare("SELECT reserved_count FROM rt_inventory_slots WHERE id = 'slot'").get()).toEqual({ reserved_count: 2 });
+    expect(testDb.raw.prepare("SELECT status FROM rt_inbound_emails WHERE id = 'email-1'").get()).toEqual({ status: 'received' });
+    expect((await request('/api/restaurant-test/inbound-emails/email-2/manual-import?account_id=account-1', body)).status).toBe(409);
+  });
+  it('予約が埋まっていてもメールを失わず未割当の予約として取り込む', async () => {
+    seedEmails();
+    const response = await request('/api/restaurant-test/inbound-emails/email-1/manual-import?account_id=account-1', { customerName: '満席確認', guestCount: 10, startsAt: '2026-10-15T10:00:00Z', endsAt: '2026-10-15T12:00:00Z' });
+    expect(response.status).toBe(201);
+    expect((await response.json() as any).data.tableId).toBeNull();
+  });
+  it('選択中の店舗以外のメールと経路を見せず、取り込ませない', async () => {
+    seedEmails();
+    const token = await createAdminSession();
+    await requestAs('/api/restaurant-test/stores/store-ginza/select?account_id=account-1', token, {});
+    expect((await requestAs('/api/restaurant-test/channels?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
+    expect((await requestAs('/api/restaurant-test/inbound-emails?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
+    expect((await requestAs('/api/restaurant-test/inbound-emails/email-other/manual-import?account_id=account-1', token, {})).status).toBe(404);
   });
 });

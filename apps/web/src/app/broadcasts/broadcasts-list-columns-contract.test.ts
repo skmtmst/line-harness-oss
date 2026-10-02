@@ -100,7 +100,7 @@ describe('一斉配信の一覧の列（設計 q76C35）', () => {
    */
   it('配信日時は Asia/Tokyo で書き出す', () => {
     const body = functionBody(SOURCE, 'function formatDatetime')
-    expect(body).toContain("timeZone: 'Asia/Tokyo'")
+    expect(body).toContain('formatDateTime(iso)')
   })
 
   /** 取れない日時に `-` ではなく、理由の読める言葉を出す。 */

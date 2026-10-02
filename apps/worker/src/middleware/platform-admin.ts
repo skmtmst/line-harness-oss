@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from 'hono';
-import { getPlatformAdminByStaffId } from '@line-crm/db';
+import { countActivePlatformAdmins, getPlatformAdminByStaffId } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { dbFor } from '../services/db-router.js';
@@ -68,10 +68,20 @@ export async function isPlatformAdminRow(db: D1Database, candidate: PlatformAdmi
 async function legacyDefaultTenantOwnerRow(db: D1Database, candidate: PlatformAdminCandidate): Promise<boolean> {
   if (candidate.role !== 'owner' || candidate.readOnly) return false;
   if ((candidate.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) return false;
-  const row = await db
-    .prepare('SELECT COUNT(*) AS count FROM platform_admins WHERE is_active = 1')
-    .first<{ count: number }>();
-  return (row?.count ?? 0) === 0;
+  /*
+   * 「登録が完了して有効な運営マスター」の数え方は countActivePlatformAdmins に
+   * そろえる（is_active=1 かつ activation_state='active'）。
+   *
+   * 以前はここだけ is_active=1 のみで数えていた。招待の行は
+   * is_active=1 / activation_state='invited' で作られる（upsertPlatformAdminInvite）
+   * ため、誰も自己登録しないまま他人を招待すると、
+   *   - この互換判定は「登録済みが居る」と読んで無効になる
+   *   - 一方 getPlatformAdminByStaffId は 'invited' を運営マスターと認めない
+   * となり、運営マスターが 0 人のまま誰も /ops に入れなくなっていた。
+   * 招待メールが失効すると再送も requirePlatformAdminWrite を要求するため、
+   * 画面からは復旧できない。
+   */
+  return (await countActivePlatformAdmins(db)) === 0;
 }
 
 export function platformForbidden(c: Context<Env>) {

@@ -1,6 +1,7 @@
 'use client'
 import { usePathname } from 'next/navigation'
 import Sidebar from './layout/sidebar'
+import SettingsInnerNav, { isSettingsAreaPath } from './layout/settings-inner-nav'
 import { UpdateBanner } from './update/update-banner'
 import AuthGuard from './auth-guard'
 import { AccountProvider } from '@/contexts/account-context'
@@ -20,6 +21,7 @@ import TopBar from './shared/top-bar'
 import NoteBar from './shared/note-bar'
 import PlatformNotices from './hq/platform-notices'
 import { logoutAndGoToLogin } from '@/lib/logout'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useEffect, useState } from 'react'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -84,8 +86,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <SessionLostNotice />
               {/* Phase 6: banner above sidebar+header so it pins to the top of the
                   admin shell. Renders nothing while loading; one of latest/fork/
-                  upgrade once /admin/version + manifest resolve. */}
-              <UpdateBanner />
+                  upgrade once /admin/version + manifest resolve.
+                  ★V8 では帯を出さない（移行③「黄色の版の帯を消す」）。版は
+                  メニューの一番下の「Ver.」が持つ。 */}
+              <div className="v7-only"><UpdateBanner /></div>
               {/* 代理ログイン中の赤い帯（★V6 37-5）。運営マスター以外には出ない。 */}
               <ImpersonationNotice />
               {/* V-2: いつもと違う端末・場所からのログイン帯。そのログイン中だけ出る。 */}
@@ -180,6 +184,14 @@ function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
  */
 function Workspace({ children }: { children: React.ReactNode }) {
   const { fullWidth } = usePageChrome()
+  const pathname = usePathname()
+  /*
+   * ★V8（夕41）：設定の画面は、白い板の中の左に「設定の中のメニュー」
+   * （幅208）を付ける。v7 では部品も枠組みも出さない（1画素も変えない）。
+   * SSR・最初の描画は v7 の形で、レイアウト効果の中で v8 に揃える。
+   */
+  const isV8 = useAdminTheme() === 'v8'
+  const withSettingsNav = isV8 && !fullWidth && isSettingsAreaPath(pathname ?? '')
   return (
     <div className={styles.side}>
       <AppTopBar />
@@ -188,9 +200,16 @@ function Workspace({ children }: { children: React.ReactNode }) {
         <div
           data-design-shell="v6-1920"
           data-design-node="J33xq"
-          className={`${styles.content} ${fullWidth ? styles.contentFull : ''}`}
+          className={`${styles.content} ${fullWidth ? styles.contentFull : ''} ${withSettingsNav ? styles.contentSettings : ''}`}
         >
-          {children}
+          {withSettingsNav ? (
+            <div className={styles.settingsSplit}>
+              <SettingsInnerNav />
+              <div className={styles.settingsBody}>{children}</div>
+            </div>
+          ) : (
+            children
+          )}
         </div>
       </main>
     </div>

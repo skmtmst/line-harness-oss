@@ -12,6 +12,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, Download } from 'lucide-react'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import {
+  loadFailureCopy,
+  loadFailureNotice,
+} from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Card from '@/components/shared/card'
@@ -20,6 +24,7 @@ import Notice from '@/components/shared/notice'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { Tabs } from '@/components/shared/tabs'
 import ListState from '@/components/shared/list-state'
+import { runOptimistic } from '@/lib/undoable'
 import {
   dashboardNotificationDestination,
   isDashboardNotificationData,
@@ -50,6 +55,10 @@ function NotificationsPageInner() {
   const [counts, setCounts] = useState<NotificationCenterData['counts'] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // M037: 捕まえた一覧の読み込み失敗。403・429の言い分けと再試行の有無に使う。
+  const [loadError, setLoadError] = useState<unknown>(null)
+  // 一覧の失敗で帯に出した文。取り直しが通ったら同じ文だけ消す。
+  const lastListFailure = useRef<string | null>(null)
   const requestId = useRef(0)
 
   const selectFilter = (next: DashboardNotificationFilter) => {
@@ -67,11 +76,15 @@ function NotificationsPageInner() {
       setItems([])
       setCounts(null)
       setError('LINEアカウントを選択してください')
+      setLoadError(null)
       setLoading(false)
       return
     }
     setLoading(true)
-    if (!append) setError('')
+    if (!append) {
+      setError('')
+      setLoadError(null)
+    }
     try {
       const response = await api.notifications.center.list(selectedAccountId, {
         category: filter,
@@ -83,13 +96,21 @@ function NotificationsPageInner() {
       if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
       setItems((current) => append ? [...current, ...response.data.items] : response.data.items)
       setCounts(response.data.counts)
-    } catch {
+      // M037: 直ったので失敗の控えを消す。追加読み込みの失敗文も消える。
+      setLoadError(null)
+      if (!append) setError('')
+      else setError((current) => current === lastListFailure.current ? '' : current)
+    } catch (caught) {
       if (id !== requestId.current) return
       if (!append) {
         setItems([])
         setCounts(null)
       }
-      setError(`通知を${STATE_TEXT.error}`)
+      // M037: 生の `API error: NNN` を出さず、原因どおりに言い分ける。
+      const message = loadFailureNotice(caught, '通知')
+      lastListFailure.current = message
+      setLoadError(caught)
+      setError(message)
     } finally {
       if (id === requestId.current) setLoading(false)
     }
@@ -97,33 +118,52 @@ function NotificationsPageInner() {
 
   useEffect(() => { void load(0, false) }, [load])
 
-  const markRead = async (item: NotificationCenterItem) => {
+  /*
+   * 既読は取り消せる軽い操作なので、押した瞬間に画面へ反映して裏で
+   * 保存する（★V7 sTJsh §1）。失敗したら未読へ戻してやり直せる
+   * 知らせを出す。
+   */
+  const markRead = (item: NotificationCenterItem) => {
     if (!selectedAccountId) return
     if (item.isRead) return
-    try {
-      const response = await api.notifications.center.markRead(item.id, selectedAccountId)
-      if (!response.success) throw new Error(response.error)
-      setItems((current) => current.map((row) => row.id === item.id ? { ...row, isRead: true } : row))
-      setCounts((current) => current ? { ...current, unread: Math.max(0, current.unread - 1) } : current)
-    } catch {
-      setError('通知を既読にできませんでした。')
+    const accountId = selectedAccountId
+    const apply = (isRead: boolean) => {
+      setItems((current) => current.map((row) => (row.id === item.id ? { ...row, isRead } : row)))
+      setCounts((current) =>
+        current ? { ...current, unread: Math.max(0, current.unread + (isRead ? -1 : 1)) } : current,
+      )
     }
+    apply(true)
+    runOptimistic({
+      request: () => api.notifications.center.markRead(item.id, accountId),
+      revert: () => apply(false),
+      failureMessage: '通知を既読にできませんでした。',
+      retry: () => markRead(item),
+    })
   }
 
   const openNotification = (item: NotificationCenterItem) => {
-    void markRead(item)
+    markRead(item)
     router.push(dashboardNotificationDestination(item))
   }
 
-  const markAllRead = async () => {
+  const markAllRead = () => {
     if (!selectedAccountId || !counts || counts.unread === 0) return
-    try {
-      const response = await api.notifications.center.markAllRead(selectedAccountId, filter)
-      if (!response.success) throw new Error(response.error)
-      await load(0, false)
-    } catch {
-      setError('通知をまとめて既読にできませんでした。')
-    }
+    const accountId = selectedAccountId
+    const beforeItems = items
+    const beforeCounts = counts
+    setItems((current) => current.map((row) => ({ ...row, isRead: true })))
+    setCounts((current) => (current ? { ...current, unread: 0 } : current))
+    runOptimistic({
+      request: () => api.notifications.center.markAllRead(accountId, filter),
+      revert: () => {
+        setItems(beforeItems)
+        setCounts(beforeCounts)
+      },
+      failureMessage: '通知をまとめて既読にできませんでした。',
+      retry: markAllRead,
+      onSuccess: () => void load(0, false),
+    })
   }
 
   const filters: Array<{ id: DashboardNotificationFilter; label: string; count: number | null }> = [
@@ -133,6 +173,10 @@ function NotificationsPageInner() {
   ]
   const total = counts ? (filter === 'error' ? counts.error : filter === 'update' ? counts.update : counts.all) : 0
   const hasMore = items.length < total
+  // M037: 一覧自体が取れなかったときは空と混ぜない。共通の失敗の1枚にする。
+  // 403は押しても直らないので再試行なし、429と通信失敗は同じ画面から取り直せる。
+  const listFailed = loadError !== null && items.length === 0
+  const listFailure = loadError !== null ? loadFailureCopy(loadError, '通知') : null
 
   /* ★V7: 画面側で狭い中央寄せをしない。中身の幅は共通の枠が持つ。 */
   return (
@@ -156,16 +200,24 @@ function NotificationsPageInner() {
         </div>
       </div>
 
-      {error ? (
+      {error && !listFailed ? (
         <Notice
           tone="danger"
           message={error}
-          action={<button type="button" onClick={() => void load(0, false)} className="shrink-0 font-medium underline">もう一度読み込む</button>}
+          action={loadError !== null && listFailure?.retryable ? (
+            <button type="button" onClick={() => void load(0, false)} className="shrink-0 font-medium underline">もう一度読み込む</button>
+          ) : undefined}
         />
       ) : null}
 
       <Card overflow="hidden">
-        {items.length === 0 && !loading ? (
+        {listFailed ? (
+          <ListState
+            kind="error"
+            error={loadError ?? undefined}
+            onRetry={listFailure?.retryable ? () => void load(0, false) : undefined}
+          />
+        ) : items.length === 0 && !loading ? (
           <ListState
             kind="empty"
             title="通知はまだありません"
@@ -188,7 +240,7 @@ function NotificationsPageInner() {
                   {item.isRead ? (
                     <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" />
                   ) : (
-                    <span aria-hidden="true" className="bg-action mt-1.5 h-2 w-2 shrink-0 rounded-full" />
+                    <span aria-hidden="true" className="bg-action mt-1.5 h-2 w-2 shrink-0 rounded-pill" />
                   )}
                   <span className="min-w-0 flex-1">
                     <span className={item.isRead ? 'text-ink block truncate text-sm' : 'text-ink block truncate text-sm font-semibold'}>

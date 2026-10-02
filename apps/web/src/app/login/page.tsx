@@ -21,6 +21,9 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_login_failed',
 ])
 
+/** 空パスワードで送信したときだけ出す入力前の案内。入力が始まったら消す。 */
+const EMPTY_PASSWORD_MESSAGE = 'パスワードを入力してください'
+
 /**
  * ログイン。★V6 0-1（`UufG8`、カード `m3tWJ`）。
  *
@@ -35,6 +38,13 @@ export default function LoginPage() {
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
+
+  // R613: 空パスワードの案内は入力が始まったら消す。
+  // 認証失敗・通信失敗・権限エラーなど別の原因の表示は次の送信まで残す。
+  const handlePasswordChange = (value: string) => {
+    setPassword(value)
+    if (value && error === EMPTY_PASSWORD_MESSAGE) setError('')
+  }
 
   useEffect(() => {
     const errorCode = new URLSearchParams(window.location.search).get('error')
@@ -53,7 +63,7 @@ export default function LoginPage() {
     setEmailMessage(emailProblem)
     if (emailProblem) return
     if (!password) {
-      setError('パスワードを入力してください')
+      setError(EMPTY_PASSWORD_MESSAGE)
       return
     }
     setBusy('password')
@@ -76,7 +86,8 @@ export default function LoginPage() {
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      // R507: 二段階認証の画面で実際のログイン方法を出せるよう、経路の印を付ける。
+      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_method: 'password' }).toString()}`)
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
@@ -118,7 +129,7 @@ export default function LoginPage() {
           />
         </AuthField>
         <AuthField label="パスワード" htmlFor="login-password">
-          <PasswordField id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
+          <PasswordField id="login-password" value={password} onChange={handlePasswordChange} autoComplete="current-password" />
         </AuthField>
         <Checkbox
           checked={remember}
@@ -129,8 +140,7 @@ export default function LoginPage() {
             パスワードを忘れた方はこちら
           </Link>
         </div>
-        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full">
-          {busy === 'password' ? 'ログインしています…' : 'ログイン'}
+        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
         </Button>
       </form>
 
@@ -140,9 +150,8 @@ export default function LoginPage() {
         <span className="h-px flex-1 bg-hairline" />
       </div>
 
-      <Button onClick={lineLogin} disabled={busy !== null} className="w-full">
-        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />
-        {busy === 'line' ? 'LINEへ移動中…' : 'LINE でログイン'}
+      <Button onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
+        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン
       </Button>
 
       <p className="text-caption text-ink-faint">

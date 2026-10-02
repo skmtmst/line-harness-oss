@@ -21,8 +21,13 @@ import Select from '@/components/shared/select'
 import EventKpi from '@/components/events/event-kpi'
 import HelpTip from '@/components/shared/help-tip'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention } from './event-attention'
+import { formatDateTime, formatDay } from '@/lib/format'
 
-type LoadStatus = 'loading' | 'ready' | 'error'
+/*
+ * R601: 読み込みの失敗は「権限不足」と「通信失敗」を分ける。
+ * 403 は押しても直らないので管理者への依頼だけ、503 などは再試行を出す。
+ */
+type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /**
  * イベント予約（設計 V2 8-3 / node Ih3xS）。
@@ -37,32 +42,20 @@ const PAGE_SIZE = 20
 
 function formatJpDate(iso: string | null): string {
   if (!iso) return '日時未設定'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(iso))
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}月${get('day')}日 ${get('hour')}:${get('minute')}`
+  return formatDateTime(iso)
 }
 
 function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string): string {
   if (!hasAccount) return 'アカウントを選択'
   if (status === 'loading') return '読み込み中'
   if (status === 'error') return '取得できませんでした'
+  if (status === 'forbidden') return '見る権限がありません'
   return readyDetail
 }
 
 function formatShortJpDate(iso: string | null): string {
   if (!iso) return '日時未設定'
-  return new Date(iso).toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDay(iso)
 }
 
 export default function EventsListPage() {
@@ -129,12 +122,13 @@ export default function EventsListPage() {
       setListTotal(res.total ?? res.items.length)
       setSummary(res.summary ?? null)
       setLoadStatus('ready')
-    } catch {
+    } catch (cause) {
       if (requestId !== loadRequestRef.current) return
       setItems([])
       setListTotal(0)
       setSummary(null)
-      setLoadStatus('error')
+      // R601: 403 は権限不足（管理者への依頼）、それ以外は通信失敗（再試行）。
+      setLoadStatus(cause instanceof ApiError && cause.status === 403 ? 'forbidden' : 'error')
     }
   }, [selectedAccountId, page, query, filter, sort])
 
@@ -329,6 +323,12 @@ export default function EventsListPage() {
         </div>
       ) : loadStatus === 'loading' ? (
         <ListState kind="loading" />
+      ) : loadStatus === 'forbidden' ? (
+        /*
+         * R601: 権限不足は通信失敗と別の1枚にする。読み直しても直らないので
+         * 再読み込み口は出さず、誰に頼めばよいかだけ言う（共通 ListState の定型文）。
+         */
+        <ListState kind="forbidden" title="イベントを見る権限がありません" />
       ) : loadStatus === 'error' ? (
         <ListState kind="error" description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>} />
       ) : items.length === 0 && !query.trim() && filter === 'all' ? (
@@ -393,8 +393,7 @@ export default function EventsListPage() {
                     </Td>
                     <Td align="right" className="tabular-nums">
                       {e.total_active}
-                      <span className="text-ink-faint">
-                        {' / '}
+                      <span className="text-ink-faint"> /{' '}
                         {e.total_capacity ?? '—'}
                       </span>
                     </Td>
@@ -524,7 +523,7 @@ export default function EventsListPage() {
           「イベントが無い」に読める。`—` と読み込み中を分ける。
         */}
         <span className="text-ink-faint text-xs">
-          {!selectedAccountId || loadStatus === 'error'
+          {!selectedAccountId || loadStatus === 'error' || loadStatus === 'forbidden'
             ? '—'
             : loadStatus === 'loading'
               ? '読み込み中'

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
@@ -120,6 +121,15 @@ export default function LibrarySection({
     }
   }
 
+  /*
+   * M022：原文のまま出さず、共通の状態別案内へ渡す。
+   * 窓は開いたままなので送り直しはできる（再試行の言葉つき）。
+   */
+  const modalFailureMessage = (caught: unknown, action: string): string =>
+    japaneseDetailOf(caught) || describeApiFailure(caught, action, {
+      forbidden: 'この操作はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+    })
+
   const deliver = async (image: BannerImage, lineAccountIds: string[]) => {
     setModalBusy(true)
     setModalError('')
@@ -129,7 +139,7 @@ export default function LibrarySection({
       replaceImage(res.data.image)
       onChanged()
     } catch (caught) {
-      setModalError(caught instanceof Error && caught.message ? caught.message : 'アカウントへ渡せませんでした。もう一度お試しください。')
+      setModalError(modalFailureMessage(caught, 'アカウントへの受け渡し'))
     } finally {
       setModalBusy(false)
     }
@@ -145,7 +155,7 @@ export default function LibrarySection({
       setOpenImage(null)
       onChanged()
     } catch (caught) {
-      setModalError(caught instanceof Error && caught.message ? caught.message : '一覧から外せませんでした。もう一度お試しください。')
+      setModalError(modalFailureMessage(caught, '一覧からの削除'))
     } finally {
       setModalBusy(false)
     }
@@ -243,8 +253,8 @@ export default function LibrarySection({
           )}
           {status === 'ready' && nextBefore ? (
             <div className="flex justify-center">
-              <Button onClick={() => void loadMore()} disabled={loadingMore}>
-                {loadingMore ? '読み込んでいます…' : `さらに${PAGE_SIZE}枚を表示`}
+              <Button onClick={() => void loadMore()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込んでいます…">
+                {`さらに${PAGE_SIZE}枚を表示`}
               </Button>
             </div>
           ) : null}

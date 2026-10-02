@@ -481,7 +481,19 @@
     "528_step_up_grant_binding.sql",
     "532_webhook_interaction_secret_unavailable.sql",
     "534_google_sheets_sync_run_scope.sql",
-    "535_tiktok_pnl.sql"
+    "535_tiktok_pnl.sql",
+    "536_support_mark_create_idempotency.sql",
+    "536_tenant_restaurant_pack_backfill.sql",
+    "537_friend_field_create_idempotency.sql",
+    "538_staff_invite_email_unique.sql",
+    "539_rich_menu_group_version.sql",
+    "540_support_mark_rule_create_idempotency.sql",
+    "541_tag_update_idempotency.sql",
+    "542_line_account_login_liff_unique.sql",
+    "543_auto_reply_create_idempotency.sql",
+    "544_line_account_tags.sql",
+    "545_restaurant_channels.sql",
+    "546_restaurant_menu_approval.sql"
   ],
-  "migrationCount": 482
+  "migrationCount": 494
 }

@@ -10,6 +10,7 @@ const dbMocks = {
   getLineAccountScopeEntries: vi.fn(),
   getLineAccountsByIds: vi.fn(),
   getLineAccountListStats: vi.fn(),
+  getLineAccountTagsByAccountIds: vi.fn(async () => ({})),
   getLineAccountById: vi.fn(),
   getLineAccountCredentialHealth: vi.fn(),
   createLineAccount: vi.fn(),
@@ -696,6 +697,37 @@ describe('POST /api/line-accounts/connect', () => {
     });
     expect(res.status).toBe(502);
     expect(dbMocks.deleteUncommittedLineAccount).toHaveBeenCalledWith(expect.anything(), 'rollback-account');
+  });
+
+  test('同時登録の負け側は重複したLoginチャネルIDを409で案内する', async () => {
+    installAutoConnectFetch();
+    // 事前検査は通ったがINSERTで一意制約に当たった競争の負け側。
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.login_channel_id'),
+    );
+    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/loginChannelId.*already assigned/);
+  });
+
+  test('同時登録の負け側は重複したLIFF IDを409で案内する', async () => {
+    installAutoConnectFetch();
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.liff_id'),
+    );
+    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/liffId.*already assigned/);
   });
 });
 
@@ -1440,6 +1472,31 @@ describe('Login pair / uniqueness validation', () => {
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
     const body = (await res.json()) as { success: boolean; error: string };
     expect(body.error).toMatch(/already assigned/);
+  });
+
+  test('POST: 同時登録の負け側は重複したLoginチャネルIDを409で案内する', async () => {
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.login_channel_id'),
+    );
+    const res = await setupApp('owner', makeDbStub(), { tenantId: 'tenant-line-owner' }).request(
+      '/api/line-accounts',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId: '123456789',
+          name: 'メイン',
+          channelAccessToken: 'token',
+          channelSecret: 'secret',
+          loginChannelId: '2009624792',
+          loginChannelSecret: 'login-secret',
+          liffId: '2009624792-XXXX',
+        }),
+      },
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/loginChannelId.*already assigned/);
   });
 
   test('PATCH: LIFF-only edit succeeds against half-configured Login (id-only) account', async () => {

@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .card {
   position: relative;
@@ -21,6 +22,17 @@
   min-height: 106px;
   gap: 5px;
   padding: 16px;
+}
+
+/*
+ * ★V7 の友だち一覧の詰めた形（zZMNG。高さ100・間4・余白14/16）。
+ * v8 では数のマスの実寸（下の cardV6 指定）がこれより強い指定で
+ * 上書きするので、このクラスは v7 にだけ効く。
+ */
+.cardV6Tight {
+  min-height: 100px;
+  gap: 4px;
+  padding: 14px 16px;
 }
 
 .cardBroadcast {
@@ -74,7 +86,7 @@
   display: inline-block;
   width: 80px;
   height: var(--text-caption);
-  border-radius: 4px;
+  border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
 }
 
@@ -120,7 +132,7 @@
 .value {
   color: var(--color-ink);
   font-size: var(--text-metric);
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   /*
    * 数の行の高さは1行ぶんにそろえる。題の行（.head 20px）と合わせて、
@@ -158,7 +170,7 @@
 .skeleton {
   width: 96px;
   height: var(--text-metric);
-  border-radius: 4px;
+  border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
   animation: kpi-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
@@ -166,6 +178,62 @@
 @keyframes kpi-card-pulse {
   50% {
     opacity: 0.5;
+  }
+}
+
+/*
+ * ★V8「数のマス」Pp3nS（一覧型のカード型）：余白 16/20・間 8・
+ * 題は 13/500。高さは読み込み中・読み込み後で同じ 122 に固定する
+ * （数が入って高くなると表が押し下げられる——PERF 0.115 の直し）。
+ * 数の帯（strip）は bx1eN の分析型で使う別の形。v7 は変わらない。
+ */
+[data-theme='v8'] .cardV6 {
+  min-height: 122px;
+  gap: 8px;
+  padding: 16px 20px;
+}
+
+[data-theme='v8'] .labelV6 {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+
+/*
+ * ★V8「数の帯」（bx1eN の分析型）：4枚のカードをやめ、1本の帯を
+ * 縦線（divider）で4つに割る。各マスは上下10・左右16・数は 22px。
+ * `data-kpi-strip` は list-kpis.tsx が付ける印（v7 では何も変わらない）。
+ */
+[data-theme='v8'] .strip {
+  gap: 0;
+}
+
+[data-theme='v8'] .strip > .card {
+  min-height: 0;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 2列（xl 未満）：偶数マスに左の線、3・4番目に上の線。 */
+[data-theme='v8'] .strip > .card:nth-child(even) {
+  border-left: 1px solid var(--color-divider);
+}
+
+[data-theme='v8'] .strip > .card:nth-child(n + 3) {
+  border-top: 1px solid var(--color-divider);
+}
+
+/* xl 以上で1列4マス：先頭以外に左の線だけ。 */
+@media (min-width: 1280px) {
+  [data-theme='v8'] .strip > .card:nth-child(n + 2) {
+    border-left: 1px solid var(--color-divider);
+  }
+
+  [data-theme='v8'] .strip > .card:nth-child(n + 3) {
+    border-top: 0;
   }
 }
 }

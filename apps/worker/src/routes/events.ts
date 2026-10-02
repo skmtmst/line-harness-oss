@@ -47,7 +47,7 @@ import {
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { resolveLineCredential } from '@line-crm/db';
+import { getFolderById, resolveLineCredential } from '@line-crm/db';
 import { createBroadcast, getBroadcastById, type Broadcast } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -106,6 +106,20 @@ events.use('/api/events/admin/*', async (c, next) => {
   }
   await next();
 });
+
+// 分類だけの変更も既存の版チェックに従う。folder_id は従来の読み取り名を残す。
+function withFolder(row: Record<string, unknown> | null) {
+  return row ? { ...row, folderId: row.folder_id ?? null } : row;
+}
+
+async function validEventFolder(c: Context<Env>, folderId: unknown, accountIds: string[]): Promise<boolean> {
+  if (folderId === null) return true;
+  if (typeof folderId !== 'string' || !folderId.trim()) return false;
+  const folder = await getFolderById(c.env.DB, folderId);
+  return !!folder && folder.kind === 'event' && (folder.account_id === null
+    || (accountIds.includes(folder.account_id)
+      && await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [folder.account_id])));
+}
 
 function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') ?? null;
@@ -442,6 +456,10 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
     return bad(c, ACCOUNT_ACCESS_ERROR, 403);
   }
 
+  if ('folderId' in body && !await validEventFolder(c, body.folderId,
+    body.target_type === 'multi-account-dedup' ? body.account_ids as string[] : [account_id])) {
+    return bad(c, 'invalid_folder', 422);
+  }
   const id = crypto.randomUUID();
   const targetType = (body.target_type as EventTargetType | undefined) ?? 'single';
   const accountIds = targetType === 'multi-account-dedup' ? (body.account_ids as string[]) : null;
@@ -475,8 +493,9 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
          og_title, og_description, og_image_url,
          visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
          questions_json,
-         current_published_version_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         current_published_version_id,
+         lifecycle_status, lifecycle_changed_at, folder_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -509,6 +528,12 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       // validateEventInput で形は検証済み。id未指定の分だけここで連番を補う。
       body.questions == null ? null : JSON.stringify((normalizeEventQuestions(body.questions) as { questions: EventQuestion[] }).questions),
       publishedVersionId,
+      // m26g R576: 作成時も公開フラグと保存する状態を両書きする。
+      // 公開で作った行が下書きのままでは、顧客 GET の可視性と
+      // 管理表示がずれる（lifecycle_status が正本・移行 492 の決め）。
+      isPublished ? 'published' : 'draft',
+      new Date().toISOString(),
+      body.folderId ?? null,
     );
   if (publishedVersionId) {
     await c.env.DB.batch([
@@ -534,7 +559,7 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
     .prepare(`SELECT * FROM events WHERE id = ?`)
     .bind(id)
     .first();
-  return c.json(row, 201);
+  return c.json(withFolder(row), 201);
 });
 
 export interface FutureEventSlotSummary {
@@ -641,6 +666,9 @@ events.get('/api/events/admin/events', async (c) => {
              AND EXISTS (SELECT 1 FROM json_each(e.account_ids) WHERE value = ?))
        )`];
   const params: unknown[] = [account_id, account_id];
+  const folderId = c.req.query('folderId');
+  if (folderId === '__ungrouped__') conditions.push('e.folder_id IS NULL');
+  else if (folderId) { conditions.push('e.folder_id = ?'); params.push(folderId); }
   if (q) {
     /*
      * #625: LIKE ではなく instr() で部分一致する。
@@ -761,7 +789,7 @@ events.get('/api/events/admin/events', async (c) => {
     }>();
   return c.json({
     ...buildOffsetListResponse({
-      items: results ?? [],
+      items: (results ?? []).map(row => withFolder(row as Record<string, unknown>)),
       total: counted?.c ?? 0,
       paging,
       sort: sort === 'name'
@@ -787,7 +815,7 @@ events.get('/api/events/admin/events/:id', async (c) => {
     .bind(c.req.param('id'), account_id, account_id)
     .first();
   if (!row) return bad(c, 'not_found', 404);
-  return c.json(row);
+  return c.json(withFolder(row));
 });
 
 events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async (c) => {
@@ -852,6 +880,15 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
       setValues.push(body[k]);
     }
   }
+  if ('folderId' in body) {
+    const targetType = body.target_type ?? exists.target_type;
+    const accountIds = targetType === 'multi-account-dedup'
+      ? (body.account_ids as string[] | undefined) ?? JSON.parse(exists.account_ids as string)
+      : [account_id];
+    if (!await validEventFolder(c, body.folderId, accountIds)) return bad(c, 'invalid_folder', 422);
+    setClauses.push('folder_id = ?');
+    setValues.push(body.folderId);
+  }
   // JSON-encoded columns (broadcasts と同じ扱い): account_ids / dedup_priority
   // null は NULL として書く、配列は JSON.stringify する。
   if (Object.prototype.hasOwnProperty.call(body, 'account_ids')) {
@@ -888,10 +925,44 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   if (setClauses.length === 0) {
     if (exists.version !== expectedVersion) return bad(c, 'version_conflict', 409);
     const row = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(id).first();
-    return c.json(row);
+    return c.json(withFolder(row));
   }
   const nextVersion = (expectedVersion as number) + 1;
   const nextPublished = (body.is_published ?? exists.is_published) === 1;
+  // m26g R576: 公開フラグと保存する状態の両書き。lifecycle 口では
+  // is_published へ両書きしているが、通常 PUT は lifecycle_status を
+  // 触らず、is_published=1・lifecycle=draft の不整合行を作っていた。
+  // その行は管理表示が「下書き」なのに顧客 GET が 200 になる。
+  // 公開フラグが実際に切り替わるときだけ、保存する状態も連動させる。
+  // 内容だけの保存（一時停止中の名前直し等）では状態を壊さない。
+  const currentLifecycle = isLifecycleStatus(exists.lifecycle_status)
+    ? exists.lifecycle_status
+    : exists.is_published === 1 ? 'published' : 'draft';
+  let nextLifecycle: string | null = null;
+  if (Object.prototype.hasOwnProperty.call(body, 'is_published')
+    && body.is_published !== exists.is_published) {
+    const target = body.is_published === 1 ? 'published' : 'draft';
+    if (target !== currentLifecycle) {
+      if (canTransitionLifecycle(currentLifecycle, target)) {
+        nextLifecycle = target;
+      } else if (currentLifecycle === 'published' && target === 'draft') {
+        // 編集画面の公開ラジオは下書きに戻す操作を許している（lifecycle 口の
+        // 遷移表は published→draft を禁じるが、あちらは状態操作の口の決め）。
+        // ここでは「公開表示なのに顧客に届かない」逆向きの不整合を消すため、
+        // 公開中→下書きの切替だけは編集の口でも受けて両書きする。
+        nextLifecycle = target;
+      } else {
+        // 終了・中止からの公開など、終端状態の復活は内容編集では受けない。
+        // 状態操作の口（lifecycle）で理由つきにやり直してもらう。
+        return bad(c, 'lifecycle_transition_invalid', 409);
+      }
+    }
+  }
+  if (nextLifecycle !== null) {
+    setClauses.push('lifecycle_status = ?');
+    setValues.push(nextLifecycle);
+    setClauses.push(`lifecycle_changed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
+  }
   const writeToken = crypto.randomUUID();
   const publishedVersionId = nextPublished ? crypto.randomUUID() : null;
   const nextEvent = { ...exists, ...body } as Record<string, unknown>;
@@ -954,7 +1025,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
     await rebuildRemindersForEvent(c.env.DB, id);
   }
   const row = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(id).first();
-  return c.json(row);
+  return c.json(withFolder(row));
 });
 
 // Cancel all pending reminders for an event's confirmed bookings, then
@@ -1871,7 +1942,24 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     .bind(slot_id, event_id)
     .first<Record<string, unknown>>();
   if (!slot) return bad(c, 'not_found', 404);
-  const body = (await c.req.json().catch(() => ({}))) as SlotInput;
+  const body = (await c.req.json().catch(() => ({}))) as SlotInput & {
+    expected_version?: unknown;
+    expectedVersion?: unknown;
+  };
+  // m26g R577: 枠の並行編集・有効切替の競合検出（v6-29 §13「変更系は
+  // 期待版を必須にし、版競合は 409 で最新内容と差分を返す」）。
+  // 版なしの更新は受けず、古い版は 409 + 最新の枠を返す。画面は
+  // 読み直して差分を見せる。イベント本体 PUT と同じ決め。
+  const slotExpectedVersion = body.expected_version ?? body.expectedVersion;
+  if (!Number.isInteger(slotExpectedVersion) || (slotExpectedVersion as number) < 1) {
+    return bad(c, 'expected_version_required', 422);
+  }
+  if ((slot.version as number) !== slotExpectedVersion) {
+    // 古い画面からの操作は、枠時刻の通知作り直しなどの副作用を
+    // 走らせる前に止める。書き込み時の条件付き更新が最終の審判で、
+    // こちらは速やかな失敗のための事前確認。
+    return c.json({ error: 'version_conflict', data: { current: slot } }, 409);
+  }
   // when only one of starts_at / ends_at is provided, range check uses existing values
   const merged: SlotInput = {
     starts_at: body.starts_at ?? (slot.starts_at as string),
@@ -1984,11 +2072,21 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     }
   }
   setClauses.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
-  setValues.push(slot_id);
-  await c.env.DB
-    .prepare(`UPDATE event_slots SET ${setClauses.join(', ')} WHERE id = ?`)
+  setClauses.push(`version = version + 1`);
+  setValues.push(slot_id, slotExpectedVersion);
+  const slotUpdated = await c.env.DB
+    .prepare(`UPDATE event_slots SET ${setClauses.join(', ')} WHERE id = ? AND version = ? AND deleted_at IS NULL`)
     .bind(...setValues)
     .run();
+  if ((slotUpdated.meta?.changes ?? 0) === 0) {
+    const current = await c.env.DB.prepare(`SELECT * FROM event_slots WHERE id = ?`).bind(slot_id).first();
+    if (!current || (current as Record<string, unknown>).deleted_at != null) {
+      return bad(c, 'not_found', 404);
+    }
+    // 敗者に最新内容（差分のもと）を返す。画面は ApiError.data.current
+    // で読んで、一覧の読み直しと合わせて見せる。
+    return c.json({ error: 'version_conflict', data: { current } }, 409);
+  }
   if (slotStartsAtChanging) {
     // 旧表の作り直しは更新後の枠時刻を読むため、枠更新の後に行う。
     await rebuildRemindersForSlot(c.env.DB, slot_id);
@@ -2315,7 +2413,8 @@ events.post('/api/events/liff/bookings/:id/change', async (c) => {
                 reminder_day_before_enabled, reminder_hours_before,
                 entry_cutoff_hours_before
            FROM events
-          WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+          WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+            AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
             (target_type = 'single' AND line_account_id = ?)
             OR (target_type = 'multi-account-dedup'
                 AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -2495,7 +2594,8 @@ events.get('/api/liff/events/:id', async (c) => {
   const row = await c.env.DB
     .prepare(
       `SELECT * FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -2578,7 +2678,8 @@ events.get('/api/liff/events/:id/slots', async (c) => {
   const ev = await c.env.DB
     .prepare(
       `SELECT id FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -2819,7 +2920,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
               visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
               questions_json
          FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))

@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import {
   HQ_SUPPORT_KINDS,
   createHqSupportRequest,
+  findRecentDuplicateHqSupportRequest,
   getTenantBilling,
   getStaffById,
   listHqSupportRequests,
@@ -235,6 +236,35 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
       lineAccountName = accountLabel?.name ?? null;
     }
 
+    const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
+    const staffName = member?.name ?? staff?.name ?? '';
+
+    /*
+     * M028：確定応答を失った再送で重複チケットを作らない。
+     * 同じ人・同じ内容の直近の送信があれば、新しく作らず既存のものを返す。
+     * 作り直さないので、運営への知らせも送り直さない。R2 への置き場確保より前で見る。
+     */
+    const duplicate = await findRecentDuplicateHqSupportRequest(c.env.DB, {
+      tenantId,
+      staffId: staff?.id ?? null,
+      staffName,
+      kind: kind as HqSupportKind,
+      subject,
+      body: text,
+      lineAccountId,
+    });
+    if (duplicate) {
+      const base = workerUrl(c);
+      const messages = await listSupportMessages(c.env.DB, duplicate.id);
+      const replies = messages
+        .filter((m) => m.author_kind === 'ops')
+        .map((m) => ({ id: m.id, authorName: m.author_name, body: m.body, createdAt: m.created_at }));
+      return c.json({
+        success: true,
+        data: { ...serialize(duplicate, base, replies), notified: duplicate.notified_at !== null },
+      }, 200);
+    }
+
     const parsed = parseAttachments(body.attachments);
     if ('error' in parsed) return c.json({ success: false, error: parsed.error }, parsed.status);
     const uploads = parsed.uploads;
@@ -242,9 +272,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
       await c.env.IMAGES.put(upload.key, upload.bytes, { httpMetadata: { contentType: upload.mimeType } });
     }
 
-    const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
     const tenant = await c.env.DB.prepare('SELECT name FROM tenants WHERE id = ?').bind(tenantId).first<{ name: string }>().catch(() => null);
-    const staffName = member?.name ?? staff?.name ?? '';
     const staffEmail = member?.email ?? null;
 
     const request = await createHqSupportRequest(c.env.DB, {

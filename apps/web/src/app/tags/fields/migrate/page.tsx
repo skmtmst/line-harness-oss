@@ -16,10 +16,11 @@ import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { ApiError, api } from '@/lib/api'
+import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import { formatDateTime } from '@/lib/format'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 
@@ -38,14 +39,14 @@ const RUN_RUNNING = new Set<FriendFieldMigrationRun['status']>(['previewed', 'qu
 
 function FieldSummary({ title, field, kind }: { title: string; field: FriendField; kind: 'source' | 'target' }) {
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+    <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
       <p className="text-xs font-semibold text-ink-faint">{title}</p>
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-ink">{field.name}</h2>
           <p className="mt-1 font-mono text-xs text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
         </div>
-        <span className={kind === 'source' ? 'rounded-full bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep'}>
+        <span className={kind === 'source' ? 'rounded-pill bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep'}>
           {FIELD_TYPE_LABELS[field.type]}
         </span>
       </div>
@@ -70,6 +71,13 @@ function MigrateFriendField() {
   /** 実行は確認と同じ証票で1回だけ。確認が成立した時点で発行する。 */
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null)
   const [run, setRun] = useState<FriendFieldMigrationRun | null>(null)
+  /*
+   * R548: 実行POSTを受け付けたrun。結果がまだ無くても「移行を実行する」
+   * には戻さない（同じ実行の再取得・再開で続ける）。
+   */
+  const [executedRunId, setExecutedRunId] = useState<string | null>(null)
+  /** 結果の取得に失敗・停滞したときの説明。再取得・再開の入口と一緒に出す。 */
+  const [pollProblem, setPollProblem] = useState('')
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
   const [executing, setExecuting] = useState(false)
@@ -134,12 +142,24 @@ function MigrateFriendField() {
     選択をすべて捨てる。前のアカウントの実行状況が残ると、いまの
     アカウントで起きていない移行が「完了」と見える。
   */
+  /*
+   * R519: 同じ移行先の作り直しは同じ要求キーで送る。入力を変えたら
+   * 新しいキーにする（同じキーに異なる内容はサーバが409で止める）。
+   */
+  const createKeyRef = useRef<string>(crypto.randomUUID())
+  useEffect(() => {
+    createKeyRef.current = crypto.randomUUID()
+  }, [targetName, targetKey, targetType])
+
   useEffect(() => {
     gateRef.current.invalidate()
     setPreview(null)
     setIdempotencyKey(null)
     setRun(null)
+    setExecutedRunId(null)
+    setPollProblem('')
     setCreatedTarget(null)
+    createKeyRef.current = crypto.randomUUID()
     /*
       TECH-07: 飛んでいる確認・実行を捨てたら、ボタンの「確認中…
       実行中…」も捨てる。世代を止めてもフラグが残ると、
@@ -163,27 +183,69 @@ function MigrateFriendField() {
     setPreview(null)
     setIdempotencyKey(null)
     setRun(null)
+    setExecutedRunId(null)
+    setPollProblem('')
+  }
+
+  /*
+   * R519: 移行先を作るか、作り済みを取り直す。
+   *
+   * 応答だけ失った再試行は同じ要求キーで送るため、サーバは保存済みを
+   * 返す。要求キーが変わった後の差し込み名の重複では、作成済みを
+   * 取り直して比べる。同一内容ならその移行先で事前確認を続け、
+   * 異なる内容なら衝突として説明する。
+   */
+  const createTargetOrRecover = async (account: string, token: number): Promise<FriendField | null> => {
+    if (!source) return null
+    const params = {
+      name: targetName.trim() || `${source.name}（新）`,
+      fieldKey: targetKey.trim() || `${source.fieldKey}_new`.slice(0, 32),
+      type: targetType,
+    }
+    try {
+      const created = await api.friendFields.create(account, params, createKeyRef.current)
+      if (!created.success) throw new Error(created.error)
+      if (!gateRef.current.current(token) || accountRef.current !== account) return null
+      setCreatedTarget(created.data)
+      setFields((current) => (current.some((item) => item.id === created.data.id) ? current : [...current, created.data]))
+      return created.data
+    } catch (reason) {
+      try {
+        const res = await api.friendFields.list(account)
+        if (res.success) {
+          const existing = res.data.find((item) => item.fieldKey === params.fieldKey) ?? null
+          if (existing && existing.name === params.name && existing.type === params.type) {
+            if (!gateRef.current.current(token) || accountRef.current !== account) return null
+            setCreatedTarget(existing)
+            setFields((current) => (current.some((item) => item.id === existing.id) ? current : [...current, existing]))
+            return existing
+          }
+        }
+      } catch { /* 取り直せないときは下の説明へ */ }
+      if (!gateRef.current.current(token) || accountRef.current !== account) return null
+      const status = (reason as { status?: number } | null)?.status
+      if (status === 409) {
+        setError(`同じ差し込み名「${params.fieldKey}」の別の項目があります。一覧を確認してください`)
+      } else {
+        setError(describeSaveFailure(reason))
+      }
+      return null
+    }
   }
 
   const runPreview = async () => {
     if (!source || !selectedAccountId || checking) return
     setChecking(true); setError(''); setPreview(null); setRun(null)
+    // 確認のやり直しは新しい出発にする。実行中の見守りは捨てる。
+    setExecutedRunId(null); setPollProblem('')
     const token = gateRef.current.begin()
     const account = selectedAccountId
     try {
       let targetField = target
       // 新規モードでは、実行できる確認（期限付き証票）に項目の実体が要るので先に作る。
       if (!targetField && targetMode === 'new') {
-        const created = await api.friendFields.create(account, {
-          name: targetName.trim() || `${source.name}（新）`,
-          fieldKey: targetKey.trim() || `${source.fieldKey}_new`.slice(0, 32),
-          type: targetType,
-        })
-        if (!created.success) throw new Error(created.error)
-        targetField = created.data
-        if (!gateRef.current.current(token) || accountRef.current !== account) return
-        setCreatedTarget(created.data)
-        setFields((current) => [...current, created.data])
+        targetField = await createTargetOrRecover(account, token)
+        if (!targetField) return
       }
       if (!targetField) {
         setError('移行先の項目を選んでください')
@@ -202,6 +264,11 @@ function MigrateFriendField() {
     }
   }
 
+  /*
+   * R548: 結果の取得失敗は黙殺しない。実行そのものは壊さないが、
+   * 失敗をはっきり出し、同じrunの再取得・再開へつなげる。
+   * R547: 上限で止まったまま「実行中」にしない。理由と入口を出す。
+   */
   const pollRun = (runId: string, account: string, token: number, attempt: number) => {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     pollTimerRef.current = setTimeout(() => {
@@ -210,28 +277,78 @@ function MigrateFriendField() {
           if (!gateRef.current.current(token) || accountRef.current !== account) return
           if (res.success) {
             setRun(res.data)
-            if (RUN_RUNNING.has(res.data.status) && attempt < 20) {
-              pollRun(runId, account, token, attempt + 1)
+            if (RUN_RUNNING.has(res.data.status)) {
+              if (attempt < 20) {
+                pollRun(runId, account, token, attempt + 1)
+              } else {
+                setPollProblem('まだ実行中です。結果の再取得か、止まっている場合の再開ができます。')
+              }
+            } else {
+              setPollProblem('')
             }
           }
         })
-        .catch(() => { /* 状況確認の失敗は実行そのものを壊さない */ })
+        .catch(() => {
+          if (!gateRef.current.current(token) || accountRef.current !== account) return
+          setPollProblem('移行の結果を確認できませんでした。通信を確かめて、結果を確認し直してください。')
+        })
     }, attempt === 0 ? 0 : 2000)
   }
 
   const execute = async () => {
     if (!source || !selectedAccountId || !preview?.previewToken || !idempotencyKey || executing) return
-    setExecuting(true); setError('')
+    setExecuting(true); setError(''); setPollProblem('')
     const token = gateRef.current.begin()
     const account = selectedAccountId
     try {
       const res = await api.friendFields.migrationExecute(source.id, account, preview.previewToken, idempotencyKey)
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       if (!res.success) throw new Error(res.error)
+      setExecutedRunId(res.data.runId)
       pollRun(res.data.runId, account, token, 0)
     } catch (reason) {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。')
+    } finally {
+      if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
+    }
+  }
+
+  /** R548: 同じrunの結果を取り直す。完了していれば結果へ戻れる。 */
+  const refetchRun = () => {
+    if (!selectedAccountId || !executedRunId || executing) return
+    setPollProblem('')
+    pollRun(executedRunId, selectedAccountId, gateRef.current.begin(), 0)
+  }
+
+  /*
+   * R547: 止まった実行を続きから再開する。新しい要求キーで送るため、
+   * サーバは受け付け済みの実行を再開する（D036）。終わっている実行の
+   * 再開は409になるので、そのときは結果を取り直して見せる。
+   */
+  const resume = async () => {
+    if (!source || !selectedAccountId || !preview?.previewToken || !executedRunId || executing) return
+    setExecuting(true); setError(''); setPollProblem('')
+    const token = gateRef.current.begin()
+    const account = selectedAccountId
+    try {
+      const res = await api.friendFields.migrationExecute(source.id, account, preview.previewToken, crypto.randomUUID())
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
+      if (!res.success) throw new Error(res.error)
+      setExecutedRunId(res.data.runId)
+      pollRun(res.data.runId, account, token, 0)
+    } catch (reason) {
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
+      try {
+        const current = await api.friendFields.migrationRun(executedRunId, account)
+        if (!gateRef.current.current(token) || accountRef.current !== account) return
+        if (current.success) {
+          setRun(current.data)
+          setPollProblem('')
+          return
+        }
+      } catch { /* 下の説明へ */ }
+      setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。')
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
     }
@@ -296,6 +413,13 @@ function MigrateFriendField() {
 
   const confirmed = Boolean(preview?.previewToken)
   const running = executing || (run ? RUN_RUNNING.has(run.status) : false)
+  /*
+   * R547・R548: 取得の失敗・停滞で人の手が必要なときだけ、同じrunの
+   * 再取得・再開を出す。見守りの最中は何も出さない。
+   */
+  const needsPollAction = executedRunId !== null && !executing && pollProblem !== ''
+    && (!run || RUN_RUNNING.has(run.status))
+  const pollAttention = pollProblem !== '' && (!run || RUN_RUNNING.has(run.status))
 
   return (
     <div data-design-node="KoT6c" className="flex flex-col gap-4">
@@ -322,7 +446,7 @@ function MigrateFriendField() {
           <span className="xl:hidden">↓</span>
           <span className="hidden xl:block">→</span>
         </div>
-        <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-sm">
+        <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-card">
           <p className="text-xs font-semibold text-ink-secondary">移行先の項目</p>
           {target ? (
             <div className="mt-3">
@@ -382,20 +506,20 @@ function MigrateFriendField() {
         </section>
       </div>
 
-      <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-base font-bold text-ink">値を変換できるか事前確認</h2><p className="mt-1 text-sm text-ink-secondary">登録済みの値を読み取り、移行できる数だけを確認します。</p></div>
-          <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (!target && targetMode === 'existing' && !existingTargetId)}>
-            {checking ? '確認しています…' : targetMode === 'new' && !createdTarget ? '項目を作成して事前確認' : '事前確認する'}
+          <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (executedRunId !== null && run === null) || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
+            {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
           </Button>
         </div>
         {preview ? (
           <div className="mt-5">
             <div className="grid gap-3 sm:grid-cols-4">
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.total}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.convertible}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-bold text-warning">{preview.summary.review}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-bold text-danger">{preview.summary.invalid}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-semibold text-ink">{preview.summary.total}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-semibold text-ink">{preview.summary.convertible}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-semibold text-warning">{preview.summary.review}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-semibold text-danger">{preview.summary.invalid}人</p></div>
             </div>
             {preview.rows.length ? (
               <DataTable className="mt-4">
@@ -407,7 +531,7 @@ function MigrateFriendField() {
         ) : <p className="mt-4 text-sm text-ink-faint">まだ事前確認していません。未取得を0人として表示しません。</p>}
       </section>
 
-      <section data-design="Usage" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Usage" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <h2 className="text-base font-bold text-ink">切り替わる使用先</h2>
         {preview ? preview.usageTargets.length > 0 ? (
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
@@ -415,17 +539,29 @@ function MigrateFriendField() {
           </div>
         ) : <Notice tone="success" className="mt-3">切り替えが必要な使用先はありません。</Notice>
           : <p className="mt-3 text-sm text-ink-faint">事前確認すると、回答フォームや自動処理などの使用先を表示します。</p>}
-        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{new Date(preview.previewExpiresAt).toLocaleString('ja-JP')}</p> : null}
+        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{formatDateTime(preview.previewExpiresAt)}</p> : null}
       </section>
 
+      {/*
+        R548: 実行を受け付けたのに結果がまだ無い間は、黙らせずに
+        「未確認」と出し、同じrunの再取得・再開へつなげる。
+        「移行を実行する」には戻さない。
+      */}
+      {!run && executedRunId ? (
+        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5" aria-live="polite">
+          <h2 className="text-base font-bold text-ink">移行の結果</h2>
+          <p className="mt-2 text-sm text-ink">{pollProblem || '実行を受け付けました。結果を確認しています…'}</p>
+        </section>
+      ) : null}
+
       {run ? (
-        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-live="polite">
+        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-live="polite">
           <h2 className="text-base font-bold text-ink">移行の結果</h2>
           <p className="mt-2 text-sm font-semibold text-ink">{RUN_STATUS_LABELS[run.status]}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-bold text-accent-deep">{run.summary.succeeded}人</p></div>
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-bold text-danger">{run.summary.failed}人</p></div>
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-bold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-semibold text-accent-deep">{run.summary.succeeded}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-semibold text-danger">{run.summary.failed}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-semibold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
           </div>
           {run.rows.filter((row) => row.status === 'failed').length ? (
             <DataTable className="mt-4">
@@ -441,27 +577,34 @@ function MigrateFriendField() {
           */}
           {run.rollbackDeadline ? (
             <p className="mt-3 text-xs leading-5 text-ink-faint">
-              元の項目の値は {new Date(run.rollbackDeadline).toLocaleString('ja-JP')} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。
+              元の項目の値は {formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。
             </p>
           ) : null}
         </section>
       ) : null}
 
       <StickyBar
-        status={run ? RUN_STATUS_LABELS[run.status] : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : 'まだ事前確認していません'}
+        status={pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : 'まだ事前確認していません'}
         actions={<>
-          <Button href="/tags?tab=fields">移行をやめる</Button>
-          {confirmed && !run ? (
+          <Button href="/tags?tab=fields">キャンセル</Button>
+          {confirmed && !executedRunId ? (
             <Button type="button" onClick={() => void runPreview()} disabled={checking || running}>確認をやり直す</Button>
           ) : null}
-          {confirmed && !run ? (
-            <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running}>
-              {running ? '実行中…' : '移行を実行する'}
+          {confirmed && !executedRunId ? (
+            <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running} busy={running} busyLabel="実行中…">移行を実行する
+            </Button>
+          ) : null}
+          {needsPollAction ? (
+            <Button type="button" onClick={() => void refetchRun()} disabled={executing}>結果を確認する</Button>
+          ) : null}
+          {needsPollAction ? (
+            <Button variant="primary" type="button" onClick={() => void resume()} disabled={executing}>
+              {executing ? '再開中…' : '続きから再開する'}
             </Button>
           ) : null}
           {!confirmed ? (
-            <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)}>
-              {checking ? '確認しています…' : targetMode === 'new' && !createdTarget ? '項目を作成して事前確認' : '事前確認する'}
+            <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
+              {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
             </Button>
           ) : null}
         </>}

@@ -18,6 +18,7 @@ import Chip from '@/components/shared/chip'
 import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -30,6 +31,7 @@ import {
   type Automation as SharedAutomation,
   type AutomationEventType,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -289,6 +291,8 @@ export default function AutomationsPage() {
   const viewerOnly = canManageAutomations === false
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [error, setError] = useState('')
   /*
    * **ブラウザの `confirm()` を使わない。**
@@ -326,6 +330,7 @@ export default function AutomationsPage() {
   const loadAutomations = useCallback(async () => {
     const requestId = ++loadRequestRef.current
     setLoadStatus('loading')
+    setLoadError(null)
     setError('')
     try {
       const [res, templatesResponse, commonActionsResponse] = await Promise.all([
@@ -354,9 +359,10 @@ export default function AutomationsPage() {
       }
       setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
       setCommonActionCount(commonActionsResponse?.success ? commonActionsResponse.data.length : null)
-    } catch {
+    } catch (caught) {
       if (requestId !== loadRequestRef.current) return
       setAutomations([])
+      setLoadError(caught)
       setLoadStatus('error')
       setAutomaticRuns(null)
       setFailedRuns(null)
@@ -706,8 +712,11 @@ export default function AutomationsPage() {
         <ListState
           kind="error"
           title="オートメーションを表示できませんでした"
-          description="登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。"
-          action={<Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は画面の文のまま。403は押しても直らないので再試行の口も出さない。
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。'}
+          error={loadError ?? undefined}
+          action={isForbiddenOrRateLimited(loadError) ? undefined : <Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
         />
       ) : visibleAutomations.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border">
@@ -721,7 +730,7 @@ export default function AutomationsPage() {
           />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
           </div>
@@ -734,7 +743,7 @@ export default function AutomationsPage() {
               <p className="truncate text-ink-secondary" title={conditionLabel(automation.conditions)}>{conditionLabel(automation.conditions)}</p>
               <p className="truncate text-ink-secondary" title={automation.actions.map((action) => automationActionLabel(action.type)).join('、')}>{automation.actions.map((action) => automationActionLabel(action.type)).join('、') || '処理なし'}</p>
               <div>
-                <span className="text-ink tabular-nums">{automation.executionCount30d.toLocaleString('ja-JP')}回</span>
+                <span className="text-ink tabular-nums">{formatNumber(automation.executionCount30d)}回</span>
                 {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
               </div>
               {/* #670 25: 状態は他画面と同じ札(Chip)で出す。素テキストだと列の中で浮く。 */}

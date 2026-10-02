@@ -16,6 +16,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { TextField } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
 import {
   ROLE_LABELS,
@@ -69,16 +70,23 @@ function MembersInner() {
     setStatus('loading')
     setActionError('')
     try {
-      const [staffRes, accountRes, meRes, loginRes] = await Promise.all([
+      // M025: 範囲限定の担当者に一覧は出さない（口も403で断る）。
+      // 先に自分を読んで理由の分かる面を出し、通らない一覧は呼ばない。
+      const meRes = await api.staff.me()
+      if (!meRes.success) throw new Error(meRes.error)
+      setMe(meRes.data)
+      if (meRes.data.accountScope === 'accounts') {
+        setStatus('ready')
+        return
+      }
+      const [staffRes, accountRes, loginRes] = await Promise.all([
         api.staff.list(),
         api.lineAccounts.list(),
-        api.staff.me(),
         api.staff.lastLogins().catch(() => null),
       ])
       if (!staffRes.success) throw new Error(staffRes.error)
       setMembers(staffRes.data)
       if (accountRes.success) setAccounts(accountRes.data)
-      if (meRes.success) setMe(meRes.data)
       if (loginRes?.success) setLastLogins(loginRes.data)
       setStatus('ready')
     } catch (caught) {
@@ -130,7 +138,10 @@ function MembersInner() {
         setStepUp({ retry: (token) => submitDialog(value, token) })
         return
       }
-      setDialogError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
+      // M026：原文のまま出さず、共通の状態別案内へ渡す（本人確認の分岐は先に残す）。
+      setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
+        forbidden: '権限者の招待・変更はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+      }))
     } finally {
       setDialogBusy(false)
     }
@@ -145,7 +156,10 @@ function MembersInner() {
       if (!res.success) throw new Error(res.error)
       setNotice(`${member.email} へ招待メールを送り直しました。`)
     } catch (caught) {
-      setActionError(caught instanceof Error && caught.message ? caught.message : '招待メールを送り直せませんでした。')
+      // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
+      setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
+        forbidden: '招待メールの再送はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+      }))
     } finally {
       setResendingId(null)
     }
@@ -221,8 +235,8 @@ function MembersInner() {
                           aria-hidden="true"
                           className={
                             isSelf
-                              ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-bold text-on-accent'
-                              : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep'
+                              ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-medium text-on-accent'
+                              : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep'
                           }
                         >
                           {(member.name || '?').slice(0, 1).toUpperCase()}
@@ -236,8 +250,8 @@ function MembersInner() {
                         <span
                           className={
                             member.role === 'owner' || member.role === 'admin'
-                              ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                              : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-secondary'
+                              ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                              : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-medium text-ink-secondary'
                           }
                         >
                           {ROLE_LABELS[member.role]}
@@ -245,12 +259,12 @@ function MembersInner() {
                         <span
                           className={
                             state === 'active'
-                              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                               : state === 'invited'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
                                 : state === 'expired'
-                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger'
-                                  : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger'
+                                  : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-medium text-ink-secondary'
                           }
                         >
                           {STATUS_LABELS[state]}
@@ -316,8 +330,8 @@ function MembersInner() {
                               aria-hidden="true"
                               className={
                                 isSelf
-                                  ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-bold text-on-accent'
-                                  : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep'
+                                  ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-medium text-on-accent'
+                                  : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep'
                               }
                             >
                               {(member.name || '?').slice(0, 1).toUpperCase()}
@@ -333,8 +347,8 @@ function MembersInner() {
                           <span
                             className={
                               member.role === 'owner' || member.role === 'admin'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                                : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-secondary'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                                : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-medium text-ink-secondary'
                             }
                           >
                             {ROLE_LABELS[member.role]}
@@ -345,12 +359,12 @@ function MembersInner() {
                           <span
                             className={
                               state === 'active'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                                 : state === 'invited'
-                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
                                   : state === 'expired'
-                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger'
-                                    : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger'
+                                    : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-medium text-ink-secondary'
                             }
                           >
                             {STATUS_LABELS[state]}
@@ -454,7 +468,10 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
       setName(response.data.name ?? trimmed)
       setSaved(true)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '統括名を保存できませんでした。')
+      // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
+        forbidden: '統括名の変更は管理者だけができます。必要なときは管理者の方に操作してもらってください。',
+      }))
     } finally {
       setSaving(false)
     }
@@ -465,7 +482,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
       <NoteBar tone="info" help="統括名は統括コンソールとメールの差出人に使われます" helpLabel="統括名の意味">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
       <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="tenant-name" className="text-label font-bold text-ink">統括名</label>
+          <label htmlFor="tenant-name" className="text-label font-medium text-ink">統括名</label>
           <p className="text-micro text-ink-faint">100文字以内で入力してください。</p>
           <TextField
             id="tenant-name"
@@ -483,8 +500,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
         <StickyBar
           status={canEdit ? undefined : '統括名の変更は管理者だけができます'}
           actions={
-            <Button variant="primary" onClick={() => void save()} disabled={loading || saving || !canEdit}>
-              {saving ? '保存中…' : '統括名を保存'}
+            <Button variant="primary" onClick={() => void save()} disabled={loading || saving || !canEdit} busy={saving}>統括名を保存する
             </Button>
           }
         />

@@ -12,7 +12,7 @@ type BoundaryAccount = {
   tenant_id: string | null;
 };
 
-type FeaturePack = 'restaurant';
+export type FeaturePack = 'restaurant';
 type TenantStatus = 'active' | 'suspended' | 'archived';
 
 type TenantRow = {
@@ -24,10 +24,10 @@ type TenantRow = {
   updated_at: string;
 };
 
-const ALLOWED_FEATURE_PACKS = new Set<FeaturePack>(['restaurant']);
+export const ALLOWED_FEATURE_PACKS = new Set<FeaturePack>(['restaurant']);
 const ALLOWED_TENANT_STATUSES = new Set<TenantStatus>(['active', 'suspended', 'archived']);
 
-function parseFeaturePacks(value: unknown): FeaturePack[] | null {
+export function parseFeaturePacks(value: unknown): FeaturePack[] | null {
   if (value === undefined) return [];
   if (!Array.isArray(value)) return null;
   if (!value.every((pack): pack is FeaturePack => (

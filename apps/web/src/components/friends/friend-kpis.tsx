@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import KpiCard from '@/components/shared/kpi-card'
+import kpiStyles from '@/components/shared/kpi-card.module.css'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 /** Pencil ★V6（`zZMNG`）の上部カード。数え方は既存APIのままにする。 */
 export default function FriendKpis() {
@@ -55,7 +57,7 @@ export default function FriendKpis() {
       title: '有効友だち',
       value: stats?.active ?? null,
       unit: '人',
-      detail: stats ? `総友だち ${stats.total.toLocaleString('ja-JP')}人` : '—',
+      detail: stats ? `総友だち ${formatNumber(stats.total)}人` : '—',
       badge: stats?.total ? `${Math.round((stats.active / stats.total) * 100)}%` : undefined,
     },
     {
@@ -104,9 +106,14 @@ export default function FriendKpis() {
           友だち集計を読み込めませんでした。
         </Notice>
       ) : null}
+      {/*
+        ★V8（夕10・夕11）：一覧型では枠線付きのカードのまま（数の帯は
+        分析型だけ）。v7 はこれまでの詰めた形（cardV6Tight）、v8 は
+        cardV6 の実寸（16/20・間8・高122）を使う。
+      */}
       <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {cards.map((card) => (
-          <KpiCard key={card.title} {...card} loading={loading} variant="v6" className="!min-h-25 !gap-1 !px-4 !py-3.5" />
+          <KpiCard key={card.title} {...card} loading={loading} variant="v6" className={kpiStyles.cardV6Tight} />
         ))}
       </div>
     </div>

@@ -25,7 +25,9 @@ import TargetMissing from '@/components/shared/target-missing'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 契約先アカウント詳細。★V6 37-4 `vhwld`。第 1 段は 概要／店舗／権限者／監査 のタブ。
@@ -76,6 +78,25 @@ function OpsTenantDetailContent() {
     setBusy(false)
     if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
     window.location.assign('/hq')
+  }
+
+  /*
+   * 飲食店機能（restaurant-test）のマスタートグル。破壊的操作ではないため、
+   * 停止・アーカイブと違い確認ダイアログや理由入力は求めず即時反映する。
+   * オフにすると、この統括の各LINEアカウントの自己設定も強制的にオフになる。
+   */
+  const toggleRestaurantFeature = async (next: boolean) => {
+    if (!detail || busy) return
+    const current = detail.tenant.featurePacks
+    const featurePacks = next
+      ? [...new Set([...current, 'restaurant'])]
+      : current.filter((pack) => pack !== 'restaurant')
+    setBusy(true)
+    const res = await opsCall(api.ops.setTenantFeaturePacks(detail.tenant.id, featurePacks))
+    setBusy(false)
+    if (!res.success) { setError(res.error || '機能パックを変更できませんでした'); return }
+    setError('')
+    await load()
   }
 
   /*
@@ -150,7 +171,21 @@ function OpsTenantDetailContent() {
               <Kv k="店舗数" v={String(accounts.filter((a) => !a.archived_at).length)} />
               <Kv k="権限者数" v={String(members.filter((m) => m.is_active).length)} />
               <Kv k="最終ログイン" v={formatDateTime(tenant.last_login_at)} />
-              <Kv k="機能パック" v={tenant.featurePacks.length ? tenant.featurePacks.join('・') : '—'} />
+              <Kv
+                k="機能パック"
+                v={(
+                  <div className="flex items-center gap-2.5">
+                    <Toggle
+                      checked={tenant.featurePacks.includes('restaurant')}
+                      label={`飲食店機能を${tenant.featurePacks.includes('restaurant') ? 'オフ' : 'オン'}にする`}
+                      onChange={(next) => void toggleRestaurantFeature(next)}
+                    />
+                    <span className="text-caption text-ink-secondary">
+                      飲食店機能（予約台帳・座席管理・メニュー管理など9画面）
+                    </span>
+                  </div>
+                )}
+              />
             </dl>
           </Card>
           <Card>
@@ -180,8 +215,8 @@ function OpsTenantDetailContent() {
             <tbody>
               {accounts.map((a) => (
                 <Tr key={a.id}>
-                  <Td><span className="block truncate text-label font-bold text-ink" title={a.name}>{a.name}</span></Td>
-                  <Td align="right"><span className="text-label text-ink">{a.friend_count.toLocaleString()}</span></Td>
+                  <Td><span className="block truncate text-label font-medium text-ink" title={a.name}>{a.name}</span></Td>
+                  <Td align="right"><span className="text-label text-ink">{formatNumber(a.friend_count)}</span></Td>
                   <Td>{a.archived_at ? <Chip tone="neutral">アーカイブ</Chip> : a.is_active ? <Chip tone="ok">接続中</Chip> : <Chip tone="danger">停止</Chip>}</Td>
                   <Td><span className="text-caption text-ink-secondary">{formatDateTime(a.updated_at)}</span></Td>
                 </Tr>
@@ -206,7 +241,7 @@ function OpsTenantDetailContent() {
             <tbody>
               {members.map((m) => (
                 <Tr key={m.id}>
-                  <Td><span className="block truncate text-label font-bold text-ink" title={m.name}>{m.name}</span></Td>
+                  <Td><span className="block truncate text-label font-medium text-ink" title={m.name}>{m.name}</span></Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={m.email ?? ''}>{m.email ?? '—'}</span></Td>
                   <Td><span className="text-caption text-ink-secondary">{ROLE_LABEL[m.role] ?? m.role}{m.access_level === 'read_only' ? '（閲覧）' : ''}</span></Td>
                   <Td>{m.is_active ? <Chip tone="ok">有効</Chip> : <Chip tone="neutral">停止</Chip>}</Td>
@@ -234,7 +269,7 @@ function OpsTenantDetailContent() {
               {audit.map((row) => (
                 <Tr key={row.id}>
                   <Td><span className="text-caption text-ink-secondary">{formatDateTime(row.created_at)}</span></Td>
-                  <Td><span className="block truncate text-caption font-bold text-ink">{row.staff_name}</span></Td>
+                  <Td><span className="block truncate text-caption font-medium text-ink">{row.staff_name}</span></Td>
                   <Td>{auditActionChip(row.action)}</Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={row.reason ?? ''}>{row.reason ?? '—'}</span></Td>
                   <Td><span className="text-caption text-ink-faint">{row.visible_to_tenant ? '表示する' : '運営のみ'}</span></Td>
@@ -317,12 +352,12 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       <div className="flex flex-col gap-4">
         {needsName ? (
           <label className="block">
-            <span className="mb-1.5 block text-caption font-bold text-ink">確認のため、契約先の名前をそのまま入力</span>
+            <span className="mb-1.5 block text-caption font-medium text-ink">確認のため、契約先の名前をそのまま入力</span>
             <TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} />
           </label>
         ) : null}
         <label className="block">
-          <span className="mb-1.5 block text-caption font-bold text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
+          <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
           <TextArea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} />
         </label>
       </div>
