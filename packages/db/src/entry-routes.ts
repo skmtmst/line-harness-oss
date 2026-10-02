@@ -92,6 +92,9 @@ export interface EntryRouteFunnel {
   friend_add_count: number;
   form_submission_count: number;
   cv_count: number;
+  remainingCount: number;
+  blockedCount: number;
+  conversionValueSum: number;
 }
 
 export async function getEntryRoutes(db: D1Database, tenantId: string): Promise<EntryRoute[]> {
@@ -327,24 +330,29 @@ export async function getEntryRouteFunnel(
 ): Promise<EntryRouteFunnel> {
   const row = await db
     .prepare(
-      `WITH first_touch AS (
-         SELECT f.id AS friend_id
+      `WITH route AS (SELECT id, ref_code FROM entry_routes WHERE id = ?),
+       first_touch AS (
+         SELECT f.id AS friend_id, f.is_following
          FROM friends f
-         INNER JOIN entry_routes er ON er.ref_code = f.ref_code
-         WHERE er.id = ?1
+         INNER JOIN route er ON er.ref_code = f.ref_code
        )
        SELECT
-         (SELECT COUNT(*) FROM ref_tracking WHERE entry_route_id = ?1) AS click_count,
+         (SELECT COUNT(*) FROM ref_tracking WHERE entry_route_id IN (SELECT id FROM route)) AS click_count,
          (SELECT COUNT(*) FROM first_touch) AS friend_add_count,
          (SELECT COUNT(*) FROM form_submissions
             WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS form_submission_count,
          (SELECT COUNT(*) FROM conversion_events
-            WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS cv_count`,
+            WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS cv_count,
+         (SELECT COUNT(*) FROM first_touch WHERE is_following = 1) AS remainingCount,
+         (SELECT COUNT(*) FROM first_touch WHERE is_following = 0) AS blockedCount,
+         (SELECT COALESCE(SUM(COALESCE(ce.value_snapshot, cp.value, 0)), 0) FROM conversion_events ce
+            JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+            WHERE ce.friend_id IN (SELECT friend_id FROM first_touch)) AS conversionValueSum`,
     )
     .bind(entryRouteId)
     .first<EntryRouteFunnel>();
   return (
-    row ?? { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0 }
+    row ?? { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0, remainingCount: 0, blockedCount: 0, conversionValueSum: 0 }
   );
 }
 

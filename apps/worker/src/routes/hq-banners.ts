@@ -702,9 +702,14 @@ hqBanners.post('/api/hq/banners/generations/:id/cancel', async (c) => {
 hqBanners.get('/api/hq/banners/images', async (c) => {
   try {
     const tenantId = tenantOf(c);
+    const delivered = c.req.query('delivered');
+    if (delivered !== undefined && delivered !== '1' && delivered !== '0') {
+      return c.json({ success: false, error: 'delivered は 1 または 0 を指定してください' }, 400);
+    }
     const limitRaw = Number(c.req.query('limit') ?? '30');
     const items = await listBannerImages(c.env.DB, {
       tenantId,
+      delivered: delivered === undefined ? undefined : delivered === '1',
       projectId: c.req.query('projectId')?.trim() || undefined,
       favoriteOnly: c.req.query('favorite') === '1',
       presetKey: c.req.query('preset')?.trim() || undefined,
